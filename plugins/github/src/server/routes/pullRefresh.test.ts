@@ -52,11 +52,18 @@ describe('shared pull refresh operations', () => {
   let tasks: ReturnType<typeof createTaskService>
   let blobs: Map<string, string>
 
-  beforeEach(() => {
+  beforeEach(async () => {
     core = makeTestDb()
     plugin = makeTestPluginDb('github', migrationsDir())
     tasks = createTaskService(core.db)
     blobs = new Map()
+    const now = Date.now()
+    await core.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await core.db.insert(schema.projects).values({
+      id: 'project-web', name: 'web', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/web.git', githubOwner: 'acme', githubName: 'web', githubRepoId: REPO_ID,
+      createdAt: now, updatedAt: now,
+    })
   })
   afterEach(() => {
     plugin.cleanup()
@@ -99,8 +106,7 @@ describe('shared pull refresh operations', () => {
       id: 'task-1',
       title: 'Feature',
       origin: 'local',
-      repoOwner: 'acme',
-      repoName: 'web',
+      projectId: 'project-web',
       branch: 'feature',
       status: 'active',
       createdAt: 1,
@@ -134,8 +140,7 @@ describe('shared pull refresh operations', () => {
       id: 'task-1',
       title: 'Feature',
       origin: 'local',
-      repoOwner: 'acme',
-      repoName: 'web',
+      projectId: 'project-web',
       branch: 'feature',
       status: 'active',
       createdAt: 1,
@@ -157,9 +162,9 @@ describe('shared pull refresh operations', () => {
   // one or from a branch nobody is on.
   it('re-adopting is idempotent and never overwrites a task that already has a PR', async () => {
     await core.db.insert(schema.tasks).values([
-      { id: 'task-adopt', title: 'Adopt me', origin: 'local', repoOwner: 'acme', repoName: 'web', branch: 'feature', status: 'active', createdAt: 1, updatedAt: 1 },
-      { id: 'task-taken', title: 'Already has one', origin: 'local', repoOwner: 'acme', repoName: 'web', branch: 'feature', pullNumber: 99, status: 'active', createdAt: 1, updatedAt: 1 },
-      { id: 'task-other', title: 'Different branch', origin: 'local', repoOwner: 'acme', repoName: 'web', branch: 'other', status: 'active', createdAt: 1, updatedAt: 1 },
+      { id: 'task-adopt', title: 'Adopt me', origin: 'local', projectId: 'project-web', branch: 'feature', status: 'active', createdAt: 1, updatedAt: 1 },
+      { id: 'task-taken', title: 'Already has one', origin: 'local', projectId: 'project-web', branch: 'feature', pullNumber: 99, status: 'active', createdAt: 1, updatedAt: 1 },
+      { id: 'task-other', title: 'Different branch', origin: 'local', projectId: 'project-web', branch: 'other', status: 'active', createdAt: 1, updatedAt: 1 },
     ])
     const fetcher = vi.fn(async () =>
       json(

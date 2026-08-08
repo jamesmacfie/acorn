@@ -35,8 +35,7 @@ export type IntegrationsResponse = { providers: PublicIntegrationProvider[]; int
 export type ConnectIntegrationRequest = { providerId: IntegrationProvider; credentials: Record<string, string> }
 export type RotateIntegrationRequest = { credentials: Record<string, string> }
 
-// --- Workspaces: named groups of repos (docs/workspaces-and-tasks.md). The top-level unit. ---
-export type WorkspaceRepo = { owner: string; name: string; sort: number }
+// --- Workspaces: named groups of Projects (docs/workspaces-and-tasks.md). The top-level unit. ---
 // When the worktree setup script runs: 'off' never, 'created' eagerly when the task is created,
 // 'terminal' lazily when its terminal first opens (the default). null is treated as 'terminal'.
 export type SetupTrigger = 'off' | 'created' | 'terminal'
@@ -70,19 +69,71 @@ export type Workspace = {
   sort: number
   icon: WorkspaceIcon | null
   color: string | null
-  repos: WorkspaceRepo[]
+  projects: WorkspaceProjectRef[]
 }
 export type WorkspaceSeed = { name: string }
-// Per-repo assignment for the onboarding modal: which workspace a repo is in + whether it's hidden.
-export type RepoAssignment = { owner: string; name: string; workspaceId: string; ignored: boolean }
 
-// --- Tasks: the single-repo unit of work (docs/workspaces-and-tasks.md/03). Rail rows. ---
+// --- Projects: a folder on the node's machine, the unit a workspace groups (docs/workspaces-and-tasks.md).
+// The successor to the (owner, name) repo keying. `vcs` and `github` are detected facets, not
+// requirements: a plain folder has neither; a git checkout without a GitHub remote has only `vcs`;
+// `path` is null for a project imported from GitHub but not yet cloned or mapped.
+export type Project = {
+  id: string
+  name: string
+  path: string | null
+  workspaceId: string
+  sort: number
+  hidden: boolean
+  vcs: 'git' | null
+  defaultBranch: string | null
+  remoteUrl: string | null
+  github: { owner: string; name: string; repoId: number | null } | null
+}
+export type ProjectSeed = { path: string; workspaceId?: string; name?: string }
+export type ProjectPatch = Partial<{ name: string; workspaceId: string; hidden: boolean; sort: number; path: string }>
+export type ProjectsResponse = { projects: Project[] }
+export type WorkspaceProjectRef = { id: string; name: string; sort: number }
+export type ProjectConfig = {
+  runTargets: string | null
+  editorCommand: string | null
+  setupScript: string | null
+  setupScriptTrigger: SetupTrigger | null
+  devScript: string | null
+  devRestartScript: string | null
+  teardownScript: string | null
+  dbUrlScript: string | null
+  dbSchemaMode: DbSchemaMode | null
+  dbSchemaValue: string | null
+  dbSchemaNotes: string | null
+  previewMode: PreviewMode | null
+  previewValue: string | null
+  browserRules: BrowserRule[]
+  branchPrefix: string | null
+}
+export type ProjectConfigPatch = Partial<{
+  setupScript: string
+  setupScriptTrigger: SetupTrigger
+  teardownScript: string
+  devScript: string
+  devRestartScript: string
+  dbUrlScript: string
+  dbSchemaMode: DbSchemaMode | ''
+  dbSchemaValue: string
+  dbSchemaNotes: string
+  previewMode: PreviewMode | ''
+  previewValue: string
+  browserRules: BrowserRule[]
+  branchPrefix: string
+}>
+export type ProjectConfigResponse = { projectId: string; config: ProjectConfig }
+
+// --- Tasks: the Project -> Task unit of work (docs/workspaces-and-tasks.md/03). Rail rows. ---
 // connectionId pins the link to a specific credential. providerId is stamped by core from that row.
 export type TaskLink = { connectionId: string; providerId: string; identifier: string; ref?: ExternalRef }
 export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>; providerId?: string }
-// A workspace's linked external projects (docs/workspaces-and-tasks.md) — (integrationId, externalId) pairs.
-export type WorkspaceProject = { integrationId: string; externalId: string }
-export type WorkspaceProjectsResponse = { projects: WorkspaceProject[] }
+// A workspace's linked provider projects (docs/workspaces-and-tasks.md) — (integrationId, externalId) pairs.
+export type WorkspaceExternalProject = { integrationId: string; externalId: string }
+export type WorkspaceExternalProjectsResponse = { projects: WorkspaceExternalProject[] }
 // A Lucide icon name (see core/client/ui/Icon.tsx). Shape-checked only, deliberately: the
 // 1756-name map is client-side, and importing it into a route would breach the client↔node boundary
 // that core/boundaries.test.ts enforces. An unrecognised name degrades to Icon's render-as-is
@@ -94,9 +145,9 @@ export type Task = {
   title: string
   icon: string | null // Lucide icon name; null = derive from origin
   origin: string
-  repoOwner: string
-  repoName: string
-  branch: string
+  projectId: string
+  branch: string | null
+  github: { owner: string; name: string } | null
   worktreePath: string | null
   pullNumber: number | null
   status: 'active' | 'archived' | 'cancelled'
@@ -110,9 +161,8 @@ export type TaskSeed = {
   title?: string
   icon?: string
   origin: Task['origin']
-  repoOwner: string
-  repoName: string
-  branch: string
+  projectId: string
+  branch?: string
   pullNumber?: number
   links?: TaskLinkSeed[]
 }
@@ -149,7 +199,7 @@ export type ContextSectionResult = {
   absent?: { reason: 'missing-cache'; detail: string }
 }
 export type TaskContext = {
-  task: { id: string; title: string; repo: string; branch: string; worktreePath: string | null; pullNumber: number | null }
+  task: { id: string; title: string; projectId: string; repo?: string; branch: string | null; worktreePath: string | null; pullNumber: number | null }
   sections: ContextSectionResult[]
   pr?: { number: number; title: string; body: string | null; changedFiles: string[] }
   issues: { provider: string; identifier: string; title: string; detail: string; cache: 'present' | 'missing' }[]
@@ -180,7 +230,7 @@ export const runStatusRoute = (taskId: string, targetId: string) => `/v2/core/ta
 
 export type RepoConfigTrustReview = {
   taskId: string
-  repo: string | null
+  projectId: string | null
   trusted: boolean
   current: { hash: string; text: string; files: Array<{ path: string; content: string }> } | null
   previous: { hash: string; text: string; ackedAt: number } | null
@@ -191,15 +241,14 @@ export const repoConfigTrustRoute = (taskId: string) => `/v2/core/tasks/${taskId
 
 
 export const taskStatusesRoute = '/v2/core/task-statuses'
-export const repoPathRoute = (owner: string, repo: string) =>
-  `/v2/core/repos/path?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
-export const repoPathSetRoute = '/v2/core/repos/path'
-export const repoPathRunTargetsRoute = '/v2/core/repos/path/run-targets'
-export const repoPathConfigRoute = '/v2/core/repos/path/config'
+export const projectsRoute = '/v2/core/projects'
+export const projectRoute = (id: string) => `${projectsRoute}/${encodeURIComponent(id)}`
+export const projectDetectRoute = (id: string) => `${projectRoute(id)}/detect`
+export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
+export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
 export const taskArchiveRoute = (id: string) => `/v2/core/tasks/${id}/archive`
 export const taskPreviewUrlRoute = (id: string) => `/v2/core/tasks/${id}/preview-url`
 export const taskOnCreatedRoute = (id: string) => `/v2/core/tasks/${id}/on-created`
-export const taskUseCheckoutRoute = (id: string) => `/v2/core/tasks/${id}/use-checkout`
 export const taskMcpRoute = (id: string) => `/v2/core/tasks/${id}/mcp`
 export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/starter`
 
@@ -252,28 +301,12 @@ export type BackupResult = { path: string; bytes: number; files: string[]; exclu
 export type BackupSuggestion = { suggestedPath: string }
 export const coreBackupRoute = '/v2/core/backup'
 
-export type V1ImportProbe = { found: boolean; path: string | null; workspaces: number; repos: number; checkouts: number }
-export type V1ImportReport = {
-  workspacesCreated: number
-  reposRegrouped: number
-  reposIgnored: number
-  checkoutsImported: number
-  // Checkout paths that no longer resolve to a git repository. Imported anyway and listed here, because
-  // a moved path is editable in Settings and a lost one is not recoverable.
-  checkoutsUnverified: string[]
-}
-export const coreImportV1Route = '/v2/core/import/v1'
-// Workspaces (named groups of repos) — the top-level unit.
+// Workspaces (named groups of Projects) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`
 export const workspaceBootstrapRoute = '/v2/core/workspaces/bootstrap'
-export const workspaceReposRoute = (id: string) => `/v2/core/workspaces/${id}/repos`
-export const workspaceIgnoreRepoRoute = '/v2/core/workspaces/ignore-repo'
-export const workspaceUnignoreRepoRoute = '/v2/core/workspaces/unignore-repo'
-export const workspaceIgnoreAllRoute = '/v2/core/workspaces/ignore-all'
-export const workspaceAssignmentsRoute = '/v2/core/workspaces/assignments'
-export const workspaceProjectsRoute = (id: string) => `/v2/core/workspaces/${id}/projects`
-// Tasks (single-repo units of work) — rail rows.
+export const workspaceExternalProjectsRoute = (id: string) => `/v2/core/workspaces/${id}/external-projects`
+// Tasks (Project -> Task units of work) — rail rows.
 export const tasksRoute = '/v2/core/tasks'
 export const taskRoute = (id: string) => `/v2/core/tasks/${id}`
 export const taskLinksRoute = (id: string) => `/v2/core/tasks/${id}/links`
@@ -284,9 +317,10 @@ export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}
 export const prefsKey = ['prefs'] as const
 // The suffixes identify the current response shapes and prevent unrelated query data from sharing keys.
 export const workspacesKey = ['workspaces', 'groups', 'v2'] as const
-export const workspaceAssignmentsKey = ['workspace-assignments'] as const
 // The `v2` suffix identifies the current task response shape, including its required `icon` field.
-export const tasksKey = ['tasks', 'v2'] as const
+export const projectsKey = ['projects', 'v2'] as const
+// v3 removes the legacy repo pair and makes projectId/github/nullable branch explicit.
+export const tasksKey = ['tasks', 'v3'] as const
 // v3 adds descriptor metadata and normalized connection summaries. A distinct key prevents a
 // persisted v2 `{ provider, connected }` row from hiding registry-driven sources/settings.
 export const integrationsKey = ['integrations', 'v3'] as const

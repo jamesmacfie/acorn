@@ -39,13 +39,19 @@ describe('task links grow/shrink', () => {
       { id: 'int-1', userId: 'james', provider: 'linear', label: 'Linear', authRef: 'encrypted', createdAt: now, updatedAt: now },
       { id: 'int-2', userId: 'james', provider: 'rollbar', label: 'Rollbar', authRef: 'encrypted', createdAt: now, updatedAt: now },
     ]).run()
+    void t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now }).run()
+    void t.db.insert(schema.projects).values({
+      id: 'project-widget', name: 'widget', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/widget.git', githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    }).run()
   })
 
   afterEach(() => t.cleanup())
 
   const createTask = async (): Promise<Task> => {
     const res = await app.fetch(
-      jsonReq('/api/tasks', 'POST', { origin: 'local', repoOwner: 'acme', repoName: 'widget', branch: 'feat/x' }),
+      jsonReq('/api/tasks', 'POST', { origin: 'local', projectId: 'project-widget', branch: 'feat/x' }),
       {} as Env,
     )
     expect(res.status).toBe(200)
@@ -114,7 +120,7 @@ describe('task links grow/shrink', () => {
 
   it('stamps provider identity on links supplied at task creation', async () => {
     const res = await app.fetch(jsonReq('/api/tasks', 'POST', {
-      origin: 'linear', repoOwner: 'acme', repoName: 'widget', branch: 'eng-42',
+      origin: 'linear', projectId: 'project-widget', branch: 'eng-42',
       links: [{ connectionId: 'int-1', identifier: 'ENG-42' }],
     }), {} as Env)
     expect(res.status).toBe(200)
@@ -124,7 +130,7 @@ describe('task links grow/shrink', () => {
 
   it('validates birth links before creating the task row', async () => {
     const res = await app.fetch(jsonReq('/api/tasks', 'POST', {
-      origin: 'linear', repoOwner: 'acme', repoName: 'widget', branch: 'eng-42',
+      origin: 'linear', projectId: 'project-widget', branch: 'eng-42',
       links: [{ connectionId: 'int-1', providerId: 'rollbar', identifier: 'ENG-42' }],
     }), {} as Env)
     expect(res.status).toBe(400)

@@ -6,7 +6,7 @@ import { archiveTask } from '@acorn/client-core/tasks/mutations.ts'
 import { paneAvailable, paneContributions } from '@acorn/client-core/registries/panes.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/registries/keybindings.tsx'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/tasks/agentSessions.ts'
 import { capabilities } from '@acorn/client-core/capabilities.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
@@ -40,7 +40,7 @@ export default function TaskView(props: {
   const tasksQuery = createQuery(() => tasksOptions(true))
   const workspacesQuery = createQuery(() => workspacesOptions(true))
   const prefs = createQuery(() => prefsOptions(true))
-  const workspace = () => workspaceForRepo(workspacesQuery.data, props.task.repoOwner, props.task.repoName)
+  const workspace = () => workspaceForProject(workspacesQuery.data, props.task.projectId)
   const status = () => taskStatus(props.task.id)
 
   const [runTargets, { refetch: refetchTargets }] = createResource(
@@ -71,8 +71,8 @@ export default function TaskView(props: {
   function nextTask(): Task | null {
     const currentWorkspace = workspace()
     const all = tasksQuery.data ?? []
-    const repoSet = currentWorkspace ? new Set(currentWorkspace.repos.map((repo) => `${repo.owner}/${repo.name}`)) : null
-    const list = repoSet ? all.filter((task) => repoSet.has(`${task.repoOwner}/${task.repoName}`)) : all
+    const projectSet = currentWorkspace ? new Set(currentWorkspace.projects.map((project) => project.id)) : null
+    const list = projectSet ? all.filter((task) => projectSet.has(task.projectId)) : all
     const index = list.findIndex((task) => task.id === props.task.id)
     if (index < 0) return list[0] ?? null
     return list[index + 1] ?? list[index - 1] ?? null

@@ -6,8 +6,8 @@ import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
 // service or child process carrying a scoped HMAC token. Provider credentials are separate encrypted
 // integration records and are not part of Principal.
 export type PrincipalKind = 'device' | 'internal'
-// `userId` is the owner's login — the scope key for every user-scoped table. `deviceId` is set only for
-// kind 'device'; the internal principal has no device row to revoke.
+// `userId` is the node owner's opaque id — the scope key for every user-scoped table. `deviceId` is set
+// only for kind 'device'; the internal principal has no device row to revoke.
 export type Principal = {
   kind: PrincipalKind
   userId: string
@@ -27,9 +27,9 @@ export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; 
 
 // Internal loopback auth (docs/mcp.md): a child process holds no device token; it presents a scoped
 // internal token instead (server/auth/internalTokens.ts). The identity is the machine's single owner,
-// resolved from the explicit active-identity binding. Never guess from a first prefs/repo row: after
-// sequential logins that is nondeterministic and can select another identity's mirror — so with nothing
-// bound this fails closed.
+// resolved from the explicit active-identity binding — minted at boot (main/core/identity/identity.ts),
+// so after first boot it is always present. The fail-closed null stays for the one context that can
+// still see an unbound store: a bare test Env built without ensureBoundIdentity.
 //
 // The token is verified by HMAC against INTERNAL_TOKEN, which is now the signing KEY rather than the
 // credential itself. secretEquals is no longer used here; verifyInternalToken does its own
@@ -54,8 +54,8 @@ async function devicePrincipal(c: { env: Env }, header: string): Promise<Princip
   const authenticated = await c.env.DEVICES.authenticate(header.slice('Bearer '.length).trim())
   if (!authenticated) return null
   // The device is the owner, so it inherits the machine's bound identity exactly as the internal
-  // principal does — but it does NOT fail closed on an empty one: connecting GitHub is what BINDS the
-  // identity (the github plugin's device-flow route), and the owner has to be authenticated to do it.
+  // principal does. The '' fallback is vestigial — the identity is minted at boot now — and kept only
+  // so a bare test Env without a bound store still authenticates.
   return { kind: 'device', userId: c.env.ACTIVE_IDENTITY.get() ?? '', deviceId: authenticated.deviceId }
 }
 

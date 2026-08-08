@@ -31,10 +31,11 @@ const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['rollbar', 100, 'meta+shift+o'],
 ]
 
-// docs/ui-design.md: "The 6 default sources: GitHub, Docker, API Requests, Linear, Rollbar, Agent Center", plus
-// core's Fleet home, which is additive (§ New surfaces) and gated on a second node.
+// Core Home is the stable default; Fleet is additive and gated on a second node. Provider browse sources
+// remain optional contributions.
 const SOURCES: Array<[id: string, order: number]> = [
-  ['fleet', 0],
+  ['home', 0],
+  ['fleet', 1],
   ['github', 10],
   ['linear', 20],
   ['rollbar', 30],
@@ -62,7 +63,7 @@ describe('docs/ui-design.md § Parity — the panes', () => {
 })
 
 describe('docs/ui-design.md § Parity — the rail sources', () => {
-  it('is exactly the six defaults plus core Fleet home, in rail order', () => {
+  it('is exactly the core and provider sources, in rail order', () => {
     // Read from the REGISTRY rather than through `availableSources`, deliberately: that accessor applies
     // the provider gate, so linear and rollbar vanish without a connected integration — which is exactly
     // why e2e S1 can only assert four of these and why this belongs in a unit test.

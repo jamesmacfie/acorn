@@ -3,12 +3,14 @@ import { buildSessionEnv, childEnv } from './taskEnv'
 
 describe('buildSessionEnv', () => {
   const baseEnv = { HOME: '/Users/x', PATH: '/usr/bin', SESSION_ENC_KEY: 'super-secret', GITHUB_CLIENT_SECRET: 'also-secret' }
-  const task = { repoOwner: 'acme', repoName: 'widget', branch: 'feat/login', title: 'Fix login' }
+  const task = { projectId: 'project-1', projectName: 'Widget', github: { owner: 'acme', name: 'widget' }, branch: 'feat/login', title: 'Fix login' }
 
   it('injects all six ACORN_* vars for a task with a resolved worktree', () => {
     const env = buildSessionEnv({ taskId: 't1', cwd: '/wt/acme-widget-feat-login', task, baseEnv })
     expect(env.ACORN_TASK_ID).toBe('t1')
     expect(env.ACORN_WORKTREE_PATH).toBe('/wt/acme-widget-feat-login')
+    expect(env.ACORN_PROJECT_ID).toBe('project-1')
+    expect(env.ACORN_PROJECT_NAME).toBe('Widget')
     expect(env.ACORN_REPO).toBe('acme/widget')
     expect(env.ACORN_BRANCH).toBe('feat/login')
     expect(env.ACORN_TASK_SLUG).toBe('feat-login')

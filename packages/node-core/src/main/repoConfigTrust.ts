@@ -3,12 +3,11 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { RepoConfigTrustReview } from '@acorn/protocol/api.ts'
-import { getRepoPath } from './repoPaths'
-import { isDir, loadTask } from './taskWorktree'
+import { isDir, loadTask, projectForTask } from './taskWorktree'
 
 export const NEEDS_CONFIG_TRUST = 'needs-trust'
 
@@ -44,33 +43,33 @@ export function readRepoConfigSnapshot(repoDir: string): Snapshot | null {
   return { files, text, hash: createHash('sha256').update(text).digest('hex') }
 }
 
-async function taskSnapshot(db: AppDatabase, taskId: string): Promise<{ repo: string; snapshot: Snapshot } | null> {
+async function taskSnapshot(db: AppDatabase, taskId: string): Promise<{ projectId: string; snapshot: Snapshot } | null> {
   const task = await loadTask(db, taskId)
   if (!task) return null
-  const mapped = await getRepoPath(db, task.repoOwner, task.repoName)
-  const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : mapped?.path && isDir(mapped.path) ? mapped.path : null
+  const project = await projectForTask(db, task)
+  const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
   if (!repoDir) return null
   const snapshot = readRepoConfigSnapshot(repoDir)
-  return snapshot ? { repo: `${task.repoOwner}/${task.repoName}`, snapshot } : null
+  return snapshot && project ? { projectId: project.id, snapshot } : null
 }
 
 export async function repoConfigTrustReview(db: AppDatabase, taskId: string): Promise<RepoConfigTrustReview> {
   const current = await taskSnapshot(db, taskId)
-  if (!current) return { taskId, repo: null, trusted: true, current: null, previous: null }
+  if (!current) return { taskId, projectId: null, trusted: true, current: null, previous: null }
   const [ack] = await db
     .select()
     .from(schema.configAcks)
-    .where(and(eq(schema.configAcks.repo, current.repo), eq(schema.configAcks.hash, current.snapshot.hash)))
+    .where(and(isNotNull(schema.configAcks.projectId), eq(schema.configAcks.projectId, current.projectId), eq(schema.configAcks.hash, current.snapshot.hash)))
     .limit(1)
   const [previous] = await db
     .select()
     .from(schema.configAcks)
-    .where(eq(schema.configAcks.repo, current.repo))
+    .where(and(isNotNull(schema.configAcks.projectId), eq(schema.configAcks.projectId, current.projectId)))
     .orderBy(desc(schema.configAcks.ackedAt))
     .limit(1)
   return {
     taskId,
-    repo: current.repo,
+    projectId: current.projectId,
     trusted: !!ack,
     current: current.snapshot,
     previous: previous && previous.hash !== current.snapshot.hash ? { hash: previous.hash, text: previous.snapshot, ackedAt: previous.ackedAt } : null,
@@ -84,13 +83,13 @@ export async function assertRepoConfigTrusted(db: AppDatabase, taskId: string): 
 
 export async function acknowledgeRepoConfig(db: AppDatabase, taskId: string, hash: string): Promise<RepoConfigTrustReview> {
   const review = await repoConfigTrustReview(db, taskId)
-  if (!review.current || !review.repo) return review
+  if (!review.current || !review.projectId) return review
   if (review.current.hash !== hash) throw new Error('Repo configuration changed while it was being reviewed. Review the new diff before trusting it.')
   await db
     .insert(schema.configAcks)
-    .values({ repo: review.repo, hash, snapshot: review.current.text, ackedAt: Date.now() })
+    .values({ projectId: review.projectId, hash, snapshot: review.current.text, ackedAt: Date.now() })
     .onConflictDoUpdate({
-      target: [schema.configAcks.repo, schema.configAcks.hash],
+      target: [schema.configAcks.projectId, schema.configAcks.hash],
       set: { snapshot: review.current.text, ackedAt: Date.now() },
     })
   return repoConfigTrustReview(db, taskId)

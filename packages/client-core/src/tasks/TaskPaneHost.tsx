@@ -6,6 +6,11 @@ import { nodeState } from '../node/fleet'
 import { freshnessOf, type Freshness } from '../node/freshness'
 import NodeChip from '../node/NodeChip'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
+// Imported for `use:paneFocus` below. Solid compiles a directive to a bare reference to this
+// identifier, so without the import the first pane that renders dies on "paneFocus is not defined".
+// The linter cannot see that use, hence the suppression rather than a deletion.
+// eslint-disable-next-line no-unused-vars -- used by the `use:paneFocus` directive on the pane element.
+import { paneFocus } from '../ui/focus'
 import Icon from '../ui/Icon'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'
@@ -20,16 +25,23 @@ export default function TaskPaneHost(props: {
 }) {
   const layout = () => layoutForTask(props.task.id) ?? defaultLayout()
   const dispatch = (action: LayoutAction) => dispatchLayout(props.task.id, action)
-  const registeredLayoutPanes = () => layout().panes.flatMap((id) => {
-    const pane = paneContribution(id)
-    return pane && paneAvailable(pane, props.task) ? [pane] : []
-  })
+  const switcherPanes = () => paneContributions().filter((pane) => paneAvailable(pane, props.task))
+  const registeredLayoutPanes = () => {
+    const chosen = layout().panes.flatMap((id) => {
+      const pane = paneContribution(id)
+      return pane && paneAvailable(pane, props.task) ? [pane] : []
+    })
+    // A layout can name a pane this task cannot show — DEFAULT_PANE is the PR pane, and a task on a
+    // plain or GitHub-less project has no PR, which is now the ordinary case rather than the exception.
+    // Fall back to the first pane the task DOES offer; the empty state below is then what it says it
+    // is: an environment with no panes at all.
+    return chosen.length ? chosen : switcherPanes().slice(0, 1)
+  }
   const visiblePanes = () => {
     const panes = registeredLayoutPanes()
     const maximized = maximizedPane(props.task.id)
     return maximized ? panes.filter((pane) => pane.id === maximized) : panes
   }
-  const switcherPanes = () => paneContributions().filter((pane) => paneAvailable(pane, props.task))
   const showsPane = (id: PaneId) => layout().panes.includes(id)
   const isPinned = (id: PaneId) => layout().pinned?.includes(id) ?? false
   const onSwitch = (pane: PaneId, event: MouseEvent) =>

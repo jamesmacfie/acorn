@@ -10,8 +10,8 @@ describe('rollbar source promotion', () => {
       title: 'Token is null', level: 'error', environment: 'prod',
       status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
     }
-    expect(prepareRollbarPromotion(item, { owner: 'acme', repo: 'widget', branch: 'Fix Token 142' })).toMatchObject({
-      origin: 'rollbar', repoOwner: 'acme', repoName: 'widget', branch: 'fix-token-142',
+    expect(prepareRollbarPromotion(item, { projectId: 'project-widget', owner: 'acme', repo: 'widget', branch: 'Fix Token 142' })).toMatchObject({
+      origin: 'rollbar', projectId: 'project-widget', branch: 'fix-token-142',
       links: [{ connectionId: 'rollbar-api', identifier: '142', ref: { displayId: '142', externalId: '999' } }],
     })
   })

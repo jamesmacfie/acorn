@@ -1,6 +1,6 @@
 import type { HttpBindings } from '@hono/node-server'
 import { randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, copyFileSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { type AppDatabase, schema } from '../server/db'
 import type { CapabilityRegistry } from '../server/plugin/capabilities'
 import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
+import { ensureBoundIdentity } from './core/identity/identity'
 import { deviceService, type DeviceService } from '../server/auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from '../server/auth/idempotency'
 import { pairingCodes, type PairingCodes } from '../server/auth/pairingCodes'
@@ -46,20 +47,14 @@ export type RuntimeBindings = {
   // dangerous than the raw SESSION_ENC_KEY that was already here, and it is the seam that scrubs a
   // credential out of a provider error before it reaches a log or a client.
   SECRETS: SecretService
-  GITHUB_CLIENT_ID: string
-  // Retained deliberately, and nothing reads it. The device authorization grant exchanges on client_id
-  // alone (plugins/github/server/routes/deviceAuth.ts), so the last reader left with routes/auth.ts. It
-  // stays at the owner's explicit request pending their decision, which is why it is now read
-  // OPTIONALLY — a fresh checkout needs no value for it — rather than removed.
-  GITHUB_CLIENT_SECRET: string
   // Bearer for loopback callers that hold no device token — the acorn MCP server and other spawned
   // children (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
   // inherit it; auth middleware maps it to the machine's single owner. Persisted across boots, because
   // a tmux-reattached agent keeps the environment of the boot that spawned it.
   INTERNAL_TOKEN: string
-  // The machine's bound owner identity. Set when a provider account is connected (the github plugin's
-  // device flow), and read by every principal — a device inherits it, and a machine caller fails closed
-  // without it rather than selecting an arbitrary cached prefs/repo row.
+  // The machine's bound owner identity: an opaque `owner-<uuid>` minted at first boot
+  // (ensureBoundIdentity below), read by every principal. Installs that bound a GitHub login under
+  // the old scheme keep that login as the opaque id — no data rewrite. Providers never bind.
   ACTIVE_IDENTITY: ActiveIdentityStore
   // Node auth root (docs/api-reference.md § Pairing): paired devices and their revocable bearer
   // tokens, the replay store behind Idempotency-Key, and the one-time pairing window.
@@ -148,6 +143,37 @@ export function openDb(dbPath: string): AppDatabase {
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('busy_timeout = 5000')
 
+  // One-time safety copy before the projects rekey (migration 0046): it is a one-way data
+  // migration, and the .bak file is the rollback story. Detected structurally by the legacy
+  // owner/repository/path table shape, so a fresh DB or an already-migrated one never pays for a copy.
+  const hasLegacyProjectTable = (): boolean => {
+    const tables = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+    return tables.some(({ name }) => {
+      const identifier = `"${name.replaceAll('"', '""')}"`
+      const columns = sqlite.prepare(`PRAGMA table_info(${identifier})`).all() as { name: string }[]
+      const names = new Set(columns.map((column) => column.name))
+      return names.has('owner') && names.has('repo') && names.has('path')
+    })
+  }
+  const preProjects = sqlite
+    .prepare("SELECT max(name = 'projects') AS projects FROM sqlite_master WHERE type = 'table'")
+    .get() as { projects: number | null }
+  const preProjectsBackup = `${databasePath}.pre-projects.bak`
+  if (hasLegacyProjectTable() && !preProjects.projects && !existsSync(preProjectsBackup)) {
+    copyFileSync(databasePath, preProjectsBackup)
+    chmodSync(preProjectsBackup, 0o600)
+  }
+
+  // Migration 0048 drops the remaining owner/name tables. Take a fresh, timestamped copy for
+  // every pre-cutover database immediately before Drizzle runs it. Checkpoint first so committed
+  // rows in an existing WAL are included in the copy; after 0048 the structural trigger disappears.
+  if (hasLegacyProjectTable()) {
+    sqlite.pragma('wal_checkpoint(TRUNCATE)')
+    const preLegacyBackup = `${databasePath}.pre-legacy-drop-${Date.now()}.bak`
+    copyFileSync(databasePath, preLegacyBackup)
+    chmodSync(preLegacyBackup, 0o600)
+  }
+
   const db = drizzle(sqlite, { schema })
   migrate(db, { migrationsFolder })
   for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
@@ -210,6 +236,11 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilitie
   const db = openDb(databasePath)
   const encKey = secret('SESSION_ENC_KEY')
   const dataDir = dirname(databasePath)
+  const activeIdentity = activeIdentityStore(dataDir)
+  // Mint the owner id on first boot and adopt any pre-identity ''-scoped rows. Before this ran at
+  // boot, the identity was bound as a side effect of connecting GitHub, and every internal caller
+  // (MCP, agents) failed closed until then.
+  ensureBoundIdentity(db, activeIdentity)
   return {
     DB: db,
     DATA_DIR: dataDir,
@@ -222,12 +253,8 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilitie
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
     SECRETS: new SecretService(encKey),
-    GITHUB_CLIENT_ID: secret('GITHUB_CLIENT_ID'),
-    // `optional`, not `secret`: nothing reads this any more (see the type above), so demanding it would
-    // make a fresh checkout fail to boot over a value with no consumer.
-    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET ?? '',
     INTERNAL_TOKEN: loadOrCreateInternalToken(dataDir),
-    ACTIVE_IDENTITY: activeIdentityStore(dataDir),
+    ACTIVE_IDENTITY: activeIdentity,
     DEVICES: deviceService(db),
     IDEMPOTENCY: idempotencyStore(db),
     PAIRING_CODES: pairingCodes(),

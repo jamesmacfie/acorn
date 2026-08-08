@@ -23,7 +23,9 @@ const section = (id: string, over: Partial<PluginContextSection> = {}): PluginCo
   ...over,
 })
 
-const args = { userLogin: 'james', task: { id: 't1' } as never, repo: 'acme/api' }
+// `repo` is the display pair; `github` is the facet, null on a plain or non-GitHub project. Both are
+// passed to plugin sections — the github facet is how a section knows whether it has anything to fetch.
+const args = { userLogin: 'james', task: { id: 't1' } as never, repo: 'acme/api', github: { owner: 'acme', name: 'api' } }
 
 describe('the context-section registry', () => {
   // BEFORE as well as after, because importing this module now registers core's real `issues` section at
@@ -90,7 +92,7 @@ describe('the context-section registry', () => {
     })))
     await getContextSections()[0].assemble({ ...args, db: { marker: 'core-handle' } as never })
     expect(seen).not.toHaveProperty('db')
-    expect(seen).toMatchObject({ userLogin: 'james', repo: 'acme/api' })
+    expect(seen).toMatchObject({ userLogin: 'james', repo: 'acme/api', github: { owner: 'acme', name: 'api' } })
   })
 
   it('resolves include=* and the defaults against what is actually registered', () => {

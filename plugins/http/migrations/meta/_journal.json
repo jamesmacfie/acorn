@@ -8,6 +8,20 @@
       "when": 1785793524076,
       "tag": "0000_lying_runaways",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786162233879,
+      "tag": "0001_sweet_wallflower",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786166157100,
+      "tag": "0002_retire_legacy_pairs",
+      "breakpoints": true
     }
   ]
 }

@@ -78,7 +78,7 @@ describe('the pipeline over the fake agent + real proposal store (docs/notes-and
     propose: async (c, flags) =>
       void (await store.propose({
         taskId: 't1',
-        repo: 'acme/api',
+        projectId: 'project-api',
         name: c.name,
         type: c.type,
         description: flags.length ? `${c.description} [${flags.join('; ')}]` : c.description,

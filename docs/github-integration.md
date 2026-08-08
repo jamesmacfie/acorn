@@ -10,11 +10,12 @@ Settings → Integrations runs the OAuth device authorization flow:
 1. `POST /v2/p/github/auth/device/start` asks GitHub for a device code.
 2. The owner enters the user code at GitHub's verification URI.
 3. `POST /v2/p/github/auth/device/poll` checks the provider at GitHub's requested interval.
-4. On success the Node validates the token, stores it in an encrypted `integrations` row, and binds
-   the active GitHub identity.
+4. On success the Node validates the token and stores it in an encrypted `integrations` row. The
+   GitHub account is provider metadata; it does not bind the node-owner identity, which core mints at
+   boot.
 
-The flow uses `GITHUB_CLIENT_ID`, no client secret, and no callback URL. `githubToken(c)` is the
-single credential read site for GitHub routes.
+The optional GitHub plugin reads `GITHUB_CLIENT_ID`, uses no client secret, and needs no callback URL.
+`githubToken(c)` is the single credential read site for GitHub routes.
 
 ## Mirror
 
@@ -33,15 +34,24 @@ mentions, labels, reviewers, comments, review threads, and create-PR. Mutations 
 then update or invalidate the affected mirror so a subsequent read does not serve a known pre-write
 value.
 
+## Importing projects
+
+Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. Each selected
+repository can be mapped to an existing folder, cloned with non-interactive Git, or deferred as a
+path-null project carrying its GitHub facet. The importer returns an individual result for every
+repository, so a failed clone does not hide successful imports. The mirror remains disposable candidate
+data; project identity, checkout paths, and default branches come from core project facets and services.
+
 Closed PR lists are paginated live provider reads. Open lists, details, and files use the local mirror
 with explicit force-refresh support. GraphQL errors and provider authorization failures are mapped to
 the common API envelope and surfaced as GitHub-specific status where the UI needs it.
 
 ## Tasks and references
 
-A PR can promote to a task. The task stores the repository and pull number; subsequent task context
-and changes use the owning Node. Linear reference panels are contributed through a provider contract,
-so the GitHub plugin does not import Linear's implementation.
+A PR can promote to a task. The task stores the core project ID and pull number; the project's GitHub
+facet supplies provider owner/name metadata. Subsequent task context and changes use the owning Node.
+Linear reference panels are contributed through a provider contract, so the GitHub plugin does not
+import Linear's implementation.
 
 ## Actions and logs
 

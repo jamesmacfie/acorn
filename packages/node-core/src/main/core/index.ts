@@ -7,9 +7,9 @@ import { createIdentityService, type IdentityService } from './identity/identity
 import { createModelService, type ModelService } from './models/text'
 import { createPrefService, type PrefService } from './identity/preferences'
 import * as proc from './exec/proc'
-import { createRepoService, type RepoService } from './vcs/repos'
 import { SecretService } from './security/secrets'
 import { createTaskService, type TaskService } from './tasks/service'
+import { createProjectService, type ProjectService } from './projects'
 import type { CapabilityRegistry } from '../../server/plugin/capabilities'
 
 export type CoreServices = {
@@ -23,9 +23,6 @@ export type CoreServices = {
   secrets: SecretService
   // Resolve a taskId against core-owned task tables for callers that hold only a task reference.
   tasks: TaskService
-  // The same seam for `repo_paths` + the executable-config trust gate: where a repo lives on this
-  // machine, its per-repo settings, and whether its committed config has been acknowledged.
-  repos: RepoService
   // The launch-context reads (the injection pref + core's section assembler), for the plugin that
   // pushes a first prompt into a new agent session.
   context: ContextService
@@ -36,9 +33,12 @@ export type CoreServices = {
   // the node itself has to read — today only plugins/agents' model-pricing overrides, which the usage
   // service needs before it can price a token count.
   prefs: PrefService
-  // The machine identity: which owner this node is bound to, which identities it knows about, and the
-  // bind/unbind writes. Core owns it — a plugin used to write it directly (main/core/identity.ts).
+  // The machine identity: which owner this node is bound to. Read-only for consumers — the binding
+  // is minted at boot (ensureBoundIdentity in main/bindings.ts), never by a plugin.
   identity: IdentityService
+  // Narrow project identity for plugins: scope resolution, importer writes, and all mapped project
+  // folders. The returned ProjectRef never exposes core config or the core SQLite handle.
+  projects: ProjectService
 }
 
 export function createCoreServices(options: {
@@ -55,18 +55,21 @@ export function createCoreServices(options: {
     proc,
     secrets: options.secrets,
     tasks: createTaskService(options.db, options.capabilities),
-    repos: createRepoService(options.db),
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
     prefs: createPrefService(options.db),
-    identity: createIdentityService(options.db, options.activeIdentity),
+    identity: createIdentityService(options.activeIdentity),
+    projects: createProjectService(options.db),
   }
 }
 
 export { SecretService }
 export type { ChildTaskSeed, TaskLinkRef, TaskRunConfig, TaskService } from './tasks/service'
 export type { IdentityService } from './identity/identity'
-export type { RepoCheckout, RepoService } from './vcs/repos'
+export type { ProjectService } from './projects'
+// The shapes ProjectService hands back and takes in. A plugin that calls the seam has to be able to
+// name them; they carry no core config columns and no database handle.
+export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects'
 export type { ContextService } from './context/launch'
 export type { PrefService } from './identity/preferences'
 export type { GenerateTextRequest, ModelService } from './models/text'

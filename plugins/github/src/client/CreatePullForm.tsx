@@ -1,11 +1,13 @@
 import { createEffect, createSignal, on, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
-import { branchesOptions, compareOptions, mentionsOptions, reposOptions } from './queries'
+import { branchesOptions, compareOptions, mentionsOptions } from './queries'
+import { projectsOptions } from '@acorn/client-core/queries.ts'
 import { pullsKey, type Branch } from '../contract/api'
 import MentionTextarea from '@acorn/client-core/ui/MentionTextarea.tsx'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
+import { githubBrowsePath } from './routes'
 import Picker from '@acorn/client-core/ui/Picker.tsx'
 import './styles/pull-list.css'
 import './styles/pull-detail.css'
@@ -18,16 +20,17 @@ export default function CreatePullForm() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const o = () => params.owner ?? ''
-  const r = () => params.repo ?? ''
-  const repos = createQuery(() => reposOptions(true))
-  const repo = () => repos.data?.find((x) => x.owner === o() && x.name === r())
-  const repoKnown = () => !!repo()
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((x) => x.id === params.projectId)
+  const github = () => project()?.github
+  const o = () => github()?.owner ?? ''
+  const r = () => github()?.name ?? ''
+  const repoKnown = () => !!project()?.id && !!github()
   const branches = createQuery(() => branchesOptions(o(), r(), repoKnown()))
   const mentionsQuery = createQuery(() => mentionsOptions(o(), r(), repoKnown()))
   const mentionsList = () => mentionsQuery.data ?? []
 
-  const base = () => (typeof searchParams.base === 'string' && searchParams.base) || repo()?.defaultBranch || ''
+  const base = () => (typeof searchParams.base === 'string' && searchParams.base) || project()?.defaultBranch || ''
   const head = () => (typeof searchParams.head === 'string' ? searchParams.head : '')
   const comparable = () => !!head() && head() !== base()
   const compare = createQuery(() => compareOptions(o(), r(), base(), head(), repoKnown() && comparable()))
@@ -83,7 +86,7 @@ export default function CreatePullForm() {
       .then((res) => {
         clearPullDraft(o(), r())
         qc.invalidateQueries({ queryKey: pullsKey(o(), r(), 'open') })
-        navigate(`/${o()}/${r()}/${res.number}`)
+    navigate(`${githubBrowsePath(params.projectId ?? '')}/${res.number}`)
       })
       .catch((e) => setError(String(e.message ?? e)))
   }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { emptyDraft, purgeStoredHttpDrafts, toSendInput } from './draft'
 
 describe('toSendInput', () => {
-  it('uses panel task context even when the saved request belongs to the repo', () => {
+  it('uses panel task context even when the saved request belongs to the project', () => {
     const repoSavedDraft = { ...emptyDraft(null), url: '{{BASE_URL}}/health' }
 
     const input = toSendInput(repoSavedDraft, 'task-1')

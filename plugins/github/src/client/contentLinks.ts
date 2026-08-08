@@ -93,10 +93,15 @@ export function linkifyLinearIds(root: HTMLElement, prefixes: string[]): void {
 
 
 // A delegated click handler for a content container: routes recognised links in-app (Linear issues
-// open the side panel via `openLinear`; GitHub PRs/repos navigate the SPA via `navigate`) and leaves
-// everything else — and modified/middle clicks (open-in-new-tab) — to the browser. Router-free so it
-// stays unit-testable; the caller passes useNavigate()'s function.
-export function makeContentLinkHandler(navigate: (to: string) => void, openLinear: (identifier: string) => void) {
+// open the side panel via `openLinear`; GitHub links resolve their facet to a project first) and
+// leaves everything else — and modified/middle clicks — to the browser. A missing project mapping
+// deliberately falls through to the real GitHub URL; owner/name alone is not a valid app route after
+// the project cutover.
+export function makeContentLinkHandler(
+  navigate: (to: string) => void,
+  openLinear: (identifier: string) => void,
+  projectIdForGithub?: (owner: string, repo: string) => string | null | undefined,
+) {
   return (e: MouseEvent) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     const anchor = (e.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null
@@ -112,14 +117,17 @@ export function makeContentLinkHandler(navigate: (to: string) => void, openLinea
     const target = parseInAppTarget(href)
     if (!target) return
     // Narrowed on `kind`, and an UNRECOGNISED kind falls through to the browser rather than being
-    // swallowed. That is the behavioural change the open target type buys: a provider this handler has
-    // never heard of can contribute a recogniser, and until something knows how to route its kind the
-    // link keeps working the way it did before anyone recognised it.
+    // swallowed. A GitHub owner/name target is only routable when the current project query resolves
+    // it to a project id; otherwise the external link remains the safe fallback.
     const str = (value: unknown): string => (typeof value === 'string' ? value : '')
-    if (target.kind === 'linear') openLinear(str(target.identifier))
-    else if (target.kind === 'pr') navigate(`/${str(target.owner)}/${str(target.repo)}/${str(target.number)}`)
-    else if (target.kind === 'repo') navigate(`/${str(target.owner)}/${str(target.repo)}`)
-    else return
+    if (target.kind === 'linear') {
+      openLinear(str(target.identifier))
+    } else if (target.kind === 'pr' || target.kind === 'repo') {
+      const projectId = projectIdForGithub?.(str(target.owner), str(target.repo))
+      if (!projectId) return
+      const suffix = target.kind === 'pr' ? `/${encodeURIComponent(str(target.number))}` : ''
+      navigate(`/p/${encodeURIComponent(projectId)}/pulls${suffix}`)
+    } else return
     e.preventDefault()
   }
 }

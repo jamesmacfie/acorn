@@ -1,25 +1,25 @@
-import type { Integration, WorkspaceProject } from '@acorn/protocol/api.ts'
+import type { Integration, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 
 const connectionIdsFor = (integrations: readonly Integration[], providerId: string): Set<string> =>
   new Set(integrations.filter((integration) => integration.providerId === providerId).map((integration) => integration.id))
 
 /** Select one provider's mappings from the workspace-wide external-project set. */
-export function workspaceProjectsForProvider(
-  projects: readonly WorkspaceProject[],
+export function workspaceExternalProjectsForProvider(
+  projects: readonly WorkspaceExternalProject[],
   integrations: readonly Integration[],
   providerId: string,
-): WorkspaceProject[] {
+): WorkspaceExternalProject[] {
   const connectionIds = connectionIdsFor(integrations, providerId)
   return projects.filter((project) => connectionIds.has(project.integrationId))
 }
 
 /** Replace one provider's mappings without disturbing mappings owned by sibling providers. */
-export function replaceWorkspaceProjectsForProvider(
-  current: readonly WorkspaceProject[],
+export function replaceWorkspaceExternalProjectsForProvider(
+  current: readonly WorkspaceExternalProject[],
   integrations: readonly Integration[],
   providerId: string,
-  replacement: readonly WorkspaceProject[],
-): WorkspaceProject[] {
+  replacement: readonly WorkspaceExternalProject[],
+): WorkspaceExternalProject[] {
   const connectionIds = connectionIdsFor(integrations, providerId)
   return [
     ...current.filter((project) => !connectionIds.has(project.integrationId)),

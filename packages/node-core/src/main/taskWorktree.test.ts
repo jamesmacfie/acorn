@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,13 +17,13 @@ describe('baseRefPref identity scope', () => {
   it('returns only the authenticated identity preference and fails closed without one', async () => {
     const t = makeTestDb()
     await t.db.insert(schema.prefs).values([
-      { userId: 'alice', key: 'base_ref:acme/web', value: 'origin/alice' },
-      { userId: 'bob', key: 'base_ref:acme/web', value: 'origin/bob' },
+      { userId: 'alice', key: 'base_ref:project-web', value: 'origin/alice' },
+      { userId: 'bob', key: 'base_ref:project-web', value: 'origin/bob' },
     ])
 
-    await expect(baseRefPref(t.db, 'alice', 'acme', 'web')).resolves.toBe('origin/alice')
-    await expect(baseRefPref(t.db, 'bob', 'acme', 'web')).resolves.toBe('origin/bob')
-    await expect(baseRefPref(t.db, null, 'acme', 'web')).resolves.toBeNull()
+    await expect(baseRefPref(t.db, 'alice', 'project-web')).resolves.toBe('origin/alice')
+    await expect(baseRefPref(t.db, 'bob', 'project-web')).resolves.toBe('origin/bob')
+    await expect(baseRefPref(t.db, null, 'project-web')).resolves.toBeNull()
     t.cleanup()
   })
 })
@@ -63,7 +63,13 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     // once per task across concurrent resolution paths.
     cpSync(join(template, 'checkout'), checkout, { recursive: true })
     const now = Date.now()
-    await t.db.insert(schema.tasks).values({ id: TASK, title: 'T', origin: 'local', repoOwner: 'acme', repoName: 'web', branch: 'feat-x', status: 'active', sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-web', name: 'web', path: checkout, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'web', githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
+    await t.db.insert(schema.tasks).values({ id: TASK, title: 'T', origin: 'local', projectId: 'project-web', branch: 'feat-x', status: 'active', sort: 0, createdAt: now, updatedAt: now })
     setWorktreesRoot(join(dir, 'worktrees'))
     created = []
     capabilities = new CapabilityRegistry()
@@ -113,5 +119,20 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
         missing: false,
       },
     ])
+  })
+
+  it('runs a branchless task from the project root without creating a worktree', async () => {
+    const plain = join(dir, 'plain')
+    mkdirSync(plain)
+    const now = Date.now()
+    await t.db.insert(schema.projects).values({
+      id: 'project-plain', name: 'plain', path: plain, workspaceId: 'workspace-1', sort: 1, hidden: false,
+      vcs: null, defaultBranch: null, remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
+    await t.db.insert(schema.tasks).values({ id: 'plain-task', title: 'Plain', origin: 'local', projectId: 'project-plain', branch: null, status: 'active', sort: 0, createdAt: now, updatedAt: now })
+    const result = await resolveTaskCwd(t.db, await loadTask(t.db, 'plain-task'), plain, null, capabilities)
+    expect(result).toEqual({ cwd: plain, isWorktree: false, created: false })
+    expect(created).toEqual([])
   })
 })

@@ -3,16 +3,18 @@ import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 import { migrationsDir } from './migrations'
 import { databaseBridge, endDbPools } from '../main/database'
 import { databaseRoutes, DATABASE } from '../server/routes/database'
+import { backfillLegacySavedQueries } from './legacyPairs'
 
 export const databasePlugin = (dataDir: string): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
   let capability: { dispose(): void } | null = null
   return {
     name: 'database',
-    init: (ctx) => {
+    init: async (ctx) => {
       // Opened and migrated before the listener binds — the route factory closes over the handle, so
       // there is no moment where a request can reach an unmigrated database.
       db = openPluginDb(dataDir, 'database', { migrationsFolder: migrationsDir() })
+      await backfillLegacySavedQueries(db, ctx.core.projects)
       capability = ctx.capabilities.provide(DATABASE, databaseBridge(ctx.core))
       ctx.routes.register(databaseRoutes(db, ctx.core), { prefix: '/tasks', note: '/:id/database/*' })
     },

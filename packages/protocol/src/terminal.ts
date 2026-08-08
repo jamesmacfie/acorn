@@ -1,7 +1,5 @@
 // Shared terminal protocol (docs/terminal-and-agents.md). Imported by main, preload, and renderer — so it holds the
 // wire contract only, never node-pty types: main owns the PTY, this just describes what crosses IPC.
-import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from './api'
-
 // The ONE AgentState vocabulary (docs/terminal-and-agents.md, README decision 15) — defined here, reused verbatim
 // by the agent surfaces (15); no other module redeclares it. Each transport emits only the subset
 // it can detect: PTY sessions 'working|idle|blocked|unknown'; managed/headless agents the full set.
@@ -84,48 +82,6 @@ export type TerminalProfile = {
   tmuxMissing?: boolean
 }
 
-// Local checkout mapping + repo-level config (docs/workspaces-and-tasks.md). Returned by repoPath.get / set.
-// The fields below are the machine-local DB fallback beneath a committed .acorn/config.toml
-// (loadRepoConfig precedence). A workspace groups repositories; this describes how to build, run, and
-// inspect one repository.
-export type RepoPath = {
-  owner: string
-  repo: string
-  path: string
-  runTargets: string | null // JSON RunTarget[] (docs/workflows.md §2) — the DB fallback config surface
-  setupScript: string | null
-  setupScriptTrigger: SetupTrigger | null
-  teardownScript: string | null
-  devScript: string | null
-  devRestartScript: string | null
-  dbUrlScript: string | null
-  dbSchemaMode: DbSchemaMode | null // where the Database pane's AI-generation schema text comes from; null → 'auto'
-  dbSchemaValue: string | null // the command or worktree-relative path per dbSchemaMode; null/blank = unset
-  dbSchemaNotes: string | null // free-form schema notes sent with the AI-generation prompt; null/blank = none
-  previewMode: PreviewMode | null
-  previewValue: string | null
-  browserRules: BrowserRule[] // parsed on the wire (empty = none)
-  branchPrefix: string | null // prepended to a new task's derived branch (already normalised); null = none
-}
-
-// Partial repo-config update sent to repoPath.config. Any omitted field is left unchanged; a field
-// set to '' (or [] for browserRules) clears the server-side value.
-export type RepoConfigPatch = {
-  setupScript?: string
-  setupScriptTrigger?: SetupTrigger
-  teardownScript?: string
-  devScript?: string
-  devRestartScript?: string
-  dbUrlScript?: string
-  dbSchemaMode?: DbSchemaMode | ''
-  dbSchemaValue?: string
-  dbSchemaNotes?: string
-  previewMode?: PreviewMode | ''
-  previewValue?: string
-  browserRules?: BrowserRule[]
-  branchPrefix?: string // normalised server-side; '' clears
-}
-
 // Run targets as the renderer sees them (docs/workflows.md §2): the merged config list + live status.
 // CANONICAL shapes for the run surface — main/runtime.ts imports these; nothing redeclares them.
 export type RunTargetInfo = {
@@ -140,9 +96,6 @@ export type RunTargetInfo = {
   running: boolean
 }
 export type RunStatus = { running: boolean; url?: string; exitCode?: number | null }
-
-// Result of validating/saving a checkout path. `reason` explains a rejection for the UI.
-export type RepoPathResult = { ok: true; repoPath: RepoPath } | { ok: false; reason: string }
 
 // Local-changes review (docs/panes.md): one working-tree change as the ChangesPane sees it.
 // A file changed in both the index and the worktree appears once per scope (staged flag).

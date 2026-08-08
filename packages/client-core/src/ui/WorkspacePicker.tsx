@@ -18,9 +18,9 @@ export default function WorkspacePicker(props: {
   }
   const glyph = (entry: FleetWorkspace) => (entry.workspace.icon?.kind === 'emoji' ? `${entry.workspace.icon.value} ` : '')
   const rowLabel = (entry: FleetWorkspace) => {
-    const repos = (entry.workspace.repos ?? []).length
+    const projects = entry.workspace.projects.length
     const node = props.grouped ? ` · ${entry.node.label}` : ''
-    return `${glyph(entry)}${entry.workspace.name}${node}${repos ? ` (${repos})` : ''}`
+    return `${glyph(entry)}${entry.workspace.name}${node}${projects ? ` (${projects})` : ''}`
   }
   return (
     <Picker<FleetWorkspace>

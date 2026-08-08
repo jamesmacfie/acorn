@@ -17,7 +17,7 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
   return {
     name: 'memory',
     required: true,
-    init: (ctx) => {
+    init: async (ctx) => {
       // Opened and migrated before the listener binds: registerKnowledgeIpc closes over the handle and
       // fills the route's bridge, so no request can reach an unmigrated database.
       db = openPluginDb(dataDir, 'memory', { migrationsFolder: migrationsDir() })
@@ -45,14 +45,17 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
       // notes" because a capability was missing would look exactly like data loss.
       const notes = () => ctx.capabilities.require(NOTES_STORE)
       const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes, notice: ctx.events.notice })
+      // The SQLite table is a derived index. Rebuild it once after migration so a fresh node has a
+      // warm index and so the project checkout/task-worktree source set is exercised at startup.
+      await runtime.reconciled()
       ctx.capabilities.provide(MEMORY_KNOWLEDGE, runtime)
       routeCapability = ctx.capabilities.provide(KNOWLEDGE, runtime.route)
       ctx.routes.register(knowledge, { prefix: '', note: 'notes/memory pane' })
       for (const tool of memoryAgentTools(runtime, runtime.proposals, ctx.core)) ctx.tools.register(tool)
       ctx.contextSections.register(
-        memorySection(async (_taskId, repo) => {
+        memorySection(async (_taskId, projectId) => {
           await runtime.reconciled()
-          return runtime.indexSlice(repo)
+          return runtime.indexSlice(projectId)
         }),
       )
     },

@@ -24,16 +24,17 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
         id, order: id === 'linear' ? 20 : 30, providerId: id, glyph: id === 'linear' ? '◷' : '◍', label: id === 'linear' ? 'Linear' : 'Rollbar',
         promotion: {
           canPromote: () => true,
-          prepare: async () => ({ origin: id, repoOwner: 'acme', repoName: 'widget', branch: 'main' }),
+          prepare: async () => ({ origin: id, projectId: 'project-1', branch: 'main' }),
           create: async (seed) => ({
             ...seed,
             id: 'task', title: seed.title ?? 'Task', icon: seed.icon ?? null, worktreePath: null, pullNumber: seed.pullNumber ?? null,
             status: 'active', parentId: null, sort: 0, links: [],
+            github: { owner: 'acme', name: 'widget' }, branch: seed.branch ?? null,
           }),
         },
       }))
     }
-    disposables.push(sourceRegistry.register({ id: 'github', order: 10, glyph: '◇', label: 'GitHub' }))
+    disposables.push(sourceRegistry.register({ id: 'github', order: 10, glyph: '◇', label: 'GitHub', providerId: 'github' }))
   })
   afterAll(() => disposables.forEach((disposable) => disposable.dispose()))
 
@@ -49,12 +50,12 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     }
   })
 
-  it('an ungated source is always shown; Linear/Rollbar appear iff connected', () => {
-    expect(availableSources(undefined).map((s) => s.id)).toEqual(['github'])
-    expect(availableSources([integration('linear')]).map((s) => s.id)).toEqual(['github', 'linear'])
-    expect(availableSources([integration('rollbar')]).map((s) => s.id)).toEqual(['github', 'rollbar'])
-    expect(availableSources([integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['github', 'linear', 'rollbar'])
-    expect(availableSources([integration('rollbar', false)]).map((s) => s.id)).toEqual(['github'])
+  it('provider sources appear only when their integration is connected', () => {
+    expect(availableSources(undefined).map((s) => s.id)).toEqual([])
+    expect(availableSources([integration('github')]).map((s) => s.id)).toEqual(['github'])
+    expect(availableSources([integration('linear')]).map((s) => s.id)).toEqual(['linear'])
+    expect(availableSources([integration('github'), integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['github', 'linear', 'rollbar'])
+    expect(availableSources([integration('github', false)]).map((s) => s.id)).toEqual([])
   })
 
   // The rail's order comes from the declared `order`, not from when a plugin happened to register.
@@ -68,7 +69,7 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
       // 'zebra' registered last with order 1 leads; 'aardvark' registered first with order 999 trails. Under
       // registration order this would read aardvark, linear, rollbar, github, zebra — and alphabetically it
       // would read aardvark first too, so neither fallback can produce this answer.
-      expect(availableSources([integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['zebra', 'github', 'linear', 'rollbar', 'aardvark'])
+      expect(availableSources([integration('github'), integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['zebra', 'github', 'linear', 'rollbar', 'aardvark'])
     } finally {
       late.dispose()
       early.dispose()
@@ -82,9 +83,9 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     let visible = false
     const gated = sourceRegistry.register({ id: 'when-test', order: 0, glyph: 'w', label: 'When', when: () => visible })
     try {
-      expect(availableSources(undefined).map((s) => s.id)).toEqual(['github'])
+      expect(availableSources(undefined).map((s) => s.id)).toEqual([])
       visible = true
-      expect(availableSources(undefined).map((s) => s.id)).toEqual(['when-test', 'github'])
+      expect(availableSources(undefined).map((s) => s.id)).toEqual(['when-test'])
     } finally {
       gated.dispose()
     }
@@ -108,7 +109,7 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     const a = sourceRegistry.register({ id: 'a-source', order: 5, glyph: 'a', label: 'A' })
     try {
       // Registered b then a; the tiebreak puts a first, so the answer does not depend on registration.
-      expect(availableSources(undefined).map((s) => s.id)).toEqual(['a-source', 'b-source', 'github'])
+      expect(availableSources(undefined).map((s) => s.id)).toEqual(['a-source', 'b-source'])
     } finally {
       a.dispose()
       b.dispose()

@@ -7,7 +7,7 @@ import type { PluginRosterEntry } from '../plugin/host'
 import { plugins, setPluginsBridge } from './plugins'
 
 const ROSTER: PluginRosterEntry[] = [
-  { name: 'github', required: true, disabled: false },
+  { name: 'github', required: false, disabled: false },
   { name: 'terminal', required: true, disabled: false },
   { name: 'docker', required: false, disabled: false },
   { name: 'rollbar', required: false, disabled: true },
@@ -63,7 +63,7 @@ describe('GET /v2/core/plugins', () => {
     expect(res.status).toBe(200)
     const state = (await res.json()) as NodePluginState
     expect(state.plugins).toEqual([
-      { name: 'github', required: true, disabled: false, running: true },
+      { name: 'github', required: false, disabled: false, running: true },
       { name: 'terminal', required: true, disabled: false, running: true },
       { name: 'docker', required: false, disabled: true, running: true },
       { name: 'rollbar', required: false, disabled: true, running: false },
@@ -88,7 +88,7 @@ describe('GET /v2/core/plugins', () => {
     // for a required plugin, so the API has to as well or the checkbox would show off while it runs.
     // `rollbar` stays in the list so the fixture is self-consistent — the roster says it was disabled at
     // boot, and a file that no longer named it would legitimately mean "restart to bring it back".
-    wire(['github', 'terminal', 'rollbar'])
+    wire(['terminal', 'rollbar'])
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins.filter((row) => row.disabled).map((row) => row.name)).toEqual(['rollbar'])
     expect(state.restartRequired).toBe(false)
@@ -126,7 +126,7 @@ describe('PUT /v2/core/plugins', () => {
     // Silently filtering would leave the owner staring at a checkbox that will not stick, with nothing
     // said. The client already knows which rows are not togglable, so a request naming one is a bug.
     const saved = wire([])
-    const res = await asDevice().fetch(request('PUT', { disabled: ['github'] }))
+    const res = await asDevice().fetch(request('PUT', { disabled: ['terminal'] }))
     expect(res.status).toBe(400)
     expect(saved()).toEqual([])
   })

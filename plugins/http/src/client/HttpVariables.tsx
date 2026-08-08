@@ -5,7 +5,7 @@
 //   value   — stored and shown as typed
 //   secret  — encrypted at rest with the Node's secret key; the
 //             plaintext never comes back to the renderer, so the field shows a placeholder
-//   command — a stored shell command run in the task worktree (or the repo checkout) when a
+//   command — a stored shell command run in the task worktree (or the project checkout) when a
 //             request references it. Its output is never stored. The same mechanism the Database
 //             pane uses for its connection URL.
 import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
@@ -31,11 +31,10 @@ type Row = { id: string | null; name: string; kind: VariableKind; value: string;
 const toRow = (v: HttpVariable): Row => ({ id: v.id, name: v.name, kind: v.kind, value: v.value, enabled: v.enabled, hasStoredSecret: v.kind === 'secret' })
 const blankRow = (): Row => ({ id: null, name: '', kind: 'value', value: '', enabled: true, hasStoredSecret: false })
 
-export default function HttpVariables(props: { owner: string; repo: string }) {
+export default function HttpVariables(props: { projectId: string; projectName: string }) {
   const [error, setError] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal<string | null>(null)
-  const scope = () => ({ owner: props.owner, repo: props.repo })
-  const [stored] = createResource(scope, (s) => listVariables(s.owner, s.repo))
+  const [stored] = createResource(() => props.projectId, listVariables)
 
   // One local list, seeded from the server load and thereafter edited in place — each save patches
   // its row from the response, so nothing refetches under a cursor. The earlier stored-plus-drafts
@@ -57,7 +56,7 @@ export default function HttpVariables(props: { owner: string; repo: string }) {
     setError(null)
     try {
       const body = { name: row.name.trim(), kind: row.kind, value: row.value, enabled: row.enabled }
-      const next = row.id ? await updateVariable(props.owner, props.repo, row.id, body) : await createVariable(props.owner, props.repo, body)
+      const next = row.id ? await updateVariable(props.projectId, row.id, body) : await createVariable(props.projectId, body)
       setRows((current) => current.map((r, i) => (i === index ? toRow(next) : r)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the variable')
@@ -71,7 +70,7 @@ export default function HttpVariables(props: { owner: string; repo: string }) {
     if (!row.id) return dropRow(index)
     if (!confirm(`Delete "${row.name}"?`)) return
     try {
-      await deleteVariable(props.owner, props.repo, row.id)
+      await deleteVariable(props.projectId, row.id)
       dropRow(index)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the variable')
@@ -81,7 +80,7 @@ export default function HttpVariables(props: { owner: string; repo: string }) {
   return (
     <div class="http-variables">
       <header class="http-variables-head">
-        <h3>Variables · {props.owner}/{props.repo}</h3>
+        <h3>Variables · {props.projectName}</h3>
         <p class="http-hint">
           Write <code>{'{{NAME}}'}</code> anywhere in a request — the URL, a header, the body, an auth field. A request can override any of these in its own Vars tab.
           Built in already: <code>{'{{repo}}'}</code>, <code>{'{{branch}}'}</code>, <code>{'{{worktree}}'}</code>, <code>{'{{taskId}}'}</code>.

@@ -44,10 +44,15 @@ beforeEach(async () => {
   testDb = makeTestDb()
   dir = mkdtempSync(join(tmpdir(), 'acorn-worktree-route-'))
   const now = Date.now()
+  await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+  await testDb.db.insert(schema.projects).values({
+    id: 'project-widget', name: 'widget', path: dir, workspaceId: 'workspace-1', sort: 0, hidden: false,
+    vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/widget.git', githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
+    createdAt: now, updatedAt: now,
+  })
   await testDb.db.insert(schema.tasks).values({
     id: 'task1',
-    repoOwner: 'acme',
-    repoName: 'widget',
+    projectId: 'project-widget',
     branch: 'main',
     title: 'a task',
     status: 'active',
@@ -56,9 +61,6 @@ beforeEach(async () => {
     createdAt: now,
     updatedAt: now,
   })
-  // taskRoot() resolves a task's root THROUGH the repo→checkout mapping (main/taskWorktree.ts), not
-  // from tasks.worktreePath alone — so every task-scoped route below needs this row to exist.
-  await testDb.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: dir, createdAt: now, updatedAt: now })
 })
 
 afterEach(() => {
@@ -68,36 +70,6 @@ afterEach(() => {
 })
 
 describe('worktree routes', () => {
-  it('serves repo-path mapping and rejects a get with no owner/repo', async () => {
-    const app = authed()
-    expect((await app.fetch(req('/core/repos/path'), env())).status).toBe(400)
-    expect(await (await app.fetch(req('/core/repos/path?owner=nobody&repo=nothing'), env())).json()).toBeNull()
-
-    const mapped = (await (await app.fetch(req('/core/repos/path?owner=acme&repo=widget'), env())).json()) as { path: string }
-    expect(mapped.path).toBe(dir)
-  })
-
-  it('persists the executable repo config that config-trust gates', async () => {
-    const app = authed()
-    const res = await app.fetch(
-      req('/core/repos/path/config', 'PUT', { owner: 'acme', repo: 'widget', patch: { setupScript: 'echo hi', previewMode: 'port', previewValue: '3000' } }),
-      env(),
-    )
-    expect(res.status).toBe(200)
-    const [row] = await testDb.db.select().from(schema.repoPaths)
-    expect(row.setupScript).toBe('echo hi')
-    expect(row.previewValue).toBe('3000')
-  })
-
-  it('400s a malformed repo-config patch', async () => {
-    const app = authed()
-    // branchPrefix is capped at 60 chars, and dbSchemaMode is a closed set — the body contract is the
-    // reason this route belongs beside config-trust rather than behind a passthrough bridge.
-    expect((await app.fetch(req('/core/repos/path/config', 'PUT', { owner: 'a', repo: 'b', patch: { branchPrefix: 'x'.repeat(61) } }), env())).status).toBe(400)
-    expect((await app.fetch(req('/core/repos/path/config', 'PUT', { owner: 'a', repo: 'b', patch: { dbSchemaMode: 'nope' } }), env())).status).toBe(400)
-    expect((await app.fetch(req('/core/repos/path/run-targets', 'PUT', { owner: 'a', repo: 'b' }), env())).status).toBe(400)
-  })
-
   it('captures a preview URL from the last non-empty stdout line', async () => {
     const app = authed()
     const res = await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'echo noise; echo http://localhost:3000' }), env())
@@ -116,16 +88,6 @@ describe('worktree routes', () => {
     const app = authed()
     const res = await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'echo "[${SESSION_ENC_KEY:-absent}]"' }), env())
     expect(await res.json()).toEqual({ ok: true, url: '[absent]' })
-  })
-
-  it('use-checkout adopts the mapped checkout and wraps a null result', async () => {
-    const app = authed()
-    // Adopts the mapped checkout and its current branch; the result is wrapped rather than bare, so a
-    // null (no mapping) is not a 404 the client has to special-case.
-    const adopted = (await (await app.fetch(req('/core/tasks/task1/use-checkout', 'POST'), env())).json()) as { result: { worktreePath: string } | null }
-    expect(adopted.result?.worktreePath).toBe(dir)
-    const [task] = await testDb.db.select().from(schema.tasks)
-    expect(task.worktreePath).toBe(dir)
   })
 
   it('inspects MCP config only from known candidate files', async () => {

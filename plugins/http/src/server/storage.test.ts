@@ -9,12 +9,9 @@ import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 const ENC_KEY = '0'.repeat(64)
 const SECRETS = new SecretService(ENC_KEY)
 
-// Only `sole` is under test here — the legacy-row claim never consults the bound identity.
-const identity = (sole: string | null): IdentityService => ({
-  sole: async () => sole,
-  active: () => null,
-  bind: () => {},
-  unbind: () => {},
+// The legacy-row claim assigns unscoped rows to the node's boot-bound owner.
+const identity = (owner: string | null): IdentityService => ({
+  active: () => owner,
 })
 
 describe('legacy HTTP storage protection', () => {
@@ -26,11 +23,9 @@ describe('legacy HTTP storage protection', () => {
 
   afterEach(() => testDb.cleanup())
 
-  it('claims a legacy row for the sole known identity and encrypts every payload field', async () => {
+  it('claims a legacy row for the active owner and encrypts every payload field', async () => {
     await testDb.db.insert(httpRequests).values({
       id: 'legacy',
-      repoOwner: 'acme',
-      repoName: 'web',
       name: 'Legacy',
       method: 'GET',
       url: 'https://example.test?token=secret',
@@ -51,11 +46,9 @@ describe('legacy HTTP storage protection', () => {
     expect(await openHttpValue(row.url, row.encrypted, SECRETS)).toBe('https://example.test?token=secret')
   })
 
-  it('leaves ownership quarantined when more than one identity exists', async () => {
+  it('leaves ownership quarantined when no active owner exists', async () => {
     await testDb.db.insert(httpVariables).values({
       id: 'legacy-var',
-      repoOwner: 'acme',
-      repoName: 'web',
       name: 'TOKEN',
       kind: 'value',
       value: 'secret',
@@ -63,7 +56,7 @@ describe('legacy HTTP storage protection', () => {
       updatedAt: 1,
     })
 
-    // sole() === null is what "none, or more than one" looks like to this function.
+    // A null active identity leaves legacy ownership quarantined rather than guessing an owner.
     await protectLegacyHttpStorage(testDb.db, SECRETS, identity(null))
 
     const [row] = await testDb.db.select().from(httpVariables)

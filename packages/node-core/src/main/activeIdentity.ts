@@ -1,9 +1,10 @@
 import { chmodSync, closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 
-// The identity bound to the machine-side internal token. Persisting the explicit login avoids
-// guessing from whichever prefs/repo row SQLite happens to return first after an account switch.
-// It is not a credential, but it still lives in the private data root and is written mode 0600.
+// The identity bound to the machine-side internal token: the node's opaque owner id, minted at
+// first boot (main/core/identity/identity.ts). Persisting it explicitly avoids guessing from
+// whichever prefs row SQLite happens to return first. It is not a credential, but it still lives
+// in the private data root and is written mode 0600.
 export type ActiveIdentityStore = {
   get(): string | null
   set(userId: string): void

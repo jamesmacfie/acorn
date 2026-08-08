@@ -434,8 +434,8 @@ describe('architecture boundaries', () => {
   it('only core reaches the machine identity store', () => {
     // The node's identity used to be WRITTEN by a feature plugin: plugins/github's device-flow route
     // set `c.env.ACTIVE_IDENTITY` after connecting an account, so core's answer to "who is the user"
-    // was a side effect of one provider. It is CoreServices.identity now (main/core/identity/identity.ts), and
-    // github binds through that seam like any other consumer.
+    // was a side effect of one provider. It is now minted by core at boot (main/core/identity/identity.ts),
+    // and providers only consume the read-only CoreServices.identity seam.
     //
     // This rule keeps the raw store out of reach so the inversion cannot come back. The allowlist is
     // node-core, which owns the store, plus the two composition roots, which construct it and hand it
@@ -459,7 +459,7 @@ describe('architecture boundaries', () => {
     // that the surface OUTSIDE it stays tiny and enumerated — those are the files that would have
     // to move or grow an adapter when the node service is split out.
     const ELECTRON_OK_OUTSIDE_DESKTOP = new Set([
-      'plugins/terminal/src/main/pickerIpc.ts',
+      'plugins/terminal/src/main/folderPickerIpc.ts',
       'plugins/preview/src/main/previewService.ts',
       'plugins/preview/src/main/browserService.ts',
       // colocated test that mocks the electron module it exercises

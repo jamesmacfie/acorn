@@ -2,23 +2,23 @@ import { describe, expect, it } from 'vitest'
 import type { Task, Workspace } from '@acorn/protocol/api.ts'
 import { planWorkspaceViewTransition } from './workspaceViewTransition'
 
-const workspace = (id: string, owner: string, name: string): Workspace => ({
+const workspace = (id: string, projectId: string, name: string): Workspace => ({
   id,
   name: id,
   isDefault: false,
   sort: 0,
   icon: null,
   color: null,
-  repos: [{ owner, name, sort: 0 }],
+  projects: [{ id: projectId, name, sort: 0 }],
 })
 
-const task = (id: string, repoOwner: string, repoName: string): Task => ({
+const task = (id: string, projectId: string, _projectName: string): Task => ({
   id,
   title: id,
   icon: null,
   origin: 'local',
-  repoOwner,
-  repoName,
+  projectId,
+  github: null,
   branch: id,
   worktreePath: null,
   pullNumber: null,
@@ -28,11 +28,11 @@ const task = (id: string, repoOwner: string, repoName: string): Task => ({
   links: [],
 })
 
-const acorn = workspace('acorn', 'jamesmacfie', 'acorn')
-const runn = workspace('runn', 'Runn-Fast', 'runn')
-const acornTask = task('acorn-task', 'jamesmacfie', 'acorn')
-const oldRunnTask = task('old-runn-task', 'Runn-Fast', 'runn')
-const selectedRunnTask = task('selected-runn-task', 'Runn-Fast', 'runn')
+const acorn = workspace('acorn', 'project-acorn', 'acorn')
+const runn = workspace('runn', 'project-runn', 'runn')
+const acornTask = task('acorn-task', 'project-acorn', 'acorn')
+const oldRunnTask = task('old-runn-task', 'project-runn', 'runn')
+const selectedRunnTask = task('selected-runn-task', 'project-runn', 'runn')
 const tasks = [acornTask, oldRunnTask, selectedRunnTask]
 
 describe('workspace view transitions', () => {

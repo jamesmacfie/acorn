@@ -25,7 +25,7 @@ describe('desktop bridge detection', () => {
   })
 
   it('both accessors and the capability map agree when the bridge is present', () => {
-    setBridge({ repoPath: { pick: async () => null } })
+    setBridge({ folderPath: { pick: async () => null } })
     expect(taskBridge()).not.toBeNull()
     expect(terminalApi()).not.toBeNull()
     expect(capabilities().terminal).toBe(true)
@@ -33,17 +33,17 @@ describe('desktop bridge detection', () => {
 
   it('taskBridge routes the folder picker through the preload bridge, not HTTP', async () => {
     let picked = 0
-    setBridge({ repoPath: { pick: async () => { picked += 1; return '/repo' } } })
-    await expect(taskBridge()!.repoPath.pick()).resolves.toBe('/repo')
+    setBridge({ folderPath: { pick: async () => { picked += 1; return '/repo' } } })
+    await expect(taskBridge()!.folderPath.pick()).resolves.toBe('/repo')
     expect(picked).toBe(1)
   })
 
   it('exposes the task-lifecycle and agent-delivery surface core consumers need', () => {
-    setBridge({ repoPath: { pick: async () => null } })
+    setBridge({ folderPath: { pick: async () => null } })
     const api = taskBridge()!
     expect(typeof api.task.archive).toBe('function')
     expect(typeof api.task.onCreated).toBe('function')
-    expect(typeof api.task.useCheckout).toBe('function')
+    expect(typeof api.project.get).toBe('function')
     expect(typeof api.task.statuses).toBe('function')
     expect(typeof api.sendToAgent).toBe('function')
     expect(typeof api.previewUrl).toBe('function')

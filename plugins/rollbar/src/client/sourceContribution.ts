@@ -24,7 +24,7 @@ export const rollbarSourceContribution: SourceContribution<RollbarItemSummary> =
   promotion: {
     // Stricter than linear's: a Rollbar item has no branch of its own, so one has to be typed or
     // derived, and the modal cannot proceed on an empty string.
-    canPromote: (_item, context) => !!context.owner && !!context.repo && !!context.branch?.trim(),
+    canPromote: (_item, context) => !!context.projectId && !!context.branch?.trim(),
     prepare: prepareRollbarPromotion,
     create: createTask,
     attachToCurrentTask: (taskId, item) =>

@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { contentLinkRegistry, parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
-import { githubContentLinkContributions, splitLinearIds } from './contentLinks'
+import { githubContentLinkContributions, makeContentLinkHandler, splitLinearIds } from './contentLinks'
 
 // Only github's own recognisers are asserted here. Linear's moved to plugins/linear with the
 // contribution itself — a github test importing linear's client would be a plugin->plugin edge
@@ -24,6 +24,32 @@ describe('parseInAppTarget', () => {
   it('ignores unrelated links', () => {
     expect(parseInAppTarget('https://example.com/x')).toBeNull()
     expect(parseInAppTarget('https://github.com/orgs/runn')).toBeNull()
+  })
+})
+
+describe('project-keyed content navigation', () => {
+  it('resolves GitHub links through the project facet', () => {
+    const navigate = vi.fn()
+    const preventDefault = vi.fn()
+    const anchor = {
+      getAttribute: (name: string) => name === 'href' ? 'https://github.com/runn/acorn/pull/42' : null,
+      dataset: {},
+    }
+    const handler = makeContentLinkHandler(navigate, vi.fn(), (owner, repo) => owner === 'runn' && repo === 'acorn' ? 'project-acorn' : null)
+
+    handler({
+      defaultPrevented: false,
+      button: 0,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      target: { closest: () => anchor },
+      preventDefault,
+    } as unknown as MouseEvent)
+
+    expect(navigate).toHaveBeenCalledWith('/p/project-acorn/pulls/42')
+    expect(preventDefault).toHaveBeenCalledOnce()
   })
 })
 

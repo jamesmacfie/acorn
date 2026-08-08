@@ -9,7 +9,8 @@ import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'
-import { getRepoPath } from './repoPaths'
+import { getProjectConfig } from './projectConfig'
+import { projectForTask } from './taskWorktree'
 import { buildSessionEnv } from './taskEnv'
 import { removeWorktree } from './worktrees'
 
@@ -45,9 +46,9 @@ export type ArchiveDeps = {
 }
 
 // The repo-level teardown script, paired with repoSetup in taskWorktree.ts, is read from repo settings.
-async function teardownScriptFor(db: AppDatabase, owner: string, repo: string): Promise<string | null> {
-  const rp = await getRepoPath(db, owner, repo)
-  return rp?.teardownScript?.trim() || null
+async function teardownScriptFor(db: AppDatabase, projectId: string): Promise<string | null> {
+  const config = await getProjectConfig(db, projectId)
+  return config?.config.teardownScript?.trim() || null
 }
 
 export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts, deps: ArchiveDeps): Promise<ArchiveResult> {
@@ -58,17 +59,26 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
   if (running && !force) return { ok: false, reason: `Stop ${running} running session${running > 1 ? 's' : ''} first.` }
   const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
   if (!t) return { ok: false, reason: 'Task not found.' }
+  const project = await projectForTask(db, t)
+  const projectRoot = project?.path ? resolve(project.path) : null
+  const ownsWorktree = !!t.worktreePath && (!projectRoot || resolve(t.worktreePath) !== projectRoot)
 
   // Teardown (docs/terminal-and-agents.md): runs while the worktree and any services still exist — before
   // sessions are stopped and before removal. Non-zero exit pauses the archive so the caller can
   // choose continue (re-invoke with skipTeardown) or abort; nothing has been torn down yet.
-  if (deleteWorktree && !opts.skipTeardown && t.worktreePath && deps.isDir(t.worktreePath)) {
-    const script = await teardownScriptFor(db, t.repoOwner, t.repoName)
+  if (deleteWorktree && ownsWorktree && !opts.skipTeardown && t.worktreePath && deps.isDir(t.worktreePath) && project) {
+    const script = await teardownScriptFor(db, project.id)
     if (script) {
       const env = buildSessionEnv({
         taskId: t.id,
         cwd: t.worktreePath,
-        task: { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title },
+        task: {
+          projectId: project.id,
+          projectName: project.name,
+          github: project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null,
+          branch: t.branch,
+          title: t.title,
+        },
       })
       const res = await deps.runTeardown(script, t.worktreePath, env, t.id)
       if (res.exitCode !== 0) {
@@ -78,15 +88,9 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
   }
 
   if (running) deps.killRunning(id)
-  if (deleteWorktree && t.worktreePath) {
-    const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-    // A "current-checkout" task borrows the main checkout (worktreePath === checkout) rather than
-    // owning an isolated worktree — never git-remove it, just drop the reference on archive.
-    const borrowsCheckout = mapped && resolve(t.worktreePath) === resolve(mapped.path)
-    if (mapped && !borrowsCheckout) {
-      const res = await removeWorktree(mapped.path, t.worktreePath, force) // force discards a dirty tree
+  if (deleteWorktree && ownsWorktree && t.worktreePath && project?.path && project.vcs === 'git') {
+    const res = await removeWorktree(project.path, t.worktreePath, force) // force discards a dirty tree
       if (!res.ok) return res
-    }
     // No mapped checkout → can't git-remove; we still archive and drop the (now-orphaned) reference.
   }
   await deps.dropTaskSessions(id)

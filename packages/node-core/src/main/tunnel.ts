@@ -40,7 +40,7 @@ function parseTarget(url: string | undefined, host: string): Target | null {
 // Refusing has to survive a peer that has already gone away.
 //
 // The window is real and not small: between `claimUpgrade` and the refusal the handler awaits a device
-// lookup AND the port resolver, which reads the tasks table, the repo_paths row and (through the run
+// lookup AND the port resolver, which reads the tasks table, the project config row and (through the run
 // bridge) possibly a `url_command`. A client that connects and immediately RSTs leaves a destroyed socket,
 // and `write` on one emits `'error'` — the HTTP server has already handed the socket over, so nobody is
 // listening and the emit becomes an `uncaughtException` that takes the service down and spends one of the

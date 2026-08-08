@@ -197,28 +197,28 @@ async function launch(): Promise<RunningApp> {
 
 // The same workspace / repo / task shape on both nodes, so the ONLY difference between what the two
 // answer is the title — which is what makes the cache assertion below meaningful.
-type Seed = { workspaceId: string; taskId: string }
+type Seed = { workspaceId: string; projectId: string; taskId: string }
 
 async function seedLocal(page: Page, nodeId: string, repoDir: string, title: string): Promise<Seed> {
   const workspace = await nodeJson<{ id: string }>(page, nodeId, '/v2/core/workspaces', { method: 'POST', body: { name: 'Alpha' } })
-  await nodeJson(page, nodeId, `/v2/core/workspaces/${workspace.id}/repos`, { method: 'POST', body: { owner: 'acorn', name: 'smoke' } })
-  await nodeJson(page, nodeId, '/v2/core/repos/path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoDir } })
+  const project = await nodeJson<{ project: { id: string } }>(page, nodeId, '/v2/core/projects', { method: 'POST', body: { path: repoDir, workspaceId: workspace.id } })
   const task = await nodeJson<{ id: string }>(page, nodeId, '/v2/core/tasks', {
     method: 'POST',
-    body: { origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title },
+    body: { origin: 'local', projectId: project.project.id, branch: 'main', title },
   })
-  return { workspaceId: workspace.id, taskId: task.id }
+  return { workspaceId: workspace.id, projectId: project.project.id, taskId: task.id }
 }
 
-async function seedRemote(node: StandaloneHandshake, title: string, repoPath?: string): Promise<Seed> {
+async function seedRemote(node: StandaloneHandshake, title: string, projectPath: string): Promise<Seed> {
   const workspace = await remoteJson<{ id: string }>(node, '/v2/core/workspaces', { method: 'POST', body: { name: 'Beta' } })
-  await remoteJson(node, `/v2/core/workspaces/${workspace.id}/repos`, { method: 'POST', body: { owner: 'acorn', name: 'smoke' } })
-  if (repoPath) await remoteJson(node, '/v2/core/repos/path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoPath } })
+  const created = await remoteJson<{ project: { id: string } }>(node, '/v2/core/projects', {
+    method: 'POST', body: { path: projectPath, workspaceId: workspace.id },
+  })
   const task = await remoteJson<{ id: string }>(node, '/v2/core/tasks', {
     method: 'POST',
-    body: { origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title },
+    body: { origin: 'local', projectId: created.project.id, branch: 'main', title },
   })
-  return { workspaceId: workspace.id, taskId: task.id }
+  return { workspaceId: workspace.id, projectId: created.project.id, taskId: task.id }
 }
 
 // A git repo on "the other machine", for a remote task that needs a worktree.
@@ -284,7 +284,7 @@ function collideIds(dataDir: string, from: Seed, to: Seed): void {
   execFileSync('sqlite3', [join(dataDir, 'core.sqlite'), `
     PRAGMA busy_timeout = 5000;
     BEGIN IMMEDIATE;
-    UPDATE workspace_repos SET workspace_id = ${quote(to.workspaceId)} WHERE workspace_id = ${quote(from.workspaceId)};
+    UPDATE projects SET workspace_id = ${quote(to.workspaceId)} WHERE workspace_id = ${quote(from.workspaceId)};
     UPDATE workspaces SET id = ${quote(to.workspaceId)} WHERE id = ${quote(from.workspaceId)};
     UPDATE tasks SET id = ${quote(to.taskId)} WHERE id = ${quote(from.taskId)};
     COMMIT;
@@ -296,10 +296,10 @@ async function dismissOnboarding(page: Page): Promise<void> {
   if (await done.isVisible().catch(() => false)) await done.click()
 }
 
-// Land on the workspace route with both queries starting from the node rather than from whatever the
+// Land on the project route with both queries starting from the node rather than from whatever the
 // pre-seed render cached. Same recipe as the smoke suite's openSmokeWorkspace.
-async function openWorkspace(page: Page): Promise<void> {
-  await page.goto(new URL('/acorn/smoke', page.url()).toString())
+async function openWorkspace(page: Page, projectId: string): Promise<void> {
+  await page.goto(new URL(`/p/${projectId}`, page.url()).toString())
   await page.reload()
   await expect(page.locator('.shell')).toBeVisible()
   await dismissOnboarding(page)
@@ -337,7 +337,7 @@ test('drives the bundled node and a second node concurrently, with per-node cach
   expect(remote.nodeId).not.toBe(localNodeId)
 
   const local = await seedLocal(running.page, localNodeId, running.repoDir, 'Task on A')
-  const seeded = await seedRemote(remote, 'Task on B')
+  const seeded = await seedRemote(remote, 'Task on B', makeRepo(join(remoteRoot, 'repo')))
   collideIds(join(remoteRoot, 'data'), seeded, local)
 
   // Pairing, through the bridge: the renderer holds no token and no certificate, so probe and pair are
@@ -379,20 +379,21 @@ test('drives the bundled node and a second node concurrently, with per-node cach
 
   // ...and as the client renders it. One QueryClient per node means the rail's ['tasks'] entry for node
   // B cannot overwrite node A's even though both hold a task with this exact id.
-  await openWorkspace(running.page)
+  await openWorkspace(running.page, local.projectId)
   await expect(running.page.locator('.tabrail-task[aria-label="Task on A"]')).toBeVisible()
 
   const switcher = running.page.locator('select.node-switcher')
   await expect(switcher.locator('option')).toHaveCount(2)
 
+  // No navigation around the switch: the active node is an in-memory signal (node/activeNode.ts), and
+  // selectActiveNode re-homes the window onto the local node on every reload. Switching nodes has to
+  // repopulate the rail in place, which is the per-node cache claim this test is here to make.
   await switcher.selectOption(remote.nodeId)
-  await dismissOnboarding(running.page)
   await expect(running.page.locator('.tabrail-task[aria-label="Task on B"]')).toBeVisible()
   await expect(running.page.locator('.tabrail-task[aria-label="Task on A"]')).toHaveCount(0)
 
   // Back again: node A's data is intact, not evicted by the visit to B.
   await switcher.selectOption(localNodeId)
-  await dismissOnboarding(running.page)
   await expect(running.page.locator('.tabrail-task[aria-label="Task on A"]')).toBeVisible()
   await expect(running.page.locator('.tabrail-task[aria-label="Task on B"]')).toHaveCount(0)
 
@@ -553,12 +554,11 @@ test('runs a terminal and opens a preview tunnel on a remote task, over the LAN'
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
   const devPort = (server.address() as { port: number }).port
   try {
-    // Declared, which is what makes it tunnellable at all — "Only declared ports; no general SOCKS". Through
-    // the CONFIG route (`/repos/path/config`), not `/repos/path`: the first is the authoring surface for the
-    // executable half of repo config and takes a `patch`, the second sets the checkout location.
-    await remoteJson(remote, '/v2/core/repos/path/config', {
+    // Declared, which is what makes it tunnellable at all — "Only declared ports; no general SOCKS".
+    // Project configuration is keyed by the project identity.
+    await remoteJson(remote, `/v2/core/projects/${seeded.projectId}/config`, {
       method: 'PUT',
-      body: { owner: 'acorn', repo: 'smoke', patch: { previewMode: 'port', previewValue: String(devPort) } },
+      body: { patch: { previewMode: 'port', previewValue: String(devPort) } },
     })
 
     // The renderer opens the tunnel and learns only a loopback port…

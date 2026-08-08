@@ -6,7 +6,7 @@
 // (tools/arch/boundaries.test.ts enumerates them). Its whole node-side surface is one read.
 //
 // It is a NodePlugin anyway, and that is the point of converting it: the read needs core's `tasks` and
-// `repo_paths`, and before this it was a loose function the composition root called with core's database
+// `projects`, and before this it was a loose function the composition root called with core's database
 // handle (`previewRulesForTask(db, taskId)` in service/runtime.ts). That is exactly the shape the split
 // removes — a plugin holding core's handle — so the function now takes CoreServices and the plugin
 // publishes it, leaving the composition root to resolve a capability instead of wiring a query.

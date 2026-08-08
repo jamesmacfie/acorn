@@ -5,7 +5,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { Modal } from '@acorn/client-core/ui/Modal.tsx'
 import { Button, Field, Input, Select } from '@acorn/client-core/ui/primitives.tsx'
 
-export type SaveTarget = { name: string; folder: string; scope: 'task' | 'repo' }
+export type SaveTarget = { name: string; folder: string; scope: 'task' | 'project' }
 
 export default function SaveRequestModal(props: {
   target: SaveTarget
@@ -50,16 +50,16 @@ export default function SaveRequestModal(props: {
         </Field>
 
         <Show when={props.inTask}>
-          <Field label="Keep in" hint={scope() === 'task' ? 'Stays with this task and goes when the task does.' : "Filed in the repo's tree, available from every task."}>
-            <Select value={scope()} onChange={(e) => setScope(e.currentTarget.value as 'task' | 'repo')}>
+          <Field label="Keep in" hint={scope() === 'task' ? 'Stays with this task and goes when the task does.' : "Filed in the project's tree, available from every task."}>
+            <Select value={scope()} onChange={(e) => setScope(e.currentTarget.value as 'task' | 'project')}>
               <option value="task">This task</option>
-              <option value="repo">The repo</option>
+              <option value="project">The project</option>
             </Select>
           </Field>
         </Show>
 
         {/* A datalist, not a picker: existing folders are suggestions and a new path is just typed. */}
-        <Show when={scope() === 'repo'}>
+        <Show when={scope() === 'project'}>
           <Field label="Folder" hint="Slash-separated. Leave blank for the top of the tree.">
             <Input
               value={folder()}

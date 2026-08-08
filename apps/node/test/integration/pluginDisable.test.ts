@@ -101,6 +101,7 @@ const OWNED: Record<string, Partial<Snapshot>> = {
   preview: { tools: ['browser_click', 'browser_console', 'browser_fill', 'browser_navigate', 'browser_screenshot', 'browser_snapshot'] },
   rollbar: { connectionProviders: ['rollbar'], integrationProviders: ['rollbar'], providerRoutes: ['rollbar'] },
   workflows: { routes: ['workflows'], databases: ['workflows.sqlite'] },
+  github: { routes: [...Array.from({ length: 12 }, () => 'github/repos'), 'github/pins', 'github', 'github'], sections: ['pr'], databases: ['github.sqlite'], connectionProviders: ['github'], integrationProviders: ['github'] },
 }
 
 // Multiset subtraction: remove each expected entry ONCE, leave the rest in order.
@@ -193,7 +194,7 @@ describe('disabling a node plugin', () => {
     // Every case below asserts "the others are still there", which an empty list satisfies trivially.
     expect(all.length).toBeGreaterThanOrEqual(15)
     expect(optional.length).toBeGreaterThanOrEqual(8)
-    expect(required.sort()).toEqual(['agents', 'github', 'memory', 'notes', 'terminal'])
+    expect(required.sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     // The ledger covers exactly the plugins that get cycled — a plugin added to the list without an entry
     // fails here rather than quietly getting a case that asserts nothing.
     expect(Object.keys(OWNED).sort()).toEqual([...optional].sort())

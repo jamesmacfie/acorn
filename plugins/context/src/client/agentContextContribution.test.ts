@@ -7,6 +7,7 @@ const context: TaskContext = {
   task: {
     id: 'task-1',
     title: 'Fix linked issue',
+    projectId: 'project-1',
     repo: 'acorn/app',
     branch: 'fix/issue',
     worktreePath: '/worktree',

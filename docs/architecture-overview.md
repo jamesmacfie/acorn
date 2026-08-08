@@ -1,7 +1,7 @@
 # Architecture overview
 
 acorn is a desktop client for one or more local Node services. The client owns presentation and
-fleet membership. A Node owns the data and execution environment for the repositories assigned to
+fleet membership. A Node owns the data and execution environment for the projects assigned to
 it. There is no shared database or cross-Node transaction.
 
 ## Runtime topology
@@ -38,9 +38,9 @@ routes.
 The Node owns:
 
 - core and plugin SQLite connections and migrations;
-- workspaces, tasks, repositories, worktrees, Git, files, and repo configuration;
+- workspaces, projects, tasks, worktrees, Git, files, and project configuration;
 - PTYs, tmux sessions, child processes, managed agents, workflows, Docker, and Postgres access;
-- provider integrations, encrypted secrets, mirrors, blob storage, audit, backup, import, and
+- provider integrations, encrypted secrets, mirrors, blob storage, audit, backup, and
   reconciliation;
 - the HTTPS listener, authenticated WebSocket, stream/tunnel sockets, and shutdown drain.
 
@@ -60,8 +60,8 @@ capabilities such as preview/browser operations.
 The Node exposes one Hono application:
 
 - `/v2/node` and `/v2/pair` are the two pre-auth pairing routes;
-- `/v2/core/*` contains core-owned workspaces, tasks, worktrees, integrations, settings, security,
-  backup, import, audit, agent-tool, and task-context routes;
+- `/v2/core/*` contains core-owned workspaces, projects, tasks, worktrees, integrations, settings,
+  security, backup, audit, agent-tool, and task-context routes;
 - `/v2/p/<plugin>/*` contains plugin-contributed routes;
 - `/v2/events` is the authenticated WebSocket for invalidation events, PTY/process streams, Docker
   streams, workflow notices, agent events, and preview tunnels.
@@ -103,14 +103,14 @@ Every consumer is TypeScript in this repo; Zod at the boundary is as far as this
 ## Product model
 
 ```text
-Workspace: named group of repositories
-  └─ Task: one repository, branch, optional worktree and linked external item
+Workspace: named group of projects
+  └─ Task: one project, optional branch/worktree and linked external item
        ├─ ordered/resizable panes
        └─ per-task terminal and managed-agent sessions
 ```
 
-Workspaces are machine-local groups. A repository belongs to one workspace. A task is always owned
-by one Node and one repository. Task origins are `github-pr`, `linear`, `rollbar`, or `local`.
+Workspaces are machine-local groups. A project belongs to one workspace. A task is always owned
+by one Node and one project. Task origins are `github-pr`, `linear`, `rollbar`, or `local`.
 
 The renderer shell is contribution-driven. Plugins register task panes, rail sources, command-palette
 rows, settings pages, slots, context sections, attention items, and node statistics. The shipped
@@ -122,7 +122,7 @@ Claude, Codex, and Aider profiles registered by `plugins/agents`.
 
 The Node separates disposable provider projections from application-owned state. GitHub, Linear, and
 Rollbar data is cached locally and revalidated on demand. Workspaces, tasks, notes, memories, agent
-sessions, workflow state, integrations, preferences, repo configuration, saved queries, devices,
+sessions, workflow state, integrations, preferences, project configuration, saved queries, devices,
 and audit records are local source-of-truth data.
 
 Core owns the cross-feature workspace/task model, device and idempotency state, integrations, generic
@@ -167,3 +167,5 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - [api-reference.md](./api-reference.md), [data-layer.md](./data-layer.md), [caching.md](./caching.md) — Node contracts.
 - [plugins.md](./plugins.md), [agent-tools.md](./agent-tools.md) — extension and tool boundaries.
 - [electron.md](./electron.md), [local-development.md](./local-development.md) — runtime and development.
+- [legacy/projects/README.md](./legacy/projects/README.md) — completed project-model migration record
+  and retained phase notes.

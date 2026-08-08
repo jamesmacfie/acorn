@@ -1,4 +1,3 @@
-import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
 import { Hono } from 'hono'
 import type { PullConflicts } from '../../contract/api'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
@@ -27,7 +26,7 @@ export function parseConflictNames(stdout: string): string[] {
   return files
 }
 
-export const pullConflicts = (core: Pick<CoreServices, 'repos'>) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/conflicts', async (c) => {
+export const pullConflicts = (core: Pick<CoreServices, 'projects' | 'git'>) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/conflicts', async (c) => {
   ownerId(c) // gate on auth, like the other /v2/p/github/repos reads
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
@@ -36,10 +35,10 @@ export const pullConflicts = (core: Pick<CoreServices, 'repos'>) => new Hono<App
   const base = c.req.query('base') ?? ''
 
   const unavailable: PullConflicts = { available: false, files: [] }
-  // `repo_paths` is CORE's table, so the checkout lookup goes through CoreServices rather than a handle of
-  // this plugin's — which is why this is the one github router that takes `core` and no database at all.
-  const mapped = await core.repos.path(owner, repo)
-  if (!mapped || !isValidRef(base)) return c.json(unavailable)
+  // Project facets are the source of truth for GitHub checkout resolution. The project service returns
+  // the deterministic primary clone, and the plugin never reads core's project tables directly.
+  const mapped = await core.projects.byGithub(owner, repo)
+  if (!mapped?.path || !isValidRef(base)) return c.json(unavailable)
   const checkout = mapped.path
 
   // Fetch the base branch tip and the PR head into throwaway per-PR refs (never touching the
@@ -48,14 +47,14 @@ export const pullConflicts = (core: Pick<CoreServices, 'repos'>) => new Hono<App
   const baseRef = `refs/acorn/conflict/${number}/base`
   const headRef = `refs/acorn/conflict/${number}/head`
   try {
-    await gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+refs/heads/${base}:${baseRef}`, `+refs/pull/${number}/head:${headRef}`], { cwd: checkout, timeoutMs: 60_000 })
+    await core.git.gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+refs/heads/${base}:${baseRef}`, `+refs/pull/${number}/head:${headRef}`], { cwd: checkout, timeoutMs: 60_000 })
   } catch {
     return c.json(unavailable)
   }
 
   try {
     // Exit 0 → the trial merge is clean (GitHub's CONFLICTING was stale); no conflicting files.
-    await gitOrThrow(['merge-tree', '--write-tree', '--name-only', baseRef, headRef], { cwd: checkout, timeoutMs: 30_000 })
+    await core.git.gitOrThrow(['merge-tree', '--write-tree', '--name-only', baseRef, headRef], { cwd: checkout, timeoutMs: 30_000 })
     return c.json({ available: true, files: [] } satisfies PullConflicts)
   } catch (e) {
     // Exit 1 → conflicts; the conflicting paths are on stdout. Anything else → couldn't compute.

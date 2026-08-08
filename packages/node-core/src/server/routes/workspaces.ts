@@ -1,43 +1,31 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { and, eq, inArray, max } from 'drizzle-orm'
+import { eq, inArray, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import type { Workspace, WorkspaceProjectsResponse, WorkspaceRepo, WorkspaceSeed } from '@acorn/protocol/api.ts'
+import type { Workspace, WorkspaceExternalProjectsResponse, WorkspaceProjectRef, WorkspaceSeed } from '@acorn/protocol/api.ts'
 import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '@acorn/protocol/workspaceIdentity.ts'
 import { getConnection } from '../integrations/connections'
-import { repoMirrorSource } from '../repoMirror'
 
-// Workspaces (docs/workspaces-and-tasks.md): named GROUPS of repos — the top-level unit. Machine-scoped (no
-// user_id) like tasks / repo_paths, but auth-gated. A repo belongs to exactly one workspace
-// (workspace_repos PK is (owner, repo)); the `Default` workspace is the catch-all.
+// Workspaces (docs/workspaces-and-tasks.md): named groups of Projects — the top-level unit.
 
-// The `owner/repo` keys of every ignored repo — the shared filter for hiding them from the
-// selector / rail / scoping while their workspace membership is kept.
-const workspaceProjectsBody = z.object({
+const workspaceExternalProjectsBody = z.object({
   projects: z.array(z.object({ integrationId: z.string().min(1), externalId: z.string().min(1) })).optional(),
 })
-
-async function ignoredRepoSet(db: ReturnType<typeof getDb>): Promise<Set<string>> {
-  return new Set((await db.select().from(schema.ignoredRepos)).map((i) => `${i.owner}/${i.repo}`))
-}
 
 async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]> {
   const rows = await db.select().from(schema.workspaces).orderBy(schema.workspaces.sort)
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
-  const repoRows = await db.select().from(schema.workspaceRepos).where(inArray(schema.workspaceRepos.workspaceId, ids))
-  // Ignored repos keep their membership but are hidden from the main UI (selector / rail / scoping).
-  const ignored = await ignoredRepoSet(db)
-  const byWs = new Map<string, WorkspaceRepo[]>()
-  for (const r of repoRows) {
-    if (ignored.has(`${r.repoOwner}/${r.repoName}`)) continue
-    const list = byWs.get(r.workspaceId) ?? []
-    list.push({ owner: r.repoOwner, name: r.repoName, sort: r.sort })
-    byWs.set(r.workspaceId, list)
+  const projectRows = await db.select().from(schema.projects).where(inArray(schema.projects.workspaceId, ids))
+  const projectsByWs = new Map<string, WorkspaceProjectRef[]>()
+  for (const project of projectRows) {
+    const list = projectsByWs.get(project.workspaceId) ?? []
+    list.push({ id: project.id, name: project.name, sort: project.sort })
+    projectsByWs.set(project.workspaceId, list)
   }
   return rows.map((r) => ({
     id: r.id,
@@ -46,7 +34,7 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     sort: r.sort,
     icon: parseWorkspaceIcon(r.icon),
     color: r.color,
-    repos: (byWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
+    projects: (projectsByWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
   }))
 }
 
@@ -63,23 +51,12 @@ export const workspaces = new Hono<AppEnv>()
   .get('/', async (c) => {
     return c.json(await listWorkspaces(getDb(c.env)))
   })
-  // Idempotent first-run setup: create Default and assign every mirrored repo not yet in a workspace.
+  // Idempotent first-run setup: the core owns only the Default workspace. Provider candidates are
+  // imported explicitly through their plugin-owned importer; boot must not turn a disposable mirror
+  // projection into application-owned project state.
   .post('/bootstrap', async (c) => {
-    const uid = ownerId(c)
     const db = getDb(c.env)
-    const defaultId = await ensureDefault(db)
-    // The candidate list is github's mirror, not a core table any more (server/repoMirror.ts). Bootstrap is
-    // idempotent by design, so an empty answer from a cold mirror means "nothing to assign yet" and the
-    // next run picks the repos up — which is exactly what it already did before the first sync.
-    const repos = await repoMirrorSource().list(uid)
-    const mapped = await db.select().from(schema.workspaceRepos)
-    const ignored = await ignoredRepoSet(db)
-    const skip = new Set([...mapped.map((m) => `${m.repoOwner}/${m.repoName}`), ...ignored])
-    const now = Date.now()
-    const toAdd = repos
-      .filter((r) => !skip.has(`${r.owner}/${r.name}`))
-      .map((r, i) => ({ workspaceId: defaultId, repoOwner: r.owner, repoName: r.name, sort: i, createdAt: now }))
-    if (toAdd.length) await db.insert(schema.workspaceRepos).values(toAdd).onConflictDoNothing()
+    await ensureDefault(db)
     return c.json(await listWorkspaces(db))
   })
   .post('/', async (c) => {
@@ -90,10 +67,10 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, icon: null, color: null, repos: [] } satisfies Workspace)
+    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, icon: null, color: null, projects: [] } satisfies Workspace)
   })
-  // Update a workspace's identity (name / icon / colour). Build/run/db/preview config is repo-level
-  // now (repo-level-settings) — see the /terminal/repo-path/config route.
+  // Update a workspace's identity (name / icon / colour). Project configuration is owned by the
+  // project routes.
   .patch('/:id', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { name?: string; icon?: unknown; color?: string | null }
     const set: { name?: string; icon?: string | null; color?: string | null; updatedAt: number } = { updatedAt: Date.now() }
@@ -128,78 +105,24 @@ export const workspaces = new Hono<AppEnv>()
     if (!row) return respondError(c, 404, 'not_found')
     if (row.isDefault) return respondError(c, 400, 'cannot_delete_default')
     const defaultId = await ensureDefault(db)
-    // Reassign this workspace's repos back to Default rather than orphaning them.
-    await db.update(schema.workspaceRepos).set({ workspaceId: defaultId }).where(eq(schema.workspaceRepos.workspaceId, id))
-    await db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, id))
+    // Reassign this workspace's projects back to Default rather than orphaning them.
+    await db.update(schema.projects).set({ workspaceId: defaultId, updatedAt: Date.now() }).where(eq(schema.projects.workspaceId, id))
+    await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
     await db.delete(schema.workspaces).where(eq(schema.workspaces.id, id))
     return c.json({ ok: true })
   })
-  // Move a repo into this workspace (partition: upsert on (owner, repo)). Also clears any ignore
-  // flag — assigning a repo to a workspace un-ignores it.
-  .post('/:id/repos', async (c) => {
-    const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as { owner?: string; name?: string; sort?: number }
-    if (!body.owner || !body.name) return respondError(c, 400, 'bad_request')
+  // External projects (Linear/Rollbar/…) linked to this workspace — (integrationId, externalId) pairs.
+  .get('/:id/external-projects', async (c) => {
     const db = getDb(c.env)
-    const now = Date.now()
-    await db.delete(schema.ignoredRepos).where(and(eq(schema.ignoredRepos.owner, body.owner), eq(schema.ignoredRepos.repo, body.name)))
-    await db
-      .insert(schema.workspaceRepos)
-      .values({ workspaceId: id, repoOwner: body.owner, repoName: body.name, sort: body.sort ?? 0, createdAt: now })
-      .onConflictDoUpdate({ target: [schema.workspaceRepos.repoOwner, schema.workspaceRepos.repoName], set: { workspaceId: id } })
-    return c.json({ ok: true })
+    const rows = await db.select().from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, c.req.param('id')))
+    return c.json({ projects: rows.map((r) => ({ integrationId: r.integrationId, externalId: r.externalId })) } satisfies WorkspaceExternalProjectsResponse)
   })
-  // Per-repo assignment map for the onboarding modal: every mapped repo's workspace + ignored flag.
-  // Drives both the workspace dropdown and the hide toggle (membership is kept while hidden, so the
-  // greyed row still shows which workspace the repo belongs to).
-  .get('/assignments', async (c) => {
-    const db = getDb(c.env)
-    const rows = await db.select().from(schema.workspaceRepos)
-    const ignored = await ignoredRepoSet(db)
-    return c.json(rows.map((r) => ({ owner: r.repoOwner, name: r.repoName, workspaceId: r.workspaceId, ignored: ignored.has(`${r.repoOwner}/${r.repoName}`) })))
-  })
-  // Hide a repo (keeps its workspace membership; just flags it ignored so it's excluded from the
-  // selector / rail / scoping). bootstrap also skips it. Reversible via /unignore-repo.
-  .post('/ignore-repo', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { owner?: string; name?: string }
-    if (!body.owner || !body.name) return respondError(c, 400, 'bad_request')
-    await getDb(c.env).insert(schema.ignoredRepos).values({ owner: body.owner, repo: body.name, createdAt: Date.now() }).onConflictDoNothing()
-    return c.json({ ok: true })
-  })
-  .post('/unignore-repo', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { owner?: string; name?: string }
-    if (!body.owner || !body.name) return respondError(c, 400, 'bad_request')
-    await getDb(c.env).delete(schema.ignoredRepos).where(and(eq(schema.ignoredRepos.owner, body.owner), eq(schema.ignoredRepos.repo, body.name)))
-    return c.json({ ok: true })
-  })
-  // Hide / show every mirrored repo at once (the onboarding master toggle).
-  .post('/ignore-all', async (c) => {
-    const uid = ownerId(c)
-    const body = (await c.req.json().catch(() => ({}))) as { ignored?: boolean }
-    const db = getDb(c.env)
-    if (body.ignored) {
-      const repos = await repoMirrorSource().list(uid)
-      if (repos.length) {
-        const now = Date.now()
-        await db.insert(schema.ignoredRepos).values(repos.map((r) => ({ owner: r.owner, repo: r.name, createdAt: now }))).onConflictDoNothing()
-      }
-    } else {
-      await db.delete(schema.ignoredRepos)
-    }
-    return c.json({ ok: true })
-  })
-  // External projects (Linear/…) linked to this workspace — (integrationId, externalId) pairs.
-  .get('/:id/projects', async (c) => {
-    const db = getDb(c.env)
-    const rows = await db.select().from(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, c.req.param('id')))
-    return c.json({ projects: rows.map((r) => ({ integrationId: r.integrationId, externalId: r.externalId })) } satisfies WorkspaceProjectsResponse)
-  })
-  .put('/:id/projects', async (c) => {
+  .put('/:id/external-projects', async (c) => {
     const id = c.req.param('id')
     // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation). Non-empty rather
     // than merely present: an empty id would have passed the old `typeof` filter and then failed the
     // connection check below with a confusing 403.
-    const parsed = workspaceProjectsBody.safeParse(await c.req.json().catch(() => ({})))
+    const parsed = workspaceExternalProjectsBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const projects = parsed.data.projects ?? []
     const db = getDb(c.env)
@@ -208,10 +131,10 @@ export const workspaces = new Hono<AppEnv>()
       if (!(await getConnection(db, uid, project.integrationId))) return respondError(c, 403, 'provider_not_connected')
     }
     const now = Date.now()
-    await db.delete(schema.workspaceProjects).where(eq(schema.workspaceProjects.workspaceId, id))
+    await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
     if (projects.length) {
       await db
-        .insert(schema.workspaceProjects)
+        .insert(schema.workspaceExternalProjects)
         .values(projects.map((p) => ({ workspaceId: id, integrationId: p.integrationId, externalId: p.externalId, createdAt: now })))
         .onConflictDoNothing()
     }

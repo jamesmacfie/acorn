@@ -19,7 +19,7 @@ import { coreSourceContributions } from './sourceContributions'
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
 for (const page of settingsPageContributions) settingsRegistry.register(page)
 for (const contribution of shellSlotContributions) uiSlotRegistry.register(contribution)
-// Core's one rail source: Fleet home, hidden by its own `when` until a second node is paired.
+// Core's home is the stable default; Fleet is hidden by its own `when` until a second node is paired.
 for (const source of coreSourceContributions) sourceRegistry.register(source)
 // Core's own persisted state: the shell slices (selection, layouts, drawer height, notices) plus the
 // direct preference slices. Which FEATURES persist state is each plugin's own declaration now, through

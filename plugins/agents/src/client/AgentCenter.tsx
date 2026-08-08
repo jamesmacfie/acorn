@@ -8,7 +8,7 @@ import { createFleetQuery } from '@acorn/client-core/node/fanout.ts'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/node/fleet.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { isActiveAgent, needsAttention } from './agentActivity'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
@@ -36,12 +36,11 @@ export default function AgentCenter() {
   const tasks = createQuery(() => tasksOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
   const activeWorkspace = createMemo(() =>
-    workspaceForRepo(workspaces.data, params.owner, params.repo))
+    workspaceForProject(workspaces.data, params.projectId))
   const workspaceId = createMemo(() => activeWorkspace()?.id ?? '')
-  const workspaceRepoKeys = createMemo(() =>
-    new Set((activeWorkspace()?.repos ?? []).map((repo) => `${repo.owner}/${repo.name}`)))
+  const workspaceProjectIds = createMemo(() => new Set(activeWorkspace()?.projects.map((project) => project.id) ?? []))
   const workspaceTasks = createMemo(() =>
-    (tasks.data ?? []).filter((task) => workspaceRepoKeys().has(`${task.repoOwner}/${task.repoName}`)))
+    (tasks.data ?? []).filter((task) => workspaceProjectIds().has(task.projectId)))
   const workspaceTaskIds = createMemo(() => new Set(workspaceTasks().map((task) => task.id)))
   const [providers] = createResource(() => managedAgentApi.providers())
   const [query, setQuery] = createSignal('')
@@ -139,7 +138,7 @@ export default function AgentCenter() {
       if (stateFilter() === 'attention' && !needsAttention(session)) return false
       // Fleet search is client-side over the fetched rows. The server search takes a workspaceId, which
       // only names a workspace on ONE node, so there is nothing to fan a server search out with.
-      if (needle && !`${session.title} ${session.providerId} ${task?.title ?? ''} ${task?.repoName ?? ''}`.toLowerCase().includes(needle)) return false
+      if (needle && !`${session.title} ${session.providerId} ${task?.title ?? ''} ${task?.github?.name ?? task?.projectId ?? ''}`.toLowerCase().includes(needle)) return false
       return true
     }).sort((a, b) =>
       Number(needsAttention(b.session)) - Number(needsAttention(a.session)) || b.session.updatedAt - a.session.updatedAt,
@@ -258,7 +257,7 @@ export default function AgentCenter() {
                 <span>
                   <strong>{task()?.title ?? 'Missing task'}</strong>
                   <small>
-                    {task() ? `${task()!.repoOwner}/${task()!.repoName}` : session.taskId}
+                    {task() ? (task()!.github ? `${task()!.github!.owner}/${task()!.github!.name}` : task()!.projectId) : session.taskId}
                     {/* The node only when there is a fleet to disambiguate — otherwise it names the only
                         machine there is. */}
                     <Show when={row.nodeLabel}>{(label) => <> · {label()}</>}</Show>

@@ -36,8 +36,8 @@ required by `better-sqlite3`/`node-pty`. If package installation ignores lifecyc
 bindings may remain unbuilt; run the package's rebuild step before diagnosing a missing-bindings
 failure.
 
-`GITHUB_CLIENT_ID` and `SESSION_ENC_KEY` must be supplied to boot. GitHub connection uses device flow
-and does not need a client secret or callback URL.
+`SESSION_ENC_KEY` must be supplied to boot. If GitHub is enabled, its plugin reads the optional
+`GITHUB_CLIENT_ID`; connection uses device flow and does not need a client secret or callback URL.
 
 ## Operations
 

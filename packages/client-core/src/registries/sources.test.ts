@@ -36,15 +36,15 @@ describe('source defaults', () => {
     const disposable = sourceRegistry.register({
       id: 'test.routes', order: 1, glyph: 'x', label: 'Routes',
       routes: [
-        { id: 'test.detail', path: '/:owner/:repo/:number', kind: 'detail', order: 30 },
-        { id: 'test.create', path: '/:owner/:repo/new', kind: 'create', order: 20 },
-        { id: 'test.repo', path: '/:owner/:repo', kind: 'repo', order: 10 },
+        { id: 'test.detail', path: '/p/:projectId/pulls/:number', kind: 'detail', order: 30 },
+        { id: 'test.create', path: '/p/:projectId/new', kind: 'create', order: 20 },
+        { id: 'test.project', path: '/p/:projectId', kind: 'project', order: 10 },
       ],
     })
     try {
-      expect(sourceRouteContributions().map((route) => route.id)).toEqual(['test.repo', 'test.create', 'test.detail'])
-      expect(sourceRoutePath('create')).toBe('/:owner/:repo/new')
-      expect(sourcePath('detail', { owner: 'acorn', repo: 'web', number: 42 })).toBe('/acorn/web/42')
+      expect(sourceRouteContributions().map((route) => route.id)).toEqual(['test.project', 'test.create', 'test.detail'])
+      expect(sourceRoutePath('create')).toBe('/p/:projectId/new')
+      expect(sourcePath('detail', { projectId: 'project-web', number: 42 })).toBe('/p/project-web/pulls/42')
     } finally {
       disposable.dispose()
     }

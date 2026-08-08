@@ -51,9 +51,14 @@ describe('local-git routes over a real worktree', () => {
     t = makeTestDb()
     setLocalGitBridge(localGitBridge({ tasks: createTaskService(t.db) }))
     const now = Date.now()
-    await t.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: work, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-widget', name: 'widget', path: work, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
     await t.db.insert(schema.tasks).values({
-      id: 'task1', title: 'T', origin: 'local', repoOwner: 'acme', repoName: 'widget', branch: 'main',
+      id: 'task1', title: 'T', origin: 'local', projectId: 'project-widget', branch: 'main',
       worktreePath: work, pullNumber: null, status: 'active', sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
     })
   })

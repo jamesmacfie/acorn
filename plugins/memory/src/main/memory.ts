@@ -9,7 +9,7 @@ import { memories } from '../node/schema'
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
 export const MEMORY_TYPES: readonly MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
-export type MemoryScope = 'repo' | 'private'
+export type MemoryScope = 'project' | 'private'
 
 export type MemoryFile = {
   name: string
@@ -22,7 +22,7 @@ export type MemoryFile = {
   body: string
 }
 
-export type MemorySource = { dir: string; scope: MemoryScope; repo: string | null }
+export type MemorySource = { dir: string; scope: MemoryScope; projectId: string | null }
 
 export const isValidMemoryName = (s: string): boolean => /^[a-z0-9][a-z0-9._-]*$/i.test(s) && !s.includes('..')
 
@@ -75,7 +75,7 @@ export function parseMemory(text: string, fallbackName: string): MemoryFile {
 
 // --- Files ---
 
-type ScannedMemory = MemoryFile & { path: string; updatedAt: number; scope: MemoryScope; repo: string | null }
+type ScannedMemory = MemoryFile & { path: string; updatedAt: number; scope: MemoryScope; projectId: string | null }
 
 export async function scanMemoryDir(source: MemorySource): Promise<ScannedMemory[]> {
   const entries = await readdir(source.dir).catch(() => [] as string[])
@@ -87,7 +87,7 @@ export async function scanMemoryDir(source: MemorySource): Promise<ScannedMemory
     try {
       const file = join(source.dir, entry)
       const [text, st] = await Promise.all([readFile(file, 'utf8'), stat(file)])
-      out.push({ ...parseMemory(text, name), path: file, updatedAt: st.mtimeMs, scope: source.scope, repo: source.repo })
+      out.push({ ...parseMemory(text, name), path: file, updatedAt: st.mtimeMs, scope: source.scope, projectId: source.projectId })
     } catch {
       // unreadable file → skipped
     }
@@ -117,11 +117,12 @@ async function atomicWrite(file: string, text: string): Promise<void> {
 }
 
 export async function regenerateIndexFile(dir: string): Promise<void> {
-  const all = await scanMemoryDir({ dir, scope: 'repo', repo: null })
+  const all = await scanMemoryDir({ dir, scope: 'project', projectId: null })
   await atomicWrite(join(dir, 'MEMORY.md'), renderMemoryIndex(all))
 }
 
-// Write a memory file into a dir (the task WORKTREE for repo scope — never the user's primary
+// Write a memory file into a dir (the task worktree for project scope, or the project folder for a
+// branchless/plain-folder task — never a different project's primary checkout;
 // checkout — or ~/.acorn/memory for private) and regenerate that dir's MEMORY.md.
 export async function writeMemoryFile(dir: string, mem: MemoryFile): Promise<{ path: string }> {
   if (!isValidMemoryName(mem.name)) throw new Error('Invalid memory name.')
@@ -136,17 +137,17 @@ export async function writeMemoryFile(dir: string, mem: MemoryFile): Promise<{ p
 
 export async function reconcileMemories(db: PluginDatabase, sources: MemorySource[]): Promise<void> {
   const scanned = (await Promise.all(sources.map(scanMemoryDir))).flat()
-  // Same (scope, repo, name) across checkouts → newest updatedAt wins.
+  // Same (scope, projectId, name) across checkouts → newest updatedAt wins.
   const winners = new Map<string, ScannedMemory>()
   for (const m of scanned) {
-    const key = `${m.scope}\0${m.repo ?? ''}\0${m.name}`
+    const key = `${m.scope}\0${m.projectId ?? ''}\0${m.name}`
     const cur = winners.get(key)
     if (!cur || m.updatedAt > cur.updatedAt) winners.set(key, m)
   }
   const rows = [...winners.values()].map((m) => ({
     id: contentHashId(m.name, m.body, m.description),
     scope: m.scope,
-    repo: m.repo,
+    projectId: m.projectId,
     name: m.name,
     type: m.type,
     description: m.description,
@@ -186,9 +187,9 @@ async function touchMemories(db: PluginDatabase, ids: string[]): Promise<void> {
     .where(inArray(memories.id, ids))
 }
 
-// FTS5 BM25 search, repo-scoped: repo rows for this repo + private rows. Query terms are quoted so
+// FTS5 BM25 search, project-scoped: project rows for this project + private rows. Query terms are quoted so
 // user input can't inject FTS syntax.
-export async function searchMemories(db: PluginDatabase, query: string, opts: { repo?: string | null; type?: MemoryType; limit?: number }): Promise<MemoryHit[]> {
+export async function searchMemories(db: PluginDatabase, query: string, opts: { projectId?: string | null; type?: MemoryType; limit?: number }): Promise<MemoryHit[]> {
   const terms = query
     .split(/\s+/)
     .map((t) => t.replace(/"/g, ''))
@@ -201,7 +202,7 @@ export async function searchMemories(db: PluginDatabase, query: string, opts: { 
   const rankById = new Map(matches.map((m) => [m.id, m.rank]))
   const rows = await db.select().from(memories).where(inArray(memories.id, [...rankById.keys()]))
   const hits = rows
-    .filter((r) => (opts.repo ? r.repo === opts.repo || r.scope === 'private' : true))
+    .filter((r) => (opts.projectId ? r.projectId === opts.projectId || r.scope === 'private' : true))
     .filter((r) => (opts.type ? r.type === opts.type : true))
     .filter((r) => !r.supersededBy)
     .map((r) => ({ ...r, rank: rankById.get(r.id) ?? 0 }))
@@ -211,30 +212,30 @@ export async function searchMemories(db: PluginDatabase, query: string, opts: { 
   return hits
 }
 
-// One memory by name (the memory_get read path), repo-scoped like listMemories. Reading it bumps
+// One memory by name (the memory_get read path), project-scoped like listMemories. Reading it bumps
 // the recall stats.
-export async function getMemory(db: PluginDatabase, opts: { repo?: string | null; name: string }): Promise<MemoryRow | null> {
-  const match = (await listMemories(db, { repo: opts.repo })).find((m) => m.name === opts.name) ?? null
+export async function getMemory(db: PluginDatabase, opts: { projectId?: string | null; name: string }): Promise<MemoryRow | null> {
+  const match = (await listMemories(db, { projectId: opts.projectId })).find((m) => m.name === opts.name) ?? null
   if (match) await touchMemories(db, [match.id])
   return match
 }
 
-export async function listMemories(db: PluginDatabase, opts: { repo?: string | null; type?: MemoryType }): Promise<MemoryRow[]> {
+export async function listMemories(db: PluginDatabase, opts: { projectId?: string | null; type?: MemoryType }): Promise<MemoryRow[]> {
   const rows = await db
     .select()
     .from(memories)
     .where(opts.type ? and(eq(memories.type, opts.type)) : undefined)
-  return rows.filter((r) => (opts.repo ? r.repo === opts.repo || r.scope === 'private' : true)).sort((a, b) => a.name.localeCompare(b.name))
+  return rows.filter((r) => (opts.projectId ? r.projectId === opts.projectId || r.scope === 'private' : true)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
-// The always-safe injection slice (12 P2): the index lines + repo-scoped feedback/convention names.
-export async function memoryIndexSlice(db: PluginDatabase, repo: string, cap = 30): Promise<{ name: string; description: string }[]> {
-  const rows = await listMemories(db, { repo })
+// The always-safe injection slice (12 P2): the index lines + project-scoped feedback/convention names.
+export async function memoryIndexSlice(db: PluginDatabase, projectId: string, cap = 30): Promise<{ name: string; description: string }[]> {
+  const rows = await listMemories(db, { projectId })
   return rows.slice(0, cap).map((r) => ({ name: r.name, description: r.description }))
 }
 
 // Launch injection block (docs/notes-and-memory.md, the push half): the MEMORY.md index slice (cheap,
-// always-safe) plus the repo-scoped feedback/convention BODIES (the rules an agent must never
+// always-safe) plus the project-scoped feedback/convention BODIES (the rules an agent must never
 // miss). Caps keep it compact — injection is recall for the high-value slice; MCP search is
 // recall for the long tail.
 export function formatMemoryInjection(
@@ -246,7 +247,7 @@ export function formatMemoryInjection(
   const bodiesCap = caps.bodies ?? 5
   const bodyChars = caps.bodyChars ?? 1500
   if (!slice.length && !keyMemories.length) return null
-  const lines: string[] = ['# Repo memory (acorn) — ask for full bodies via memory_get / read .acorn/memory/']
+  const lines: string[] = ['# Project memory (acorn) — ask for full bodies via memory_get / read .acorn/memory/']
   if (slice.length) {
     lines.push('', '## Index')
     for (const m of slice.slice(0, indexCap)) lines.push(`- ${m.name} — ${m.description}`)
@@ -265,13 +266,13 @@ export function formatMemoryInjection(
 
 // Standard source set: every active worktree + each primary checkout + the private home dir.
 export function memorySources(
-  activeWorktrees: { dir: string; repo: string }[],
-  checkouts: { dir: string; repo: string }[],
+  activeWorktrees: { dir: string; projectId: string }[],
+  checkouts: { id: string; path: string }[],
   homeDir: string,
 ): MemorySource[] {
   const out: MemorySource[] = []
-  for (const w of activeWorktrees) out.push({ dir: join(w.dir, '.acorn', 'memory'), scope: 'repo', repo: w.repo })
-  for (const c of checkouts) out.push({ dir: join(c.dir, '.acorn', 'memory'), scope: 'repo', repo: c.repo })
-  out.push({ dir: join(homeDir, '.acorn', 'memory'), scope: 'private', repo: null })
+  for (const w of activeWorktrees) out.push({ dir: join(w.dir, '.acorn', 'memory'), scope: 'project', projectId: w.projectId })
+  for (const c of checkouts) out.push({ dir: join(c.path, '.acorn', 'memory'), scope: 'project', projectId: c.id })
+  out.push({ dir: join(homeDir, '.acorn', 'memory'), scope: 'private', projectId: null })
   return out.filter((s, i, arr) => arr.findIndex((x) => x.dir === s.dir) === i && existsSync(s.dir.replace(/\/.acorn\/memory$/, '')))
 }

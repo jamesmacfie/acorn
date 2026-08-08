@@ -216,13 +216,22 @@ describe('resolveVars — command execution context', () => {
     const base = join(root, 'base')
     mkdirSync(worktree)
     mkdirSync(base)
-    await fx.coreDb.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: base, createdAt: 0, updatedAt: 0 })
+    await fx.coreDb.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
+    await fx.coreDb.insert(schema.projects).values({
+      id: 'project-widget', name: 'widget', path: base, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
+      createdAt: 0, updatedAt: 0,
+    })
+    await fx.coreDb.insert(schema.projects).values({
+      id: 'project-other', name: 'other', path: null, workspaceId: 'workspace-1', sort: 1, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'other', githubRepoId: null,
+      createdAt: 0, updatedAt: 0,
+    })
     await fx.coreDb.insert(schema.tasks).values({
       id: 'task-1',
       title: 'API task',
       origin: 'local',
-      repoOwner: 'acme',
-      repoName: 'widget',
+      projectId: 'project-widget',
       branch: 'feature/api-url',
       worktreePath: worktree,
       pullNumber: null,
@@ -236,8 +245,7 @@ describe('resolveVars — command execution context', () => {
     await fx.db.insert(httpVariables).values({
       id: 'var-1',
       userId: USER,
-      repoOwner: 'acme',
-      repoName: 'widget',
+      projectId: 'project-widget',
       name: 'BASE_URL',
       kind: 'command',
       value: await protectHttpValue(`printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`, SECRETS),
@@ -247,7 +255,7 @@ describe('resolveVars — command execution context', () => {
       updatedAt: 0,
     })
 
-    const vars = await resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
+    const vars = await resolveVars(fx.db, fx.core, USER, 'project-widget', input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
 
     const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
     expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
@@ -257,14 +265,13 @@ describe('resolveVars — command execution context', () => {
     expect(vars.branch).toBe('feature/api-url')
   })
 
-  it('rejects an execution task from another repo', async () => {
+  it('rejects an execution task from another project', async () => {
     fx = fixture()
     await fx.coreDb.insert(schema.tasks).values({
       id: 'task-2',
       title: 'Other task',
       origin: 'local',
-      repoOwner: 'acme',
-      repoName: 'other',
+      projectId: 'project-other',
       branch: 'main',
       worktreePath: null,
       pullNumber: null,
@@ -276,8 +283,8 @@ describe('resolveVars — command execution context', () => {
       archivedAt: null,
     })
 
-    await expect(resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input({ executionTaskId: 'task-2' }))).rejects.toThrow(
-      'The selected task belongs to acme/other',
+    await expect(resolveVars(fx.db, fx.core, USER, 'project-widget', input({ executionTaskId: 'task-2' }))).rejects.toThrow(
+      'The selected task belongs to project-other, not this project',
     )
   })
 
@@ -286,8 +293,7 @@ describe('resolveVars — command execution context', () => {
     await fx.db.insert(httpVariables).values({
       id: 'var-unused',
       userId: USER,
-      repoOwner: 'acme',
-      repoName: 'widget',
+      projectId: 'project-widget',
       name: 'BASE_URL',
       kind: 'command',
       value: await protectHttpValue('exit 17', SECRETS),
@@ -297,9 +303,9 @@ describe('resolveVars — command execution context', () => {
       updatedAt: 0,
     })
 
-    await expect(resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input())).resolves.not.toHaveProperty('BASE_URL')
+    await expect(resolveVars(fx.db, fx.core, USER, 'project-widget', input())).resolves.not.toHaveProperty('BASE_URL')
     await expect(
-      resolveVars(fx.db, fx.core, USER, 'acme', 'widget', input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
+      resolveVars(fx.db, fx.core, USER, 'project-widget', input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
     ).resolves.toMatchObject({ BASE_URL: 'http://override.test' })
   })
 })
@@ -329,7 +335,7 @@ describe('send — transport outcomes', () => {
     const cause = Object.assign(new Error('getaddrinfo ENOTFOUND missing.test'), { code: 'ENOTFOUND' })
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed', { cause })))
 
-    const result = await send(fx.db, fx.core, USER, 'acme', 'widget', input({ url: 'http://missing.test/health' }))
+    const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'http://missing.test/health' }))
 
     expect(result).toMatchObject({
       ok: false,
@@ -347,7 +353,7 @@ describe('send — transport outcomes', () => {
     fx = fixture()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('server broke', { status: 500, statusText: 'Internal Server Error' })))
 
-    const result = await send(fx.db, fx.core, USER, 'acme', 'widget', input({ url: 'http://api.test/fail' }))
+    const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'http://api.test/fail' }))
 
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error('Expected an HTTP response')
@@ -360,8 +366,7 @@ describe('send — transport outcomes', () => {
     await fx.db.insert(httpVariables).values({
       id: 'secret-var',
       userId: USER,
-      repoOwner: 'acme',
-      repoName: 'widget',
+      projectId: 'project-widget',
       name: 'TOKEN',
       kind: 'secret',
       value: await protectHttpValue('server-only-secret', SECRETS),
@@ -377,8 +382,7 @@ describe('send — transport outcomes', () => {
       fx.db,
       fx.core,
       USER,
-      'acme',
-      'widget',
+      'project-widget',
       input({
         url: 'https://api.test/items/server-only-secret?token={{TOKEN}}',
         headers: [{ name: 'X-API-Key', value: '{{TOKEN}}', enabled: true }],

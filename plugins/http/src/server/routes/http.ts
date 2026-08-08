@@ -30,7 +30,7 @@ const authSchema = z.discriminatedUnion('mode', [
 
 const requestBody = z.object({
   folder: z.string().max(500).default(''),
-  taskId: z.string().nullable().default(null),
+  taskId: z.string().min(1).nullable().default(null),
   name: z.string().min(1).max(200),
   method: z.enum(httpMethods),
   url: z.string().max(4000),
@@ -71,7 +71,7 @@ const parseJson = <T>(raw: string, fallback: T): T => {
   }
 }
 
-const toRequest = async (row: typeof httpRequests.$inferSelect, secrets: SecretService): Promise<HttpRequest> => {
+const toRequest = async (row: typeof httpRequests.$inferSelect, secrets: SecretService, projectId: string): Promise<HttpRequest> => {
   const [url, headers, body, auth, vars] = await Promise.all([
     openHttpValue(row.url, row.encrypted, secrets),
     openHttpValue(row.headers, row.encrypted, secrets),
@@ -81,8 +81,7 @@ const toRequest = async (row: typeof httpRequests.$inferSelect, secrets: SecretS
   ])
   return {
     id: row.id,
-    repoOwner: row.repoOwner,
-    repoName: row.repoName,
+    projectId,
     folder: row.folder,
     taskId: row.taskId,
     name: row.name,
@@ -109,11 +108,15 @@ const toVariable = async (row: typeof httpVariables.$inferSelect, secrets: Secre
   updatedAt: row.updatedAt,
 })
 
-const scope = (c: { req: { param: (k: string) => string } }) => ({ owner: c.req.param('owner'), repo: c.req.param('repo') })
-const inRepo = (userId: string, owner: string, repo: string) =>
-  and(eq(httpRequests.userId, userId), eq(httpRequests.repoOwner, owner), eq(httpRequests.repoName, repo))
-const variablesInRepo = (userId: string, owner: string, repo: string) =>
-  and(eq(httpVariables.userId, userId), eq(httpVariables.repoOwner, owner), eq(httpVariables.repoName, repo))
+const projectScope = async (c: { req: { param: (key: string) => string } }, core: SendCoreServices) => {
+  const project = await core.projects.byId(c.req.param('projectId'))
+  return project ? { project } : null
+}
+const taskScopeError = (taskId: string) => `Task "${taskId}" does not belong to this project`
+const taskBelongsToProject = async (taskId: string, projectId: string, core: SendCoreServices): Promise<boolean> =>
+  (await core.tasks.load(taskId))?.projectId === projectId
+const inProject = (userId: string, projectId: string) => and(eq(httpRequests.userId, userId), eq(httpRequests.projectId, projectId))
+const variablesInProject = (userId: string, projectId: string) => and(eq(httpVariables.userId, userId), eq(httpVariables.projectId, projectId))
 
 const protectedRequestFields = async (d: z.infer<typeof requestBody>, secrets: SecretService) => {
   const [url, headers, body, auth, vars] = await Promise.all([
@@ -138,31 +141,37 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       await next()
     })
 
-    // Saved requests for the repo. `?taskId=` returns that task's ad-hoc requests instead of the
-    // repo tree; the two sets are disjoint by construction (taskId null vs set).
-    .get('/:owner/:repo/requests', async (c) => {
-      const { owner, repo } = scope(c)
+    // Saved requests for the project. `?taskId=` returns that task's ad-hoc requests instead of the
+    // project tree; the two sets are disjoint by construction (taskId null vs set).
+    .get('/projects/:projectId/requests', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const userId = ownerId(c)
       const taskId = c.req.query('taskId')
+      if (taskId === '') return respondError(c, 400, 'bad_request', ['taskId must not be empty'])
+      if (taskId && !(await taskBelongsToProject(taskId, project.id, core))) return respondError(c, 400, 'bad_request', [taskScopeError(taskId)])
       const rows = await db
         .select()
         .from(httpRequests)
-        .where(and(inRepo(userId, owner, repo), taskId ? eq(httpRequests.taskId, taskId) : isNull(httpRequests.taskId)))
+        .where(and(inProject(userId, project.id), taskId ? eq(httpRequests.taskId, taskId) : isNull(httpRequests.taskId)))
         .orderBy(asc(httpRequests.folder), asc(httpRequests.name))
-      return c.json(await Promise.all(rows.map((row) => toRequest(row, secrets))))
+      return c.json(await Promise.all(rows.map((row) => toRequest(row, secrets, project.id))))
     })
 
-    .post('/:owner/:repo/requests', async (c) => {
-      const { owner, repo } = scope(c)
+    .post('/projects/:projectId/requests', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const parsed = requestBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       const d = parsed.data
+      if (d.taskId && !(await taskBelongsToProject(d.taskId, project.id, core))) return respondError(c, 400, 'bad_request', [taskScopeError(d.taskId)])
       const protectedFields = await protectedRequestFields(d, secrets)
       const row = {
         id: crypto.randomUUID(),
         userId: ownerId(c),
-        repoOwner: owner,
-        repoName: repo,
+        projectId: project.id,
         folder: d.folder,
         taskId: d.taskId,
         name: d.name,
@@ -178,17 +187,20 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
         updatedAt: now(),
       }
       await db.insert(httpRequests).values(row)
-      return c.json(await toRequest(row, secrets), 201)
+      return c.json(await toRequest(row, secrets, project.id), 201)
     })
 
-    .put('/:owner/:repo/requests/:id', async (c) => {
-      const { owner, repo } = scope(c)
+    .put('/projects/:projectId/requests/:id', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const parsed = requestBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       const d = parsed.data
+      if (d.taskId && !(await taskBelongsToProject(d.taskId, project.id, core))) return respondError(c, 400, 'bad_request', [taskScopeError(d.taskId)])
       const userId = ownerId(c)
       const protectedFields = await protectedRequestFields(d, secrets)
-      // Scope the update to this repo so an id from another repo can't be smuggled in.
+      // Scope the update to this project so an id from another project can't be smuggled in.
       const updated = await db
         .update(httpRequests)
         .set({
@@ -205,38 +217,44 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
           encrypted: true,
           updatedAt: now(),
         })
-        .where(and(inRepo(userId, owner, repo), eq(httpRequests.id, c.req.param('id'))))
+        .where(and(inProject(userId, project.id), eq(httpRequests.id, c.req.param('id'))))
         .returning()
       if (!updated.length) return respondError(c, 404, 'not_found')
-      return c.json(await toRequest(updated[0], secrets))
+      return c.json(await toRequest(updated[0], secrets, project.id))
     })
 
-    .delete('/:owner/:repo/requests/:id', async (c) => {
-      const { owner, repo } = scope(c)
+    .delete('/projects/:projectId/requests/:id', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const userId = ownerId(c)
       const deleted = await db
         .delete(httpRequests)
-        .where(and(inRepo(userId, owner, repo), eq(httpRequests.id, c.req.param('id'))))
+        .where(and(inProject(userId, project.id), eq(httpRequests.id, c.req.param('id'))))
         .returning({ id: httpRequests.id })
       if (!deleted.length) return respondError(c, 404, 'not_found')
       return c.body(null, 204)
     })
 
-    // --- repo variables ---
+    // --- project variables ---
 
-    .get('/:owner/:repo/vars', async (c) => {
-      const { owner, repo } = scope(c)
+    .get('/projects/:projectId/vars', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const userId = ownerId(c)
       const rows = await db
         .select()
         .from(httpVariables)
-        .where(variablesInRepo(userId, owner, repo))
+        .where(variablesInProject(userId, project.id))
         .orderBy(asc(httpVariables.name))
       return c.json(await Promise.all(rows.map((row) => toVariable(row, secrets))))
     })
 
-    .post('/:owner/:repo/vars', async (c) => {
-      const { owner, repo } = scope(c)
+    .post('/projects/:projectId/vars', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       const d = parsed.data
@@ -245,8 +263,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const row = {
         id: crypto.randomUUID(),
         userId,
-        repoOwner: owner,
-        repoName: repo,
+        projectId: project.id,
         name: d.name,
         kind: d.kind,
         value,
@@ -258,13 +275,15 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       try {
         await db.insert(httpVariables).values(row)
       } catch {
-        return respondError(c, 409, 'duplicate_name', [`A variable named "${d.name}" already exists for this repo`])
+        return respondError(c, 409, 'duplicate_name', [`A variable named "${d.name}" already exists for this project`])
       }
       return c.json(await toVariable(row, secrets), 201)
     })
 
-    .put('/:owner/:repo/vars/:id', async (c) => {
-      const { owner, repo } = scope(c)
+    .put('/projects/:projectId/vars/:id', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       const d = parsed.data
@@ -273,7 +292,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const existing = await db
         .select()
         .from(httpVariables)
-        .where(and(variablesInRepo(userId, owner, repo), eq(httpVariables.id, id)))
+        .where(and(variablesInProject(userId, project.id), eq(httpVariables.id, id)))
       if (!existing.length) return respondError(c, 404, 'not_found')
 
       // The renderer never sees a secret's plaintext, so it sends '' to mean "leave it alone".
@@ -283,17 +302,19 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const updated = await db
         .update(httpVariables)
         .set({ name: d.name, kind: d.kind, value, encrypted: true, enabled: d.enabled, updatedAt: now() })
-        .where(and(variablesInRepo(userId, owner, repo), eq(httpVariables.id, id)))
+        .where(and(variablesInProject(userId, project.id), eq(httpVariables.id, id)))
         .returning()
       return c.json(await toVariable(updated[0], secrets))
     })
 
-    .delete('/:owner/:repo/vars/:id', async (c) => {
-      const { owner, repo } = scope(c)
+    .delete('/projects/:projectId/vars/:id', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const userId = ownerId(c)
       const deleted = await db
         .delete(httpVariables)
-        .where(and(variablesInRepo(userId, owner, repo), eq(httpVariables.id, c.req.param('id'))))
+        .where(and(variablesInProject(userId, project.id), eq(httpVariables.id, c.req.param('id'))))
         .returning({ id: httpVariables.id })
       if (!deleted.length) return respondError(c, 404, 'not_found')
       return c.body(null, 204)
@@ -302,12 +323,14 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
     // --- send ---
     // The request is sent inline rather than by id, so an unsaved edit (and an ad-hoc request that
     // was never saved at all) can be fired without a round-trip through the DB first.
-    .post('/:owner/:repo/send', async (c) => {
-      const { owner, repo } = scope(c)
+    .post('/projects/:projectId/send', async (c) => {
+      const scoped = await projectScope(c, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const { project } = scoped
       const parsed = sendBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       try {
-        return c.json(await send(db, core, ownerId(c), owner, repo, parsed.data))
+        return c.json(await send(db, core, ownerId(c), project.id, parsed.data))
       } catch (err) {
         // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
         // request to display, so they stay a 422. Network attempts return a typed SendFailure above.

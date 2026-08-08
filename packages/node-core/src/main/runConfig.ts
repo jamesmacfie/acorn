@@ -43,19 +43,19 @@ export type RepoConfig = {
   repoTargetIds: string[]
 }
 
-// The DB columns the file layers override — now the repo_paths repo-config row (repo-level-settings;
-// was the per-workspace columns). The `dev` run button comes from the dev script (or explicit
+// The DB columns the file layers override — the project config row (project-level settings; formerly
+// per-workspace columns). The `dev` run button comes from the dev script (or explicit
 // config) — see the layering comment in loadRepoConfig below.
 export type DbConfigFallback = {
   setupScript?: string | null
   teardownScript?: string | null
   devScript?: string | null // "run dev" command → a base `dev` target (repo config overrides)
   devRestartScript?: string | null // restart command for the base `dev` target
-  runTargetsJson?: string | null // repo_paths.runTargets (JSON column, 13 §A DB fallback surface)
-  dbUrlScript?: string | null // repo_paths.dbUrlScript
-  previewMode?: PreviewMode | null // repo_paths.previewMode
-  previewValue?: string | null // repo_paths.previewValue
-  browserRules?: BrowserRule[] // repo_paths.browserRules (parsed; DB-only, no toml layer)
+  runTargetsJson?: string | null // projects.run_targets (JSON column)
+  dbUrlScript?: string | null // projects.db_url_script
+  previewMode?: PreviewMode | null // projects.preview_mode
+  previewValue?: string | null // projects.preview_value
+  browserRules?: BrowserRule[] // projects.browser_rules (parsed; DB-only, no toml layer)
 }
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -170,10 +170,10 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
   return layer
 }
 
-// The repo_paths.runTargets JSON column → RunTarget[] (the per-repo DB fallback surface).
+// The projects.run_targets JSON column → RunTarget[] (the per-project DB fallback surface).
 // Malformed JSON → no targets. (The pre-0017 scalar runCommand/devPort columns are gone — data
 // migration 0017 folded them into this JSON column, and 0018 dropped them.)
-export function legacyRunTargets(db: DbConfigFallback): RunTarget[] {
+export function projectRunTargets(db: DbConfigFallback): RunTarget[] {
   if (!db.runTargetsJson) return []
   try {
     const arr = JSON.parse(db.runTargetsJson) as unknown
@@ -224,13 +224,13 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
   // CANONICAL home for run targets — commit `[scripts.run.dev]` there. The DB surfaces are
   // fallback layers only, and the merge order below makes toml win by inserting later:
   //   1. workspaces.devScript/devRestartScript → a base `dev` target (lowest precedence)
-  //   2. repo_paths.runTargets JSON (per-repo Settings surface)
+  //   2. projects.run_targets JSON (per-project Settings surface)
   //   3. ~/.acorn/config.toml (personal defaults)
   //   4. ./.acorn/config.toml (committed — always wins)
   // The base `dev` target gets no `default` flag — it carries no URL, so flagging it would shadow
   // a repo's real default target in RuntimeService.defaultUrl.
   if (db.devScript?.trim()) run.set('dev', { id: 'dev', command: db.devScript.trim(), restart: db.devRestartScript?.trim() || undefined })
-  for (const t of legacyRunTargets(db)) run.set(t.id, t)
+  for (const t of projectRunTargets(db)) run.set(t.id, t)
   for (const t of user?.run.values() ?? []) run.set(t.id, t)
   for (const t of repo?.run.values() ?? []) run.set(t.id, t)
 

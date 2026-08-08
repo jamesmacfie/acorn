@@ -1,0 +1,88 @@
+import { isAbsolute, join } from 'node:path'
+import { and, eq } from 'drizzle-orm'
+import { Hono } from 'hono'
+import { z } from 'zod'
+import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { respondError } from '@acorn/node-core/server/respond.ts'
+import type { GithubImportItem, GithubImportResponse, GithubImportResult } from '../../contract/api'
+import { repos } from '../../node/schema'
+
+const actionSchema = z.discriminatedUnion('action', [
+  z.object({ repoId: z.number().int().positive(), action: z.literal('map'), path: z.string().min(1) }),
+  z.object({ repoId: z.number().int().positive(), action: z.literal('clone'), parentDir: z.string().min(1) }),
+  z.object({ repoId: z.number().int().positive(), action: z.literal('defer') }),
+])
+
+// Accept the named request shape used by the client and the bare-array shape used by early callers.
+// Both normalize to one boundary contract before any repository work begins.
+const requestSchema = z.union([
+  z.object({ repositories: z.array(actionSchema).min(1).max(100) }),
+  z.object({ items: z.array(actionSchema).min(1).max(100) }).transform(({ items }) => ({ repositories: items })),
+  z.array(actionSchema).min(1).max(100).transform((repositories) => ({ repositories })),
+])
+
+type ImportCore = Pick<CoreServices, 'projects' | 'git'>
+
+const failed = (item: GithubImportItem, owner: string, name: string, error: unknown): GithubImportResult => ({
+  repoId: item.repoId,
+  owner,
+  name,
+  action: item.action,
+  ok: false,
+  error: error instanceof Error ? error.message : String(error),
+})
+
+export const githubImport = (db: PluginDatabase, core: ImportCore) => new Hono<AppEnv>()
+  .post('/import', async (c) => {
+    const userId = ownerId(c)
+    const parsed = requestSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((issue) => issue.message))
+
+    const results: GithubImportResult[] = []
+    for (const item of parsed.data.repositories) {
+      const [repo] = await db
+        .select({ id: repos.id, owner: repos.owner, name: repos.name })
+        .from(repos)
+        .where(and(eq(repos.userId, userId), eq(repos.id, item.repoId)))
+      if (!repo) {
+        results.push(failed(item, '', '', 'Repository is not available in the GitHub mirror.'))
+        continue
+      }
+
+      try {
+        let projectId: string
+        if (item.action === 'map') {
+          if (!isAbsolute(item.path)) throw new Error('Checkout path must be absolute.')
+          const project = await core.projects.create({ name: repo.name, path: item.path })
+          const stamped = await core.projects.update(project.id, { githubRepoId: repo.id })
+          if (!stamped) throw new Error('Project disappeared while importing.')
+          projectId = stamped.id
+        } else if (item.action === 'clone') {
+          if (!isAbsolute(item.parentDir)) throw new Error('Clone parent directory must be absolute.')
+          await core.git.gitOrThrow(
+            ['clone', `https://github.com/${repo.owner}/${repo.name}.git`, repo.name],
+            { cwd: item.parentDir, env: { GIT_TERMINAL_PROMPT: '0' } },
+          )
+          const project = await core.projects.create({ name: repo.name, path: join(item.parentDir, repo.name) })
+          const stamped = await core.projects.update(project.id, { githubRepoId: repo.id })
+          if (!stamped) throw new Error('Project disappeared while importing.')
+          projectId = stamped.id
+        } else {
+          const project = await core.projects.create({
+            name: repo.name,
+            path: null,
+            github: { owner: repo.owner, name: repo.name, repoId: repo.id },
+          })
+          projectId = project.id
+        }
+        results.push({ repoId: repo.id, owner: repo.owner, name: repo.name, action: item.action, ok: true, projectId })
+      } catch (error) {
+        results.push(failed(item, repo.owner, repo.name, error))
+      }
+    }
+
+    return c.json({ results } satisfies GithubImportResponse)
+  })

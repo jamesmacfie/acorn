@@ -1,10 +1,9 @@
-import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db/index'
-import { schema } from '../server/db/index'
 import { RUN_TARGETS, type RunBridge } from '../server/routes/harness'
 import { routeTestCapabilityFor } from '../server/bridge'
 import type { CapabilityRegistry } from '../server/plugin/capabilities'
 import { loadTask } from './taskWorktree'
+import { getProjectConfig } from './projectConfig'
 
 // Which loopback ports a task legitimately serves on, for the preview tunnel's allowlist
 // (main/tunnel.ts). docs/api-reference.md § Streams: "Only declared ports; no general SOCKS."
@@ -72,17 +71,13 @@ export function declaredTunnelPorts(db: AppDatabase, capabilities?: Pick<Capabil
       if (Array.isArray(list)) for (const target of list) if (typeof target?.url === 'string') add(target.url)
     }
 
-    // Source 2. Resolved through the task's repo, so a caller cannot name a repo it has no task in — the
+    // Source 2. Resolved through the task's project, so a caller cannot name a project it has no task in — the
     // taskId is already scope-checked by the upgrade handler.
     const task = await loadTask(db, taskId).catch(() => null)
-    if (task) {
-      const [row] = await db
-        .select({ previewMode: schema.repoPaths.previewMode, previewValue: schema.repoPaths.previewValue })
-        .from(schema.repoPaths)
-        .where(and(eq(schema.repoPaths.owner, task.repoOwner), eq(schema.repoPaths.repo, task.repoName)))
-        .limit(1)
-      const value = (row?.previewValue ?? '').trim()
-      if (row?.previewMode === 'port') {
+    if (task?.projectId) {
+      const config = (await getProjectConfig(db, task.projectId))?.config
+      const value = (config?.previewValue ?? '').trim()
+      if (config?.previewMode === 'port') {
         const port = Number(value)
         if (Number.isInteger(port) && port >= 1 && port <= 65535) ports.add(port)
       }
@@ -90,7 +85,7 @@ export function declaredTunnelPorts(db: AppDatabase, capabilities?: Pick<Capabil
       // asks for a tunnel, gets a 403, and falls back to loading the URL as given — so a remote task
       // configured with `http://localhost:8025` rendered whatever was on the OWNER'S 8025 while claiming to
       // show the remote preview. It is declarative config, exactly like `'port'`.
-      if (row?.previewMode === 'url') add(value)
+      if (config?.previewMode === 'url') add(value)
     }
 
     return [...ports]

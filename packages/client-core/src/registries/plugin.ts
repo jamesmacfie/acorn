@@ -16,6 +16,7 @@ import { sourceRegistry, type SourceContribution } from './sources'
 import { commandRegistry, type CommandContribution } from './commands'
 import { keybindingRegistry, type KeybindingContribution } from './keybindings'
 import { integrationFlowRegistry, type IntegrationFlowContribution } from './integrationFlows'
+import { projectImporterRegistry, type ProjectImporterContribution } from './projectImporters'
 // From ./slots, not ./uiSlots — the slot HOSTS contain JSX, and reaching a JSX module from here would
 // make this file (and so the whole host) unimportable in a bare-Node vitest run. See slots.ts.
 import { taskSlotRegistry, uiSlotRegistry, type TaskSlotContribution, type UiSlotContribution } from './slots'
@@ -35,6 +36,7 @@ export type ClientPluginContext = {
   commands: ClientContributionPoint<CommandContribution>
   keybindings: ClientContributionPoint<KeybindingContribution>
   integrationFlows: ClientContributionPoint<IntegrationFlowContribution>
+  projectImporters: ClientContributionPoint<ProjectImporterContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
   slots: ClientContributionPoint<UiSlotContribution>
   taskSlots: ClientContributionPoint<TaskSlotContribution>
@@ -60,10 +62,9 @@ export type ClientPluginContext = {
 
 export type ClientPlugin = {
   name: string
-  // github, terminal, agents, memory and notes: the shell (or core's context assembler behind it)
-  // assumes their contributions exist, so they cannot be disabled. Same five as the node half, and for
-  // the same reason. This list said "same three" while the node half had five — `memory` and `notes`
-  // were togglable on the client and not on the node, so a user could untick half of one plugin.
+  // terminal, agents, memory and notes: the shell (or core's context assembler behind it) assumes their
+  // contributions exist, so they cannot be disabled. GitHub is optional; its PR rail and importer are
+  // gated/removed as one plugin contribution.
   required?: boolean
   // Registration only, and synchronous: it publishes descriptors into signals. Nothing here awaits
   // anything, and nothing here performs I/O — making it async would put a promise between `render()`
@@ -138,6 +139,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     commands,
     keybindings,
     integrationFlows: ownIntegrationFlow,
+    projectImporters: own(projectImporterRegistry),
     settingsPages: own(settingsRegistry),
     slots: own(uiSlotRegistry),
     taskSlots: own(taskSlotRegistry),

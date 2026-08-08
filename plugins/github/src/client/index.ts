@@ -6,31 +6,29 @@ import { pullFilePaletteSlotContribution } from './slotContribution'
 import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
 import { githubContentLinkContributions } from './contentLinks'
 import { setSelectedSource } from '@acorn/client-core/tasks/tasks.ts'
-import { githubRepositoryContribution } from './repositoryContribution'
 import { githubIntegrationFlow } from './integrationFlow'
 import { githubRouteContributions } from './routes'
+import GithubImporter from './GithubImporter'
 
 const GithubBrowse = lazy(() => import('./GithubBrowse'))
 
 export const githubClientPlugin: ClientPlugin = {
   name: 'github',
-  required: true,
+  required: false,
   init: (ctx) => {
     // github.com PR and repo URLs, resolved in-app instead of opening a browser.
     for (const contribution of githubContentLinkContributions) ctx.contribute(contentLinkRegistry, contribution)
-    // No `providerId`: unlike linear's and rollbar's, this source is NOT gated on a connected integration
-    // row. It has to be visible before GitHub is connected — that browse surface is where a fresh install
-    // ends up, and gating it would leave first run with no source at all.
+    // The PR rail is provider-owned and only appears once GitHub is connected. Core home remains the
+    // default landing source, so a disabled/disconnected provider never becomes the startup view.
     //
     // No `promotion` either: github's browse creates a task inline from its PR list (seeding provider links
     // as it goes) rather than through PromoteToTaskModal, so there is nothing for the registry to hold.
-    // `order: 10` is what puts GitHub at the head of the rail. Declared, so it survives this plugin being
-    // moved anywhere in the client plugin list.
+    // `providerId` is enforced by the client host and gates the source on the GitHub integration.
     ctx.sources.register({
-      id: 'github', order: 10, glyph: '◇', label: 'GitHub', component: GithubBrowse, defaultPane: 'pr', isDefault: true,
-      repository: githubRepositoryContribution,
+      id: 'github', order: 10, glyph: '◇', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
       routes: githubRouteContributions,
     })
+    ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: '◇', component: GithubImporter })
     ctx.commands.register({
       id: 'source.github.open',
       title: 'Go to GitHub in the left rail',

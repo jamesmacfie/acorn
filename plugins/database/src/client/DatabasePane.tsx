@@ -61,7 +61,7 @@ export default function DatabasePane(props: { task: Task }) {
   const integrations = createQuery(() => integrationsOptions(true))
   const modelConnections = createMemo(() => (integrations.data ? availableModelConnections(integrations.data) : []))
 
-  // Saved queries (docs/pg.md) are repo-scoped, so they outlive this task; the route resolves the repo
+  // Saved queries (docs/pg.md) are project-scoped, so they outlive this task; the route resolves the project
   // from the task id. createResource, not the query cache — this pane holds all its other state in signals.
   // Failures surface in the pane's error line rather than rejecting — a resource in an error state
   // re-throws on read, which would take the whole pane down over a missing list of snippets.

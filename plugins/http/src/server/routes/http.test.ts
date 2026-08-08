@@ -5,6 +5,7 @@ import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { HttpRequest, HttpVariable } from '../../shared/model'
 import { httpRequests, httpVariables } from '../../node/schema'
 import { migrationsDir } from '../../node/migrations'
@@ -34,9 +35,33 @@ describe('HTTP credential isolation', () => {
   let pluginDb: TestPluginDb
   let coreDb: TestDb
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pluginDb = makeTestPluginDb('http', migrationsDir())
     coreDb = makeTestDb()
+    const now = Date.now()
+    await coreDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await coreDb.db.insert(schema.projects).values([
+      {
+        id: 'project-web', name: 'web', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
+        vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/web.git', githubOwner: 'acme', githubName: 'web', githubRepoId: null,
+        createdAt: now, updatedAt: now,
+      },
+      {
+        id: 'project-api', name: 'api', path: null, workspaceId: 'workspace-1', sort: 1, hidden: false,
+        vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/api.git', githubOwner: 'acme', githubName: 'api', githubRepoId: null,
+        createdAt: now, updatedAt: now,
+      },
+    ])
+    await coreDb.db.insert(schema.tasks).values([
+      {
+        id: 'task-web', title: 'Web task', icon: null, origin: 'local', projectId: 'project-web', branch: 'main', worktreePath: null,
+        pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+      },
+      {
+        id: 'task-api', title: 'API task', icon: null, origin: 'local', projectId: 'project-api', branch: 'main', worktreePath: null,
+        pullNumber: null, status: 'active', parentId: null, sort: 1, createdAt: now, updatedAt: now, archivedAt: null,
+      },
+    ])
   })
 
   afterEach(() => {
@@ -55,7 +80,7 @@ describe('HTTP credential isolation', () => {
   }
 
   it('encrypts saved request payloads and returns them only to their owner', async () => {
-    const created = await call(principal('alice'), '/api/http/acme/web/requests', {
+    const created = await call(principal('alice'), '/api/http/projects/project-web/requests', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(requestBody),
@@ -70,15 +95,15 @@ describe('HTTP credential isolation', () => {
       expect(raw).not.toContain(secret)
     }
 
-    const alice = (await (await call(principal('alice'), '/api/http/acme/web/requests')).json()) as HttpRequest[]
+    const alice = (await (await call(principal('alice'), '/api/http/projects/project-web/requests')).json()) as HttpRequest[]
     expect(alice).toHaveLength(1)
     expect(alice[0]).toMatchObject(requestBody)
-    expect(await (await call(principal('bob'), '/api/http/acme/web/requests')).json()).toEqual([])
+    expect(await (await call(principal('bob'), '/api/http/projects/project-web/requests')).json()).toEqual([])
   })
 
   it('encrypts every variable kind, masks secrets, and scopes names per user', async () => {
     const create = (login: string, kind: 'value' | 'secret' | 'command', value: string) =>
-      call(principal(login), '/api/http/acme/web/vars', {
+      call(principal(login), '/api/http/projects/project-web/vars', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name: 'TOKEN', kind, value, enabled: true }),
@@ -96,12 +121,43 @@ describe('HTTP credential isolation', () => {
     expect(JSON.stringify(stored)).not.toContain('bob-value')
     expect(stored.every((row) => row.encrypted)).toBe(true)
 
-    const bobRows = (await (await call(principal('bob'), '/api/http/acme/web/vars')).json()) as HttpVariable[]
+    const bobRows = (await (await call(principal('bob'), '/api/http/projects/project-web/vars')).json()) as HttpVariable[]
     expect(bobRows).toMatchObject([{ name: 'TOKEN', kind: 'value', value: 'bob-value' }])
   })
 
+  it('rejects request task IDs that are missing or owned by another project', async () => {
+    const mismatched = { ...requestBody, taskId: 'task-api' }
+    const create = await call(principal('alice'), '/api/http/projects/project-web/requests', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(mismatched),
+    })
+    expect(create.status).toBe(400)
+    expect(await create.json()).toMatchObject({ error: { code: 'bad_request' } })
+
+    const valid = await call(principal('alice'), '/api/http/projects/project-web/requests', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...requestBody, taskId: 'task-web' }),
+    })
+    expect(valid.status).toBe(201)
+    const saved = (await valid.json()) as HttpRequest
+
+    const update = await call(principal('alice'), `/api/http/projects/project-web/requests/${saved.id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(mismatched),
+    })
+    expect(update.status).toBe(400)
+    expect(await update.json()).toMatchObject({ error: { code: 'bad_request' } })
+
+    const read = await call(principal('alice'), '/api/http/projects/project-web/requests?taskId=task-api')
+    expect(read.status).toBe(400)
+    expect(await read.json()).toMatchObject({ error: { code: 'bad_request' } })
+  })
+
   it('rejects the machine internal principal before it can read or send credentials', async () => {
-    const response = await call(principal('alice', 'internal'), '/api/http/acme/web/requests')
+    const response = await call(principal('alice', 'internal'), '/api/http/projects/project-web/requests')
     expect(response.status).toBe(403)
     expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
   })

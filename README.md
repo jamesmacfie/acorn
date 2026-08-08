@@ -11,7 +11,7 @@ Every Node has its own data root and is addressed through the same HTTPS protoco
 
 - GitHub pull-request browsing and review: diffs, comments, reviews, labels, reviewers, checks, and
   Actions logs.
-- Workspaces group repositories. Tasks represent work on one repository and may own a branch,
+- Workspaces group projects. Tasks represent work on one project and may own a branch,
   worktree, linked PR, panes, terminals, and managed agent sessions.
 - Task panes provide PR review, changes, notes, context, editor, search, preview, Docker, database,
   HTTP requests, Linear, and Rollbar surfaces.
@@ -74,9 +74,9 @@ pnpm --filter @acorn/desktop dist          # build and package the macOS app
 pnpm pack:node                             # build the standalone Node tarball
 ```
 
-The Node needs `GITHUB_CLIENT_ID` and an exactly 64-character hexadecimal `SESSION_ENC_KEY` in
-development. `GITHUB_CLIENT_SECRET` is accepted for local environment compatibility but is not used
-by the device-flow implementation. Native modules are ABI-specific: use `pnpm rebuild:node` for
+The Node needs an exactly 64-character hexadecimal `SESSION_ENC_KEY` in development. The optional
+GitHub plugin reads `GITHUB_CLIENT_ID` when GitHub connection/import features are enabled; it does not
+use a client secret. Native modules are ABI-specific: use `pnpm rebuild:node` for
 plain Node commands and `pnpm run rebuild` for Electron, as documented in
 [local-development.md](./docs/local-development.md).
 
@@ -92,5 +92,5 @@ Start with [architecture-overview.md](./docs/architecture-overview.md), then use
 - [local-development.md](./docs/local-development.md), [testing.md](./docs/testing.md), and
   [node-distribution.md](./docs/node-distribution.md) — build, test, and distribution workflows.
 
-The completed design and implementation record remains in [docs/legacy/vNext](./docs/legacy/vNext) for reference.
-It is not the source of current runtime contracts; the parent `docs/` tree and the code are.
+The completed project-model migration record is [docs/legacy/projects/README.md](./docs/legacy/projects/README.md).
+Current runtime contracts live in the parent `docs/` tree and the code.

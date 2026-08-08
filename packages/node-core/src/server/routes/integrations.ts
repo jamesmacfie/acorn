@@ -94,7 +94,6 @@ export const integrations = new Hono<AppEnv>()
     }
   })
   .delete('/:id', async (c) => {
-    if (c.req.param('id') === 'github') return respondError(c, 400, 'provider_bad_config')
     try {
       await disconnectConnection(getDb(c.env), ownerId(c), c.req.param('id'))
       // The row is gone by now, and the audit row is what is left of it — which is exactly why the

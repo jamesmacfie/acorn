@@ -4,9 +4,10 @@ import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } fro
 import type { PaneId } from './layout'
 import { sourcePath } from '../registries/sources'
 
-// Where a task lives in the router (repo browse, or the PR when it has one).
+// Where a task lives in the router (project browse, PR detail, or the task route for local work).
 export function pathForTask(t: Task): string {
-  return sourcePath(t.pullNumber != null ? 'detail' : 'repo', { owner: t.repoOwner, repo: t.repoName, number: t.pullNumber ?? '' })
+  if (t.pullNumber != null && t.github) return sourcePath('detail', { projectId: t.projectId, number: t.pullNumber })
+  return `/t/${encodeURIComponent(t.id)}`
 }
 
 // Make a task the active one (signals only — the caller navigates to pathForTask). Shared by the

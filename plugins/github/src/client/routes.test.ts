@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { githubRouteContributions } from './routes'
 
-describe('GitHub route compatibility', () => {
-  it('keeps the existing deep-link shapes and static-before-parameter order', () => {
+describe('GitHub route contributions', () => {
+  it('owns only the project-scoped PR surfaces', () => {
     expect(githubRouteContributions.map((route) => route.path)).toEqual([
-      '/:owner/:repo',
-      '/:owner/:repo/new',
-      '/:owner/:repo/:number',
+      '/p/:projectId/pulls',
+      '/p/:projectId/pulls/new',
+      '/p/:projectId/pulls/:number',
     ])
-    expect(githubRouteContributions.map((route) => route.order)).toEqual([10, 20, 30])
+    expect(githubRouteContributions.map((route) => route.order)).toEqual([30, 40, 50])
   })
 })

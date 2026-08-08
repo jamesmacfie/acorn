@@ -9,7 +9,7 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 
 type TaskRow = typeof schema.tasks.$inferSelect
-type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; workflowRunId?: string }
+type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; github: { owner: string; name: string } | null; workflowRunId?: string }
 type ContextDraft = {
   items: ContextItem[]
   // The response adapter is intentionally separate from canonical `items`: existing task-context
@@ -48,7 +48,7 @@ export type ContextNotesSource = (
   taskId: string,
   repo: string,
 ) => Promise<{ slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[]>
-export type ContextMemorySource = (taskId: string, repo: string) => Promise<{ name: string; description: string }[]>
+export type ContextMemorySource = (taskId: string, projectId: string) => Promise<{ name: string; description: string }[]>
 
 export type ContextPullRequestSource = (
   userId: string,
@@ -120,9 +120,9 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
     label: 'Pull request',
     defaultIncluded: false,
     budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-    async assemble({ userLogin, task }) {
-      if (task.pullNumber == null) return { items: [] }
-      const pr = await source(userLogin, task.repoOwner, task.repoName, task.pullNumber)
+    async assemble({ userLogin, task, github }) {
+      if (task.pullNumber == null || !github) return { items: [] }
+      const pr = await source(userLogin, github.owner, github.name, task.pullNumber)
       if (!pr) return { items: [] }
       const changedFiles = pr.changedFiles
       const compatibility = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
@@ -237,11 +237,11 @@ export function memorySection(source: ContextMemorySource): PluginContextSection
   return {
     id: 'memory',
     order: 40,
-    label: 'Repo memory',
+    label: 'Project memory',
     defaultIncluded: false,
     budget: { maxItems: 30, overflow: 'index-only' },
-    async assemble({ task, repo }) {
-      const memories = await source(task.id, repo)
+    async assemble({ task }) {
+      const memories = task.projectId ? await source(task.id, task.projectId) : []
       return {
         items: memories.map((memory) => ({ id: memory.name, kind: 'memory', label: memory.name, details: [memory.description] })),
         compatibility: { memory: memories },
@@ -249,7 +249,7 @@ export function memorySection(source: ContextMemorySource): PluginContextSection
     },
     format(items, omitted) {
       if (!items.length) return ''
-      return ['## Repo memory (index — ask for bodies via memory_get)', ...items.map((item) => `- ${item.label} — ${item.details?.[0] ?? ''}`)].join('\n') + formatOmitted(omitted)
+      return ['## Project memory (index — ask for bodies via memory_get)', ...items.map((item) => `- ${item.label} — ${item.details?.[0] ?? ''}`)].join('\n') + formatOmitted(omitted)
     },
   }
 }
@@ -319,9 +319,13 @@ export async function assembleContext(
 ): Promise<TaskContext | null> {
   const [task] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, taskId))
   if (!task) return null
-  const repo = `${task.repoOwner}/${task.repoName}`
+  const project = await db.select().from(schema.projects).where(eq(schema.projects.id, task.projectId)).limit(1).then((rows) => rows[0] ?? null)
+  if (!project) return null
+  const projectId = project.id
+  const github = project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null
+  const repo = github ? `${github.owner}/${github.name}` : ''
   const ctx: TaskContext = {
-    task: { id: task.id, title: task.title, repo, branch: task.branch, worktreePath: task.worktreePath, pullNumber: task.pullNumber },
+    task: { id: task.id, title: task.title, projectId, repo: repo || undefined, branch: task.branch, worktreePath: task.worktreePath, pullNumber: task.pullNumber },
     sections: [],
     issues: [],
     notes: [],
@@ -329,7 +333,7 @@ export async function assembleContext(
   }
   for (const contribution of registry.list()) {
     if (!include.has(contribution.id)) continue
-    const draft = await contribution.assemble({ db, userLogin, task, repo, workflowRunId: opts.workflowRunId })
+    const draft = await contribution.assemble({ db, userLogin, task, repo, github, workflowRunId: opts.workflowRunId })
     const budgeted = applyBudget(draft.items, contribution.budget)
     const compatibility = budgetCompatibilityProjection(draft.compatibility, contribution.budget)
     if (compatibility) Object.assign(ctx, compatibility)

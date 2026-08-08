@@ -34,7 +34,6 @@ const ACTION_LABELS: Record<string, string> = {
   'config.trusted': 'Repo config trusted',
   'plugins.disabled.changed': 'Plugins changed',
   'backup.created': 'Backup created',
-  'import.v1': 'Imported V1 configuration',
 }
 
 const describeActor = (entry: AuditEntry): string => {

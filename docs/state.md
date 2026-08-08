@@ -5,7 +5,7 @@ Client caches and persisted UI state are disposable and never prove that a mutat
 
 ## Node-owned state
 
-The Node is authoritative for workspaces, repositories, tasks, branches, worktrees, Git status,
+The Node is authoritative for workspaces, projects, tasks, branches, worktrees, Git status,
 notes, memories, integrations, provider mirrors, terminal metadata, managed sessions, workflow runs,
 Docker/database configuration, saved requests, secrets, devices, plugin enablement, config trust,
 and audit records.

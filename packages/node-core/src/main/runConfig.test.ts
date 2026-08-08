@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { legacyRunTargets, loadRepoConfig } from './runConfig'
+import { loadRepoConfig, projectRunTargets } from './runConfig'
 
 describe('loadRepoConfig (docs/workflows.md §2)', () => {
   let dir: string
@@ -99,13 +99,13 @@ browser = "run:dev"
     expect(cfg.layouts).toEqual([{ id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }])
   })
 
-  it('db/preview: repo_paths fallback resolves; committed [database]/[preview] toml wins (repo-level-settings)', () => {
-    // DB fallback only (no toml): the repo_paths values pass through.
+  it('db/preview: project config fallback resolves; committed [database]/[preview] toml wins (project-level-settings)', () => {
+    // DB fallback only (no toml): the project values pass through.
     const fallback = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback', previewMode: 'port', previewValue: '3000' })
     expect(fallback.errors).toEqual([])
     expect(fallback.dbUrlScript).toBe('db-fallback')
     expect(fallback.preview).toEqual({ mode: 'port', value: '3000' })
-    // Committed .acorn/config.toml wins over the repo_paths fallback.
+    // Committed .acorn/config.toml wins over the project fallback.
     writeConfig(repoDir, `
 [database]
 url_script = "bin/print-db-url"
@@ -164,11 +164,11 @@ command = "pnpm db:seed"
   })
 })
 
-describe('legacyRunTargets (run_targets JSON column)', () => {
+describe('projectRunTargets (run_targets JSON column)', () => {
   it('reads the typed runTargets JSON column and survives malformed JSON', () => {
     const json = JSON.stringify([{ id: 'stack', command: 'docker compose up', stop: 'docker compose down' }])
-    expect(legacyRunTargets({ runTargetsJson: json })[0].id).toBe('stack')
-    expect(legacyRunTargets({ runTargetsJson: '{not json' })).toEqual([]) // malformed → no targets
-    expect(legacyRunTargets({})).toEqual([])
+    expect(projectRunTargets({ runTargetsJson: json })[0].id).toBe('stack')
+    expect(projectRunTargets({ runTargetsJson: '{not json' })).toEqual([]) // malformed → no targets
+    expect(projectRunTargets({})).toEqual([])
   })
 })

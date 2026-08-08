@@ -14,6 +14,7 @@ import { taskSlotRegistry, uiSlotRegistry } from '@acorn/client-core/registries/
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
 import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
+import { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
 import { clientPlugins } from '../../src/app/client/plugins'
 
 const REGISTRIES = {
@@ -32,6 +33,7 @@ const REGISTRIES = {
   nodeStats: nodeStatRegistry,
   attention: attentionRegistry,
   contentLinks: contentLinkRegistry,
+  projectImporters: projectImporterRegistry,
 } as const
 
 type RegistryName = keyof typeof REGISTRIES
@@ -76,6 +78,7 @@ const FULL: Snapshot = {
   nodeStats: ['agents.active'],
   attention: ['agents.sessions', 'memory.proposals'],
   contentLinks: ['github.pull-request', 'github.repository', 'linear.issue'],
+  projectImporters: ['github'],
 }
 
 // What each OPTIONAL plugin owns. Registries it does not touch are omitted.
@@ -102,6 +105,14 @@ const OWNED: Record<string, Partial<Snapshot>> = {
   onboarding: { slots: ['overlay/onboarding.first-run'] },
   preview: { panes: ['preview'] },
   rollbar: { panes: ['rollbar'], sources: ['rollbar'] },
+  github: {
+    panes: ['pr'],
+    sources: ['github'],
+    slots: ['overlay/palette.pull-files'],
+    projectImporters: ['github'],
+    persistedState: ['github.pr-filters'],
+    contentLinks: ['github.pull-request', 'github.repository'],
+  },
   workflows: { settingsPages: ['workflows'], paletteRows: ['workflows.defs'], pollers: ['workflows.triggers'] },
 }
 
@@ -132,7 +143,7 @@ describe('disabling a client plugin', () => {
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     expect(NAMES.length).toBeGreaterThanOrEqual(16)
-    expect([...REQUIRED].sort()).toEqual(['agents', 'github', 'memory', 'notes', 'terminal'])
+    expect([...REQUIRED].sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     expect(OPTIONAL.length).toBeGreaterThanOrEqual(10)
     // Every optional plugin is in the ledger, and every ledger entry claims something. A plugin
     // contributing nothing would make its own case below pass vacuously — this fails instead.

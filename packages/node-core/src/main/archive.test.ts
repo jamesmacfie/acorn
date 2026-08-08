@@ -59,14 +59,16 @@ describe('archiveTask teardown ordering', () => {
     t = makeTestDb()
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'ws1', name: 'W', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
-    await t.db.insert(schema.workspaceRepos).values({ workspaceId: 'ws1', repoOwner: 'acme', repoName: 'widget', sort: 0, createdAt: now })
-    await t.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: checkout, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-widget', name: 'widget', path: checkout, workspaceId: 'ws1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
     await t.db.insert(schema.tasks).values({
       id: 'task1',
       title: 'Fix it',
       origin: 'local',
-      repoOwner: 'acme',
-      repoName: 'widget',
+      projectId: 'project-widget',
       branch: 'feat/x',
       worktreePath: worktree,
       pullNumber: null,
@@ -91,7 +93,7 @@ describe('archiveTask teardown ordering', () => {
     runTeardown: runTeardownProcess,
   })
 
-  const setTeardown = (script: string | null) => t.db.update(schema.repoPaths).set({ teardownScript: script })
+  const setTeardown = (script: string | null) => t.db.update(schema.projects).set({ teardownScript: script })
 
   it('runs teardown in the live worktree (ACORN_* env) before removal', async () => {
     const marker = join(dir, 'marker')
@@ -146,6 +148,17 @@ describe('archiveTask teardown ordering', () => {
     const res = await archiveTask(t.db, 'task1', {}, d)
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.reason).toContain('running session')
+  })
+
+  it('never removes the project folder for a legacy checkout-marker task', async () => {
+    await t.db.insert(schema.tasks).values({
+      id: 'marker-task', title: 'Legacy checkout', origin: 'local', projectId: 'project-widget',
+      branch: 'HEAD', worktreePath: checkout,
+      status: 'active', sort: 1, createdAt: Date.now(), updatedAt: Date.now(), archivedAt: null,
+    })
+    const res = await archiveTask(t.db, 'marker-task', { force: true }, deps())
+    expect(res).toEqual({ ok: true })
+    expect(isDir(checkout)).toBe(true)
   })
 
   it('current-checkout task (worktreePath === checkout) archives without removing the checkout', async () => {

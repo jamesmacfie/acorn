@@ -1,6 +1,8 @@
 import { createSignal, For, onMount, Show } from 'solid-js'
 import { useParams } from '@solidjs/router'
+import { createQuery } from '@tanstack/solid-query'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
+import { projectsOptions } from '../queries'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../registries/sources'
 import { Tabs } from '../ui/Tabs'
@@ -24,6 +26,9 @@ export function PromoteToTaskModal(props: {
   onAttached: (task: Task) => void
 }) {
   const params = useParams()
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
+  const github = () => project()?.github
   const promotion = () => {
     const source = sourceRegistry.get(props.providerId)
     // A source with no promotion cannot be promoted through this modal, and nothing opens it for one — the
@@ -43,10 +48,12 @@ export function PromoteToTaskModal(props: {
   // Prefill title/branch from the provider's own seed derivation (branch omitted so it derives a
   // default). Both current providers are synchronous; resolve defensively in case one isn't.
   onMount(() => {
-    void Promise.resolve(promotion().prepare(props.item, { owner: params.owner ?? '', repo: params.repo ?? '', branch: '', existingBranches: props.existingBranches }))
+    const projectId = params.projectId
+    if (!projectId) return
+    void Promise.resolve(promotion().prepare(props.item, { projectId, owner: github()?.owner ?? '', repo: github()?.name ?? '', branch: '', existingBranches: props.existingBranches }))
       .then((seed) => {
         setTitle(seed.title ?? '')
-        setBranch(seed.branch)
+        setBranch(seed.branch ?? '')
       })
       .catch(() => {})
   })
@@ -55,15 +62,18 @@ export function PromoteToTaskModal(props: {
 
   async function submitNew(e: Event) {
     e.preventDefault()
-    const { owner, repo } = params
+    const projectId = params.projectId
+    const isGitProject = project()?.vcs === 'git'
     const b = slugifyBranch(branch())
-    if (!owner || !repo || !title().trim() || !b) return
+    if (!projectId || !title().trim() || (isGitProject && !b)) return
     setBusy(true)
     setError('')
     try {
-      const context = { owner, repo, branch: b, existingBranches: props.existingBranches }
+      const context = { projectId, owner: github()?.owner ?? '', repo: github()?.name ?? '', branch: isGitProject ? b : undefined, existingBranches: props.existingBranches }
       const base = await Promise.resolve(promotion().prepare(props.item, context))
-      const seed: TaskSeed = { ...base, title: title().trim(), branch: b }
+      const seed: TaskSeed = isGitProject
+        ? { ...base, title: title().trim(), branch: b }
+        : { ...base, title: title().trim(), branch: undefined }
       const task = await promotion().create(seed)
       await promotion().afterCreate?.(task, props.item, context)
       props.onCreated(task)
@@ -113,12 +123,14 @@ export function PromoteToTaskModal(props: {
 
           <Show when={mode() === 'new'}>
             <form id="promote-panel-new" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitNew}>
-              <p class="muted">New task in {params.owner}/{params.repo}.</p>
+              <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
               <input class="ui-input" type="text" placeholder="Task title" value={title()} onInput={(e) => setTitle(e.currentTarget.value)} />
-              <input class="ui-input" type="text" placeholder="branch" value={branch()} onInput={(e) => setBranch(e.currentTarget.value)} />
+              <Show when={project()?.vcs === 'git'}>
+                <input class="ui-input" type="text" placeholder="branch" value={branch()} onInput={(e) => setBranch(e.currentTarget.value)} />
+              </Show>
               <div class="close-actions">
                 <button type="button" class="ui-btn" onClick={props.onClose}>Cancel</button>
-                <button type="submit" class="ui-btn" disabled={busy() || !title().trim() || !slugifyBranch(branch())}>Create task</button>
+                <button type="submit" class="ui-btn" disabled={busy() || !title().trim() || (project()?.vcs === 'git' && !slugifyBranch(branch()))}>Create task</button>
               </div>
             </form>
           </Show>

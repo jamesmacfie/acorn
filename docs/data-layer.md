@@ -25,8 +25,9 @@ exclusive `node.lock`.
 ```
 
 `node.json` stores the stable Node ID, certificate metadata, and preferred last-bound port. A root
-is opened by `openDataRoot`, which creates the identity, takes the lock, and refuses an incompatible
-root. The configuration importer reads a copy of an older root and leaves the source untouched.
+  is opened by `openDataRoot`, which creates the identity, takes the lock, and refuses an incompatible
+  root. Database upgrades are applied by the owning migration chain; backups are explicit archives and
+  never mutate their source data.
 
 ## Core database
 
@@ -35,8 +36,8 @@ Core owns data shared by multiple features:
 | Area | Tables |
 | --- | --- |
 | Identity/transport | `devices`, `idempotency`, `audit` |
-| Workspaces/tasks | `workspaces`, `workspace_repos`, `ignored_repos`, `workspace_projects`, `tasks`, `task_links` |
-| Repository configuration | `repo_paths`, `config_acks` |
+| Workspaces/tasks | `workspaces`, `projects`, `workspace_external_projects`, `tasks`, `task_links` |
+| Project configuration/trust | `projects`, `config_acks` |
 | Provider registry | `integrations` |
 | External item projection | `issues`, `issue_resources`, provider `sync_state` markers |
 | Node preferences | `prefs` |
@@ -53,10 +54,10 @@ These plugins own SQLite files and migrations:
 | --- | --- |
 | `plugins/agents.sqlite` | managed sessions, turns, event ledger, requests, attachments, artifacts, webhooks, FTS |
 | `plugins/changes.sqlite` | review notes and plugin-local change state |
-| `plugins/database.sqlite` | saved SQL queries |
+| `plugins/database.sqlite` | project-scoped saved SQL queries |
 | `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
-| `plugins/http.sqlite` | requests, variables, encrypted request fields |
-| `plugins/memory.sqlite` | memory index, proposals, FTS |
+| `plugins/http.sqlite` | project-scoped requests/variables, encrypted request fields |
+| `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/notes.sqlite` | task/workspace/global notes and revisions |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
 | `plugins/workflows.sqlite` | definitions, runs, steps, gates, and trigger state |
@@ -88,8 +89,8 @@ Provider data is a disposable read model. GitHub, Linear, and Rollbar remain the
 truth; refresh can delete and rebuild local rows. Application-owned state survives provider refreshes.
 
 Machine-scoped entities include workspaces, tasks, notes, memories, terminal metadata, worktrees,
-and repository configuration. Identity-scoped records use the active GitHub login where switching
-the connected account must not inherit another account's settings, integrations, or saved requests.
+  and project configuration. Identity-scoped records use the node's boot-bound opaque owner id;
+provider account changes must not alter the owner's settings, integrations, or saved requests.
 
 The shared `blobs/` directory is content-addressed. It stores immutable patch bodies, file bodies,
 attachments, and artifacts by SHA. Plugin rows may retain a blob until the owning record is deleted.
@@ -122,18 +123,16 @@ Node plugin host and use `CoreServices` for core-owned operations.
 The archive excludes blobs and worktrees and scrubs credentials, device rows, and other token
 material. Restore is a manual operation into a fresh data root.
 
-The V1 configuration importer is intentionally narrow. It reads a copied source database, imports
-workspace/repository grouping, checkout paths, repository scripts/configuration, and branch prefixes,
-then leaves the source unchanged. It does not import tokens, tasks, notes, memories, terminals, or
-preferences. Imported executable config has no `config_acks` entry and must be reviewed again.
+There is no runtime configuration importer. Legacy data is handled by versioned migrations and their
+seeded replay tests; a backup remains the supported way to preserve a source before an upgrade.
+Executable configuration recovered without a matching `config_acks` row must be reviewed again.
 
 ## Retention
 
 Both sweeps run AT BOOT, not on a timer, and there is no scheduler service. A node that is never
 restarted is also one that is never accumulating a backlog worth pruning, and a scheduler for one
-range-delete a day is machinery this does not need (`server/audit.ts` states the same). Some of the
-`docs/legacy/vNext/` material lists a `scheduler` on CoreServices; that was written and deleted, and
-never shipped.
+range-delete a day is machinery this does not need (`server/audit.ts` states the same). Older design
+notes listed a `scheduler` on CoreServices; that was written and deleted, and never shipped.
 
 - idempotency rows: 24 hours, cleaned at boot;
 - audit rows: 90 days, pruned at boot;

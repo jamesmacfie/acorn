@@ -4,7 +4,7 @@
 // (contract/runTargets.ts). The service stays dependency-injected so it's unit-testable under plain Node.
 //
 // Its two DB-shaped needs are now CoreServices calls, because this plugin has no handle to core's
-// database: `taskRunConfig` (repo_paths merged with the repo's committed config, in the lazily created
+// database: `taskRunConfig` (project config merged with the project's committed config, in the lazily created
 // worktree) and the executable-config trust gate.
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { RunTarget } from '@acorn/node-core/main/runConfig.ts'
@@ -22,13 +22,16 @@ export type RunSessionGlue = {
 
 // Runtime service (docs/workflows.md §2): run targets as terminal sessions in the task worktree.
 // Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_* env.
-export function createRuntimeService(core: Pick<CoreServices, 'tasks' | 'repos' | 'proc'>, glue: RunSessionGlue): RuntimeService {
+export function createRuntimeService(core: Pick<CoreServices, 'tasks' | 'projects' | 'proc'>, glue: RunSessionGlue): RuntimeService {
   const runScript = async (taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }> => {
     const t = await core.tasks.load(taskId)
+    const project = t?.projectId ? await core.projects.byId(t.projectId) : null
     const env = buildSessionEnv({
       taskId,
       cwd,
-      task: t ? { repoOwner: t.repoOwner, repoName: t.repoName, branch: t.branch, title: t.title } : null,
+      task: t && project
+        ? { projectId: project.id, projectName: project.name, github: project.github, branch: t.branch, title: t.title }
+        : null,
     })
     // CoreServices.proc: bounded output and a process-group kill. A stop/url script routinely leaves
     // a grandchild behind, and the previous execFile only killed the direct child on timeout.
@@ -45,6 +48,6 @@ export function createRuntimeService(core: Pick<CoreServices, 'tasks' | 'repos' 
     exitCode: glue.exitCode,
     killSession: glue.killSession,
     runScript,
-    authorizeRepoConfig: (taskId) => core.repos.assertConfigTrusted(taskId),
+    authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
   })
 }

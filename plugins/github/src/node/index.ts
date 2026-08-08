@@ -1,10 +1,10 @@
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
-import { setRepoMirrorSource } from '@acorn/node-core/server/repoMirror.ts'
 import { pullRequestSection } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/actions'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
+import { githubImport } from '../server/routes/import'
 import { githubProvider } from '../server/provider'
 import { mentions } from '../server/routes/mentions'
 import { pins } from '../server/routes/pins'
@@ -18,22 +18,16 @@ import { pulls } from '../server/routes/pulls'
 import { pullsBatch } from '../server/routes/pullsBatch'
 import { repoLabels } from '../server/routes/repoLabels'
 import { repos } from '../server/routes/repos'
-import {
-  failingChecksFor,
-  mirrorFootprint,
-  mirroredDefaultBranch,
-  mirroredIdentities,
-  mirroredPullRequest,
-  mirroredRepoList,
-} from '../server/mirrorQueries'
+import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { migrationsDir } from './migrations'
+import { githubClientId } from './config'
 
 export const githubPlugin = (dataDir: string): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
   return {
     name: 'github',
-    required: true,
+    required: false,
     init: async (ctx) => {
       // Opened and migrated before the listener binds. Every router below is a FACTORY closing over this
       // handle rather than a module-scope router reading `getDb(c.env)`, for the reason
@@ -70,8 +64,8 @@ export const githubPlugin = (dataDir: string): NodePlugin => {
       // mirror's transaction and goes through CoreServices.tasks.adoptPullNumbers instead.
       ctx.routes.register(pulls(store, ctx.core), { prefix: '/repos' })
       ctx.routes.register(pullDetail(store), { prefix: '/repos' })
-      // The one github router with no handle at all: it shells out to git in the repo's checkout, and the
-      // checkout path comes from core's `repo_paths` through CoreServices.
+      // The one github router with no plugin database handle: it shells out to git in the mapped project
+      // checkout, and the path comes from CoreServices.projects through the core git seam.
       ctx.routes.register(pullConflicts(ctx.core), { prefix: '/repos', note: '/:owner/:repo/pulls/:number/conflicts' })
       ctx.routes.register(pullFiles(store), { prefix: '/repos' })
       ctx.routes.register(pullBlob(store), { prefix: '/repos' })
@@ -86,10 +80,11 @@ export const githubPlugin = (dataDir: string): NodePlugin => {
       // and the client's `pinsRoute` moved with it in the same commit — the repo selector is the only
       // caller.
       ctx.routes.register(pins(store), { prefix: '/pins' })
-      // The device-flow connect, which writes CORE's `integrations` row through core's own
-      // connectProvider and binds the machine identity through core's own identity service. It touches
-      // none of this plugin's tables, so it takes CoreServices and no handle.
-      ctx.routes.register(githubDeviceAuth(ctx.core), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
+      // The device-flow connect writes CORE's `integrations` row through core's own connectProvider.
+      // It does not bind the machine identity: core mints that owner at boot. It touches none of this
+      // plugin's tables, so it takes no handle.
+      ctx.routes.register(githubDeviceAuth(githubClientId), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
+      ctx.routes.register(githubImport(store, ctx.core), { prefix: '', note: 'POST /import — import mirrored repositories into core projects' })
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
         pullRequest: (userId, repoOwner, repoName, pullNumber) => mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
@@ -111,27 +106,11 @@ export const githubPlugin = (dataDir: string): NodePlugin => {
         mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
       ))
 
-      // Core's own three reads of the mirror — workspace bootstrap, the `repo_info` tool's default branch,
-      // and the sole-identity check — go through a slot rather than the capability registry, because two of
-      // the three consumers are route handlers and `c.env` deliberately cannot reach the plugin graph
-      // (@acorn/node-core/server/repoMirror.ts states the reasoning). Filling it from init, rather than
-      // leaving it to the composition root, is what keeps it filled for `dev:node` too.
-      setRepoMirrorSource({
-        list: (userId) => mirroredRepoList(store, userId),
-        defaultBranch: (userId, owner, name) => mirroredDefaultBranch(store, userId, owner, name),
-        identities: () => mirroredIdentities(store),
-      })
     },
     // The plugin's SQLite file is in WAL mode, so it has to be closed before the data root's lock is
     // dropped — the composition root's own teardown invariant. Every router above closes over the handle
-    // and is discarded with the plugin's route contributions by the host, so unlike the plugins that fill
-    // a module-scope bridge slot there is nothing here to null out: a second startServiceRuntime in one
-    // process builds fresh routers over its own handle.
+    // and is discarded with the plugin's route contributions by the host.
     dispose: () => {
-      // Cleared explicitly rather than trusting teardown order: the slot is a module-scope singleton, so a
-      // second startServiceRuntime in one process would otherwise leave core's workspace bootstrap and
-      // identity check reading through this boot's CLOSED handle.
-      setRepoMirrorSource(null)
       db?.close()
       db = null
     },

@@ -70,11 +70,9 @@ namespace.
 | `GET` | `/v2/core/security` | Read Node security posture |
 | `GET` | `/v2/core/backup` | Suggest a destination path for a backup |
 | `POST` | `/v2/core/backup` | Create a credential-scrubbed database archive |
-| `GET` | `/v2/core/import/v1` | Inspect a source root without importing |
-| `POST` | `/v2/core/import/v1` | Import configuration from a copied V1 database |
 
-These routes are device-only. Backup and import use Node filesystem paths, so an internal task token
-must not reach them.
+These routes are device-only. Backup uses Node filesystem paths, so an internal task token must not
+reach it.
 
 ### Preferences and integrations
 
@@ -96,18 +94,16 @@ write-only.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/v2/core/workspaces` | List workspaces and visible repository membership |
+| `GET` | `/v2/core/workspaces` | List workspaces and their project membership |
 | `POST` | `/v2/core/workspaces/bootstrap` | Initialize the default workspace |
 | `POST` | `/v2/core/workspaces` | Create a workspace |
 | `PATCH` | `/v2/core/workspaces/:id` | Update workspace identity |
 | `DELETE` | `/v2/core/workspaces/:id` | Delete a non-default workspace |
-| `POST` | `/v2/core/workspaces/:id/repos` | Assign a repository to a workspace |
-| `GET` | `/v2/core/workspaces/assignments` | List repository-to-workspace assignments and ignore state |
-| `POST` | `/v2/core/workspaces/ignore-repo` | Hide one repository from workspace selection |
-| `POST` | `/v2/core/workspaces/unignore-repo` | Show one repository in workspace selection |
-| `POST` | `/v2/core/workspaces/ignore-all` | Hide or show every mirrored repository |
-| `GET` | `/v2/core/workspaces/:id/projects` | List external projects linked to a workspace |
-| `PUT` | `/v2/core/workspaces/:id/projects` | Replace external projects linked to a workspace |
+| `GET` | `/v2/core/projects` | List local projects and their facets |
+| `POST` | `/v2/core/projects` | Add or import a project |
+| `PATCH` | `/v2/core/projects/:id` | Update project identity, folder, or visibility |
+| `GET` | `/v2/core/workspaces/:id/external-projects` | List provider projects linked to a workspace |
+| `PUT` | `/v2/core/workspaces/:id/external-projects` | Replace provider projects linked to a workspace |
 | `GET` | `/v2/core/tasks` | List active tasks on this Node |
 | `POST` | `/v2/core/tasks` | Create a task |
 | `PATCH` | `/v2/core/tasks/:id` | Update task metadata or archive/activate a task |
@@ -123,14 +119,13 @@ worktree, run-target, and repo-config authority remains in core.
 
 ### Worktrees, configuration, and run targets
 
-The core worktree router covers repository paths and task lifecycle surfaces, including:
+The core worktree router covers project configuration and task lifecycle surfaces, including:
 
 ```text
 /v2/core/task-statuses
-/v2/core/repos/path
-/v2/core/repos/path/run-targets
-/v2/core/repos/path/config
-/v2/core/tasks/:id/{preview-url,on-created,use-checkout,archive}
+/v2/core/projects/:id/run-targets
+/v2/core/projects/:id/config
+/v2/core/tasks/:id/{preview-url,on-created,archive}
 /v2/core/tasks/:id/{mcp,mcp/starter}
 /v2/core/tasks/:id/config-trust
 /v2/core/tasks/:id/run/*
@@ -184,7 +179,7 @@ Sessions persist normalized event history and expose paged HTTP reads plus live 
 
 ```text
 /v2/p/terminal/sessions*
-/v2/core/tasks/:id/{archive,preview-url,on-created,use-checkout,mcp}
+/v2/core/tasks/:id/{archive,preview-url,on-created,mcp}
 /v2/p/workflows/tasks/:id/workflows*
 /v2/p/workflows/workflows/runs/:runId/*
 ```

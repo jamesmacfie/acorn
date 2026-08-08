@@ -3,7 +3,6 @@ import { Portal } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, type Task } from '@acorn/client-core/queries.ts'
 import { terminalApi } from './terminalClient'
-import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { onClosePaneWithin } from '@acorn/client-core/lib/onClosePaneWithin.ts'
 import { isTerminalMax } from '@acorn/client-core/tasks/tasks.ts'
 import { activeTerminal, addSession, rememberActiveTerminal, refreshSessions, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
@@ -18,15 +17,12 @@ import { termFontSize } from '@acorn/client-core/ui/metrics.ts'
 import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 
-// Bottom drawer of persistent local sessions. The "+" opens a profile menu
-// (Shell / Claude Code / Codex / Aider, disabled when not on PATH); agents start in the active
-// task's mapped checkout (prompting for the path if unmapped) on a durable tmux backend.
+// Bottom drawer of persistent local sessions. The "+" opens a profile menu; the node resolves the
+// active project folder/worktree from the task id on a durable tmux backend.
 // Sessions are scoped to the active task, not the URL — switching tasks swaps the
 // visible terminals.
 export default function TerminalPanel(props: { onClose: () => void; task: Task | null }) {
   const api = terminalApi()
-  // Repo checkout mapping is a platform concern (core's task bridge); the PTY verbs above are ours.
-  const bridge = taskBridge()
   const queryClient = useQueryClient()
   const ws = () => props.task
   const prefs = createQuery(() => prefsOptions(true))
@@ -42,11 +38,6 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // Optimistic tab: the title of a session whose create() is still round-tripping (worktree +
   // spawn can take seconds), so the click gives instant feedback in the tab strip.
   const [pendingTitle, setPendingTitle] = createSignal<string | null>(null)
-  // Repo-path prompt: set when a launch needs a checkout we don't have mapped yet.
-  const [prompt, setPrompt] = createSignal<{ owner: string; repo: string; number?: string } | null>(null)
-  const [pendingProfile, setPendingProfile] = createSignal('shell')
-  const [pathInput, setPathInput] = createSignal('')
-  const [pathError, setPathError] = createSignal<string | null>(null)
   const surfaceFontSize = () => resolveTerminalFontSize(prefs.data?.[PrefKeys.terminalFontSize], termFontSize())
 
   // Scope the strip to the active task (docs/workspaces-and-tasks.md). A session opened in task A
@@ -196,8 +187,8 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     window.addEventListener('pointerup', onUp)
   }
 
-  function titleFor(profileId: string, owner?: string, repo?: string, number?: string): string {
-    const ctx = owner && repo ? `${owner}/${repo}${number ? ` #${number}` : ''}` : ''
+  function titleFor(profileId: string, task?: Task | null): string {
+    const ctx = task?.github ? `${task.github.owner}/${task.github.name}${task.pullNumber != null ? ` #${task.pullNumber}` : ''}` : task?.title ?? ''
     if (profileId === 'shell') return ctx || 'shell'
     const label = profiles().find((p) => p.id === profileId)?.label ?? profileId
     return ctx ? `${label} · ${ctx}` : label
@@ -205,14 +196,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   // Spawn into the active task. `checkout` is the base repo path; the main process derives the
   // task's lazy worktree from it and cwds the session there (docs/workspaces-and-tasks.md).
-  async function spawn(profileId: string, checkout: string | undefined, owner?: string, repo?: string, number?: string) {
+  async function spawn(profileId: string) {
     const taskId = ws()?.id
     if (!api || !taskId) return
-    const title = titleFor(profileId, owner, repo, number)
+    const title = titleFor(profileId, ws())
     setBusy(true)
     setPendingTitle(title)
     try {
-      const s = await api.create({ taskId, profileId, cwd: checkout, title })
+      const s = await api.create({ taskId, profileId, title })
       addSession(s) // create returns the session — no list round trip before the tab renders
       setActiveId(s.id)
     } catch (e) {
@@ -223,44 +214,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     }
   }
 
-  // Launch a profile in the active task's repo checkout, prompting for the local path the
-  // first time we see this repo (validated in main before we spawn). docs/workspaces-and-tasks.md: context
-  // comes from the task, not the URL; the worktree is created lazily in main (Flow C).
+  // Launch a profile; the node resolves project path/worktree from taskId. docs/workspaces-and-tasks.md:
+  // context comes from the task, not the URL; the worktree is created lazily in main (Flow C).
   async function startProfile(profileId: string) {
     setMenuOpen(false)
     setError(null)
     const w = ws()
-    if (!api || !bridge || !w) return
-    const owner = w.repoOwner
-    const repo = w.repoName
-    const number = w.pullNumber != null ? String(w.pullNumber) : undefined
-    const mapped = await bridge.repoPath.get(owner, repo)
-    if (mapped) return spawn(profileId, mapped.path, owner, repo, number)
-    setPendingProfile(profileId)
-    setPathError(null)
-    setPathInput('')
-    setPrompt({ owner, repo, number })
-  }
-
-  // Native folder picker — same bridge the onboarding modal uses (bridge.repoPath.pick). Fills the
-  // input so the user can eyeball it before hitting Open; submitPath still validates in main.
-  async function pickPath() {
-    if (!bridge) return
-    const picked = await bridge.repoPath.pick()
-    if (picked) setPathInput(picked)
-  }
-
-  async function submitPath(e: Event) {
-    e.preventDefault()
-    const ctx = prompt()
-    if (!ctx || !bridge) return
-    const res = await bridge.repoPath.set(ctx.owner, ctx.repo, pathInput().trim())
-    if (!res.ok) {
-      setPathError(res.reason)
-      return
-    }
-    setPrompt(null)
-    await spawn(pendingProfile(), res.repoPath.path, ctx.owner, ctx.repo, ctx.number)
+    if (!api || !w) return
+    await spawn(profileId)
   }
 
   // One click closes the tab: remove() kills a running session first, then drops it.
@@ -358,34 +319,6 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
             ✕
           </button>
         </header>
-
-        <Show when={prompt()}>
-          {(ctx) => (
-            <form class="terminal-prompt" onSubmit={submitPath}>
-              <span class="terminal-prompt-label">
-                Local checkout for {ctx().owner}/{ctx().repo}:
-              </span>
-              <input
-                class="terminal-prompt-input"
-                type="text"
-                autofocus
-                placeholder="/Users/you/Source/repo"
-                value={pathInput()}
-                onInput={(e) => setPathInput(e.currentTarget.value)}
-              />
-              <button type="button" class="terminal-drawer-btn" title="Choose folder…" aria-label="Choose folder" onClick={() => void pickPath()}>
-                📁
-              </button>
-              <button type="submit" class="terminal-drawer-btn">
-                Open
-              </button>
-              <button type="button" class="terminal-drawer-btn" onClick={() => setPrompt(null)}>
-                Cancel
-              </button>
-              <Show when={pathError()}>{(msg) => <span class="terminal-prompt-error">{msg()}</span>}</Show>
-            </form>
-          )}
-        </Show>
 
         <Show when={error()}>{(msg) => <div class="terminal-prompt-error terminal-error-banner">{msg()}</div>}</Show>
 

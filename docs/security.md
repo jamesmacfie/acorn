@@ -26,7 +26,7 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
 - `/v2/node` and `/v2/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
-  security, backup, and import are device-only.
+  security, and backup are device-only.
 - `/v2/events` authenticates the upgrade and rechecks device activity for long-lived streams.
 - There is no cookie or ambient browser credential, so CSRF middleware is not part of the protocol.
 
@@ -41,11 +41,11 @@ Child environments are built by the process broker. They do not inherit `SESSION
 credentials, arbitrary `ACORN_*` values, or the parent process environment. They receive a task-scoped
 internal token, the current data-root path, and the TLS trust material needed to call the Node.
 
-The active GitHub identity is explicit and persisted. Internal auth fails closed if it is unset. A
-task-scoped token cannot use another task's task-addressed routes, terminal streams, preview tunnel,
-or worktree operations. Provider-credential restrictions are route-specific; the current GitHub
-routes can be reached by an authenticated internal principal and therefore can spend the active
-owner's GitHub credential.
+The node-owner identity is opaque, explicit, and persisted at first boot. It is independent of
+provider connections, and internal auth fails closed if it is unset. A task-scoped token cannot use
+another task's task-addressed routes, terminal streams, preview tunnel, or worktree operations.
+Provider-credential restrictions are route-specific; the current GitHub routes can be reached by an
+authenticated internal principal and therefore can spend the active owner's GitHub credential.
 
 ## Process, path, and configuration controls
 
@@ -102,5 +102,5 @@ and can dominate archive size. Restore is a documented manual operation into a f
 
 The append-only core `audit` table retains security-relevant decisions for 90 days. Producers include
 pairing-window changes, device pair/revoke, config-trust acknowledgement, secret create/replace/delete,
-plugin toggles, backup, and V1 config import. The Settings → Security surface reads it. The trail is
+plugin toggles, and backup. The Settings → Security surface reads it. The trail is
 not tamper-evident against someone who already controls the database file.

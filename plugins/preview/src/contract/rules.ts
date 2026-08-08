@@ -3,7 +3,7 @@
 //
 // This plugin is almost entirely Electron-main: the preview pane is a `WebContentsView` and its driver
 // lives in main/. Its one node-side read is this — resolve a taskId to the `browser_rules` its repo
-// declares — and it exists on the node because the lookup needs core's `tasks` and `repo_paths` tables and
+// declares — and it exists on the node because the lookup needs core's `tasks` and `projects` tables and
 // because ONLY serialisable rules may cross into Electron main. The native preview never receives a
 // database handle and never reaches back into service modules.
 //

@@ -1,5 +1,5 @@
 import { request as httpsRequest } from 'node:https'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -73,7 +73,6 @@ describe('Electron-free service runtime', () => {
     port: process.env.ACORN_PORT,
     key: process.env.SESSION_ENC_KEY,
     clientId: process.env.GITHUB_CLIENT_ID,
-    clientSecret: process.env.GITHUB_CLIENT_SECRET,
   }
   let dataDir: string | null = null
 
@@ -84,8 +83,6 @@ describe('Electron-free service runtime', () => {
     else process.env.SESSION_ENC_KEY = original.key
     if (original.clientId == null) delete process.env.GITHUB_CLIENT_ID
     else process.env.GITHUB_CLIENT_ID = original.clientId
-    if (original.clientSecret == null) delete process.env.GITHUB_CLIENT_SECRET
-    else process.env.GITHUB_CLIENT_SECRET = original.clientSecret
     if (dataDir) rmSync(dataDir, { recursive: true, force: true })
     dataDir = null
   })
@@ -112,7 +109,6 @@ describe('Electron-free service runtime', () => {
     delete process.env.ACORN_PORT
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
     process.env.GITHUB_CLIENT_ID = 'test-client'
-    process.env.GITHUB_CLIENT_SECRET = 'test-secret'
   }
 
   it('migrates, listens over TLS, reconciles, and drains without Electron or GitHub', async () => {
@@ -137,6 +133,7 @@ describe('Electron-free service runtime', () => {
       expect(runtime.started.nodeId).toMatch(/^[0-9a-f-]{36}$/)
       expect(runtime.started.deviceToken).toMatch(/^acorn_dt_/)
       expect(runtime.started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
+      expect(readFileSync(join(dataDir!, 'active-identity'), 'utf8').trim()).toMatch(/^owner-[0-9a-f-]{36}$/)
 
       // The pre-auth route, over a connection validated against the reported certificate. There is no
       // SPA shell to fetch any more — the node serves no web assets.

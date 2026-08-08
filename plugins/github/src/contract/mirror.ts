@@ -37,11 +37,6 @@ export type GithubMirrorCapability = {
    */
   footprint(): Promise<Record<string, number>>
 
-  // repoList / repoDefaultBranch / identities are deliberately NOT here. Core needs all three, but its
-  // consumers are two route handlers and a CoreServices member — none of which may reach the capability
-  // registry, because `c.env` intentionally cannot enumerate the plugin graph. They arrive through
-  // @acorn/node-core/server/repoMirror.ts's slot instead, which this plugin's init fills from the same
-  // queries. Declaring them here as well would be a second name for one seam with no caller behind it.
 }
 
 export const GITHUB_MIRROR = capabilityId<GithubMirrorCapability>('github.mirror')

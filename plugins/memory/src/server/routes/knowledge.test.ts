@@ -52,18 +52,18 @@ describe('knowledge routes (memory + notes)', () => {
   it('routes memory list/search/add/proposals and note CRUD to the bridge', async () => {
     const calls: string[] = []
     setKnowledgeBridge(fake({
-      memoryList: async (repo) => (calls.push(`list:${repo ?? ''}`), []),
+      memoryList: async (projectId) => (calls.push(`list:${projectId ?? ''}`), []),
       memoryAdd: async (taskId, p) => (calls.push(`add:${taskId}:${p.scope}`), { path: '/x' }),
       notesCreate: async (location, title) => (calls.push(`create:${location.scope}:${location.scope === 'workspace' ? location.workspaceId : ''}:${title}`), { slug: 's' }),
       notesRemove: async (location, slug) => (calls.push(`rm:${location.scope}:${location.scope === 'workspace' ? location.workspaceId : ''}:${slug}`), { ok: true }),
     }))
     const app = authed()
-    await app.fetch(req('/api/memory?repo=acme/widget'), {} as Env)
+    await app.fetch(req('/api/memory?projectId=project-widget'), {} as Env)
     await app.fetch(req('/api/tasks/task1/memory', 'POST', { scope: 'private', name: 'n', description: 'd', type: 'reference', body: 'b' }), {} as Env)
     await app.fetch(req('/api/workspaces/ws1/notes', 'POST', { title: 'Hi' }), {} as Env)
     await app.fetch(req('/api/workspaces/ws1/notes/hi', 'DELETE'), {} as Env)
     await app.fetch(req('/api/tasks/task1/notes', 'POST', { title: 'Task note' }), {} as Env)
-    expect(calls).toEqual(['list:acme/widget', 'add:task1:private', 'create:workspace:ws1:Hi', 'rm:workspace:ws1:hi', 'create:task::Task note'])
+    expect(calls).toEqual(['list:project-widget', 'add:task1:private', 'create:workspace:ws1:Hi', 'rm:workspace:ws1:hi', 'create:task::Task note'])
   })
 
   it('routes note title rename to the bridge (task + workspace)', async () => {

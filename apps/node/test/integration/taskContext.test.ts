@@ -55,19 +55,24 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     registerContextSection('notes', asContextSection(notesSection((...args) => notesSource(...args))))
     registerContextSection('memory', asContextSection(memorySection((...args) => memorySource(...args))))
     vi.mocked(getDb).mockReturnValue(t.db)
+    const now = Date.now()
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-api', name: 'api', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/api.git', githubOwner: 'acme', githubName: 'api', githubRepoId: 99,
+      createdAt: now, updatedAt: now,
+    })
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
     app.route('/api/tasks', taskContext)
-    const now = Date.now()
     await t.db.insert(schema.tasks).values({
       id: 'task1',
       title: 'fix: guard null token',
       origin: 'rollbar',
-      repoOwner: 'acme',
-      repoName: 'api',
+      projectId: 'project-api',
       branch: 'fix/null-token',
       worktreePath: '/wt/acme-api-fix-null-token',
       pullNumber: 813,
@@ -151,6 +156,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     expect(ctx.task).toEqual({
       id: 'task1',
       title: 'fix: guard null token',
+      projectId: 'project-api',
       repo: 'acme/api',
       branch: 'fix/null-token',
       worktreePath: '/wt/acme-api-fix-null-token',

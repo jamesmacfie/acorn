@@ -6,11 +6,7 @@ import { listRequests } from './httpClient'
 
 const requestsForTask = async (taskId: string) => {
   const task = await readJson<TaskContext>(taskContextRoute(taskId))
-  const slash = task.task.repo.indexOf('/')
-  if (slash < 1) return []
-  const owner = task.task.repo.slice(0, slash)
-  const repo = task.task.repo.slice(slash + 1)
-  return (await listRequests(owner, repo, taskId)).slice(0, 100)
+  return (await listRequests(task.task.projectId, taskId)).slice(0, 100)
 }
 
 export const httpAgentContextContribution: AgentContextContribution = {

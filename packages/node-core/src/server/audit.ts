@@ -28,7 +28,6 @@ export type AuditAction =
   | 'plugins.disabled.changed'
   // Data leaving or entering the node.
   | 'backup.created'
-  | 'import.v1'
 
 export type AuditActor = { actor: 'device' | 'internal' | 'system'; actorId?: string | null }
 
