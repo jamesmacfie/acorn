@@ -45,6 +45,7 @@ Distribution (to clients)
 
 Rendering
   rectangles  → sandboxed iframe per surface, MessageChannel RPC bridge
+                (panes, reference panels, settings pages, project importers)
   chrome      → descriptors rendered natively by the host, data from plugin node routes
 ```
 
@@ -58,6 +59,12 @@ The dividing line: **a contribution the sandbox can host is one expressible as d
 messages.** If a third-party plugin someday genuinely needs an inline renderer, the escalation
 path is review and adoption into first-party, not a bigger hole in the sandbox.
 
+Project importers (`packages/client-core/src/registries/projectImporters.ts`) sit on the
+sandbox-hostable side even though they are component contributions today. An importer is a
+rectangle the shell hosts in a modal plus two lifecycle callbacks (`onClose`, `onImported`) — it
+never reaches into a surrounding component tree, so the callbacks become bridge verbs and the
+rectangle becomes a frame. Phase 3 carries it; there is no separate phase for project discovery.
+
 ## Why loadable JS and not external processes
 
 The alternative (herdr-style language-agnostic argv executables driving a CLI) was considered and
@@ -69,6 +76,15 @@ this "the precondition for third-party plugins"), per-plugin SQLite files and mi
 exist (`packages/node-core/src/main/pluginStorage.ts`, `pluginMigrations.ts`), the per-node
 disable set exists (`packages/node-core/src/main/disabledPlugins.ts`), and both plugin hosts
 already own registration disposal for clean re-init.
+
+The projects migration strengthened the case twice over. Core grew `ctx.core.projects`
+(`packages/node-core/src/main/core/projects.ts`) — a seam built for plugins rather than exposed to
+them, handing out `ProjectRef` projections so a plugin can resolve project identity without
+learning core's config columns or touching the core SQLite handle. And the largest first-party
+plugin lost its privileges: github now runs `required: false` with a provider-gated rail source and
+no core coupling beyond that seam (`plugins/github/src/client/index.ts:17,28`). The seams a
+third-party plugin will use are already carrying the plugin most likely to have needed an
+exception.
 
 ## Status
 
@@ -172,6 +188,16 @@ collaboration only via contracts/capabilities/broadcasts/registries (docs/plugin
 architecture test (`tools/arch/boundaries.test.ts`) grows new rules per phase and every phase
 must leave it green.
 
+Core owns Workspace → Project → Task (docs/workspaces-and-tasks.md). A plugin that scopes its rows
+to a codebase keys them by `projectId`, obtained from `ctx.core.projects` — never by an
+`(owner, name)` GitHub pair. The pair is a nullable facet on the project row and its index is
+deliberately non-unique, because two clones of one repo are a legal, normal thing to have
+(`packages/node-core/src/server/db/schema.ts:125-126`). Keying on it means a plugin's data
+silently merges across clones and vanishes for projects with no GitHub remote at all. Every
+first-party plugin that stores per-codebase rows already made this move (http, database, memory);
+`(owner, name)` survives only inside github's own PR mirror, where the numeric repo id is the real
+key anyway.
+
 ## Practical notes (repo-wide)
 
 - **Gate before handing work back**: `pnpm lint` (oxlint + `tsc --noEmit` in every package) and
@@ -183,6 +209,10 @@ must leave it green.
   `pnpm --filter @acorn/desktop test:e2e`.
 - **Client cache gotcha**: the renderer's query cache persists to IndexedDB with no buster; bump
   query keys when persisted response types gain required fields.
+- **Migrations are freshly baselined**: every SQLite chain in the repo — core and all eight
+  plugins — was reset to a single `0000_*` migration. Nothing here should assume a long numbered
+  chain, and the plugin authoring story (phase 5, and the future ecosystem work) starts a new
+  plugin's chain at `0000`.
 - **Known pre-existing test failures**: one live-PTY `posix_spawnp` failure in agentSend tests,
   and `serviceSpawn`/`standaloneShutdown` electron-import failures in some environments. Verified
   on clean trees; don't chase them.
@@ -192,6 +222,9 @@ must leave it green.
 - `docs/plugins.md` — the current (compiled-in) plugin system; gets its two-tier rewrite with
   the future ecosystem work (phase-0 already updates its plugin-api line).
 - `docs/architecture-overview.md` — runtime topology, contract ownership, wire validation.
+- `docs/workspaces-and-tasks.md` — the Workspace → Project → Task model plugins scope against.
+  `docs/legacy/projects/` is the completed migration record: read it for rationale, not for
+  current state (its phase files describe intermediate dual-write stages that no longer exist).
 - `docs/security.md`, `docs/authentication.md` — trust boundaries this design extends.
 - `docs/electron.md` — `app://` scheme, preload bridge, broker.
 - `docs/panes.md`, `docs/ui-design.md`, `docs/state.md`, `docs/caching.md` — the client surfaces

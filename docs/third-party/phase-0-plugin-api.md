@@ -18,15 +18,14 @@ packages/plugin-api/
     node/index.ts      NodePlugin, NodePluginContext, registries, CoreServices facade,
                        route toolkit, storage toolkit
     client/index.ts    ClientPlugin, ClientPluginContext, contribution types,
-                       client data toolkit, connected components
+                       client data toolkit
     ui/index.ts        pure presentation re-exports (client-core ui/ — primitives, Icon,
                        Picker, Tabs, Modal, CopyButton, diff model, appearance)
   package.json         exports: { "./node": …, "./client": …, "./ui": … }
 ```
 
-Plus: every first-party plugin repointed to it, the `ui/` vs `connected/` split inside
-client-core with its boundary rules, and a `.d.ts` snapshot test that makes surface changes
-deliberate.
+Plus: every first-party plugin repointed to it, the `ui/` purity rule inside client-core enforced
+by the architecture test, and a `.d.ts` snapshot test that makes surface changes deliberate.
 
 Deliberately NOT produced: more packages. A `ui-components` (or `route-toolkit`, …) package was
 considered and rejected — the problem plugins have is *contract control* (an enumerable,
@@ -70,9 +69,9 @@ the raw modules, are the unit of decision:
 | Capabilities | `server/plugin/capabilities.ts` (10) | Re-export `CapabilityRegistry`, capability id helpers |
 | Provider types | `server/integrations/types.ts` (10), model provider adapter types | Re-export |
 | Client data toolkit | `client-core/apiClient.ts` (34), `queries.ts` (29), `registries/clientEvents.ts` (15) | Re-export |
-| Client registries | `registries/panes.ts` (15), `sources.ts` (10), plus slots, paletteRows, attention, nodeStats, refPanels, settings, pollers, keybindings, commands | Re-export the contribution **types**; the registration functions stay host-internal (plugins register via `ctx`, never by importing a registry) |
-| UI primitives | `client-core/ui/primitives.tsx` (17), `ui/Icon.tsx` (10), `ui/Picker.tsx` (7), `ui/CopyButton.tsx` (7), `ui/Tabs.tsx` (4), `ui/Modal.tsx` (2), `ui/diff/model.ts` (8), `ui/appearance.ts` (8) | Re-export via the `/ui` entrypoint — the pure design-system surface (see next section) |
-| Connected components | `ui/RepoPicker.tsx`, `ui/WorkspacePicker.tsx`, `ui/MentionTextarea.tsx` (plugins use all three) | Move to `client-core/src/connected/`, re-export via `/client` beside the data toolkit they depend on |
+| Client registries | `registries/panes.ts` (15), `sources.ts` (10), plus slots, paletteRows, attention, nodeStats, refPanels, settings, pollers, keybindings, commands, `projectImporters` | Re-export the contribution **types**; the registration functions stay host-internal (plugins register via `ctx`, never by importing a registry) |
+| UI primitives | `ui/diff` (20), `ui/primitives.tsx` (17), `ui/Icon.tsx` (10), `ui/appearance.ts` (8), `ui/Picker.tsx` (7), `ui/CopyButton.tsx` (7), `ui/Tabs.tsx` (4), `ui/metrics.ts` (4), `ui/displayMeta.ts` (4), `ui/dismissable.ts` (4), `ui/UserAvatar.tsx` (3), `ui/Modal.tsx` (2), `ui/MentionTextarea.tsx` (2) | Re-export via the `/ui` entrypoint — the pure design-system surface (see next section) |
+| Editor bootstrap | `ui/monacoSetup.ts` (2, side-effect import from the editor and database panes) | **Not `/ui`.** It registers Monaco's web workers through Vite `?worker` imports — a bundler-coupled side effect, not presentation. Move it out of `ui/` (see next section) and decide its public status separately from the design system |
 | Wire types | `@acorn/protocol/*` (138) | **Not absorbed.** protocol is already the pure shared wire-type package and stays directly importable |
 | Test toolkit | `node-core/testkit/db.ts` (30) | **Not public.** Stays a devDependency import; add `@acorn/plugin-api/testkit` later only if third-party authors need it |
 
@@ -90,18 +89,26 @@ import the facade**, and the facade is the enumerated, snapshot-guarded surface.
 
 ## The `/ui` entrypoint and the client presentation layer
 
-The `/ui` entrypoint only earns its name if what it exports is genuinely pure. Today
-`client-core/src/ui/` mixes pure presentation with three data-aware components, so this phase
-splits the folder and enforces the layer:
+The `/ui` entrypoint only earns its name if what it exports is genuinely pure. The good news,
+measured against the tree rather than assumed: `client-core/src/ui/` is **already almost pure**.
+Every component plugins import — `WorkspacePicker`, `MentionTextarea`, `UserAvatar`, `Picker`,
+the primitives, the diff stack — takes its data as props and hands back DOM. `WorkspacePicker`
+receives `workspaces`/`active`/`onSelect`; `MentionTextarea` receives `mentions: string[]`;
+`UserAvatar` receives a `login` string. None of them fetch.
+
+So this phase does not carve out a `connected/` folder full of components. It states the rule,
+fixes the two real exceptions, and lets the architecture test hold the line from then on:
 
 ```text
 packages/client-core/src/
-  ui/                  pure presentation: props in, DOM out. No fetching, no stores.
-    primitives.tsx, Icon.tsx, IconPicker.tsx, Modal.tsx, Tabs.tsx, CopyButton.tsx,
+  ui/                  pure presentation: props in, DOM out. No fetching, no store writes.
+    primitives.tsx, Icon.tsx, IconPicker.tsx, iconNodes.ts, Modal.tsx, Tabs.tsx,
+    CopyButton.tsx, UserAvatar.tsx, MentionTextarea.tsx, WorkspacePicker.tsx,
     Picker.tsx (the GENERIC picker: rows + callbacks, knows nothing),
-    diff/, cx.ts, focus.ts, dismissable.ts, appearance.ts, tokenAxes.ts
-  connected/           data-aware compositions: may import ui/ AND the data layer.
-    RepoPicker.tsx, WorkspacePicker.tsx, MentionTextarea.tsx
+    ContributionBoundary.tsx, diff/, displayMeta.ts, metrics.ts,
+    cx.ts, focus.ts, dismissable.ts, appearance.ts, tokenAxes.ts
+  connected/           created only when something needs it: data-aware compositions that may
+                       import ui/ AND the data layer. Empty at the end of this phase, by design.
   tasks/, queries.ts, apiClient.ts, persistence/, registries/   (data layer, unchanged)
 ```
 
@@ -114,37 +121,46 @@ ui/  ←  connected/  ←  shell / registries / plugins
    domain queries (tasks/…) → queries.ts (machinery) → apiClient.ts (transport)
 ```
 
-- `ui/` imports nothing from client-core except itself. Nothing in `ui/` imports `connected/`.
-- `connected/` contains **components only — no query definitions**. `RepoPicker` imports
-  `useReposQuery` from the tasks domain module; it does not define it. Query keys are a
-  data-layer contract (node-scoped keys, scope eviction, the persisted-IndexedDB-cache buster
-  rule), reviewed where the domain queries live — a key minted inside a component file escapes
-  that review surface, and "only one consumer" never stays true (the repo list is wanted by
-  pickers, palette, sources, onboarding). This mirrors plugins exactly: a plugin defines its
-  own queries in its client dir on the `queries.ts` machinery; `connected/` is core's version
-  of a plugin's panes — consumers, not definers.
-- The connected shape is deliberately thin — subscribe to a domain hook, hand rows to a pure
-  component:
+- `ui/` imports nothing from client-core's data layer at runtime, and nothing from `connected/`.
+  **Type-only imports are allowed**: `WorkspacePicker` does `import type { FleetWorkspace } from
+  '../workspaces/fleetWorkspaces'`, which is a shape it renders, not a store it reads. Write the
+  rule against runtime imports or it fails on a component that is behaving correctly.
+- The two exceptions to fix, both real:
+  - **`ui/focus.ts`** imports `setFocusedPane` from `../tasks/tasks` and its `paneFocus` directive
+    writes that store on `focusin`/`pointerdown`. Every other export in the file
+    (`nextListIndex`, `createListNavigation`, `trapOverlayFocus`) is pure. Move `paneFocus` and
+    its `solid-js` `Directives` declaration to the pane host area; leave the rest.
+  - **`ui/monacoSetup.ts`** registers Monaco's web workers via Vite `?worker` imports. It is a
+    bundler-coupled side effect, imported for its effect by the editor and database panes. Move
+    it out of `ui/` into the editor feature area. It should not sit on a design-system entrypoint
+    a third-party author is told to import from.
+- `connected/` contains **components only — no query definitions**. Query keys are a data-layer
+  contract (node-scoped keys, scope eviction, the persisted-IndexedDB-cache buster rule),
+  reviewed where the domain queries live — a key minted inside a component file escapes that
+  review surface, and "only one consumer" never stays true. The projects list is the live example:
+  one key (`projectsKey = ['projects','v2']`, `packages/protocol/src/api.ts`) feeding pickers,
+  palette rows, the rail, and settings. This mirrors plugins exactly: a plugin defines its own
+  queries in its client dir on the `queries.ts` machinery; `connected/` is core's version of a
+  plugin's panes — consumers, not definers.
+- The connected shape, when something finally needs it, is deliberately thin — subscribe to a
+  domain hook, hand rows to a pure component:
 
   ```tsx
-  // connected/RepoPicker.tsx — the whole idea in one file
-  export function RepoPicker(props: { onPick: (repo: Repo) => void }) {
-    const repos = useReposQuery()                              // the connected part
-    return <Picker rows={repos()} onPick={props.onPick} … />   // the ui/ part
+  // connected/<Thing>Picker.tsx — the whole idea in one file
+  export function ThingPicker(props: { onPick: (thing: Thing) => void }) {
+    const things = useThingsQuery()                             // the connected part
+    return <Picker rows={things()} onSelect={props.onPick} … /> // the ui/ part
   }
   ```
 
-  This is also the standing refactor recipe: when a `ui/` component starts wanting data, wrap
-  it in `connected/` — never add the fetch to it.
+  This is the standing refactor recipe: when a `ui/` component starts wanting data, wrap it in
+  `connected/` — never add the fetch to it. `WorkspacePicker` is what the recipe protects: its
+  callers do the subscribing, so the component itself stays reusable and exportable.
 
-Because only three files move, the boundaries rules are pure path checks with **no baseline**:
-`ui/**` imports no data layer and nothing from `connected/`; done. (The alternative — leave the
-files and carry an enumerated shrinking baseline — was considered; moving three files is cheaper
-than carrying exceptions forever.)
-
-One judgment call during the move: `UserAvatar` — if it renders from props it is `ui/`; if it
-resolves a user itself, it lands in `connected/` or gets the wrap treatment. Either is fine; the
-test enforces whichever it is from then on.
+Because the folder is already clean, the boundaries rules are pure path checks with **no
+baseline** once the two exceptions above are moved. (The alternative — leave them and carry an
+enumerated shrinking baseline — was considered; moving two things is cheaper than carrying
+exceptions forever.)
 
 Downstream consumers of this split: the `/ui` export list is the source-of-truth vocabulary for
 the third-party CSS primitive kit (phase 3), and a clean `ui/` is what makes a future standalone
@@ -152,10 +168,11 @@ design-system package a trivial extraction rather than a project.
 
 ## Steps
 
-1. The client presentation split first (it changes what the entrypoints export): move
-   RepoPicker/WorkspacePicker/MentionTextarea to `client-core/src/connected/`, settle
-   UserAvatar, fix imports (mechanical), and add the two path rules to
-   `tools/arch/boundaries.test.ts` (`ui/**` → no data layer, no `connected/`).
+1. The client presentation cleanup first (it changes what the entrypoints export): move
+   `paneFocus` out of `ui/focus.ts` into the pane host area, move `ui/monacoSetup.ts` into the
+   editor feature area and repoint its two side-effect importers (editor and database panes), then
+   add the path rules to `tools/arch/boundaries.test.ts` — `ui/**` makes no runtime import of the
+   data layer and none of `connected/`. Type-only imports pass.
 2. Create `packages/plugin-api` with the three entrypoints, `package.json` `exports` map,
    tsconfig matching sibling packages. Wire into the pnpm workspace and the root lint loop.
 3. Populate `node/index.ts`, `client/index.ts`, and `ui/index.ts` per the table above. Types
@@ -184,8 +201,8 @@ design-system package a trivial extraction rather than a project.
 
 - No file under `plugins/` imports `@acorn/node-core` or `@acorn/client-core` directly (except
   testkit in tests, if kept).
-- `client-core/src/ui/` contains only pure presentation; the three connected components live in
-  `connected/`; both path rules pass with no baseline.
+- `client-core/src/ui/` contains only pure presentation: `paneFocus` and `monacoSetup` have
+  moved out, and both path rules pass with no baseline.
 - `tools/arch/boundaries.test.ts` enforces all new rules (plugin imports + ui layering) with
   empty baselines.
 - The `.d.ts` snapshot test exists and is green.

@@ -43,14 +43,24 @@ In `apps/desktop/src/app/main/appScheme.ts` (or a sibling module it composes):
 
 ## Frame contribution kind
 
-`packages/client-core/src/registries/panes.ts` (and `refPanels.ts`, `settings.ts`) gain a second
-contribution kind alongside the current component form:
+`packages/client-core/src/registries/panes.ts` (and `refPanels.ts`, `settings.ts`,
+`projectImporters.ts`) gain a second contribution kind alongside the current component form:
 
 ```ts
 type PaneContribution =
   | { kind?: 'component'; id: string; …; render: Component<PaneProps> }   // existing, first-party
   | { kind: 'frame'; id: string; …; pluginId: string; surface: string }   // sandboxed
 ```
+
+Project importers are the one surface where the frame form changes the contribution's shape rather
+than just its rendering. `ProjectImporterContribution` today is
+`{ id, label, glyph, component }` where the component receives `onClose` and `onImported`
+callbacks (`packages/client-core/src/registries/projectImporters.ts`). A frame cannot be handed
+callbacks, so the two become bridge verbs (below) and the descriptor keeps only
+`{ id, label, glyph, pluginId, surface }`. The host still owns the modal chrome, the dismissal
+affordance, and the post-import refresh — an importer frame decides when it is done, never how the
+shell reacts. Discovery itself (list candidates, authenticate, clone or map a folder) is entirely
+the plugin's, which is why importers need `core.projects:write`.
 
 Frame surfaces in the manifest carry an optional `formFactor: ["desktop" | "mobile"]`, default
 `["desktop"]`. Costless now while the schema is unversioned; it is what lets a future mobile
@@ -63,15 +73,18 @@ The shell renders `frame` panes with one generic host component (suggested
 
 ```tsx
 <iframe
-  src={`app-plugin://${hash}/index.html?surface=${surface}&node=${nodeId}&task=${taskId ?? ''}`}
+  src={`app-plugin://${hash}/index.html?surface=${surface}&node=${nodeId}&task=${taskId ?? ''}&project=${projectId ?? ''}`}
   sandbox="allow-scripts"
 />
 ```
 
 - `sandbox="allow-scripts"` without `allow-same-origin` is defense-in-depth on top of the
   separate origin.
-- The frame is instantiated **per node** (and per task where the pane is task-scoped): the query
-  string tells the plugin what it is looking at; the bridge pins what it can reach (below).
+- The frame is instantiated **per node**, and per task or per project where the surface is scoped
+  that way: the query string tells the plugin what it is looking at; the bridge pins what it can
+  reach (below). Project is its own parameter rather than something derived from the task, because
+  the surfaces that need it most have no task at all — an importer runs before any project exists,
+  and a project-scoped pane opens from the rail.
 - Pane ids remain stable persisted layout keys — `frame` panes obey the same rule
   (docs/ui-design.md: panes keep their ids).
 
@@ -109,7 +122,8 @@ structured-clone-safe. Error envelope mirrors the API's
 
 ### Enforcement (the choke point)
 
-One host-side broker per frame, holding `{ pluginId, nodeId, taskId }` bound at frame creation:
+One host-side broker per frame, holding `{ pluginId, nodeId, taskId, projectId }` bound at frame
+creation:
 
 - **`api`** — path must match the permission manifest before anything else:
   - `/v2/p/<own pluginId>/…` — always allowed; it is the plugin's own namespace.
@@ -117,6 +131,28 @@ One host-side broker per frame, holding `{ pluginId, nodeId, taskId }` bound at 
     ⇒ mutating verbs). Maintain the scope→route table in one module with exhaustive tests;
     deny-by-default for anything unmapped (all of `/v2/core/security`, `/v2/core/settings`,
     device/backup/audit routes are permanently unmappable).
+  - The project routes, which need stating explicitly because a plugin that scopes anything to a
+    codebase has to read them. Write the table against the route constants enumerated in
+    `packages/protocol/src/api.ts` (`projectsRoute`, `projectRoute`, `projectDetectRoute`,
+    `projectConfigRoute`, `projectRunTargetsRoute`) so a new route cannot be added without the
+    exhaustive test noticing it is unclassified:
+
+    | Scope | Routes |
+    | --- | --- |
+    | `core.projects:read` | `GET /v2/core/projects`, `GET /v2/core/projects/:id/config` |
+    | `core.projects:write` | `POST /v2/core/projects`, `PATCH /v2/core/projects/:id`, `POST /v2/core/projects/:id/detect` |
+    | `core.workspaces:read` | `GET /v2/core/workspaces` |
+    | **unmappable** | `PUT /v2/core/projects/:id/config`, `PUT /v2/core/projects/:id/run-targets`, `DELETE /v2/core/projects/:id`, every workspace mutation |
+
+    The two config `PUT`s belong in the permanently-unmappable list beside `/v2/core/security`,
+    and for a stronger reason than most: they write `setup_script`, `dev_script`,
+    `teardown_script`, and `db_url_script` — shell commands the Node later executes. They are the
+    surface project config trust exists to guard (`main/repoConfigTrust.ts`), and a bridge that
+    mapped them would let a sandboxed frame with no network and no token achieve arbitrary code
+    execution on the Node by writing a script and waiting for the next task. `DELETE` is excluded
+    on the same principle applied to destruction: it is a confirmed, user-initiated act.
+    Creating and detecting projects is safe by comparison — a new project row is inert until
+    someone opens it — which is what makes importers workable.
   - Other plugins' namespaces — denied. Cross-plugin reads happen server-side via capabilities.
   - Allowed requests forward through the existing per-node client (`window.acorn.nodeFetch` via
     `packages/client-core/src/apiClient.ts`) **pinned to the frame's nodeId**. The plugin never
@@ -130,7 +166,10 @@ One host-side broker per frame, holding `{ pluginId, nodeId, taskId }` bound at 
   `localStorage` also works (origin = hash) but rotates with every update — document that
   `state` is the durable option.
 - **`ui`** — a closed verb set executed by the host: `toast`, `copy` (clipboard write with the
-  standard user-visible affordance), `openPane` (own panes only). No arbitrary verbs.
+  standard user-visible affordance), `openPane` (own panes only), and the two importer lifecycle
+  verbs `importer.done` / `importer.close`, valid only from a frame whose surface is an importer.
+  `done` closes the modal and triggers the host's post-import refresh (the `onImported` callback
+  a first-party importer gets); `close` is plain dismissal. No arbitrary verbs.
 
 Rate-limit the port (e.g. 100 in-flight, 1k msgs/10s) so a broken plugin cannot busy-loop the
 shell; kill-switch drops the port and shows a "plugin misbehaving" placeholder in the pane.
@@ -147,7 +186,7 @@ const tasks = await acorn.api.get('/v2/core/tasks')
 const off = acorn.events.on('invalidate:tasks', refetch)
 await acorn.state.set('columns', cols)
 acorn.ui.toast('3 cards dispatched')
-acorn.context                                       // { surface, nodeId, taskId, theme }
+acorn.context                            // { surface, nodeId, taskId, projectId, theme }
 ```
 
 Typed, promise-based, cancellation via `AbortSignal` mapped to a `cancel` message. Ship it inside
@@ -187,6 +226,11 @@ Write these as e2e assertions, not manual checks:
   (spy at the broker).
 - A frame for node A cannot address node B (path is pinned server-side of the bridge, not by
   argument).
+- An importer frame holding `core.projects:write` is still denied
+  `PUT /v2/core/projects/:id/config` and `PUT …/run-targets` — assert on the deny error, and
+  assert the request never reaches `nodeFetch`. This is the code-execution path; test it directly
+  rather than trusting the table.
+- `importer.done` from a frame whose surface is a pane is rejected.
 - `window.open` and top-level navigation from the frame are blocked.
 - Port flood triggers the rate limiter, shell stays responsive.
 
@@ -200,8 +244,11 @@ half. It is the fixture for the e2e suite and a candidate exemplar for the futur
 
 - Demo pane renders with tokens applied under both theme axes, calls only declared routes,
   receives invalidation events, and passes every item on the security checklist.
-- Frame contribution kind lands in panes/refPanels/settings registries without disturbing
-  component contributions (layout keys stable).
+- Frame contribution kind lands in the panes/refPanels/settings/projectImporters registries
+  without disturbing component contributions (layout keys stable). Github's importer still
+  renders as a component through the same registry — the two kinds coexist.
+- An importer frame can create a project end to end: candidate list from its own routes,
+  `POST /v2/core/projects`, `importer.done`, host refreshes and the project appears in the rail.
 - SDK published inside `@acorn/plugin-api` with tests; bridge broker unit-tested against the
   scope table exhaustively.
 - `pnpm lint`, suites, boundaries test, desktop e2e green.

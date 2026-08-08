@@ -40,11 +40,12 @@ though it arrives from disk):
     "node": {                        // node-half facets — shape ctx in this phase (see
                                      // "Permission-shaped context" below for what this does
                                      // and does not guarantee)
-      "core": ["tasks:read", "git"], // CoreServices facets exposed on ctx.core
+      "core": ["tasks:read", "projects:read", "git"],   // CoreServices facets on ctx.core
       "capabilities": ["agents.onStatusChanged"],
       "secrets": false,              // use-scoped secret access via ctx.core.secrets
       "exec": false,                 // process broker facet
-      "net": ["ntfy.sh"]             // intended egress hosts (disclosure until Phase 7)
+      "net": ["ntfy.sh"]             // intended egress hosts (disclosure until node-half
+                                     // sandboxing — node-security.md, rung 2)
     }
   },
   "contributions": {}                // declarative chrome, used from Phase 4 on
@@ -135,6 +136,12 @@ handing over the full context built-ins get:
 - `ctx.core` exposes only the facets named under `permissions.node.core`; `secrets`, the process
   broker (`exec`), and Git are individually gated. An unrequested facet is absent from the
   object, so honest code fails at development time, not in production.
+- `projects` splits read from write, because the two are very different asks.
+  `projects:read` gives `byId`, `byGithub`, `checkouts`, `config`, and `setup`; `projects:write`
+  adds `create` and `update` — the facet a project importer needs (phase 3). Note in the trust
+  prompt that `checkouts()` returns every mapped project folder path on the node, which is a
+  filesystem-layout disclosure and not obvious from the words "read projects"
+  (`packages/node-core/src/main/core/projects.ts`).
 - `ctx.events.streams()` and `ctx.events.channel()` are **never** present for loaded plugins,
   regardless of manifest — WS/PTY infrastructure ownership is first-party-only (README, "Two
   tiers").
@@ -167,6 +174,12 @@ writes it plus a generated manifest into `<dataRoot>/plugins/rollbar/`, removes 
 static list, and boots. Everything must behave identically: provider routes mount, rail source
 appears (client half is still compiled-in until Phase 2 — a plugin may be loaded on the node and
 built-in on the client during the transition; the id is what ties them).
+
+Github is the more interesting eventual target — the projects migration left it `required: false`
+with a provider-gated rail source and no core privilege beyond `ctx.core.projects`
+(`plugins/github/src/client/index.ts`), so nothing structural stops it loading. It is deliberately
+not this phase's guinea pig: a first loader bug should not take PR review out from under whoever is
+dogfooding. Revisit once bundle distribution has run for a while.
 
 ## Tests
 
