@@ -24,9 +24,9 @@ beforeEach(async () => {
   // has run the plugin host. Two plugins is enough to show the recorded list is the STATE, not a diff.
   setPluginsBridge({
     roster: () => [
-      { name: 'docker', required: false, disabled: false },
-      { name: 'http', required: false, disabled: false },
-      { name: 'terminal', required: true, disabled: false },
+      { name: 'docker', required: false, disabled: false, state: 'active' },
+      { name: 'http', required: false, disabled: false, state: 'active' },
+      { name: 'terminal', required: true, disabled: false, state: 'active' },
     ],
     disabled: () => disabled,
     setDisabled: (names) => {

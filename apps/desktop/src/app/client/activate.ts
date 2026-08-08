@@ -1,5 +1,7 @@
 import { initClientPlugins } from '@acorn/client-core/registries/plugin.ts'
 import { disabledNodePlugins, refreshNodePlugins } from '@acorn/client-core/node/nodePlugins.ts'
+import { pluginFailureAttention } from '@acorn/client-core/node/pluginFailures.ts'
+import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
 import { noticeKindContributions } from '@acorn/client-core/notifications/kindContributions.ts'
 import { directPreferenceSlices } from '@acorn/client-core/persistence/preferenceSlices.ts'
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
@@ -26,6 +28,9 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 // ctx.persistedState — the app no longer holds a list of four plugin slices it does not own.
 for (const slice of [...coreStateSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
 pollerRegistry.register(taskStatusPollerContribution)
+// Core's own attention source: plugins this node installed but could not start. Registered here
+// rather than by a plugin, because the plugin that failed is not running to report itself.
+attentionRegistry.register(pluginFailureAttention)
 activateScopedStateEviction()
 
 // The first activation runs with nothing disabled, and that is not a placeholder any more: the list

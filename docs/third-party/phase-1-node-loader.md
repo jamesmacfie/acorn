@@ -1,5 +1,9 @@
 # Phase 1 — Node loader
 
+**Status: done.** `docs/plugins.md` § "Loaded plugins" is the current description; everything below is
+the plan as written, kept for its reasoning. Where the two disagree, `docs/plugins.md` and the tests
+are right. What actually differed is recorded in "As built" at the end.
+
 **Size: M.** Requires Phase 0. After this phase a Node can load a plugin from disk at boot, with
 contained failure, and one first-party plugin (Rollbar) dogfoods the path in dev.
 
@@ -203,3 +207,48 @@ dogfooding. Revisit once bundle distribution has run for a while.
 - Disable/enable round-trips through the existing Settings toggle.
 - Loader inert without `ACORN_UNSAFE_PLUGINS=1`.
 - Boundaries test, `pnpm lint`, and suites green.
+
+## As built
+
+Six differences between the plan above and what shipped.
+
+- **The fetch-shaped route seam landed on `ctx.routes`, not on provider routes.** node-security's
+  design rule 1 is discharged for a plugin's own `/v2/p/<id>` namespace: `ctx.routes.fetch(handler)`
+  exists, and `ctx.routes.register` (the Hono one) is *absent* from a loaded plugin's context. Provider
+  routes still take a Hono router, because `ownedConnections(c, …)` and `providerResource(c, …)` take
+  the host's Hono context and read core's database handle off it — making those portable means
+  rewriting the integrations resource runtime onto an explicit context, which is rung-2 work in its own
+  right. Rollbar dogfoods through the provider path, so it never touches the new seam; the seam's own
+  coverage is `packages/node-core/src/server/pluginFetchRoute.test.ts`.
+- **Rollbar cuts over by shadowing, not by deletion.** Removing `rollbarPlugin()` from
+  `apps/node/src/server/plugins.ts` would have taken Rollbar's node half out of the *packaged* app,
+  since nothing ships a built bundle into a data root until phase 2. Instead the loader marks a loaded
+  plugin whose id matches a built-in (`shadowsBuiltin`) and the composition root drops the built-in
+  from the graph, logging it. Reachable only behind `ACORN_UNSAFE_PLUGINS=1`, so an unflagged or
+  packaged boot can never have a built-in replaced from disk — and in a flagged dev boot the disk copy
+  really is the only Rollbar running, which is what dogfooding needs.
+- **The attention item is client-side, over the roster route.** There is no node-side attention
+  surface — `attentionRegistry` lives in client-core and its sources fetch per node. So the roster
+  grew `state: 'active' | 'failed' | 'disabled'` and `failedAt`, and
+  `packages/client-core/src/node/pluginFailures.ts` is a core-owned attention source registered from
+  the client composition root. `running` is deliberately untouched: `restartRequired` is computed from
+  it, and a restart cannot fix a plugin whose init throws.
+- **`contained` is not a flag on the plugin — it is membership in `options.loaded`.** One map from
+  plugin name to the manifest's `permissions.node` block, supplied by the composition root, means both
+  "contain its failures" and "shape its context". A field on `NodePlugin` would have been a value the
+  plugin's own bundle could set.
+- **The dogfood builds with Vite, not esbuild.** There is no esbuild in this workspace, and
+  `apps/node` already bundles itself with Vite using exactly the settings a plugin bundle needs.
+  `apps/node/scripts/build-plugin.mjs` inlines everything except `node:` builtins — including Hono, so
+  the bundle hands the host a Hono instance of its own class. Same version, structurally compatible;
+  the integration test is what proves it rather than the assumption.
+- **`permissions.node.core` gates the eight simple facets plus `projects:read`/`projects:write`;
+  `secrets` and `exec` are only reachable through their own manifest booleans**, so neither can be
+  granted by a facet list. `projects:write` implies read. `git` is grantable without `exec` and that
+  split is disclosure rather than containment — `core/vcs/git` wraps the same `runProcess` the broker
+  exposes, which `main/pluginPermissions.ts` says out loud rather than implying otherwise.
+
+Still open, and deliberately not fixed here: `pluginMigrationsFolder` walks *up* from the bundle's
+`import.meta.url`, which from `<dataRoot>/plugins/<id>/dist/node.js` ascends out of the plugin
+directory. The first loaded plugin that owns a database needs a manifest-driven migrations path.
+Rollbar owns none, which is part of why it is the guinea pig.

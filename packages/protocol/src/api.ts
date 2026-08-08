@@ -260,7 +260,20 @@ export const prefsRoute = '/v2/core/prefs'
 // `running` and `disabled` are separate answers, not one. A toggle takes effect at the node's next
 // start (plugins.md: "disabling unregisters contributions at next startup"), so between the save and the
 // restart the two differ — which is exactly the state the page has to render rather than lie about.
-export type NodePluginRow = { name: string; required: boolean; disabled: boolean; running: boolean }
+//
+// `state` is the third answer and the only one a restart cannot change: a plugin loaded from disk
+// whose init threw is 'failed'. It is deliberately NOT folded into `running` — `restartRequired` is
+// computed from `running`, and a restart cannot fix a broken plugin, so a failed row must not make
+// the page demand one (docs/third-party/phase-1-node-loader.md).
+export type NodePluginRow = {
+  name: string
+  required: boolean
+  disabled: boolean
+  running: boolean
+  state: 'active' | 'failed' | 'disabled'
+  // Epoch millis, present only on a failed row.
+  failedAt?: number
+}
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
 export const corePluginsRoute = '/v2/core/plugins'
 // Every client paired with a node, and the revoke for one of them (docs/ui-design.md § New surfaces: "revoke this or

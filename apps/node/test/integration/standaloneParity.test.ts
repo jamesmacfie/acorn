@@ -7,9 +7,12 @@ import { NODE_DRAIN_ORDER, assembleNodeGraph, nodePluginNames } from '../../src/
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 describe('composition graph parity', () => {
-  it('uses one plugin graph and one drain order for both Node hosts', () => {
-    const graph = assembleNodeGraph('', {} as never)
+  it('uses one plugin graph and one drain order for both Node hosts', async () => {
+    // No ACORN_UNSAFE_PLUGINS in this environment, so the loader contributes nothing and the graph
+    // is exactly the compiled-in list — which is the assertion that matters here.
+    const graph = await assembleNodeGraph('', {} as never)
     expect(graph.plugins.map((plugin) => plugin.name)).toEqual(nodePluginNames())
+    expect(graph.loaded.size).toBe(0)
     expect(graph.drainOrder).toEqual(NODE_DRAIN_ORDER)
     expect(NODE_DRAIN_ORDER).toEqual(['listener', 'reconciliation', 'plugin state', 'plugins', 'sqlite', 'data root'])
   })

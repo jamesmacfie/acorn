@@ -40,6 +40,10 @@ const state = (bridge: PluginsBridge) => {
     required: entry.required,
     disabled: !entry.required && pending.has(entry.name),
     running: !entry.disabled,
+    // The outcome for THIS boot, passed through untouched. A failed row still reports
+    // `running: true` on purpose — see the note on NodePluginRow about restartRequired.
+    state: entry.state,
+    ...(entry.failedAt === undefined ? {} : { failedAt: entry.failedAt }),
   }))
   // A restart is needed exactly where what WOULD run differs from what IS running. That covers both
   // directions: a plugin just turned off but still serving, and one turned back on that has not loaded.

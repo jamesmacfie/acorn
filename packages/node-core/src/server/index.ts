@@ -1,9 +1,9 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { idempotency } from './middleware/idempotency'
 import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } from './middleware/requireUser'
-import { onServerError, requestIdMiddleware } from './respond'
+import { onServerError, requestIdMiddleware, respondError } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { audit } from './routes/audit'
 import { backup } from './routes/backup'
@@ -114,9 +114,38 @@ export function createApp() {
     // task-scoped agents out of surfaces they legitimately use.
     .route(PLUGIN_NAMESPACE, buildIntegrationProviderRoutes())
 
-  // Plugin-owned routers, projected from the registry AFTER the auth gate above (still inside the
+  // Plugin-owned routes, projected from the registry AFTER the auth gate above (still inside the
   // authMiddleware/requireUser envelope). See app/server/routes.ts for the contributions.
-  for (const contribution of pluginRouteContributions()) app.route(routeMountPath(contribution), contribution.router)
+  for (const contribution of pluginRouteContributions()) {
+    const mount = routeMountPath(contribution)
+    if (contribution.router) {
+      app.route(mount, contribution.router)
+      continue
+    }
+    // A fetch-shaped contribution (a loaded plugin). Two mounts because Hono's `/*` does not match
+    // the bare mount path itself, and a plugin owning its whole namespace has to be able to answer
+    // `/v2/p/<id>`. The handler is given the request with the mount stripped from the path, so it
+    // sees the same relative paths `app.route()` gives a router.
+    const serve = async (c: Context<AppEnv>): Promise<Response> => {
+      // The `/v2/*` requireUser gate above already guarantees this, but the handler is third-party
+      // code and PluginRequestContext promises it a principal — so prove it here rather than assert.
+      const principal = c.get('principal')
+      if (!principal) return respondError(c, 401, 'unauthenticated')
+      const raw = c.req.raw
+      const url = new URL(raw.url)
+      url.pathname = url.pathname.slice(mount.length) || '/'
+      // Built field by field rather than `new Request(url, raw)`: handing a Request as the init bag
+      // reads its `body` getter, and undici then demands `duplex` for the stream it finds there.
+      const forwarded = new Request(url, {
+        method: raw.method,
+        headers: raw.headers,
+        ...(raw.method === 'GET' || raw.method === 'HEAD' ? {} : { body: raw.body, duplex: 'half' }),
+      } as RequestInit)
+      return contribution.fetch(forwarded, { principal })
+    }
+    app.all(mount, serve)
+    app.all(`${mount}/*`, serve)
+  }
 
   return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/api-reference.md § Errors)
 }

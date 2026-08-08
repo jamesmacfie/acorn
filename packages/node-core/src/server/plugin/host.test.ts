@@ -9,7 +9,8 @@ import { agentToolContributions } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import { pluginRouteContributions } from '../routeRegistry'
 import { initPlugins } from './host'
-import type { NodePlugin } from './types'
+import type { NodePermissions } from '../../main/pluginManifest'
+import type { NodePlugin, NodePluginContext } from './types'
 
 const noop = (): void => {}
 
@@ -229,5 +230,127 @@ describe('plugin host', () => {
     await host([contribute], ['docker'])
     expect(pluginRouteContributions().some((c) => c.plugin === 'docker')).toBe(false)
     expect(agentToolContributions().some((c) => c.name === 'probe_tool')).toBe(false)
+  })
+
+  it('reports a roster state alongside what the owner asked for', async () => {
+    const result = await host([plugin('github'), plugin('terminal', { required: true }), plugin('docker')], ['docker', 'terminal'])
+    expect(result.roster).toEqual([
+      { name: 'github', required: false, disabled: false, state: 'active' },
+      // Required, so the disable flag is ignored in both fields.
+      { name: 'terminal', required: true, disabled: false, state: 'active' },
+      { name: 'docker', required: false, disabled: true, state: 'disabled' },
+    ])
+  })
+})
+
+// The other half of the two-tier rule. A built-in throwing is a broken build and still fails the
+// boot (the cases above). A plugin loaded from disk is third-party code, so its failure is contained:
+// its contributions are rolled back, it is reported, and the node keeps starting.
+describe('loaded plugins', () => {
+  let shared: ReturnType<typeof makeTestDb> | null = null
+  const coreDb = () => (shared ??= makeTestDb()).db
+  afterAll(() => shared?.cleanup())
+
+  const plugin = (name: string, opts: Partial<NodePlugin> = {}): NodePlugin => ({ name, init: () => {}, ...opts })
+
+  // Membership in `loaded` is the only thing that separates the two tiers, which is what these cases
+  // are really asserting: same plugin object, different treatment.
+  const host = (plugins: readonly NodePlugin[], loaded: Record<string, Partial<NodePermissions>>) =>
+    initPlugins(plugins, {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      loaded: new Map(
+        Object.entries(loaded).map(([name, node]) => [
+          name,
+          { core: [], capabilities: [], secrets: false, exec: false, net: [], ...node },
+        ]),
+      ),
+    })
+
+  const ctxOf = async (permissions: Partial<NodePermissions>): Promise<NodePluginContext> => {
+    let captured!: NodePluginContext
+    await host([plugin('ntfy', { init: (ctx) => void (captured = ctx) })], { ntfy: permissions })
+    return captured
+  }
+
+  it('contains an init failure: rolled back, reported, boot continues', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    const router = new Hono<AppEnv>()
+    let disposed = false
+    const result = await host(
+      [
+        plugin('ntfy', {
+          init: (ctx) => {
+            ctx.routes.fetch(() => new Response('ok'))
+            void router
+            throw new Error('boom')
+          },
+          dispose: () => void (disposed = true),
+        }),
+        plugin('after', {}),
+      ],
+      { ntfy: {}, after: {} },
+    )
+    expect(result.failed).toEqual([{ name: 'ntfy', error: 'boom', at: expect.any(Number) }])
+    expect(result.enabled).toEqual(['after'])
+    // The rollback is the load-bearing part: three routes registered before the throw must not stay
+    // mounted, serving from a plugin that never finished starting.
+    expect(pluginRouteContributions().some((c) => c.plugin === 'ntfy')).toBe(false)
+    expect(disposed).toBe(true)
+    expect(result.roster.find((entry) => entry.name === 'ntfy')).toMatchObject({ state: 'failed', failedAt: expect.any(Number) })
+    error.mockRestore()
+  })
+
+  it('contains a ready failure the same way, and does not dispose it twice', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    let disposals = 0
+    const result = await host(
+      [plugin('ntfy', { ready: () => { throw new Error('late') }, dispose: () => void (disposals += 1) })],
+      { ntfy: {} },
+    )
+    expect(result.failed[0]).toMatchObject({ name: 'ntfy', error: 'late' })
+    expect(result.enabled).toEqual([])
+    await result.dispose()
+    expect(disposals).toBe(1)
+    error.mockRestore()
+  })
+
+  it('withholds the WS surface and the Hono route seam regardless of manifest', async () => {
+    // Permanently first-party: PTY stream ownership and WS channel prefixes cannot survive a
+    // message-passing boundary, and a Hono instance cannot cross a process one.
+    const ctx = await ctxOf({ core: ['fs', 'git', 'tasks'], capabilities: ['x'], secrets: true, exec: true })
+    expect(ctx.events.channel).toBeUndefined()
+    expect(ctx.events.streams).toBeUndefined()
+    expect(ctx.routes.register).toBeUndefined()
+    expect(typeof ctx.routes.fetch).toBe('function')
+    // Everything else it did ask for is present.
+    expect(ctx.events.status).toBeTypeOf('function')
+    expect(ctx.core.git).toBeDefined()
+  })
+
+  it('shapes core and capabilities from the manifest', async () => {
+    const ctx = await ctxOf({ core: ['git'] })
+    expect(ctx.core.git).toBeDefined()
+    expect(ctx.core.fs).toBeUndefined()
+    expect(ctx.core.secrets).toBeUndefined()
+    expect(ctx.core.proc).toBeUndefined()
+    expect(ctx.capabilities.get(capabilityId('anything'))).toBeUndefined()
+  })
+
+  it('leaves a built-in with the full context', async () => {
+    let captured!: NodePluginContext
+    await host([plugin('terminal', { init: (ctx) => void (captured = ctx) })], {})
+    expect(captured.routes.register).toBeTypeOf('function')
+    expect(captured.events.streams).toBeTypeOf('function')
+    expect(captured.core.secrets).toBeDefined()
+    expect(captured.core.proc).toBeDefined()
+  })
+
+  it('mounts a fetch-shaped route under the plugin namespace', async () => {
+    await host([plugin('ntfy', { init: (ctx) => ctx.routes.fetch(() => new Response('ok'), { prefix: '/send' }) })], { ntfy: {} })
+    const contribution = pluginRouteContributions().find((c) => c.plugin === 'ntfy')
+    expect(contribution).toMatchObject({ plugin: 'ntfy', prefix: '/send' })
+    expect(contribution?.router).toBeUndefined()
+    expect(contribution?.fetch).toBeTypeOf('function')
   })
 })

@@ -166,6 +166,7 @@
 .plugin-row label { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .plugin-pending { font-size: var(--fs-xs); }
+.plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
 
 /* Section headings inside a settings page. Settings → Security is the first page with two independent
    halves (backup, audit trail), and an unstyled <h3> inherits a browser default that fights every style

@@ -7,7 +7,7 @@ import type { ConnectionProviderContribution, IntegrationProviderContribution } 
 import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
 import type { PluginContextSection } from '../agentTools/contextSections'
-import type { AppEnv } from '../middleware/auth'
+import type { AppEnv, Principal } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../../main/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
@@ -23,10 +23,31 @@ export type PluginRouteOptions = {
   note?: string
 }
 
+// What a fetch-shaped route handler learns about the caller. Structured-clone-safe by rule
+// (docs/third-party/node-security.md § Design rules): no live objects, no functions, no class
+// instances — everything here has to survive being posted across a process boundary unchanged the
+// day loaded plugins move out of process.
+export type PluginRequestContext = {
+  // Already authenticated and authorized by the host's middleware before the handler is reached.
+  principal: Principal
+}
+
+// The route shape a LOADED plugin serves. A Hono instance cannot cross a process boundary; a
+// (Request) → Response function can, which is why this is the only door a loaded plugin gets. A
+// plugin is still free to build its routes with its own bundled Hono and hand over `app.fetch`.
+export type PluginFetchHandler = (request: Request, context: PluginRequestContext) => Response | Promise<Response>
+
 export type PluginRouteRegistry = {
   // The plugin id is bound by the host, so a plugin cannot mount itself under another's namespace —
   // which the raw registerRoute({ plugin }) call could do by typo or by intent.
+  //
+  // Built-ins only: this hands the host a live object from the plugin's realm, which is exactly what
+  // a process boundary cannot carry. Absent from a loaded plugin's context.
   register(router: Hono<AppEnv>, options?: PluginRouteOptions): void
+  // The portable half. Mounted at the same /v2/p/<plugin><prefix>, behind the same auth gate; the
+  // handler receives a Request whose path is relative to that mount, exactly as `register` gives a
+  // router paths relative to its own mount.
+  fetch(handler: PluginFetchHandler, options?: PluginRouteOptions): void
 }
 
 export type PluginToolRegistry = {
@@ -85,13 +106,21 @@ export type PluginBroadcast = {
   streams(handlers: StreamHandlers): void
 }
 
+// The registry as plugins may use it. Structural rather than the class itself, because a loaded
+// plugin receives a filtered wrapper (main/pluginPermissions.ts) rather than the registry instance.
+export type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
+
+// A loaded plugin gets this same type with members MISSING at runtime: the facets its manifest did
+// not ask for, plus `routes.register`, `events.channel` and `events.streams`, which are permanently
+// first-party regardless of manifest. server/plugin/host.ts builds it; main/pluginPermissions.ts
+// explains why the type deliberately does not describe the reduction.
 export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
   tools: PluginToolRegistry
   contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
-  capabilities: CapabilityRegistry
+  capabilities: PluginCapabilities
   // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes
   // core capability through this, rather than deep-importing whichever core module has the helper.
   core: CoreServices

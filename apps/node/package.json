@@ -10,6 +10,7 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "build": "vite build",
+    "build:plugin": "node scripts/build-plugin.mjs",
     "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/server/standalone.ts"
   },
   "dependencies": {

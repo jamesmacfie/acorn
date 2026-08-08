@@ -88,6 +88,37 @@ receive the core database handle merely to query shared tables.
 It supplies no HTTP client. This list named one, and none exists — see docs/http-client.md for why
 that matters and when it will have to.
 
+### Loaded plugins
+
+A Node can also load a plugin's node half from disk, from `<dataRoot>/plugins/<id>/` — a directory
+holding an `acorn-plugin.json` manifest and an ESM bundle that default-exports a `NodePlugin`
+(`packages/node-core/src/main/pluginManifest.ts`, `pluginLoader.ts`). Loaded plugins join the same
+array and the same host pass as the compiled-in ones, so ordering, `ready`, capability late-binding
+and disposal are identical.
+
+Three things differ, and all three follow from the code not being ours:
+
+- **The loader is off unless `ACORN_UNSAFE_PLUGINS=1`.** The install-time trust prompt does not exist
+  yet (docs/third-party/phase-2-distribution-trust.md, phase 5), and running third-party code the user
+  never agreed to is not a default worth having. The flag goes away when the prompt arrives.
+- **Failures are contained.** A built-in throwing from `init` still fails the boot — it is first-party
+  code in the same binary, and a node that cannot assemble should say so. A loaded plugin throwing has
+  its registrations rolled back, is reported through the roster (`state: 'failed'`) and the attention
+  inbox, and the node keeps starting.
+- **The context is shaped by the manifest.** `permissions.node` decides which `CoreServices` facets
+  and capability ids the plugin can see; `ctx.routes.register` (Hono), `ctx.events.channel` and
+  `ctx.events.streams` are never present, whatever the manifest says. A loaded plugin serves routes as
+  `ctx.routes.fetch(handler)` instead — a `(Request) → Response` function, which is the one shape that
+  survives moving plugins out of process later.
+
+That last point is least privilege for **cooperative** code and honest disclosure for users, not a
+security boundary: a loaded bundle shares the Node's process and can `import('node:fs')` and ignore
+`ctx` entirely. `docs/third-party/node-security.md` is the full threat model, and every surface that
+renders these permissions has to say *declared*, not *enforced*.
+
+`apps/node/scripts/build-plugin.mjs` builds a first-party plugin into this shape for development; it
+is not the distribution mechanism.
+
 Client initialization is synchronous registration. The host exposes contribution points for panes,
 sources, settings pages, shell/task slots, context sections, provider reference panels, palette rows,
 agent contexts, agent-tool renderers, pollers, persisted-state slices, Node statistics, and attention

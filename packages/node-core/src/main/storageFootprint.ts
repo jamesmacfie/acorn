@@ -14,18 +14,25 @@ async function fileBytes(path: string): Promise<number> {
   }
 }
 
-async function directoryBytes(path: string): Promise<number> {
+async function directoryBytes(path: string, keep: (name: string) => boolean = () => true): Promise<number> {
   try {
     let total = 0
     for (const entry of await readdir(path, { withFileTypes: true })) {
       const child = join(path, entry.name)
-      total += entry.isDirectory() ? await directoryBytes(child) : entry.isFile() ? (await stat(child)).size : 0
+      if (!keep(entry.name)) continue
+      total += entry.isDirectory() ? await directoryBytes(child, keep) : entry.isFile() ? (await stat(child)).size : 0
     }
     return total
   } catch {
     return 0
   }
 }
+
+// `<dataRoot>/plugins` holds two unrelated things: one SQLite file per plugin (plus its -wal/-shm
+// siblings), and — since the loader landed — the unpacked package of every INSTALLED plugin, in a
+// subdirectory named for its id. Only the first is "plugin databases"; counting the second would
+// silently report bundle bytes as stored rows.
+const isPluginDatabase = (name: string): boolean => name.includes('.sqlite')
 
 /**
  * Row counts a plugin can report about its own database. Resolved by the composition root from the
@@ -46,7 +53,7 @@ export async function logStorageFootprint(
   const [blobBytes, coreBytes, pluginBytes, issues, syncRows] = await Promise.all([
     directoryBytes(join(dataDir, 'blobs')),
     fileBytes(resolveDatabasePath(dataDir)),
-    directoryBytes(join(dataDir, PLUGIN_DB_DIR)),
+    directoryBytes(join(dataDir, PLUGIN_DB_DIR), isPluginDatabase),
     db.select({ value: count() }).from(schema.issues),
     db.select({ value: count() }).from(schema.syncState),
   ])
