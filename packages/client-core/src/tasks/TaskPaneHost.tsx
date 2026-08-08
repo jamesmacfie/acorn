@@ -10,7 +10,7 @@ import { ContributionBoundary } from '../ui/ContributionBoundary'
 // identifier, so without the import the first pane that renders dies on "paneFocus is not defined".
 // The linter cannot see that use, hence the suppression rather than a deletion.
 // eslint-disable-next-line no-unused-vars -- used by the `use:paneFocus` directive on the pane element.
-import { paneFocus } from '../ui/focus'
+import { paneFocus } from './paneFocus'
 import Icon from '../ui/Icon'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'

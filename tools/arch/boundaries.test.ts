@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
@@ -36,8 +36,12 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
   })
   .map((dir) => {
     const name = (JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string }).name
-    const kind = name === '@acorn/desktop' || name === '@acorn/node' ? 'app' : name.startsWith('@acorn/plugin-') ? 'plugin' : 'lib'
-    return { name, dir, src: join(dir, 'src'), kind: kind as Pkg['kind'] }
+    // Kind comes from WHERE a package lives, not from what it is called. It used to key off the
+    // `@acorn/plugin-` name prefix, which quietly made `@acorn/plugin-api` — a shared library in
+    // packages/ that every plugin imports — classify as a plugin, inverting three rules at once.
+    const base = basename(dirname(dir))
+    const kind: Pkg['kind'] = base === 'apps' ? 'app' : base === 'plugins' ? 'plugin' : 'lib'
+    return { name, dir, src: join(dir, 'src'), kind }
   })
 
 const byName = new Map(PACKAGES.map((p) => [p.name, p]))
@@ -131,6 +135,12 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/client-core') return 'client'
   if (pkg.name === '@acorn/node-core') return 'node'
   if (pkg.name === '@acorn/protocol') return 'shared'
+  // The facade carries both halves, so it is classified per entrypoint. Without this its `node/`
+  // directory would fall through to 'shared' below (the node-side segments are server/main/…,
+  // deliberately not `node`, because client-core/src/node/ is the FLEET node — client code), and a
+  // renderer file importing @acorn/plugin-api/node would drag node code into the bundle with no
+  // rule firing.
+  if (pkg.name === '@acorn/plugin-api') return segment(pkg, file) === 'node' ? 'node' : 'client'
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
   if (seg === 'server' || seg === 'main' || seg === 'service' || seg === 'mcp' || seg === 'wiring') return 'node'
@@ -480,6 +490,66 @@ describe('architecture boundaries', () => {
       })
       .map((e) => `${rel(e.fromFile)} => ${rel(e.target.file!)}`)
     expect([...new Set(crossed)].sort()).toEqual([])
+  })
+
+  it('client-core ui/ is pure presentation: props in, DOM out', () => {
+    // ui/ is what @acorn/plugin-api/ui re-exports, so its import edges ARE the design-system
+    // contract. A component that starts wanting data gets wrapped in connected/ — a thin
+    // subscribe-and-hand-rows-to-a-pure-component layer — never a fetch added in place.
+    //
+    // An ALLOWLIST of destinations, not a denylist of data modules: a denylist silently stops
+    // covering the next directory someone adds, which is the failure mode that matters here.
+    // Three carve-outs, all pure or presentation infrastructure:
+    //   lib/         DOM predicates, debounce, the localStorage draft helper DiffRows binds to
+    //   highlight/   the shiki highlighter the diff model colours through
+    //   palette/model.ts  fuzzyScore, a module with zero imports of its own
+    //
+    // TYPE-ONLY imports pass. ui/WorkspacePicker.tsx does `import type { FleetWorkspace } from
+    // '../workspaces/fleetWorkspaces'` — a shape it renders, not a store it reads — and a rule
+    // written against all imports would fail a component that is behaving correctly.
+    //
+    // Known and deliberate: ui/diff/DiffRows.tsx reaches lib/draftState, which reads and writes
+    // localStorage. That is a store write by the spirit of the rule; it is allowed because the
+    // draft belongs to the comment box being rendered and lib/draftState.ts says so in its header.
+    const UI_MAY_IMPORT = (file: string): boolean => {
+      const p = rel(file)
+      if (!p.startsWith('packages/client-core/src/')) return false
+      const inner = p.slice('packages/client-core/src/'.length)
+      return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('highlight/') || inner === 'palette/model.ts'
+    }
+    // Same clause-parsing idiom as the schema ratchet below: `[^'"]*?` for the clause, because a
+    // preceding import's specifier contains the quotes that bound the statement.
+    const CLAUSE_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
+    const BARE_IMPORT_RE = /\bimport\s*['"]([^'"\n]+)['"]/g
+    const uiDir = join(ROOT, 'packages/client-core/src/ui')
+    const offenders: string[] = []
+    let scanned = 0
+    for (const file of walk(uiDir).filter((f) => !isTestCode(f))) {
+      scanned++
+      const text = readFileSync(file, 'utf8')
+      const specs: string[] = []
+      for (const re of [CLAUSE_IMPORT_RE, BARE_IMPORT_RE]) {
+        re.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text))) {
+          if (re === CLAUSE_IMPORT_RE) {
+            // A named clause whose every entry is `type X` is type-only in substance.
+            const named = m[1].trim().match(/^\{([\s\S]*)\}$/)
+            if (named && named[1].split(',').every((part) => !part.trim() || /^type\s/.test(part.trim()))) continue
+            specs.push(m[2])
+          } else specs.push(m[1])
+        }
+      }
+      for (const spec of specs) {
+        const target = resolveSpec(file, spec)
+        if (!target.file) continue // external, or @acorn/protocol resolved elsewhere — both fine
+        if (target.pkg && target.pkg.name !== '@acorn/client-core') continue // protocol and friends
+        if (!UI_MAY_IMPORT(target.file)) offenders.push(`${rel(file)}: ${spec}`)
+      }
+    }
+    // Anti-vacuity: the walker must actually be finding the design system.
+    expect(scanned).toBeGreaterThan(15)
+    expect([...new Set(offenders)].sort()).toEqual([])
   })
 
   it('the package graph is acyclic (turbo topological tasks require it)', () => {
