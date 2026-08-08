@@ -13,10 +13,18 @@ import { ManagedAgentRuntime } from '../main/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { createSessionExecute } from '../main/sessionExecute'
 import { createAgentUsageService } from '../main/usage/service'
-import { managedAgents, setManagedAgentsBridge } from '../server/routes/managed'
+import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
-import { agentUsage, setAgentUsageBridge } from '../server/routes/usage'
+import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
 import { migrationsDir } from './migrations'
+import { aiderProfile, claudeCodeProfile, codexProfile } from '../main/index'
+import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
+
+let builtInProfileDisposables: (() => void)[] | null = null
+export function registerBuiltInProfiles(): void {
+  if (builtInProfileDisposables) return
+  builtInProfileDisposables = [claudeCodeProfile, codexProfile, aiderProfile].map((profile) => agentProfileRegistry.register(profile))
+}
 
 // Registered once per PROCESS, not once per boot. The driver registry is a module singleton whose
 // `register` throws on a duplicate id, and apps/node/src/service/runtime.test.ts starts the runtime four
@@ -48,10 +56,13 @@ export type AgentsPluginDeps = {
 export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
   let runtime: ManagedAgentRuntime | null = null
+  let managedRoute: { dispose(): void } | null = null
+  let usageRoute: { dispose(): void } | null = null
   return {
     name: 'agents',
     required: true,
     init: (ctx) => {
+      registerBuiltInProfiles()
       registerBuiltInDrivers()
       // Opened and migrated before the listener binds: the runtime below closes over the handle and
       // fills both bridges in this same call, so no request and no provider spawn can reach an
@@ -101,11 +112,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         onCompletedTurn: deps.memoryReviewTrigger,
       })
 
-      setManagedAgentsBridge(managedAgentsBridge(runtime))
+      managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime))
       // Local provider usage (the CLI plan probes) plus the pricing overrides it costs against. The
       // probe directory is under the data root, beside the plugin's SQLite file, and the pricing read
       // goes through `CoreServices.prefs` because `prefs` is core's table (main/pricingStore.ts).
-      setAgentUsageBridge({
+      usageRoute = ctx.capabilities.provide(AGENT_USAGE, {
         ...createAgentUsageService({
           probeDir: join(dataDir, 'agent-usage-probe'),
           pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
@@ -139,8 +150,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     dispose: async () => {
       await runtime?.stop()
       runtime = null
-      setManagedAgentsBridge(null)
-      setAgentUsageBridge(null)
+      managedRoute?.dispose()
+      usageRoute?.dispose()
+      for (const dispose of builtInProfileDisposables ?? []) dispose()
+      builtInProfileDisposables = null
       db?.close()
       db = null
     },

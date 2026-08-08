@@ -83,15 +83,31 @@ composition) — with slice 3. `docs/testing.md` if the parity-test story change
 
 ## Done criteria
 
-- [ ] Shared assembly in node-core; no Electron import in it (arch tests prove this).
-- [ ] Deps bag / reconcile / drain appear once in the codebase.
-- [ ] Structural parity test in place; needle scans gone.
-- [ ] Integration + e2e green; user QA note: app boots, node child restarts after kill (crash
+- [x] Shared assembly in `apps/node`; no Electron import in it (arch tests prove this).
+- [x] Deps bag / reconcile / drain appear once in the shared composition layer.
+- [x] Structural parity test in place; needle scans gone.
+- [ ] Integration + e2e green; live app boot/restart QA (crash
       budget behavior unchanged).
 
 ## Progress
 
-- [ ] Slice 1 — graph snapshot
-- [ ] Slice 2 — extraction + standalone
-- [ ] Slice 3 — desktop root
-- [ ] Slice 4 — structural parity
+- [x] Slice 1 — graph snapshot
+- [x] Slice 2 — extraction + standalone
+- [x] Slice 3 — desktop root
+- [x] Slice 4 — structural parity
+
+## Completion amendment — 2026-08-08
+
+The pre-flight changed the extraction boundary: `apps/desktop/src/app/main/serviceHost.ts` is a
+supervisor and does not assemble the Node plugin graph. The duplicated graph is owned by `apps/node`,
+not `node-core`; moving it into `node-core` would invert the package dependency because the graph names
+plugins. The shared assembly therefore lives in `apps/node/src/server/composition.ts`, with the shared
+`pluginDeps` builder from the earlier slice. Both Node hosts consume `assembleNodeGraph`, the shared
+post-listener `reconcileNode`, and `drainNode`, whose drain order is an exported structural constant.
+
+The old source-text parity scan was replaced by `standaloneParity.test.ts` executing the shared graph and
+asserting plugin names plus the drain order. Standalone now runs the same tmux, worktree, workflow, agent,
+and storage reconciliation sequence as the supervised Node. Electron supervision remains in
+`serviceHost.ts`; no Electron dependency entered the shared assembly. Package typechecks, the focused
+Node parity suite, and architecture tests are green. Live desktop boot/restart QA remains a final handoff
+item because it requires launching Electron.

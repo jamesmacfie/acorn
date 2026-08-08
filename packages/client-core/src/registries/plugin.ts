@@ -13,6 +13,9 @@ import { provideClientCapability, type ClientCapabilityId } from '../clientCapab
 import type { Disposable, Registry } from './registry'
 import { settingsRegistry, type SettingsContribution } from './settings'
 import { sourceRegistry, type SourceContribution } from './sources'
+import { commandRegistry, type CommandContribution } from './commands'
+import { keybindingRegistry, type KeybindingContribution } from './keybindings'
+import { integrationFlowRegistry, type IntegrationFlowContribution } from './integrationFlows'
 // From ./slots, not ./uiSlots — the slot HOSTS contain JSX, and reaching a JSX module from here would
 // make this file (and so the whole host) unimportable in a bare-Node vitest run. See slots.ts.
 import { taskSlotRegistry, uiSlotRegistry, type TaskSlotContribution, type UiSlotContribution } from './slots'
@@ -29,6 +32,9 @@ export type ClientPluginContext = {
   // Generic per call, because a source's promotion is typed on the item it promotes. The underlying
   // registry erases that (it holds a heterogeneous list); a plugin still declares its own item type.
   sources: { register<Item>(entry: SourceContribution<Item>): void }
+  commands: ClientContributionPoint<CommandContribution>
+  keybindings: ClientContributionPoint<KeybindingContribution>
+  integrationFlows: ClientContributionPoint<IntegrationFlowContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
   slots: ClientContributionPoint<UiSlotContribution>
   taskSlots: ClientContributionPoint<TaskSlotContribution>
@@ -115,12 +121,23 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     },
   })
   const sources = own(sourceRegistry)
+  const commands = own(commandRegistry)
+  const keybindings = own(keybindingRegistry)
+  const ownIntegrationFlow: ClientContributionPoint<IntegrationFlowContribution> = {
+    register: (entry) => {
+      if (entry.id !== name) throw new Error(`Plugin '${name}' registered integration flow '${entry.id}'`)
+      record(integrationFlowRegistry.register(entry))
+    },
+  }
   return {
     name,
     panes: own(paneRegistry),
     // The registry is heterogeneous by construction, so widening the item type here is the erasure,
     // not a hole: nothing downstream reads a promotion without first selecting the source by id.
     sources: { register: <Item>(entry: SourceContribution<Item>) => sources.register(entry) },
+    commands,
+    keybindings,
+    integrationFlows: ownIntegrationFlow,
     settingsPages: own(settingsRegistry),
     slots: own(uiSlotRegistry),
     taskSlots: own(taskSlotRegistry),

@@ -5,6 +5,10 @@ import { prPaneContribution } from './pullDetail/PrPane'
 import { pullFilePaletteSlotContribution } from './slotContribution'
 import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
 import { githubContentLinkContributions } from './contentLinks'
+import { setSelectedSource } from '@acorn/client-core/tasks/tasks.ts'
+import { githubRepositoryContribution } from './repositoryContribution'
+import { githubIntegrationFlow } from './integrationFlow'
+import { githubRouteContributions } from './routes'
 
 const GithubBrowse = lazy(() => import('./GithubBrowse'))
 
@@ -22,7 +26,27 @@ export const githubClientPlugin: ClientPlugin = {
     // as it goes) rather than through PromoteToTaskModal, so there is nothing for the registry to hold.
     // `order: 10` is what puts GitHub at the head of the rail. Declared, so it survives this plugin being
     // moved anywhere in the client plugin list.
-    ctx.sources.register({ id: 'github', order: 10, glyph: '◇', label: 'GitHub', component: GithubBrowse, defaultPane: 'pr' })
+    ctx.sources.register({
+      id: 'github', order: 10, glyph: '◇', label: 'GitHub', component: GithubBrowse, defaultPane: 'pr', isDefault: true,
+      repository: githubRepositoryContribution,
+      routes: githubRouteContributions,
+    })
+    ctx.commands.register({
+      id: 'source.github.open',
+      title: 'Go to GitHub in the left rail',
+      category: 'navigation',
+      palette: true,
+      run: () => setSelectedSource('github'),
+    })
+    ctx.keybindings.register({
+      id: 'source.github.open',
+      command: 'source.github.open',
+      description: 'Go to GitHub in the left rail',
+      category: 'Tasks',
+      defaultChord: 'meta+0',
+      when: 'global',
+    })
+    ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)
     ctx.slots.register(pullFilePaletteSlotContribution)
     ctx.persistedState.register(prFiltersSlice)

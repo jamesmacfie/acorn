@@ -4,7 +4,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadWorkflowFiles } from '@acorn/plugin-workflows/main/workflowFiles.ts'
 import { normalizePersistedWorkflow } from '@acorn/plugin-workflows/main/workflowValidation.ts'
-import '../../src/wiring/agentProfiles' // profiles come from the composition root
+import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
+
+registerBuiltInProfiles() // profiles come from the agents plugin
 
 describe('workflow files (docs/workflows.md)', () => {
   let dir: string

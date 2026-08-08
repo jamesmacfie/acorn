@@ -40,6 +40,10 @@ workflows, Docker, provider clients, reconciliation, and shutdown draining. `wil
 close the listener, dispose plugin engines, close SQLite, and release the data-root lock with a
 30-second overall deadline.
 
+The supervised child and standalone Node consume the same `apps/node/src/server/composition.ts` graph
+and reconciliation/drain plan. Electron supplies supervision and native adapters; it does not assemble a
+parallel plugin graph.
+
 ## Renderer origin and protocol handler
 
 The renderer loads from `app://acorn` and the Node serves no assets. `main/appScheme.ts` maps bundled

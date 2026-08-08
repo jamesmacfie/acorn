@@ -43,11 +43,11 @@ const buildPlugins = (dataDir: string) =>
       memoryReviewTrigger: async () => undefined,
     },
     preview: { browser: desktop.browser },
+    notes: { internalEnv: () => ({}) },
     terminal: {
       internalEnv: () => ({}),
       launchInjector: async () => undefined,
       memoryReviewTrigger: async () => undefined,
-      seedTaskNotes: async () => undefined,
       reconciled: Promise.resolve(),
     },
     workflows: {

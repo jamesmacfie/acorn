@@ -6,6 +6,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
+import { z } from 'zod'
 import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './workflowBuiltins'
 import type {
@@ -86,7 +87,9 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
   const schemaJson = str(o.schema_json)
   if (schemaJson) {
     try {
-      schema = JSON.parse(schemaJson) as object
+      const parsed = z.record(z.string(), z.unknown()).safeParse(JSON.parse(schemaJson))
+      if (!parsed.success) throw new Error('schema_json must be a JSON object')
+      schema = parsed.data
     } catch {
       errors.push({ source, message: `${id}: step '${name}' has invalid schema_json` })
       return null

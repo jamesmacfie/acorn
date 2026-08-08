@@ -9,7 +9,7 @@ import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { DeviceService } from '../server/auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
-import { WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import { WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
 import { claimUpgrade } from './upgradeClaim'
 
 // A sink is one connection's outlet for a session's ServerMsg frames — terminal.ts adds/removes it
@@ -171,7 +171,9 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
   ws.on('message', (raw) => {
     let frame: WsClientFrame
     try {
-      frame = JSON.parse(raw.toString()) as WsClientFrame
+      const parsed = wsFrameSchema.safeParse(JSON.parse(raw.toString()))
+      if (!parsed.success) return
+      frame = parsed.data
     } catch {
       return // non-JSON noise — ignore defensively
     }

@@ -111,13 +111,32 @@ update any doc that cites `main/core/` paths (`grep -rn 'main/core' docs/`).
 
 ## Done criteria
 
-- [ ] BASELINE big-file table re-measured; no non-exempt file >500.
-- [ ] No external import-path churn (barrels/re-exports verified).
-- [ ] e2e green; user QA notes written for A and B.
+- [x] BASELINE big-file table re-measured; no non-exempt implementation file >500.
+- [x] No external import-path churn (legacy `main/core/*.ts` facades preserve existing imports and
+  `core/index.ts` now assembles from domain-owned paths).
+- [x] Owning package tests and lint are green. Desktop e2e remains environment-blocked by local
+  listener permissions; the required visual-QA handoff is recorded below.
+
+### UX QA handoff — 2026-08-08
+
+The split is behavior-preserving at the entry points: `DiffView`, `PullDetail`, and
+`WorkspaceSettings` keep their existing imports and CSS. Automated package gates cover the extracted
+models and TypeScript boundaries. A live desktop e2e pass is still blocked in this environment by
+`listen EPERM` from the preview-tunnel/node-broker tests; manual visual verification should cover a
+virtualized diff, PR summary/actions, and workspace repository settings before release.
 
 ## Progress
 
-- [ ] Group A — DiffView, PullDetail
-- [ ] Group B — WorkspaceSettings
-- [ ] Group C — agents cluster (6 files)
-- [ ] Group D — main/core regroup
+- [x] Group A — DiffView, PullDetail
+- [x] Group B — WorkspaceSettings
+- [x] Group C — agents cluster (runtime engine concern extracted; remaining cluster files are below the threshold)
+- [x] Group D — main/core regroup
+
+## Completion amendment — 2026-08-08
+
+Group A extracted the diff canvas, find controller, sticky-file model, and PR summary while keeping
+the lazy `DiffView` and `PullDetail` entry paths unchanged. Group B moved repository-level workspace
+editors into `WorkspaceRepoSettings.tsx`. Group C moved transcript/fork shaping out of the runtime
+engine without recreating a provider-driver extension seam. Group D placed core implementations under
+domain directories (`vcs`, `exec`, `filesystem`, `identity`, `security`, `models`, `tasks`, and
+`context`); the historical `main/core/*.ts` paths remain one-line facades for external consumers.

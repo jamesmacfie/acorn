@@ -8,12 +8,11 @@
 // A run target IS a terminal session in the task worktree — start/stop/restart go through the same PTY
 // engine the run pane drives, so an agent and a human cannot end up with two copies of `pnpm dev`.
 import { z } from 'zod'
-import { broadcastRepoConfigTrustNotice } from '@acorn/node-core/main/notify.ts'
 import { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
 import { ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
 import type { TerminalRunTargets } from '../contract/runTargets'
 
-export function runAgentTools(runTargets: TerminalRunTargets): AgentToolContribution[] {
+export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNotice: (taskId: string) => void = () => {}): AgentToolContribution[] {
   const empty = z.object({})
 
   // Starting a run target EXECUTES the repo's committed `.acorn/config.toml`, so it is behind the
@@ -24,7 +23,7 @@ export function runAgentTools(runTargets: TerminalRunTargets): AgentToolContribu
       return await execute()
     } catch (error) {
       if (!isRepoConfigTrustError(error)) throw error
-      broadcastRepoConfigTrustNotice(taskId)
+      repoConfigTrustNotice(taskId)
       throw new ToolError('needs-trust', 'Repo configuration must be reviewed and trusted before it can run.')
     }
   }

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { type AppDatabase, schema } from '../server/db'
+import type { CapabilityRegistry } from '../server/plugin/capabilities'
 import { activeIdentityStore, type ActiveIdentityStore } from './activeIdentity'
 import { deviceService, type DeviceService } from '../server/auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from '../server/auth/idempotency'
@@ -65,6 +66,10 @@ export type RuntimeBindings = {
   DEVICES: DeviceService
   IDEMPOTENCY: IdempotencyStore
   PAIRING_CODES: PairingCodes
+  // Route handlers receive only this late-binding read surface. It keeps the per-runtime registry
+  // out of the plugin host while allowing a request to resolve the provider that was initialized for
+  // this node. The resolver deliberately exposes no registration or enumeration methods to routes.
+  CAPABILITIES: Pick<CapabilityRegistry, 'get' | 'require'>
 }
 
 // What routes actually see as `c.env`: an ordinary exported type that travels with the import graph
@@ -183,12 +188,18 @@ function loadOrCreateInternalToken(dataDir: string): string {
   return token
 }
 
-export type BindingsOptions = { dbPath: string; blobsDir: string; nodeId: string; appVersion: string }
+export type BindingsOptions = {
+  dbPath: string
+  blobsDir: string
+  nodeId: string
+  appVersion: string
+  capabilities: Pick<CapabilityRegistry, 'get' | 'require'>
+}
 
 // Build the bindings object once at startup. Electron resolves the data root in electron.ts
 // (app.getPath('userData') when packaged, the repo-local apps/node/.acorn in dev) and passes
 // the paths in; the standalone entry takes ACORN_DATA_DIR or that same dev root.
-export function makeBindings({ dbPath, blobsDir, nodeId, appVersion }: BindingsOptions): RuntimeBindings {
+export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilities }: BindingsOptions): RuntimeBindings {
   const secret = (name: string): string => {
     const value = process.env[name]
     if (!value) throw new Error(`Missing required env var ${name} (set it in .env or the environment)`)
@@ -220,5 +231,6 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion }: BindingsO
     DEVICES: deviceService(db),
     IDEMPOTENCY: idempotencyStore(db),
     PAIRING_CODES: pairingCodes(),
+    CAPABILITIES: capabilities,
   }
 }

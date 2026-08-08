@@ -2,10 +2,11 @@ import type { Task } from '../queries'
 import { markTaskRead } from '../notifications/notifications'
 import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } from './tasks'
 import type { PaneId } from './layout'
+import { sourcePath } from '../registries/sources'
 
 // Where a task lives in the router (repo browse, or the PR when it has one).
 export function pathForTask(t: Task): string {
-  return `/${t.repoOwner}/${t.repoName}${t.pullNumber != null ? `/${t.pullNumber}` : ''}`
+  return sourcePath(t.pullNumber != null ? 'detail' : 'repo', { owner: t.repoOwner, repo: t.repoName, number: t.pullNumber ?? '' })
 }
 
 // Make a task the active one (signals only — the caller navigates to pathForTask). Shared by the

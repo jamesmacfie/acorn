@@ -1,7 +1,6 @@
 import type { ServerType } from '@hono/node-server'
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
-import '../wiring/agentProfiles'
 import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
@@ -10,22 +9,18 @@ import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
-import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
-import { nodePlugins } from '../server/plugins'
+import { PLUGIN_STATE } from '@acorn/node-core/server/routes/plugins.ts'
 import { buildPluginDeps } from '../server/pluginDeps'
-import { closeListener, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { closeListener, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
+import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import { pruneAudit } from '@acorn/node-core/server/audit.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
-import { reconcileWorktrees, setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
-import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
-import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
-import { wireAgentTools } from '../wiring/agentToolsWiring'
-import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
-import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
-import { configureTerminalMcp, reconcileTmux, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/terminal.ts'
+import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
+import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
+import { assembleNodeGraph, drainNode, reconcileNode } from '../server/composition'
 
 export type ServiceRuntime = {
   previewRules(taskId: string): Promise<PreviewBrowserRule[]>
@@ -82,6 +77,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   let reconcileTask: Promise<void> | null = null
   let stopped = false
   let dbClosed = false
+  let pluginStateCapability: { dispose(): void } | null = null
 
   stateChanged('migrating')
   let dataRoot: DataRoot
@@ -94,8 +90,9 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     stateChanged('failed', error instanceof Error ? error.message : String(error))
     throw error
   }
+  const capabilities = new CapabilityRegistry()
   try {
-    runtime = makeRuntime(dataRoot, config.version)
+    runtime = makeRuntime(dataRoot, config.version, capabilities)
   } catch (error) {
     dataRoot.release()
     stateChanged('failed', error instanceof Error ? error.message : String(error))
@@ -125,20 +122,21 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     //   - the root lock LAST: only drop it once SQLite is closed, or a restart could open the database
     //     while this process still holds its WAL. A drain that hits the deadline leaves it to
     //     dataRoot's own `process.on('exit')` hook, which is why missing it here is survivable.
-    const outcome = await drainWithDeadline([
-      ['listener', () => closeListener(server)],
-      ['reconciliation', async () => await reconcileTask],
-      ['plugins', async () => await disposePlugins?.()],
-      [
-        'sqlite',
-        async () => {
-          if (dbClosed) return
-          dbClosed = true
-          db.close()
-        },
-      ],
-      ['data root', async () => dataRoot.release()],
-    ])
+    const outcome = await drainNode({
+      listener: async () => { if (server) await closeListener(server) },
+      reconciliation: async () => { if (reconcileTask) await reconcileTask },
+      pluginState: async () => {
+        pluginStateCapability?.dispose()
+        pluginStateCapability = null
+      },
+      plugins: async () => await disposePlugins?.(),
+      sqlite: async () => {
+        if (dbClosed) return
+        dbClosed = true
+        db.close()
+      },
+      dataRoot: async () => dataRoot.release(),
+    })
     if (outcome === 'timeout') console.warn('[service:stop] drain exceeded its deadline; exiting anyway')
     stateChanged('stopped')
     mark('teardown')
@@ -195,12 +193,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // The plugin composition seam (docs/plugins.md § Cross-plugin collaboration). Owned by this
     // runtime rather than by the module, so a process that starts the service more than once (the
     // tests do) gets a clean graph each time instead of "capability already provided".
-    const capabilities = new CapabilityRegistry()
-    const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
+    const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
     const plugins = await initPlugins(
-      nodePlugins(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser })),
+      assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser })).plugins,
       // The persisted per-node list UNION the start config's. The file is the owner's setting, and it is
       // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
       // file. The start config stays an override for tests and `dev:node`, which want to pin a list
@@ -209,7 +206,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
-    setPluginsBridge({
+    pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
       roster: () => plugins.roster,
       // The EFFECTIVE set, not the file alone. Reporting only the file made `restartRequired` permanently
       // true whenever the start config pinned a list without writing one (`dev:node`, an integration
@@ -235,49 +232,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       void refreshAcornMcpRegistrations().catch((error) => console.warn('[service:boot] MCP re-register failed:', error))
     }
     reconcileTask = (async () => {
-      // The github mirror's row counts come from the plugin that owns those tables now; core counts only
-      // what it can still see (main/storageFootprint.ts explains why an absent contributor is omitted
-      // from the line rather than logged as zero).
-      const githubMirror = capabilities.get(GITHUB_MIRROR)
-      void logStorageFootprint(
-        db,
-        config.dataDir,
-        githubMirror ? [{ plugin: 'github', counts: () => githubMirror.footprint() }] : [],
-      ).catch((error) => console.warn('[storage] footprint failed:', error))
       try {
-        await reconcileTmux()
-        mark('reconcile.tmux')
-      } catch (error) {
-        console.warn('[service:boot] reconcile tmux failed:', error)
+        await reconcileNode({ db, dataDir: config.dataDir, capabilities, mark })
+      } finally {
+        finishReconcile()
+        if (!stopped) stateChanged('ready')
       }
-      try {
-        await reconcileWorktrees(db)
-        mark('reconcile.worktrees')
-      } catch (error) {
-        console.warn('[service:boot] reconcile worktrees failed:', error)
-      }
-      try {
-        // The workflows plugin builds the runner; the ordering stays the composition root's. It must run
-        // after the listener binds (a resumed step calls the node's own loopback context route) and before
-        // finishReconcile() below, because start/gate/cancel all await that promise so a run cannot be
-        // started into the sweep. `get`, not `require`: workflows is not a required plugin.
-        await capabilities.get(WORKFLOWS_RUNNER)?.reconcile()
-        mark('reconcile.workflow')
-      } catch (error) {
-        console.warn('[service:boot] reconcile workflow failed:', error)
-      }
-      try {
-        // Same shape as the workflow sweep above and for the same reason: the plugin builds the runtime,
-        // the ordering stays here. It has to run after the listener binds (a resumed session's tools call
-        // the node's own loopback surface) and before finishReconcile(). `require`, not `get`: agents is
-        // a required plugin.
-        await capabilities.require(AGENTS_RUNTIME).reconcile()
-        mark('reconcile.agents')
-      } catch (error) {
-        console.warn('[service:boot] reconcile managed agents failed:', error)
-      }
-      finishReconcile()
-      if (!stopped) stateChanged('ready')
     })()
 
     return {

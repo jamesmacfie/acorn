@@ -1,5 +1,5 @@
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
-import { NODE_PROTOCOL_VERSION, type NodeInfo, type PairResult } from '@acorn/protocol/node.ts'
+import { NODE_PROTOCOL_VERSION, nodeInfoSchema, pairResultSchema, type PairResult } from '@acorn/protocol/node.ts'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
 import { nodeRequest } from './nodeRequest'
@@ -32,10 +32,11 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
   if (url.protocol !== 'https:') throw new Error('A node endpoint must be https — the pin is the identity.')
 
   const { body, certPem, fingerprint } = await unverifiedGet(url)
-  const info = JSON.parse(body) as Partial<NodeInfo>
-  if (typeof info.protocolVersion !== 'number' || typeof info.fingerprint !== 'string') {
+  const parsedInfo = nodeInfoSchema.safeParse(JSON.parse(body))
+  if (!parsedInfo.success) {
     throw new Error(`${endpoint} did not answer like an acorn node.`)
   }
+  const info = parsedInfo.data
   if (normalizeFingerprint(info.fingerprint) !== fingerprint) {
     // The node reports its own fingerprint; a peer that re-terminates TLS cannot make the two agree
     // without also owning the node's private key.
@@ -72,9 +73,9 @@ export async function pairWithNode(
       // to distinguish here either.
       throw new Error(response.status === 429 ? 'Too many pairing attempts. Try again shortly.' : 'Pairing failed. Check the code and try again.')
     }
-    const result = JSON.parse(text) as Partial<PairResult>
-    if (!result.deviceToken || !result.nodeId || !result.device) throw new Error('The node returned an unusable pairing result.')
-    return result as PairResult
+    const result = pairResultSchema.safeParse(JSON.parse(text))
+    if (!result.success) throw new Error('The node returned an unusable pairing result.')
+    return result.data
   } finally {
     agent.destroy()
   }

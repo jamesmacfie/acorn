@@ -7,6 +7,7 @@ import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts
 import type { DbSavedQuery } from '../shared/database'
 import { GENERATE_MAX_PROMPT_CHARS } from '../shared/database'
 import { databaseApi } from './databaseClient'
+import { filterSavedQueries } from './databaseModel'
 
 const errorMessage = (e: unknown): string => {
   if (e instanceof ApiError) {
@@ -37,11 +38,7 @@ export default function GenerateSqlModal(props: {
   const chosen = () => props.queries.filter((q) => exampleIds().includes(q.id))
   const toggle = (q: DbSavedQuery) =>
     setExampleIds((ids) => (ids.includes(q.id) ? ids.filter((i) => i !== q.id) : [...ids, q.id]))
-  const matches = (query: string) => {
-    const needle = query.trim().toLowerCase()
-    if (!needle) return [...props.queries]
-    return props.queries.filter((q) => `${q.name} ${q.notes ?? ''}`.toLowerCase().includes(needle))
-  }
+  const matches = (query: string) => filterSavedQueries(props.queries, query)
 
   const generate = async () => {
     if (busy() || !prompt().trim() || !connectionId()) return

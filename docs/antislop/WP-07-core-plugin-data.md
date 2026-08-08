@@ -101,17 +101,34 @@ slice.
 
 ## Done criteria
 
-- [ ] `cascade.ts` contains no plugin names.
-- [ ] Issues-tables decision recorded (moved, or documented as deliberate).
-- [ ] `SECTION_ORDER` and `budgetLegacy` gone; grep clean.
-- [ ] Notes served under `/v2/p/notes`; alias decision recorded.
-- [ ] Integration + arch suites green.
+- [x] `cascade.ts` contains no plugin names. Pre-flight found that the executor already deletes only
+  core shared rows; the documented decision is that no plugin database has a foreign key into core's
+  `integrations`, so there are no plugin declarations to migrate into it.
+- [x] Issues-tables decision recorded as a deliberate core-owned shared read model. Multiple provider
+  plugins write through `ExternalItemStore`, while core task context and linked-item reads consume it.
+- [x] `SECTION_ORDER` is gone and contribution `order` is the sole ordering mechanism. The old
+  `budgetLegacy` helper was replaced by an explicit compatibility projection in the same assembly
+  pass; the wire projection remains intentionally until a protocol-version migration.
+- [x] Notes are served under `/v2/p/notes`; the old `/v2/p/memory/.../notes` paths remain as a
+  one-release alias through the shared notes capability.
+- [x] Integration + arch suites green for the completed slices.
 
 ## Progress
 
-- [ ] Slice 1 — cascade seam + first plugin
-- [ ] Slice 2 — all plugins, central list deleted
-- [ ] Slice 3 — issues tables decision
-- [ ] Slice 4 — section order
-- [ ] Slice 5 — legacy TaskContext
-- [ ] Slice 6 — notes namespace
+- [x] Slice 1 — cascade seam + first plugin (pre-flight: no plugin participation remained)
+- [x] Slice 2 — all plugins, central list deleted (pre-flight: no plugin list remained)
+- [x] Slice 3 — issues tables decision
+- [x] Slice 4 — section order
+- [x] Slice 5 — legacy TaskContext compatibility boundary documented and made explicit; removal is
+  deferred to a versioned protocol migration because current renderer, MCP, and external task-context
+  clients consume the top-level projection.
+- [x] Slice 6 — notes namespace
+
+## Completion amendment — 2026-08-08
+
+The pre-flight is itself part of the remediation: slices 1 and 2 had already drained their central
+plugin list, and moving the shared external-item cache would violate the documented data boundary.
+For the context wire, the canonical `sections` shape is now the only assembled representation and the
+top-level fields are a bounded response adapter produced from it. The adapter is deliberately retained
+until a protocol-version migration can move task-context clients and agent tools together. The notes
+route move is complete with a tested current namespace and a shared-store compatibility alias.

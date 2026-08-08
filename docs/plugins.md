@@ -17,9 +17,10 @@ plugins/<name>/
     shared/     types/logic shared by this plugin's runtimes
 ```
 
-Not every plugin has every directory. The profile packages are Node-only adapters. Onboarding is a
-client overlay with core setup support. Linear and Rollbar are integration providers that use core's
-generic external-item store rather than owning a plugin database.
+Not every plugin has every directory. The built-in Claude, Codex, and Aider profiles are registered
+by `plugins/agents`; there are no separate profile packages. Onboarding is a client overlay with
+core setup support. Linear and Rollbar are integration providers that use core's generic external-
+item store rather than owning a plugin database.
 
 The current Node plugin interface is defined in
 `packages/node-core/src/server/plugin/types.ts`; the client interface is in
@@ -69,7 +70,11 @@ Plugins collaborate through four mechanisms:
 1. **Contracts** — import only a provider's `contract/` entrypoint for types, capability IDs, or
    narrow pure functions.
 2. **Capabilities** — resolve typed functions from the Node's per-runtime capability registry at
-   call time. Missing optional providers produce a degraded feature, not a module import.
+   call time. This is the Node's only late-binding mechanism: route handlers receive a read-only
+   capability view through `RuntimeBindings`, while plugin providers register during `init`. Missing
+   optional providers produce a degraded feature, not a module import. The small helpers in
+   `server/bridge.ts` are typed route adapters; their setter functions exist only for isolated route
+   tests and are never used by production composition.
 3. **Broadcasts** (`ctx.events`) — tell connected CLIENTS that something changed. This is not a
    plugin-to-plugin channel and there is no subscribe side: nothing in the node listens. It is an
    invalidation channel over the authenticated WebSocket — no durability, no replay, no delivery
@@ -87,8 +92,8 @@ dependencies, an acyclic package graph, and the client/Node split.
 Table-owning plugins open one `plugins/<name>.sqlite` file under the Node data root and own its
 migrations. Current table-owning plugins include agents, changes, database, GitHub, HTTP, memory,
 notes, terminal, and workflows. Core owns shared workspace/task/integration/external-item/security
-tables. Docker, editor, Linear, Rollbar, model providers, preview, and profile packages use core
-services or provider registries without owning a database file.
+tables. Docker, editor, Linear, Rollbar, model providers, preview, and the built-in agents profiles
+use core services or provider registries without owning a database file.
 
 There are no cross-file foreign keys, `ATTACH` queries, or transactions spanning plugin databases.
 Cross-plugin workflows use durable operation state and explicit IDs/capabilities.

@@ -192,6 +192,18 @@ Sessions persist normalized event history and expose paged HTTP reads plus live 
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
 execution. Workflows own durable definitions, runs, steps, gates, and reconciliation.
 
+### Notes and memory
+
+```text
+/v2/p/notes/tasks/:id/notes[/*]
+/v2/p/notes/workspaces/:wsId/notes[/*]
+/v2/p/memory/memory[/*]
+```
+
+The notes plugin owns the current notes namespace. The memory plugin's note paths under
+`/v2/p/memory/tasks/.../notes` and `/v2/p/memory/workspaces/.../notes` are deprecated compatibility
+aliases for one release and resolve through the same notes store.
+
 ### Other feature plugins
 
 | Plugin | Current route surface |
@@ -201,7 +213,8 @@ execution. Workflows own durable definitions, runs, steps, gates, and reconcilia
 | `docker` | Node inventory and task container actions |
 | `editor` | task file reads/writes and search |
 | `http` | encrypted request/variable storage and send |
-| `memory` | memory entries, proposals, and task/workspace notes |
+| `memory` | memory entries and proposals; deprecated notes aliases |
+| `notes` | task, workspace, and global note CRUD |
 | `linear` | projects, issues, comments, and reference resolution |
 | `rollbar` | normalized items, occurrences, and details |
 | `preview` | preview rules and browser-agent operations |

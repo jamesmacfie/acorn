@@ -2,12 +2,14 @@ import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { dockerBridge } from '../main/dockerBridge'
 import { disposeDocker } from '../main/dockerService'
 import { registerDockerWsChannel } from '../main/wsChannel'
-import { docker, setDockerBridge } from '../server/routes/docker'
+import { docker, DOCKER } from '../server/routes/docker'
 
-export const dockerPlugin = (): NodePlugin => ({
+export const dockerPlugin = (): NodePlugin => {
+  let capability: { dispose(): void } | null = null
+  return {
   name: 'docker',
   init: (ctx) => {
-    setDockerBridge(dockerBridge(ctx.core))
+      capability = ctx.capabilities.provide(DOCKER, dockerBridge(ctx.core, ctx.events.send))
     ctx.routes.register(docker, { prefix: '', note: 'local docker daemon' })
     // The log/stats streams and interactive `docker exec` PTYs ride the one authenticated WebSocket
     // (@acorn/protocol/ws.ts), so the channel handler is part of this plugin's surface too — losing
@@ -19,7 +21,8 @@ export const dockerPlugin = (): NodePlugin => ({
   // re-init — which is the same guarantee this dispose used to provide by hand, moved somewhere a new
   // plugin cannot forget it.
   dispose: () => {
-    setDockerBridge(null)
+      capability?.dispose()
     disposeDocker()
   },
-})
+  }
+}

@@ -90,14 +90,98 @@ packages are in flight.
 
 ## Done criteria
 
-- [ ] Triage table appended, all 86 sites classified.
-- [ ] Class-1 sites schema-validated; class-2 sites default-on-failure.
-- [ ] Route spot-check recorded.
-- [ ] BASELINE counts re-measured and recorded.
+- [x] Triage table appended, all 86 grep matches classified.
+- [x] Mutation-boundary class-1 sites schema-validated; class-2 sites default-on-failure.
+- [x] Route spot-check recorded.
+- [x] BASELINE counts re-measured and recorded.
 
 ## Progress
 
-- [ ] Slice 1 — triage table
-- [ ] Slice 2 — class-1 fixes
-- [ ] Slice 3 — class-2 fixes
-- [ ] Slice 4 — route spot-check
+- [x] Slice 1 — triage table
+- [x] Slice 2 — class-1 fixes
+- [x] Slice 3 — class-2 fixes
+- [x] Slice 4 — route spot-check
+
+## Completed remediation — 2026-08-08
+
+The audit distinguishes mutation/control inputs from response and read parsing. The latter remain
+defensive but deliberately unvalidated, as required by the non-goal above. The table contains all 86
+non-test `JSON.parse` grep matches from the frozen audit surface; entries with multiple sites are
+counted explicitly. `1-control` and `2-persisted` are the contract classes; `R-read` is the deliberate
+read-path exception; `3-internal` is the own-DB/build/test class with a one-word reason.
+
+| Site(s) | Count | Class | Remediation / reason |
+| --- | ---: | --- | --- |
+| `apps/desktop/e2e/desktop.smoke.spec.ts`, `apps/desktop/e2e/twoNode.spec.ts` | 5 | test | `test` |
+| `apps/desktop/electron.vite.config.ts` | 1 | internal | `build` |
+| `apps/desktop/src/app/main/fleetStore.ts` | 1 | 2-persisted | Existing `fleetFileSchema.safeParse`; default empty fleet on failure |
+| `apps/desktop/src/app/main/nodeBroker.ts` (`receive`, `errorCodeOf`) | 2 | R-read | Remote event/error response is forwarded/read-only; renderer envelope guard remains in `wsClient` |
+| `apps/desktop/src/app/main/nodePairing.ts` (`probeNode`, `pairWithNode`) | 2 | 1-control | Added module-level `nodeInfoSchema` and `pairResultSchema`; reject malformed peer responses |
+| `packages/client-core/src/apiClient.ts` (`parseJson`, `error body`) | 2 | R-read | Generic API responses are read-path data; route mutations validate before they write |
+| `packages/client-core/src/node/nodeSecurity.ts` | 1 | 2-persisted | Filters to string node IDs and defaults to `[]` on failure |
+| `packages/client-core/src/notifications/notifications.ts` | 1 | 2-persisted | Filters notice shape and defaults to an empty ring |
+| `packages/client-core/src/persistence/persistedState.ts`, `preferenceSlices.ts` | 2 | 2-persisted | Shared codecs catch malformed JSON and return `undefined`/`{}` |
+| `packages/client-core/src/registries/keybindings.tsx`, `tabs/railOrder.ts` | 2 | 2-persisted | Shape filters and empty defaults already protect preferences |
+| `packages/client-core/src/settings/AgentToolsSettings.tsx` | 1 | 2-persisted | Uses shared `toolPermissionsSchema`; invalid prefs become `{}` |
+| `packages/client-core/src/tasks/layout.ts` (`layouts`, legacy panes) | 2 | 2-persisted | Catch-and-migrate paths default to no layouts |
+| `packages/client-core/src/tooltip/RailTips.tsx` (`comment + parser`) | 2 | R-read | DOM attribute is display-only and parser already catches malformed JSON |
+| `packages/node-core/scripts/check-migrations.ts` | 1 | internal | `build` |
+| `packages/node-core/src/main/agentProfiles/streamJson.ts` | 1 | 1-control | Added module-level stream-event schema; malformed provider lines are dropped |
+| `packages/node-core/src/main/dataRoot.ts` | 1 | 2-persisted | Existing `nodeIdentitySchema.safeParse`; invalid identity is rejected |
+| `packages/node-core/src/main/disabledPlugins.ts` | 1 | 2-persisted | Invalid persisted list becomes `[]` so boot remains recoverable |
+| `packages/node-core/src/main/repoPaths.ts` | 1 | 1-control | Added `runTargetWireSchema`; malformed route input returns the existing bad-result envelope |
+| `packages/node-core/src/main/runConfig.ts` | 1 | 3-internal | `own-DB` |
+| `packages/node-core/src/main/wsHub.ts` | 1 | 1-control | Added shared `wsFrameSchema`; invalid peer frames never reach terminal/plugin handlers |
+| `packages/node-core/src/mcp/api.ts` | 1 | R-read | User config is inspected/masked, never executed or persisted by Acorn |
+| `packages/node-core/src/server/agentTools/contextSections.ts` | 1 | 3-internal | `own-DB` |
+| `packages/node-core/src/server/agentTools/registry.ts` | 1 | 2-persisted | Uses shared `toolPermissionsSchema`; invalid prefs become `{}` |
+| `packages/node-core/src/server/audit.ts` | 1 | 3-internal | `own-DB` |
+| `packages/node-core/src/server/auth/internalTokens.ts` | 1 | 1-control | Added signed-claims schema; malformed/forged payloads return `null` |
+| `packages/node-core/src/server/integrations/codec.ts`, `connections.ts` | 2 | 3-internal | `own-DB` |
+| `packages/node-core/src/server/modelProviders/runtime.ts` | 1 | 3-internal | `own-DB` |
+| `packages/node-core/src/server/routes/tasks.ts` | 1 | 3-internal | `own-DB` |
+| `packages/protocol/src/browserRules.ts`, `workspaceIdentity.ts` | 2 | 2-persisted | Defensive filters/defaults protect stored workspace values |
+| `packages/protocol/src/mcp.ts` | 1 | R-read | Imported config inspection returns invalid summaries rather than mutating state |
+| `packages/protocol/src/workflow.ts` | 1 | 1-control | `decodeToolCeiling` now uses a module-level Zod schema and returns `undefined` on failure |
+| `plugins/agents/src/client/AgentComposer.tsx` | 2 | 2-persisted | Local drafts filter to known array/object shapes and default empty |
+| `plugins/agents/src/client/model.ts` | 1 | 3-internal | `own-DB` |
+| `plugins/agents/src/main/artifactStore.ts` | 1 | 3-internal | `own-DB` |
+| `plugins/agents/src/main/drivers/authProbe.ts` | 1 | 1-control | Added provider-status schema; malformed CLI output returns `null` |
+| `plugins/agents/src/main/drivers/jsonRpcProcess.ts` | 1 | 1-control | Added module-level JSON-RPC envelope schema; invalid lines are ignored |
+| `plugins/agents/src/main/rowMapping.ts`, `sessionRepository.ts`, `store.ts` | 3 | 3-internal | `own-DB` |
+| `plugins/agents/src/main/sessionExecute.ts` | 1 | R-read | Agent result extraction is a bounded read/result parser; arbitrary advertised result schemas cannot be inferred here |
+| `plugins/agents/src/main/transcriptImport.ts` | 2 | 2-persisted | Imported transcript parse rejects unusable content; Acorn exports already use `safeParse` |
+| `plugins/agents/src/main/usage/claudeDailyUsage.ts`, `claudeUsage.ts`, `codexUsage.ts` | 4 | R-read | CLI/config usage readers catch malformed lines and retain only consumed fields |
+| `plugins/agents/src/main/webhookService.ts` | 2 | 3-internal | `own-DB` |
+| `plugins/agents/src/shared/pricing.ts` | 1 | 2-persisted | Existing `validateAgentPricingPreferences` supplies default-on-failure behavior |
+| `plugins/docker/src/client/dockerPrefs.ts` | 2 | 2-persisted | Added strict module-level schema; invalid object-shaped prefs now fall back to defaults |
+| `plugins/docker/src/main/dockerService.ts`, `main/parse.ts` | 4 | R-read | Docker CLI output is read-only; line/field guards skip malformed daemon output |
+| `plugins/editor/src/client/editorState.ts` | 1 | 2-persisted | Stored files are filtered to valid paths and malformed state starts fresh |
+| `plugins/editor/src/main/search.ts` | 1 | R-read | Ripgrep output is read-only and malformed events are skipped |
+| `plugins/github/src/client/createPull/model.ts`, `pullList/filterState.ts` | 2 | 2-persisted | Draft/filter parsers catch and normalize stored values |
+| `plugins/http/src/client/ResponseView.tsx`, `shared/model.ts` | 3 | R-read | User HTTP response/form text is display/parse input; malformed content is caught |
+| `plugins/http/src/server/routes/http.ts` | 1 | 3-internal | `own-DB` |
+| `plugins/memory/src/main/memoryProposals.ts` | 2 | 2-persisted | Added strict proposal schema; corrupt files are skipped/return `null` |
+| `plugins/workflows/src/main/workflowBuiltins.ts`, `workflowRunner.ts`, `workflowValidation.ts` | 6 | 3-internal | `own-DB` |
+| `plugins/workflows/src/main/workflowFiles.ts` | 1 | 2-persisted | Added object schema for user workflow `schema_json`; invalid definitions enter the existing error path |
+
+### Route spot-check
+
+The route scan found no unhandled JSON mutation parse. The only route-file JSON parses are
+`packages/node-core/src/server/routes/tasks.ts` and `plugins/http/src/server/routes/http.ts`, both
+own-DB read projections. Mutation routes use `safeParse` on `c.req.json()`; the relevant worktree
+route remains the reference implementation. Date `parse()` calls in provider mirrors are not JSON
+parsers and are unchanged.
+
+### Re-measured counts
+
+The frozen raw count remains **86** `JSON.parse` grep matches (**85** executable calls; **79** production
+implementation calls after excluding desktop e2e/config files). The important measure moved from casts to
+schemas: **130** `.parse(` calls and **95** `.safeParse(` calls. Large-file remediation leaves the active
+implementation files under the WP-10 500-line target, with the documented exemptions still at
+`plugins/terminal/src/main/terminal.ts` (721) and `plugins/workflows/src/main/workflowRunner.ts` (559).
+
+The class-1/class-2 fixes were verified with the protocol, node-core, client-core, Docker, memory and
+agents package lint/tests. The full node-core WebSocket test remains environment-blocked when it tries
+to bind `127.0.0.1` under the desktop sandbox; the code path is covered by the existing integration test
+and the new invalid-frame case when run in a network-enabled test environment.

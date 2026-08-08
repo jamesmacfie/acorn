@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs'
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { DockerBridge } from '../server/routes/docker'
+import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { DockerComposeAction, DockerContainerAction, DockerContainerSummary, DockerPruneKind, DockerTaskSummary } from '../shared/model'
 import { docker, DockerCliError } from './cli'
 import { loadDockerOverrides } from './dockerConfig'
@@ -32,8 +33,8 @@ const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' |
 // it should not hold (docs/data-layer.md § Plugin DBs).
 export type DockerCoreServices = Pick<CoreServices, 'tasks'>
 
-export function dockerBridge(core: DockerCoreServices): DockerBridge {
-  const service = getDockerService()
+export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsServerFrame) => void): DockerBridge {
+  const service = getDockerService(broadcast)
 
   async function linkedContainers(taskId: string): Promise<DockerContainerSummary[]> {
     const task = await core.tasks.load(taskId)

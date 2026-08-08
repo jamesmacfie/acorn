@@ -4,8 +4,6 @@ import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
-import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
-import { seedTaskNotes } from '@acorn/plugin-notes/main/seedTaskNotes.ts'
 import type { NodePluginDeps } from './plugins'
 
 // The plugin dependency bag, built once for both composition roots.
@@ -37,8 +35,6 @@ export function buildPluginDeps({ capabilities, core, internalEnv, reconciled, b
   // Breaking that properly means inverting one half, the way plugins/agents and plugins/workflows were
   // (plugins/agents/src/contract/workflowControl.ts). Until then the root injects the thunks.
   const knowledgeAt = () => capabilities.require(MEMORY_KNOWLEDGE)
-  const notesAt = () => capabilities.require(NOTES_STORE)
-
   return {
     agents: {
       internalEnv,
@@ -47,13 +43,11 @@ export function buildPluginDeps({ capabilities, core, internalEnv, reconciled, b
     // The browser driver behind the six `browser_*` tools preview owns. A native adapter, so it comes
     // from the root: a plugin may not import electron to build one.
     preview: { browser },
+    notes: { internalEnv },
     terminal: {
       internalEnv,
       launchInjector: (taskId, sessionId) => knowledgeAt().launchInjector(taskId, sessionId),
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
-      // 'service' scope, deliberately: seeding calls the node's own loopback surface to read the PR
-      // mirror and the linked Linear tickets, so it must keep the reach a task-scoped child is denied.
-      seedTaskNotes: (task) => seedTaskNotes(core, notesAt(), internalEnv({ scope: 'service' }), task),
       reconciled,
     },
     workflows: {

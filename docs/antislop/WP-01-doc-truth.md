@@ -81,15 +81,18 @@ This package *is* the doc update.
 
 ## Done criteria
 
-- [ ] All pre-flight greps return the corrected state.
-- [ ] analysis.md ledger present, dated, and cross-links to `docs/antislop/`.
-- [ ] No edits outside `README.md` and `docs/`.
+- [x] All pre-flight greps return the corrected state.
+- [x] analysis.md ledger present, dated, and cross-links to `docs/antislop/`.
+- [x] No edits outside `README.md` and `docs/` for this slice.
 
 ## Progress
 
-- [ ] Slice 1 — links
-- [ ] Slice 2 — allowlist claim
-- [ ] Slice 3 — analysis.md ledger + stale counts
-- [ ] Slice 4 — profile plugins
-- [ ] Slice 5 — spawn claim
-- [ ] Slice 6 — adoption ratchet documented
+Pre-flight also found the same retired profile-package wording in `docs/plugins.md` and
+`docs/data-layer.md`; those references were corrected with Slice 4.
+
+- [x] Slice 1 — links
+- [x] Slice 2 — allowlist claim
+- [x] Slice 3 — analysis.md ledger + stale counts
+- [x] Slice 4 — profile plugins
+- [x] Slice 5 — spawn claim
+- [x] Slice 6 — adoption ratchet documented

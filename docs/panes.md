@@ -38,7 +38,7 @@ does not rewrite the durable row.
 
 Each pane contributes its ID, label, order, default chord, minimum width, component, and optional
 availability predicate through `paneRegistry`. A pane may also register context sections, task slots,
-palette rows, agent-tool renderers, and persisted state through its plugin.
+palette rows, commands/keybindings, agent-tool renderers, and persisted state through its plugin.
 
 Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.

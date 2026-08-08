@@ -268,6 +268,22 @@ describe('wsHub streaming', () => {
     ws.close()
   })
 
+  it('ignores a JSON frame without a channel before it reaches a handler', async () => {
+    const seen: string[] = []
+    setStreamHandlers({ input: () => {}, attach: () => {}, detach: () => {}, streamTaskId: () => 'task-1' })
+    registerWsChannelHandler('docker', {
+      onFrame: (frame) => seen.push(frame.channel),
+      onDisconnect: () => {},
+    })
+    const ws = await open(authHeaders())
+    ws.send(JSON.stringify({ id: 'not-a-frame', data: 'ignored' }))
+    ws.send(JSON.stringify({ channel: 42, data: 'ignored' }))
+    ws.send(JSON.stringify({ channel: 'docker:valid' }))
+    await waitFor(() => seen.length === 1, 'the valid frame to reach the handler')
+    expect(seen).toEqual(['docker:valid'])
+    ws.close()
+  })
+
   it('routes prefixed frames to a registered channel handler and signals disconnect', async () => {
     const seen: string[] = []
     const disconnects: object[] = []

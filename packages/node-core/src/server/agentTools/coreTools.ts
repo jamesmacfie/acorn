@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { assembleContext, parseInclude } from '@acorn/node-core/server/agentTools/contextSections.ts'
-import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { loadTask } from '@acorn/node-core/main/taskWorktree.ts'
-import { repoMirrorSource } from '@acorn/node-core/server/repoMirror.ts'
+import { assembleContext, parseInclude } from './contextSections.ts'
+import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from './registry.ts'
+import type { AppDatabase } from '../db/index.ts'
+import { loadTask } from '../../main/taskWorktree.ts'
+import { repoMirrorSource } from '../repoMirror.ts'
 
 // The owner id for the core-owned contributions. Registration is idempotent across service boots.
 const OWNER = 'core'

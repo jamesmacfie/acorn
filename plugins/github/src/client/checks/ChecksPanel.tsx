@@ -6,6 +6,7 @@ import { FAILED_STATUSES } from '@acorn/client-core/ui/displayMeta.ts'
 import { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/highlight/shiki.ts'
 import Icon from '@acorn/client-core/ui/Icon.tsx'
 import { splitJobLog } from './splitJobLog'
+import '../styles/checks-panel.css'
 
 function StepLog(props: { text: string }) {
   const [lines] = createResource(

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { SearchResult } from '../../shared/search'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
@@ -16,8 +16,9 @@ export type SearchBridge = {
 }
 export type SearchOpts = { caseSensitive: boolean; wholeWord: boolean; regex: boolean }
 
-export const searchBridgeSlot = bridgeSlot<SearchBridge>()
-export const setSearchBridge = searchBridgeSlot.set
+export const SEARCH = routeCapability<SearchBridge>('editor.searchRoute')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setSearchBridge = (bridge: SearchBridge | null): void => setRouteTestCapability(SEARCH, bridge)
 
 // Search spawns a process, so the body is validated (the privileged-boundary contract: bodies that spawn processes get a
 // zod schema + a malformed-body test). Unknown keys are stripped, toggles default to off.
@@ -33,7 +34,7 @@ export const search = new Hono<AppEnv>().post('/:id/search', async (c) => {
   const parsed = searchBody.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return respondError(c, 400, 'bad_request')
   const { query, opts } = parsed.data
-  return viaBridge(c, searchBridgeSlot, (b) =>
+  return viaBridge(c, SEARCH, (b) =>
     b.findInFiles(c.req.param('id'), query, {
       caseSensitive: opts?.caseSensitive ?? false,
       wholeWord: opts?.wholeWord ?? false,

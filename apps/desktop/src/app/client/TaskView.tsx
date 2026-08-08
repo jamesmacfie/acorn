@@ -20,6 +20,7 @@ import TaskPaneHost from '@acorn/client-core/tasks/TaskPaneHost.tsx'
 import { confirmWillEvent } from '@acorn/client-core/registries/willPhase.tsx'
 import { TaskSlotHost } from '@acorn/client-core/registries/uiSlots.tsx'
 import { completeTaskArchive } from '@acorn/client-core/tasks/archiveLifecycle.ts'
+import { defaultSourceId } from '@acorn/client-core/registries/sources.ts'
 import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
 import '@acorn/client-core/tasks/task-view.css'
 
@@ -190,7 +191,8 @@ export default function TaskView(props: {
         activateTaskSignals(next)
         navigate(pathForTask(next))
       } else {
-        setSelectedSource('github')
+        const source = defaultSourceId()
+        if (source) setSelectedSource(source)
         setActiveTaskId(null)
         navigate('/')
       }

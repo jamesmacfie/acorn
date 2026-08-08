@@ -1,25 +1,27 @@
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
-import { setRunBridge } from '@acorn/node-core/server/routes/harness.ts'
-import { setOnTaskCreated, setTaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
-import { setOnWorktreeCreated } from '@acorn/node-core/main/taskWorktree.ts'
+import { WORKTREE_CREATED } from '@acorn/node-core/main/taskWorktree.ts'
+import { RUN_TARGETS } from '@acorn/node-core/server/routes/harness.ts'
+import { TASK_CREATED, TASK_SESSIONS } from '@acorn/node-core/server/routes/worktree.ts'
+import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
 import { TERMINAL_SESSIONS } from '../contract/sessions'
 import { runAgentTools } from '../main/agentTools'
 import { createRuntimeService } from '../main/runIpc'
 import { disposeTerminal, registerTerminalIpc, sendToAgent, sessionControl, terminalRunGlue, type TerminalIpcDeps } from '../main/terminal'
-import { setTerminalBridge, terminal } from '../server/routes/terminal'
+import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
 import { migrationsDir } from './migrations'
 
 // The four hooks this plugin still cannot resolve for itself. Each one's blocker is stated on
 // TerminalIpcDeps in main/terminal.ts; in short, one closes over the listener origin and the internal
 // signing key (neither exists at init), and three belong to plugins/memory whose capability id is
 // deliberately not in a contract/.
-export type TerminalPluginDeps = TerminalIpcDeps
+export type TerminalPluginDeps = Omit<TerminalIpcDeps, 'seedTaskNotes'>
 
 export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
+  let routeDisposables: { dispose(): void }[] = []
   return {
     name: 'terminal',
     required: true,
@@ -31,7 +33,18 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
       // Fills the terminal bridge, the WS stream handlers (including streamTaskId, which the task-scope
       // guard in main/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
-      registerTerminalIpc(db, ctx.core, deps)
+      const registrations = registerTerminalIpc(db, ctx.core, {
+        ...deps,
+        seedTaskNotes: (task) => ctx.capabilities.get(NOTES_SEED_TASK)?.(task) ?? Promise.resolve(),
+        status: ctx.events.status,
+        streams: ctx.events.streams,
+      })
+      routeDisposables = [
+        ctx.capabilities.provide(TERMINAL_ROUTE, registrations.terminal),
+        ctx.capabilities.provide(TASK_SESSIONS, registrations.taskSessions),
+        ctx.capabilities.provide(TASK_CREATED, registrations.taskCreated),
+        ctx.capabilities.provide(WORKTREE_CREATED, registrations.worktreeCreated),
+      ]
       ctx.routes.register(terminal, { prefix: '', note: '/sessions, /profiles — PTY control only' })
 
       // Run targets are terminal sessions in the task worktree, so the service can only be built where
@@ -40,18 +53,18 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
       // which is how the agent-tool and workflow projections in apps/node/src/wiring/ reach it without
       // reading a mutable global out of this plugin.
       const runTargets = createRuntimeService(ctx.core, terminalRunGlue())
-      setRunBridge({
+      routeDisposables.push(ctx.capabilities.provide(RUN_TARGETS, {
         targets: (taskId) => runTargets.targets(taskId),
         start: (taskId, targetId) => runTargets.start(taskId, targetId),
         stop: (taskId, targetId) => runTargets.stop(taskId, targetId),
         restart: (taskId, targetId) => runTargets.restart(taskId, targetId),
         status: (taskId, targetId) => runTargets.status(taskId, targetId),
         defaultUrl: (taskId) => runTargets.defaultUrl(taskId),
-      })
+        }))
       ctx.capabilities.provide(TERMINAL_RUN_TARGETS, runTargets)
       // The five run_* agent tools, over the service built two lines up. The capability stays published
       // because the workflow runner's `run` step still resolves it from apps/node/src/wiring/.
-      for (const tool of runAgentTools(runTargets)) ctx.tools.register(tool)
+      for (const tool of runAgentTools(runTargets, ctx.events.repoConfigTrustNotice)) ctx.tools.register(tool)
       // terminal.sendToAgent (contract/sendToAgent.ts): the PTY delivery primitive plugins/memory's
       // launch injector needs. Published rather than exported into a dep bag, so memory resolves it at
       // call time and degrades to a no-op when this plugin is absent.
@@ -71,11 +84,8 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
     // own or a second boot in one process serves through the first boot's closures.
     dispose: () => {
       disposeTerminal()
-      setTerminalBridge(null)
-      setTaskSessionsBridge(null)
-      setOnTaskCreated(null)
-      setOnWorktreeCreated(null)
-      setRunBridge(null)
+      for (const disposable of routeDisposables) disposable.dispose()
+      routeDisposables = []
       db?.close()
       db = null
     },

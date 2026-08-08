@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acorn maintainability migration audit</title>
+  <style>
+    :root { color-scheme: dark; --bg:#101214; --panel:#171a1f; --panel2:#1d2229; --text:#edf0f2; --muted:#9da6ae; --line:#303841; --accent:#8ee6bd; --blue:#8ab4ff; --amber:#f3c976; --red:#ff9b9b; }
+    * { box-sizing:border-box; }
+    html { background:var(--bg); }
+    body { margin:0; color:var(--text); background:radial-gradient(circle at 80% -10%,#263f3a 0,transparent 34rem),var(--bg); font:15px/1.55 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:1180px; margin:auto; padding:48px 24px 80px; }
+    h1,h2,h3,p { margin-top:0; } h1 { max-width:840px; margin-bottom:14px; font-size:clamp(2.2rem,5vw,4.6rem); line-height:.98; letter-spacing:-.065em; } h2 { margin:0 0 14px; font-size:1.35rem; letter-spacing:-.02em; } h3 { margin-bottom:5px; font-size:1rem; }
+    .kicker { color:var(--accent); font-size:.76rem; font-weight:700; letter-spacing:.18em; text-transform:uppercase; } .lede { max-width:790px; color:var(--muted); font-size:1.08rem; }
+    .hero { display:grid; grid-template-columns:1.45fr .8fr; gap:28px; align-items:end; margin-bottom:34px; } .stamp { color:var(--muted); font-size:.9rem; border-left:2px solid var(--accent); padding-left:14px; }
+    .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:14px; margin:14px 0; } .card { background:linear-gradient(145deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:14px; padding:20px; box-shadow:0 10px 35px #0003; } .span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}
+    .metric { font-size:2.2rem; line-height:1; font-weight:750; letter-spacing:-.05em; } .metric small { color:var(--muted); font-size:.76rem; font-weight:500; letter-spacing:0; } .sub { color:var(--muted); font-size:.86rem; margin:8px 0 0; }
+    .good { color:var(--accent); } .warn { color:var(--amber); } .bad { color:var(--red); } .blue { color:var(--blue); }
+    .score { display:flex; align-items:center; gap:16px; } .score strong { font-size:3.8rem; color:var(--accent); line-height:1; } .score p { margin:0; color:var(--muted); }
+    .timeline { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:18px; } .event { position:relative; border-top:2px solid var(--accent); padding-top:12px; } .event:before { content:""; position:absolute; top:-7px; left:0; width:11px; height:11px; border:2px solid var(--bg); background:var(--accent); border-radius:50%; } .event strong { display:block; } .event span { color:var(--muted); font-size:.82rem; }
+    .bar-row { display:grid; grid-template-columns:210px 1fr 72px; gap:10px; align-items:center; margin:11px 0; font-size:.84rem; } .bar-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .bars { position:relative; height:18px; background:#0f1114; border-radius:99px; overflow:hidden; } .bar-before,.bar-after { position:absolute; left:0; top:0; height:50%; border-radius:99px; } .bar-before { background:#56616d; top:0; } .bar-after { background:var(--accent); top:50%; } .bar-note { color:var(--muted); text-align:right; }
+    table { width:100%; border-collapse:collapse; font-size:.86rem; } th,td { padding:9px 8px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; } th { color:var(--muted); font-weight:600; } td:first-child { color:var(--blue); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8rem; }
+    .pill { display:inline-block; padding:3px 8px; border:1px solid var(--line); border-radius:99px; color:var(--muted); font-size:.75rem; margin:2px 3px 2px 0; } .pill.good { border-color:#438c6c; color:var(--accent); } .pill.warn { border-color:#8c7342; color:var(--amber); }
+    .map { display:grid; grid-template-columns:1fr 42px 1fr; gap:12px; align-items:center; } .node { min-height:110px; border:1px solid var(--line); background:#12161a; border-radius:12px; padding:13px; } .arrow { text-align:center; color:var(--accent); font-size:1.8rem; }
+    ul { margin:8px 0 0; padding-left:20px; } li { margin:5px 0; color:var(--muted); } li strong { color:var(--text); }
+    footer { border-top:1px solid var(--line); margin-top:34px; padding-top:18px; color:var(--muted); font-size:.82rem; } a { color:var(--blue); }
+    @media (max-width:800px) { main{padding:30px 16px 60px}.hero{grid-template-columns:1fr}.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12}.timeline{grid-template-columns:repeat(2,1fr)}.bar-row{grid-template-columns:130px 1fr 58px;font-size:.75rem}.map{grid-template-columns:1fr}.arrow{transform:rotate(90deg);height:18px}.card{padding:16px}table{font-size:.78rem}th,td{padding:7px 5px} }
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div>
+      <div class="kicker">Acorn · antislop migration audit</div>
+      <h1>The seams are clearer now.</h1>
+      <p class="lede">A sequential remediation of WP-01 through WP-11: provider knowledge moved to provider-owned contributions, runtime edges became capabilities, composition roots converged, large files collapsed, and mutation boundaries gained explicit validation.</p>
+    </div>
+    <div class="stamp"><strong>Audit snapshot</strong><br>2026-08-08 · working tree vs <code>78c83bcd</code><br>Generated from direct git, wc, rg, lint, and test measurements.</div>
+  </header>
+
+  <section class="grid">
+    <article class="card span-4"><div class="metric good">11 <small>work packages</small></div><p class="sub">WP-01 → WP-11 executed in dependency order, with WP-07/08 coordinated inside node-core.</p></article>
+    <article class="card span-4"><div class="metric">23/23 <small>lint packages</small></div><p class="sub">Full <code>pnpm lint</code> passes; remaining output is pre-existing warning noise.</p></article>
+    <article class="card span-4"><div class="metric blue">86 → 95 <small>JSON audit signal</small></div><p class="sub">86 raw grep matches remain intentionally; safeParse coverage rose from 76 to 95 as boundaries became explicit.</p></article>
+    <article class="card span-7"><div class="score"><strong>8.7</strong><p><b>Maintainability scorecard</b><br>Clear ownership, enforced boundaries, smaller change surfaces. The remaining deduction is live desktop QA and a few compatibility adapters that need an intentional later removal.</p></div></article>
+    <article class="card span-5"><div class="metric">+1,422 <small>net lines</small></div><p class="sub">Tracked diff: +1,538 / −4,678. Untracked additions: 4,562 lines across 49 files. Net includes new compatibility facades, tests, registries, documentation, and this audit.</p></article>
+  </section>
+
+  <section class="card">
+    <h2>Migration timeline by theme</h2>
+    <div class="timeline">
+      <div class="event"><strong>WP-01–02</strong><span>truth + characterization</span></div>
+      <div class="event"><strong>WP-03–06</strong><span>shell ownership migration</span></div>
+      <div class="event"><strong>WP-07–09</strong><span>data, binding, composition</span></div>
+      <div class="event"><strong>WP-10–11</strong><span>file shape + validation</span></div>
+    </div>
+    <p class="sub" style="margin-top:20px"><code>78c83bcd</code> · baseline documentation commit → all remediation is currently uncommitted because this worktree cannot create its linked Git index lock.</p>
+  </section>
+
+  <section class="grid">
+    <article class="card span-7">
+      <h2>Large-file collapse</h2>
+      <p class="sub">Grey is the committed baseline; green is the current implementation. Tests and documented terminal/workflow exemptions are shown separately in the table.</p>
+      <div class="bar-row"><span class="bar-label">github / DiffView</span><div class="bars"><i class="bar-before" style="width:100%"></i><i class="bar-after" style="width:63%"></i></div><span class="bar-note">788 → 28</span></div>
+      <div class="bar-row"><span class="bar-label">github / PullDetail</span><div class="bars"><i class="bar-before" style="width:76%"></i><i class="bar-after" style="width:62%"></i></div><span class="bar-note">596 → 489</span></div>
+      <div class="bar-row"><span class="bar-label">client / WorkspaceSettings</span><div class="bars"><i class="bar-before" style="width:74%"></i><i class="bar-after" style="width:22%"></i></div><span class="bar-note">578 → 171</span></div>
+      <div class="bar-row"><span class="bar-label">agents / runtimeEngine</span><div class="bars"><i class="bar-before" style="width:68%"></i><i class="bar-after" style="width:61%"></i></div><span class="bar-note">534 → 476</span></div>
+      <div class="bar-row"><span class="bar-label">terminal / terminal</span><div class="bars"><i class="bar-before" style="width:91%"></i><i class="bar-after" style="width:91%"></i></div><span class="bar-note">721</span></div>
+      <div class="bar-row"><span class="bar-label">workflows / runner</span><div class="bars"><i class="bar-before" style="width:70%"></i><i class="bar-after" style="width:70%"></i></div><span class="bar-note">559</span></div>
+    </article>
+    <article class="card span-5">
+      <h2>New largest files</h2>
+      <table><tr><th>File</th><th>LOC</th></tr><tr><td>terminal.ts</td><td>721</td></tr><tr><td>desktop.smoke.spec.ts</td><td>655</td></tr><tr><td>twoNode.spec.ts</td><td>608</td></tr><tr><td>workflowRunner.ts</td><td>559</td></tr><tr><td>runtime.test.ts</td><td>499</td></tr><tr><td>DiffForPull.tsx</td><td>493</td></tr></table>
+      <p class="sub">The largest production files are now intentional workflow/terminal engines; the formerly oversized UI files are below 500 LOC.</p>
+    </article>
+  </section>
+
+  <section class="grid">
+    <article class="card span-6">
+      <h2>Directory/module map</h2>
+      <div class="map"><div class="node"><b>Before</b><br><span class="pill warn">client-core GitHub ledger</span><span class="pill warn">shell CSS aggregate</span><span class="pill warn">apps/node wiring</span><span class="pill warn">parallel bridge setters</span></div><div class="arrow">→</div><div class="node"><b>After</b><br><span class="pill good">plugin contributions</span><span class="pill good">feature-owned CSS</span><span class="pill good">apps/node composition</span><span class="pill good">runtime capabilities</span></div></div>
+    </article>
+    <article class="card span-6">
+      <h2>Language/file mix</h2>
+      <table><tr><th></th><th>HEAD</th><th>Current</th><th>Δ</th></tr><tr><td>TypeScript</td><td>885</td><td>924</td><td class="good">+39</td></tr><tr><td>TSX</td><td>126</td><td>131</td><td class="good">+5</td></tr><tr><td>CSS</td><td>44</td><td>48</td><td class="good">+4</td></tr><tr><td>HTML</td><td>2</td><td>3</td><td class="good">+1</td></tr><tr><td>All files</td><td>1,335</td><td>1,384</td><td class="good">+49</td></tr></table>
+      <p class="sub">The added footprint is mostly typed seams and tests, not generated output. Four CSS files are represented as delete + untracked until Git stages rename detection.</p>
+    </article>
+  </section>
+
+  <section class="grid">
+    <article class="card span-6"><h2>What improved</h2><ul><li><strong>Ownership:</strong> GitHub owns repository reads, routes, device flow, and feature styles; core keeps generic contracts.</li><li><strong>Runtime:</strong> capability IDs replace provider-shaped module globals; the bridge is now a narrow route adapter and test seam.</li><li><strong>Data:</strong> notes has a current namespace; core’s shared external-item read model is documented as deliberate.</li><li><strong>Change shape:</strong> 788-line DiffView became a stable wrapper plus focused diff modules; compatibility facades preserve imports.</li><li><strong>Validation:</strong> control frames, pairing responses, JSON-RPC, signed claims, run targets, and persisted data have explicit schemas.</li></ul></article>
+    <article class="card span-6"><h2>Test and API impact</h2><ul><li><strong>Passed:</strong> full lint 23/23; arch 22/22; client-core 298/298; GitHub 80/80; agents 162/162; workflows 20/20; protocol 45/45; Docker 32/32; notes 24/24.</li><li><strong>Added:</strong> characterization coverage for Linear, Rollbar, Docker, database, notes, terminal routes, agent profiles, source/route registries, repository contracts, and schema fallbacks.</li><li><strong>API:</strong> route shapes stay stable except the current notes namespace, whose memory path remains a compatibility alias.</li><li><strong>Runtime/deploy:</strong> both Node hosts share graph/reconcile/drain composition; no Electron dependency entered the shared assembly.</li></ul></article>
+  </section>
+
+  <section class="grid">
+    <article class="card span-7"><h2>Costs and residual risk</h2><ul><li class="warn"><strong>Live desktop QA:</strong> loopback server tests fail with <code>listen EPERM</code> in this sandbox; PTY coverage fails with <code>posix_spawnp failed</code>. Run desktop boot, terminal attach, source switching, route navigation, and two-node restart QA in a normal desktop environment.</li><li><strong>Compatibility:</strong> old memory routes, protocol agent projections, and test-only route capability overrides remain intentionally bounded seams. Remove them on their documented release/migration schedule.</li><li><strong>Git state:</strong> the linked worktree index lock is unavailable, so changes are not committed or staged in this audit.</li><li><strong>Next slice:</strong> add real Electron smoke evidence, then remeasure and stage the migration so Git can record renames and per-slice history.</li></ul></article>
+    <article class="card span-5"><h2>Source documents</h2><p><a href="README.md">Antislop index</a><br><a href="BASELINE.md">Frozen baseline</a><br><a href="WP-11-mutation-validation.md">Validation triage</a><br><a href="../architecture-overview.md">Architecture overview</a><br><a href="../analysis.md">Current analysis ledger</a></p><p class="sub">This page is static, self-contained, and intentionally uses no network assets.</p></article>
+  </section>
+
+  <footer>Generated for the Acorn maintainability migration. Headline metrics are checked against <code>git diff HEAD</code>, <code>git ls-tree</code>, <code>git ls-files</code>, and direct line counts from the working tree.</footer>
+</main>
+</body>
+</html>

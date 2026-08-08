@@ -1,7 +1,12 @@
 import type { ToolRisk } from './api'
+import { z } from 'zod'
 
 export type { ToolRisk }
 export type ToolCeiling = { allow?: string[]; maxRisk?: ToolRisk }
+const toolCeilingSchema = z.object({
+  allow: z.array(z.string()).optional(),
+  maxRisk: z.enum(['read', 'write', 'execute']).optional(),
+})
 
 export const RISK_ORDER: Record<ToolRisk, number> = { read: 0, write: 1, execute: 2 }
 
@@ -47,11 +52,8 @@ export function encodeToolCeiling(ceiling: ToolCeiling): string {
 export function decodeToolCeiling(raw: string | undefined): ToolCeiling | undefined {
   if (!raw) return undefined
   try {
-    const parsed = JSON.parse(fromBase64Url(raw)) as ToolCeiling
-    if (!parsed || typeof parsed !== 'object') return undefined
-    if (parsed.maxRisk && !['read', 'write', 'execute'].includes(parsed.maxRisk)) return undefined
-    if (parsed.allow && (!Array.isArray(parsed.allow) || parsed.allow.some((id) => typeof id !== 'string'))) return undefined
-    return normalizeToolCeiling(parsed)
+    const parsed = toolCeilingSchema.safeParse(JSON.parse(fromBase64Url(raw)))
+    return parsed.success ? normalizeToolCeiling(parsed.data) : undefined
   } catch {
     return undefined
   }

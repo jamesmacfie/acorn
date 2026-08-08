@@ -17,6 +17,10 @@ management are unavailable. The terminal, managed-agent, and workflow engines ar
 standalone composition when their dependencies are present; unsupported native adapters report an
 explicit unavailable state.
 
+Standalone and Electron-supervised Node hosts use the same `apps/node/src/server/composition.ts` graph,
+post-listener reconciliation sequence, and bounded drain order. The host difference is supervision and
+native capability injection, not a second plugin assembly.
+
 ## Install and start
 
 ```sh

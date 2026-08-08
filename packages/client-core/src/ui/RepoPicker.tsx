@@ -1,8 +1,7 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { postJson } from '../apiClient'
 import { setPin } from '../workspaces/mutations'
-import { pinsKey, reposKey, reposRefreshRoute, type ShellRepo as Repo } from '../githubShellReads'
+import { pinsKey, refreshRepos as refreshRepositoryList, reposKey, type ShellRepo as Repo } from '../queries'
 import Picker from './Picker'
 
 // Searchable repo picker (the topbar selector). Owns repo-specific bits — pinned-first ordering,
@@ -42,7 +41,7 @@ export default function RepoPicker(props: {
       // last same-origin escape hatches, and nothing is same-origin once the renderer loads from a
       // custom app scheme. Any failure — including "the GitHub integration is not connected" — is just
       // the failed flag; there is no session to bounce to any more.
-      await postJson(reposRefreshRoute)
+      await refreshRepositoryList()
       await queryClient.invalidateQueries({ queryKey: reposKey })
     } catch {
       setRefreshFailed(true)

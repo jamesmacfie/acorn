@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
+import { routeCapability, routeCapabilityFor, setRouteTestCapability } from '../bridge'
 
 export type RunBridge = {
   targets(taskId: string): Promise<unknown>
@@ -12,10 +13,9 @@ export type RunBridge = {
   defaultUrl(taskId: string): Promise<string | undefined>
 }
 
-const bridges: { run: RunBridge | null } = { run: null }
-export const setRunBridge = (b: RunBridge | null): void => void (bridges.run = b)
-// Accessor for the public terminal plugin's run-target endpoints (docs/public-api.md).
-export const getRunBridge = (): RunBridge | null => bridges.run
+export const RUN_TARGETS = routeCapability<RunBridge>('terminal.runRoute')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setRunBridge = (bridge: RunBridge | null): void => setRouteTestCapability(RUN_TARGETS, bridge)
 
 // ─── Typed errors (docs/api-reference.md): domain failures are NOT 503s ─────────────────────────
 
@@ -35,7 +35,7 @@ const STATUS: Record<HarnessErrorKind, 503 | 404 | 400 | 409 | 500> = { unavaila
 
 // Resolve the run bridge, run the call, JSON the data; a missing bridge → 503, thrown errors → their
 // kind's status (untyped throws classify as 'failed', or the route's declared errorKind).
-async function respond<B>(c: Context<AppEnv>, bridge: B | null, fn: (b: B) => Promise<unknown>, opts?: { errorKind?: HarnessError['kind'] }): Promise<Response> {
+async function respond<B>(c: Context<AppEnv>, bridge: B | null | undefined, fn: (b: B) => Promise<unknown>, opts?: { errorKind?: HarnessError['kind'] }): Promise<Response> {
   if (!bridge) return respondError(c, 503, 'bridge-unavailable')
   try {
     return c.json(await fn(bridge))
@@ -52,10 +52,10 @@ async function respond<B>(c: Context<AppEnv>, bridge: B | null, fn: (b: B) => Pr
 
 // Auth is enforced globally by requireUser in createApp() (docs/security.md §3).
 export const harness = new Hono<AppEnv>()
-  .get('/:id/run', (c) => respond(c, bridges.run, (b) => b.targets(c.req.param('id'))))
+  .get('/:id/run', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.targets(c.req.param('id'))))
   // Static 'default-url' before the ':target' routes so it can't be shadowed by a target id.
-  .get('/:id/run/default-url', (c) => respond(c, bridges.run, async (b) => ({ url: (await b.defaultUrl(c.req.param('id'))) ?? null })))
-  .post('/:id/run/:target/start', (c) => respond(c, bridges.run, (b) => b.start(c.req.param('id'), c.req.param('target'))))
-  .post('/:id/run/:target/stop', (c) => respond(c, bridges.run, (b) => b.stop(c.req.param('id'), c.req.param('target'))))
-  .post('/:id/run/:target/restart', (c) => respond(c, bridges.run, (b) => b.restart(c.req.param('id'), c.req.param('target'))))
-  .get('/:id/run/:target/status', (c) => respond(c, bridges.run, (b) => b.status(c.req.param('id'), c.req.param('target'))))
+  .get('/:id/run/default-url', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), async (b) => ({ url: (await b.defaultUrl(c.req.param('id'))) ?? null })))
+  .post('/:id/run/:target/start', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.start(c.req.param('id'), c.req.param('target'))))
+  .post('/:id/run/:target/stop', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.stop(c.req.param('id'), c.req.param('target'))))
+  .post('/:id/run/:target/restart', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.restart(c.req.param('id'), c.req.param('target'))))
+  .get('/:id/run/:target/status', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.status(c.req.param('id'), c.req.param('target'))))

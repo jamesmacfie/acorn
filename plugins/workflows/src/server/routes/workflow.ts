@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { isTaskConfined, mayActOnTask } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -26,8 +26,9 @@ export type WorkflowBridge = {
   pollTriggers(): Promise<{ started: number; errors: string[] }>
 }
 
-export const workflowBridgeSlot = bridgeSlot<WorkflowBridge>()
-export const setWorkflowBridge = workflowBridgeSlot.set
+export const WORKFLOW_ROUTE = routeCapability<WorkflowBridge>('workflows.route')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setWorkflowBridge = (bridge: WorkflowBridge | null): void => setRouteTestCapability(WORKFLOW_ROUTE, bridge)
 
 // start executes an agent CLI, gate resumes one — both get validated bodies (the privileged-boundary contract). The def
 // shape is validated structurally (name + steps[]); the runner re-checks the rest.
@@ -41,7 +42,7 @@ const killBody = z.object({ stepId: z.string().min(1) })
 const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
   const runId = c.req.param('runId')
   if (!runId || !isTaskConfined(c)) return next()
-  const bridge = workflowBridgeSlot.get()
+  const bridge = routeCapabilityFor(c, WORKFLOW_ROUTE)
   if (!bridge) return next() // let viaBridge answer 503 — dev:node has no runner
   const taskId = await bridge.taskIdForRun(runId)
   if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
@@ -52,27 +53,27 @@ const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
 // (/workflows/runs/:runId/...) paths in one router.
 export const workflow = new Hono<AppEnv>()
   .use('/workflows/runs/:runId/*', ownsRun)
-  .get('/tasks/:id/workflows', (c) => viaBridge(c, workflowBridgeSlot, (b) => b.defs(c.req.param('id'))))
+  .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'))))
   .post('/tasks/:id/workflows', async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, workflowBridgeSlot, (b) => b.start(c.req.param('id'), parsed.data.def))
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.start(c.req.param('id'), parsed.data.def))
   })
-  .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, workflowBridgeSlot, (b) => b.runs(c.req.param('id'))))
-  .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, workflowBridgeSlot, (b) => b.steps(c.req.param('runId'))))
+  .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))
+  .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.steps(c.req.param('runId'))))
   .post('/workflows/runs/:runId/gate', async (c) => {
     const parsed = gateBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, workflowBridgeSlot, (b) => b.gate(c.req.param('runId'), parsed.data.stepId, parsed.data.approved))
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.gate(c.req.param('runId'), parsed.data.stepId, parsed.data.approved))
   })
-  .post('/workflows/runs/:runId/cancel', (c) => viaBridge(c, workflowBridgeSlot, (b) => b.cancel(c.req.param('runId'))))
+  .post('/workflows/runs/:runId/cancel', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.cancel(c.req.param('runId'))))
   .post('/workflows/runs/:runId/kill', async (c) => {
     const parsed = killBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, workflowBridgeSlot, (b) => b.kill(c.req.param('runId'), parsed.data.stepId))
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.kill(c.req.param('runId'), parsed.data.stepId))
   })
   // Node-wide, not task-scoped: a poll evaluates every task's triggers and STARTS runs. There is no
   // taskId to confine it to, so a confined caller is refused outright rather than given a partial sweep —
   // an agent has no business firing other tasks' workflows. The renderer's poller is a device.
   .post('/workflows/triggers/poll', (c) =>
-    isTaskConfined(c) ? respondError(c, 403, 'interactive_user_required') : viaBridge(c, workflowBridgeSlot, (b) => b.pollTriggers()))
+    isTaskConfined(c) ? respondError(c, 403, 'interactive_user_required') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.pollTriggers()))

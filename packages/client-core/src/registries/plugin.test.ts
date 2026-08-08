@@ -3,6 +3,7 @@ import { paneRegistry, type PaneContribution } from './panes'
 import { initClientPlugins, type ClientPlugin } from './plugin'
 import { Registry } from './registry'
 import { sourceRegistry, type SourceContribution } from './sources'
+import { integrationFlowRegistry } from './integrationFlows'
 import { uiSlotRegistry } from './slots'
 
 // The client half of packages/node-core/src/server/plugin/host.test.ts. What it can and cannot prove is
@@ -136,6 +137,23 @@ describe('the client plugin host', () => {
     expect(plugin.entries()).toHaveLength(1)
     initClientPlugins(plugins, { disabled: ['publisher'] })
     expect(plugin.get('host.owned')).toBeUndefined()
+  })
+
+  it('tracks provider-owned integration flows through activation and disable', () => {
+    const flow = {
+      id: 'flow-owner',
+      deviceFlow: {
+        start: async () => ({ deviceCode: 'd', userCode: 'u', verificationUri: 'https://example.test', expiresIn: 60, interval: 5 }),
+        poll: async () => ({ status: 'expired' as const }),
+      },
+    }
+    const plugin: ClientPlugin = { name: 'flow-owner', init: (ctx) => ctx.integrationFlows.register(flow) }
+    initClientPlugins([plugin])
+    expect(integrationFlowRegistry.get('flow-owner')).toBe(flow)
+    expect(() => initClientPlugins([plugin])).not.toThrow()
+    expect(integrationFlowRegistry.entries()).toHaveLength(1)
+    initClientPlugins([plugin], { disabled: ['flow-owner'] })
+    expect(integrationFlowRegistry.get('flow-owner')).toBeUndefined()
   })
 
   it('applies the provider-ownership rule to a plugin-published registry too', () => {

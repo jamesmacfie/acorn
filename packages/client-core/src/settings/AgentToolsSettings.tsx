@@ -5,12 +5,13 @@ import { readJson } from '../apiClient'
 import { prefsOptions } from '../queries'
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../persistence/prefKeys'
+import { toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
 
 // Settings → Agent tools (docs/agent-tools.md): the permission surface over the agent-tool
 // registry. Tools are grouped by risk tier (read → write → execute); a tier toggle and per-tool
 // toggles persist as ONE prefs slice. Turning a tier or tool off removes it from every projection
 // (MCP tools/list AND a direct harness call) — the manifest re-reads these on each fetch.
-type ToolPerms = { tiers?: Partial<Record<ToolRisk, boolean>>; tools?: Record<string, boolean> }
+type ToolPerms = ToolPermissions
 
 const TIERS: { risk: ToolRisk; label: string; blurb: string }[] = [
   { risk: 'read', label: 'Read', blurb: 'Inspect context, notes, memory, git and the PR. No side effects.' },
@@ -30,7 +31,8 @@ export default function AgentToolsSettings() {
     const raw = prefs.data?.[PrefKeys.agentToolPermissions]
     if (!raw) return {}
     try {
-      return JSON.parse(raw) as ToolPerms
+      const parsed = toolPermissionsSchema.safeParse(JSON.parse(raw))
+      return parsed.success ? parsed.data : {}
     } catch {
       return {}
     }

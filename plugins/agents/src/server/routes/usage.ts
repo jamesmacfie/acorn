@@ -4,7 +4,7 @@ import {
   validateAgentPricingPreferences,
   type AgentPricingPreferences,
 } from '../../shared/pricing'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { ownerId, requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -15,13 +15,14 @@ export type AgentUsageBridge = {
   setPricing(userId: string, preferences: AgentPricingPreferences): Promise<void>
 }
 
-export const agentUsageBridgeSlot = bridgeSlot<AgentUsageBridge>()
-export const setAgentUsageBridge = agentUsageBridgeSlot.set
+export const AGENT_USAGE = routeCapability<AgentUsageBridge>('agents.usageRoute')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setAgentUsageBridge = (bridge: AgentUsageBridge | null): void => setRouteTestCapability(AGENT_USAGE, bridge)
 
 export const agentUsage = new Hono<AppEnv>()
   .get('/pricing', (c) => {
     const userId = ownerId(c)
-    return viaBridge(c, agentUsageBridgeSlot, (bridge) => bridge.pricing(userId))
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.pricing(userId))
   })
   // Device only. This writes the OWNER's pricing preferences, keyed on `ownerId(c)` — which is the same value for
   // a device and for an agent-spawned child, so nothing else here distinguished them. A task-scoped agent could
@@ -36,16 +37,16 @@ export const agentUsage = new Hono<AppEnv>()
     const result = validateAgentPricingPreferences(body)
     if (!result.ok) return respondError(c, 400, 'bad_request', result.errors)
     const userId = ownerId(c)
-    return viaBridge(c, agentUsageBridgeSlot, async (bridge) => {
+    return viaBridge(c, AGENT_USAGE, async (bridge) => {
       await bridge.setPricing(userId, result.value)
       return result.value satisfies AgentPricingPreferences
     })
   })
   .get('/usage', (c) => {
     const userId = ownerId(c)
-    return viaBridge(c, agentUsageBridgeSlot, (bridge) => bridge.read({ userId }))
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.read({ userId }))
   })
   .post('/usage/refresh', (c) => {
     const userId = ownerId(c)
-    return viaBridge(c, agentUsageBridgeSlot, (bridge) => bridge.read({ userId, force: true }))
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.read({ userId, force: true }))
   })

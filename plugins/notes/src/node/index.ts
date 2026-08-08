@@ -2,16 +2,23 @@ import { join } from 'node:path'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { notesSection } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
-import { NOTES_STORE } from '../contract/store'
+import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
+import { NOTES_SEED_TASK, NOTES_STORE } from '../contract/store'
 import { notesAgentTools } from '../main/agentTools'
 import { NotesStore } from '../main/notes'
+import { seedTaskNotes } from '../main/seedTaskNotes'
+import { notes } from '../server/routes/notes'
 
-export const notesPlugin = (dataDir: string): NodePlugin => ({
+export type NotesPluginDeps = { internalEnv: InternalEnvFactory }
+
+export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalEnv: () => ({}) }): NodePlugin => ({
   name: 'notes',
   required: true,
   init: (ctx) => {
     const store = new NotesStore(join(dataDir, 'notes'))
     ctx.capabilities.provide(NOTES_STORE, store)
+    ctx.capabilities.provide(NOTES_SEED_TASK, (task) => seedTaskNotes(ctx.core, store, deps.internalEnv({ scope: 'service' }), task))
+    ctx.routes.register(notes, { prefix: '', note: 'notes CRUD' })
     // notes_list / notes_read / notes_write / notes_append, over the SAME store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.
     for (const tool of notesAgentTools(store, ctx.core)) ctx.tools.register(tool)

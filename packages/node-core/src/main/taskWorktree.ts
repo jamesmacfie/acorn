@@ -10,6 +10,7 @@ import type { TaskStatus, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from './runConfig'
 import { getRepoPath } from './repoPaths'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
+import { capabilityId, type CapabilityRegistry } from '../server/plugin/capabilities'
 
 // Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
@@ -114,16 +115,12 @@ export function taskContext(t: TaskRow | undefined): Pick<TerminalSession, 'repo
 }
 
 // Fired once per task, right after its worktree is first created and configured files are copied.
-// Registered by the terminal plugin to run the workspace setup script (maybeRunSetup). It lives
-// HERE — the single worktree-creation choke point — because every lazy creator funnels through
-// resolveTaskCwd (first terminal, editor/changes panes via taskRoot, run config, workflows); hooks
-// at individual callers miss whichever one happens to create the worktree first.
-// Nullable on both ends: the plugin that fills it clears it again in dispose, so a hook closed over a
-// torn-down engine cannot be invoked by the next boot's first worktree creation.
-let onWorktreeCreated: ((t: TaskRow, cwd: string) => Promise<void>) | null = null
-export const setOnWorktreeCreated = (fn: ((t: TaskRow, cwd: string) => Promise<void>) | null): void => {
-  onWorktreeCreated = fn
-}
+// The terminal plugin owns the implementation; core owns this choke point and resolves the hook from
+// the per-runtime registry passed by the caller. This avoids a process-global callback surviving one
+// runtime into the next.
+export type WorktreeCreatedHook = (task: TaskRow, cwd: string) => Promise<void>
+export const WORKTREE_CREATED = capabilityId<WorktreeCreatedHook>('core.taskWorktreeCreated')
+type CapabilityReader = Pick<CapabilityRegistry, 'get'>
 
 const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boolean; created: boolean }>>()
 export async function resolveTaskCwd(
@@ -131,6 +128,7 @@ export async function resolveTaskCwd(
   t: TaskRow | undefined,
   baseCheckout: string | undefined,
   userId: string | null = null,
+  capabilities?: CapabilityReader,
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
   if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true, created: false }
   if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false, created: false }
@@ -150,7 +148,7 @@ export async function resolveTaskCwd(
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
     if (wt.created) {
       await copyConfiguredFiles(db, t, baseCheckout, wt.path)
-      await onWorktreeCreated?.(t, wt.path).catch((e) => console.warn('[worktrees] created-hook failed:', e))
+      await capabilities?.get(WORKTREE_CREATED)?.(t, wt.path).catch((e) => console.warn('[worktrees] created-hook failed:', e))
     }
     return { cwd: wt.path, isWorktree: true, created: wt.created }
   })()
@@ -165,13 +163,13 @@ export async function resolveTaskCwd(
 // The on-disk root the editor/local-git panes operate on: the task's worktree (created lazily,
 // like the terminal), or null if the repo has no mapped checkout yet. Re-derived per IPC call so
 // the taskId — not a renderer-supplied absolute path — is the capability.
-export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null): Promise<string | null> {
+export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null, capabilities?: CapabilityReader): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
   const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
   const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
   if (!baseCheckout) return null
-  const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId)
+  const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId, capabilities)
   return resolve(cwd)
 }
 
@@ -230,13 +228,14 @@ export async function repoFor(db: AppDatabase, taskId: string): Promise<string> 
 export async function taskRunConfig(
   db: AppDatabase,
   taskId: string,
+  capabilities?: CapabilityReader,
 ): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] } | { error: string }> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
   const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
   const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
   if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
-  const { cwd } = await resolveTaskCwd(db, t, baseCheckout)
+  const { cwd } = await resolveTaskCwd(db, t, baseCheckout, null, capabilities)
   const cfg = loadRepoConfig(cwd, homedir(), {
     setupScript: mapped?.setupScript,
     teardownScript: mapped?.teardownScript,

@@ -13,6 +13,7 @@ type WorkspaceViewTransitionInput = {
   selectedSource: string | null
   activeTaskId: string | null
   tasks: readonly Task[]
+  defaultSource: string
   rememberedNextView?: WorkspaceView
 }
 
@@ -56,7 +57,7 @@ export function planWorkspaceViewTransition(input: WorkspaceViewTransitionInput)
       kind: 'restore-source',
       source: input.rememberedNextView && 'source' in input.rememberedNextView
         ? input.rememberedNextView.source
-        : 'github',
+        : input.defaultSource,
     },
   }
 }

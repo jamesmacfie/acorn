@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
+import { z } from 'zod'
 
 type JsonObject = Record<string, unknown>
 type JsonRpcId = string | number
@@ -33,6 +34,13 @@ type JsonRpcProcessOptions = {
 
 const asObject = (value: unknown): JsonObject | null =>
   typeof value === 'object' && value != null && !Array.isArray(value) ? value as JsonObject : null
+
+const jsonRpcMessageSchema = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  method: z.string().optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
+  error: z.record(z.string(), z.unknown()).optional(),
+}).passthrough()
 
 export class JsonRpcProcess {
   readonly #child: ChildProcessWithoutNullStreams
@@ -141,7 +149,8 @@ export class JsonRpcProcess {
   #handleLine(line: string): void {
     let message: JsonObject | null
     try {
-      message = asObject(JSON.parse(line))
+      const parsed = jsonRpcMessageSchema.safeParse(JSON.parse(line))
+      message = parsed.success ? parsed.data : null
     } catch {
       return
     }

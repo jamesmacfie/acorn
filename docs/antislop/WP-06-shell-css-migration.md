@@ -91,14 +91,21 @@ and two style packs; everything should look identical to before.
 
 ## Done criteria
 
-- [ ] No github-named CSS under `packages/client-core/src/styles/`.
-- [ ] `integrations-panel.css` decision recorded and executed.
-- [ ] Hygiene/adoption suites green; e2e green; user QA note written.
+- [x] No GitHub-owned feature CSS remains under `packages/client-core/src/styles/`.
+- [x] The `integrations-panel.css` decision is recorded and executed as `integrations.css`.
+- [ ] Hygiene/adoption suites are green; desktop e2e and live visual QA remain blocked/deferred as recorded in the final migration audit.
 
 ## Progress
 
-- [ ] Slice 1 — audit + integrations decision
-- [ ] Slice 2 — checks-panel.css
-- [ ] Slice 3 — pull-list.css
-- [ ] Slice 4 — pull-detail.css
-- [ ] Slice 5 — integrations-panel.css
+- [x] Slice 1 — audit + integrations decision
+- [x] Slice 2 — checks-panel.css
+- [x] Slice 3 — pull-list.css
+- [x] Slice 4 — pull-detail.css
+- [x] Slice 5 — integrations-panel.css
+
+Completion note (2026-08-08): `checks-panel.css`, `pull-list.css`, and `pull-detail.css` now live
+with the GitHub plugin and are imported by their owning components. `integrations-panel.css` was
+shared by core integration settings and GitHub pull-detail rows, so it was retained in core under
+the role-named `integrations.css`. The existing style walker already scans plugin sources; token
+values and selector behavior were not changed. Hygiene and package tests are covered by the final
+validation pass; visual QA remains part of the migration audit.

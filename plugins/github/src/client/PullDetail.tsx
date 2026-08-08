@@ -4,8 +4,6 @@ import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-que
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
 import { checksState, FAILED_STATUSES, fileStatusMeta, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
-import { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
-import Icon from '@acorn/client-core/ui/Icon.tsx'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from '@acorn/client-core/ui/Picker.tsx'
 import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
@@ -20,33 +18,19 @@ import { ConversationEntryItem } from './pullDetail/Conversation'
 import ChecksPanel from './checks/ChecksPanel'
 import { scanLinearRefs } from '@acorn/plugin-linear/contract/scanRefs.ts'
 import { refPanelFor } from '@acorn/client-core/registries/refPanels.ts'
-import { linkifyLinearIds, makeContentLinkHandler, splitLinearIds } from './contentLinks'
+import { linkifyLinearIds, makeContentLinkHandler } from './contentLinks'
+import { PullSummary } from './PullSummary'
 import { buildConversationEntries, buildThreadSnippetIndex } from './pullDetail/model'
 import { persistDraft } from '@acorn/client-core/lib/draftState.ts'
 import { createNavigatorScrollRestoration } from './reviewScrollRestoration'
 import type { ReviewViewScope } from './reviewViewState'
+import './styles/pull-detail.css'
+import './styles/checks-panel.css'
 
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
 
 // Render plain text with bare Linear identifiers (CRA-404) turned into clickable links — used for
 // the PR title, where the id is plain text. Prefixes gate which ids are real (see splitLinearIds).
-function LinearText(props: { text: string; prefixes: string[]; onOpen: (id: string) => void }) {
-  const parts = createMemo(() => splitLinearIds(props.text, props.prefixes))
-  return (
-    <For each={parts()}>
-      {(p) =>
-        p.id ? (
-          <a class="linear-inline-link" onClick={() => props.onOpen(p.id!)}>
-            {p.text}
-          </a>
-        ) : (
-          <>{p.text}</>
-        )
-      }
-    </For>
-  )
-}
-
 const rememberOpen = (key: string) => (el: HTMLDetailsElement) => {
   const stored = localStorage.getItem(`section-open:${key}`)
   if (stored !== null) el.open = stored === '1'
@@ -212,119 +196,28 @@ export default function PullDetail(props: { task?: Task } = {}) {
       <Show when={detail.data?.pull} fallback={<p class="placeholder">{detail.isError ? 'Not found.' : 'Loading…'}</p>}>
         {(pull) => (
           <>
-            <div class="pr-detail-header" ref={bindNavigatorScroll}>
-              <div class="pr-detail-title">
-                <span class="pr-num copyable">#{pull().number}<CopyButton text={() => String(pull().number)} title="Copy PR number" /></span> <LinearText text={pull().title} prefixes={linearPrefixes()} onOpen={setOpenIssue} />
-              </div>
-              <div class="pr-detail-meta muted">
-                <span class={`state-badge state-${pull().state}`}>{pull().draft ? 'draft' : pull().state}</span>
-                <Show when={pull().author}>
-                  {(a) => (
-                    <span class="identity-chip">
-                      <UserAvatar login={a()} />
-                      <span>{a()}</span>
-                    </span>
-                  )}
-                </Show>
-                <span class="branch-flow">
-                  <button class="branch-chip" title={pull().baseRef ?? 'base'} onClick={() => navigator.clipboard.writeText(pull().baseRef ?? '')}>
-                    <span class="branch-chip-label">{pull().baseRef ?? 'base'}</span>
-                    <Icon name="copy" class="branch-chip-copy" size={12} />
-                  </button>
-                  <span class="branch-arrow">←</span>
-                  <button class="branch-chip" title={pull().headRef ?? 'head'} onClick={() => navigator.clipboard.writeText(pull().headRef ?? '')}>
-                    <span class="branch-chip-label">{pull().headRef ?? 'head'}</span>
-                    <Icon name="copy" class="branch-chip-copy" size={12} />
-                  </button>
-                </span>
-                <span>
-                  {fileSummary().count} files · <span class="file-stat add">+{fileSummary().additions}</span> /{' '}
-                  <span class="file-stat del">−{fileSummary().deletions}</span>
-                </span>
-                <Show when={formatRelativeTime(pull().updatedAt)}>
-                  {(age) => <span>{age()}</span>}
-                </Show>
-              </div>
-              <Show when={pull().state === 'open'}>
-                <div class="pr-actions">
-                  <Show when={!pull().autoMergeEnabled}>
-                    <select class="repo-select" value={mergeMethod()} onChange={(e) => setMergeMethod(e.currentTarget.value)}>
-                      <option value="squash">squash</option>
-                      <option value="merge">merge</option>
-                      <option value="rebase">rebase</option>
-                    </select>
-                  </Show>
-                  <Show when={pull().autoMergeEnabled}>
-                    <button type="button" onClick={() => run(autoMergeDisable.mutateAsync())} disabled={autoMergeDisable.isPending}>
-                      Disable auto-merge
-                    </button>
-                  </Show>
-                  <Show when={!pull().autoMergeEnabled && pull().mergeStateStatus === 'BLOCKED'}>
-                    <button type="button" onClick={() => run(autoMergeEnable.mutateAsync())} disabled={autoMergeEnable.isPending}>
-                      Enable auto-merge ({mergeMethod()})
-                    </button>
-                  </Show>
-                  <Show when={!pull().autoMergeEnabled && pull().mergeStateStatus !== 'BLOCKED'}>
-                    <button
-                      type="button"
-                      onClick={() => run(merge.mutateAsync())}
-                      disabled={merge.isPending || pull().mergeable === 'CONFLICTING'}
-                      title={pull().mergeable === 'CONFLICTING' ? 'Resolve merge conflicts before merging' : undefined}
-                    >
-                      Merge
-                    </button>
-                  </Show>
-                  <button type="button" onClick={() => run(close.mutateAsync())} disabled={close.isPending}>
-                    Close
-                  </button>
-                  <button type="button" onClick={() => run(draft.mutateAsync(!pull().draft))} disabled={draft.isPending}>
-                    {pull().draft ? 'Ready for review' : 'Convert to draft'}
-                  </button>
-                </div>
-              </Show>
-              <Show when={pull().state === 'closed'}>
-                <div class="pr-actions">
-                  <button type="button" onClick={() => run(reopen.mutateAsync())} disabled={reopen.isPending}>
-                    Reopen
-                  </button>
-                </div>
-              </Show>
-              <Show when={actionError()}>
-                <div class="action-error">{actionError()}</div>
-              </Show>
-            </div>
-
-            <Show when={conflicting()}>
-              <details class="nav-section" open ref={rememberOpen('conflicts')}>
-                <summary>
-                  Merge conflicts
-                  <Show when={conflicts.data?.available && conflicts.data.files.length}>
-                    <span class="muted"> ({conflicts.data!.files.length})</span>
-                  </Show>
-                </summary>
-                <Show
-                  when={conflicts.data?.available}
-                  fallback={
-                    <p class="muted" style={{ padding: '4px var(--pane-pad)' }}>
-                      {conflicts.isLoading ? 'Checking for conflicting files…' : 'This PR has merge conflicts. Map this repo to a local checkout to list the conflicting files.'}
-                    </p>
-                  }
-                >
-                  <ul class="file-list">
-                    <For each={conflicts.data!.files} fallback={<li class="placeholder">Conflicts reported, but no specific files were detected.</li>}>
-                      {(path) => (
-                        <li class="file-row">
-                          <button type="button" class="file-open" onClick={() => selectFile(path)}>
-                            <span class="file-status file-status-warn" title="Conflicting">!</span>
-                            <span class="file-path">{path}</span>
-                          </button>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </Show>
-              </details>
-            </Show>
+            <PullSummary
+              pull={pull}
+              bindNavigatorScroll={bindNavigatorScroll}
+              fileSummary={fileSummary}
+              linearPrefixes={linearPrefixes}
+              onOpenIssue={setOpenIssue}
+              mergeMethod={mergeMethod}
+              setMergeMethod={setMergeMethod}
+              run={run}
+              disableAutoMerge={{ run: () => autoMergeDisable.mutateAsync(), pending: autoMergeDisable.isPending }}
+              enableAutoMerge={{ run: () => autoMergeEnable.mutateAsync(), pending: autoMergeEnable.isPending }}
+              merge={{ run: () => merge.mutateAsync(), pending: merge.isPending }}
+              close={{ run: () => close.mutateAsync(), pending: close.isPending }}
+              draft={{ run: (isDraft) => draft.mutateAsync(isDraft), pending: draft.isPending }}
+              reopen={{ run: () => reopen.mutateAsync(), pending: reopen.isPending }}
+              actionError={actionError}
+              conflicting={conflicting()}
+              conflicts={() => conflicts.data}
+              conflictsLoading={() => conflicts.isLoading}
+              conflictsRef={rememberOpen('conflicts')}
+              selectFile={selectFile}
+            />
 
             <Show when={pull().body}>
               <details class="nav-section" open ref={rememberOpen('description')}>

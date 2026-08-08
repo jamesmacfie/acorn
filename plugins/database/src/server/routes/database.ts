@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { GENERATE_MAX_PROMPT_CHARS } from '../../shared/database'
 import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbSavedQuery, DbSchemaResult, DbTablesResult, DbWriteResult } from '../../shared/database'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
@@ -38,8 +38,9 @@ export type DatabaseBridge = {
   schema(taskId: string): Promise<DbSchemaResult>
 }
 
-export const databaseBridgeSlot = bridgeSlot<DatabaseBridge>()
-export const setDatabaseBridge = databaseBridgeSlot.set
+export const DATABASE = routeCapability<DatabaseBridge>('database.route')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setDatabaseBridge = (bridge: DatabaseBridge | null): void => setRouteTestCapability(DATABASE, bridge)
 
 // Everything that reaches SQL is validated (the privileged-boundary contract). DbCell is string | null on the wire.
 const cell = z.union([z.string(), z.null()])
@@ -89,14 +90,14 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
   }
 
   return new Hono<AppEnv>()
-    .post('/:id/database/connect', (c) => viaBridge(c, databaseBridgeSlot, (b) => b.connect(id(c))))
-    .post('/:id/database/disconnect', (c) => viaBridge(c, databaseBridgeSlot, (b) => b.disconnect(id(c))))
-    .get('/:id/database/tables', (c) => viaBridge(c, databaseBridgeSlot, (b) => b.tables(id(c))))
+    .post('/:id/database/connect', (c) => viaBridge(c, DATABASE, (b) => b.connect(id(c))))
+    .post('/:id/database/disconnect', (c) => viaBridge(c, DATABASE, (b) => b.disconnect(id(c))))
+    .get('/:id/database/tables', (c) => viaBridge(c, DATABASE, (b) => b.tables(id(c))))
     .get('/:id/database/columns', (c) => {
       const schema = c.req.query('schema')
       const name = c.req.query('name')
       if (!schema || !name) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, databaseBridgeSlot, (b) => b.columns(id(c), schema, name))
+      return viaBridge(c, DATABASE, (b) => b.columns(id(c), schema, name))
     })
     .get('/:id/database/rows', (c) => {
       const schema = c.req.query('schema')
@@ -104,27 +105,27 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
       if (!schema || !name) return respondError(c, 400, 'bad_request')
       const offsetRaw = c.req.query('offset')
       const offset = offsetRaw ? Number(offsetRaw) : undefined
-      return viaBridge(c, databaseBridgeSlot, (b) => b.rows(id(c), schema, name, offset))
+      return viaBridge(c, DATABASE, (b) => b.rows(id(c), schema, name, offset))
     })
     .post('/:id/database/query', async (c) => {
       const p = queryBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, databaseBridgeSlot, (b) => b.query(id(c), p.data.sql))
+      return viaBridge(c, DATABASE, (b) => b.query(id(c), p.data.sql))
     })
     .post('/:id/database/update', async (c) => {
       const p = updateBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, databaseBridgeSlot, (b) => b.update(id(c), p.data.schema, p.data.name, p.data.column, p.data.value, p.data.pk))
+      return viaBridge(c, DATABASE, (b) => b.update(id(c), p.data.schema, p.data.name, p.data.column, p.data.value, p.data.pk))
     })
     .post('/:id/database/insert', async (c) => {
       const p = insertBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, databaseBridgeSlot, (b) => b.insert(id(c), p.data.schema, p.data.name, p.data.values))
+      return viaBridge(c, DATABASE, (b) => b.insert(id(c), p.data.schema, p.data.name, p.data.values))
     })
     .post('/:id/database/delete', async (c) => {
       const p = deleteBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, databaseBridgeSlot, (b) => b.remove(id(c), p.data.schema, p.data.name, p.data.pk))
+      return viaBridge(c, DATABASE, (b) => b.remove(id(c), p.data.schema, p.data.name, p.data.pk))
     })
     // --- saved queries (repo-scoped, this plugin's own table — no bridge) ---
     .get('/:id/database/queries', async (c) => {
@@ -173,7 +174,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
     .post('/:id/database/generate', async (c) => {
       const p = generateBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      const bridge = databaseBridgeSlot.get()
+      const bridge = routeCapabilityFor(c, DATABASE)
       if (!bridge) return respondError(c, 503, 'bridge-unavailable')
       // AI SQL generation spends the owner's OpenAI/Anthropic key, billed to the owner. A task-scoped
       // agent credential must not reach it (server/middleware/requireUser.ts § canUseProviderCredential).

@@ -80,13 +80,35 @@ slice. User QA note: repo list renders, pins work, PR checks visible on a task.
 
 ## Done criteria
 
-- [ ] `githubShellReads.ts` gone; grep for it returns nothing.
-- [ ] `CORE_IMPORT_ROOTS` shrunk if a root lost its last consumer.
-- [ ] No `/v2/p/github` literal remains in `packages/client-core/src`.
-- [ ] Arch tests + e2e green; user QA note written.
+- [x] `githubShellReads.ts` gone; grep for it returns nothing.
+- [x] `CORE_IMPORT_ROOTS` was remeasured; no root lost its last legitimate consumer.
+- [x] No `/v2/p/github` literal remains in `packages/client-core/src`.
+- [ ] Desktop e2e is blocked by sandbox `listen EPERM`; user QA handoff is recorded in the final migration audit.
 
 ## Progress
 
-- [ ] Slice 1 — consumer map (append table here)
-- [ ] Slices 2..N — per-export moves
-- [ ] Final — file deleted, roots shrunk
+- [x] Slice 1 — consumer map (append table here)
+- [x] Slices 2..N — per-export moves
+- [x] Final — file deleted, roots shrunk
+
+Completed 2026-08-08. The ledger's consumers now use the following ownership seams:
+
+| Former ledger item | Shell consumer | New owner/seam |
+| --- | --- | --- |
+| repos/pins query keys and options | `App.tsx`, `WorkspaceRepoAssignments.tsx`, HTTP settings/browse | `SourceContribution.repository` → core generic query wrappers |
+| repo refresh | `RepoPicker.tsx` | `SourceRepository.refreshRepos()` |
+| pin mutation | `workspaces/mutations.ts` and `RepoPicker.tsx` | `SourceRepository.setPin()` |
+| pull-check query | `TabRail.tsx` | `SourceRepository.pullChecks()` → core generic query wrapper |
+| repo shape | startup restore and `RepoPicker.tsx` | `SourceRepo` structural contract in the source registry |
+| GitHub device flow | `IntegrationsSettings.tsx` | `integrationFlowRegistry`, registered by plugins/github |
+
+The GitHub plugin owns all provider routes and wire reads in `repositoryContribution.ts` and
+`integrationFlow.ts`; `githubShellReads.ts` is deleted. `CORE_IMPORT_ROOTS` remains unchanged:
+`@acorn/client-core/queries.ts` and `@acorn/client-core/registries` still have legitimate imports,
+so no exact-set root disappeared. Linear/Rollbar provider routes were already absent from core.
+
+Validation: `pnpm --filter @acorn/client-core test`, `pnpm --filter @acorn/plugin-github test`,
+`pnpm --filter @acorn/arch-tests test`, and `pnpm lint` pass. The desktop persisted-state
+conformance test passes (24 tests). The full desktop package test remains blocked by sandbox
+`listen EPERM` failures in pre-existing broker/tunnel tests; no renderer test failed. Manual QA is
+recorded in the final migration audit.

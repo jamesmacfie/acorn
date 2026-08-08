@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
+import { toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
 
 export type ToolRisk = SharedToolRisk
 
@@ -47,8 +48,8 @@ export type ToolPerms = {
 export function parseToolPerms(raw: string | undefined): ToolPerms {
   if (!raw) return {}
   try {
-    const v = JSON.parse(raw) as ToolPerms
-    return v && typeof v === 'object' ? v : {}
+    const parsed = toolPermissionsSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : {}
   } catch {
     return {}
   }

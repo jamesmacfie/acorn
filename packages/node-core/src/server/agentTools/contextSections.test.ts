@@ -55,7 +55,7 @@ describe('the context-section registry', () => {
   })
 
   // The point of declaring order rather than ranking a list in core: a new section can land BETWEEN two
-  // existing ones. Under the old SECTION_ORDER array it could only ever go last.
+  // existing ones. Under the old hardcoded section list it could only ever go last.
   it('lets a new section slot between two existing ones', () => {
     registerContextSection('a', asContextSection(section('pr')))
     registerContextSection('b', asContextSection(section('memory')))

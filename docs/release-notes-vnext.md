@@ -34,4 +34,4 @@ manual release verification remain release-operator tasks that require Apple sig
 a fresh macOS environment.
 
 For implementation contracts, use the parent topic docs and the source. The completed phase record is
-kept under [docs/vNext](./vNext).
+kept under [docs/legacy/vNext](./legacy/vNext).

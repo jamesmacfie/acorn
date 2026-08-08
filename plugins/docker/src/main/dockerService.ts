@@ -3,7 +3,7 @@
 // refreshes without polling the daemon. Pure Node (child processes only) — constructed lazily on
 // first use, so it works under both the Electron root and dev:node; bootstrap disposes it on quit.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { wsBroadcast } from '@acorn/node-core/main/wsHub.ts'
+import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { DockerContainerSummary, DockerImage, DockerInfo, DockerNetwork, DockerScope, DockerVolume } from '../shared/model'
 import { docker, DockerCliError, dockerEnv } from './cli'
 import { eventScope, parseImagesOutput, parseJsonLines, parseNetworksOutput, parsePsOutput, parseVolumesOutput } from './parse'
@@ -17,6 +17,7 @@ const MAX_STREAM_CHILDREN = 32 // Bound concurrent stream readers to protect the
 type VersionJson = { Client?: { Context?: string }; Server?: { Version?: string } }
 
 class DockerService {
+  constructor(private readonly broadcast: (frame: WsServerFrame) => void) {}
   private infoCache: { at: number; value: DockerInfo } | null = null
   private lists = new Map<DockerScope, { at: number; data: unknown }>()
   private pending = new Map<DockerScope, Promise<unknown>>()
@@ -132,7 +133,7 @@ class DockerService {
       this.broadcastTimer = null
       const scopes = [...this.dirtyScopes]
       this.dirtyScopes.clear()
-      if (scopes.length) wsBroadcast({ channel: 'docker:changed', scopes })
+      if (scopes.length) this.broadcast({ channel: 'docker:changed', scopes })
     }, BROADCAST_DEBOUNCE_MS)
   }
 
@@ -192,8 +193,8 @@ class DockerService {
 
 let service: DockerService | null = null
 
-export function getDockerService(): DockerService {
-  if (!service) service = new DockerService()
+export function getDockerService(broadcast: (frame: WsServerFrame) => void = () => {}): DockerService {
+  if (!service) service = new DockerService(broadcast)
   return service
 }
 

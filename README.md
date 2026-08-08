@@ -92,5 +92,5 @@ Start with [architecture-overview.md](./docs/architecture-overview.md), then use
 - [local-development.md](./docs/local-development.md), [testing.md](./docs/testing.md), and
   [node-distribution.md](./docs/node-distribution.md) — build, test, and distribution workflows.
 
-The completed design and implementation record remains in [docs/vNext](./docs/vNext) for reference.
+The completed design and implementation record remains in [docs/legacy/vNext](./docs/legacy/vNext) for reference.
 It is not the source of current runtime contracts; the parent `docs/` tree and the code are.

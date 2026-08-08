@@ -6,13 +6,14 @@ import { memoryAgentTools } from '../main/agentTools'
 import { memorySection } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { registerKnowledgeIpc, type KnowledgeDeps } from '../main/knowledgeIpc'
 import { MEMORY_KNOWLEDGE } from '../contract/knowledge'
-import { knowledge, setKnowledgeBridge } from '../server/routes/knowledge'
+import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
 import { migrationsDir } from './migrations'
 
 // No deps: both of this plugin's former app-supplied thunks now resolve through the plugin context —
 // sendToAgent and notes through capabilities, the owner identity through ctx.core.identity.
 export const memoryPlugin = (dataDir: string): NodePlugin => {
   let db: ReturnType<typeof openPluginDb> | null = null
+  let routeCapability: { dispose(): void } | null = null
   return {
     name: 'memory',
     required: true,
@@ -43,8 +44,9 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
       // does NOT degrade: notes is a `required` plugin, and a notes pane that silently answered "no
       // notes" because a capability was missing would look exactly like data loss.
       const notes = () => ctx.capabilities.require(NOTES_STORE)
-      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes })
+      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes, notice: ctx.events.notice })
       ctx.capabilities.provide(MEMORY_KNOWLEDGE, runtime)
+      routeCapability = ctx.capabilities.provide(KNOWLEDGE, runtime.route)
       ctx.routes.register(knowledge, { prefix: '', note: 'notes/memory pane' })
       for (const tool of memoryAgentTools(runtime, runtime.proposals, ctx.core)) ctx.tools.register(tool)
       ctx.contextSections.register(
@@ -59,7 +61,7 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
     dispose: () => {
       db?.close()
       db = null
-      setKnowledgeBridge(null)
+      routeCapability?.dispose()
     },
   }
 }

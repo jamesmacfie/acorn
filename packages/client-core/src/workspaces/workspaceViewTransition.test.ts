@@ -43,6 +43,7 @@ describe('workspace view transitions', () => {
       selectedSource: null,
       activeTaskId: selectedRunnTask.id,
       tasks,
+      defaultSource: 'github',
       rememberedNextView: { taskId: oldRunnTask.id },
     })
 
@@ -57,6 +58,7 @@ describe('workspace view transitions', () => {
       selectedSource: null,
       activeTaskId: oldRunnTask.id,
       tasks,
+      defaultSource: 'github',
       rememberedNextView: { taskId: oldRunnTask.id },
     })
 
@@ -71,6 +73,7 @@ describe('workspace view transitions', () => {
       selectedSource: null,
       activeTaskId: oldRunnTask.id,
       tasks,
+      defaultSource: 'github',
       rememberedNextView: { taskId: acornTask.id },
     })
 
@@ -84,6 +87,7 @@ describe('workspace view transitions', () => {
       selectedSource: 'linear',
       activeTaskId: oldRunnTask.id,
       tasks,
+      defaultSource: 'github',
       rememberedNextView: { source: 'github' },
     })
 

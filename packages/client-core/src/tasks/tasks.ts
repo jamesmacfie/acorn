@@ -5,7 +5,7 @@
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
 import { activeNodeId } from '../node/activeNode'
-import { sourceRegistry } from '../registries/sources'
+import { defaultSourceId, sourceRegistry } from '../registries/sources'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../registries/scopeEviction'
 
@@ -17,8 +17,19 @@ export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 // accepts an unknown string so a temporarily missing plugin source remains inert and round-trips
 // through persistence until the user explicitly selects another source.
 export type SourceId = string
-export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && (v === 'github' || !!sourceRegistry.get(v))
-const [selectedSource, setSelectedSource] = createSignal<string | null>('github')
+export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && !!sourceRegistry.get(v)
+
+// The default source is registered after this module is evaluated. Keep the initial state unset so the
+// accessor resolves that contribution lazily, while retaining an explicit null for task views.
+const UNSET_SOURCE = Symbol('unset-source')
+const [selectedSourceState, setSelectedSourceState] = createSignal<string | null | typeof UNSET_SOURCE>(UNSET_SOURCE)
+export const selectedSource = (): string | null => {
+  const selected = selectedSourceState()
+  return selected === UNSET_SOURCE ? defaultSourceId() ?? null : selected
+}
+export function setSelectedSource(source: string | null): void {
+  setSelectedSourceState(source)
+}
 
 // Per-workspace memory of the last view — a rail source (browse) or a task — so switching workspaces
 // returns you to exactly what you were looking at rather than always jumping back to GitHub.
@@ -194,7 +205,7 @@ export function evictTaskState(taskId: string): void {
   })
 }
 
-export { activeTaskId, setActiveTaskId, selectedSource, setSelectedSource, taskLayouts }
+export { activeTaskId, setActiveTaskId, taskLayouts }
 
 export function clearNodeScopedTaskState(): void {
   viewByWorkspace.clear()

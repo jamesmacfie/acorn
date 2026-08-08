@@ -12,7 +12,9 @@ type TaskRow = typeof schema.tasks.$inferSelect
 type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; workflowRunId?: string }
 type ContextDraft = {
   items: ContextItem[]
-  legacy?: Partial<Pick<TaskContext, 'pr' | 'issues' | 'notes' | 'memory'>>
+  // The response adapter is intentionally separate from canonical `items`: existing task-context
+  // clients still consume the top-level fields in TaskContext, while new consumers use sections.
+  compatibility?: Partial<Pick<TaskContext, 'pr' | 'issues' | 'notes' | 'memory'>>
   absent?: ContextSectionResult['absent']
 }
 
@@ -20,7 +22,7 @@ export type ContextSectionContribution = {
   id: string
   // Where this section sits in the assembled block. DECLARED by the section, not ranked by core.
   //
-  // The order used to be a `SECTION_ORDER = ['pr','issues','notes','memory']` list in this file — core
+  // The order used to be a hardcoded `['pr','issues','notes','memory']` list in this file — core
   // sequencing four plugin-owned ids, which meant a fifth section could only ever land at the end and
   // a plugin could not say where it belonged. This is the same "sort on a declared field, never on
   // when you registered" rule the client-side pane and slot registries already follow, and the numbers
@@ -83,17 +85,17 @@ function applyBudget(items: ContextItem[], budget: ContextBudget): { items: Cont
   }
 }
 
-function budgetLegacy(
-  legacy: ContextDraft['legacy'],
+function budgetCompatibilityProjection(
+  compatibility: ContextDraft['compatibility'],
   budget: ContextBudget,
-): ContextDraft['legacy'] {
-  if (!legacy) return undefined
+): ContextDraft['compatibility'] {
+  if (!compatibility) return undefined
   const limit = budget.maxItems ?? Number.POSITIVE_INFINITY
-  const result: NonNullable<ContextDraft['legacy']> = {}
-  if (legacy.pr) result.pr = budget.maxBytesPerItem ? { ...legacy.pr, body: legacy.pr.body == null ? null : truncateBytes(legacy.pr.body, budget.maxBytesPerItem) } : legacy.pr
-  if (legacy.issues) result.issues = legacy.issues.slice(0, limit)
-  if (legacy.notes) result.notes = legacy.notes.slice(0, limit).map((note) => ({ ...note, body: budget.maxBytesPerItem ? truncateBytes(note.body, budget.maxBytesPerItem) : note.body }))
-  if (legacy.memory) result.memory = legacy.memory.slice(0, limit)
+  const result: NonNullable<ContextDraft['compatibility']> = {}
+  if (compatibility.pr) result.pr = budget.maxBytesPerItem ? { ...compatibility.pr, body: compatibility.pr.body == null ? null : truncateBytes(compatibility.pr.body, budget.maxBytesPerItem) } : compatibility.pr
+  if (compatibility.issues) result.issues = compatibility.issues.slice(0, limit)
+  if (compatibility.notes) result.notes = compatibility.notes.slice(0, limit).map((note) => ({ ...note, body: budget.maxBytesPerItem ? truncateBytes(note.body, budget.maxBytesPerItem) : note.body }))
+  if (compatibility.memory) result.memory = compatibility.memory.slice(0, limit)
   return result
 }
 
@@ -108,7 +110,7 @@ const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more o
 // ─── The sections ───────────────────────────────────────────────────────────────────────────────
 //
 // Sections are registered by the plugin or core service that owns their rows. The shared contract keeps
-// budgets, legacy projections, and wire formatting consistent for the route, manifest preview, and send
+// budgets, compatibility projections, and wire formatting consistent for the route, manifest preview, and send
 // assembly.
 
 export function pullRequestSection(source: ContextPullRequestSource): PluginContextSection {
@@ -123,10 +125,10 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
       const pr = await source(userLogin, task.repoOwner, task.repoName, task.pullNumber)
       if (!pr) return { items: [] }
       const changedFiles = pr.changedFiles
-      const legacy = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
+      const compatibility = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
       return {
         items: [{ id: `pr:${pr.number}`, kind: 'PR', label: `#${pr.number} ${pr.title}`, body: pr.body ?? undefined, details: changedFiles }],
-        legacy: { pr: legacy },
+        compatibility: { pr: compatibility },
       }
     },
     format(items) {
@@ -194,7 +196,7 @@ export const linkedIssuesSection: ContextSectionContribution = {
     }
     return {
       items,
-      legacy: { issues },
+      compatibility: { issues },
       absent: missing ? { reason: 'missing-cache', detail: `${missing} linked item${missing === 1 ? '' : 's'} missing cached provider detail.` } : undefined,
     }
   },
@@ -220,7 +222,7 @@ export function notesSection(source: ContextNotesSource): PluginContextSection {
         : allNotes
       return {
         items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope], origin: { author: note.author } })),
-        legacy: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
+        compatibility: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
       }
     },
     format(items, omitted) {
@@ -242,7 +244,7 @@ export function memorySection(source: ContextMemorySource): PluginContextSection
       const memories = await source(task.id, repo)
       return {
         items: memories.map((memory) => ({ id: memory.name, kind: 'memory', label: memory.name, details: [memory.description] })),
-        legacy: { memory: memories },
+        compatibility: { memory: memories },
       }
     },
     format(items, omitted) {
@@ -329,8 +331,8 @@ export async function assembleContext(
     if (!include.has(contribution.id)) continue
     const draft = await contribution.assemble({ db, userLogin, task, repo, workflowRunId: opts.workflowRunId })
     const budgeted = applyBudget(draft.items, contribution.budget)
-    const legacy = budgetLegacy(draft.legacy, contribution.budget)
-    if (legacy) Object.assign(ctx, legacy)
+    const compatibility = budgetCompatibilityProjection(draft.compatibility, contribution.budget)
+    if (compatibility) Object.assign(ctx, compatibility)
     const items = budgeted.items.map((item) => ({ ...item, jump: contribution.jump?.(item) }))
     ctx.sections.push({
       id: contribution.id,

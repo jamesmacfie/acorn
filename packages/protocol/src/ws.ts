@@ -22,12 +22,19 @@
 // a payload, so adding a stream is now a plugin-local change.
 
 // docs/api-reference.md § Events: one WS per node per client, token-authenticated at upgrade.
+import { z } from 'zod'
+
 export const WS_PATH = '/v2/events'
 
 // The index signature is load-bearing twice over: it lets an owner's frame satisfy this without a cast
 // at every send site, and it suppresses excess-property checks so existing literal sends still
 // typecheck unchanged.
 export type WsFrame = { channel: string } & Record<string, unknown>
+
+// The envelope is deliberately open for plugin-owned payloads, but the channel tag is still a
+// mutation boundary for term input/attach/detach. Validate the one field core dispatches before any
+// plugin or terminal handler sees a peer-supplied frame.
+export const wsFrameSchema = z.object({ channel: z.string().min(1) }).passthrough()
 
 // Kept as distinct names because the DIRECTION is still meaningful to a reader even though the shapes
 // are now identical, and because it means node-core, client-core and the desktop broker compile

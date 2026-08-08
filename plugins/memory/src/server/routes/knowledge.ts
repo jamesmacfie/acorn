@@ -2,17 +2,15 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { Context } from 'hono'
 import type { NoteLocation } from '@acorn/protocol/notes.ts'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { isTaskConfined, requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
-// Notes + memory (docs/notes-and-memory.md): the renderer's knowledge surface — was the
-// `memory:*` and `notes:*` IPC channels. Distinct from the harness memory/notes
-// bridges (the MCP agent surface): this is the human-facing pane (manual add, the proposal gate,
-// note CRUD + inclusion). Backed by the same NotesStore + memory index in the main process, so it
-// 503s under dev:node. Mounted at the plugin namespace root to carry /memory*, /tasks/:id/notes* and
-// /workspaces/:wsId/notes* alike — hence the doubled /v2/p/memory/memory (see app/server/routes.ts).
+// Memory's route surface plus a one-release compatibility alias for the notes routes. The notes
+// plugin owns the current `/v2/p/notes/*` namespace; these `/v2/p/memory/*/notes` paths remain only
+// for clients and agent prompts that may have retained the old URL. Both surfaces use the same
+// NotesStore capability, so the alias cannot create a second source of truth.
 
 export type KnowledgeBridge = {
   memoryList(repo?: string): Promise<unknown>
@@ -29,8 +27,9 @@ export type KnowledgeBridge = {
   notesRemove(location: NoteLocation, slug: string): Promise<unknown>
 }
 
-export const knowledgeBridgeSlot = bridgeSlot<KnowledgeBridge>()
-export const setKnowledgeBridge = knowledgeBridgeSlot.set
+export const KNOWLEDGE = routeCapability<KnowledgeBridge>('memory.knowledgeRoute')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setKnowledgeBridge = (bridge: KnowledgeBridge | null): void => setRouteTestCapability(KNOWLEDGE, bridge)
 
 // Everything that writes a memory file / note gets a validated body (the privileged-boundary contract).
 const editedShape = z.object({ name: z.string(), type: z.string(), description: z.string(), body: z.string() })
@@ -63,73 +62,73 @@ const confineTaskQuery = (c: Context<AppEnv>): { taskId?: string } | null => {
 export const knowledge = new Hono<AppEnv>()
   .use('/workspaces/:wsId/notes/*', requireDevice)
   // --- memory ---
-  .get('/memory', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.memoryList(c.req.query('repo') ?? undefined)))
+  .get('/memory', (c) => viaBridge(c, KNOWLEDGE, (b) => b.memoryList(c.req.query('repo') ?? undefined)))
   .get('/memory/search', (c) => {
     const q = c.req.query('q')
     if (!q) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.memorySearch(q, c.req.query('repo') ?? undefined, c.req.query('type') ?? undefined))
+    return viaBridge(c, KNOWLEDGE, (b) => b.memorySearch(q, c.req.query('repo') ?? undefined, c.req.query('type') ?? undefined))
   })
   .get('/memory/proposals', (c) => {
     const filter = confineTaskQuery(c)
     // 404 rather than 403, matching every other confinement denial in this codebase: the answer must not
     // reveal whether the task the caller named exists.
     if (!filter) return respondError(c, 404, 'not_found')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.memoryProposals(filter.taskId))
+    return viaBridge(c, KNOWLEDGE, (b) => b.memoryProposals(filter.taskId))
   })
   .post('/memory/proposals/:id/resolve', requireDevice, async (c) => {
     const p = resolveBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.memoryResolveProposal(c.req.param('id'), p.data.approved, p.data.edited))
+    return viaBridge(c, KNOWLEDGE, (b) => b.memoryResolveProposal(c.req.param('id'), p.data.approved, p.data.edited))
   })
   .post('/tasks/:id/memory', async (c) => {
     const p = addBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.memoryAdd(c.req.param('id'), p.data))
+    return viaBridge(c, KNOWLEDGE, (b) => b.memoryAdd(c.req.param('id'), p.data))
   })
-  // --- notes (global/workspace compatibility path + first-class task scope) ---
-  .get('/workspaces/:wsId/notes', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesList(workspaceLocation(c.req.param('wsId')))))
-  .get('/workspaces/:wsId/notes/:slug', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesRead(workspaceLocation(c.req.param('wsId')), c.req.param('slug'))))
+  // --- notes compatibility alias (the current routes live in plugins/notes) ---
+  .get('/workspaces/:wsId/notes', (c) => viaBridge(c, KNOWLEDGE, (b) => b.notesList(workspaceLocation(c.req.param('wsId')))))
+  .get('/workspaces/:wsId/notes/:slug', (c) => viaBridge(c, KNOWLEDGE, (b) => b.notesRead(workspaceLocation(c.req.param('wsId')), c.req.param('slug'))))
   .post('/workspaces/:wsId/notes', async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesCreate(workspaceLocation(c.req.param('wsId')), p.data.title, p.data.kind))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesCreate(workspaceLocation(c.req.param('wsId')), p.data.title, p.data.kind))
   })
   .put('/workspaces/:wsId/notes/:slug', async (c) => {
     const p = writeBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesWrite(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.body))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesWrite(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.body))
   })
   .post('/workspaces/:wsId/notes/:slug/included', async (c) => {
     const p = includedBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetIncluded(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.included))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesSetIncluded(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.included))
   })
   .post('/workspaces/:wsId/notes/:slug/title', async (c) => {
     const p = titleBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetTitle(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.title))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesSetTitle(workspaceLocation(c.req.param('wsId')), c.req.param('slug'), p.data.title))
   })
-  .delete('/workspaces/:wsId/notes/:slug', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesRemove(workspaceLocation(c.req.param('wsId')), c.req.param('slug'))))
-  .get('/tasks/:id/notes', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesList(taskLocation(c.req.param('id')))))
-  .get('/tasks/:id/notes/:slug', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesRead(taskLocation(c.req.param('id')), c.req.param('slug'))))
+  .delete('/workspaces/:wsId/notes/:slug', (c) => viaBridge(c, KNOWLEDGE, (b) => b.notesRemove(workspaceLocation(c.req.param('wsId')), c.req.param('slug'))))
+  .get('/tasks/:id/notes', (c) => viaBridge(c, KNOWLEDGE, (b) => b.notesList(taskLocation(c.req.param('id')))))
+  .get('/tasks/:id/notes/:slug', (c) => viaBridge(c, KNOWLEDGE, (b) => b.notesRead(taskLocation(c.req.param('id')), c.req.param('slug'))))
   .post('/tasks/:id/notes', async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesCreate(taskLocation(c.req.param('id')), p.data.title, p.data.kind))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesCreate(taskLocation(c.req.param('id')), p.data.title, p.data.kind))
   })
   .put('/tasks/:id/notes/:slug', async (c) => {
     const p = writeBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesWrite(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.body))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesWrite(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.body))
   })
   .post('/tasks/:id/notes/:slug/included', async (c) => {
     const p = includedBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetIncluded(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.included))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesSetIncluded(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.included))
   })
   .post('/tasks/:id/notes/:slug/title', async (c) => {
     const p = titleBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, knowledgeBridgeSlot, (b) => b.notesSetTitle(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.title))
+    return viaBridge(c, KNOWLEDGE, (b) => b.notesSetTitle(taskLocation(c.req.param('id')), c.req.param('slug'), p.data.title))
   })
-  .delete('/tasks/:id/notes/:slug', (c) => viaBridge(c, knowledgeBridgeSlot, (b) => b.notesRemove(taskLocation(c.req.param('id')), c.req.param('slug'))))
+  .delete('/tasks/:id/notes/:slug', (c) => viaBridge(c, KNOWLEDGE, (b) => b.notesRemove(taskLocation(c.req.param('id')), c.req.param('slug'))))

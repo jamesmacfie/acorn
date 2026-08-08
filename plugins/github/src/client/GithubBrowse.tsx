@@ -19,6 +19,7 @@ import { filesKey, pullKey, pullsKey, pullsRoute, pullsPrefixKey, type Pull } fr
 import { readJson } from '@acorn/client-core/apiClient.ts'
 import Acorn from '@acorn/client-core/Acorn.tsx'
 import PullList from './PullList'
+import { githubCreateRoute } from './routes'
 
 // Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and the
 // create-PR form do not compete with the first interactive paint. PullList is the startup path and is
@@ -32,8 +33,8 @@ export default function GithubBrowse() {
   const params = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  // Create-PR mode: the static /:owner/:repo/new route (outranks the :number param route).
-  const newMatch = useMatch(() => '/:owner/:repo/new')
+  // Create-PR mode: the static route is contributed ahead of the parameter route.
+  const newMatch = useMatch(() => githubCreateRoute)
   const isNew = () => !!newMatch()
 
   const [refreshingPulls, setRefreshingPulls] = createSignal(false)

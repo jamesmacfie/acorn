@@ -37,10 +37,18 @@ permission preference before executing.
 
 ## Context sections
 
-Plugins register context sections through the Node context-section registry. Core assembles them in a
-declared order, applies byte/token budgets, records section status/freshness, and returns a deterministic
+Plugins register context sections through the Node context-section registry. Each contribution declares
+its wire order; the registry sorts by that value rather than maintaining a core-owned list of plugin
+IDs. Core applies byte/token budgets, records section status/freshness, and returns a deterministic
 snapshot. GitHub, notes, memory, Linear, Rollbar, and task sections are optional contributions; one
 failing section does not discard its siblings.
+
+`sections` is the canonical context representation used by the renderer and MCP context formatter.
+The response also retains the top-level `pr`, `issues`, `notes`, and `memory` fields as a bounded
+compatibility projection for existing task-context clients and agent tools. This is an intentional
+wire-compatibility adapter, not a second assembly path: both views are produced from the same
+contribution and budgeted in one pass. A future protocol-version migration can remove the projection
+after those consumers move to `sections`.
 
 ## Safety rules
 

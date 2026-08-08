@@ -5,6 +5,7 @@ import { readJson } from '../apiClient'
 import { activeNodeId, setActiveNode } from '../node/activeNode'
 import { createFleetQuery, type FleetUnavailable } from '../node/fanout'
 import { nodes } from '../node/fleet'
+import { sourcePath } from '../registries/sources'
 
 export type FleetWorkspace = {
   workspace: Workspace
@@ -42,14 +43,13 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
 
 // Selecting a workspace on another node: switch the node FIRST, then navigate.
 //
-// The order is the whole point. Every route is `/:owner/:repo` with no node in it, and the shell derives
-// the active workspace from that repo against the ACTIVE node's query cache — so navigating first would
-// resolve the path against the wrong node, which either finds nothing or, worse, finds a different repo
-// that happens to share the owner/name. docs/ui-design.md § New surfaces requires node context to switch
-// atomically.
+// The order is the whole point. The source route has no node in it, and the shell derives the active
+// workspace from that repo against the ACTIVE node's query cache — so navigating first would resolve the
+// path against the wrong node, which either finds nothing or, worse, finds a different repo that happens
+// to share the owner/name. docs/ui-design.md § New surfaces requires node context to switch atomically.
 export function selectFleetWorkspace(entry: FleetWorkspace, navigate: (path: string) => void): void {
   const first = entry.workspace.repos[0]
   if (!first) return // an empty workspace has nowhere to go, same as the single-node picker
   if (entry.nodeId !== activeNodeId()) setActiveNode(entry.nodeId)
-  navigate(`/${first.owner}/${first.name}`)
+  navigate(sourcePath('repo', { owner: first.owner, repo: first.name }))
 }

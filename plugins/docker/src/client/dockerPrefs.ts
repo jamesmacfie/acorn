@@ -1,6 +1,7 @@
 // Docker preferences: one JSON pref (docker_prefs) read reactively from the prefs query and
 // written through saveJsonPref. The slice declares durability/bounds for the persistence layer.
 import type { QueryClient } from '@tanstack/solid-query'
+import { z } from 'zod'
 import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
 import type { PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
 import { saveJsonPref } from '@acorn/client-core/settings/savePref.ts'
@@ -12,10 +13,17 @@ export type DockerPrefs = {
 
 export const defaultDockerPrefs: DockerPrefs = { confirmDestructive: true, showStopped: true }
 
+const dockerPrefsSchema = z.strictObject({
+  confirmDestructive: z.boolean().optional(),
+  showStopped: z.boolean().optional(),
+})
+
 export function readDockerPrefs(prefs: Record<string, string> | undefined): DockerPrefs {
   try {
     const raw = prefs?.[PrefKeys.dockerPrefs]
-    return raw ? { ...defaultDockerPrefs, ...(JSON.parse(raw) as Partial<DockerPrefs>) } : defaultDockerPrefs
+    if (!raw) return defaultDockerPrefs
+    const parsed = dockerPrefsSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? { ...defaultDockerPrefs, ...parsed.data } : defaultDockerPrefs
   } catch {
     return defaultDockerPrefs
   }

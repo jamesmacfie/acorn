@@ -15,6 +15,7 @@
     "@acorn/node-core": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@tanstack/solid-query": "^5.101.0",
+    "hono": "catalog:",
     "solid-js": "catalog:",
     "zod": "catalog:"
   },

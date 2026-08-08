@@ -19,6 +19,7 @@ import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activ
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
+import './styles/pull-list.css'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll

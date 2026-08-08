@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
@@ -9,7 +8,6 @@ import type {
   AgentProviderDescriptor,
   AgentSession,
   AgentSessionSnapshot,
-  AgentTurn,
   AgentWsFrame,
 } from '@acorn/protocol/managedAgents.ts'
 import { agentDriverRegistry, type AgentDriverRegistry } from './drivers/registry'
@@ -23,6 +21,9 @@ import { AgentStore } from './store'
 import { decideAgentCommand } from './stateMachine'
 import { AgentWebhookService } from './webhookService'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
+import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
+
+export { agentTurnInputText } from './runtimeContext'
 
 type LiveSession = {
   handle: AgentDriverSession | null
@@ -65,14 +66,6 @@ const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000]
 const secretEnvironmentValues = (env: Record<string, string>): string[] =>
   Object.entries(env).flatMap(([key, value]) =>
     /(?:TOKEN|SECRET|PASSWORD|AUTH|COOKIE|KEY)/i.test(key) && value ? [value] : [])
-
-export const agentTurnInputText = (turn: AgentTurn): string =>
-  turn.input.flatMap((part) => {
-    if (part.type === 'text') return [part.text]
-    if (part.type === 'file') return [`@${part.path}`]
-    if (part.type === 'context') return [`[Context: ${part.label}]`]
-    return [`[Attachment: ${part.attachmentId}]`]
-  }).join('\n\n')
 
 export class ManagedAgentEngine {
   readonly store: AgentStore
@@ -464,63 +457,12 @@ export class ManagedAgentEngine {
     return snapshot.events.some((event) => event.event.type === 'turn_completed' || event.event.type === 'error')
   }
 
-  protected async completedTurnTranscript(sessionId: string, turnId: string): Promise<{ taskId: string; transcript: string }> {
-    const [snapshot, events] = await Promise.all([
-      this.store.snapshot(sessionId, 0, 1),
-      this.store.eventsForTurn(turnId),
-    ])
-    const turn = snapshot.turns.find((candidate) => candidate.id === turnId)
-    const lines = [
-      `Managed agent session: ${snapshot.session.id}`,
-      `Managed agent turn: ${turnId}`,
-      `Provider: ${snapshot.session.providerId}`,
-      '',
-      turn ? `User:\n${agentTurnInputText(turn)}` : '',
-      ...events.flatMap((record) => {
-        if (record.event.type === 'assistant_message') return [`Assistant:\n${record.event.text}`]
-        if (record.event.type === 'tool') return [`Tool: ${record.event.tool.title} (${record.event.tool.status})`]
-        if (record.event.type === 'file_change') return [`File change: ${record.event.path ?? record.event.summary ?? 'unknown'}`]
-        return []
-      }),
-    ].filter(Boolean)
-    return { taskId: snapshot.session.taskId, transcript: lines.join('\n\n').slice(-20_000) }
+  protected completedTurnTranscript(sessionId: string, turnId: string): Promise<{ taskId: string; transcript: string }> {
+    return buildCompletedTurnTranscript(this.store, sessionId, turnId)
   }
 
-  protected async forkContext(source: AgentSession): Promise<Extract<AgentTurn['input'][number], { type: 'context' }>> {
-    const snapshot = await this.store.exportSnapshot(source.id)
-    const lines = snapshot.events.slice(-200).flatMap((record) => {
-      if (record.event.type === 'user_message') return [`User:\n${record.event.text}`]
-      if (record.event.type === 'assistant_message') return [`Assistant:\n${record.event.text}`]
-      if (record.event.type === 'file_change') {
-        return [`File change: ${record.event.path ?? record.event.summary ?? 'unspecified'}`]
-      }
-      if (record.event.type === 'plan') {
-        return [`Plan:\n${record.event.entries.map((entry) => `- [${entry.status}] ${entry.text}`).join('\n')}`]
-      }
-      return []
-    })
-    const content = lines.join('\n\n').slice(-100_000)
-    const snapshotContent = [
-      'This is an explicit Acorn context-copy fork, not provider-native history.',
-      'The provider has not seen this snapshot until it is included with a new turn.',
-      '',
-      content || '(The source session has no displayable conversation events.)',
-    ].join('\n')
-    return {
-      type: 'context',
-      contextId: randomUUID(),
-      label: `History copied from ${source.title}`,
-      content: snapshotContent,
-      source: 'agents',
-      resourceId: source.id,
-      provenance: `Managed session ${source.id}, events through sequence ${source.lastEventSeq}`,
-      deepLink: { pane: 'agents', intent: { sessionId: source.id } },
-      byteSize: Buffer.byteLength(snapshotContent, 'utf8'),
-      estimatedTokens: Math.ceil(Buffer.byteLength(snapshotContent, 'utf8') / 4),
-      freshness: 'cached',
-      sensitivity: 'workspace',
-      capturedAt: Date.now(),
-    }
+  protected forkContext(source: AgentSession): ReturnType<typeof buildForkContext> {
+    return buildForkContext(this.store, source)
   }
 
   protected async stopLive(sessionId: string): Promise<void> {

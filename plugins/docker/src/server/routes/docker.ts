@@ -3,7 +3,7 @@
 // ref is shape-validated here first (leading-dash guard) — 503 when the bridge isn't wired.
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -40,8 +40,9 @@ export type DockerBridge = {
   taskTeardown(taskId: string): Promise<{ ok: true }>
 }
 
-export const dockerBridgeSlot = bridgeSlot<DockerBridge>()
-export const setDockerBridge = dockerBridgeSlot.set
+export const DOCKER = routeCapability<DockerBridge>('docker.route')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setDockerBridge = (bridge: DockerBridge | null): void => setRouteTestCapability(DOCKER, bridge)
 
 const actionBody = z.object({ action: z.enum(dockerContainerActions as [DockerContainerAction, ...DockerContainerAction[]]) })
 const removeBody = z.object({ force: z.boolean().optional() })
@@ -77,55 +78,55 @@ export const docker = new Hono<AppEnv>()
   .use('/prune', requireDevice)
   .use('/compose/*', requireDevice)
   .use('/task-summary', requireDevice)
-  .get('/info', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.info()))
-  .get('/containers', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.containers()))
+  .get('/info', (c) => viaBridge(c, DOCKER, (b) => b.info()))
+  .get('/containers', (c) => viaBridge(c, DOCKER, (b) => b.containers()))
   .get('/containers/:ref/inspect', (c) => {
     const r = ref(c)
     if (!r) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.inspectContainer(r))
+    return viaBridge(c, DOCKER, (b) => b.inspectContainer(r))
   })
   .post('/containers/:ref/action', async (c) => {
     const r = ref(c)
     const p = actionBody.safeParse(await c.req.json().catch(() => null))
     if (!r || !p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.containerAction(r, p.data.action))
+    return viaBridge(c, DOCKER, (b) => b.containerAction(r, p.data.action))
   })
   .post('/containers/:ref/remove', async (c) => {
     const r = ref(c)
     const p = removeBody.safeParse(await c.req.json().catch(() => ({})))
     if (!r || !p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.removeContainer(r, p.data.force ?? false))
+    return viaBridge(c, DOCKER, (b) => b.removeContainer(r, p.data.force ?? false))
   })
-  .get('/images', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.images()))
+  .get('/images', (c) => viaBridge(c, DOCKER, (b) => b.images()))
   .post('/images/:ref/remove', async (c) => {
     const r = ref(c)
     const p = removeBody.safeParse(await c.req.json().catch(() => ({})))
     if (!r || !p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.removeImage(r, p.data.force ?? false))
+    return viaBridge(c, DOCKER, (b) => b.removeImage(r, p.data.force ?? false))
   })
-  .get('/volumes', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.volumes()))
+  .get('/volumes', (c) => viaBridge(c, DOCKER, (b) => b.volumes()))
   .post('/volumes/:ref/remove', async (c) => {
     const r = ref(c)
     const p = removeBody.safeParse(await c.req.json().catch(() => ({})))
     if (!r || !p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.removeVolume(r, p.data.force ?? false))
+    return viaBridge(c, DOCKER, (b) => b.removeVolume(r, p.data.force ?? false))
   })
-  .get('/networks', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.networks()))
+  .get('/networks', (c) => viaBridge(c, DOCKER, (b) => b.networks()))
   .post('/networks/:ref/remove', (c) => {
     const r = ref(c)
     if (!r) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.removeNetwork(r))
+    return viaBridge(c, DOCKER, (b) => b.removeNetwork(r))
   })
   .post('/prune', async (c) => {
     const p = pruneBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.prune(p.data.kind))
+    return viaBridge(c, DOCKER, (b) => b.prune(p.data.kind))
   })
   .post('/compose/action', async (c) => {
     const p = composeBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, dockerBridgeSlot, (b) => b.composeAction(p.data.project, p.data.action))
+    return viaBridge(c, DOCKER, (b) => b.composeAction(p.data.project, p.data.action))
   })
-  .get('/task-summary', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.taskSummary()))
-  .get('/tasks/:id/containers', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.taskContainers(c.req.param('id'))))
-  .post('/tasks/:id/teardown', (c) => viaBridge(c, dockerBridgeSlot, (b) => b.taskTeardown(c.req.param('id'))))
+  .get('/task-summary', (c) => viaBridge(c, DOCKER, (b) => b.taskSummary()))
+  .get('/tasks/:id/containers', (c) => viaBridge(c, DOCKER, (b) => b.taskContainers(c.req.param('id'))))
+  .post('/tasks/:id/teardown', (c) => viaBridge(c, DOCKER, (b) => b.taskTeardown(c.req.param('id'))))
