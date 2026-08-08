@@ -3,16 +3,12 @@ import type { Context } from 'hono'
 import { Hono } from 'hono'
 import type { PullFile, PullFilesPatchRequest } from '../../contract/api'
 import { filesResource } from '../resourceKeys'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
-import { type Cached, type RefreshResult, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
+import { type AppEnv, type Cached, ownerId, type PluginDatabase, type RefreshResult, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { fetchFiles, mirrorFiles, readFiles } from './prMirror'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 const MAX_PATCH_PATHS = 20
 

@@ -4,7 +4,7 @@
 // is event-driven — the store re-fetches on `docker:changed`.
 import { createQuery } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { prefsOptions } from '@acorn/client-core/queries.ts'
+import { prefsOptions } from '@acorn/plugin-api/client'
 import { wsOnDockerChanged } from './wsChannel'
 import { readDockerPrefs } from './dockerPrefs'
 import type { DockerComposeAction, DockerContainerSummary, DockerPruneKind } from '../shared/model'

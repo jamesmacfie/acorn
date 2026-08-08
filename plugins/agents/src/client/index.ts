@@ -4,7 +4,7 @@
 // the managed-agent runtime is FOR, and core's task view falls back to a pane list that assumes they
 // exist.
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './agentActivity'
 import { managedAgentApi } from './managedClient'
 import { activateManagedAgentNoticeTargets } from './managedSelection'

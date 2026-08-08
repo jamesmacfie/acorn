@@ -19,7 +19,7 @@
 // No database, no routes, no `dispose`: there is nothing to release. Not `required` — a node with preview
 // disabled reports no page rules and contributes no browser tools, and `[]` is already the "no rules
 // configured" case the browser automation handles.
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import type { NodePlugin } from '@acorn/plugin-api/node'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 import { PREVIEW_RULES } from '../contract/rules'
 import { browserAgentTools } from '../server/agentTools'

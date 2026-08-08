@@ -3,7 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { memories } from '../node/schema'
 
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'

@@ -1,5 +1,4 @@
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
-import type { LayoutRecipe } from '@acorn/node-core/main/runConfig.ts'
+import { capabilityId, type LayoutRecipe } from '@acorn/plugin-api/node'
 import type { RunStatus, RunTargetInfo } from '@acorn/protocol/terminal.ts'
 
 // `{ error }` rather than a throw, on every read: a repo with no mapped checkout or an unparseable

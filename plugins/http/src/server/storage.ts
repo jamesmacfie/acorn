@@ -1,4 +1,4 @@
-import { SecretUnavailableError, type SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { type SecretService, SecretUnavailableError } from '@acorn/plugin-api/node'
 
 export class HttpStorageError extends Error {}
 

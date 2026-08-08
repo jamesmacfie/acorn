@@ -5,7 +5,7 @@
 // GitHub verbs only. Workspace/repo-visibility writes live in core/client/workspaces/mutations.ts,
 // task and review-note writes in core/client/tasks/mutations.ts, and prefs behind
 // core/client/settings/savePref.ts — none of those are GitHub concepts.
-import { postJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { postJson, writeJson } from '@acorn/plugin-api/client'
 import { autoMergeRoute, createPullRoute, pullRoute, rerunFailedRoute, requestedReviewersRoute, resolveThreadRoute } from '../contract/api'
 
 export const createPr = (o: string, r: string, input: { title: string; body: string; base: string; head: string; draft: boolean }) =>

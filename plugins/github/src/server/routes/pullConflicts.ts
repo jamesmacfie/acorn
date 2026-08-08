@@ -1,9 +1,6 @@
 import { Hono } from 'hono'
 import type { PullConflicts } from '../../contract/api'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, type CoreServices, ownerId, respondError } from '@acorn/plugin-api/node'
 
 
 // GitHub exposes no per-file conflict data — only the `mergeable` enum on the PR. To list the files

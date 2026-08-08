@@ -13,16 +13,7 @@ import {
   linearError,
   linearFetch,
 } from '..'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
-import { encodeCached, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
-import {
-  connectionHasCapability,
-  ownedConnections,
-  ownedExternalItems,
-  withOwnedConnections,
-  type StoredConnection,
-} from '@acorn/node-core/server/integrations/connections.ts'
+import { type AppEnv, connectionHasCapability, encodeCached, ownedConnections, ownedExternalItems, parseCached, ProviderOperationError, providerRequestScheduler, providerResource, respondError, type StoredConnection, withOwnedConnections } from '@acorn/plugin-api/node'
 import {
   linearNodeToDetail,
   linearProvider,
@@ -30,9 +21,6 @@ import {
   linearSummaryOf,
   type LinearResourceInput,
 } from '../provider'
-import { providerResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
-import { providerRequestScheduler } from '@acorn/node-core/server/integrations/budgetRuntime.ts'
-import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type {
   LinearIssueDetail,
   LinearIssuesRequest,

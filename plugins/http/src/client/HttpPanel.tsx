@@ -2,8 +2,7 @@
 // (that task's ad-hoc requests on top of the project tree). Everything below is shared between them —
 // the only difference is `taskId`.
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import { Button, Input, Select, SectionHeader } from '@acorn/client-core/ui/primitives.tsx'
-import Icon from '@acorn/client-core/ui/Icon.tsx'
+import { Button, Icon, Input, SectionHeader, Select } from '@acorn/plugin-api/ui'
 import { fromCurl, httpMethods, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
 import { draftsDiffer, emptyDraft, toDraft, toSendInput, type Draft } from './draft'

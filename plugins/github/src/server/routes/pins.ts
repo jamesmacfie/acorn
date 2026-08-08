@@ -1,9 +1,6 @@
 import { and, eq, max } from 'drizzle-orm'
 import { Hono } from 'hono'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { pinnedRepos } from '../../node/schema'
 
 export const pins = (db: PluginDatabase) =>

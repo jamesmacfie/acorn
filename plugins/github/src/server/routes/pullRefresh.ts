@@ -1,13 +1,10 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
+import { chunkRowsByColumnBudget, type CoreServices, type PluginDatabase, type RefreshResult, type RouteResult } from '@acorn/plugin-api/node'
 import { pullsResource } from '../resourceKeys'
-import type { RefreshResult, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, type GqlPull, type PatchBlobStore } from './prMirror'
 import { deletePullMirrorStatements } from '../mirrorRetention'
 import { pullRequests, syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 

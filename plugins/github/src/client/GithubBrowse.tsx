@@ -16,11 +16,10 @@ import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { forceRefreshPull } from './queries'
 import { filesKey, pullKey, pullsKey, pullsRoute, pullsPrefixKey, type Pull } from '../contract/api'
-import { readJson } from '@acorn/client-core/apiClient.ts'
-import Acorn from '@acorn/client-core/Acorn.tsx'
+import { projectsOptions, readJson } from '@acorn/plugin-api/client'
+import { Acorn } from '@acorn/plugin-api/ui'
 import PullList from './PullList'
 import { githubBrowseRoute, githubCreateRoute, githubPullRoute } from './routes'
-import { projectsOptions } from '@acorn/client-core/queries.ts'
 
 // Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and the
 // create-PR form do not compete with the first interactive paint. PullList is the startup path and is

@@ -21,15 +21,7 @@ import {
   linearError,
   linearFetch,
 } from './'
-import { encodeCached, isRecord, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
-import {
-  ProviderOperationError,
-  type CachedExternalItem,
-  type CachedItemCodec,
-  type CodecResult,
-  type MirroredResourceContribution,
-} from '@acorn/node-core/server/integrations/types.ts'
-import { defaultBudgets, externalIdsFor, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
+import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, publicProvider } from '@acorn/plugin-api/node'
 
 type LinearValidated = { viewer: Viewer; secret: string }
 type LinearCached = CachedExternalItem<LinearIssueSummary, LinearIssueDetail>

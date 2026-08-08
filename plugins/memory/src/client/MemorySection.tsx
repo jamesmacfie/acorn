@@ -1,5 +1,5 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
-import type { Task } from '@acorn/client-core/queries.ts'
+import type { Task } from '@acorn/plugin-api/client'
 import { memoryApi, type MemoryType } from './memoryClient'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']

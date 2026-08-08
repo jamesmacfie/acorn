@@ -9,7 +9,7 @@ import {
   databaseRowsRoute,
   databaseTablesRoute,
 } from '../shared/database'
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbSavedQuery, DbTablesResult, DbWriteResult } from '../shared/database'
 
 export type DatabaseApi = {

@@ -1,9 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { registerAcornMcp } from '@acorn/node-core/main/mcpRegister.ts'
-import { lineDelimitedJsonAdapter } from '@acorn/node-core/main/agentProfiles/streamJson.ts'
-import type { AgentProfileContribution } from '@acorn/node-core/main/agentProfiles/types.ts'
+import { type AgentProfileContribution, lineDelimitedJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
 
 function materializeSchema(schema: object): string {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-schema-'))

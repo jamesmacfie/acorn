@@ -12,7 +12,7 @@
 // to fill that method, which is why it is `get`-able and answers `[]` when preview is disabled — a node
 // with no preview plugin has no page rules to report, and an empty list is exactly what the browser
 // automation already treats as "no rules configured".
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { capabilityId } from '@acorn/plugin-api/node'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 
 export type PreviewRulesCapability = {

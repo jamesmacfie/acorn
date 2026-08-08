@@ -2,21 +2,9 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from
 import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { compareOptions } from './queries'
-import { projectsOptions } from '@acorn/client-core/queries.ts'
-import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
-import { DiffLine, NonCodeRow } from '@acorn/client-core/ui/diff/DiffRows.tsx'
-import { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'
-import {
-  buildDiffRows,
-  buildRenderableRows,
-  highlighterTokenize,
-  isCodeRow,
-  plainTokenize,
-  type CodeRow,
-  type ParsedFile,
-  type Row,
-  type TokenizeLine,
-} from '@acorn/client-core/ui/diff/model.ts'
+import { getHighlighter, projectsOptions } from '@acorn/plugin-api/client'
+import { DiffLine, NonCodeRow } from '@acorn/plugin-api/ui'
+import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, highlighterTokenize, isCodeRow, type ParsedFile, plainTokenize, type Row, type TokenizeLine } from '@acorn/plugin-api/ui/diff'
 
 // Right (Diff) pane in create mode: read-only base..head preview. Reuses the diff engine
 // (createDiffHydrator + buildRenderableRows + Shiki) and the row components, but with no review

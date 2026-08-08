@@ -1,10 +1,9 @@
 import { createSignal } from 'solid-js'
-import { pushManagedAgentNotice } from '@acorn/client-core/notifications/notifications.ts'
+import { onScopeEvicted, pushManagedAgentNotice } from '@acorn/plugin-api/client'
 import { wsOnAgentFrame } from './wsChannel'
 import type { AgentEventRecord, AgentSession, AgentSessionSnapshot, AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot } from './managedSnapshot'
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})

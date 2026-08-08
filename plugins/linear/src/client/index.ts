@@ -2,11 +2,10 @@
 //
 // Linear owns no tables. Its provider descriptor and node routes use the core-owned external-item
 // read model, while this client contribution supplies the rail source, reference panel, and pane.
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import { type ClientPlugin, contentLinkRegistry } from '@acorn/plugin-api/client'
 import { linearPaneContribution } from './paneContribution'
 import { linearRefPanelContribution } from './refPanelContribution'
 import { linearSourceContribution } from './sourceContribution'
-import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
 import { linearContentLinkContribution } from './contentLink'
 
 export const linearClientPlugin: ClientPlugin = {

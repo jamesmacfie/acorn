@@ -8,8 +8,7 @@
 // A run target IS a terminal session in the task worktree — start/stop/restart go through the same PTY
 // engine the run pane drives, so an agent and a human cannot end up with two copies of `pnpm dev`.
 import { z } from 'zod'
-import { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
-import { ToolError, type AgentToolContribution, type ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
+import { type AgentToolContribution, isRepoConfigTrustError, type ToolContext, ToolError } from '@acorn/plugin-api/node'
 import type { TerminalRunTargets } from '../contract/runTargets'
 
 export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNotice: (taskId: string) => void = () => {}): AgentToolContribution[] {

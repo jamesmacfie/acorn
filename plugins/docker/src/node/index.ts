@@ -1,4 +1,4 @@
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import type { NodePlugin } from '@acorn/plugin-api/node'
 import { dockerBridge } from '../main/dockerBridge'
 import { disposeDocker } from '../main/dockerService'
 import { registerDockerWsChannel } from '../main/wsChannel'

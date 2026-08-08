@@ -8,8 +8,7 @@
 // The `splitLinearIds` / `linkifyLinearIds` pair genuinely does stay. It is not link RESOLUTION — it
 // is github's PR body rendering, turning bare `CRA-404` text into something clickable, and it runs
 // against GitHub's innerHTML in github's own pane.
-import type { ContentLinkContribution } from '@acorn/client-core/registries/contentLinks.ts'
-import { parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
+import { type ContentLinkContribution, parseInAppTarget } from '@acorn/plugin-api/client'
 
 const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
 const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$/i

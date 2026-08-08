@@ -1,13 +1,9 @@
 import { For, Show, createSignal } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, projectsKey, workspacesKey } from '@acorn/client-core/queries.ts'
+import { clientEvents, integrationsOptions, type ProjectImporterProps, projectsKey, taskBridge, workspacesKey, writeJson } from '@acorn/plugin-api/client'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
-import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
-import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-import { writeJson } from '@acorn/client-core/apiClient.ts'
 import { githubImportRoute, reposKey, type GithubImportAction, type GithubImportItem, type GithubImportResponse, type Repo } from '../contract/api'
 import { reposOptions } from './queries'
-import type { ProjectImporterProps } from '@acorn/client-core/registries/projectImporters.ts'
 
 type ImportChoice = GithubImportAction
 type Result = GithubImportResponse['results'][number]

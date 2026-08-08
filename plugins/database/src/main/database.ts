@@ -14,10 +14,9 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import { type CoreServices, loadRepoConfig } from '@acorn/plugin-api/node'
 import type { DatabaseBridge } from '../server/routes/database'
 import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
-import { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
 
 const { Pool } = pg
 const exec = promisify(execFile)

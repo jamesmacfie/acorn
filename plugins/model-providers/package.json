@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-api": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@anthropic-ai/sdk": "^0.113.0",
     "openai": "^6.48.0"

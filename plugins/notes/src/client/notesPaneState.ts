@@ -3,7 +3,7 @@
 // Manifest's section selection has a stated durability requirement). Evicted on task archive.
 import { createSignal } from 'solid-js'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+import { onScopeEvicted } from '@acorn/plugin-api/client'
 
 export type NotesSelection = { scope: NoteScope; slug: string }
 

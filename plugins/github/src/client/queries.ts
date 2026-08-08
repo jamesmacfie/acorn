@@ -2,7 +2,7 @@
 // (../contract/api.ts) rather than in client-core, so the shell no longer carries a feature's read
 // layer. Moved verbatim from @acorn/client-core/queries.ts — same keys, same staleTime, same refetch
 // and invalidation behaviour.
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson, writeJson } from '@acorn/plugin-api/client'
 import {
   branchesKey,
   branchesRoute,

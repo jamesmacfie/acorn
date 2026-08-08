@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
+import type { SourceContribution } from '@acorn/plugin-api/client'
 
 const DockerBrowse = lazy(() => import('./DockerBrowse'))
 

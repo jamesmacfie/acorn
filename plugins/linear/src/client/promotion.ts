@@ -1,5 +1,5 @@
 import type { TaskSeed } from '@acorn/protocol/api.ts'
-import type { SourcePromotionContext } from '@acorn/client-core/registries/sources.ts'
+import type { SourcePromotionContext } from '@acorn/plugin-api/client'
 import type { LinearProjectIssue } from '../shared/api'
 
 // Turning a Linear issue into a task seed needs this plugin's wire type, so it belongs to the plugin

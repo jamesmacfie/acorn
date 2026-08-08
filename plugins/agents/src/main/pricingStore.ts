@@ -1,4 +1,4 @@
-import type { PrefService } from '@acorn/node-core/main/core/prefs.ts'
+import type { PrefService } from '@acorn/plugin-api/node'
 import {
   agentPricingPreferenceKey,
   parseAgentPricingPreferences,

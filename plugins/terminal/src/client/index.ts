@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { terminalAgentContextContribution } from './agentContextContribution'
 import { terminalDrawerContribution } from './drawerContribution'
 import { terminalPaletteRowSource } from './paletteRowSource'

@@ -4,7 +4,7 @@
 // (open state, toggle, and whether a task is active at all). Moved verbatim out of
 // apps/desktop/src/app/client/slotContributions.tsx — the shell contributed the toggle for the drawer
 // this plugin owns, which is the wrong way round.
-import type { UiSlotContribution } from '@acorn/client-core/registries/uiSlots.tsx'
+import type { UiSlotContribution } from '@acorn/plugin-api/client'
 
 export const terminalToggleSlotContribution: UiSlotContribution = {
   id: 'terminal.topbar-toggle',

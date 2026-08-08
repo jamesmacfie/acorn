@@ -1,6 +1,4 @@
-import { registerAcornMcp } from '@acorn/node-core/main/mcpRegister.ts'
-import { lineDelimitedJsonAdapter } from '@acorn/node-core/main/agentProfiles/streamJson.ts'
-import type { AgentProfileContribution } from '@acorn/node-core/main/agentProfiles/types.ts'
+import { type AgentProfileContribution, lineDelimitedJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
 
 export const claudeCodeProfile: AgentProfileContribution = {
   id: 'claude-code',

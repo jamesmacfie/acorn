@@ -1,11 +1,7 @@
 import { createEffect, createSignal, createResource, For, onCleanup, onMount, Show } from 'solid-js'
-import type { Task, Workspace } from '@acorn/client-core/queries.ts'
-import { debounce } from '@acorn/client-core/lib/debounce.ts'
-import { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
-import { bytesOf, formatSize } from '@acorn/client-core/lib/formatSize.ts'
+import { bytesOf, clientEvents, consumePaneIntent, debounce, formatSize, openPane, renderMarkdown, type Task, type Workspace } from '@acorn/plugin-api/client'
 import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
-import { clientEvents, consumePaneIntent, openPane } from '@acorn/client-core/registries/clientEvents.ts'
 import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
 import './notes.css'
 

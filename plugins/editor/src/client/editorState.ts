@@ -2,8 +2,7 @@
 // flags, active file — persisted to the 'editor_open_files' pref so relaunch restores the tabs
 // (dirty resets: content isn't persisted). Pure list ops + a thin signal store, like tasks.ts.
 import { createSignal } from 'solid-js'
-import { openPane } from '@acorn/client-core/registries/clientEvents.ts'
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+import { onScopeEvicted, openPane } from '@acorn/plugin-api/client'
 
 export type OpenFile = { path: string; ephemeral: boolean; dirty: boolean }
 

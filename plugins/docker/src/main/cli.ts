@@ -3,7 +3,7 @@
 // Docker Desktop / OrbStack / colima — whatever `docker context` points at.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { brokerEnv } from '@acorn/node-core/main/core/proc.ts'
+import { brokerEnv } from '@acorn/plugin-api/node'
 
 const exec = promisify(execFile)
 

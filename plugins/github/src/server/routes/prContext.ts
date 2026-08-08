@@ -1,11 +1,9 @@
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { prResource } from '../resourceKeys'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
+import { type AppEnv, ownerId, type PluginDatabase } from '@acorn/plugin-api/node'
 import { githubToken } from '../githubToken'
 import { pullRequests, repos, syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // The write paths reach the mirror through the handle resolvePr was given, which is what keeps prActions
 // and friends from needing one of their own.

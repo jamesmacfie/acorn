@@ -264,60 +264,59 @@ describe('architecture boundaries', () => {
     expect(importers.filter((f) => !CHILD_PROCESS_OK.has(f))).toEqual([])
   })
 
-  it('plugins import core through a reviewed set of module roots (ratchet)', () => {
+  it('plugins reach the host only through @acorn/plugin-api', () => {
     // Every package declares `"exports": { "./*": "./src/*" }`, so there is no encapsulation at the
-    // module-system level at all — a plugin can reach any file in core. This turns "everything is
-    // public" into "the public surface is a reviewed list", with no build step, no versioning and no
-    // new package. When third-party plugins become real, this list IS the draft API to harden.
+    // module-system level at all — a plugin can reach any file in core. This used to be answered
+    // with a reviewed list of module roots; it is now answered with a package. @acorn/plugin-api
+    // re-exports an enumerated surface, its own snapshot test makes growing that surface a
+    // deliberate act, and a third-party plugin can depend on it without inheriting the server.
     //
-    // ROOTS, not files: ~110 distinct paths would be a list nobody reads, and the value here is the
-    // review. A new entry means someone opened a new seam and had to say so; a new file under an
-    // existing root is ordinary work.
+    // A plugin's first-party imports are therefore: the facade, the wire types, another plugin's
+    // contract/, and its own files. Nothing else in packages/.
+    const ALLOWED_CSS = new Set([
+      // A stylesheet is not re-exportable — `export … from` carries bindings, and these files have
+      // none. Both are core-owned CSS for a core-owned component the plugin renders.
+      '@acorn/client-core/palette/palette.css',
+      '@acorn/client-core/workspaces/onboarding.css',
+    ])
+    const offenders = crossPackage
+      .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
+      .filter((e) => e.target.pkg!.name !== '@acorn/plugin-api' && e.target.pkg!.name !== '@acorn/protocol')
+      .filter((e) => !isContract(e.target.pkg, e.target.file))
+      .filter((e) => !ALLOWED_CSS.has(e.spec))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    // Anti-vacuity: the facade must actually be carrying the traffic.
+    expect(crossPackage.filter((e) => e.target.pkg!.name === '@acorn/plugin-api').length).toBeGreaterThan(200)
+    expect([...new Set(offenders)].sort()).toEqual([])
+  })
+
+  it('plugin TESTS import core through a reviewed set of module roots (ratchet)', () => {
+    // Production code goes through the facade; test scaffolding does not, and should not be forced
+    // to. A test that seeds core's tables, builds a real CoreServices or opens a tmp-dir database is
+    // reaching for the HOST, not for an API — a third-party author gets a testkit entrypoint if and
+    // when one is built, and inventing that surface now would mean publishing core's internals as
+    // contract to satisfy first-party fixtures.
     //
-    // The deliberate omission is `@acorn/node-core/testkit` — that is test-only surface, and the rule
-    // below keeps production out of it.
-    const CORE_IMPORT_ROOTS = [
-      // client-core
-      '@acorn/client-core/Acorn.tsx',
-      '@acorn/client-core/agent',
-      '@acorn/client-core/apiClient.ts',
-      '@acorn/client-core/capabilities.ts',
-      '@acorn/client-core/clientCapabilities.ts',
-      '@acorn/client-core/configTrust',
-      '@acorn/client-core/highlight',
-      '@acorn/client-core/integrations',
+    // ROOTS, not files: the value here is the review. A new entry means someone opened a new seam
+    // and had to say so; a new file under an existing root is ordinary work.
+    const TEST_IMPORT_ROOTS = [
       '@acorn/client-core/lib',
-      '@acorn/client-core/modelProviders',
       '@acorn/client-core/node',
-      '@acorn/client-core/notifications',
       '@acorn/client-core/palette',
-      '@acorn/client-core/persistence',
-      // Shrinks with finding 10: what is left in core's queries.ts after the github/linear/rollbar
-      // factories moved out is core's own, plus the githubShellReads ledger that finding deletes.
-      '@acorn/client-core/queries.ts',
       '@acorn/client-core/registries',
       '@acorn/client-core/settings',
       '@acorn/client-core/tasks',
       '@acorn/client-core/ui',
       '@acorn/client-core/ui/diff',
-      '@acorn/client-core/workspaces',
-      '@acorn/client-core/wsChannels.ts',
       '@acorn/client-core/wsClient.ts',
-      // node-core
       '@acorn/node-core/main',
-      '@acorn/node-core/main/agentProfiles',
       '@acorn/node-core/main/core',
       '@acorn/node-core/server',
-      '@acorn/node-core/server/agentTools',
-      '@acorn/node-core/server/auth',
+      '@acorn/node-core/server/db',
       '@acorn/node-core/server/integrations',
       '@acorn/node-core/server/middleware',
-      '@acorn/node-core/server/modelProviders',
-      '@acorn/node-core/server/plugin',
-      // Only the bridge slots a plugin fills for a core route family (server/bridge.ts explains which
-      // mechanism belongs where). Not a licence to import core's route handlers.
       '@acorn/node-core/server/routes',
-      '@acorn/node-core/server/sync',
+      '@acorn/node-core/testkit',
     ]
     const rootOf = (spec: string): string => {
       const pkg = spec.startsWith('@acorn/node-core/') ? '@acorn/node-core/' : '@acorn/client-core/'
@@ -325,10 +324,10 @@ describe('architecture boundaries', () => {
       if (parts.length === 1) return spec
       return pkg + (parts.length > 2 ? `${parts[0]}/${parts[1]}` : parts[0])
     }
-    const used = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
+    const used = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && isTestCode(e.fromFile))
       .filter((e) => e.spec.startsWith('@acorn/node-core/') || e.spec.startsWith('@acorn/client-core/'))
       .map((e) => rootOf(e.spec))
-    expect([...new Set(used)].sort()).toEqual([...CORE_IMPORT_ROOTS].sort())
+    expect([...new Set(used)].sort()).toEqual([...TEST_IMPORT_ROOTS].sort())
   })
 
   it('the testkit is imported only by tests', () => {
@@ -504,8 +503,16 @@ describe('architecture boundaries', () => {
     const DECLARES = /^\s*(import\s|export\s+(const|let|var|function|class|default|async)\b)/m
     const entrypoints = walk(api.src).filter((f) => !isTestCode(f))
     const declaring = entrypoints.filter((f) => DECLARES.test(readFileSync(f, 'utf8'))).map(rel)
+    // Only ui/index.ts may re-export from a .tsx module. Every entrypoint is a barrel, so importing
+    // one member evaluates all of them, and Solid compiles a component to code that touches
+    // `window` at module scope — a component anywhere else makes that entrypoint unloadable from a
+    // plugin's node-environment test suite. This is the rule those files' headers describe, and it
+    // is mechanical on purpose: it should not depend on anyone remembering it.
+    const componentLeak = entrypoints
+      .filter((f) => rel(f) !== 'packages/plugin-api/src/ui/index.ts')
+      .flatMap((f) => (readFileSync(f, 'utf8').match(/'@acorn\/[^']+\.tsx'/g) ?? []).map((spec) => `${rel(f)}: ${spec}`))
     expect(entrypoints.length).toBeGreaterThanOrEqual(4) // anti-vacuity: the walker found the entrypoints
-    expect([...new Set([...foreign, ...declaring])].sort()).toEqual([])
+    expect([...new Set([...foreign, ...declaring, ...componentLeak])].sort()).toEqual([])
   })
 
   it('client-core ui/ is pure presentation: props in, DOM out', () => {

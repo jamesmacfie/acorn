@@ -10,9 +10,8 @@
 // compiles fine and 404s at runtime. Commands use HTTP; workflow notices and step events use the
 // shared WebSocket.
 
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { openRepoConfigTrust, readJson, writeJson } from '@acorn/plugin-api/client'
 import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
-import { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.ts'
 
 export type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 

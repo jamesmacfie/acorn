@@ -2,9 +2,7 @@
 // written through saveJsonPref. The slice declares durability/bounds for the persistence layer.
 import type { QueryClient } from '@tanstack/solid-query'
 import { z } from 'zod'
-import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
-import type { PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
-import { saveJsonPref } from '@acorn/client-core/settings/savePref.ts'
+import { type PersistedStateSlice, PrefKeys, saveJsonPref } from '@acorn/plugin-api/client'
 
 export type DockerPrefs = {
   confirmDestructive: boolean // two-click confirm on remove/prune/compose-down

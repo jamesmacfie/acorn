@@ -1,7 +1,7 @@
 // The review-note writes, moved out of @acorn/client-core/tasks/mutations.ts with the routes they
 // drive (../shared/api.ts). That file mixed core's task writes with this plugin's note writes over one
 // import block; the task half stays in core.
-import { postJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { postJson, writeJson } from '@acorn/plugin-api/client'
 import { reviewNoteRoute, reviewNotesRoute, reviewNotesSentRoute, type ReviewNote, type ReviewNoteSeed } from '../shared/api'
 
 // Local review notes (docs/panes.md): task-scoped, never sent to GitHub until the review is submitted.

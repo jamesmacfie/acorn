@@ -1,6 +1,5 @@
 import { createResource, For, Show } from 'solid-js'
-import { activeTaskId } from '@acorn/client-core/tasks/tasks.ts'
-import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { activeTaskId, capabilities } from '@acorn/plugin-api/client'
 import { workflowApi } from '../contract/workflowClient'
 
 // Settings → Workflows (docs/workflows.md): a read-only inspector over the committed/user workflow

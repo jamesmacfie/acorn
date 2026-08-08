@@ -10,8 +10,7 @@
 // (`ctx.sessionId`, from the x-acorn-session-id header), which is what lets the pane and the context
 // assembler show who wrote a note and lets a human tell an agent's scratch from their own.
 import { z } from 'zod'
-import { ToolError, type AgentToolContribution } from '@acorn/node-core/server/agentTools/registry.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import type { NotesStoreCapability } from '../contract/store'
 

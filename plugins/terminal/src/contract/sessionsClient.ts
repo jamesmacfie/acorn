@@ -18,7 +18,7 @@
 // contract-purity boundary rule requires.
 import { terminalSessionsRoute } from './routes'
 import type { CreateOpts, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson, writeJson } from '@acorn/plugin-api/client'
 
 export type TerminalSessionsClient = {
   // Spawns the PTY. The engine re-derives cwd from `taskId` — creating the task's worktree on first use —

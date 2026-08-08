@@ -1,5 +1,5 @@
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import type { CoreServices } from '@acorn/plugin-api/node'
 
 // Database lookup remains service-owned. Only serialisable rules cross into Electron main; the
 // native preview never receives a database handle or reaches back into service modules.

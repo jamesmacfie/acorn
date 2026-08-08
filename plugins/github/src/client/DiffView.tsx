@@ -1,7 +1,7 @@
 import { createMemo, Show } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
-import { projectsOptions, type Task } from '@acorn/client-core/queries.ts'
+import { projectsOptions, type Task } from '@acorn/plugin-api/client'
 import { routeKey as makeRouteKey } from './fileNavigation'
 import { DiffForPull, type PullRoute } from './DiffForPull'
 

@@ -4,9 +4,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import { buildSessionEnv, type SessionTaskInfo } from '@acorn/node-core/main/taskEnv.ts'
+import { buildSessionEnv, type CoreServices, type PluginDatabase, type SessionTaskInfo } from '@acorn/plugin-api/node'
 import { httpVariables } from '../node/schema'
 import {
   applyAuth,

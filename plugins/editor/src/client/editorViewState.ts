@@ -1,6 +1,5 @@
 import type { editor } from 'monaco-editor'
-import { activeNodeId } from '@acorn/client-core/node/activeNode.ts'
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+import { activeNodeId, onScopeEvicted } from '@acorn/plugin-api/client'
 
 const viewStates = new Map<string, editor.ICodeEditorViewState>()
 const viewKey = (taskId: string, path: string): string => `${activeNodeId() ?? ''}/${taskId}:${path}`

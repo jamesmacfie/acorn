@@ -5,7 +5,7 @@
 //
 // It reads from ../shared/api and client-core only, never from this plugin's own client/, so the
 // transitive contract-purity rule holds.
-import { writeJson } from '@acorn/client-core/apiClient.ts'
+import { writeJson } from '@acorn/plugin-api/client'
 import { linearIssuesKey, linearIssuesRoute, type LinearIssuesRequest, type LinearIssuesResponse } from '../shared/api'
 
 export type { LinearIssueState, LinearIssueSummary, LinearIssuesResponse } from '../shared/api'

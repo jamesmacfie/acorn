@@ -3,7 +3,7 @@ import { constants } from 'node:fs'
 import { lstat, mkdir, open, readFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { and, asc, eq, ne } from 'drizzle-orm'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type { AgentArtifact, AgentArtifactKind } from '@acorn/protocol/managedAgents.ts'
 

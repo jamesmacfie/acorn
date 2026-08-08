@@ -1,12 +1,9 @@
 import { Hono } from 'hono'
 import type { Label } from '../../contract/api'
 import { gh, ghError } from '..'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 type GitHubLabel = {
   name: string

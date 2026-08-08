@@ -5,7 +5,7 @@
 // purpose: what it really is, is the error taxonomy that turns the runtime's thrown messages into the
 // status codes managed.ts's handlers promise. Keeping that next to the router is what makes the mapping
 // reviewable against the surface it shapes; node/index.ts owns composition, not HTTP semantics.
-import { BridgeError } from '@acorn/node-core/server/bridge.ts'
+import { BridgeError } from '@acorn/plugin-api/node'
 import type { ManagedAgentRuntime } from '../../main/runtime'
 import type { ManagedAgentsBridge } from './managed'
 

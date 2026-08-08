@@ -1,7 +1,7 @@
 import { createEffect, Show } from 'solid-js'
 import type { DiffFindController } from './DiffFindController'
 import type { Accessor } from 'solid-js'
-import type { ViewMode } from '@acorn/client-core/ui/diff/model.ts'
+import type { ViewMode } from '@acorn/plugin-api/ui/diff'
 
 export function DiffToolbar(props: { find: DiffFindController; viewMode: Accessor<ViewMode>; setViewMode: (mode: ViewMode) => Promise<void> }) {
   let findInput: HTMLInputElement | undefined

@@ -3,7 +3,7 @@
 // Two panes, not one: the file editor and find-in-files are separate panes with separate chords, but
 // one plugin — they share the ripgrep/read-file routes and the Monaco setup.
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { editorOpenFilesSlice } from './openFilesSlice'
 import { editorPaneContribution } from './paneContribution'
 import { searchPaneContribution } from './search/paneContribution'

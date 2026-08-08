@@ -1,15 +1,13 @@
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
+import { formatRelativeTime, renderMarkdown } from '@acorn/plugin-api/client'
 import { linearIssueKey, type LinearComment } from '../shared/api'
 import { linearIssueOptions } from './queries'
 import type { LinearRelatedIssue } from '../shared/api'
 import { postLinearComment } from './mutations'
-import { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
 import { priorityMeta } from './model'
-import { Tabs, type TabDef } from '@acorn/client-core/ui/Tabs.tsx'
-import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
+import { CopyButton, type TabDef, Tabs } from '@acorn/plugin-api/ui'
 
 export type LinearIssueTarget = { identifier: string; connectionId?: string }
 const targetKey = (target: LinearIssueTarget) => `${target.connectionId ?? 'unscoped'}:${target.identifier}`

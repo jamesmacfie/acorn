@@ -1,8 +1,4 @@
-import { runApi } from '@acorn/client-core/tasks/runClient.ts'
-import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
-import type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
-import { dispatchLayout, setRecipeBrowserUrl, setTerminalOpen } from '@acorn/client-core/tasks/tasks.ts'
-import { refreshSessions } from '@acorn/client-core/tasks/agentSessions.ts'
+import { dispatchLayout, type PaletteItem, type PaletteRowSource, refreshSessions, runApi, setRecipeBrowserUrl, setTerminalOpen } from '@acorn/plugin-api/client'
 import { invokeLayoutRecipe, type RecipeSpec } from './recipes'
 
 // What the last `targets` fetch returned, kept so `invoke` can act on the picked row without a second request.

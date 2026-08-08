@@ -2,8 +2,7 @@
 // always-visible fields in the panel's metabar, because naming is a save-time decision — inputs sat
 // above the request tabs read as part of the request itself.
 import { createSignal, For, Show } from 'solid-js'
-import { Modal } from '@acorn/client-core/ui/Modal.tsx'
-import { Button, Field, Input, Select } from '@acorn/client-core/ui/primitives.tsx'
+import { Button, Field, Input, Modal, Select } from '@acorn/plugin-api/ui'
 
 export type SaveTarget = { name: string; folder: string; scope: 'task' | 'project' }
 

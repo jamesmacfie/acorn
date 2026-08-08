@@ -1,6 +1,5 @@
 import { and, count, eq } from 'drizzle-orm'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import type { MirroredPullRequest } from '../contract/mirror'
 import { checks, prFiles, pullRequests, repos, syncState } from '../node/schema'
 

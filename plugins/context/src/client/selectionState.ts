@@ -6,7 +6,7 @@
 import { createSignal } from 'solid-js'
 import type { TraySelection } from './model'
 import { bumpContextRevision, evictContextRevision } from './contextRevision'
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+import { onScopeEvicted } from '@acorn/plugin-api/client'
 
 const [contextSelections, setContextSelections] = createSignal<Record<string, TraySelection>>({})
 

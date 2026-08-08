@@ -1,5 +1,4 @@
-import { postJson } from '@acorn/client-core/apiClient.ts'
-import type { IntegrationFlowContribution } from '@acorn/client-core/registries/integrationFlows.ts'
+import { type IntegrationFlowContribution, postJson } from '@acorn/plugin-api/client'
 
 const deviceStartRoute = '/v2/p/github/auth/device/start'
 const devicePollRoute = '/v2/p/github/auth/device/poll'

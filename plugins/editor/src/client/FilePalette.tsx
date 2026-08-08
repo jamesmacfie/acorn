@@ -1,9 +1,7 @@
 import { createMemo, createResource, For, Show } from 'solid-js'
 import { editorApi } from './editorClient'
 import { editorOpen } from './editorState'
-import { activeTaskId, dispatchActiveLayout } from '@acorn/client-core/tasks/tasks.ts'
-import { fuzzyScore } from '@acorn/client-core/palette/model.ts'
-import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
+import { activeTaskId, createOverlayPalette, dispatchActiveLayout, fuzzyScore } from '@acorn/plugin-api/client'
 import '@acorn/client-core/palette/palette.css'
 
 // ⌘P quick-open: fuzzy-jump to a file in the active task's worktree. Monaco has no built-in file

@@ -9,8 +9,7 @@
 //             request references it. Its output is never stored. The same mechanism the Database
 //             pane uses for its connection URL.
 import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
-import { Button, Input, Select } from '@acorn/client-core/ui/primitives.tsx'
-import Icon from '@acorn/client-core/ui/Icon.tsx'
+import { Button, Icon, Input, Select } from '@acorn/plugin-api/ui'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
 import { createVariable, deleteVariable, listVariables, updateVariable } from './httpClient'
 

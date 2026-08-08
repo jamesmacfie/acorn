@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { TaskSlotContribution } from '@acorn/client-core/registries/uiSlots.tsx'
+import type { TaskSlotContribution } from '@acorn/plugin-api/client'
 
 const DockerFooterBadge = lazy(() => import('./DockerFooterBadge'))
 const DockerRailBadge = lazy(() => import('./DockerRailBadge'))

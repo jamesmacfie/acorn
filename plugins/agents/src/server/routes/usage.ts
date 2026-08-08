@@ -4,10 +4,7 @@ import {
   validateAgentPricingPreferences,
   type AgentPricingPreferences,
 } from '../../shared/pricing'
-import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId, requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, ownerId, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 export type AgentUsageBridge = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>

@@ -1,4 +1,4 @@
-import type { ContentLinkContribution } from '@acorn/client-core/registries/contentLinks.ts'
+import type { ContentLinkContribution } from '@acorn/plugin-api/client'
 
 // Linear's URL recogniser. It used to live in plugins/github/src/client/contentLinks.ts, beside
 // github's own two, because that is where the registry was — so the provider that owned the pattern

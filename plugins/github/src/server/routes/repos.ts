@@ -2,15 +2,11 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { Repo } from '../../contract/api'
 import { reposResource } from '../resourceKeys'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { REPOS_STALE_AFTER_MS } from '../syncPolicy'
-import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 import { readCachedRepos, refreshRepos, toPublicRepo } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { repos as reposTable, syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
 // live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles

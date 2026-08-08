@@ -2,9 +2,7 @@
 // The mode selectors for Body and Auth sit in the tab strip's right slot rather than inside their
 // panels — Bruno's arrangement, and it keeps the current mode visible from any tab.
 import { createMemo, createSignal, For, Index, Show } from 'solid-js'
-import { Tabs, type TabDef } from '@acorn/client-core/ui/Tabs.tsx'
-import { Button, Input, Select, Textarea } from '@acorn/client-core/ui/primitives.tsx'
-import Icon from '@acorn/client-core/ui/Icon.tsx'
+import { Button, Icon, Input, Select, type TabDef, Tabs, Textarea } from '@acorn/plugin-api/ui'
 import { authModes, bodyModes, joinUrl, parseFormBody, splitUrl, type AuthConfig, type BodyMode, type KeyValue } from '../shared/model'
 import type { Draft } from './draft'
 

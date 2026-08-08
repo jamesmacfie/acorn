@@ -13,6 +13,7 @@
   "dependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-context": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",

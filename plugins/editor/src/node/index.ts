@@ -1,4 +1,4 @@
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import type { NodePlugin } from '@acorn/plugin-api/node'
 import { editorBridge } from '../main/editor'
 import { searchBridge } from '../main/search'
 import { editor, EDITOR } from '../server/routes/editor'

@@ -1,7 +1,6 @@
 import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { rowHeightSm } from '@acorn/client-core/ui/metrics.ts'
-import { watchAppearance } from '@acorn/client-core/ui/appearance.ts'
+import { rowHeightSm, watchAppearance } from '@acorn/plugin-api/client'
 import type { DbCell } from '../shared/database'
 
 const COL_W = 200

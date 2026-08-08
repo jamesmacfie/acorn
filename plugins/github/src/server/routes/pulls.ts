@@ -3,17 +3,12 @@ import { Hono } from 'hono'
 import { pullsResource } from '../resourceKeys'
 import { gh, ghError } from '..'
 import type { ClosedPullsPage, Pull } from '../../contract/api'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
-import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
+import { type AppEnv, type Cached, type CoreServices, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { refreshOpenPulls } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { pullRequests, syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 
 // PR list for a repo (docs/caching.md serve-then-revalidate, via server/sync/engine.ts). PR data is
 // "fast-changing": short TTL + conditional If-None-Match. The list ETag lives in sync_state (no

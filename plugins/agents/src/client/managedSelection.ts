@@ -1,6 +1,5 @@
 import { createSignal } from 'solid-js'
-import { registerNoticeTargetHandler } from '@acorn/client-core/notifications/notifications.ts'
-import { dispatchLayout } from '@acorn/client-core/tasks/tasks.ts'
+import { dispatchLayout, registerNoticeTargetHandler } from '@acorn/plugin-api/client'
 
 const [selectedByTask, setSelectedByTask] = createSignal<Record<string, string | undefined>>({})
 const [focusedRequestBySession, setFocusedRequestBySession] = createSignal<Record<string, string | undefined>>({})

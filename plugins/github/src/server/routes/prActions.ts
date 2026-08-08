@@ -1,13 +1,10 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { bustPrSync, resolvePr, setPrState } from './prContext'
 import { githubToken } from '../githubToken'
 import { comments, prLabels, pullRequests, reviewRequests, viewedFiles } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // PR write actions (docs/github-integration.md). Each calls GitHub, updates the local mirror so
 // a read within the TTL window reflects the change, and returns the canonical bit. The client

@@ -1,8 +1,7 @@
 // Shared container detail panel (docs/ui-design.md): Info + live Logs + live Stats tabs, used by
 // the browse right pane and the task pane — one component, two hosts (the RollbarItemPanel split).
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
-import { writeJson } from '@acorn/client-core/apiClient.ts'
-import { requestTerminalFocusIntent } from '@acorn/client-core/registries/clientEvents.ts'
+import { requestTerminalFocusIntent, writeJson } from '@acorn/plugin-api/client'
 import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/routes.ts'
 import { wsDockerAttach } from './wsChannel'
 import type { DockerStatsSample } from '../shared/wsFrames'

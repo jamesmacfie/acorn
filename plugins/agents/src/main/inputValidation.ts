@@ -1,4 +1,4 @@
-import { confineExistingFile } from '@acorn/node-core/main/core/fs.ts'
+import { confineExistingFile } from '@acorn/plugin-api/node'
 import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 

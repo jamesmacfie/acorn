@@ -1,7 +1,4 @@
-import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
-import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
-import { getProfile, resolveCommand } from '@acorn/node-core/main/profiles.ts'
+import { agentProfileRegistry, getProfile, type InternalEnvFactory, type NodePlugin, openPluginDb, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -18,7 +15,6 @@ import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
 import { migrationsDir } from './migrations'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../main/index'
-import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
 
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {

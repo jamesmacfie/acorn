@@ -1,9 +1,5 @@
 import { Hono } from 'hono'
-import { connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
-import { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, connectProvider, ownerId, providerError, respondError } from '@acorn/plugin-api/node'
 import { GITHUB_PROVIDER } from '../githubToken'
 
 // GitHub OAuth via the device authorization grant (RFC 8628).

@@ -4,9 +4,7 @@
 // pane, written in the app, importing the plugin's panel to render it. Nothing about it was the app's:
 // it reads `task.links` for its own providerId and it consumes its own `pane-intent` events.
 import { createMemo, createSignal, lazy, onCleanup, onMount } from 'solid-js'
-import type { Task } from '@acorn/client-core/queries.ts'
-import { clientEvents, consumePaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
-import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
+import { clientEvents, consumePaneIntent, type PaneContribution, type Task } from '@acorn/plugin-api/client'
 import type { LinearIssueTarget } from './LinearIssuePanel'
 
 const LinearIssuePanel = lazy(() => import('./LinearIssuePanel'))

@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { capabilityId } from '@acorn/plugin-api/node'
 
 // agents.runtime — the post-listener reconcile pass, exactly as `workflows.runner` is.
 //

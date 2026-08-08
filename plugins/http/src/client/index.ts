@@ -1,6 +1,6 @@
 // The http plugin's client part (docs/plugins.md § The plugin API).
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { httpAgentContextContribution } from './agentContextContribution'
 import { purgeStoredHttpDrafts } from './draft'
 import { httpPaneContribution } from './paneContribution'

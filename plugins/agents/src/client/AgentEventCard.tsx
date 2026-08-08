@@ -2,11 +2,10 @@ import { For, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
-import { dispatchLayout, setTerminalOpen } from '@acorn/client-core/tasks/tasks.ts'
-import { requestTerminalFocus } from '@acorn/client-core/tasks/agentSessions.ts'
+import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { managedAgentApi } from './managedClient'
 import { AgentToolCallCard } from './toolRendererRegistry'
-import { Button } from '@acorn/client-core/ui/primitives.tsx'
+import { Button } from '@acorn/plugin-api/ui'
 
 const copy = (text: string): void => {
   void navigator.clipboard.writeText(text)

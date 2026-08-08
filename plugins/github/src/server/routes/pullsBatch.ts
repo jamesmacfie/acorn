@@ -3,15 +3,12 @@ import { Hono } from 'hono'
 import type { PullBatchFilesMode, PullBatchItem, PullBatchRequest } from '../../contract/api'
 import { filesResource, prResource } from '../resourceKeys'
 import { ghError, ghGraphQL } from '..'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, type GqlPull } from './prMirror'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Batch prefetch — warm the mirror for several open PRs at once so client navigation is instant.
 // Detail is one multi-alias GraphQL call for all stale PRs (one GitHub round-trip); files stay N

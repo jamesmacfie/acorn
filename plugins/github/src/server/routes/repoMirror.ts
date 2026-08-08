@@ -1,12 +1,10 @@
 import { and, desc, eq } from 'drizzle-orm'
-import { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
+import { chunkRowsByColumnBudget, type PluginDatabase, type RefreshResult, type RouteFailure, type RouteResult } from '@acorn/plugin-api/node'
 import { reposResource } from '../resourceKeys'
 import { gh, ghError } from '..'
-import type { RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 import type { Repo } from '../../contract/api'
 import { deleteRepoMirrorStatements } from '../mirrorRetention'
 import { repos, syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Every exported helper here already took the handle as a parameter, which is why this module needed no
 // reshaping when the tables moved — only the type of the thing being passed in changed.

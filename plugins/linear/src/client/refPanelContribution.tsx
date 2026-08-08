@@ -7,7 +7,7 @@
 // component itself would make the registry's generic props contract the panel's only shape and force that
 // caller to speak it too.
 import { lazy } from 'solid-js'
-import type { RefPanelContribution, RefPanelTarget } from '@acorn/client-core/registries/refPanels.ts'
+import type { RefPanelContribution, RefPanelTarget } from '@acorn/plugin-api/client'
 
 const LinearIssuePanel = lazy(() => import('./LinearIssuePanel'))
 

@@ -2,10 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { Context } from 'hono'
 import type { NoteLocation } from '@acorn/protocol/notes.ts'
-import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { isTaskConfined, requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, isTaskConfined, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 // Memory's route surface plus a one-release compatibility alias for the notes routes. The notes
 // plugin owns the current `/v2/p/notes/*` namespace; these `/v2/p/memory/*/notes` paths remain only

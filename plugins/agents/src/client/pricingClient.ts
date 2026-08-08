@@ -1,4 +1,4 @@
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson, writeJson } from '@acorn/plugin-api/client'
 import {
   agentPricingRoute,
   type AgentPricingPreferences,
