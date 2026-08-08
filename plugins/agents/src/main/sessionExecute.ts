@@ -4,7 +4,7 @@
 // app only because workflows could not import agents. It is agents' code: every line touches
 // ManagedAgentRuntime, its session store, and its turn lifecycle.
 import { randomUUID } from 'node:crypto'
-import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/node-core/main/headless.ts'
+import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import type { AgentEventRecord, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import type { AgentSessionExecute, AgentSessionExecuteRequest } from '../contract/sessionExecute'
 import type { ManagedAgentRuntime } from './runtime'

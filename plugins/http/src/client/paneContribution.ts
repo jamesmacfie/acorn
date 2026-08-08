@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
+import type { PaneContribution } from '@acorn/plugin-api/client'
 
 const HttpTaskPane = lazy(() => import('./HttpTaskPane'))
 

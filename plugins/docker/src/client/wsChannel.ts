@@ -4,8 +4,7 @@
 // reconnect loop that knew how to spell `docker:${kind}:attach`. Core now owns the envelope and routes
 // on the `docker` prefix (@acorn/client-core/wsChannels.ts); everything below — the maps, the payload
 // narrowing, and the reattach set — belongs to this plugin.
-import { registerWsChannel } from '@acorn/client-core/wsChannels.ts'
-import { wsConnect, wsSend } from '@acorn/client-core/wsClient.ts'
+import { registerWsChannel, wsConnect, wsSend } from '@acorn/plugin-api/client'
 import type { DockerServerFrame, DockerStatsSample } from '../shared/wsFrames'
 
 const dockerChangedSubs = new Set<(scopes: string[]) => void>()

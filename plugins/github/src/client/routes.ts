@@ -1,4 +1,4 @@
-import type { SourceRouteContribution } from '@acorn/client-core/registries/sources.ts'
+import type { SourceRouteContribution } from '@acorn/plugin-api/client'
 
 // GitHub owns only its optional PR browse surface. Core owns /p/:projectId and /p/:projectId/new.
 export const githubRouteContributions: readonly SourceRouteContribution[] = [

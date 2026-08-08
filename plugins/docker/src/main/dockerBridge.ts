@@ -3,8 +3,7 @@
 // daemon down/CLI missing → 409 docker_unavailable (info() reports availability for UI gating),
 // anything else → 422 with the stderr tail.
 import { existsSync } from 'node:fs'
-import { BridgeError } from '@acorn/node-core/server/bridge.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import { BridgeError, type CoreServices } from '@acorn/plugin-api/node'
 import type { DockerBridge } from '../server/routes/docker'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { DockerComposeAction, DockerContainerAction, DockerContainerSummary, DockerPruneKind, DockerTaskSummary } from '../shared/model'

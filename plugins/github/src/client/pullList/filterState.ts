@@ -2,7 +2,7 @@
 // free-text query are remembered per workspace id and persisted to the `pr_filters` pref (App.tsx),
 // so returning to a workspace restores its last filter. Signals-only, like ../tasks/tasks.ts.
 import { createSignal } from 'solid-js'
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+import { onScopeEvicted } from '@acorn/plugin-api/client'
 
 export type PrFilter = { tab: 'open' | 'closed'; filter: string }
 const defaultFilter = (): PrFilter => ({ tab: 'open', filter: '' })

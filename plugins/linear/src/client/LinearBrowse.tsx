@@ -1,24 +1,11 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import {
-  integrationsOptions,
-  tasksKey,
-  tasksOptions,
-  workspaceExternalProjectsKey,
-  workspaceExternalProjectsOptions,
-  workspacesOptions,
-} from '@acorn/client-core/queries.ts'
+import { activateTaskSignals, createDismissable, formatRelativeTime, integrationsOptions, pathForTask, replaceWorkspaceExternalProjectsForProvider, setWorkspaceExternalProjects, tasksKey, tasksOptions, workspaceExternalProjectsForProvider, workspaceExternalProjectsKey, workspaceExternalProjectsOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { linearProjectsOptions, workspaceLinearIssuesOptions } from './queries'
-import { setWorkspaceExternalProjects } from '@acorn/client-core/workspaces/mutations.ts'
 import type { Task, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import type { LinearProjectIssue } from '../shared/api'
-import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
-import { createDismissable } from '@acorn/client-core/ui/dismissable.ts'
-import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { replaceWorkspaceExternalProjectsForProvider, workspaceExternalProjectsForProvider } from '@acorn/client-core/integrations/workspaceProjects.ts'
-import { PromoteToTaskModal } from '@acorn/client-core/integrations/PromoteToTaskModal.tsx'
-import { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
+import { PromoteToTaskModal } from '@acorn/plugin-api/ui'
 import { emptyLinearFilter, filterLinearIssues, groupLinearIssuesByState, linearFacets, priorityMeta, sortLinearIssues, type LinearFilter } from './model'
 import LinearIssuePanel from './LinearIssuePanel'
 

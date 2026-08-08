@@ -2,17 +2,13 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { PullDetail } from '../../contract/api'
 import { prResource } from '../resourceKeys'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
-import { type Cached, serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
+import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { readComposite } from './prMirror'
 import { refreshPullDetail } from './pullRefresh'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // PR detail — the composite GraphQL read (docs/github-integration.md), the primary read for the
 // PR screen: PR + reviews + comments + checks in one round-trip. GraphQL has no ETag, so

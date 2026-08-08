@@ -1,6 +1,6 @@
 import { createMemo } from 'solid-js'
 import type { Accessor } from 'solid-js'
-import type { DiffFile, Row, SplitBand, ViewMode } from '@acorn/client-core/ui/diff/model.ts'
+import type { DiffFile, Row, SplitBand, ViewMode } from '@acorn/plugin-api/ui/diff'
 
 type VirtualItem = { index: number; start: number; end: number }
 type DiffVirtualizer = { getVirtualItems: () => VirtualItem[] }

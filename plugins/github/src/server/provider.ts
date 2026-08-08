@@ -1,5 +1,4 @@
-import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
-import { defaultBudgets, externalIdsFor, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
+import { defaultBudgets, externalIdsFor, ProviderOperationError, publicProvider } from '@acorn/plugin-api/node'
 import { gh, ghError } from './index'
 
 type GithubViewer = { login: string; name: string | null; avatar_url: string | null }

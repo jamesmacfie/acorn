@@ -1,7 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { Tabs, type TabDef } from '@acorn/client-core/ui/Tabs.tsx'
-import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
-import { Badge } from '@acorn/client-core/ui/primitives.tsx'
+import { Badge, CopyButton, type TabDef, Tabs } from '@acorn/plugin-api/ui'
 import type { SendFailure, SendResult, SendSuccess, TimelineEntry } from '../shared/model'
 import { decodeBody } from './httpClient'
 

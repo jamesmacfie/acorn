@@ -2,10 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { NoteKind, NoteLocation } from '@acorn/protocol/notes.ts'
 import { NOTES_STORE } from '../../contract/store'
-import { viaBridge } from '@acorn/node-core/server/bridge.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, requireDevice, respondError, viaBridge } from '@acorn/plugin-api/node'
 
 // Notes owns this route surface. The memory plugin keeps the old /v2/p/memory/* note paths as a
 // compatibility alias for clients and agent prompts that may have retained them.

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type {
   AgentEventRecord,

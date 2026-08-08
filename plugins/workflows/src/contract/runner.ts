@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { capabilityId } from '@acorn/plugin-api/node'
 
 // workflows.runner — the ONE method the composition root needs off the runner after init.
 //

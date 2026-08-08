@@ -4,7 +4,7 @@
 // gitdiff-parser path works unchanged. execFile with arg arrays only; repo-relative paths are
 // validated at this boundary (reject `..`/absolute — the editor-IPC discipline).
 
-import { git, gitOrThrow, gitText } from '@acorn/node-core/main/core/git.ts'
+import { git, gitOrThrow, gitText } from '@acorn/plugin-api/node'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
 

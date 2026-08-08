@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+import { onScopeEvicted } from '@acorn/plugin-api/client'
 
 // Session-only expanded-directory state, scoped to the task whose worktree the tree represents.
 // Keeping this outside EditorPane lets pane/task navigation unmount the lazy tree without losing

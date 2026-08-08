@@ -11,7 +11,7 @@ import {
   type EditorEntry,
   type EditorWriteResult,
 } from '../contract/api'
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson, writeJson } from '@acorn/plugin-api/client'
 
 export type { EditorEntry } from '../contract/api'
 

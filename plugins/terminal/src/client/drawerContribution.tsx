@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
+import type { UiSlotContribution } from '@acorn/plugin-api/client'
 
 const TerminalPanel = lazy(() => import('./TerminalPanel'))
 

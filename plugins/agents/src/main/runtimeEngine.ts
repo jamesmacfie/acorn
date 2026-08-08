@@ -1,7 +1,4 @@
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
-import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
+import type { CoreServices, InternalEnvFactory, PluginDatabase, SecretService } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,

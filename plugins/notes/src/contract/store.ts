@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { capabilityId } from '@acorn/plugin-api/node'
 import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@acorn/protocol/notes.ts'
 
 // Provenance a non-human writer stamps on a note it creates or replaces. `author: 'agent'` plus the

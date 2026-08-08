@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/solid-query'
-import WorkspaceProjectAssignments from '@acorn/client-core/workspaces/WorkspaceProjectAssignments.tsx'
+import { WorkspaceProjectAssignments } from '@acorn/plugin-api/ui'
 import { saveOnboardingCompletion } from './onboardingCompletion'
 import '@acorn/client-core/workspaces/onboarding.css'
 

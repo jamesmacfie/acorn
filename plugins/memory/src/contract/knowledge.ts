@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { capabilityId } from '@acorn/plugin-api/node'
 
 // The two memory hooks that are driven from OUTSIDE this plugin: inject a task's launch context into
 // a fresh agent session, and run the memory-review pass when a session ends.

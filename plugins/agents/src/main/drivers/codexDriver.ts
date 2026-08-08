@@ -1,4 +1,4 @@
-import { brokerEnv } from '@acorn/node-core/main/core/proc.ts'
+import { brokerEnv } from '@acorn/plugin-api/node'
 import { AGENT_TOOL_PASSTHROUGH } from './toolEnv'
 import { execFile } from 'node:child_process'
 import { basename, resolve } from 'node:path'

@@ -1,8 +1,6 @@
 import { Hono } from 'hono'
 import { gh, ghError } from '..'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, ownerId, respondError } from '@acorn/plugin-api/node'
 import type { RunJobs } from '../../contract/api'
 import { githubToken } from '../githubToken'
 

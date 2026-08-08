@@ -1,8 +1,6 @@
 import { createSignal, lazy, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { nodeReady } from '@acorn/client-core/node/activeNode.ts'
-import { prefsOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
-import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
+import { nodeReady, PrefKeys, prefsOptions, workspacesOptions } from '@acorn/plugin-api/client'
 
 const OnboardingModal = lazy(() => import('./OnboardingModal'))
 

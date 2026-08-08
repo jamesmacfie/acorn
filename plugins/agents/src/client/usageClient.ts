@@ -1,4 +1,4 @@
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type { AgentUsageSnapshot } from '../shared/usage'
 import { agentUsageRefreshRoute, agentUsageRoute } from '../shared/usage'
 

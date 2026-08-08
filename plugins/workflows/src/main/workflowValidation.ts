@@ -1,4 +1,4 @@
-import { DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
+import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import type {
   StepValidationContext,
   WorkflowBudget,

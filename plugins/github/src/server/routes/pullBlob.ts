@@ -1,12 +1,8 @@
 import { Hono } from 'hono'
-import { fileBodyBlobKey } from '@acorn/node-core/server/blobs.ts'
+import { type AppEnv, fileBodyBlobKey, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { gh, ghError } from '..'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 const decodeBase64 = (content: string) =>
   new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0)))

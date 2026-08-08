@@ -1,4 +1,4 @@
-import { readBytes, readJson, sendForm, writeJson } from '@acorn/client-core/apiClient.ts'
+import { readBytes, readJson, sendForm, writeJson } from '@acorn/plugin-api/client'
 import type {
   AgentAttachment,
   AgentArtifact,

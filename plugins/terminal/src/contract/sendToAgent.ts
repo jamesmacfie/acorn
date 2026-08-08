@@ -13,7 +13,7 @@
 //
 // Consumers resolve it with `capabilities.get()` at CALL time, not at init — plugin init order is
 // undefined (server/plugin/capabilities.ts), so a consumer that caches at init may cache `undefined`.
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { capabilityId } from '@acorn/plugin-api/node'
 import type { SendSubmit } from '../shared/send'
 
 export type { SendSubmit }

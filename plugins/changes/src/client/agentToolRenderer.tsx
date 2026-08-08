@@ -1,7 +1,6 @@
 import { For, Show } from 'solid-js'
-import { dispatchLayout } from '@acorn/client-core/tasks/tasks.ts'
-import type { AgentToolRendererContribution } from '@acorn/client-core/registries/agentToolRenderers.ts'
-import { Button } from '@acorn/client-core/ui/primitives.tsx'
+import { type AgentToolRendererContribution, dispatchLayout } from '@acorn/plugin-api/client'
+import { Button } from '@acorn/plugin-api/ui'
 
 export const changesAgentToolRenderer: AgentToolRendererContribution = {
   id: 'changes.agent-file-tool',

@@ -1,8 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 // Editor pane (docs/workspaces-and-tasks.md): read/write/list files on the task's worktree. Was the `editor:*`
 // IPC channels; now task-scoped HTTP behind the EditorBridge (main/editor.ts).

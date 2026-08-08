@@ -6,10 +6,8 @@
 // Its two DB-shaped needs are now CoreServices calls, because this plugin has no handle to core's
 // database: `taskRunConfig` (project config merged with the project's committed config, in the lazily created
 // worktree) and the executable-config trust gate.
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { RunTarget } from '@acorn/node-core/main/runConfig.ts'
+import { buildSessionEnv, type CoreServices, type RunTarget } from '@acorn/plugin-api/node'
 import { RuntimeService } from './runtime'
-import { buildSessionEnv } from '@acorn/node-core/main/taskEnv.ts'
 
 // The session-engine glue the service needs (terminal.ts provides it): spawn a target's command as
 // a terminal session in the task worktree, and observe/kill it.

@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
+import { clientEvents } from '@acorn/plugin-api/client'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 

@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 
 const OnboardingOverlay = lazy(() => import('./OnboardingOverlay'))
 

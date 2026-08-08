@@ -18,7 +18,7 @@
 // naming an unregistered connection provider, and it also checks that the provider declares
 // `textGeneration`. Registering them in the wrong order fails the boot rather than silently producing a
 // provider that cannot generate.
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import type { NodePlugin } from '@acorn/plugin-api/node'
 import { anthropicConnectionProvider, anthropicModelProvider } from '../server/anthropic'
 import { openAIConnectionProvider, openAIModelProvider } from '../server/openai'
 

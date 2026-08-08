@@ -7,7 +7,7 @@ import { sep } from 'node:path'
 import { promisify } from 'node:util'
 import { rgPath } from '@vscode/ripgrep'
 import type { SearchBridge, SearchOpts } from '../server/routes/search'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import type { CoreServices } from '@acorn/plugin-api/node'
 import type { FileHits, SearchResult } from '../shared/search'
 
 // Only the task→worktree resolution, from core, which owns `tasks`. This plugin owns no tables and so

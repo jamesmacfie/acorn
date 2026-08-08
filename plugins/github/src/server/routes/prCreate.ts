@@ -3,12 +3,9 @@ import { Hono } from 'hono'
 import { pullsResource } from '../resourceKeys'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { Branch, Compare } from '../../contract/api'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { ownerId } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { githubToken } from '../githubToken'
 import { repos, syncState } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror —
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts

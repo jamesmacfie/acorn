@@ -11,8 +11,7 @@
 // (docs/notes-and-memory.md §1). `ctx.sessionId` is transport metadata from the x-acorn-session-id
 // header, stamped on the proposal so a reviewer can see which agent session asked for it.
 import { z } from 'zod'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import { ToolError, type AgentToolContribution } from '@acorn/node-core/server/agentTools/registry.ts'
+import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import type { MemoryIndex } from './knowledgeIpc'
 import { MEMORY_TYPES, type MemoryType } from './memory'
 import type { MemoryProposalStore } from './memoryProposals'

@@ -5,7 +5,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { terminalApi } from './terminalClient'
 import { baseTheme, monoFont, xtermTheme } from './theme'
-import { isAppDark, watchAppearance } from '@acorn/client-core/ui/appearance.ts'
+import { isAppDark, watchAppearance } from '@acorn/plugin-api/client'
 import { TERMINAL_LINE_HEIGHT } from './preferences'
 
 // xterm 5.5.0 bug: disposing a terminal (workspace/tab switch, or a task finishing in another

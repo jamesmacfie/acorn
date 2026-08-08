@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
-import { providerCredential } from '@acorn/node-core/server/integrations/credential.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
+import { type AppEnv, providerCredential } from '@acorn/plugin-api/node'
 
 export const GITHUB_PROVIDER = 'github'
 

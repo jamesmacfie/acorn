@@ -1,4 +1,4 @@
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { memoryApi } from './memoryClient'
 import MemorySection from './MemorySection'
 

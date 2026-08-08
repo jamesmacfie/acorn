@@ -1,10 +1,5 @@
 import { createResource, onCleanup } from 'solid-js'
-import type { Task } from '@acorn/client-core/queries.ts'
-import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
-import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-import { recipeBrowserUrl } from '@acorn/client-core/tasks/tasks.ts'
-import { runApi } from '@acorn/client-core/tasks/runClient.ts'
-import { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/node/tunnelUrl.ts'
+import { closeTunnelsForTask, type PaneContribution, recipeBrowserUrl, runApi, type Task, taskBridge, tunnelUrl } from '@acorn/plugin-api/client'
 import PreviewPane from './PreviewPane'
 
 export function PreviewTaskPane(props: { task: Task }) {

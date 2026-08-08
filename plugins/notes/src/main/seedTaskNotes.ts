@@ -4,7 +4,7 @@
 // ticket — each tagged with the task id so the context assembler scopes them to this task alone.
 // Best-effort and idempotent per task: a failure never blocks task/worktree setup, and a re-fire
 // no-ops once any note carries this task's id.
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
+import type { CoreServices } from '@acorn/plugin-api/node'
 import type { NotesStoreCapability, SeedTask } from '../contract/store'
 
 export type SeedCoreServices = Pick<CoreServices, 'tasks' | 'projects'>

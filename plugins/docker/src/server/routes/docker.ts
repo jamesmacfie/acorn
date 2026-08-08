@@ -3,10 +3,7 @@
 // ref is shape-validated here first (leading-dash guard) — 503 when the bridge isn't wired.
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { requireDevice } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type {
   DockerComposeAction,
   DockerContainerAction,

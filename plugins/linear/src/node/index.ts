@@ -1,4 +1,4 @@
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import type { NodePlugin } from '@acorn/plugin-api/node'
 import { linearProvider } from '../server/provider'
 import { linear } from '../server/routes/linear'
 

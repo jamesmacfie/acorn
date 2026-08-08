@@ -1,8 +1,7 @@
 import { For, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
-import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '@acorn/client-core/ui/diff/DiffRows.tsx'
-import type { FindHighlight } from '@acorn/client-core/ui/diff/find.ts'
-import { isCodeRow, type CodeRow, type GapRow, type Row, type SplitBand, type ViewMode } from '@acorn/client-core/ui/diff/model.ts'
+import { DiffLine, type LineComposerController, NonCodeRow, SplitCell, type ThreadCollapseController } from '@acorn/plugin-api/ui'
+import { type CodeRow, type FindHighlight, type GapRow, isCodeRow, type Row, type SplitBand, type ViewMode } from '@acorn/plugin-api/ui/diff'
 import type { Thread } from '../contract/api'
 
 type VirtualItem = { index: number; start: number; end: number }

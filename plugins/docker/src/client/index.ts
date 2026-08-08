@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { registerDockerArchiveConcern } from './archiveConcern'
 import { dockerAgentContextContribution } from './agentContextContribution'
 import { dockerPrefsSlice } from './dockerPrefs'

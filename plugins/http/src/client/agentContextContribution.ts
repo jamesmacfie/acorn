@@ -1,7 +1,6 @@
-import { readJson } from '@acorn/client-core/apiClient.ts'
+import { contextSnapshot, readJson } from '@acorn/plugin-api/client'
 import { taskContextRoute, type TaskContext } from '@acorn/protocol/api.ts'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
-import { contextSnapshot } from '@acorn/client-core/agent/contextSnapshot.ts'
 import { listRequests } from './httpClient'
 
 const requestsForTask = async (taskId: string) => {

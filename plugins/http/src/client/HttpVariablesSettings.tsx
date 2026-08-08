@@ -3,7 +3,7 @@
 // Variables tab inside the API panel, where the repo is already known.
 import { createQuery } from '@tanstack/solid-query'
 import { createSignal, For, Show } from 'solid-js'
-import { projectsOptions } from '@acorn/client-core/queries.ts'
+import { projectsOptions } from '@acorn/plugin-api/client'
 import HttpVariables from './HttpVariables'
 import './http.css'
 

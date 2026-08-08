@@ -1,5 +1,4 @@
-import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
-import type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
+import type { PaletteItem, PaletteRowSource } from '@acorn/plugin-api/client'
 import { workflowApi, type WorkflowDefSummary } from '../contract/workflowClient'
 
 // The defs a `rows` fetch returned, so `invoke` can start the picked one without a second request.

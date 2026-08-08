@@ -1,4 +1,4 @@
-import { clientCapabilityId } from '@acorn/client-core/clientCapabilities.ts'
+import { clientCapabilityId } from '@acorn/plugin-api/client'
 import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 
 // The slice of workflow control the agent task sidebar needs, declared by the CONSUMER.

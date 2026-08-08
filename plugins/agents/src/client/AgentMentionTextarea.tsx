@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import { readJson } from '@acorn/client-core/apiClient.ts'
+import { readJson } from '@acorn/plugin-api/client'
 import { editorFilesRoute } from '@acorn/plugin-editor/contract/api.ts'
-import { Button, Textarea } from '@acorn/client-core/ui/primitives.tsx'
+import { Button, Textarea } from '@acorn/plugin-api/ui'
 import {
   activeFileMention,
   completeFileMention,

@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+import { capabilityId } from '@acorn/plugin-api/node'
 
 /** A PR as core's context assembler needs it: the mirrored head of the task's pull request. */
 export type MirroredPullRequest = {

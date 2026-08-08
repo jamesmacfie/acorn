@@ -1,7 +1,5 @@
 import OpenAI from 'openai'
-import { publicConnectionProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
-import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
-import type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders/types.ts'
+import { type ModelProviderAdapter, ProviderOperationError, publicConnectionProvider } from '@acorn/plugin-api/node'
 import type { ModelCatalogEntry } from '@acorn/protocol/integrations.ts'
 import { modelProviderError, modelProviderHealth } from './errors'
 

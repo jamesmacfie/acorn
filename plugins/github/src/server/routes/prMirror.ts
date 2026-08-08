@@ -1,14 +1,10 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '../../contract/api'
-import { patchBlobKey } from '@acorn/node-core/server/blobs.ts'
-import { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
+import { chunkRowsByColumnBudget, type Env, patchBlobKey, type PluginDatabase, type RouteResult } from '@acorn/plugin-api/node'
 import { filesResource, prResource } from '../resourceKeys'
 import { gh, ghError } from '..'
-import type { RouteResult } from '@acorn/node-core/server/sync/engine.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
 import { checks as checksTable, comments as commentsTable, prCommits as prCommitsTable, prFiles as prFilesTable, prLabels as prLabelsTable, pullRequests as pullRequestsTable, reviewRequests as reviewRequestsTable, reviewThreads as reviewThreadsTable, reviews as reviewsTable, syncState as syncStateTable, viewedFiles as viewedFilesTable } from '../../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
 // on-disk patch blobs), plus their read-backs. Both the single-PR routes (pullDetail / pullFiles)

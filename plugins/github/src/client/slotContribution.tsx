@@ -4,7 +4,7 @@
 // needs a prop wired from the slot CONTEXT — "open the shortcuts settings page" — and a JSX wrapper is
 // how a slot adapts a component to the host's props contract.
 import { lazy } from 'solid-js'
-import type { UiSlotContribution } from '@acorn/client-core/registries/uiSlots.tsx'
+import type { UiSlotContribution } from '@acorn/plugin-api/client'
 
 const Shortcuts = lazy(() => import('./Shortcuts'))
 

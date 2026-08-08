@@ -3,9 +3,8 @@
 // {{worktree}} / {{branch}} / {{taskId}} builtins resolve against it — which is the point, since
 // every task worktree runs its own dev server on its own port.
 import { Show } from 'solid-js'
-import type { Task } from '@acorn/client-core/queries.ts'
+import { projectsOptions, type Task } from '@acorn/plugin-api/client'
 import { createQuery } from '@tanstack/solid-query'
-import { projectsOptions } from '@acorn/client-core/queries.ts'
 import HttpPanel from './HttpPanel'
 import './http.css'
 

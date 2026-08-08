@@ -1,6 +1,4 @@
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
-import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
-import { pullRequestSection } from '@acorn/node-core/server/agentTools/contextSections.ts'
+import { type NodePlugin, openPluginDb, pullRequestSection } from '@acorn/plugin-api/node'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/actions'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'

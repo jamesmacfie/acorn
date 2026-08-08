@@ -4,7 +4,7 @@
 import { createQuery } from '@tanstack/solid-query'
 import { useParams } from '@solidjs/router'
 import { Show } from 'solid-js'
-import { projectsOptions } from '@acorn/client-core/queries.ts'
+import { projectsOptions } from '@acorn/plugin-api/client'
 import HttpPanel from './HttpPanel'
 import './http.css'
 

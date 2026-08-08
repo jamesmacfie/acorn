@@ -1,4 +1,4 @@
-import { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+import { onScopeEvicted } from '@acorn/plugin-api/client'
 // Session-only scroll state for PR review surfaces. A task review is isolated from the classic
 // GitHub browser even when both show the same PR; task-owned entries are evicted on archive.
 export type ReviewViewScope = {

@@ -1,9 +1,6 @@
 import { lazy } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import type { Task } from '@acorn/client-core/queries.ts'
-import { workspacesOptions } from '@acorn/client-core/queries.ts'
-import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
-import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { type PaneContribution, type Task, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 
 const NotesPane = lazy(() => import('./NotesPane'))
 

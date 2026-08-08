@@ -1,7 +1,6 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
-import { Button } from '@acorn/client-core/ui/primitives.tsx'
-import { Modal } from '@acorn/client-core/ui/Modal.tsx'
+import { Button, Modal } from '@acorn/plugin-api/ui'
 
 export default function AgentContextPickerModal(props: {
   contribution: AgentContextContribution

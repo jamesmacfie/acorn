@@ -6,8 +6,7 @@
 // declared in core/client/capabilities.ts, which is what reads it to answer "is this desktop?".
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../contract/routes'
-import { readJson, writeJson } from '@acorn/client-core/apiClient.ts'
-import { wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite } from '@acorn/client-core/wsClient.ts'
+import { readJson, writeJson, wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite } from '@acorn/plugin-api/client'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>

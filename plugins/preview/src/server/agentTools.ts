@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AgentToolContribution } from '@acorn/node-core/server/agentTools/registry.ts'
+import type { AgentToolContribution } from '@acorn/plugin-api/node'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
 export function browserAgentTools(browser: BrowserDesktopCapability): AgentToolContribution[] {

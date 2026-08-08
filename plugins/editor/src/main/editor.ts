@@ -4,10 +4,8 @@
 // worktree root from the DB and confines the renderer-supplied relative path with resolveInRoot,
 // so a traversal (`../`) or a symlink pointing outside the worktree is rejected. Pure-Node, so it
 // works in dev:node too; wired in main/serverBridges.ts.
-import { gitOrThrow } from '@acorn/node-core/main/core/git.ts'
+import { BridgeError, type CoreServices, gitOrThrow } from '@acorn/plugin-api/node'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
-import { BridgeError } from '@acorn/node-core/server/bridge.ts'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 
 export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs'>

@@ -1,5 +1,5 @@
 // The context plugin's client part (docs/plugins.md § The plugin API).
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { taskContextAgentContribution } from './agentContextContribution'
 import { contextPaneContribution } from './paneContribution'
 import { contextSelectionSlice } from './selectionSlice'

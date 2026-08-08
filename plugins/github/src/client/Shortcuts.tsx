@@ -1,13 +1,10 @@
 import { createEffect, createMemo, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
-import { fuzzyScore } from '@acorn/client-core/palette/model.ts'
-import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
+import { createOverlayPalette, fuzzyScore, projectsOptions, registerCommands } from '@acorn/plugin-api/client'
 import type { PullFile } from '../contract/api'
-import { registerCommands } from '@acorn/client-core/registries/commands.ts'
-import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
+import { registerKeybindings } from '@acorn/plugin-api/ui'
 import { createQuery } from '@tanstack/solid-query'
-import { projectsOptions } from '@acorn/client-core/queries.ts'
 import { githubCreateRoute } from './routes'
 
 // Global keyboard shortcuts + the file finder. Mounted once in App. PullList owns j/k (next/prev

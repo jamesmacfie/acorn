@@ -1,5 +1,5 @@
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
-import { contextSnapshot } from '@acorn/client-core/agent/contextSnapshot.ts'
+import { contextSnapshot } from '@acorn/plugin-api/client'
 import { databaseApi } from './databaseClient'
 
 export const databaseAgentContextContribution: AgentContextContribution = {

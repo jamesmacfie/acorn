@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
-import { Button, Input, Select } from '@acorn/client-core/ui/primitives.tsx'
+import { Button, Input, Select } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
 
 export default function AgentRequestCard(props: {

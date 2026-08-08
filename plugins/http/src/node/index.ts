@@ -1,5 +1,4 @@
-import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
-import { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
+import { type NodePlugin, openPluginDb } from '@acorn/plugin-api/node'
 import { httpRoutes } from '../server/routes/http'
 import { migrationsDir } from './migrations'
 

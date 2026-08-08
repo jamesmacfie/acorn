@@ -2,7 +2,7 @@ import type { BatchItem } from 'drizzle-orm/batch'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { checks as checksTable, comments as commentsTable, prCommits, prFiles, prLabels, pullRequests, repos as reposTable, reviewRequests, reviewThreads, reviews as reviewsTable } from '../node/schema'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { PluginDatabase } from '@acorn/plugin-api/node'
 
 export type MirrorPullKey = { userId: string; repoId: number; number: number }
 

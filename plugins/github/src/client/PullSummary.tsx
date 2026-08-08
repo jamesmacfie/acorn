@@ -1,11 +1,9 @@
 import { createMemo, For, Show } from 'solid-js'
 import type { Accessor } from 'solid-js'
-import Icon from '@acorn/client-core/ui/Icon.tsx'
-import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
-import { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
+import { CopyButton, Icon, UserAvatar } from '@acorn/plugin-api/ui'
+import { formatRelativeTime } from '@acorn/plugin-api/client'
 import { splitLinearIds } from './contentLinks'
 import type { Pull, PullConflicts } from '../contract/api'
-import { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
 
 function LinearText(props: { text: string; prefixes: string[]; onOpen: (id: string) => void }) {
   const parts = createMemo(() => splitLinearIds(props.text, props.prefixes))

@@ -1,5 +1,5 @@
 import { createEffect, onCleanup } from 'solid-js'
-import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
+import { getHighlighter } from '@acorn/plugin-api/client'
 import { renderAgentMarkdown } from './agentMarkdown'
 
 const SHIKI_LANGUAGES = new Set([

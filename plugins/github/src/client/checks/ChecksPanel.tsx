@@ -2,9 +2,8 @@ import { createEffect, createMemo, createResource, createSignal, For, onCleanup,
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { jobLogOptions, runJobsOptions } from '../queries'
-import { FAILED_STATUSES } from '@acorn/client-core/ui/displayMeta.ts'
-import { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/highlight/shiki.ts'
-import Icon from '@acorn/client-core/ui/Icon.tsx'
+import { FAILED_STATUSES, getHighlighter, tokenizeAnsiLines } from '@acorn/plugin-api/client'
+import { Icon } from '@acorn/plugin-api/ui'
 import { splitJobLog } from './splitJobLog'
 import '../styles/checks-panel.css'
 

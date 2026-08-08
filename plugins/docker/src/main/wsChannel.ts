@@ -2,7 +2,7 @@
 // interactive `docker exec` PTYs (node-pty — `-it` needs a real tty). Everything is keyed by
 // connection and torn down on detach/kill/disconnect. Refs are shape-validated here — they reach argv.
 import { spawn as ptySpawn, type IPty } from 'node-pty'
-import type { PluginBroadcast } from '@acorn/node-core/server/plugin/types.ts'
+import type { PluginBroadcast } from '@acorn/plugin-api/node'
 import { isDockerRef } from '../shared/model'
 import type { DockerClientFrame } from '../shared/wsFrames'
 import { dockerEnv } from './cli'

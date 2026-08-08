@@ -2,42 +2,12 @@ import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } 
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
 import { filesKey } from '../contract/api'
-import { prefsOptions } from '@acorn/client-core/queries.ts'
+import { clientEvents, getHighlighter, PrefKeys, prefsOptions, readDraft, registerCommands, savePref, writeDraft } from '@acorn/plugin-api/client'
 import { fetchFilePatches, fileBlobOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
 import { filePatchKey, pullKey, type PullFile, type Thread } from '../contract/api'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
-import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
-import { FileHead, type LineComposerController, type ThreadCollapseController } from '@acorn/client-core/ui/diff/DiffRows.tsx'
-import { registerCommands } from '@acorn/client-core/registries/commands.ts'
-import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
-import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
-import { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'
-import { readDraft, writeDraft } from '@acorn/client-core/lib/draftState.ts'
-import { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/ui/diff/virtualization.ts'
-import {
-  buildDiffRows,
-  buildRenderableRows,
-  DIFF_LOAD_ROW_HEIGHT,
-  estimateRowSize,
-  estimateSplitBandSize,
-  expandGap,
-  gapId,
-  highlighterTokenize,
-  isCodeRow,
-  plainTokenize,
-  rowIdentityKeys,
-  splitBandIdentityKeys,
-  toBands,
-  type CodeRow,
-  type GapRow,
-  type ParsedFile,
-  type Row,
-  type SplitBand,
-  type TokenizeLine,
-  type ViewMode,
-} from '@acorn/client-core/ui/diff/model.ts'
-import { savePref } from '@acorn/client-core/settings/savePref.ts'
-import { PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
+import { FileHead, type LineComposerController, registerKeybindings, type ThreadCollapseController } from '@acorn/plugin-api/ui'
+import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGap, gapId, type GapRow, highlighterTokenize, isCodeRow, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, type TokenizeLine, type ViewMode } from '@acorn/plugin-api/ui/diff'
 import { createDiffScrollRestoration } from './reviewScrollRestoration'
 import type { ReviewViewScope } from './reviewViewState'
 import { createDiffFindController } from './DiffFindController'

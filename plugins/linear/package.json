@@ -13,6 +13,7 @@
   "dependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-api": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@solidjs/router": "^0.16.1",
     "@tanstack/solid-query": "^5.101.0",

@@ -6,7 +6,7 @@
 // accepted memories land in the TASK WORKTREE (reviewed via its PR) + the index updates.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { HeadlessResult } from '@acorn/node-core/main/headless.ts'
+import type { HeadlessResult } from '@acorn/plugin-api/node'
 import { contentHashId, MEMORY_TYPES, writeMemoryFile, type MemoryType } from './memory'
 import type { MemoryProposal, MemoryProposalStore } from './memoryProposals'
 

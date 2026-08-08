@@ -6,8 +6,7 @@
 // capability the plugin owns. They read the SAME module the review pane's LocalGitBridge reads
 // (main/localGit.ts), so the agent and the human see one truth about the working tree.
 import { z } from 'zod'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import { ToolError, type AgentToolContribution } from '@acorn/node-core/server/agentTools/registry.ts'
+import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import { gitLog, localChanges, localDiff } from './localDiff'
 
 // Not an error: a task can legitimately exist before its worktree does, and an agent asking about

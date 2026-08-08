@@ -4,18 +4,12 @@ import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import { buildSessionEnv, childEnv, type CoreServices, getProfile, type InternalEnvFactory, type Launcher, launcherSpec, listProfileDefs, listProfiles, type PluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRow, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from '../server/routes/terminal'
-import type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
-import type { PluginBroadcast } from '@acorn/node-core/server/plugin/types.ts'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
 import type { SendSubmit } from '../shared/send'
 import { AgentSender } from './agentSend'
-import { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
-import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
-import { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
 import {
   clampDim,
   computeIdle,
@@ -29,12 +23,9 @@ import {
   tmuxNewSessionArgs,
   trimRing,
 } from './terminalUtils'
-import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailable } from '@acorn/node-core/main/profiles.ts'
 import { fileURLToPath } from 'node:url'
-import { launcherSpec, resolveMcpEntry, serverName, type Launcher } from '@acorn/node-core/main/mcpRegister.ts'
 import type { RunSessionGlue } from './runIpc'
 import { TerminalDisplay } from './terminalDisplay'
-import { rendererBaseCheckout, taskContext, type TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
 
 // PTYs live in the Node utility service. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in the service), not an app

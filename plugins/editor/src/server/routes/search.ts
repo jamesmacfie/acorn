@@ -1,9 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { SearchResult } from '../../shared/search'
-import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
+import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 // Find-in-files (docs/panes.md): project-wide text search over the task's worktree via ripgrep.
 // Was the `search:findInFiles` IPC channel. The taskId in the path is the
