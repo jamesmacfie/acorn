@@ -1,5 +1,11 @@
 # Phase 0 — Extract `@acorn/plugin-api`
 
+**Status: done.** Shipped in three commits: the client presentation cleanup, the facade package, and
+the repoint of all seventeen plugins. `docs/plugins.md` § "The plugin API" is the current
+description; everything below is the plan as written, kept for its reasoning. Where the two
+disagree, `docs/plugins.md` and the boundaries test are right. What actually differed is recorded in
+"As built" at the end.
+
 **Size: M–L.** Pure refactor, no behavior change. Valuable standalone: it hardens the
 first-party plugin boundary whether or not the later phases ship. Two workstreams: the facade
 package itself, and the client presentation-layer split that gives the `/ui` entrypoint a clean
@@ -223,3 +229,41 @@ design-system package a trivial extraction rather than a project.
   diff and path rules both surface at review time.
 - **Import-cycle risk is low** (plugin-api only re-exports) but run the acyclic-graph check in
   the architecture test before assuming.
+
+## As built
+
+Seven differences between the plan above and what shipped. Five of them are the same discovery:
+**an entrypoint is a barrel, so importing one member evaluates every module on it**, and Solid
+compiles a component to code that touches `window` at module scope. That is invisible in the app,
+where a bundler tree-shakes and a DOM exists, and immediate in this repo's test setup, where suites
+run in bare Node with no DOM by deliberate choice.
+
+- **Four entrypoints, not three.** `/ui/diff` is separate because the diff model's `Row` type
+  collides with the `Row` layout component on `/ui`, and renaming a symbol at thirty call sites is
+  worse than one more export line.
+- **`/client` and `/ui` are split by "is it a component", not by "is it presentation".** The
+  design system's plain functions (`cx`, `token`, the metrics, `displayMeta`) are on `/client`;
+  `registerKeybindings` and `registerWillHandler` are on `/ui` despite not being presentation,
+  because they live in `.tsx` modules. The rule is mechanical and enforced by a boundaries rule
+  rather than left to memory: only `ui/index.ts` may re-export from a `.tsx` module.
+- **The surface snapshot pins exported NAMES, not a rolled-up `.d.ts`.** Every package here is
+  consumed as TypeScript source, `noEmit` is global and nothing in the repo emits declarations, so
+  a real rollup would mean adding both a declaration build and API Extractor to a monorepo that
+  deliberately has neither. Names catch every addition, removal and rename; `tsc --noEmit` across
+  the seventeen consumers already catches an upstream type changing shape.
+- **`monacoSetup` moved to the app boot, not to a plugin.** Its two importers were in two
+  different plugin packages, so "the editor feature area" did not exist as a shared home. It now
+  lives at `client-core/src/editor/monacoSetup.ts` and is imported once from the renderer entry —
+  which is also more correct than two panes racing to assign `self.MonacoEnvironment`.
+- **No empty `connected/` directory.** Git cannot track one. The rule is stated here and in
+  `docs/plugins.md`, and the `ui/` boundaries rule (an allowlist of destinations) already rejects
+  an import of it.
+- **Plugin tests keep their direct core imports**, with the reviewed-roots ratchet retargeted at
+  them. See `docs/plugins.md` for why.
+- **Two test harnesses had to catch up.** `apps/desktop`'s client suite stubs the globals that
+  module-scope code needs; `@solidjs/router` reads `history.state`, and it is now on the import
+  path of any plugin with a UI, so the stub grew a `History`. And `apps/node` registered agent
+  profiles from a global `setupFile`, which pre-loaded core's whole server surface before any
+  suite's `vi.mock` could hoist — every provider suite that mocks `server/db` got the real module.
+  Profiles now register in-graph, which is the pattern `test/registerProviders.ts` already
+  documented for exactly this hazard.

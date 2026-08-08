@@ -22,9 +22,41 @@ by `plugins/agents`; there are no separate profile packages. Onboarding is a cli
 core setup support. Linear and Rollbar are integration providers that use core's generic external-
 item store rather than owning a plugin database.
 
-The current Node plugin interface is defined in
-`packages/node-core/src/server/plugin/types.ts`; the client interface is in
-`packages/client-core/src/registries/plugin.ts`. There is no separate `plugin-api` package.
+## The plugin API
+
+`packages/plugin-api` (`@acorn/plugin-api`) is the only host package a plugin's production code may
+import. It adds no behavior of its own: it re-exports an enumerated slice of node-core and
+client-core, and `tools/arch/boundaries.test.ts` enforces both halves of that — plugins reach the
+host only through the facade, and the facade only re-exports.
+
+Four entrypoints:
+
+| Entrypoint | What it carries |
+| --- | --- |
+| `@acorn/plugin-api/node` | `NodePlugin` and the context types, the route toolkit (`AppEnv`, `requireUser` and friends, `respondError`, the bridge), per-plugin SQLite and migrations, the `CoreServices` type, capability ids, provider and integration contracts |
+| `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, and the design system's plain functions (`cx`, `token`, metrics) |
+| `@acorn/plugin-api/ui` | Everything that is a component: primitives, `Icon`, `Picker`, `Modal`, `Tabs`, the diff rows, and the registration seams that live in a `.tsx` module |
+| `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass |
+
+The line between `/client` and `/ui` is drawn by the runtime, not by taste. Each entrypoint is a
+barrel, so importing one member evaluates all of them, and Solid compiles a component to code that
+touches `window` at module scope. Anything reached through a `.tsx` module therefore lands on `/ui`,
+which keeps `/client` loadable from a plugin's node-environment test suite. A boundaries rule
+enforces it.
+
+`packages/plugin-api/src/surface.snapshot.txt` pins every exported name. A change to the surface
+fails that test until the snapshot is regenerated
+(`UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`), which is the point: growing the contract
+should be a deliberate act. The implementation still lives in
+`packages/node-core/src/server/plugin/types.ts` and
+`packages/client-core/src/registries/plugin.ts`, which stay free to move files around underneath.
+
+Two things stay outside the facade. `@acorn/protocol` is the shared wire-type package and is
+imported directly. And plugin TEST code may still reach node-core and client-core: a test that seeds
+core's tables, builds a real `CoreServices` or opens a temp-directory database is reaching for the
+host rather than for an API, and a second ratchet in the boundaries test reviews what it reaches.
+That is a first-party privilege; a third-party author gets a testkit entrypoint if and when one is
+built.
 
 ## Activation
 
