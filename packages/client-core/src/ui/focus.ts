@@ -1,16 +1,4 @@
 import { isTypingTarget } from '../lib/isTypingTarget'
-import { setFocusedPane } from '../tasks/tasks'
-
-export type PaneFocusOptions = { taskId: string; paneId: string }
-
-export function paneFocus(element: HTMLElement, value: () => PaneFocusOptions): void {
-  const mark = () => {
-    const options = value()
-    setFocusedPane(options.taskId, options.paneId)
-  }
-  element.addEventListener('focusin', mark)
-  element.addEventListener('pointerdown', mark)
-}
 
 export const nextListIndex = (current: number, count: number, key: string): number => {
   if (count <= 0) return 0
@@ -49,13 +37,5 @@ export function trapOverlayFocus(event: KeyboardEvent, root: HTMLElement): void 
   } else if (!event.shiftKey && document.activeElement === last) {
     event.preventDefault()
     first.focus()
-  }
-}
-
-declare module 'solid-js' {
-  namespace JSX {
-    interface Directives {
-      paneFocus: PaneFocusOptions
-    }
   }
 }

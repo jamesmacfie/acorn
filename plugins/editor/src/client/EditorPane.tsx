@@ -1,6 +1,5 @@
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import * as monaco from 'monaco-editor'
-import '@acorn/client-core/ui/monacoSetup.ts'
 import type { Task } from '@acorn/client-core/queries.ts'
 import { debounce } from '@acorn/client-core/lib/debounce.ts'
 import { editorApi } from './editorClient'
