@@ -3,7 +3,7 @@ import type { NodePluginRow } from '@acorn/protocol/api.ts'
 import { nextDisabledList, pluginPending } from './pluginToggle'
 
 const row = (name: string, over: Partial<NodePluginRow> = {}): NodePluginRow =>
-  ({ name, required: false, disabled: false, running: true, ...over })
+  ({ name, required: false, disabled: false, running: true, state: 'active', ...over })
 
 const ROWS: NodePluginRow[] = [
   row('github'),

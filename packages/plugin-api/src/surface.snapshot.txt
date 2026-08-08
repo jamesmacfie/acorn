@@ -162,10 +162,15 @@ node: LayoutRecipe
 node: MirroredResourceContribution
 node: ModelProviderAdapter
 node: ModelService
+node: NodePermissions
 node: NodePlugin
 node: NodePluginContext
+node: PLUGIN_API_MAJOR
 node: PluginBroadcast
 node: PluginDatabase
+node: PluginFetchHandler
+node: PluginManifest
+node: PluginRequestContext
 node: PrefService
 node: Principal
 node: ProfileDef

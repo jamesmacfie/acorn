@@ -73,11 +73,12 @@ const unavailableBrowser: BrowserDesktopCapability = {
 
 // The standalone and Electron roots activate the same plugin list, through the same builder. Their
 // behavior differs only where the available runtime bridge does — here, the preview browser.
+const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser }))
 const plugins = await initPlugins(
-  assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser })).plugins,
+  graph.plugins,
   // Plugin disablement is stored by the Node itself. The desktop fleet file controls the client view,
   // while this persisted set controls a standalone process at boot.
-  { capabilities, core, disabled: disabledPlugins.get() },
+  { capabilities, core, disabled: disabledPlugins.get(), loaded: graph.loaded },
 )
 const pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
   roster: () => plugins.roster,

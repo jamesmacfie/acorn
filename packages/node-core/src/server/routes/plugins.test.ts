@@ -7,10 +7,10 @@ import type { PluginRosterEntry } from '../plugin/host'
 import { plugins, setPluginsBridge } from './plugins'
 
 const ROSTER: PluginRosterEntry[] = [
-  { name: 'github', required: false, disabled: false },
-  { name: 'terminal', required: true, disabled: false },
-  { name: 'docker', required: false, disabled: false },
-  { name: 'rollbar', required: false, disabled: true },
+  { name: 'github', required: false, disabled: false, state: 'active' },
+  { name: 'terminal', required: true, disabled: false, state: 'active' },
+  { name: 'docker', required: false, disabled: false, state: 'active' },
+  { name: 'rollbar', required: false, disabled: true, state: 'disabled' },
 ]
 
 // The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
@@ -63,12 +63,28 @@ describe('GET /v2/core/plugins', () => {
     expect(res.status).toBe(200)
     const state = (await res.json()) as NodePluginState
     expect(state.plugins).toEqual([
-      { name: 'github', required: false, disabled: false, running: true },
-      { name: 'terminal', required: true, disabled: false, running: true },
-      { name: 'docker', required: false, disabled: true, running: true },
-      { name: 'rollbar', required: false, disabled: true, running: false },
+      { name: 'github', required: false, disabled: false, running: true, state: 'active' },
+      { name: 'terminal', required: true, disabled: false, running: true, state: 'active' },
+      { name: 'docker', required: false, disabled: true, running: true, state: 'active' },
+      { name: 'rollbar', required: false, disabled: true, running: false, state: 'disabled' },
     ])
     expect(state.restartRequired).toBe(true)
+  })
+
+  it('passes a failed plugin through without demanding a restart a restart cannot deliver', async () => {
+    // A loaded plugin whose init threw. It is not disabled and its contributions are gone, but the
+    // owner's list and the running set still agree — so the restart banner must stay down, and the
+    // client learns about the failure from `state` and the attention inbox instead.
+    setPluginsBridge({
+      roster: () => [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1_700_000_000_000 }],
+      disabled: () => [],
+      setDisabled: () => {},
+    })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins).toEqual([
+      { name: 'ntfy', required: false, disabled: false, running: true, state: 'failed', failedAt: 1_700_000_000_000 },
+    ])
+    expect(state.restartRequired).toBe(false)
   })
 
   it('reports restartRequired false when the file and the process agree', async () => {
@@ -111,7 +127,7 @@ describe('PUT /v2/core/plugins', () => {
     expect(res.status).toBe(200)
     expect(saved()).toEqual(['docker'])
     const state = (await res.json()) as NodePluginState
-    expect(state.plugins.find((row) => row.name === 'docker')).toEqual({ name: 'docker', required: false, disabled: true, running: true })
+    expect(state.plugins.find((row) => row.name === 'docker')).toEqual({ name: 'docker', required: false, disabled: true, running: true, state: 'active' })
     expect(state.restartRequired).toBe(true)
   })
 

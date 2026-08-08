@@ -4,6 +4,8 @@ import { reconcileWorktrees } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import { loadExternalPlugins } from '@acorn/node-core/main/pluginLoader.ts'
+import type { NodePermissions } from '@acorn/node-core/main/pluginManifest.ts'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/index.ts'
@@ -15,13 +17,37 @@ import { nodePlugins, type NodePluginDeps } from './plugins'
 // names plugins, while node-core must remain independent of plugins.
 export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
 
-export type NodeComposition = { plugins: NodePlugin[]; drainOrder: typeof NODE_DRAIN_ORDER }
-
-export function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): NodeComposition {
-  return { plugins: nodePlugins(dataDir, deps), drainOrder: NODE_DRAIN_ORDER }
+export type NodeComposition = {
+  plugins: NodePlugin[]
+  // The subset that came off disk, keyed by name, carrying its manifest's node permissions. The host
+  // takes this as the one signal that a plugin is contained and permission-shaped.
+  loaded: ReadonlyMap<string, NodePermissions>
+  drainOrder: typeof NODE_DRAIN_ORDER
 }
 
-export const nodePluginNames = (): string[] => assembleNodeGraph('', {} as NodePluginDeps).plugins.map((plugin) => plugin.name)
+// Async because loading a plugin from disk is an `await import()`. Both composition roots already
+// awaited initPlugins around this call, so the graph is assembled at the same point it always was.
+//
+// The loader is inert without ACORN_UNSAFE_PLUGINS=1 (main/pluginLoader.ts explains why), so an
+// unflagged boot — which is every packaged boot today — gets exactly the static list and nothing else.
+export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
+  const builtins = nodePlugins(dataDir, deps)
+  const { loaded } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
+  // A loaded plugin may deliberately replace a built-in of the same id — that is how the loader is
+  // dogfooded (scripts/build-plugin.mjs). Only one of them may be in the graph: the ids are route
+  // namespaces and database filenames, and initPlugins rejects a duplicate name outright.
+  const shadowed = new Set(loaded.filter((entry) => entry.shadowsBuiltin).map((entry) => entry.manifest.id))
+  return {
+    plugins: [...builtins.filter((plugin) => !shadowed.has(plugin.name)), ...loaded.map((entry) => entry.plugin)],
+    loaded: new Map(loaded.map((entry) => [entry.manifest.id, entry.manifest.permissions.node])),
+    drainOrder: NODE_DRAIN_ORDER,
+  }
+}
+
+// The compiled-in list only. Deliberately not derived from assembleNodeGraph: this is the parity
+// fixture the standalone/supervised comparison uses, and it must describe what the BUILD contains,
+// not what happens to be installed in whichever data root the process was pointed at.
+export const nodePluginNames = (): string[] => nodePlugins('', {} as NodePluginDeps).map((plugin) => plugin.name)
 
 export type ReconcileOptions = {
   db: AppDatabase

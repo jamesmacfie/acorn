@@ -118,6 +118,12 @@ export default function PluginsSettings() {
               <Show when={pluginPending(row)}>
                 <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>
               </Show>
+              {/* A plugin installed on this node whose start-up threw. Restarting will not fix it, so
+                  this deliberately does not raise the restart banner — the owner has to turn it off or
+                  fix the plugin. */}
+              <Show when={row.state === 'failed'}>
+                <span class="plugin-failed" role="status">failed to start</span>
+              </Show>
             </li>
           )}
         </For>

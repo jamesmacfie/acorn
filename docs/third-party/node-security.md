@@ -234,7 +234,13 @@ keep rung 2 a refactor instead of a redesign; each is already stated in its phas
 here as the checklist reviewers should hold PRs against:
 
 1. **Fetch-shaped route handlers** for loaded plugins (phase 1) — a Hono instance cannot cross a
-   process boundary.
+   process boundary. *Shipped for a plugin's own namespace*: `ctx.routes.fetch(handler)` exists and
+   `ctx.routes.register` (the Hono one) is absent from a loaded plugin's context. **Not** shipped for
+   provider routes, which still take a Hono router: their handlers reach core's database through the
+   host's Hono context (`ownedConnections(c, …)`, `providerResource(c, …)`), so the remaining work is
+   to give the integrations resource runtime an explicit context. That is a rung-2 prerequisite in its
+   own right — a plugin process cannot hold `c.env.DB` either way — and reviewers should hold new
+   provider-facing helpers to taking a plain context object rather than `c`.
 2. **No `streams`/`channel` for loaded plugins, ever** (phase 1) — the one contribution that
    cannot survive the boundary.
 3. **Async-shaped `ctx` surfaces only** on the public plugin-api — no new synchronous

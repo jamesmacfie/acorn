@@ -196,13 +196,14 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
+    const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser }))
     const plugins = await initPlugins(
-      assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser })).plugins,
+      graph.plugins,
       // The persisted per-node list UNION the start config's. The file is the owner's setting, and it is
       // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
       // file. The start config stays an override for tests and `dev:node`, which want to pin a list
       // without writing into a data root.
-      { capabilities, core, disabled: effectiveDisabled() },
+      { capabilities, core, disabled: effectiveDisabled(), loaded: graph.loaded },
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)

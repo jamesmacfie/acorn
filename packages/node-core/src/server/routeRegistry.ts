@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from './middleware/auth'
+import type { PluginFetchHandler } from './plugin/types'
 
 // The two current HTTP namespaces (docs/api-reference.md § HTTP conventions). Core owns
 // `/v2/core/*`; every plugin gets `/v2/p/<plugin>/*`. Both live under the one `/v2/*` middleware
@@ -19,7 +20,16 @@ const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
 // this registry on one field instead of pattern-matching URLs. `prefix` is whatever path the plugin
 // wants under its own namespace — empty for a router that owns the whole namespace, `/tasks` for the
 // task-scoped sub-resources. Distinct sub-paths mean registration order is not load-bearing.
-export type RouteContribution = { plugin: string; prefix: string; router: Hono<AppEnv>; note?: string }
+//
+// Two carriers, one mount. A built-in contributes a `router`; a LOADED plugin contributes a
+// `fetch` handler, because a Hono instance is a live object from the plugin's realm and cannot
+// cross the process boundary that rung 2 will put there (docs/third-party/node-security.md § Design
+// rules). Everything downstream — the mount path, the auth envelope, per-plugin removal — is
+// identical, which is the point: the transport changes later, the registry does not.
+export type RouteContribution = { plugin: string; prefix: string; note?: string } & (
+  | { router: Hono<AppEnv>; fetch?: never }
+  | { fetch: PluginFetchHandler; router?: never }
+)
 
 export class RouteRegistry {
   readonly #contributions: RouteContribution[] = []
