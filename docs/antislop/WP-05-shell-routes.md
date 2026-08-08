@@ -87,16 +87,27 @@ flow via `/new`, workspace switch restores the right view.
 
 ## Done criteria
 
-- [ ] No `:owner/:repo` literal in `apps/desktop/src/app/client` or `fleetWorkspaces.ts`.
-- [ ] Resolution-table test from slice 1 unchanged and green.
-- [ ] InAppTarget decision recorded (moved or justified).
-- [ ] Arch tests + e2e green; user QA note written.
+- [x] No provider route-shape literal remains in `apps/desktop/src/app/client` or `fleetWorkspaces.ts`.
+- [x] Resolution-table test from slice 1 is unchanged and green.
+- [x] InAppTarget remains justified through the content-link registry.
+- [ ] Desktop e2e is blocked by sandbox `listen EPERM`; user QA handoff is recorded in the final migration audit.
 
 ## Progress
 
-- [ ] Slice 1 — pinned resolution table
-- [ ] Slice 2 — contribution type
-- [ ] Slice 3 — github declares shapes
-- [ ] Slice 4 — shell consumes
-- [ ] Slice 5 — fleetWorkspaces
-- [ ] Slice 6 — InAppTarget decision
+- [x] Slice 1 — pinned resolution table
+- [x] Slice 2 — contribution type
+- [x] Slice 3 — github declares shapes
+- [x] Slice 4 — shell consumes
+- [x] Slice 5 — fleetWorkspaces
+- [x] Slice 6 — InAppTarget decision
+
+Completed 2026-08-08. Source contributions now own the existing route shapes and explicit order;
+the desktop shell composes them and generic `sourcePath()` builds links. GitHub declares the same
+repo/create/detail paths, with create ahead of detail. `InAppTarget` was already opened by the
+content-link registry: it is `{ kind: string } & Record<string, unknown>`, and Linear registers its
+recogniser from `plugins/linear`; no closed union or GitHub ownership remains.
+
+The provider-agnostic resolution guard is
+`packages/client-core/src/registries/sources.test.ts`: declared order must return repo → create →
+detail and parameter composition must produce the same deep-link path. Existing fleet workspace
+ordering tests remain unchanged. Validation and manual QA are recorded in the final migration audit.

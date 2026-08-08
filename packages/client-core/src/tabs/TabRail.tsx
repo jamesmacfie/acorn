@@ -4,10 +4,11 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
 import { archiveTask, createCheckoutTask, createTask, patchTask } from '../tasks/mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
-import { shellPullChecksOptions } from '../githubShellReads'
+import { shellPullChecksOptions } from '../queries'
 import { checksState } from '../ui/displayMeta'
 import { createDismissable } from '../ui/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { defaultSourceId } from '../registries/sources'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { capabilities } from '../capabilities'
 import { availableSources } from './sources'
@@ -117,7 +118,7 @@ export default function TabRail() {
     return applyRailOrder(scoped, railOrder())
   }
 
-  // Sources: GitHub always; Linear/Rollbar when connected (docs/workspaces-and-tasks.md, docs/integrations.md).
+  // Sources are contributed by plugins and filtered by their own integration/capability gates.
   // Selecting one fills the main area with that source's browse view.
   const sources = () => availableSources(integrations.data?.integrations)
   function selectSource(id: SourceId) {
@@ -151,12 +152,10 @@ export default function TabRail() {
     }))
     const commands = registerCommands([
       { id: 'task.create', title: 'New task', category: 'task', palette: true, run: openNew },
-      { id: 'source.github.open', title: 'Go to GitHub in the left rail', category: 'navigation', run: () => { setMenuId(null); setSelectedSource('github') } },
       ...numbered,
     ])
     const bindings = registerKeybindings([
       { id: 'task.create', command: 'task.create', description: 'New task', category: 'Tasks', defaultChord: 'meta+shift+n', when: 'global' },
-      { id: 'source.github.open', command: 'source.github.open', description: 'Go to GitHub in the left rail', category: 'Tasks', defaultChord: 'meta+0', when: 'global' },
       ...numbered.map((command, index) => ({
         id: command.id, command: command.id, description: command.title, category: 'Tasks',
         defaultChord: `meta+${index + 1}`, when: 'global' as const,
@@ -256,7 +255,8 @@ export default function TabRail() {
     completeTaskArchive(w.id, () => {
       if (activeTaskId() === w.id) {
         setActiveTaskId(null)
-        setSelectedSource('github') // archived the active task → fall back to the GitHub browse
+        const source = defaultSourceId()
+        if (source) setSelectedSource(source) // archived the active task → fall back to the default browse
       }
     })
     await invalidate()

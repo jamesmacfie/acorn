@@ -7,7 +7,9 @@ import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.t
 import { contentHashId } from '@acorn/plugin-memory/main/memory.ts'
 import { acceptProposal, generateMemoryProposals, rejectProposal, verifyCandidates, MEMORY_REVIEW_SCHEMA, type MemoryCandidate, type MemoryGenDeps } from '@acorn/plugin-memory/main/memoryGen.ts'
 import { MemoryProposalStore } from '@acorn/plugin-memory/main/memoryProposals.ts'
-import '../../src/wiring/agentProfiles' // profiles come from the composition root
+import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
+
+registerBuiltInProfiles() // profiles come from the agents plugin
 
 const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-agent.sh')
 

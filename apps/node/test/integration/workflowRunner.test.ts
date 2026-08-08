@@ -9,7 +9,9 @@ import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
 import { migrationsDir } from '@acorn/plugin-workflows/node/migrations.ts'
 import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/node/schema.ts'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/main/workflowRunner.ts'
-import '../../src/wiring/agentProfiles' // profiles come from the composition root
+import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
+
+registerBuiltInProfiles() // profiles come from the agents plugin
 
 const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-agent.sh')
 

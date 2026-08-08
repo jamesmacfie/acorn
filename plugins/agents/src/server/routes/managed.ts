@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { isTaskConfined, mayActOnTask } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -82,8 +82,9 @@ export type ManagedAgentsBridge = {
   ): Promise<AgentSession[]>
 }
 
-export const managedAgentsBridgeSlot = bridgeSlot<ManagedAgentsBridge>()
-export const setManagedAgentsBridge = managedAgentsBridgeSlot.set
+export const MANAGED_AGENTS = routeCapability<ManagedAgentsBridge>('agents.managedRoute')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setManagedAgentsBridge = (bridge: ManagedAgentsBridge | null): void => setRouteTestCapability(MANAGED_AGENTS, bridge)
 
 const listQuerySchema = z.object({
   taskId: z.string().uuid().optional(),
@@ -120,7 +121,7 @@ const owns = (param: string, resolve: (b: ManagedAgentsBridge, id: string) => Pr
   createMiddleware<AppEnv>(async (c, next) => {
     const id = c.req.param(param)
     if (!id || !isTaskConfined(c)) return next()
-    const bridge = managedAgentsBridgeSlot.get()
+    const bridge = routeCapabilityFor(c, MANAGED_AGENTS)
     if (!bridge) return next() // let viaBridge answer 503 — "no runtime" is not "not yours"
     const taskId = await resolve(bridge, id)
     if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
@@ -159,7 +160,7 @@ export const managedAgents = new Hono<AppEnv>()
   .use('/attachments/:attachmentId/*', owns('attachmentId', (b, id) => b.taskIdForAttachment(id)))
   .use('/artifacts/:artifactId/*', owns('artifactId', (b, id) => b.taskIdForArtifact(id)))
   .get('/providers', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.providers(c.req.query('force') === 'true')))
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
   .post('/attachments', async (c) => {
     const parsed = attachmentQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
@@ -173,29 +174,29 @@ export const managedAgents = new Hono<AppEnv>()
     if (!(file instanceof File)) return respondError(c, 400, 'attachment_required')
     if (file.size > 10 * 1024 * 1024) return respondError(c, 413, 'attachment_too_large')
     const bytes = new Uint8Array(await file.arrayBuffer())
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) =>
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.uploadAttachment(parsed.data.taskId, file.name, file.type, bytes))
   })
   .get('/attachments/:attachmentId', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, async (bridge) => {
+    viaBridge(c, MANAGED_AGENTS, async (bridge) => {
       const attachment = await bridge.attachment(c.req.param('attachmentId'))
       if (!attachment) throw new Error('Attachment not found.')
       return attachment
     }))
   .delete('/attachments/:attachmentId', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, async (bridge) => ({
+    viaBridge(c, MANAGED_AGENTS, async (bridge) => ({
       removed: await bridge.removeAttachment(c.req.param('attachmentId')),
     })))
   .get('/sessions/:sessionId/artifacts', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.artifacts(c.req.param('sessionId'))))
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.artifacts(c.req.param('sessionId'))))
   .get('/artifacts/:artifactId', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, async (bridge) => {
+    viaBridge(c, MANAGED_AGENTS, async (bridge) => {
       const artifact = await bridge.artifact(c.req.param('artifactId'))
       if (!artifact) throw new Error('Artifact not found.')
       return artifact
     }))
   .get('/artifacts/:artifactId/content', async (c) => {
-    const bridge = managedAgentsBridgeSlot.get()
+    const bridge = routeCapabilityFor(c, MANAGED_AGENTS)
     if (!bridge) return respondError(c, 503, 'bridge-unavailable')
     const result = await bridge.artifactContent(c.req.param('artifactId'))
     if (!result) return respondError(c, 404, 'artifact_not_found')
@@ -216,7 +217,7 @@ export const managedAgents = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const filter = confineFilter(c, parsed.data)
     if (!filter) return respondError(c, 404, 'not_found')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.listSessions(filter))
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.listSessions(filter))
   })
   .get('/sessions/search', (c) => {
     const parsed = z.object({
@@ -229,7 +230,7 @@ export const managedAgents = new Hono<AppEnv>()
     const { q, ...rest } = parsed.data
     const filter = confineFilter(c, rest)
     if (!filter) return respondError(c, 404, 'not_found')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.search(q, filter))
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.search(q, filter))
   })
   .post('/sessions', async (c) => {
     const key = idempotencyKey(c.req.raw.headers)
@@ -239,33 +240,33 @@ export const managedAgents = new Hono<AppEnv>()
     // Spawning a provider CLI in a worktree: the taskId is in the body, so this is the check no mount
     // can make. Without it a task-scoped agent starts sessions in any task.
     if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.createSession(parsed.data, key))
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.createSession(parsed.data, key))
   })
   .post('/transcript-imports', async (c) => {
     const parsed = importAgentTranscriptSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.importTranscript(parsed.data))
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.importTranscript(parsed.data))
   })
   .get('/sessions/:sessionId', (c) => {
     const parsed = pageQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) =>
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.snapshot(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit))
   })
   .get('/sessions/:sessionId/events', (c) => {
     const parsed = pageQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) =>
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.events(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit))
   })
   .patch('/sessions/:sessionId', async (c) => {
     const parsed = patchAgentSessionSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.patchSession(c.req.param('sessionId'), parsed.data))
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.patchSession(c.req.param('sessionId'), parsed.data))
   })
   .delete('/sessions/:sessionId', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.deleteSession(c.req.param('sessionId'))))
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.deleteSession(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/turns', async (c) => {
     const key = idempotencyKey(c.req.raw.headers)
     if (!key) return respondError(c, 400, 'idempotency_key_required')
@@ -274,23 +275,23 @@ export const managedAgents = new Hono<AppEnv>()
       typeof body === 'object' && body != null ? { ...body, idempotencyKey: key } : body,
     )
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.enqueueTurn(c.req.param('sessionId'), parsed.data))
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.enqueueTurn(c.req.param('sessionId'), parsed.data))
   })
   .patch('/sessions/:sessionId/turns/:turnId', async (c) => {
     const parsed = patchQueuedTurnSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) =>
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.patchQueuedTurn(c.req.param('sessionId'), c.req.param('turnId'), parsed.data))
   })
   .delete('/sessions/:sessionId/turns/:turnId', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, async (bridge) => {
+    viaBridge(c, MANAGED_AGENTS, async (bridge) => {
       await bridge.cancelTurn(c.req.param('sessionId'), c.req.param('turnId'))
       return { ok: true }
     }))
   .post('/sessions/:sessionId/cancel', async (c) => {
     const parsed = cancelBodySchema.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, async (bridge) => {
+    return viaBridge(c, MANAGED_AGENTS, async (bridge) => {
       await bridge.cancelTurn(c.req.param('sessionId'), parsed.data.turnId)
       return { ok: true }
     })
@@ -303,29 +304,29 @@ export const managedAgents = new Hono<AppEnv>()
       typeof body === 'object' && body != null ? { ...body, idempotencyKey: key } : body,
     )
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) =>
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.resolveRequest(c.req.param('sessionId'), c.req.param('requestId'), parsed.data.resolution, key))
   })
   .post('/sessions/:sessionId/fork', async (c) => {
     const parsed = forkBodySchema.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.fork(c.req.param('sessionId'), parsed.data.title))
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.fork(c.req.param('sessionId'), parsed.data.title))
   })
   .post('/sessions/:sessionId/compact', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, async (bridge) => {
+    viaBridge(c, MANAGED_AGENTS, async (bridge) => {
       await bridge.compact(c.req.param('sessionId'))
       return { ok: true }
     }))
   .post('/sessions/:sessionId/handoff-terminal', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.handoffToTerminal(c.req.param('sessionId'))))
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.handoffToTerminal(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/resume-managed', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.resumeManaged(c.req.param('sessionId'))))
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.resumeManaged(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/verify-imported-resume', (c) =>
-    viaBridge(c, managedAgentsBridgeSlot, (bridge) => bridge.verifyImportedResume(c.req.param('sessionId'))))
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.verifyImportedResume(c.req.param('sessionId'))))
   .get('/sessions/:sessionId/export', (c) => {
     const parsed = exportQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, async (bridge) => ({
+    return viaBridge(c, MANAGED_AGENTS, async (bridge) => ({
       format: parsed.data.format,
       content: await bridge.exportSession(c.req.param('sessionId'), parsed.data.format),
     }))
@@ -333,6 +334,6 @@ export const managedAgents = new Hono<AppEnv>()
   .get('/sessions/:sessionId/wait', (c) => {
     const parsed = agentWaitQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, managedAgentsBridgeSlot, (bridge) =>
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.wait(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.until, parsed.data.timeoutMs))
   })

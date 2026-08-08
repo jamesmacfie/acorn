@@ -4,14 +4,13 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-import { setKnowledgeBridge } from '../server/routes/knowledge'
+import type { KnowledgeBridge } from '../server/routes/knowledge'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
 import { formatMemoryInjection, getMemory, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
 import { acceptProposal, generateMemoryProposals, rejectProposal } from './memoryGen'
 import { MemoryProposalStore } from './memoryProposals'
 import type { NotesStoreCapability } from '@acorn/plugin-notes/contract/store.ts'
 import type { NoteKind } from '@acorn/protocol/notes.ts'
-import { broadcastWorkflowNotice } from '@acorn/node-core/main/notify.ts'
 import { listProfileDefs, profileAvailable, resolveCommand, type ProfileDef } from '@acorn/node-core/main/profiles.ts'
 import { isDir } from '@acorn/node-core/main/taskWorktree.ts'
 import { buildSessionEnv } from '@acorn/node-core/main/taskEnv.ts'
@@ -22,6 +21,7 @@ export type KnowledgeDeps = {
   // Queue a text block into an agent session on its idle edge (agentSender in terminal.ts).
   sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
   notes(): NotesStoreCapability
+  notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
 }
 
 export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'context' | 'identity'>
@@ -64,7 +64,7 @@ export function memoryReviewProfile(): ProfileDef | null {
   )
 }
 
-export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge {
+export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
   const proposals = new MemoryProposalStore(join(dataRoot, 'memory-proposals'))
 
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
@@ -159,7 +159,7 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
             originSessionId: null,
           })),
       })
-      if (out.proposed > 0) broadcastWorkflowNotice(taskId, 'gate', `${out.proposed} memory proposal${out.proposed === 1 ? '' : 's'} await review`)
+      if (out.proposed > 0) deps.notice(taskId, 'gate', `${out.proposed} memory proposal${out.proposed === 1 ? '' : 's'} await review`)
     } catch {
       // auto-generation is best-effort — never disturbs the task lifecycle
     }
@@ -169,7 +169,7 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
   // (server/routes/knowledge.ts). Distinct from the harness memory/notes bridges (the MCP agent
   // surface); this is the human-facing pane. guard() keeps the `| { error }` contract the clients
   // union on. Backed by the same stores, so it 503s under dev:node.
-  setKnowledgeBridge({
+  const route: KnowledgeBridge = {
     memoryList: (repo) =>
       guard(async () => {
         await reconciled()
@@ -256,11 +256,12 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
         await deps.notes().remove(location, slug)
         return { ok: true }
       }),
-  })
+  }
 
   // Published as `memory.knowledge`. The four index reads are bound to THIS plugin's database, which
   // is what lets the agent-tool and context-section wiring keep working without a handle to it.
   return {
+    route,
     proposals,
     reconciled,
     launchInjector,

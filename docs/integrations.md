@@ -45,6 +45,7 @@ retried.
 
 ## Provider boundaries
 
-Provider credentials are read through named plugin accessors and CoreServices. Outbound calls use
-host allowlists and bounded timeouts. Provider responses are mapped into protocol-safe projections;
-raw payloads and credential material do not cross into the renderer.
+Provider credentials are read through named plugin accessors and CoreServices. Outbound calls are
+made by the owning provider plugin; there is no shared host allowlist or central outbound guard.
+Each provider maps responses into protocol-safe projections; raw payloads and credential material
+do not cross into the renderer.

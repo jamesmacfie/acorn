@@ -28,6 +28,7 @@ export type NodePluginDeps = {
   // an app-supplied dep: a plugin may not import electron (tools/arch/boundaries.test.ts enumerates the
   // three that may, and preview's node/ is not one of them).
   preview: PreviewPluginDeps
+  notes: { internalEnv: import('@acorn/node-core/server/auth/internalTokens.ts').InternalEnvFactory }
   terminal: TerminalPluginDeps
   workflows: WorkflowsPluginDeps
 }
@@ -46,7 +47,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   linearPlugin(),
   memoryPlugin(dataDir),
   modelProvidersPlugin(),
-  notesPlugin(dataDir),
+  notesPlugin(dataDir, deps.notes),
   previewPlugin(deps.preview),
   rollbarPlugin(),
   terminalPlugin(dataDir, deps.terminal),

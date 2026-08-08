@@ -17,6 +17,35 @@ export type SourcePromotion<Item> = {
   attachToCurrentTask?(taskId: string, item: Item): Promise<void>
 }
 
+export type SourceReadContext = { signal?: AbortSignal }
+export type SourceRepo = {
+  id: number
+  owner: string
+  name: string
+  private: boolean
+  pushedAt: number | null
+}
+export type SourceCheck = { name: string; status: string | null; url: string | null; runId: number | null }
+export type SourcePullChecks = { checks: SourceCheck[] }
+
+// Repository-backed sources provide the shell's shared repo picker reads through this narrow seam.
+// The source owns the routes and wire types; core owns only the generic query/cache behavior.
+export type SourceRepository = {
+  repos(context: SourceReadContext): Promise<SourceRepo[]>
+  pins(context: SourceReadContext): Promise<number[]>
+  refreshRepos(): Promise<void>
+  setPin(repoId: number, pinned: boolean): Promise<void>
+  pullChecks(owner: string, repo: string, number: string, context: SourceReadContext): Promise<SourcePullChecks>
+}
+
+export type SourceRouteKind = 'repo' | 'create' | 'detail'
+export type SourceRouteContribution = {
+  id: string
+  path: string
+  kind: SourceRouteKind
+  order: number
+}
+
 export type SourceContribution<Item = unknown> = {
   id: string
   // The rail's position, DECLARED rather than derived from where the plugin sits in the client plugin list.
@@ -48,7 +77,38 @@ export type SourceContribution<Item = unknown> = {
   component?: Component
   defaultPane?: string
   requiredCapability?: string
+  // The owning plugin may declare the initial browse surface. Keeping this on the contribution avoids
+  // making the shell know which provider happens to be bundled first.
+  isDefault?: boolean
+  repository?: SourceRepository
+  routes?: readonly SourceRouteContribution[]
   promotion?: SourcePromotion<Item>
 }
 
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')
+
+const sourceOrder = (a: SourceContribution, b: SourceContribution): number => a.order - b.order || a.id.localeCompare(b.id)
+
+// Resolve lazily because plugins populate the registry after this module is evaluated. The explicit
+// default wins over rail order; the fallback keeps bare hosts useful before a provider declares one.
+export const defaultSource = (): SourceContribution | undefined => {
+  const sources = sourceRegistry.entries()
+  return sources.find((source) => source.isDefault) ?? [...sources].sort(sourceOrder)[0]
+}
+
+export const defaultSourceId = (): string | undefined => defaultSource()?.id
+
+export const repositorySource = (): SourceRepository | undefined => sourceRegistry.entries().find((source) => source.repository)?.repository
+
+export const sourceRouteContributions = (): SourceRouteContribution[] => sourceRegistry
+  .entries()
+  .flatMap((source) => source.routes ?? [])
+  .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+
+export const sourceRoutePath = (kind: SourceRouteKind): string | undefined => sourceRouteContributions().find((route) => route.kind === kind)?.path
+
+export const sourcePath = (kind: SourceRouteKind, params: Record<string, string | number>): string => {
+  const path = sourceRoutePath(kind)
+  if (!path) return '/'
+  return path.replace(/:([A-Za-z0-9_]+)/g, (_match, name: string) => encodeURIComponent(String(params[name] ?? '')))
+}

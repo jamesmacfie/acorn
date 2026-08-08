@@ -2,12 +2,10 @@
 // read goes through the broker's device bearer; 401 on /me is a valid logged-out state, elsewhere it
 // is an error.
 //
-// The github, linear and rollbar factories that used to sit here moved to their own plugins
-// (finding 1). What is left is what core actually owns.
+// Provider-specific routes and wire types stay with their plugins. The shell query wrappers below use
+// the repository source contribution for the shared picker/status reads.
 import { readJson } from './apiClient'
-// Re-exported so the shell's existing `from '../queries'` call sites keep working while finding 10
-// is outstanding. See githubShellReads.ts for why that file exists and when it should be deleted.
-export { pinsKey, pinsOptions, reposKey, reposOptions, reposRefreshRoute, shellPullChecksOptions, type ShellRepo } from './githubShellReads'
+import { repositorySource, type SourcePullChecks, type SourceRepo } from './registries/sources'
 import { homeNodeTarget } from './node/fleet'
 import { mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
 import { integrationsKey, integrationsRoute, workspaceProjectsRoute, workspaceAssignmentsRoute, workspaceAssignmentsKey, type RepoAssignment, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceProjectsResponse } from '@acorn/protocol/api.ts'
@@ -16,6 +14,42 @@ export { integrationsKey, prefsKey, tasksKey, workspacesKey } from '@acorn/proto
 export type { Integration, IntegrationsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceProject, WorkspaceRepo } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
+
+export type ShellRepo = SourceRepo
+export type ShellPullChecks = SourcePullChecks
+export const reposKey = ['repos'] as const
+export const pinsKey = ['pins'] as const
+const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
+
+export const reposOptions = (enabled: boolean) => ({
+  queryKey: reposKey,
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<ShellRepo[]> => repositorySource()?.repos({ signal }) ?? [],
+})
+
+export const pinsOptions = (enabled: boolean) => ({
+  queryKey: pinsKey,
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<number[]> => repositorySource()?.pins({ signal }) ?? [],
+})
+
+export const refreshRepos = async (): Promise<void> => {
+  const source = repositorySource()
+  if (!source) throw new Error('repository source unavailable')
+  await source.refreshRepos()
+}
+
+export const setRepoPin = async (repoId: number, pinned: boolean): Promise<void> => {
+  const source = repositorySource()
+  if (!source) throw new Error('repository source unavailable')
+  await source.setPin(repoId, pinned)
+}
+
+export const shellPullChecksOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
+  queryKey: pullKey(owner, repo, number),
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<ShellPullChecks> => repositorySource()?.pullChecks(owner, repo, number, { signal }) ?? { checks: [] },
+})
 
 // Active tasks for the rail (docs/workspaces-and-tasks.md). Source of truth is us; refetch on focus
 // keeps the dirty/PR-inherited markers fresh as the mirror syncs.

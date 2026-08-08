@@ -10,6 +10,7 @@ import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-co
 import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-core/node/activeNode.ts'
 import { clientFor } from '@acorn/client-core/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
+import { sourceRouteContributions } from '@acorn/client-core/registries/sources.ts'
 
 const noop = () => null
 
@@ -49,9 +50,7 @@ render(
           >
             <Router root={App}>
               <Route path="/" component={noop} />
-              <Route path="/:owner/:repo" component={noop} />
-              <Route path="/:owner/:repo/new" component={noop} />
-              <Route path="/:owner/:repo/:number" component={noop} />
+              {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
             </Router>
           </PersistQueryClientProvider>
         )

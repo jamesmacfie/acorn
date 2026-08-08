@@ -14,7 +14,7 @@ import { getRepoPath, setRepoConfig, setRepoPath, setRunTargets } from '../../ma
 import { buildSessionEnv } from '../../main/taskEnv'
 import { computeTaskStatuses, isDir, loadTask, resolveTaskCwd, repoSetup, taskRoot } from '../../main/taskWorktree'
 import { currentBranch } from '../../main/worktrees'
-import { bridgeSlot, viaBridge } from '../bridge'
+import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../bridge'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
@@ -31,17 +31,15 @@ export type TaskSessionsBridge = {
   runTeardown(script: string, cwd: string, env: Record<string, string>, taskId: string): Promise<{ exitCode: number | null; output: string }>
 }
 
-export const taskSessionsBridgeSlot = bridgeSlot<TaskSessionsBridge>()
-export const setTaskSessionsBridge = taskSessionsBridgeSlot.set
+export const TASK_SESSIONS = routeCapability<TaskSessionsBridge>('terminal.taskSessionsRoute')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setTaskSessionsBridge = (bridge: TaskSessionsBridge | null): void => setRouteTestCapability(TASK_SESSIONS, bridge)
 
 // Fired after a task's worktree is first created — the terminal plugin registers the hook that runs
-// the repo's setup script as a background tab (main/taskWorktree.ts's setOnWorktreeCreated). Set by
-// the composition root so `on-created` can seed PR notes without core importing the notes plugin.
-// Nullable so the plugin that fills it can clear it in dispose — the same reason
-// main/taskWorktree.ts's onWorktreeCreated is nullable.
-type TaskCreatedHook = (taskId: string) => Promise<void>
-let onTaskCreated: TaskCreatedHook | null = null
-export const setOnTaskCreated = (hook: TaskCreatedHook | null): void => void (onTaskCreated = hook)
+// the repo's setup script as a background tab. Set by the runtime capability registry so `on-created`
+// can seed PR notes without core importing the notes plugin.
+export type TaskCreatedHook = (taskId: string) => Promise<void>
+export const TASK_CREATED = routeCapability<TaskCreatedHook>('terminal.taskCreatedHook')
 
 const repoPathSetBody = z.object({ owner: z.string(), repo: z.string(), path: z.string() })
 const runTargetsBody = z.object({ owner: z.string(), repo: z.string(), runTargets: z.string() })
@@ -81,10 +79,11 @@ async function capturePreviewUrl(
   db: ReturnType<typeof getDb>,
   taskId: string,
   rawScript: string,
+  capabilities: AppEnv['Bindings']['CAPABILITIES'],
 ): Promise<{ ok: boolean; url?: string; reason?: string }> {
   const script = rawScript?.trim()
   if (!script) return { ok: false, reason: 'no script configured' }
-  const cwd = await taskRoot(db, taskId)
+  const cwd = await taskRoot(db, taskId, null, capabilities)
   if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
   const task = await loadTask(db, taskId)
   const result = await runProcess({
@@ -107,8 +106,8 @@ async function capturePreviewUrl(
 
 // MCP config inspector (docs/mcp.md): read ONLY the known candidate files and mask secrets HERE, so
 // raw values never cross to the renderer. Read-only — acorn never launches these servers.
-async function inspectTaskMcp(db: ReturnType<typeof getDb>, taskId: string): Promise<{ file: string; servers: McpServerSummary[] }[]> {
-  const root = taskId ? await taskRoot(db, taskId) : null
+async function inspectTaskMcp(db: ReturnType<typeof getDb>, taskId: string, capabilities: AppEnv['Bindings']['CAPABILITIES']): Promise<{ file: string; servers: McpServerSummary[] }[]> {
+  const root = taskId ? await taskRoot(db, taskId, null, capabilities) : null
   const out: { file: string; servers: McpServerSummary[] }[] = []
   for (const candidate of MCP_CANDIDATES) {
     const base = candidate.root === 'home' ? homedir() : root
@@ -181,7 +180,7 @@ export const worktree = new Hono<AppEnv>()
   .post('/tasks/:id/preview-url', async (c) => {
     const parsed = previewBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return c.json(await capturePreviewUrl(getDb(c.env), c.req.param('id'), parsed.data.script))
+    return c.json(await capturePreviewUrl(getDb(c.env), c.req.param('id'), parsed.data.script, c.env.CAPABILITIES))
   })
   // Notified right after a task is created. If the repo runs its setup script on creation and the
   // checkout is mapped, eagerly create the worktree — resolveTaskCwd's onWorktreeCreated hook is what
@@ -193,7 +192,7 @@ export const worktree = new Hono<AppEnv>()
     let task = await loadTask(db, taskId)
     if (!task) return c.json({ ok: true })
     // Best-effort and independent of worktree setup: seeds PR/ticket context into curatable notes.
-    await onTaskCreated?.(taskId).catch((error) => console.warn('[worktree] task-created hook failed:', error))
+    await routeCapabilityFor(c, TASK_CREATED)?.(taskId).catch((error) => console.warn('[worktree] task-created hook failed:', error))
     const { script, trigger } = await repoSetup(db, task.repoOwner, task.repoName)
     if (trigger !== 'created' || !script?.trim()) return c.json({ ok: true })
     // Re-read after the hook's await — a pane may have created the worktree meanwhile.
@@ -201,7 +200,7 @@ export const worktree = new Hono<AppEnv>()
     if (!task || (task.worktreePath && isDir(task.worktreePath))) return c.json({ ok: true })
     const mapped = await getRepoPath(db, task.repoOwner, task.repoName)
     if (!mapped || !isDir(mapped.path)) return c.json({ ok: true })
-    await resolveTaskCwd(db, task, mapped.path)
+    await resolveTaskCwd(db, task, mapped.path, null, c.env.CAPABILITIES)
     broadcastStatus() // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })
@@ -209,11 +208,11 @@ export const worktree = new Hono<AppEnv>()
   .post('/tasks/:id/archive', async (c) => {
     const parsed = archiveBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, taskSessionsBridgeSlot, (sessions) => archive(getDb(c.env), c.req.param('id'), parsed.data, sessions))
+    return viaBridge(c, TASK_SESSIONS, (sessions) => archive(getDb(c.env), c.req.param('id'), parsed.data, sessions))
   })
-  .get('/tasks/:id/mcp', async (c) => c.json(await inspectTaskMcp(getDb(c.env), c.req.param('id'))))
+  .get('/tasks/:id/mcp', async (c) => c.json(await inspectTaskMcp(getDb(c.env), c.req.param('id'), c.env.CAPABILITIES)))
   .post('/tasks/:id/mcp/starter', async (c) => {
-    const root = await taskRoot(getDb(c.env), c.req.param('id'))
+    const root = await taskRoot(getDb(c.env), c.req.param('id'), null, c.env.CAPABILITIES)
     if (!root) return c.json({ ok: false, reason: 'No worktree yet — open a terminal first.' })
     const file = resolve(root, '.mcp.json')
     if (existsSync(file)) return c.json({ ok: false, reason: '.mcp.json already exists.' })

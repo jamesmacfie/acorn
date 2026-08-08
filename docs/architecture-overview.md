@@ -115,8 +115,8 @@ by one Node and one repository. Task origins are `github-pr`, `linear`, `rollbar
 The renderer shell is contribution-driven. Plugins register task panes, rail sources, command-palette
 rows, settings pages, slots, context sections, attention items, and node statistics. The shipped
 feature packages are GitHub, terminal, agents, editor, changes, notes, memory, context, workflows,
-database, Docker, HTTP, preview, Linear, Rollbar, model providers, onboarding, and the Claude, Codex,
-and Aider profile packages.
+database, Docker, HTTP, preview, Linear, Rollbar, model providers, onboarding, and the built-in
+Claude, Codex, and Aider profiles registered by `plugins/agents`.
 
 ## Data ownership
 

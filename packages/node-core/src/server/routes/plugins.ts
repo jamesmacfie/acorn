@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { auditRequest } from '../auditRequest'
-import { bridgeSlot, BridgeError, viaBridge } from '../bridge'
+import { routeCapability, setRouteTestCapability, BridgeError, viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import type { PluginRosterEntry } from '../plugin/host'
@@ -23,8 +23,9 @@ export type PluginsBridge = {
   setDisabled(names: readonly string[]): void
 }
 
-export const pluginsBridgeSlot = bridgeSlot<PluginsBridge>()
-export const setPluginsBridge = pluginsBridgeSlot.set
+export const PLUGIN_STATE = routeCapability<PluginsBridge>('core.pluginStateRoute')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setPluginsBridge = (bridge: PluginsBridge | null): void => setRouteTestCapability(PLUGIN_STATE, bridge)
 
 const body = z.strictObject({ disabled: z.array(z.string().min(1)).max(200) })
 
@@ -47,11 +48,11 @@ const state = (bridge: PluginsBridge) => {
 }
 
 export const plugins = new Hono<AppEnv>()
-  .get('/', (c) => viaBridge(c, pluginsBridgeSlot, async (bridge) => state(bridge)))
+  .get('/', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => state(bridge)))
   .put('/', async (c) => {
     const parsed = body.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, pluginsBridgeSlot, async (bridge) => {
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
       const known = new Map(bridge.roster().map((entry) => [entry.name, entry]))
       // Both rejections are 400 rather than a silent filter. A typo'd name that vanished would leave the
       // owner looking at a checkbox that would not stick and no explanation; a `required` name silently

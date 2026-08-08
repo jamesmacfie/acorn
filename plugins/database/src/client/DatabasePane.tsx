@@ -8,6 +8,7 @@ import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
 import { isAppDark, token, watchAppearance } from '@acorn/client-core/ui/appearance.ts'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import { databaseApi } from './databaseClient'
+import { filterSavedQueries, quoteIdentifier, savedQueryLabel } from './databaseModel'
 import GenerateSqlModal from './GenerateSqlModal'
 import ResultGrid from './ResultGrid'
 import SaveQueryModal from './SaveQueryModal'
@@ -32,8 +33,6 @@ function applyMonacoTheme() {
   })
   monaco.editor.setTheme('app')
 }
-
-const qid = (id: string): string => `"${id.replace(/"/g, '""')}"`
 
 type Selected = { schema: string; name: string } | null
 
@@ -73,10 +72,7 @@ export default function DatabasePane(props: { task: Task }) {
   const savedList = (): DbSavedQuery[] => saved() ?? []
   // The name a Save would default to: whatever was last loaded, so load → tweak → Save updates in place.
   const [loadedName, setLoadedName] = createSignal('')
-  const matchSaved = (query: string) => {
-    const needle = query.trim().toLowerCase()
-    return needle ? savedList().filter((q) => `${q.name} ${q.notes ?? ''}`.toLowerCase().includes(needle)) : savedList()
-  }
+  const matchSaved = (query: string) => filterSavedQueries(savedList(), query)
   const deleteSaved = async (q: DbSavedQuery) => {
     try {
       await api.deleteQuery(props.task.id, q.id)
@@ -134,7 +130,7 @@ export default function DatabasePane(props: { task: Task }) {
         setFooter(`${rows.rows.length} of ${rows.total ?? '?'} rows`)
         setError('')
       })
-      if (editor) editor.setValue(`SELECT * FROM ${qid(t.schema)}.${qid(t.name)} LIMIT 500;`)
+      if (editor) editor.setValue(`SELECT * FROM ${quoteIdentifier(t.schema)}.${quoteIdentifier(t.name)} LIMIT 500;`)
     } finally {
       setBusy(false)
     }
@@ -251,7 +247,7 @@ export default function DatabasePane(props: { task: Task }) {
                 buttonClass="db-run-btn"
                 results={matchSaved}
                 // Notes are searchable, so show their first line to explain why a row matched.
-                rowLabel={(q) => (q.notes?.trim() ? `${q.name} — ${q.notes.trim().split('\n')[0]}` : q.name)}
+                rowLabel={savedQueryLabel}
                 isActive={(q) => q.name === loadedName()}
                 leading={(q) => (
                   <button type="button" class="db-chip-x" title="Delete query" onClick={() => void deleteSaved(q)}>✕</button>

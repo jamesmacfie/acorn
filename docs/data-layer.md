@@ -61,12 +61,26 @@ These plugins own SQLite files and migrations:
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
 | `plugins/workflows.sqlite` | definitions, runs, steps, gates, and trigger state |
 
-Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and profile packages use core
-services or provider registries without their own database file.
+Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
+profiles use core services or provider registries without their own database file.
 
 Plugin databases have independent migration chains. There are no cross-database foreign keys,
 `ATTACH` queries, or transactions spanning files. A cross-plugin workflow uses IDs, capabilities,
 events, and durable operation state rather than joining tables.
+
+## External-item read model
+
+`issues`, `issue_resources`, `task_links`, and provider `sync_state` rows are deliberately core-owned
+shared read models, not an accidental Linear or Rollbar database. The provider plugins own their
+remote adapters and write through `ExternalItemStore`; core task context, linked-item resolution,
+storage-footprint reporting, and more than one provider consume the same normalized cache. Moving the
+tables into one provider would either duplicate the cache or make core join a plugin database, both of
+which violate the one-database-per-plugin boundary.
+
+The integration disconnect cascade in `packages/node-core/src/server/db/cascade.ts` therefore removes
+the core rows keyed to the disconnected integration. It intentionally contains only core tables: no
+plugin database has a foreign key into `integrations`, so there is no plugin-specific cascade
+declaration to execute. Plugin-local rows are independently retained or pruned by their owning plugin.
 
 ## Ownership rules
 

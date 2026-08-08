@@ -1,13 +1,13 @@
 import { z } from 'zod'
 import type { ServiceRpcPeer } from '@acorn/protocol/serviceProtocol.ts'
-import { driverFor } from '@acorn/plugin-preview/main/browserService.ts'
 import {
+  driverFor,
   previewCurrentUrl,
   previewEvictTask,
   previewLoadUrl,
   previewNavigate,
   previewNavState,
-} from '@acorn/plugin-preview/main/previewService.ts'
+} from '@acorn/plugin-preview/main/index.ts'
 
 const taskPayload = z.strictObject({ taskId: z.string().min(1) })
 const previewLoadPayload = taskPayload.extend({ url: z.string() })

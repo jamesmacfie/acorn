@@ -94,6 +94,8 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['GET', '/v2/p/workflows/tasks/:id/workflows'], // registered by the plugin's own init
   ['GET', '/v2/p/workflows/workflows/runs/:runId/steps'], // doubled: the router owns '/workflows/*'
   ['GET', '/v2/p/memory/memory'], // doubled: the router owns '/memory'
+  ['GET', '/v2/p/notes/tasks/:id/notes'],
+  ['GET', '/v2/p/notes/workspaces/:wsId/notes'],
   ['GET', '/v2/p/memory/tasks/:id/notes'],
   ['GET', '/v2/p/memory/workspaces/:wsId/notes'],
   ['GET', '/v2/p/terminal/sessions'], // the terminal router owns the sessions namespace
@@ -133,6 +135,7 @@ describe('assembled routes', () => {
         agents: { internalEnv: () => ({}) },
         // Inert: this suite asserts the MOUNT TABLE, and preview contributes agent tools, not routes.
         preview: { browser: {} as never },
+        notes: { internalEnv: () => ({}) },
         // terminal is `required`, so it initializes here whatever this test asks for. Its four
         // composition-root deps are inert stubs: this suite asserts the MOUNT TABLE, and nothing it
         // exercises spawns a pseudo-terminal.
@@ -140,7 +143,6 @@ describe('assembled routes', () => {
           internalEnv: () => ({}),
           launchInjector: async () => {},
           memoryReviewTrigger: async () => {},
-          seedTaskNotes: async () => {},
           reconciled: Promise.resolve(),
         },
         // Same treatment: this suite asserts the MOUNT TABLE, so nothing here starts a run. `failingChecks`

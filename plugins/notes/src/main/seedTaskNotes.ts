@@ -5,8 +5,7 @@
 // Best-effort and idempotent per task: a failure never blocks task/worktree setup, and a re-fire
 // no-ops once any note carries this task's id.
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
-import type { TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
-import type { NotesStoreCapability } from '../contract/store'
+import type { NotesStoreCapability, SeedTask } from '../contract/store'
 
 export type SeedCoreServices = Pick<CoreServices, 'tasks'>
 
@@ -61,7 +60,7 @@ async function fetchJson<T>(url: string, token: string): Promise<T | null> {
 
 // Seed the PR + ticket notes for a freshly created task. Silent no-op when there's no PR/links or
 // the task was already seeded.
-export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesStoreCapability, internalApiEnv: Record<string, string>, task: TaskRow): Promise<void> {
+export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesStoreCapability, internalApiEnv: Record<string, string>, task: SeedTask): Promise<void> {
   const base = internalApiEnv.ACORN_API_URL
   const token = internalApiEnv.ACORN_API_TOKEN ?? ''
   if (!base) return

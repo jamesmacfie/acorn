@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { isTaskConfined, mayActOnTask } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
@@ -25,8 +25,9 @@ export type TerminalBridge = {
   sendToAgent(sessionId: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
 }
 
-export const terminalBridgeSlot = bridgeSlot<TerminalBridge>()
-export const setTerminalBridge = terminalBridgeSlot.set
+export const TERMINAL_ROUTE = routeCapability<TerminalBridge>('terminal.route')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setTerminalBridge = (bridge: TerminalBridge | null): void => setRouteTestCapability(TERMINAL_ROUTE, bridge)
 
 // create spawns a PTY and resize/send touch a live process, so each gets a validated body (the
 // privileged-boundary contract). CreateOpts is passed through — the engine re-derives cwd from
@@ -46,8 +47,6 @@ const createBody = z
 const resizeBody = z.object({ cols: z.number(), rows: z.number() })
 const sendBody = z.object({ text: z.string().min(1), submit: z.enum(['now', 'after-ready', 'draft']) })
 
-const b = terminalBridgeSlot
-
 // A PTY is arbitrary command execution as the owner, so every route below that names a session has to
 // answer "does this caller own that session's task?" — the question main/wsHub.ts § mayDriveStream
 // already asks of the WebSocket half. It did not ask it here, and the gap was the whole hole: a
@@ -61,7 +60,7 @@ const b = terminalBridgeSlot
 const ownsSession = createMiddleware<AppEnv>(async (c, next) => {
   const sid = c.req.param('sid')
   if (!sid || !isTaskConfined(c)) return next()
-  const impl = b.get()
+  const impl = routeCapabilityFor(c, TERMINAL_ROUTE)
   if (!impl) return next() // let viaBridge answer 503
   const taskId = impl.taskIdFor(sid)
   // 404 on an unknown session too, not just a foreign one: a task-scoped caller must not be able to
@@ -75,31 +74,31 @@ export const terminal = new Hono<AppEnv>()
   // else. Unfiltered, `list()` handed every agent the titles and task ids of every other task's
   // terminals — the same shape of leak as an unguarded /devices.
   .get('/sessions', (c) =>
-    viaBridge(c, b, async (t) => {
+    viaBridge(c, TERMINAL_ROUTE, async (t) => {
       const all = await t.list()
       return isTaskConfined(c) ? all.filter((s) => mayActOnTask(c, s.taskId)) : all
     }),
   )
-  .get('/profiles', (c) => viaBridge(c, b, (t) => t.profiles()))
+  .get('/profiles', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.profiles()))
   .post('/sessions', async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     // Spawning: the taskId is in the BODY, so the gate is a body read rather than a path param. Without
     // it a task-scoped agent could spawn a PTY in any task's worktree.
     if (!mayActOnTask(c, p.data.taskId)) return respondError(c, 404, 'not_found')
-    return viaBridge(c, b, (t) => t.create(p.data as CreateOpts))
+    return viaBridge(c, TERMINAL_ROUTE, (t) => t.create(p.data as CreateOpts))
   })
   .use('/sessions/:sid/*', ownsSession)
-  .post('/sessions/:sid/kill', (c) => viaBridge(c, b, (t) => t.kill(c.req.param('sid'))))
-  .post('/sessions/:sid/interrupt', (c) => viaBridge(c, b, (t) => t.interrupt(c.req.param('sid'))))
-  .post('/sessions/:sid/remove', (c) => viaBridge(c, b, (t) => t.remove(c.req.param('sid'))))
+  .post('/sessions/:sid/kill', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.kill(c.req.param('sid'))))
+  .post('/sessions/:sid/interrupt', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.interrupt(c.req.param('sid'))))
+  .post('/sessions/:sid/remove', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.remove(c.req.param('sid'))))
   .post('/sessions/:sid/resize', async (c) => {
     const p = resizeBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.resize(c.req.param('sid'), p.data.cols, p.data.rows))
+    return viaBridge(c, TERMINAL_ROUTE, (t) => t.resize(c.req.param('sid'), p.data.cols, p.data.rows))
   })
   .post('/sessions/:sid/send', async (c) => {
     const p = sendBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, b, (t) => t.sendToAgent(c.req.param('sid'), p.data.text, p.data.submit))
+    return viaBridge(c, TERMINAL_ROUTE, (t) => t.sendToAgent(c.req.param('sid'), p.data.text, p.data.submit))
   })

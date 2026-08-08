@@ -35,7 +35,7 @@ import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@ac
 import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
-import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
+import { defaultSourceId, sourcePath, sourceRegistry, sourceRoutePath } from '@acorn/client-core/registries/sources.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
@@ -247,6 +247,7 @@ export default function App() {
         selectedSource: untrack(selectedSource),
         activeTaskId: untrack(activeTaskId),
         tasks: tasks.data ?? [],
+        defaultSource: defaultSourceId() ?? '',
         rememberedNextView: workspaceView(ws.id),
       })
       if (transition.previousView) rememberWorkspaceView(prevWs.id, transition.previousView)
@@ -286,8 +287,8 @@ export default function App() {
   const toggleCollapsed = () => setCollapsed((value) => !value)
 
   const selected = () => (params.owner && params.repo ? `${params.owner}/${params.repo}` : '')
-  // Create-PR mode: the static /:owner/:repo/new route (outranks the :number param route).
-  const newMatch = useMatch(() => '/:owner/:repo/new')
+  // Create-PR mode: the source contribution owns the static route shape.
+  const newMatch = useMatch(() => sourceRoutePath('create') ?? '')
   const isNew = () => !!newMatch()
 
   async function clearCache() {
@@ -332,21 +333,25 @@ export default function App() {
                  so disable it. The workspace selector stays live (it swaps the whole UI). */
               disabled={!selectedSource() && !!activeTask()}
               onSelect={(value) => {
-                // From a task view, picking a repo returns to the GitHub browse; from a Source
-                // (GitHub/Linear) it just re-scopes that source to the chosen repo.
-                if (!selectedSource()) setSelectedSource('github')
-                navigate(`/${value}`)
+                // From a task view, picking a repo returns to the default browse; from a source
+                // it just re-scopes that source to the chosen repo.
+                if (!selectedSource()) {
+                  const source = defaultSourceId()
+                  if (source) setSelectedSource(source)
+                }
+                const [owner, repo] = value.split('/')
+                navigate(sourcePath('repo', { owner, repo }))
               }}
             />
           </Show>
         </div>
         <div class="breadcrumb">
           <Show when={params.owner} fallback={<span class="brand">acorn</span>}>
-            <button type="button" class="crumb crumb-link" onClick={() => navigate(`/${params.owner}/${params.repo}`)}>
+            <button type="button" class="crumb crumb-link" onClick={() => navigate(sourcePath('repo', { owner: params.owner ?? '', repo: params.repo ?? '' }))}>
               {params.owner}
             </button>
             <span class="crumb-sep">/</span>
-            <button type="button" class="crumb crumb-link" onClick={() => navigate(`/${params.owner}/${params.repo}`)}>
+            <button type="button" class="crumb crumb-link" onClick={() => navigate(sourcePath('repo', { owner: params.owner ?? '', repo: params.repo ?? '' }))}>
               {params.repo}
             </button>
             <Show when={params.number}>

@@ -4,6 +4,7 @@ import { createServer as createHttpsServer } from 'node:https'
 import { resolve } from 'node:path'
 import { createApp } from '../server/index'
 import { makeBindings, type RuntimeBindings } from './bindings'
+import { CapabilityRegistry } from '../server/plugin/capabilities'
 import { openDataRoot, type DataRoot } from './dataRoot'
 import { resolveDatabasePath } from './serverPaths'
 import { configuredPort, devDataDir } from './serverConfig'
@@ -102,7 +103,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
     devices: runtime.DEVICES,
     // Derived from what this node already resolves for the task, so the tunnel's allowlist is not a new
     // configuration surface (main/tunnelPorts.ts).
-    declaredPorts: declaredTunnelPorts(runtime.DB),
+    declaredPorts: declaredTunnelPorts(runtime.DB, runtime.CAPABILITIES),
   }
   attachWsHub(server as unknown as import('node:http').Server, upgradeDeps)
 
@@ -221,12 +222,13 @@ export async function drainWithDeadline(
 // `appVersion` comes from the composition root (Electron's app.getVersion(), via ServiceStartConfig).
 // The plain-Node entry has no packaged version, and saying so is more useful than parsing a
 // package.json that will not exist beside the bundled artifact.
-export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev'): RuntimeBindings {
+export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev', capabilities = new CapabilityRegistry()): RuntimeBindings {
   return makeBindings({
     dbPath: resolveDatabasePath(root.dir),
     blobsDir: resolve(root.dir, 'blobs'),
     nodeId: root.nodeId,
     appVersion,
+    capabilities,
   })
 }
 

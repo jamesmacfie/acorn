@@ -2,9 +2,10 @@ import { createEffect, onCleanup, type Accessor, type Setter } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { NavigateOptions } from '@solidjs/router'
 import type { Task } from '@acorn/protocol/api.ts'
-import type { ShellRepo as Repo } from '../githubShellReads'
+import type { ShellRepo as Repo } from '../queries'
 import { nodes } from '../node/fleet'
 import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../tasks/tasks'
+import { defaultSourceId, sourcePath } from '../registries/sources'
 import { PrefKeys } from './prefKeys'
 import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'
 import { createStartupRestore } from './startupRestore'
@@ -80,7 +81,7 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
           const [, owner, repo] = saved.split('/')
           const valid = !!saved && repos.some((candidate) => candidate.owner === owner && candidate.name === repo)
           const fallback = repos[0]
-          options.navigate(valid ? saved : `/${fallback.owner}/${fallback.name}`, { replace: true })
+          options.navigate(valid ? saved : sourcePath('repo', { owner: fallback.owner, repo: fallback.name }), { replace: true })
         },
       ),
       legacy: legacyScalar(PrefKeys.lastPath),
@@ -101,7 +102,7 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
     },
     {
       id: 'core.last-source', key: PrefKeys.lastSource, scope: 'app', restore: 'view', version: 1,
-      codec: stringCodec, empty: () => 'github', unknownIds: 'retain-inert', maxBytes: 512,
+      codec: stringCodec, empty: () => defaultSourceId() ?? '', unknownIds: 'retain-inert', maxBytes: 512,
       binding: appStateBinding(
         () => selectedSource() ?? '',
         (saved) => {

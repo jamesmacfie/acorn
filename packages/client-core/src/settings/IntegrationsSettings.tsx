@@ -1,7 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
-import { postJson } from '../apiClient'
 import CopyButton from '../ui/CopyButton'
 import Icon from '../ui/Icon'
 import {
@@ -12,35 +11,7 @@ import {
   testIntegration,
 } from '../integrations/integrationClient'
 import { integrationsKey, integrationsOptions } from '../queries'
-
-// plugins/github owns this flow end to end — its two routes and their response shapes are declared
-// in plugins/github/src/server/routes/deviceAuth.ts. They are duplicated here as local literals
-// because client-core is a shared library and may not import a plugin.
-//
-// This settings page runs the flow itself, which is the real problem and not one a move can fix: the
-// proper shape is a `deviceAuth` field on the integration-provider contribution, so the provider
-// supplies its own connect flow and core just renders it. That is finding 10's job (de-GitHub the
-// shell); collected here as debt against it.
-//
-// Two routes rather than one because the client owns the polling interval: a long poll would hold a
-// request slot for up to fifteen minutes per pending connection.
-const githubDeviceStartRoute = '/v2/p/github/auth/device/start'
-const githubDevicePollRoute = '/v2/p/github/auth/device/poll'
-
-type GithubDeviceStart = {
-  deviceCode: string
-  userCode: string
-  verificationUri: string
-  expiresIn: number
-  // Seconds. GitHub's floor is 5 and it may ask for more; never poll faster than it asks.
-  interval: number
-}
-type GithubDevicePoll =
-  | { status: 'pending'; slowDown?: boolean }
-  | { status: 'denied' }
-  | { status: 'expired' }
-  | { status: 'connected'; integration?: unknown }
-
+import { integrationFlowRegistry, type DeviceFlowStart } from '../registries/integrationFlows'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   return (
@@ -76,7 +47,7 @@ export default function IntegrationsSettings() {
   // 'device-flow'`. Currently only GitHub, and one branch here rather than a page of its own: this
   // component is already descriptor-driven, so "how the credential is obtained" is one more thing the
   // descriptor answers.
-  const [device, setDevice] = createSignal<GithubDeviceStart | null>(null)
+  const [device, setDevice] = createSignal<DeviceFlowStart | null>(null)
   let poller: ReturnType<typeof setTimeout> | undefined
   const stopPolling = () => clearTimeout(poller)
   onCleanup(stopPolling)
@@ -85,7 +56,9 @@ export default function IntegrationsSettings() {
     setBusy(true)
     setError('')
     try {
-      const started = await postJson<GithubDeviceStart>(githubDeviceStartRoute)
+      const flow = selectedProvider() ? integrationFlowRegistry.get(selectedProvider()!.id)?.deviceFlow : undefined
+      if (!flow) throw new Error('This provider does not expose a device connection flow.')
+      const started = await flow.start()
       setDevice(started)
       // The node performs the exchange; the client only paces it. `interval` is GitHub's, honoured
       // exactly — polling faster earns a slow_down and, eventually, nothing.
@@ -97,7 +70,7 @@ export default function IntegrationsSettings() {
     }
   }
 
-  const poll = (started: GithubDeviceStart, delay: number, deadline = Date.now() + started.expiresIn * 1000) => {
+  const poll = (started: DeviceFlowStart, delay: number, deadline = Date.now() + started.expiresIn * 1000) => {
     stopPolling()
     poller = setTimeout(async () => {
       if (Date.now() > deadline) {
@@ -106,7 +79,9 @@ export default function IntegrationsSettings() {
         return
       }
       try {
-        const result = await postJson<GithubDevicePoll>(githubDevicePollRoute, { deviceCode: started.deviceCode })
+        const flow = selectedProvider() ? integrationFlowRegistry.get(selectedProvider()!.id)?.deviceFlow : undefined
+        if (!flow) throw new Error('This provider does not expose a device connection flow.')
+        const result = await flow.poll(started.deviceCode)
         if (result.status === 'connected') {
           setDevice(null)
           setAdding(false)

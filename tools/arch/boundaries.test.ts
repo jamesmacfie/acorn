@@ -206,7 +206,7 @@ describe('architecture boundaries', () => {
   })
 
   it('spawning a child process is an enumerated exception to the broker', () => {
-    // main/core/proc.ts opens by quoting docs/security.md: "all child processes go through the process
+    // main/core/exec/proc.ts opens by quoting docs/security.md: "all child processes go through the process
     // broker". Nineteen production modules import node:child_process directly, ten of them in plugins.
     //
     // Most of those are legitimately outside the broker's model, which captures bounded output from a
@@ -220,7 +220,7 @@ describe('architecture boundaries', () => {
     // claim it used to make.
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
-      'packages/node-core/src/main/core/proc.ts', // IS the broker
+      'packages/node-core/src/main/core/exec/proc.ts', // IS the broker
       'packages/node-core/src/main/archive.ts', // bounded git archive
       'packages/node-core/src/main/headless.ts', // one-shot agent run, streams stdout as it goes
       'packages/node-core/src/main/mcpRegister.ts', // registers the MCP server with a CLI
@@ -250,7 +250,7 @@ describe('architecture boundaries', () => {
         .map((e) => rel(e.fromFile)),
     )].sort()
     // Anti-vacuity: the broker itself must always be in the result, or the matcher has stopped matching.
-    expect(importers).toContain('packages/node-core/src/main/core/proc.ts')
+    expect(importers).toContain('packages/node-core/src/main/core/exec/proc.ts')
     expect(importers.filter((f) => !CHILD_PROCESS_OK.has(f))).toEqual([])
   })
 
@@ -345,17 +345,9 @@ describe('architecture boundaries', () => {
     // the real surface (server/plugin/types.ts § PluginBroadcast), and this is the ratchet that drains
     // the imports it replaced.
     //
-    // Everything reachable from a plugin's `init` is already migrated. What is left is six call sites
-    // inside `main/` modules that are constructed without a context — a PTY engine, a docker service, a
-    // git watcher. Each needs its own threading, so they are listed rather than rewritten in a commit
-    // whose job was the seam.
-    const BROADCAST_BASELINE = [
-      'plugins/changes/src/main/localGit.ts',
-      'plugins/docker/src/main/dockerService.ts',
-      'plugins/memory/src/main/knowledgeIpc.ts',
-      'plugins/terminal/src/main/agentTools.ts',
-      'plugins/terminal/src/main/terminal.ts',
-    ]
+    // Every plugin now receives these event projections through NodePluginContext. Keep this ratchet
+    // empty: a new direct import would be an architectural regression, not an item to append here.
+    const BROADCAST_BASELINE: string[] = []
     const HUB = ['@acorn/node-core/main/wsHub.ts', '@acorn/node-core/main/notify.ts']
     const offenders = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && !e.isTest)
       .filter((e) => HUB.includes(e.spec))
@@ -370,23 +362,12 @@ describe('architecture boundaries', () => {
     // up depending on an internal module that was never meant to be load-bearing. That is what this
     // ratchet measures: it may only shrink.
     //
-    // It has already shrunk twice: three entries went when the capability ids moved into contract/
-    // (agents.runtime, workflows.runner, memory.knowledge), and nine more when per-node state eviction
-    // was inverted so each owner registers its own evictor (registries/scopeEviction.ts) instead of
-    // being listed by the shell. What is left is honest work still to do: the preview and terminal
-    // main-process adapters, notes' task seeding, and onboarding's client entry.
+    // The baseline is empty: composition roots consume only node/index.ts, client/index.ts,
+    // main/index.ts, or contract/ surfaces. Keep this ratchet empty as an import-boundary guard.
     //
     // Tests are exempt. A test may reach into whatever it is testing, and holding integration tests to
     // the production surface would only push them into re-exporting internals through it.
-    const APP_DEEP_IMPORT_BASELINE = [
-      '@acorn/plugin-notes/main/seedTaskNotes.ts',
-      '@acorn/plugin-onboarding/client/index.tsx',
-      '@acorn/plugin-preview/main/browserService.ts',
-      '@acorn/plugin-preview/main/previewService.ts',
-      '@acorn/plugin-agents/main/profiles/index.ts',
-      '@acorn/plugin-terminal/main/pickerIpc.ts',
-      '@acorn/plugin-terminal/main/terminal.ts',
-    ]
+    const APP_DEEP_IMPORT_BASELINE: string[] = []
     const ENTRYPOINTS = ['/node/index.ts', '/client/index.ts', '/main/index.ts']
     const deep = EDGES.filter((e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile))
       .filter((e) => e.target.pkg?.kind === 'plugin' && e.target.pkg.name !== e.fromPkg.name)
@@ -453,7 +434,7 @@ describe('architecture boundaries', () => {
   it('only core reaches the machine identity store', () => {
     // The node's identity used to be WRITTEN by a feature plugin: plugins/github's device-flow route
     // set `c.env.ACTIVE_IDENTITY` after connecting an account, so core's answer to "who is the user"
-    // was a side effect of one provider. It is CoreServices.identity now (main/core/identity.ts), and
+    // was a side effect of one provider. It is CoreServices.identity now (main/core/identity/identity.ts), and
     // github binds through that seam like any other consumer.
     //
     // This rule keeps the raw store out of reach so the inversion cannot come back. The allowlist is

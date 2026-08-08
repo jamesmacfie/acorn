@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import '../../src/wiring/agentProfiles' // register the built-in profile plugins into the registry under test
+import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
+registerBuiltInProfiles() // register the built-in profiles into the registry under test
 import { agentProfileRegistry, type AgentProfileContribution } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { listProfileDefs } from '@acorn/node-core/main/profiles.ts'
 
@@ -36,4 +37,3 @@ describe('agent profile registry', () => {
     expect(listProfileDefs()).not.toContain(profile)
   })
 })
-

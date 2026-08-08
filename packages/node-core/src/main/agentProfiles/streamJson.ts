@@ -1,10 +1,14 @@
 import type { HeadlessCapture, StreamEvent, StreamJsonAdapter } from './types'
+import { z } from 'zod'
+
+const streamEventSchema = z.object({ type: z.string().optional() }).passthrough()
 
 export function parseStreamLine(line: string): StreamEvent | null {
   const trimmed = line.trim()
   if (!trimmed) return null
   try {
-    return JSON.parse(trimmed) as StreamEvent
+    const parsed = streamEventSchema.safeParse(JSON.parse(trimmed))
+    return parsed.success ? parsed.data as StreamEvent : null
   } catch {
     return null
   }

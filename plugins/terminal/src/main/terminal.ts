@@ -7,9 +7,9 @@ import { eq } from 'drizzle-orm'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import { terminalSessions } from '../node/schema'
-import { setTerminalBridge } from '../server/routes/terminal'
-import { setOnTaskCreated, setTaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
-import { setStreamHandlers } from '@acorn/node-core/main/wsHub.ts'
+import type { TerminalBridge } from '../server/routes/terminal'
+import type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
+import type { PluginBroadcast } from '@acorn/node-core/server/plugin/types.ts'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
 import type { SendSubmit } from '../shared/send'
 import { AgentSender } from './agentSend'
@@ -32,10 +32,9 @@ import {
 import { getProfile, listProfileDefs, listProfiles, resolveCommand, tmuxAvailable } from '@acorn/node-core/main/profiles.ts'
 import { fileURLToPath } from 'node:url'
 import { launcherSpec, resolveMcpEntry, serverName, type Launcher } from '@acorn/node-core/main/mcpRegister.ts'
-import { broadcastStatus } from '@acorn/node-core/main/notify.ts'
 import type { RunSessionGlue } from './runIpc'
 import { TerminalDisplay } from './terminalDisplay'
-import { rendererBaseCheckout, setOnWorktreeCreated, taskContext, type TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
+import { rendererBaseCheckout, taskContext, type TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
 
 // PTYs live in the Node utility service. Sessions run on one of two backends:
 //  - node-pty: spawn the command directly. Survives a window reload (PTY is in the service), not an app
@@ -123,6 +122,7 @@ let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<vo
 let seedNotes: ((task: TaskRow) => Promise<void>) | null = null
 let internalEnv: InternalEnvFactory = () => ({})
 let bootReconciled: Promise<void> = Promise.resolve()
+let statusBroadcast: () => void = () => {}
 
 // PTY-tier AgentState (docs/terminal-and-agents.md): shells stay 'unknown'; agents flip working/idle with the
 // silence detector ('blocked' lands with the prompt-pattern scan).
@@ -285,7 +285,7 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     if (s.meta.idle) {
       s.meta.idle = false // output resumed → no longer waiting
       s.meta.agentState = ptyState(s.meta.kind, s.meta.status, false)
-      broadcastStatus()
+      statusBroadcast()
     }
     queueOutput(s, data) // append to ring now; coalesce the wire frame onto the ~16ms tick
   })
@@ -299,7 +299,7 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     if (s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode)
     // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
     if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.slice(-10_000))
-    broadcastStatus()
+    statusBroadcast()
   })
   return s
 }
@@ -317,7 +317,7 @@ function startIdleWatch() {
         s.meta.agentState = matchBlockedPrompt(s.ring.slice(-4000)) ? 'blocked' : 'idle'
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
         // The OS toast moved to the renderer (docs/terminal-and-agents.md): focus-gated + cooldown/dedup there.
-        broadcastStatus()
+        statusBroadcast()
       }
     }
   }, 3000)
@@ -337,7 +337,7 @@ async function maybeRunSetup(t: TaskRow, cwd: string): Promise<void> {
   const { script, trigger } = await services().repos.setup(t.repoOwner, t.repoName)
   if (trigger === 'off' || !script?.trim()) return
   await spawnOne({ taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
-  broadcastStatus() // panel re-lists to show the Setup tab even when no other spawn follows
+  statusBroadcast() // panel re-lists to show the Setup tab even when no other spawn follows
 }
 
 async function create(opts: CreateOpts): Promise<TerminalSession> {
@@ -502,7 +502,7 @@ export async function reconcileTmux() {
   // This now runs after the window (composition root step 6), so the renderer's initial term:list
   // has already fired — ping it to re-list, or resurrected sessions stay invisible until some
   // unrelated broadcast (shell sessions never hit the idle-edge broadcasts).
-  if (reattached) broadcastStatus()
+  if (reattached) statusBroadcast()
 }
 
 // The session-engine glue the run-target service (runIpc) needs: spawn a target's command as a
@@ -514,7 +514,7 @@ export function terminalRunGlue(): RunSessionGlue {
     startSession: async (taskId: string, target: { id: string; command: string }, cwd: string) => {
       const t = await services().tasks.load(taskId)
       const meta = await spawnOne({ taskId, command: target.command, title: `▶ ${target.id}` }, cwd, true, taskContext(t), t)
-      broadcastStatus()
+      statusBroadcast()
       return meta.id
     },
     isRunning: (sessionId: string) => sessions.get(sessionId)?.meta.status === 'running',
@@ -534,6 +534,8 @@ export type TerminalIpcDeps = {
   // Resolves when the composition root's post-window reconcile pass is done (always resolves,
   // even on reconcile failure). Mutating surfaces that read the sessions map await it.
   reconciled: Promise<void>
+  status?: () => void
+  streams?: (handlers: Parameters<PluginBroadcast['streams']>[0]) => void
 }
 
 // Release everything registerTerminalIpc installed. Called from the plugin's dispose (node/index.ts),
@@ -564,9 +566,17 @@ export function disposeTerminal(): void {
   memoryReviewTrigger = null
   seedNotes = null
   bootReconciled = Promise.resolve()
+  statusBroadcast = () => {}
 }
 
-export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalIpcDeps): void {
+export type TerminalIpcRegistrations = {
+  terminal: TerminalBridge
+  taskSessions: TaskSessionsBridge
+  taskCreated: TaskCreatedHook
+  worktreeCreated: (task: TaskRow, cwd: string) => Promise<void>
+}
+
+export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalIpcDeps): TerminalIpcRegistrations {
   store = pluginDb
   core = coreServices
   internalEnv = deps.internalEnv
@@ -574,17 +584,18 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
   memoryReviewTrigger = deps.memoryReviewTrigger
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
+  statusBroadcast = deps.status ?? (() => {})
 
   // Every worktree creation funnels through core's resolveTaskCwd; this hook makes the setup script run
   // regardless of which surface (terminal, pane, workflow) created the worktree.
-  setOnWorktreeCreated((t, cwd) => maybeRunSetup(t, cwd))
+  const worktreeCreated = (t: TaskRow, cwd: string): Promise<void> => maybeRunSetup(t, cwd)
 
   // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
   // routes (server/routes/terminal.ts).
   // The STREAM half (term:input/attach/detach + the term:out push, term:status) is the WebSocket
   // hub (setStreamHandlers below). The native repo picker is registered separately through preload.
   // The bridge closes over the engine internals (sessions map, agentSender, …).
-  setTerminalBridge({
+  const terminal: TerminalBridge = {
     // Same lookup the WS hub gets as `streamTaskId` below, off the same map — see TerminalBridge.
     taskIdFor: (id) => sessions.get(id)?.meta.taskId ?? null,
     list: async () => [...sessions.values()].map((s) => s.meta),
@@ -628,14 +639,14 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
       if (s.meta.status === 'running') s.pty.resize(c, r)
       return true
     },
-  })
+  }
 
   // The PTY half of archive (@acorn/node-core/server/routes/worktree.ts owns the route and the
   // orchestration). These four are the only parts of tearing a task down that need a pseudo-terminal:
   // the running-session guard, killing this task's sessions, dropping their rows, and streaming
   // teardown output into a "Teardown" tab. An unfilled slot answers 503, which is exactly what
   // dev:node did before when the whole terminal bridge was unset.
-  setTaskSessionsBridge({
+  const taskSessions: TaskSessionsBridge = {
     // The reconcile gate the route awaits before the running-session guard (see TaskSessionsBridge).
     ready: () => bootReconciled,
     runningCount: (taskId) => [...sessions.values()].filter((s) => s.meta.taskId === taskId && s.meta.status === 'running').length,
@@ -660,7 +671,7 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
       const meta = await spawnOne({ taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t)
       const s = sessions.get(meta.id)
       if (!s) return { exitCode: 1, output: 'Could not start the teardown session.' }
-      broadcastStatus()
+      statusBroadcast()
       return new Promise((resolveTeardown) => {
         const timer = setTimeout(() => killSession(s), TEARDOWN_TIMEOUT_MS)
         s.pty.onExit(({ exitCode }) => {
@@ -669,19 +680,19 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
         })
       })
     },
-  })
+  }
 
   // Seeding PR/ticket notes on task creation is core's route now, but the notes store is injected
   // here by the composition root — so this hands core the hook rather than moving the dependency.
-  setOnTaskCreated(async (taskId) => {
+  const taskCreated: TaskCreatedHook = async (taskId) => {
     const task = await services().tasks.load(taskId)
     if (task) await seedNotes?.(task)
-  })
+  }
 
   // The STREAM half (the WebSocket transport): the terminal engine's PTY input/output + attach/detach now
   // ride the one authenticated WebSocket (main/wsHub.ts) instead of per-session IPC channels. The
   // hub routes client frames here and hands each attachment a sink to fan output to.
-  setStreamHandlers({
+  deps.streams?.({
     // Which task owns a session, so the WS hub can refuse a task-scoped internal credential that tries
     // to attach to (or type into) another task's pseudo-terminal (main/wsHub.ts § mayDriveStream).
     streamTaskId: (id) => sessions.get(id)?.meta.taskId ?? null,
@@ -706,4 +717,5 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
   // Durable-state reconciliation (reconcileTmux) is driven by the composition root's reconcile()
   // step, off the paint-critical path. The idle-watch is engine-owned and starts here.
   startIdleWatch()
+  return { terminal, taskSessions, taskCreated, worktreeCreated }
 }

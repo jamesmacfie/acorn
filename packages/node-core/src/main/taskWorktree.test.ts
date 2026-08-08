@@ -4,8 +4,9 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../server/db'
+import { CapabilityRegistry } from '../server/plugin/capabilities'
 import { makeTestDb, type TestDb } from '../testkit/db'
-import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setOnWorktreeCreated, setWorktreesRoot } from './taskWorktree'
+import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot, WORKTREE_CREATED } from './taskWorktree'
 
 vi.setConfig({ testTimeout: 20_000 })
 
@@ -35,6 +36,7 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
   let dir: string
   let checkout: string
   let created: string[]
+  let capabilities: CapabilityRegistry
 
   let template: string
 
@@ -64,41 +66,42 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     await t.db.insert(schema.tasks).values({ id: TASK, title: 'T', origin: 'local', repoOwner: 'acme', repoName: 'web', branch: 'feat-x', status: 'active', sort: 0, createdAt: now, updatedAt: now })
     setWorktreesRoot(join(dir, 'worktrees'))
     created = []
-    setOnWorktreeCreated(async (task, cwd) => {
+    capabilities = new CapabilityRegistry()
+    capabilities.provide(WORKTREE_CREATED, async (task, cwd) => {
       created.push(`${task.id}:${cwd}`)
     })
   })
   afterEach(() => {
-    setOnWorktreeCreated(async () => {})
     t.cleanup()
     rmSync(dir, { recursive: true, force: true })
   })
 
   it('fires exactly once across concurrent creators, then never again on reuse', async () => {
     const task = await loadTask(t.db, TASK)
-    const [a, b] = await Promise.all([resolveTaskCwd(t.db, task, checkout), resolveTaskCwd(t.db, task, checkout)])
+    const [a, b] = await Promise.all([resolveTaskCwd(t.db, task, checkout, null, capabilities), resolveTaskCwd(t.db, task, checkout, null, capabilities)])
     expect(a.isWorktree).toBe(true)
     expect(b.cwd).toBe(a.cwd)
     expect(created).toEqual([`${TASK}:${a.cwd}`])
 
     // Reuse — both via the persisted worktreePath and via a stale row that predates it.
-    const fresh = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
-    const stale = await resolveTaskCwd(t.db, task, checkout)
+    const fresh = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    const stale = await resolveTaskCwd(t.db, task, checkout, null, capabilities)
     expect(fresh).toMatchObject({ cwd: a.cwd, created: false })
     expect(stale).toMatchObject({ cwd: a.cwd, created: false })
     expect(created).toHaveLength(1)
   })
 
   it('a failing hook does not break worktree resolution', async () => {
-    setOnWorktreeCreated(async () => {
+    capabilities = new CapabilityRegistry()
+    capabilities.provide(WORKTREE_CREATED, async () => {
       throw new Error('setup exploded')
     })
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
     expect(res).toMatchObject({ isWorktree: true, created: true })
   })
 
   it('computes status for active worktrees after the bounded fan-out refactor', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
     writeFileSync(join(res.cwd, 'f.txt'), 'changed\n')
 
     await expect(computeTaskStatuses(t.db)).resolves.toEqual([

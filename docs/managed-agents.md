@@ -61,5 +61,5 @@ killing the provider process; the client reattaches from the session sequence or
 ## Source map
 
 The main implementation is in `plugins/agents/src/node`, `src/main`, `src/server/routes`, and
-`src/client`; process/profile boundaries are supplied by `apps/node/src/wiring/agentProfiles.ts` and
-the terminal plugin.
+`src/client`; process/profile boundaries are supplied by `plugins/agents/src/main/index.ts` and the
+terminal plugin.

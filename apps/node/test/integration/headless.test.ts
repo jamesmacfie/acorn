@@ -4,7 +4,9 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildHeadlessArgv, parseStreamJson, runHeadless } from '@acorn/node-core/main/headless.ts'
-import '../../src/wiring/agentProfiles' // register the built-in profile plugins under test
+import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
+
+registerBuiltInProfiles() // register the built-in profile plugins under test
 
 const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-agent.sh')
 

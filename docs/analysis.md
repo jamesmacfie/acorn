@@ -12,6 +12,37 @@ are historical and several of their "not done" items have since landed (provider
 via `requireProviderAccess`, the idempotency middleware). Trust this file and the code over the
 legacy notes.
 
+## Status ledger — 2026-08-08
+
+The findings below are the original numbered registry; this ledger records what has landed since
+the review and where the remaining work is being executed.
+
+- **F2 landed:** `packages/protocol/src/ws.ts` now carries the open transport envelope, with
+  channel payloads registered through `packages/client-core/src/wsChannels.ts`.
+- **F3 landed:** node plugins broadcast through `NodePluginContext.events`; the plugin contract and
+  `docs/plugins.md` describe broadcast as the client-notification mechanism.
+- **F4 landed:** `tools/arch/boundaries.test.ts` enforces the reviewed `CORE_IMPORT_ROOTS` set and
+  the testkit boundary.
+- **F5 landed:** core owns `ACTIVE_IDENTITY` through `main/core/identity/identity.ts`; the architecture
+  suite keeps other packages from writing it.
+- **F7 landed:** capability IDs and signatures live in provider `contract/` modules, and app-to-plugin
+  reach is guarded by the shrinking entrypoint/contract baseline.
+- **F11 landed:** per-owner client state registers scope evictors through
+  `client-core/registries/scopeEviction.ts`.
+- **F12 landed:** direct child-process use is restricted to the reviewed `CHILD_PROCESS_OK` set in
+  `tools/arch/boundaries.test.ts`.
+- **F6 landed:** [WP-08](antislop/WP-08-late-binding-unification.md) moved runtime late binding to
+  capability registries, removed the app wiring directory, and left only a justified test adapter.
+- **F8 landed:** [WP-07](antislop/WP-07-core-plugin-data.md) kept core's deliberate shared read models
+  while moving the notes write namespace and ownership boundary into the notes plugin.
+- **F9 landed:** [WP-09](antislop/WP-09-composition-root-parity.md) made `apps/node` the shared graph,
+  reconciliation, and drain composition layer for both hosts.
+- **F10 landed:** [WP-03](antislop/WP-03-shell-source-registry.md) through
+  [WP-06](antislop/WP-06-shell-css-migration.md) moved source, route, read, and feature-style ownership
+  out of the shell.
+- **F13 landed:** [WP-11](antislop/WP-11-mutation-validation.md) classified the JSON audit and added
+  schemas at external control and persisted-data boundaries.
+
 ## Verdict
 
 The architecture is in genuinely good shape. The plugin seam is real, not aspirational: across all
@@ -33,7 +64,7 @@ shape.
 
 Named explicitly so a future cleanup pass doesn't mistake discipline for accident.
 
-- **`tools/arch/boundaries.test.ts`** (330 lines, 13 rules) is the load-bearing artifact of the
+- **`tools/arch/boundaries.test.ts`** (603 lines, 22 rules at this review pin) is the load-bearing artifact of the
   repository. Filesystem-derived package list (a new package is covered the day it appears), an
   anti-vacuity guard (asserts ≥20 packages, >2000 edges, >500 cross-package edges, so a broken
   scanner fails loudly instead of passing empty), transitive contract-purity (rule 12: a plugin's
@@ -61,7 +92,8 @@ Named explicitly so a future cleanup pass doesn't mistake discipline for acciden
   gates by mount path (both `/x` and `/x/*` forms), so a route added later inherits its gate.
   Uniform-null auth failures (tokens, pairing codes refuse to be status oracles). A single error
   envelope built in exactly one place (`server/respond.ts`). The process broker's env allowlist and
-  kill-tree (`main/core/proc.ts`). `SecretService.use()`'s scrub-on-throw (`main/core/secrets.ts`).
+  kill-tree (`main/core/exec/proc.ts`). `SecretService.use()`'s scrub-on-throw
+  (`main/core/security/secrets.ts`).
 - **Meta-tests that iterate the system instead of hardcoding it**: the provider conformance suite
   (`apps/node/test/integration/conformance.test.ts`) walks the registry and holds every provider to
   the same obligations; `standaloneParity.test.ts` scans both composition roots; the two-node e2e
@@ -168,11 +200,11 @@ route); github calls it like any consumer. Cheap now, structural later.
 
 ### Tier 2 — consistency and inverted dependencies
 
-**6. Three parallel late-binding mechanisms on the node.** (a) The capability registry — the
+**6. [Resolved by WP-08] Three parallel late-binding mechanisms on the node.** (a) The capability registry — the
 intended seam. (b) Nine module-global bridge slots in `server/bridge.ts` and friends
 (`setConfigTrustBridge`, `setPluginsBridge`, `setRepoMirrorSource`, `setRunBridge`,
 `setOnTaskCreated`, `setOnWorktreeCreated`, `setStreamHandlers`, `setRepoMirrorSource`,
-`setWorktreesRoot`). (c) Two surviving `wireX()` functions in `apps/node/src/wiring/` from the
+`setWorktreesRoot`). (c) Two surviving `wireX()` functions in the app wiring layer from the
 mechanism the plugin host explicitly replaced (`host.ts:4`). Three of the bridge slots are core
 code shaped for a specific first-party plugin — `setRepoMirrorSource` exists for github,
 `setRunBridge` and `setOnTaskCreated` for terminal — which is a core→plugin dependency wearing a
@@ -251,7 +283,7 @@ Don't unify the three mechanisms; each is right for its job. Just make membershi
 eviction impossible to forget.
 
 **12. "All child processes go through the process broker" is stated but not enforced.**
-`main/core/proc.ts:1` quotes the security doc's universal claim, yet 18 modules import
+`main/core/exec/proc.ts:1` quotes the security doc's universal claim, yet 18 modules import
 `node:child_process` directly, 10 of them in plugins (agents drivers, docker CLI, editor search,
 database, http send, terminal). Several are legitimately outside the broker's model (long-lived
 streaming children, PTYs), but nothing distinguishes a sanctioned exception from an unmigrated
@@ -286,15 +318,15 @@ Stale references (fix the pointer or the code):
   the reasoning written in `server/audit.ts`. Fine — but say so where the scheduler is promised.
 
 Oddities:
-- Notes' HTTP surface is served under **memory's** namespace (`/v2/p/memory/tasks/:id/notes`,
-  built in `plugins/memory/src/server/routes/knowledge.ts` over notes' `contract/store.ts`).
-  Notes owns the store; memory owns the wire. Currently unreachable as a bug (both are required
-  plugins), but it is the kind of accident that hardens into an API.
+- Notes' HTTP surface was served under **memory's** namespace at review time. WP-07 now serves the
+  current `/v2/p/notes` namespace from `plugins/notes/src/server/routes/notes.ts`; the old memory
+  route remains a compatibility alias for one release.
 - `apps/node/package.json` lists `@acorn/node-core` and every plugin under `devDependencies`.
   Works because vite bundles; misdescribes the graph.
-- The `profiles-*` packages are not plugins in the host sense — each is a bare
+- The `profiles-*` packages were not plugins in the host sense — each was a bare
   `AgentProfileContribution` object (11–48 lines of source under 3 config files each, 9 files of
-  boilerplate for 95 lines total), registered by `apps/node/src/wiring/agentProfiles.ts`.
+  boilerplate for 95 lines total), registered by the app wiring layer. WP-08 folded that
+  registration into `plugins/agents/src/main/index.ts`, making the first-party ownership explicit.
   Meanwhile everything that actually encodes Claude/Codex knowledge — drivers (296–325 lines
   each), normalizers, usage probes, pricing tables — lives hardcoded inside `plugins/agents`, and
   `plugins/agents/src/node/index.ts:27-32` registers `'claude'`/`'codex'` drivers by literal.
@@ -310,9 +342,9 @@ Oddities:
   fine, but `docs/plugins.md`'s package-shape description doesn't mention the pattern.
 
 Tooling gaps:
-- `lint` is `tsc --noEmit` in every package; there is **no ESLint (or equivalent) anywhere**, so
-  unused imports/variables/dead exports are invisible (both of the dead-code items above would
-  have been caught). One flat config at the root with a handful of rules would pay for itself.
+- `lint` runs oxlint followed by `tsc --noEmit` in every package. Oxlint is intentionally narrow —
+  it catches the repository's agreed dead-code and `node:` protocol issues without turning style
+  disputes into noise; broader lint coverage remains a separate decision.
 - No test for `apps/desktop/src/app/main/bootstrap.ts` — the crash/restart/quit interlock state
   machine (five mutable flags coordinating three restart paths) is the only main-process file
   without one, and it is the file where a mistake shows up as "the app won't die" on a user's
@@ -368,7 +400,7 @@ or doc correction) so it cannot regress. Order within tiers is by leverage.
 9. **Finding 8** — TTLs and section order onto contributions; retire the legacy context shape.
 10. **Finding 11** — eviction hook; state-placement rule in `docs/state.md`.
 11. **Finding 12** — child-process allowlist; correct `docs/security.md`.
-12. **Tier 3 sweep** — dead code, stale pointers, doc corrections, ESLint, `bootstrap.ts` test.
+12. **Tier 3 sweep** — dead code, stale pointers, doc corrections, and the `bootstrap.ts` test.
 
 Run `pnpm lint`, `pnpm test`, and `pnpm --filter @acorn/arch-tests test` after every item; the
 arch suite must stay at zero plugin→plugin violations and its baselines may only shrink.

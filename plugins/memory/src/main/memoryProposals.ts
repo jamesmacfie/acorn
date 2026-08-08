@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { z } from 'zod'
 import { isValidMemoryName, MEMORY_TYPES, type MemoryType } from './memory'
 
 export type MemoryProposal = {
@@ -24,6 +25,20 @@ export type MemoryProposal = {
   status: 'pending' | 'accepted' | 'rejected'
   createdAt: number
 }
+
+const memoryProposalSchema = z.strictObject({
+  id: z.string().min(1),
+  taskId: z.string().min(1),
+  repo: z.string().nullable(),
+  name: z.string(),
+  type: z.enum(MEMORY_TYPES),
+  description: z.string(),
+  body: z.string(),
+  flags: z.array(z.string()).default([]),
+  originSessionId: z.string().nullable(),
+  status: z.enum(['pending', 'accepted', 'rejected']),
+  createdAt: z.number(),
+})
 
 export class MemoryProposalStore {
   constructor(private root: string) {
@@ -61,9 +76,9 @@ export class MemoryProposalStore {
     for (const name of entries) {
       if (!name.endsWith('.json')) continue
       try {
-        // Default `flags` so proposals written before the field existed still parse as complete.
-        const parsed = JSON.parse(await readFile(join(this.root, name), 'utf8')) as Omit<MemoryProposal, 'flags'> & { flags?: string[] }
-        const p: MemoryProposal = { ...parsed, flags: parsed.flags ?? [] }
+        const parsed = memoryProposalSchema.safeParse(JSON.parse(await readFile(join(this.root, name), 'utf8')))
+        if (!parsed.success) continue
+        const p: MemoryProposal = parsed.data
         if (!status || p.status === status) out.push(p)
       } catch {
         // unreadable proposal → skipped
@@ -74,8 +89,8 @@ export class MemoryProposalStore {
 
   async get(id: string): Promise<MemoryProposal | null> {
     try {
-      const parsed = JSON.parse(await readFile(this.fileFor(id), 'utf8')) as Omit<MemoryProposal, 'flags'> & { flags?: string[] }
-      return { ...parsed, flags: parsed.flags ?? [] }
+      const parsed = memoryProposalSchema.safeParse(JSON.parse(await readFile(this.fileFor(id), 'utf8')))
+      return parsed.success ? parsed.data : null
     } catch {
       return null
     }

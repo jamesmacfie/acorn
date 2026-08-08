@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -43,5 +43,12 @@ describe('memory proposals (docs/notes-and-memory.md — the human gate)', () =>
     await expect(store.propose({ taskId: 't', repo: null, name: '../evil', type: 'fix', description: 'd', body: '', originSessionId: null })).rejects.toThrow('Invalid memory name')
     await expect(store.propose({ taskId: 't', repo: null, name: 'ok', type: 'novel' as never, description: 'd', body: '', originSessionId: null })).rejects.toThrow('Invalid memory type')
     expect(await store.resolve('nope', 'rejected')).toBeNull()
+  })
+
+  it('skips a persisted proposal whose fields no longer match the stored contract', async () => {
+    const file = join(dir, 'proposals', 'corrupt.json')
+    writeFileSync(file, JSON.stringify({ id: 'corrupt', taskId: 't1', repo: null, name: 'x', type: 'fix', description: 'd', body: 'b', flags: ['ok'], originSessionId: null, status: 'pending', createdAt: 'y' }))
+    expect(await store.list()).toEqual([])
+    expect(await store.get('corrupt')).toBeNull()
   })
 })

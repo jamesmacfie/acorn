@@ -3,4 +3,6 @@
 // them. Integration PROVIDERS are NOT registered globally — a test that mocks a provider plugin's
 // modules must register providers in-graph (by importing src/server/providers itself) so its
 // vi.mock hoists above the registration; a global import would pre-load the real module first.
-import '../src/wiring/agentProfiles'
+import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
+
+registerBuiltInProfiles()

@@ -1,6 +1,7 @@
 import { gitOrThrow } from './core/git'
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
+import { z } from 'zod'
 import { eq, and } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
@@ -8,6 +9,17 @@ import { normalizeBranchPrefix } from '@acorn/protocol/branch.ts'
 import { isValidBrowserRule, parseBrowserRules } from '@acorn/protocol/browserRules.ts'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
 import type { RepoConfigPatch, RepoPath, RepoPathResult } from '@acorn/protocol/terminal.ts'
+
+const runTargetWireSchema = z.object({
+  id: z.string().min(1),
+  command: z.string().min(1),
+  stop: z.string().optional(),
+  restart: z.string().optional(),
+  url: z.string().optional(),
+  urlCommand: z.string().optional(),
+  icon: z.string().optional(),
+  default: z.boolean().optional(),
+}).refine((target) => !(target.url && target.urlCommand), { message: 'url and urlCommand are mutually exclusive' })
 
 
 export async function getRepoPath(db: AppDatabase, owner: string, repo: string): Promise<RepoPath | null> {
@@ -47,14 +59,8 @@ export async function setRunTargets(db: AppDatabase, owner: string, repo: string
   const value = json.trim() || null
   if (value) {
     try {
-      const arr = JSON.parse(value) as unknown
-      if (!Array.isArray(arr)) return { ok: false, reason: 'Run targets must be a JSON array.' }
-      for (const t of arr) {
-        const o = t as Record<string, unknown>
-        if (!o || typeof o !== 'object' || typeof o.id !== 'string' || !o.id.trim() || typeof o.command !== 'string' || !o.command.trim())
-          return { ok: false, reason: 'Each run target needs an "id" and a "command".' }
-        if (o.url && o.urlCommand) return { ok: false, reason: `Target "${o.id}": pick one of "url" / "urlCommand".` }
-      }
+      const parsed = z.array(runTargetWireSchema).safeParse(JSON.parse(value))
+      if (!parsed.success) return { ok: false, reason: 'Run targets must be a valid JSON array of targets.' }
     } catch {
       return { ok: false, reason: 'Invalid JSON.' }
     }

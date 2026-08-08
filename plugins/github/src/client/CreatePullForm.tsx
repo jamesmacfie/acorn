@@ -7,6 +7,8 @@ import MentionTextarea from '@acorn/client-core/ui/MentionTextarea.tsx'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import Picker from '@acorn/client-core/ui/Picker.tsx'
+import './styles/pull-list.css'
+import './styles/pull-detail.css'
 
 // Mid (Navigator) pane in create mode: base/head pickers + title/body/draft + Create. base/head
 // live in the URL (?base=&head=) so they're shareable and reactive — the compare query and the

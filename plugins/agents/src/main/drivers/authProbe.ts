@@ -1,8 +1,10 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { z } from 'zod'
 import { usageProcessEnv } from '../usage/processRunner'
 
 const execFileAsync = promisify(execFile)
+const claudeAuthStatusSchema = z.object({ loggedIn: z.boolean().optional() }).passthrough()
 
 export async function probeCodexAuthentication(executable: string): Promise<boolean | null> {
   try {
@@ -26,8 +28,8 @@ export async function probeClaudeAuthentication(executable: string): Promise<boo
       timeout: 5_000,
       maxBuffer: 64 * 1024,
     })
-    const result = JSON.parse(stdout) as { loggedIn?: unknown }
-    return typeof result.loggedIn === 'boolean' ? result.loggedIn : null
+    const result = claudeAuthStatusSchema.safeParse(JSON.parse(stdout))
+    return result.success ? result.data.loggedIn ?? null : null
   } catch {
     return null
   }

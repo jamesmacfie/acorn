@@ -1,15 +1,16 @@
 import type { AppDatabase } from '../../server/db'
 import type { ActiveIdentityStore } from '../activeIdentity'
-import { createContextService, type ContextService } from './context'
-import * as fs from './fs'
-import * as git from './git'
-import { createIdentityService, type IdentityService } from './identity'
-import { createModelService, type ModelService } from './models'
-import { createPrefService, type PrefService } from './prefs'
-import * as proc from './proc'
-import { createRepoService, type RepoService } from './repos'
-import { SecretService } from './secrets'
-import { createTaskService, type TaskService } from './tasks'
+import { createContextService, type ContextService } from './context/launch'
+import * as fs from './filesystem/confinement'
+import * as git from './vcs/git'
+import { createIdentityService, type IdentityService } from './identity/identity'
+import { createModelService, type ModelService } from './models/text'
+import { createPrefService, type PrefService } from './identity/preferences'
+import * as proc from './exec/proc'
+import { createRepoService, type RepoService } from './vcs/repos'
+import { SecretService } from './security/secrets'
+import { createTaskService, type TaskService } from './tasks/service'
+import type { CapabilityRegistry } from '../../server/plugin/capabilities'
 
 export type CoreServices = {
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
@@ -46,13 +47,14 @@ export function createCoreServices(options: {
   // The persisted binding. Required rather than defaulted, so a composition root cannot end up with a
   // process-local identity by omission; tests pass memoryIdentityStore() (main/activeIdentity.ts).
   activeIdentity: ActiveIdentityStore
+  capabilities?: Pick<CapabilityRegistry, 'get'>
 }): CoreServices {
   return {
     fs,
     git,
     proc,
     secrets: options.secrets,
-    tasks: createTaskService(options.db),
+    tasks: createTaskService(options.db, options.capabilities),
     repos: createRepoService(options.db),
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
@@ -62,12 +64,12 @@ export function createCoreServices(options: {
 }
 
 export { SecretService }
-export type { ChildTaskSeed, TaskLinkRef, TaskRunConfig, TaskService } from './tasks'
-export type { IdentityService } from './identity'
-export type { RepoCheckout, RepoService } from './repos'
-export type { ContextService } from './context'
-export type { PrefService } from './prefs'
-export type { GenerateTextRequest, ModelService } from './models'
-export { SecretUnavailableError, redact } from './secrets'
-export type { ProcResult, ProcSpec } from './proc'
-export type { ConfineFailure, ConfineResult } from './fs'
+export type { ChildTaskSeed, TaskLinkRef, TaskRunConfig, TaskService } from './tasks/service'
+export type { IdentityService } from './identity/identity'
+export type { RepoCheckout, RepoService } from './vcs/repos'
+export type { ContextService } from './context/launch'
+export type { PrefService } from './identity/preferences'
+export type { GenerateTextRequest, ModelService } from './models/text'
+export { SecretUnavailableError, redact } from './security/secrets'
+export type { ProcResult, ProcSpec } from './exec/proc'
+export type { ConfineFailure, ConfineResult } from './filesystem/confinement'

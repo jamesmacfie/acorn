@@ -4,6 +4,9 @@ import type { Workspace } from '@acorn/protocol/api.ts'
 import { activeNodeId, setActiveNode } from '../node/activeNode'
 import { refreshFleet, _resetFleet } from '../node/fleet'
 import { selectFleetWorkspace, type FleetWorkspace } from './fleetWorkspaces'
+import { sourceRegistry } from '../registries/sources'
+
+let routeDisposable: { dispose(): void }
 
 const node = (nodeId: string, label: string): NodeRecord => ({
   nodeId, label, endpoint: `https://127.0.0.1:9${nodeId.length}00`, local: nodeId === 'a',
@@ -16,6 +19,10 @@ const entry = (nodeId: string, label: string, ws: Workspace): FleetWorkspace =>
   ({ workspace: ws, nodeId, node: node(nodeId, label) })
 
 beforeEach(async () => {
+  routeDisposable = sourceRegistry.register({
+    id: 'test.fleet-routes', order: 1, glyph: 'x', label: 'Routes',
+    routes: [{ id: 'test.fleet-repo', path: '/:owner/:repo', kind: 'repo', order: 1 }],
+  })
   _resetFleet()
   ;(globalThis as { window?: unknown }).window = {
     acorn: {
@@ -32,6 +39,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  routeDisposable.dispose()
   _resetFleet()
   setActiveNode(null)
   delete (globalThis as { window?: unknown }).window

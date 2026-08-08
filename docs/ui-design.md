@@ -28,6 +28,19 @@ feature CSS is scoped to its plugin.
 All 12 shipped themes and 4 style packs are registered literals and covered by parity tests. Device
 preferences persist locally; they do not depend on which Node is active.
 
+Feature-owned styles live beside the feature components that consume them. For example, the GitHub
+pull list, pull detail, and checks panel import their own plugin styles; genuinely shared integration
+settings remain in the client-core `integrations.css` role sheet. This keeps plugin presentation out
+of the core aggregate without changing tokens or selector behavior.
+
+## Primitive adoption ratchet
+
+`packages/client-core/src/ui/adoption.test.ts` tracks the incremental migration from hand-written
+controls to the shared UI primitives. Its `CONVERTED` list may only grow; every listed file must
+avoid raw buttons, selects, textareas, and retired shared classes. New components should use the
+primitives from the start, and the retired-class check must remain clean while older surfaces are
+migrated.
+
 ## Interaction rules
 
 - Command palette opens with `⌘K` and uses contributed actions and rows.

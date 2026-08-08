@@ -10,25 +10,21 @@
 // These pure-Node composition hooks register agent profiles, core agent tools, and config-trust
 // behavior before the listener binds. Desktop-only capabilities are supplied separately by Electron
 // main; this entry supplies explicit headless adapters where a plugin still needs one.
-import '../wiring/agentProfiles'
 import { join } from 'node:path'
-import { closeListener, devDataDir, drainWithDeadline, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { closeListener, devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { pruneAudit } from '@acorn/node-core/server/audit.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
-import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
+import { PLUGIN_STATE } from '@acorn/node-core/server/routes/plugins.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
-import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
-import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
-import { reconcileTmux } from '@acorn/plugin-terminal/main/terminal.ts'
-import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
-import { wireAgentTools } from '../wiring/agentToolsWiring'
-import { nodePlugins } from './plugins'
+import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
 import { buildPluginDeps } from './pluginDeps'
+import { assembleNodeGraph, drainNode, reconcileNode } from './composition'
+import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
 // ACORN_DATA_DIR names the root explicitly. It is the same variable this node hands its own child
@@ -38,7 +34,8 @@ import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabiliti
 // Opening it takes the root's exclusive lock, so a standalone node and a running desktop app refuse to
 // share one root explicitly instead of racing over SQLite.
 const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
-const runtime = makeRuntime(root)
+const capabilities = new CapabilityRegistry()
+const runtime = makeRuntime(root, undefined, capabilities)
 const disabledPlugins = disabledPluginsStore(root.dir)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
 // Audit retention is enforced at boot so the append-only audit table remains bounded.
@@ -59,8 +56,7 @@ const internalEnv: InternalEnvFactory = (claims) => ({
 })
 let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
-const capabilities = new CapabilityRegistry()
-const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
+const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
 
 // Every method rejects identically: there is no window on a standalone node, so there is nothing to drive.
 // A rejection rather than a silent empty result, because an agent that asked for a snapshot and got nothing
@@ -78,12 +74,12 @@ const unavailableBrowser: BrowserDesktopCapability = {
 // The standalone and Electron roots activate the same plugin list, through the same builder. Their
 // behavior differs only where the available runtime bridge does — here, the preview browser.
 const plugins = await initPlugins(
-  nodePlugins(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser })),
+  assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser })).plugins,
   // Plugin disablement is stored by the Node itself. The desktop fleet file controls the client view,
   // while this persisted set controls a standalone process at boot.
   { capabilities, core, disabled: disabledPlugins.get() },
 )
-setPluginsBridge({
+const pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
   roster: () => plugins.roster,
   disabled: () => disabledPlugins.get(),
   setDisabled: (names) => disabledPlugins.set(names),
@@ -99,31 +95,11 @@ wireAgentTools({ db: runtime.DB })
 const listener = await startListener(runtime, root)
 apiUrl = listener.endpoint.origin
 
-// Re-attach surviving tmux sessions before anything can archive a task. Skipping it would leave the
-// archive route's running-session guard passing vacuously against an empty session map — the exact
-// failure mode TaskSessionsBridge.ready() exists to prevent.
-try {
-  await reconcileTmux()
-} catch (error) {
-  console.warn('[node] tmux reconcile failed:', error)
-}
-// Before finishReconcile(), like the supervised root: the sweep re-queues every 'running' step, and
-// start/gate/cancel await that promise precisely so a run cannot be started into it.
-try {
-  await capabilities.get(WORKFLOWS_RUNNER)?.reconcile()
-} catch (error) {
-  console.warn('[node] workflow reconcile failed:', error)
-}
-// The agent sweep: interrupt every turn that was active when this node last exited, expire its pending
-// requests, collect orphaned attachments and re-arm webhook delivery. After the listener binds, because a
-// resumed session's tools call the node's own loopback surface.
-try {
-  await capabilities.require(AGENTS_RUNTIME).reconcile()
-} catch (error) {
-  console.warn('[node] managed agent reconcile failed:', error)
-} finally {
-  finishReconcile()
-}
+// Re-attach sessions, repair worktree state, and sweep workflow/agent records through the same
+// post-listener sequence as the supervised root. The listener is already live because resumed work
+// calls the Node's own authenticated routes.
+const reconcileTask = reconcileNode({ db: runtime.DB, dataDir: root.dir, capabilities }).finally(() => finishReconcile())
+await reconcileTask
 
 console.log(
   JSON.stringify({
@@ -142,12 +118,14 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   if (stopping) return
   stopping = true
   console.log(`[node] ${signal} — draining`)
-  const outcome = await drainWithDeadline([
-    ['listener', () => closeListener(listener.server)],
-    ['plugins', () => plugins.dispose()],
-    ['sqlite', async () => runtime.DB.close()],
-    ['data root', async () => root.release()],
-  ])
+  const outcome = await drainNode({
+    listener: () => closeListener(listener.server),
+    reconciliation: async () => await reconcileTask,
+    pluginState: async () => pluginStateCapability.dispose(),
+    plugins: () => plugins.dispose(),
+    sqlite: async () => runtime.DB.close(),
+    dataRoot: async () => root.release(),
+  })
   if (outcome === 'timeout') console.warn('[node] drain exceeded its deadline; exiting anyway')
   process.exit(0)
 }

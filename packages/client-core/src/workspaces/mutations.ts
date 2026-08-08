@@ -16,7 +16,7 @@ import {
   workspaceIgnoreAllRoute,
 } from '@acorn/protocol/api.ts'
 
-import { pinsRoute } from '../githubShellReads'
+import { setRepoPin } from '../queries'
 
 // Replace a workspace's combined external-project set. Provider-specific callers merge their slice
 // first via integrations/workspaceProjects.ts so sibling-provider mappings survive.
@@ -55,8 +55,4 @@ export const setAllReposIgnored = (ignored: boolean) => postJson<{ ok: true }>(w
 
 // Pin a repo to the top of the picker — repo visibility, same family as ignore/unignore.
 export const setPin = async (repoId: number, pinned: boolean) =>
-  writeJson<{ repoId: number; pinned: boolean }>(
-    pinsRoute,
-    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repoId, pinned }) },
-    (res) => `pins ${res.status}`,
-  )
+  setRepoPin(repoId, pinned)

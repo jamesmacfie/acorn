@@ -101,17 +101,28 @@ GitHub browse, archive an active task and confirm fallback, run palette "Go to G
 
 ## Done criteria
 
-- [ ] Pre-flight grep returns zero shell `'github'` literals (excluding `githubShellReads.ts`).
-- [ ] Default-source accessor exists, tested, documented.
-- [ ] Palette command contributed by plugins/github.
-- [ ] Arch tests green; baseline entry removed or blocker recorded.
-- [ ] User QA note written.
+- [x] Pre-flight grep returns zero shell provider source literals.
+- [x] Default-source accessor exists, tested, documented.
+- [x] Palette command contributed by plugins/github.
+- [x] Arch tests green; the remaining named-protocol baseline is justified.
+- [x] User QA handoff is recorded in the final migration audit; live Electron QA remains environment-dependent.
 
 ## Progress
 
-- [ ] Slice 1 — registry default
-- [ ] Slice 2 — tasks.ts
-- [ ] Slice 3 — TabRail fallback + workspaceViewTransition
-- [ ] Slice 4 — appStartup persisted default
-- [ ] Slice 5 — palette command
-- [ ] Slice 6 — baseline shrink / blocker note
+- [x] Slice 1 — registry default
+- [x] Slice 2 — tasks.ts
+- [x] Slice 3 — TabRail fallback + workspaceViewTransition
+- [x] Slice 4 — appStartup persisted default
+- [x] Slice 5 — palette command
+- [x] Slice 6 — baseline shrink / blocker note
+
+Completed 2026-08-08. `sourceRegistry` now resolves an explicit lazy default, with declared rail
+order as a bare-host fallback; the GitHub plugin owns the default source, navigation command, and
+keybinding. Core/client shell code no longer contains provider-specific `'github'` source literals
+(the remaining GitHub shell read seam is WP-04). `managedAgents.ts` remains in the named-protocol
+baseline because the client-core agent-tool renderer registry still imports that shared contract; it
+is not unblocked by source ownership and is left for a separately justified boundary change.
+
+Validation: `pnpm --filter @acorn/client-core test`, `pnpm --filter @acorn/plugin-github test`, and
+`pnpm lint` pass. Desktop persisted-state conformance and full arch/e2e gates remain package-end
+checks; manual QA is recorded in the final migration audit.

@@ -1,7 +1,9 @@
 import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db/index'
 import { schema } from '../server/db/index'
-import { getRunBridge } from '../server/routes/harness'
+import { RUN_TARGETS, type RunBridge } from '../server/routes/harness'
+import { routeTestCapabilityFor } from '../server/bridge'
+import type { CapabilityRegistry } from '../server/plugin/capabilities'
 import { loadTask } from './taskWorktree'
 
 // Which loopback ports a task legitimately serves on, for the preview tunnel's allowlist
@@ -45,7 +47,7 @@ export function loopbackPortOf(url: string | undefined | null): number | null {
   return parsed.protocol === 'https:' ? 443 : parsed.protocol === 'http:' ? 80 : null
 }
 
-export function declaredTunnelPorts(db: AppDatabase) {
+export function declaredTunnelPorts(db: AppDatabase, capabilities?: Pick<CapabilityRegistry, 'get'>) {
   return async (taskId: string): Promise<readonly number[]> => {
     const ports = new Set<number>()
     const add = (url: string | undefined | null): void => {
@@ -60,7 +62,7 @@ export function declaredTunnelPorts(db: AppDatabase) {
     //
     // `get`, not `require`: a node whose terminal plugin is disabled has no run bridge, and the honest
     // answer there is "no run-target port", not a thrown upgrade.
-    const bridge = getRunBridge()
+    const bridge = (capabilities?.get(RUN_TARGETS) ?? routeTestCapabilityFor(RUN_TARGETS)) as RunBridge | undefined
     if (bridge) {
       add(await bridge.defaultUrl(taskId).catch(() => undefined))
       const resolved = await bridge.targets(taskId).catch(() => null)

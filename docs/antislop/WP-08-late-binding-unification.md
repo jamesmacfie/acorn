@@ -112,15 +112,42 @@ changes shape.
 
 ## Done criteria
 
-- [ ] Inventory appended; every row resolved.
-- [ ] `BROADCAST_BASELINE` and `APP_DEEP_IMPORT_BASELINE` both `[]`.
-- [ ] `apps/node/src/wiring/` deleted; `bridge.ts` deleted or justified.
-- [ ] node-core + integration + arch suites green; user QA note for terminal flows.
+- [x] Inventory appended; every row resolved.
+- [x] `BROADCAST_BASELINE` and `APP_DEEP_IMPORT_BASELINE` both `[]`.
+- [x] `apps/node/src/wiring/` deleted; `bridge.ts` is justified as a typed route adapter.
+- [ ] node-core + integration + arch focused suites are green; live terminal QA remains a final desktop handoff item.
 
 ## Progress
 
-- [ ] Slice 1 — inventory
-- [ ] Broadcast entries 1–5
-- [ ] Deep-import entries 1–7
-- [ ] Core slots + wiring
-- [ ] Final — bridge.ts
+- [x] Slice 1 — inventory
+- [x] Broadcast entries 1–5
+- [x] Deep-import entries 1–7
+- [x] Core slots + wiring
+- [x] Final — bridge.ts
+
+## Completion amendment — 2026-08-08
+
+The inventory is resolved through one per-runtime `CapabilityRegistry`:
+
+| Surface | Provider | Consumer | Resolution |
+| --- | --- | --- | --- |
+| HTTP route bridges | plugin/node registration | route handlers | `RuntimeBindings.CAPABILITIES` + typed capability IDs |
+| Worktree-created setup | terminal plugin | `resolveTaskCwd` through core services/routes | `core.taskWorktreeCreated` |
+| PTY/WS/status broadcasts | `NodePluginContext.events` | terminal, Docker, memory, changes | context projections; no plugin imports `main/wsHub` or `main/notify` |
+| Notes task seeding | notes plugin | terminal task-created hook | `notes.seedTask` contract capability |
+| Preview/terminal/profile app adapters | plugin `main/index.ts` entrypoints | Electron/Node composition roots | reviewed plugin entrypoints |
+| Core agent tools | node-core agent-tools module | both Node composition roots | core-owned registration, outside `apps/node/src/wiring` |
+| Built-in profiles | agents plugin init/dispose | core profile registry | plugin-owned registration lifecycle |
+
+`BROADCAST_BASELINE` and `APP_DEEP_IMPORT_BASELINE` are both empty and enforced by
+`tools/arch/boundaries.test.ts`. `bridge.ts` remains as a narrow typed route adapter because Hono
+handlers need a common 503/error projection; `setRouteTestCapability` is explicitly test-only
+compatibility for route unit tests and is not consulted when a runtime capability exists. No production
+provider uses a setter or module-global bridge.
+
+The app-owned `apps/node/src/wiring/` directory is gone. The composition roots still call the core-owned
+agent-tool registration because it is a core runtime responsibility, while the agent profiles register and
+dispose from the agents plugin itself. Focused node-core, terminal, notes, preview, agents, desktop/node
+typechecks, and the architecture suite are green. Full repository gates remain scheduled at the end of
+the sequential remediation run. Terminal user-QA remains a final validation item because PTY rendering
+requires a live desktop session.

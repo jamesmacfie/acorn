@@ -18,7 +18,7 @@ import { WorkflowRunner, type WorkflowDef } from '../main/workflowRunner'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { encodeToolCeiling } from '../main/workflowTools'
 import { WorkflowValidationError } from '../main/workflowValidation'
-import { setWorkflowBridge, workflow } from '../server/routes/workflow'
+import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { migrationsDir } from './migrations'
 import { workflowRuns } from './schema'
 
@@ -41,6 +41,7 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
   let db: ReturnType<typeof openPluginDb> | null = null
   // Held so dispose can abort in-flight steps before the database closes (see dispose below).
   let live: WorkflowRunner | null = null
+  let routeCapability: { dispose(): void } | null = null
   return {
     name: 'workflows',
     init: (ctx) => {
@@ -168,7 +169,7 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
       // Kept so dispose can abort in-flight steps before the database closes.
       live = runner
 
-      setWorkflowBridge({
+      routeCapability = ctx.capabilities.provide(WORKFLOW_ROUTE, {
         // One column off this plugin's own runs table — see WorkflowBridge for why the router needs it.
         taskIdForRun: async (runId) => {
           const [row] = await store.select({ taskId: workflowRuns.taskId }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
@@ -245,7 +246,7 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
     dispose: () => {
       live?.stop()
       live = null
-      setWorkflowBridge(null)
+      routeCapability?.dispose()
       db?.close()
       db = null
     },

@@ -19,7 +19,7 @@ const EXEC_SHELL = 'command -v bash >/dev/null && exec bash || exec sh'
 // (server/plugin/types.ts § PluginBroadcast), which is also what makes the host able to take the
 // registration back on a re-init.
 export function registerDockerWsChannel(events: PluginBroadcast): void {
-  const service = getDockerService()
+  const service = getDockerService(events.send)
   const streamSubs = new Map<object, Map<StreamKey, { stop(): void }>>()
   const execSubs = new Map<object, Map<string, IPty>>()
 

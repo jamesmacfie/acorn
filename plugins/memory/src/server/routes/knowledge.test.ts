@@ -5,8 +5,9 @@ import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { knowledge, setKnowledgeBridge, type KnowledgeBridge } from './knowledge'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Notes/memory write paths get validated bodies (the privileged-boundary contract); the store logic is covered by
-// main/notes.test.ts, memory.test.ts, memoryProposals.test.ts. Here: routing + auth + validation.
+// Memory paths and the deprecated notes alias get validated bodies (the privileged-boundary contract);
+// current notes routing is characterized in plugins/notes/src/server/routes/notes.test.ts. Store logic
+// is covered by main/notes.test.ts, memory.test.ts, and memoryProposals.test.ts. Here: routing + auth + validation.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

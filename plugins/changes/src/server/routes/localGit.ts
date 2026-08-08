@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
-import { bridgeSlot, viaBridge } from '@acorn/node-core/server/bridge.ts'
+import { routeCapability, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { respondError } from '@acorn/node-core/server/respond.ts'
 
@@ -25,8 +25,9 @@ export type LocalGitBridge = {
   push(taskId: string): Promise<GitActionResult>
 }
 
-export const localGitBridgeSlot = bridgeSlot<LocalGitBridge>()
-export const setLocalGitBridge = localGitBridgeSlot.set
+export const LOCAL_GIT = routeCapability<LocalGitBridge>('changes.localGit')
+/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
+export const setLocalGitBridge = (bridge: LocalGitBridge | null): void => setRouteTestCapability(LOCAL_GIT, bridge)
 
 // Stage/discard/commit run git against the worktree, so path/message bodies are validated (§1).
 const pathBody = z.object({ path: z.string().min(1) })
@@ -36,38 +37,38 @@ const commitBody = z.object({ message: z.string() })
 const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 
 export const localGit = new Hono<AppEnv>()
-  .get('/:id/local/changes', (c) => viaBridge(c, localGitBridgeSlot, (b) => b.changes(id(c))))
+  .get('/:id/local/changes', (c) => viaBridge(c, LOCAL_GIT, (b) => b.changes(id(c))))
   .get('/:id/local/diff', (c) => {
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, localGitBridgeSlot, (b) => b.diff(id(c), path, c.req.query('scope') === 'staged' ? 'staged' : 'unstaged'))
+    return viaBridge(c, LOCAL_GIT, (b) => b.diff(id(c), path, c.req.query('scope') === 'staged' ? 'staged' : 'unstaged'))
   })
   .get('/:id/local/blob', (c) => {
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, localGitBridgeSlot, (b) => b.blob(id(c), path, c.req.query('ref') ?? undefined))
+    return viaBridge(c, LOCAL_GIT, (b) => b.blob(id(c), path, c.req.query('ref') ?? undefined))
   })
   .post('/:id/local/stage', async (c) => {
     const p = pathBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, localGitBridgeSlot, (b) => b.stage(id(c), p.data.path))
+    return viaBridge(c, LOCAL_GIT, (b) => b.stage(id(c), p.data.path))
   })
   .post('/:id/local/unstage', async (c) => {
     const p = pathBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, localGitBridgeSlot, (b) => b.unstage(id(c), p.data.path))
+    return viaBridge(c, LOCAL_GIT, (b) => b.unstage(id(c), p.data.path))
   })
   .post('/:id/local/discard', async (c) => {
     const p = discardBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, localGitBridgeSlot, (b) => b.discard(id(c), p.data.path, p.data.untracked))
+    return viaBridge(c, LOCAL_GIT, (b) => b.discard(id(c), p.data.path, p.data.untracked))
   })
   .post('/:id/local/commit', async (c) => {
     const p = commitBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, localGitBridgeSlot, (b) => b.commit(id(c), p.data.message))
+    return viaBridge(c, LOCAL_GIT, (b) => b.commit(id(c), p.data.message))
   })
-  .post('/:id/local/stage-all', (c) => viaBridge(c, localGitBridgeSlot, (b) => b.stageAll(id(c))))
-  .post('/:id/local/unstage-all', (c) => viaBridge(c, localGitBridgeSlot, (b) => b.unstageAll(id(c))))
-  .post('/:id/local/discard-all', (c) => viaBridge(c, localGitBridgeSlot, (b) => b.discardAll(id(c))))
-  .post('/:id/local/push', (c) => viaBridge(c, localGitBridgeSlot, (b) => b.push(id(c))))
+  .post('/:id/local/stage-all', (c) => viaBridge(c, LOCAL_GIT, (b) => b.stageAll(id(c))))
+  .post('/:id/local/unstage-all', (c) => viaBridge(c, LOCAL_GIT, (b) => b.unstageAll(id(c))))
+  .post('/:id/local/discard-all', (c) => viaBridge(c, LOCAL_GIT, (b) => b.discardAll(id(c))))
+  .post('/:id/local/push', (c) => viaBridge(c, LOCAL_GIT, (b) => b.push(id(c))))

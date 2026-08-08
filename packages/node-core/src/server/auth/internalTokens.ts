@@ -3,6 +3,7 @@
 // can reconnect after a Node restart; rotating the key revokes outstanding tokens. Tokens do not
 // expire, so scope and key rotation are the active lifetime controls.
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { z } from 'zod'
 
 // 'service' — the node calling its own HTTP surface over loopback (notes seeding, workflow context
 //   assembly). Full reach, minted in-process, and NEVER placed in a child's environment.
@@ -27,6 +28,11 @@ const PREFIX = 'acorn_it_'
 // payload or signature containing an underscore produced more than the expected number of parts and
 // every such token failed to verify. Caught by auth.test.ts on the first run.
 const SEPARATOR = '.'
+const internalClaimsPayloadSchema = z.strictObject({
+  s: z.enum(['service', 'task']),
+  t: z.string().min(1).optional(),
+  n: z.string().min(1).optional(),
+})
 const b64 = (value: Buffer | string): string => Buffer.from(value).toString('base64url')
 
 const sign = (key: string, payload: string): string => createHmac('sha256', key).update(payload).digest('base64url')
@@ -56,12 +62,9 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
   const b = Buffer.from(expected)
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null
   try {
-    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { s?: unknown; t?: unknown; n?: unknown }
-    if (decoded.s !== 'service' && decoded.s !== 'task') return null
-    const taskId = typeof decoded.t === 'string' && decoded.t ? decoded.t : undefined
-    const sessionId = typeof decoded.n === 'string' && decoded.n ? decoded.n : undefined
-    if (decoded.s === 'task' && !taskId) return null
-    return { scope: decoded.s, taskId, sessionId }
+    const decoded = internalClaimsPayloadSchema.safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')))
+    if (!decoded.success || (decoded.data.s === 'task' && !decoded.data.t)) return null
+    return { scope: decoded.data.s, taskId: decoded.data.t, sessionId: decoded.data.n }
   } catch {
     return null
   }

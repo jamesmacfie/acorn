@@ -25,12 +25,14 @@ export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
 //
 // `fingerprint` is the sha256 of the node's self-signed certificate (lowercase hex). Always present:
 // the listener is TLS unconditionally, and an optional pin is a pin that silently is not one.
-export type NodeInfo = {
-  protocolVersion: number
-  fingerprint: string
-  nodeId?: string
-  appVersion?: string
-}
+export const nodeInfoSchema = z.strictObject({
+  protocolVersion: z.number().int().positive(),
+  fingerprint: z.string().min(1),
+  nodeId: z.string().optional(),
+  appVersion: z.string().optional(),
+})
+
+export type NodeInfo = z.infer<typeof nodeInfoSchema>
 
 // POST /v2/pair. Validated with zod rather than hand-checked because this is the one route an
 // unpaired caller can reach: unknown fields are rejected (strictObject) and the lengths are bounded
@@ -43,15 +45,21 @@ export type PairRequest = z.infer<typeof pairRequestSchema>
 
 // A paired device as the owner sees it. Never carries the token or its hash — the raw token is
 // returned exactly once, in PairResult.
-export type PairedDevice = {
-  id: string
-  name: string
-  createdAt: number
-  lastSeenAt: number | null
-  revokedAt: number | null
-}
+export const pairedDeviceSchema = z.strictObject({
+  id: z.string().min(1),
+  name: z.string(),
+  createdAt: z.number().int(),
+  lastSeenAt: z.number().int().nullable(),
+  revokedAt: z.number().int().nullable(),
+})
+export type PairedDevice = z.infer<typeof pairedDeviceSchema>
 
-export type PairResult = { deviceToken: string; nodeId: string; device: PairedDevice }
+export const pairResultSchema = z.strictObject({
+  deviceToken: z.string().min(1),
+  nodeId: z.string().min(1),
+  device: pairedDeviceSchema,
+})
+export type PairResult = z.infer<typeof pairResultSchema>
 export type DevicesResponse = { devices: PairedDevice[] }
 // POST /v2/core/pair/start: the code the node displays (QR + text) and how long it lives.
 export type PairingWindow = { code: string; expiresInMs: number }

@@ -10,6 +10,11 @@ CRUD, context projection, agent read/append tools, and import/export. The Node s
 `plugins/notes.sqlite`; autosave sends an expected revision and surfaces a conflict rather than
 overwriting a newer edit.
 
+The current HTTP surface is `/v2/p/notes/tasks/:id/notes` and
+`/v2/p/notes/workspaces/:wsId/notes` (including their read/write, title, inclusion, and delete
+subroutes). `/v2/p/memory/.../notes` remains as a one-release compatibility alias for saved agent
+prompts and older clients; it uses the notes capability and does not own a second store.
+
 The Notes pane provides a task-first scratchpad, scope navigation, include-in-context controls,
 debounced saves, conflict recovery, and Markdown import/export. Notes written by an agent are
 attributed to the task/session and still follow the same revision rules.
