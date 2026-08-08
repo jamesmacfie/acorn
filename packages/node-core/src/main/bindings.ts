@@ -1,6 +1,6 @@
 import type { HttpBindings } from '@hono/node-server'
 import { randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, copyFileSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -142,37 +142,6 @@ export function openDb(dbPath: string): AppDatabase {
   // enabling enforcement would be a misleading no-op.
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('busy_timeout = 5000')
-
-  // One-time safety copy before the projects rekey (migration 0046): it is a one-way data
-  // migration, and the .bak file is the rollback story. Detected structurally by the legacy
-  // owner/repository/path table shape, so a fresh DB or an already-migrated one never pays for a copy.
-  const hasLegacyProjectTable = (): boolean => {
-    const tables = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
-    return tables.some(({ name }) => {
-      const identifier = `"${name.replaceAll('"', '""')}"`
-      const columns = sqlite.prepare(`PRAGMA table_info(${identifier})`).all() as { name: string }[]
-      const names = new Set(columns.map((column) => column.name))
-      return names.has('owner') && names.has('repo') && names.has('path')
-    })
-  }
-  const preProjects = sqlite
-    .prepare("SELECT max(name = 'projects') AS projects FROM sqlite_master WHERE type = 'table'")
-    .get() as { projects: number | null }
-  const preProjectsBackup = `${databasePath}.pre-projects.bak`
-  if (hasLegacyProjectTable() && !preProjects.projects && !existsSync(preProjectsBackup)) {
-    copyFileSync(databasePath, preProjectsBackup)
-    chmodSync(preProjectsBackup, 0o600)
-  }
-
-  // Migration 0048 drops the remaining owner/name tables. Take a fresh, timestamped copy for
-  // every pre-cutover database immediately before Drizzle runs it. Checkpoint first so committed
-  // rows in an existing WAL are included in the copy; after 0048 the structural trigger disappears.
-  if (hasLegacyProjectTable()) {
-    sqlite.pragma('wal_checkpoint(TRUNCATE)')
-    const preLegacyBackup = `${databasePath}.pre-legacy-drop-${Date.now()}.bak`
-    copyFileSync(databasePath, preLegacyBackup)
-    chmodSync(preLegacyBackup, 0o600)
-  }
 
   const db = drizzle(sqlite, { schema })
   migrate(db, { migrationsFolder })

@@ -1,1 +1,0 @@
-DROP TABLE `review_notes`;

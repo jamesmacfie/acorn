@@ -8,6 +8,7 @@
     "db:generate": "node scripts/db.mjs generate",
     "db:locate": "pnpm --filter @acorn/node-core db:locate",
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
+    "db:reset": "node scripts/db-reset.mjs",
     "dev": "turbo run dev",
     "dev:node": "pnpm --filter @acorn/node dev:node",
     "dist": "pnpm --filter @acorn/desktop dist",

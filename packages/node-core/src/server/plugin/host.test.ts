@@ -182,9 +182,8 @@ describe('plugin host', () => {
   })
 
   it('runs every ready() only after every init, so cross-plugin reads do not depend on list order', async () => {
-    // The hazard this closes: plugins/http's legacy-row claim reads a slot github fills in its own init,
-    // and in `init` that worked only because github sorts before http alphabetically. Reordering the list
-    // by domain would have silently stopped claiming the owner's saved API requests.
+    // The hazard this closes: a plugin whose init reads a slot another plugin fills in its own init
+    // works only by alphabetical luck. Reordering the list by domain would silently break it.
     const order: string[] = []
     await host([
       plugin('early', {

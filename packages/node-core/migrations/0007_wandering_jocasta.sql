@@ -1,1 +1,0 @@
-ALTER TABLE `repo_paths` ADD `editor_command` text;

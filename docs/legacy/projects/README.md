@@ -45,6 +45,16 @@ phase of this migration removes one or more:
    auto-assigned from it, the new-task dropdown read it, and the app's URL space is literally
    `/:owner/:repo`. → replaced by project-based navigation and the plugin-owned importer in **Phases 2 and 3**.
 
+## After the fact: the chains were squashed
+
+Once all six phases landed, every migration chain (core and plugin) was regenerated from the current
+schema as a single baseline migration, and the one-way conversion code went with it: the projects
+backfill and cutover migrations, their replay tests, the `.pre-projects` / `.pre-legacy-drop`
+database copies in `openDb`, the plugin pair-rekey staging tables and init backfills, and the HTTP
+plugin's legacy unscoped-row claim. There is no upgrade path from a pre-baseline database — a new
+install starts from a fresh data root. The phase files below describe how the model changed, not
+code that still exists.
+
 ## Status
 
 All six phases are implemented on `james/vnext-fable` and, at the time of writing, still uncommitted.

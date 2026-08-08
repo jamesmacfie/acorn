@@ -8,8 +8,7 @@ import { sqliteTable, integer, text, uniqueIndex } from 'drizzle-orm/sqlite-core
 
 // Named SQL snippets for the Database pane (docs/pg.md). Project-scoped, NOT task-scoped: a query
 // written against a project's schema outlives any one task worktree. Machine-scoped (no user_id).
-// Saving under an existing project/name overwrites it. Legacy repository pairs are copied to an
-// upgrade-only staging table by migration 0002 and are not part of this live schema.
+// Saving under an existing project/name overwrites it.
 export const dbSavedQueries = sqliteTable(
   'db_saved_queries',
   {

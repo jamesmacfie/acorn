@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "64861edf-d051-40a7-9c9e-7c36c578cdf0",
+  "id": "8c2b17eb-cea0-43ad-8a62-8ac0bf772bc1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "db_saved_queries": {
@@ -14,18 +14,11 @@
           "notNull": true,
           "autoincrement": false
         },
-        "repo_owner": {
-          "name": "repo_owner",
+        "project_id": {
+          "name": "project_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "repo_name": {
-          "name": "repo_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "name": {
@@ -65,11 +58,10 @@
         }
       },
       "indexes": {
-        "db_saved_queries_repo_name_idx": {
-          "name": "db_saved_queries_repo_name_idx",
+        "db_saved_queries_project_name_idx": {
+          "name": "db_saved_queries_project_name_idx",
           "columns": [
-            "repo_owner",
-            "repo_name",
+            "project_id",
             "name"
           ],
           "isUnique": true

@@ -56,6 +56,19 @@ pnpm db:migrate
 The launch path applies pending migrations automatically. `pnpm db:locate` prints the active core
 database path.
 
+To go back to a first run, quit the app and delete the databases:
+
+```sh
+pnpm db:reset          # lists what it will delete, then asks
+pnpm db:reset --yes    # non-interactive
+```
+
+It removes `core.sqlite` and every `plugins/*.sqlite` (WAL and SHM sidecars included) from the dev
+data root, or from `ACORN_DATA_DIR` when that is set. Node identity, the listener key, and the
+internal token stay. The device row goes with the core database, so the desktop pairs again on the
+next launch — that is the intended fresh-install path, since there is no upgrade path from an older
+database.
+
 ## Build artifacts
 
 `apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and chunks. Electron stages them into

@@ -1,1 +1,0 @@
-ALTER TABLE `workspaces` ADD `db_url_script` text;
