@@ -18,7 +18,7 @@ type WorkspaceViewTransitionInput = {
 }
 
 const ownsTask = (workspace: Workspace, task: Task): boolean =>
-  workspace.repos.some((repo) => repo.owner === task.repoOwner && repo.name === task.repoName)
+  workspace.projects.some((project) => project.id === task.projectId)
 
 // Plan one route-derived workspace change without touching signals or navigation. Task selection
 // changes its signals before the router updates, so the active task may already belong to the

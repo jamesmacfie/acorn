@@ -386,7 +386,7 @@ export class AgentSessionRepository {
     const textMatch = matchedIds.length
       ? or(like(schema.agentSessions.title, escapedLike), inArray(schema.agentSessions.id, matchedIds))
       : like(schema.agentSessions.title, escapedLike)
-    // One query now, not two. The workspace-scoped branch existed only to reach `workspace_repos`
+    // One query now, not two. The workspace-scoped branch existed only to reach core workspace membership
     // through `tasks`; with the ids in hand the filter is an ordinary predicate on this plugin's own
     // column, so the join, the `{ session: … }` projection and the `.map` that unwrapped it all go.
     const rows = await this.db

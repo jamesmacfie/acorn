@@ -13,7 +13,7 @@ viewed-file state, inline threads, and lazy context expansion.
 
 ## Workspaces and tasks
 
-A workspace is a named group of repositories. A task is work on one repository and branch, with an
+A workspace is a named group of projects. A task is work on one project and branch, with an
 optional worktree, linked PR or external issue, panes, terminal sessions, and managed agent sessions.
 Tasks can originate from GitHub, Linear, Rollbar, or the local task command. Worktrees are created
 lazily when a task first needs filesystem/process access.
@@ -27,7 +27,7 @@ lazily when a task first needs filesystem/process access.
 - `context` — choose, preview, size, and send task context.
 - `editor` / `search` — worktree files, Monaco editing, and ripgrep search.
 - `preview` — hardened browser preview and agent browser tools.
-- `database` — task-scoped PostgreSQL schema, rows, SQL, and saved queries.
+- `database` — task-scoped PostgreSQL schema, rows, SQL, and project-scoped saved queries.
 - `docker` — task-matched containers, logs, stats, exec, and lifecycle actions.
 - `http` — encrypted requests, variables, auth helpers, and response inspection.
 - `linear` / `rollbar` — linked issue panels.
@@ -71,7 +71,7 @@ Docker inventory is Node-local and matched to tasks using Compose/project/worktr
 execution is process-brokered and trust-gated where configuration is executable.
 
 The database pane leases a task-scoped PostgreSQL connection, introspects schema, pages rows, edits
-primary-key values, runs SQL, and stores repository-scoped saved queries. The HTTP pane stores request
+primary-key values, runs SQL, and stores project-scoped saved queries. The HTTP pane stores request
 and variable data encrypted at rest; sending is restricted to an interactive device principal.
 
 ## Settings and fleet

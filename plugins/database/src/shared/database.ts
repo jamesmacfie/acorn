@@ -22,7 +22,7 @@ export type DbPk = Record<string, DbCell>
 // AI query generation (docs/pg.md): where the schema text in the prompt came from, and the result
 // of a generate call. Generate errors travel as HTTP error responses, not a union.
 export type DbSchemaSource = 'auto' | 'script' | 'file'
-// `notes` is the repo's free-form schema notes (repo_paths.db_schema_notes) — facts the schema text
+// `notes` is the project's free-form schema notes (projects.db_schema_notes) — facts the schema text
 // can't express (JSONB shapes, enum meanings), carried here so the route needs no repo lookup.
 export type DbSchemaResult = { schema: string; source: DbSchemaSource; notes?: string } | { error: string }
 export type DbGenerateResult = { sql: string; providerId: string; modelId: string }
@@ -30,7 +30,7 @@ export type DbGenerateResult = { sql: string; providerId: string; modelId: strin
 // Shared so the modal's maxlength and the route's zod bound can't drift apart.
 export const GENERATE_MAX_PROMPT_CHARS = 4000
 
-// A named SQL snippet saved against a repo (docs/pg.md): loaded back into the editor, and optionally
+// A named SQL snippet saved against a project (docs/pg.md): loaded back into the editor, and optionally
 // fed to AI generation as a worked example (name + notes + SQL).
 export type DbSavedQuery = { id: string; name: string; notes: string | null; sql: string; updatedAt: number }
 
@@ -42,6 +42,6 @@ export const databaseRowsRoute = (taskId: string, schema: string, name: string, 
   `/v2/p/database/tasks/${taskId}/database/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`
 export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
   `/v2/p/database/tasks/${taskId}/database/${action}`
-// Saved queries: repo-scoped rows, addressed through the task (the repo is resolved server-side).
+// Saved queries: project-scoped rows, addressed through the task (the project is resolved server-side).
 export const databaseQueriesRoute = (taskId: string) => `/v2/p/database/tasks/${taskId}/database/queries`
 export const databaseQueryRoute = (taskId: string, queryId: string) => `/v2/p/database/tasks/${taskId}/database/queries/${queryId}`

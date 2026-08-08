@@ -3,7 +3,7 @@ import type { TaskContext } from '@acorn/protocol/api.ts'
 import { formatContextBlock, formatLaunchContext } from './contextBlock'
 
 const ctx: TaskContext = {
-  task: { id: 't1', title: 'fix: guard null token', repo: 'acme/api', branch: 'fix/null-token', worktreePath: null, pullNumber: 813 },
+  task: { id: 't1', title: 'fix: guard null token', projectId: 'project-1', repo: 'acme/api', branch: 'fix/null-token', worktreePath: null, pullNumber: 813 },
   sections: [
     { id: 'pr', label: 'PR', defaultIncluded: false, budget: { overflow: 'truncate-tail' }, items: [], compact: '## PR #813: fix\nGuards the token.', omitted: 0 },
     { id: 'notes', label: 'Notes', defaultIncluded: true, budget: { overflow: 'truncate-tail' }, items: [], compact: '## Notes\n### Plan\nDo the thing.', omitted: 0 },

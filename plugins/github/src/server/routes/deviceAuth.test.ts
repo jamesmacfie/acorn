@@ -5,12 +5,8 @@ import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 // CORE's schema, on purpose: the device flow writes core's `integrations` row through core's own
-// connectProvider and touches none of this plugin's tables — so this test needs core's handle only, and
-// `githubDeviceAuth` is the one github router that is a factory over CoreServices rather than over the
-// plugin database.
+// connectProvider and touches none of this plugin's tables — so this test needs core's handle only.
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
-import { memoryIdentityStore, type ActiveIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { testGate } from '@acorn/node-core/testkit/auth.ts'
 import { githubDeviceAuth } from './deviceAuth'
@@ -21,13 +17,10 @@ const ENC_KEY = '0'.repeat(64)
 const PRINCIPAL: Principal = { kind: 'device', deviceId: 'd1', userId: 'james' }
 
 let harness: TestDb
-// The identity binding is core's now, so the test observes it where core keeps it rather than on `c.env`.
-let identity: ActiveIdentityStore
 const fetchMock = vi.fn()
 
 beforeEach(() => {
   harness = makeTestDb()
-  identity = memoryIdentityStore()
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
   if (!connectionProviderRegistry.get('github')) connectionProviderRegistry.register(githubProvider)
@@ -42,12 +35,10 @@ const env = () =>
   ({
     DB: harness.db,
     ...testSecretEnv(ENC_KEY),
-    GITHUB_CLIENT_ID: 'client-id',
   }) as unknown as Env
 
 const post = (path: string, body?: unknown) => {
-  const core = createCoreServices({ secrets: new SecretService(ENC_KEY), db: harness.db, activeIdentity: identity })
-  const app = new Hono<AppEnv>().use('/api/*', ...testGate(PRINCIPAL)).route('/api/github', githubDeviceAuth(core))
+  const app = new Hono<AppEnv>().use('/api/*', ...testGate(PRINCIPAL)).route('/api/github', githubDeviceAuth(() => 'client-id'))
   return app.fetch(
     new Request(`http://acorn.test/api/github${path}`, {
       method: 'POST',
@@ -111,7 +102,7 @@ describe('github device flow — poll', () => {
     expect(await (await post('/auth/device/poll', pollBody)).json()).toEqual({ status: 'expired' })
   })
 
-  it('stores the token encrypted, records the granted scopes, and binds the identity', async () => {
+  it('stores the token encrypted and records the granted scopes', async () => {
     fetchMock
       .mockResolvedValueOnce(json({ access_token: 'gho_realtoken' })) // token exchange
       .mockResolvedValueOnce(json({ login: 'james', name: 'James', avatar_url: null }, { headers: { 'x-oauth-scopes': 'repo, read:org' } }))
@@ -129,7 +120,6 @@ describe('github device flow — poll', () => {
     // At rest it is ciphertext, and the plaintext round-trips only under the right key.
     expect(row.authRef).not.toContain('gho_realtoken')
     expect(await decryptSecret(row.authRef, ENC_KEY)).toBe('gho_realtoken')
-    expect(identity.get()).toBe('james')
   })
 
   it('never echoes the access token back to the client', async () => {

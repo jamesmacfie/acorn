@@ -44,7 +44,7 @@ function probe(listener: Listener, path: string, host?: string): Promise<Probe> 
 }
 
 describe('the loopback TLS listener', () => {
-  const original = { port: process.env.ACORN_PORT, key: process.env.SESSION_ENC_KEY, id: process.env.GITHUB_CLIENT_ID, secret: process.env.GITHUB_CLIENT_SECRET }
+  const original = { port: process.env.ACORN_PORT, key: process.env.SESSION_ENC_KEY }
   let dataDir: string | null = null
   let root: DataRoot | null = null
   let listener: Listener | null = null
@@ -55,8 +55,6 @@ describe('the loopback TLS listener', () => {
     // No ACORN_PORT: the point of this suite is the ephemeral-port path the app now uses.
     delete process.env.ACORN_PORT
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
-    process.env.GITHUB_CLIENT_ID = 'test-client'
-    process.env.GITHUB_CLIENT_SECRET = 'test-secret'
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-listener-'))
     root = openDataRoot(dataDir)
   })
@@ -73,7 +71,7 @@ describe('the loopback TLS listener', () => {
     if (dataDir) rmSync(dataDir, { recursive: true, force: true })
     dataDir = null
     for (const [name, value] of Object.entries(original)) {
-      const key = { port: 'ACORN_PORT', key: 'SESSION_ENC_KEY', id: 'GITHUB_CLIENT_ID', secret: 'GITHUB_CLIENT_SECRET' }[name]!
+      const key = { port: 'ACORN_PORT', key: 'SESSION_ENC_KEY' }[name]!
       if (value == null) delete process.env[key]
       else process.env[key] = value
     }

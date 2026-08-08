@@ -3,13 +3,13 @@ import { createQuery } from '@tanstack/solid-query'
 import type { Task } from '@acorn/client-core/queries.ts'
 import { workspacesOptions } from '@acorn/client-core/queries.ts'
 import type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 
 const NotesPane = lazy(() => import('./NotesPane'))
 
 export function NotesTaskPane(props: { task: Task }) {
   const workspaces = createQuery(() => workspacesOptions(true))
-  const workspace = () => workspaceForRepo(workspaces.data, props.task.repoOwner, props.task.repoName)
+  const workspace = () => workspaceForProject(workspaces.data, props.task.projectId)
   return <NotesPane task={props.task} workspace={workspace()} />
 }
 

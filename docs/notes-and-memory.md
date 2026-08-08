@@ -21,9 +21,11 @@ attributed to the task/session and still follow the same revision rules.
 
 ## Memory
 
-Memory is durable reviewed knowledge. Accepted entries are Markdown files in the repository's
-`.acorn/memory/` directory or Node-private memory storage. The memory plugin owns file reconciliation,
-hash deduplication, supersession, proposals, an FTS index, and recall metadata.
+Memory is durable reviewed knowledge. Accepted project entries are Markdown files in a mapped
+project folder's `.acorn/memory/` directory (or an active task worktree); private entries live in
+Node-private memory storage. The memory plugin owns file reconciliation, hash deduplication,
+supersession, proposals, an FTS index, and recall metadata. Plain folders are supported: they use
+project scope without Git revision/diff anchoring.
 
 Agents can search and propose memory entries but cannot write accepted knowledge directly. Acceptance
 revalidates the proposal revision and relevant worktree state before updating the authoritative file.

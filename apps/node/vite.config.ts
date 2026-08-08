@@ -14,9 +14,8 @@ export default defineConfig({
   // `noExternal` only decides what Vite's SSR pipeline would auto-externalize; the `external`
   // predicate below is the real rule.
   ssr: { noExternal: true },
-  // Keep `process.env` a runtime lookup — the service reads SESSION_ENC_KEY, GITHUB_CLIENT_* and
-  // ACORN_PORT from the environment it is spawned with, so a build-time substitution would bake in
-  // the builder's environment.
+  // Keep `process.env` a runtime lookup — the service reads SESSION_ENC_KEY and ACORN_PORT from the
+  // environment it is spawned with, and the optional GitHub plugin reads its own client id there.
   define: {
     'process.env': 'process.env',
     'global.process.env': 'global.process.env',

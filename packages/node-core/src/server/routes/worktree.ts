@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -10,12 +9,10 @@ import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../main/archive'
 import { runProcess } from '../../main/core/proc'
 import { broadcastStatus } from '../../main/notify'
-import { getRepoPath, setRepoConfig, setRepoPath, setRunTargets } from '../../main/repoPaths'
 import { buildSessionEnv } from '../../main/taskEnv'
-import { computeTaskStatuses, isDir, loadTask, resolveTaskCwd, repoSetup, taskRoot } from '../../main/taskWorktree'
-import { currentBranch } from '../../main/worktrees'
+import { computeTaskStatuses, isDir, loadTask, projectForTask, projectSetup, resolveTaskCwd, taskRoot } from '../../main/taskWorktree'
 import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../bridge'
-import { getDb, schema } from '../db'
+import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
@@ -41,37 +38,6 @@ export const setTaskSessionsBridge = (bridge: TaskSessionsBridge | null): void =
 export type TaskCreatedHook = (taskId: string) => Promise<void>
 export const TASK_CREATED = routeCapability<TaskCreatedHook>('terminal.taskCreatedHook')
 
-const repoPathSetBody = z.object({ owner: z.string(), repo: z.string(), path: z.string() })
-const runTargetsBody = z.object({ owner: z.string(), repo: z.string(), runTargets: z.string() })
-const browserRuleSchema = z.object({
-  id: z.string(),
-  enabled: z.boolean(),
-  urlPattern: z.string(),
-  trigger: z.literal('load'),
-  action: z.object({ type: z.literal('fill'), selector: z.string(), value: z.string() }),
-})
-// The executable half of repo config — setup/teardown/dev/db-url scripts and the preview command.
-// This is the AUTHORING surface for exactly the content config-trust hash-gates, which is why it
-// belongs beside the trust route in core rather than in the plugin that happens to run the scripts.
-const repoConfigBody = z.object({
-  owner: z.string(),
-  repo: z.string(),
-  patch: z.object({
-    setupScript: z.string().optional(),
-    setupScriptTrigger: z.enum(['off', 'created', 'terminal']).optional(),
-    teardownScript: z.string().optional(),
-    devScript: z.string().optional(),
-    devRestartScript: z.string().optional(),
-    dbUrlScript: z.string().optional(),
-    dbSchemaMode: z.enum(['auto', 'script', 'file']).or(z.literal('')).optional(),
-    dbSchemaValue: z.string().optional(),
-    dbSchemaNotes: z.string().max(8000).optional(),
-    previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
-    previewValue: z.string().optional(),
-    browserRules: z.array(browserRuleSchema).optional(),
-    branchPrefix: z.string().max(60).optional(),
-  }),
-})
 const previewBody = z.object({ script: z.string() })
 const archiveBody = z.object({ deleteWorktree: z.boolean().optional(), force: z.boolean().optional(), skipTeardown: z.boolean().optional() })
 
@@ -86,6 +52,7 @@ async function capturePreviewUrl(
   const cwd = await taskRoot(db, taskId, null, capabilities)
   if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
   const task = await loadTask(db, taskId)
+  const project = task ? await projectForTask(db, task) : null
   const result = await runProcess({
     file: '/bin/sh',
     args: ['-c', script],
@@ -93,7 +60,9 @@ async function capturePreviewUrl(
     env: buildSessionEnv({
       taskId,
       cwd,
-      task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
+      task: task && project
+        ? { projectId: project.id, projectName: project.name, github: project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null, branch: task.branch, title: task.title }
+        : null,
     }),
     timeoutMs: 10_000,
   })
@@ -122,19 +91,6 @@ async function inspectTaskMcp(db: ReturnType<typeof getDb>, taskId: string, capa
   return out
 }
 
-// "New task here": point the task at the mapped checkout itself instead of an isolated worktree, and
-// adopt the checkout's current branch. worktreePath === checkout is the marker every guard keys off.
-async function useCheckout(db: ReturnType<typeof getDb>, taskId: string): Promise<{ worktreePath: string; branch: string } | null> {
-  const task = await loadTask(db, taskId)
-  if (!task) return null
-  const mapped = await getRepoPath(db, task.repoOwner, task.repoName)
-  if (!mapped || !isDir(mapped.path)) return null
-  const branch = (await currentBranch(mapped.path)) || task.branch // detached HEAD → keep the seed branch
-  await db.update(schema.tasks).set({ worktreePath: mapped.path, branch, updatedAt: Date.now() }).where(eq(schema.tasks.id, task.id))
-  broadcastStatus() // rail/footer pick up the borrowed checkout
-  return { worktreePath: mapped.path, branch }
-}
-
 // Archive is the ONLY path allowed to tear a worktree down, and never automatic. The guard →
 // teardown → stop sessions → remove worktree → mark archived orchestration is main/archive.ts's; the
 // live-session half comes from the slot.
@@ -150,41 +106,18 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
   })
 }
 
-// Mounted at /v2/core (server/index.ts): /task-statuses, /repos/path*, and /tasks/:id/* lifecycle.
+// Mounted at /v2/core (server/index.ts): /task-statuses and /tasks/:id/* lifecycle.
 export const worktree = new Hono<AppEnv>()
   // Live dirty/changed-file status for every active task with a worktree — polled by the rail/footer.
   .get('/task-statuses', async (c) => c.json(await computeTaskStatuses(getDb(c.env))))
-  // --- repo → checkout mapping and repo-level config (owner/repo-scoped) ---
-  .get('/repos/path', async (c) => {
-    const owner = c.req.query('owner')
-    const repo = c.req.query('repo')
-    if (!owner || !repo) return respondError(c, 400, 'bad_request')
-    return c.json(await getRepoPath(getDb(c.env), owner, repo))
-  })
-  .put('/repos/path', async (c) => {
-    const parsed = repoPathSetBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return c.json(await setRepoPath(getDb(c.env), parsed.data.owner, parsed.data.repo, parsed.data.path))
-  })
-  .put('/repos/path/run-targets', async (c) => {
-    const parsed = runTargetsBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return c.json(await setRunTargets(getDb(c.env), parsed.data.owner, parsed.data.repo, parsed.data.runTargets))
-  })
-  .put('/repos/path/config', async (c) => {
-    const parsed = repoConfigBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return c.json(await setRepoConfig(getDb(c.env), parsed.data.owner, parsed.data.repo, parsed.data.patch))
-  })
   // --- task lifecycle ---
   .post('/tasks/:id/preview-url', async (c) => {
     const parsed = previewBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return c.json(await capturePreviewUrl(getDb(c.env), c.req.param('id'), parsed.data.script, c.env.CAPABILITIES))
   })
-  // Notified right after a task is created. If the repo runs its setup script on creation and the
-  // checkout is mapped, eagerly create the worktree — resolveTaskCwd's onWorktreeCreated hook is what
-  // actually runs the script, so this stays core logic even though the script lands in a PTY tab.
+  // Notified right after a task is created. Branchless tasks already run in the project folder, so
+  // only a Git branch task can have a newly-created worktree to eagerly prepare.
   .post('/tasks/:id/on-created', async (c) => {
     const db = getDb(c.env)
     const taskId = c.req.param('id')
@@ -193,18 +126,18 @@ export const worktree = new Hono<AppEnv>()
     if (!task) return c.json({ ok: true })
     // Best-effort and independent of worktree setup: seeds PR/ticket context into curatable notes.
     await routeCapabilityFor(c, TASK_CREATED)?.(taskId).catch((error) => console.warn('[worktree] task-created hook failed:', error))
-    const { script, trigger } = await repoSetup(db, task.repoOwner, task.repoName)
+    const project = await projectForTask(db, task)
+    if (!project || !task.branch || !project.path) return c.json({ ok: true })
+    const { script, trigger } = await projectSetup(db, project.id)
     if (trigger !== 'created' || !script?.trim()) return c.json({ ok: true })
     // Re-read after the hook's await — a pane may have created the worktree meanwhile.
     task = await loadTask(db, taskId)
     if (!task || (task.worktreePath && isDir(task.worktreePath))) return c.json({ ok: true })
-    const mapped = await getRepoPath(db, task.repoOwner, task.repoName)
-    if (!mapped || !isDir(mapped.path)) return c.json({ ok: true })
-    await resolveTaskCwd(db, task, mapped.path, null, c.env.CAPABILITIES)
+    if (!isDir(project.path)) return c.json({ ok: true })
+    await resolveTaskCwd(db, task, project.path, null, c.env.CAPABILITIES)
     broadcastStatus() // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })
-  .post('/tasks/:id/use-checkout', async (c) => c.json({ result: await useCheckout(getDb(c.env), c.req.param('id')) }))
   .post('/tasks/:id/archive', async (c) => {
     const parsed = archiveBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')

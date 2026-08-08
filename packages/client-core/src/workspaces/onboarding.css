@@ -68,8 +68,3 @@
   padding: var(--pane-pad);
   border-top: var(--chrome-divider);
 }
-
-/* The V1 importer's offer (docs/vNext/plan.md § Phase 5). Reuses .settings-notice for the frame — the
-   two say the same kind of thing ("here is a state you may want to act on, with the action beside it")
-   and a second near-identical box would be a second thing to keep in step across four style packs. */
-.v1-import { flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); }

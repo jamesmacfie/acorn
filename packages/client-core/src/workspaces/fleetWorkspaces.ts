@@ -48,8 +48,8 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
 // path against the wrong node, which either finds nothing or, worse, finds a different repo that happens
 // to share the owner/name. docs/ui-design.md § New surfaces requires node context to switch atomically.
 export function selectFleetWorkspace(entry: FleetWorkspace, navigate: (path: string) => void): void {
-  const first = entry.workspace.repos[0]
+  const first = entry.workspace.projects[0]
   if (!first) return // an empty workspace has nowhere to go, same as the single-node picker
   if (entry.nodeId !== activeNodeId()) setActiveNode(entry.nodeId)
-  navigate(sourcePath('repo', { owner: first.owner, repo: first.name }))
+  navigate(sourcePath('project', { projectId: first.id }))
 }

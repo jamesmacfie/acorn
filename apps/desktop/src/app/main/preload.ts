@@ -60,9 +60,9 @@ contextBridge.exposeInMainWorld('acorn', {
   // The terminal residue: ONLY the native folder picker (dialog.showOpenDialog — a true Electron
   // capability), plus the renderer's desktop-mode marker.
   terminal: {
-    repoPath: {
-      // Native folder picker (onboarding / repo mapping). Returns the chosen absolute path or null.
-      pick: () => ipcRenderer.invoke('term:repoPath:pick'),
+    folderPath: {
+      // Native folder picker (onboarding / project mapping). Returns the chosen absolute path or null.
+      pick: () => ipcRenderer.invoke('term:folderPath:pick'),
     },
   },
   // Browser-preview surface (docs/panes.md): a main-owned WebContentsView per task. The

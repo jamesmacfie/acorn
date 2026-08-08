@@ -544,6 +544,9 @@ importers:
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13)
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
@@ -798,6 +801,9 @@ importers:
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^26.0.0

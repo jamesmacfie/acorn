@@ -5,18 +5,18 @@ import {
   integrationsOptions,
   tasksKey,
   tasksOptions,
-  workspaceProjectsKey,
-  workspaceProjectsOptions,
+  workspaceExternalProjectsKey,
+  workspaceExternalProjectsOptions,
   workspacesOptions,
 } from '@acorn/client-core/queries.ts'
 import { linearProjectsOptions, workspaceLinearIssuesOptions } from './queries'
-import { setWorkspaceProjects } from '@acorn/client-core/workspaces/mutations.ts'
-import type { Task, WorkspaceProject } from '@acorn/protocol/api.ts'
+import { setWorkspaceExternalProjects } from '@acorn/client-core/workspaces/mutations.ts'
+import type { Task, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import type { LinearProjectIssue } from '../shared/api'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { createDismissable } from '@acorn/client-core/ui/dismissable.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '@acorn/client-core/integrations/workspaceProjects.ts'
+import { replaceWorkspaceExternalProjectsForProvider, workspaceExternalProjectsForProvider } from '@acorn/client-core/integrations/workspaceProjects.ts'
 import { PromoteToTaskModal } from '@acorn/client-core/integrations/PromoteToTaskModal.tsx'
 import { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
 import { emptyLinearFilter, filterLinearIssues, groupLinearIssuesByState, linearFacets, priorityMeta, sortLinearIssues, type LinearFilter } from './model'
@@ -26,7 +26,7 @@ import LinearIssuePanel from './LinearIssuePanel'
 // and may span several connected Linear workspaces; each linked project is an (integrationId,
 // externalId) pair. Issues are scoped to the workspace's linked projects; selecting one opens its
 // detail, while the row's explicit action promotes it to a task on the current repo.
-const projKey = (p: WorkspaceProject) => `${p.integrationId}:${p.externalId}`
+const projKey = (p: WorkspaceExternalProject) => `${p.integrationId}:${p.externalId}`
 const issueKey = (issue: LinearProjectIssue) => `${issue.integrationId}:${issue.identifier}`
 
 export default function LinearBrowse() {
@@ -34,14 +34,14 @@ export default function LinearBrowse() {
   const params = useParams()
   const qc = useQueryClient()
   const workspaces = createQuery(() => workspacesOptions(true))
-  const ws = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  const ws = () => workspaceForProject(workspaces.data, params.projectId)
   const wsId = () => ws()?.id ?? null
 
-  const linked = createQuery(() => workspaceProjectsOptions(wsId(), true))
+  const linked = createQuery(() => workspaceExternalProjectsOptions(wsId(), true))
   const integrations = createQuery(() => integrationsOptions(true))
   const allLinkedProjects = () => linked.data?.projects ?? []
   const connections = () => integrations.data?.integrations ?? []
-  const linkedProjects = () => workspaceProjectsForProvider(allLinkedProjects(), connections(), 'linear')
+  const linkedProjects = () => workspaceExternalProjectsForProvider(allLinkedProjects(), connections(), 'linear')
   const issues = createQuery(() => workspaceLinearIssuesOptions(linkedProjects(), linkedProjects().length > 0))
   const allIssues = () => issues.data?.issues ?? []
   const facets = createMemo(() => linearFacets(allIssues()))
@@ -58,7 +58,7 @@ export default function LinearBrowse() {
   const groups = createMemo(() => groupLinearIssuesByState(sortLinearIssues(filterLinearIssues(allIssues(), filter()))))
 
   createEffect(on(
-    () => `${params.owner ?? ''}/${params.repo ?? ''}`,
+    () => params.projectId ?? '',
     () => {
       setSelectedIssue(null)
       setFilter(emptyLinearFilter)
@@ -103,8 +103,8 @@ export default function LinearBrowse() {
     const chosen = (projects.data?.projects ?? [])
       .filter((p) => checked().has(`${p.integrationId}:${p.id}`))
       .map((p) => ({ integrationId: p.integrationId, externalId: p.id }))
-    await setWorkspaceProjects(id, replaceWorkspaceProjectsForProvider(allLinkedProjects(), connections(), 'linear', chosen))
-    await qc.invalidateQueries({ queryKey: workspaceProjectsKey(id) })
+    await setWorkspaceExternalProjects(id, replaceWorkspaceExternalProjectsForProvider(allLinkedProjects(), connections(), 'linear', chosen))
+    await qc.invalidateQueries({ queryKey: workspaceExternalProjectsKey(id) })
     setPickerOpen(false)
   }
 
@@ -114,13 +114,12 @@ export default function LinearBrowse() {
 
   // Active tasks eligible to attach to: scoped to the routed workspace, matching the rail roster.
   const attachTasks = () => {
-    const inWs = new Set((ws()?.repos ?? []).map((r) => `${r.owner}/${r.name}`))
-    return (tasks.data ?? []).filter((t) => t.status === 'active' && (inWs.size === 0 || inWs.has(`${t.repoOwner}/${t.repoName}`)))
+    const inWs = new Set(ws()?.projects.map((project) => project.id) ?? [])
+    return (tasks.data ?? []).filter((t) => t.status === 'active' && (inWs.size === 0 || inWs.has(t.projectId)))
   }
 
   async function promote(it: LinearProjectIssue) {
-    const { owner, repo } = params
-    if (!owner || !repo) return
+    if (!params.projectId) return
     // If a task for this ticket already exists, focus it instead of creating a duplicate.
     const existing = (await qc.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[]))
       .find((t) => t.status === 'active' && t.links.some((l) => l.providerId === 'linear' && l.connectionId === it.integrationId && l.identifier === it.identifier))
@@ -303,7 +302,7 @@ export default function LinearBrowse() {
             headerLabel={`+TASK — ${issue().identifier}`}
             itemTitle={issue().title}
             attachTasks={attachTasks()}
-            existingBranches={(tasks.data ?? []).map((t) => t.branch)}
+            existingBranches={(tasks.data ?? []).flatMap((t) => t.branch ? [t.branch] : [])}
             onClose={() => setPromoteIssue(null)}
             onCreated={afterPromote}
             onAttached={afterPromote}

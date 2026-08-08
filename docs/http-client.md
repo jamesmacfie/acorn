@@ -5,7 +5,7 @@ Node-owned and encrypted where their values are sensitive.
 
 ## Data model
 
-Requests can be repository-filed or ad hoc. Variables can be plain, secret, or command-backed. Saved
+Requests can be project-filed or ad hoc. Variables can be plain, secret, or command-backed. Saved
 requests and variables are stored in `plugins/http.sqlite`; unsaved task-pane edits remain drafts.
 Secret values are encrypted with `SESSION_ENC_KEY` and are never returned as plaintext in list/read
 responses.

@@ -65,26 +65,26 @@ const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 type SavedRow = typeof dbSavedQueries.$inferSelect
 const rowToQuery = (r: SavedRow): DbSavedQuery => ({ id: r.id, name: r.name, notes: r.notes, sql: r.sql, updatedAt: r.updatedAt })
 
-type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models'>
+type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models' | 'projects'>
 
 export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) => {
-  // Saved queries are repo-scoped but addressed through the task, like everything else in this pane —
-  // the task is what the renderer has.
-  const repoOf = (taskId: string) => core.tasks.load(taskId)
+  // Saved queries are project-scoped but addressed through the task, like everything else in this
+  // pane — the renderer has the task and core resolves its project without a cross-file join.
+  const taskOf = (taskId: string) => core.tasks.load(taskId)
+  const projectOf = async (t: { projectId: string }) => core.projects.byId(t.projectId)
+  const projectScope = (projectId: string) => eq(dbSavedQueries.projectId, projectId)
 
-  const repoScope = (t: { repoOwner: string; repoName: string }) =>
-    and(eq(dbSavedQueries.repoOwner, t.repoOwner), eq(dbSavedQueries.repoName, t.repoName))
-
-  // The saved queries a generate call asked to include as examples, scoped to the task's repo so an id
-  // from another repo can't be smuggled into the prompt.
+  // The saved queries a generate call asked to include as examples, scoped to the task's project so an id
+  // from another project can't be smuggled into the prompt.
   const loadExamples = async (taskId: string, ids: readonly string[]): Promise<DbSavedQuery[]> => {
     if (!ids.length) return []
-    const t = await repoOf(taskId)
-    if (!t) return []
+    const t = await taskOf(taskId)
+    const project = t ? await projectOf(t) : null
+    if (!project) return []
     const rows = await db
       .select()
       .from(dbSavedQueries)
-      .where(and(repoScope(t), inArray(dbSavedQueries.id, [...ids])))
+      .where(and(projectScope(project.id), inArray(dbSavedQueries.id, [...ids])))
       .orderBy(dbSavedQueries.name)
     return rows.map(rowToQuery)
   }
@@ -127,11 +127,13 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
       if (!p.success) return respondError(c, 400, 'bad_request')
       return viaBridge(c, DATABASE, (b) => b.remove(id(c), p.data.schema, p.data.name, p.data.pk))
     })
-    // --- saved queries (repo-scoped, this plugin's own table — no bridge) ---
+    // --- saved queries (project-scoped, this plugin's own table — no bridge) ---
     .get('/:id/database/queries', async (c) => {
-      const t = await repoOf(id(c))
+      const t = await taskOf(id(c))
       if (!t) return respondError(c, 404, 'not_found')
-      const rows = await db.select().from(dbSavedQueries).where(repoScope(t)).orderBy(dbSavedQueries.name)
+      const project = await projectOf(t)
+      if (!project) return c.json([])
+      const rows = await db.select().from(dbSavedQueries).where(projectScope(project.id)).orderBy(dbSavedQueries.name)
       return c.json(rows.map(rowToQuery))
     })
     .post('/:id/database/queries', async (c) => {
@@ -139,13 +141,14 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
       if (!p.success) return respondError(c, 400, 'bad_request')
       // The taskId is a plain ID into core's tables, so core validates it — this was a join in this
       // file, and cannot be one across two SQLite files.
-      const t = await repoOf(id(c))
+      const t = await taskOf(id(c))
       if (!t) return respondError(c, 404, 'not_found')
+      const project = await projectOf(t)
+      if (!project) return respondError(c, 400, 'project_not_found')
       const now = Date.now()
-      const row: SavedRow = {
+      const row: typeof dbSavedQueries.$inferInsert = {
         id: randomUUID(),
-        repoOwner: t.repoOwner,
-        repoName: t.repoName,
+        projectId: project.id,
         name: p.data.name.trim(),
         notes: p.data.notes.trim() || null,
         sql: p.data.sql.trim(),
@@ -156,16 +159,18 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
         .insert(dbSavedQueries)
         .values(row)
         .onConflictDoUpdate({
-          target: [dbSavedQueries.repoOwner, dbSavedQueries.repoName, dbSavedQueries.name],
+          target: [dbSavedQueries.projectId, dbSavedQueries.name],
           set: { notes: row.notes, sql: row.sql, updatedAt: now },
         })
         .returning()
       return c.json(rowToQuery(saved))
     })
     .delete('/:id/database/queries/:queryId', async (c) => {
-      const t = await repoOf(id(c))
+      const t = await taskOf(id(c))
       if (!t) return respondError(c, 404, 'not_found')
-      await db.delete(dbSavedQueries).where(and(eq(dbSavedQueries.id, c.req.param('queryId')), repoScope(t)))
+      const project = await projectOf(t)
+      if (!project) return c.json({ ok: true })
+      await db.delete(dbSavedQueries).where(and(eq(dbSavedQueries.id, c.req.param('queryId')), projectScope(project.id)))
       return c.json({ ok: true })
     })
     // Generate a PostgreSQL query from a natural-language description via a connected model provider

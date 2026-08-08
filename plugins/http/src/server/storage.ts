@@ -27,7 +27,9 @@ export async function openHttpValue(value: string, encrypted: boolean, secrets: 
 }
 
 export async function protectLegacyHttpStorage(db: PluginDatabase, secrets: SecretService, identity: IdentityService): Promise<void> {
-  const soleIdentity = await identity.sole()
+  // The node's owner, bound at boot. Legacy unscoped rows predate identity scoping entirely, and a
+  // node has exactly one owner, so they are the owner's rows.
+  const activeIdentity = identity.active()
 
   const requests = await db.select().from(httpRequests).where(eq(httpRequests.encrypted, false))
   const variables = await db.select().from(httpVariables).where(eq(httpVariables.encrypted, false))
@@ -35,7 +37,7 @@ export async function protectLegacyHttpStorage(db: PluginDatabase, secrets: Secr
   const requestUpdates = await Promise.all(
     requests.map(async (row) => ({
       id: row.id,
-      userId: row.userId === LEGACY_USER && soleIdentity ? soleIdentity : row.userId,
+      userId: row.userId === LEGACY_USER && activeIdentity ? activeIdentity : row.userId,
       url: await protectHttpValue(row.url, secrets),
       headers: await protectHttpValue(row.headers, secrets),
       body: await protectHttpValue(row.body, secrets),
@@ -55,7 +57,7 @@ export async function protectLegacyHttpStorage(db: PluginDatabase, secrets: Secr
       }
       return {
         id: row.id,
-        userId: row.userId === LEGACY_USER && soleIdentity ? soleIdentity : row.userId,
+        userId: row.userId === LEGACY_USER && activeIdentity ? activeIdentity : row.userId,
         value: await protectHttpValue(plaintext, secrets),
       }
     }),

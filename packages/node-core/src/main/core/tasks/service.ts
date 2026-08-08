@@ -1,13 +1,14 @@
 // The task read seam (CoreServices.tasks). Plugins hold task IDs and ask core to resolve them through
 // this service; database handles remain private to their owning layer.
-import { and, eq, isNull, max } from 'drizzle-orm'
+import { and, eq, isNull, max, or, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { LayoutRecipe, RunTarget } from '../../runConfig'
 import type { AppDatabase } from '../../../server/db'
 import { schema } from '../../../server/db'
 import { broadcastStatus } from '../../notify'
-import { loadTask, resolveTaskCwd, taskRoot, taskRunConfig, workspaceIdFor, workspaceIdForRepo, type TaskRow } from '../../taskWorktree'
+import { loadTask, projectForTask, resolveTaskCwd, taskRoot, taskRunConfig, workspaceIdFor, type TaskRow } from '../../taskWorktree'
+import { normalizeGithubPart } from '../../projects'
 import type { CapabilityRegistry } from '../../../server/plugin/capabilities'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Restated as a
@@ -31,35 +32,35 @@ export type TaskService = {
   // The tasks row, or undefined when the id does not resolve — the "validated by the owning plugin"
   // half of a plain-ID reference.
   load(taskId: string): Promise<TaskRow | undefined>
-  // The task's worktree root, resolving through the repo→checkout mapping and creating the worktree
+  // The task's worktree root, resolving through the project checkout and creating the worktree
   // lazily if needed. null when no checkout is mapped.
   //
-  // `userId` is not decoration: creating a worktree consults the per-repo `base_ref:<owner>/<repo>`
+  // `userId` is not decoration: creating a worktree consults the per-project base-ref preference
   // preference, which is user-owned state, and a missing identity fails closed to git's origin/main
   // fallback rather than selecting another login's preference. Callers that HAVE an authorizing
   // identity (plugins/http's send resolves it from the request principal) must pass it.
   root(taskId: string, userId?: string | null): Promise<string | null>
   // The cwd a task's commands run in, creating the worktree on first use (docs/workspaces-and-tasks.md
   // Flow C). Takes the row rather than the id because the one caller — plugins/terminal's spawn path —
-  // already loaded it to derive the session's repo/PR context, and re-reading would be a second query
+  // already loaded it to derive the session's project/PR context, and re-reading would be a second query
   // across a database boundary.
   //
   // `userId` carries the same weight it does on `root` above — worktree creation consults the per-repo
   // `base_ref` preference, which is user-owned — so a caller that HAS an authorizing identity (the
-  // workflow runner resolves it from the node's active GitHub identity) passes it, and one that does not
+  // workflow runner resolves it from the node's active owner identity) passes it, and one that does not
   // (terminal's spawn path, which runs for whoever is at the keyboard) omits it and gets git's fallback.
   resolveCwd(task: TaskRow | undefined, baseCheckout: string | undefined, userId?: string | null): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
-  // Run targets + cwd for a task: `repo_paths` settings merged with the repo's committed
+  // Run targets + cwd for a task: project settings merged with the project's committed
   // `.acorn/config.toml`. plugins/terminal's RuntimeService is the only consumer, and it cannot read
   // either source itself — one is a core table, the other needs the lazily-created worktree.
   runConfig(taskId: string): Promise<TaskRunConfig>
   // Every non-archived task. Two plugins need the whole set rather than one id: docker matches every
   // live container against every active task's worktree/branch to build the rail badge, and memory
   // reconciles its file index from every active worktree. Full rows because those two read different
-  // columns (docker: id/worktreePath/branch; memory: worktreePath/repoOwner/repoName) and a narrowed
+  // columns (docker: id/worktreePath/branch; memory: worktreePath/projectId) and a narrowed
   // projection would just be the union of both.
   active(): Promise<TaskRow[]>
-  // The workspace a task belongs to, resolved task → repo → `workspace_repos`. Throws when the task or
+  // The workspace a task belongs to, resolved task → project → workspace membership. Throws when the task or
   // its membership is missing, because the one caller (plugins/notes' `notes_*` tools with
   // `scope: 'workspace'`) has no meaningful degraded answer: a workspace-scoped note has to land in a
   // directory named after a real workspace, and inventing one would silently write notes nobody reads.
@@ -68,7 +69,7 @@ export type TaskService = {
   // The same lookup, with "no workspace" as a VALUE rather than a throw.
   //
   // Added for plugins/notes' context section, which walks task → workspace → global and must skip the middle
-  // scope when the task's repo is in no workspace yet. It was written as
+  // scope when the task's project has no workspace yet. It was written as
   // `ctx.core.tasks.workspaceId(taskId).catch(() => null)`, and that catch is too wide: `workspaceId` throws for
   // "task not found", for "no membership", AND for any genuine database failure, so a broken query degraded into
   // "this task has no workspace" and every included workspace note silently vanished from the prompt with no
@@ -112,17 +113,22 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
       const candidates = await db
         .select({ id: schema.tasks.id, branch: schema.tasks.branch })
         .from(schema.tasks)
+        .leftJoin(schema.projects, eq(schema.projects.id, schema.tasks.projectId))
         .where(
           and(
-            eq(schema.tasks.repoOwner, repoOwner),
-            eq(schema.tasks.repoName, repoName),
+            // Adoption is a GitHub-domain operation: every local project clone with this facet
+            // participates, rather than only the oldest project.
+            and(
+              sql`lower(${schema.projects.githubOwner}) = ${normalizeGithubPart(repoOwner)}`,
+              sql`lower(${schema.projects.githubName}) = ${normalizeGithubPart(repoName)}`,
+            ),
             eq(schema.tasks.status, 'active'),
             isNull(schema.tasks.pullNumber),
           ),
         )
       const now = Date.now()
       const updates = candidates.flatMap((task) => {
-        const pullNumber = branchToPull.get(task.branch)
+        const pullNumber = task.branch ? branchToPull.get(task.branch) : undefined
         return pullNumber == null
           ? []
           : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(eq(schema.tasks.id, task.id))]
@@ -143,22 +149,16 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
     workspaceIdOrNull: async (taskId) => {
       const task = await loadTask(db, taskId)
       if (!task) return null
-      return workspaceIdForRepo(db, task.repoOwner, task.repoName)
+      const project = await projectForTask(db, task)
+      return project?.workspaceId ?? null
     },
-    idsForWorkspace: async (workspaceId) =>
-      (
-        await db
-          .selectDistinct({ id: schema.tasks.id })
-          .from(schema.tasks)
-          .innerJoin(
-            schema.workspaceRepos,
-            and(
-              eq(schema.workspaceRepos.repoOwner, schema.tasks.repoOwner),
-              eq(schema.workspaceRepos.repoName, schema.tasks.repoName),
-            ),
-          )
-          .where(eq(schema.workspaceRepos.workspaceId, workspaceId))
-      ).map((row) => row.id),
+    idsForWorkspace: async (workspaceId) => {
+      const projectIds = (await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.workspaceId, workspaceId))).map((row) => row.id)
+      const projectTasks = projectIds.length
+        ? await db.selectDistinct({ id: schema.tasks.id }).from(schema.tasks).where(or(...projectIds.map((id) => eq(schema.tasks.projectId, id))))
+        : []
+      return projectTasks.map((row) => row.id)
+    },
     links: (taskId) =>
       db
         .select({ provider: schema.taskLinks.provider, integrationId: schema.taskLinks.integrationId, identifier: schema.taskLinks.identifier })
@@ -167,10 +167,14 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
     createChild: async (parentTaskId, seed) => {
       const parent = await loadTask(db, parentTaskId)
       if (!parent) throw new Error('Parent task not found.')
+      const project = await projectForTask(db, parent)
+      if (!project) throw new Error('Parent task has no project.')
       // Branch names are de-duped against EVERY task, not just this parent's children: a worktree is
       // keyed on the branch, so a collision with an unrelated task would hand two tasks one checkout.
-      const existing = (await db.select({ branch: schema.tasks.branch }).from(schema.tasks)).map((row) => row.branch)
-      const branch = dedupeBranch(slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`, existing)
+      const existing = (await db.select({ branch: schema.tasks.branch }).from(schema.tasks)).flatMap((row) => row.branch ? [row.branch] : [])
+      const branch = project.vcs === 'git'
+        ? dedupeBranch(slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`, existing)
+        : null
       const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
       const id = randomUUID()
       const at = Date.now()
@@ -178,8 +182,8 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
         id,
         title: seed.title,
         origin: 'local',
-        repoOwner: parent.repoOwner,
-        repoName: parent.repoName,
+        // A child works in the parent's repo by definition, so it inherits the project id too.
+        projectId: project.id,
         branch,
         pullNumber: null,
         worktreePath: null,

@@ -13,9 +13,9 @@ import { respondError } from '@acorn/node-core/server/respond.ts'
 // NotesStore capability, so the alias cannot create a second source of truth.
 
 export type KnowledgeBridge = {
-  memoryList(repo?: string): Promise<unknown>
-  memorySearch(query: string, repo?: string, type?: string): Promise<unknown>
-  memoryAdd(taskId: string, p: { scope: 'repo' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
+  memoryList(projectId?: string): Promise<unknown>
+  memorySearch(query: string, projectId?: string, type?: string): Promise<unknown>
+  memoryAdd(taskId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
   memoryProposals(taskId?: string): Promise<unknown>
   memoryResolveProposal(id: string, approved: boolean, edited?: { name: string; type: string; description: string; body: string }): Promise<unknown>
   notesList(location: NoteLocation): Promise<unknown>
@@ -33,7 +33,7 @@ export const setKnowledgeBridge = (bridge: KnowledgeBridge | null): void => setR
 
 // Everything that writes a memory file / note gets a validated body (the privileged-boundary contract).
 const editedShape = z.object({ name: z.string(), type: z.string(), description: z.string(), body: z.string() })
-const addBody = z.object({ scope: z.enum(['repo', 'private']), name: z.string(), description: z.string(), type: z.string(), body: z.string() })
+const addBody = z.object({ scope: z.enum(['project', 'private']), name: z.string(), description: z.string(), type: z.string(), body: z.string() })
 const resolveBody = z.object({ approved: z.boolean(), edited: editedShape.optional() })
 const createBody = z.object({ title: z.string(), kind: z.string().optional() })
 const writeBody = z.object({ body: z.string() })
@@ -62,11 +62,11 @@ const confineTaskQuery = (c: Context<AppEnv>): { taskId?: string } | null => {
 export const knowledge = new Hono<AppEnv>()
   .use('/workspaces/:wsId/notes/*', requireDevice)
   // --- memory ---
-  .get('/memory', (c) => viaBridge(c, KNOWLEDGE, (b) => b.memoryList(c.req.query('repo') ?? undefined)))
+  .get('/memory', (c) => viaBridge(c, KNOWLEDGE, (b) => b.memoryList(c.req.query('projectId') ?? undefined)))
   .get('/memory/search', (c) => {
     const q = c.req.query('q')
     if (!q) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, KNOWLEDGE, (b) => b.memorySearch(q, c.req.query('repo') ?? undefined, c.req.query('type') ?? undefined))
+    return viaBridge(c, KNOWLEDGE, (b) => b.memorySearch(q, c.req.query('projectId') ?? undefined, c.req.query('type') ?? undefined))
   })
   .get('/memory/proposals', (c) => {
     const filter = confineTaskQuery(c)

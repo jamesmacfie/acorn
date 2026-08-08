@@ -2,7 +2,7 @@
 //
 // They lived in apps/node/src/wiring/agentToolsWiring.ts for two recorded blockers, and both are gone:
 // the NotesStore instance was constructed by plugins/memory (it is this plugin's own now, published as
-// `notes.store`), and the 'workspace' scope needed `workspaceIdFor` over core's `workspace_repos`, for
+// `notes.store`), and the 'workspace' scope needed `workspaceIdFor` over core workspace membership, for
 // which CoreServices had no seam (`CoreServices.tasks.workspaceId` is that seam, added with these
 // callers rather than ahead of them).
 //

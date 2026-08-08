@@ -9,8 +9,8 @@ describe('linear source promotion', () => {
       branchName: 'eng-42-ship-it', state: null, assignee: null,
       priority: null, priorityLabel: null, updatedAt: null, labels: [],
     }
-    expect(prepareLinearPromotion(item, { owner: 'acme', repo: 'widget' })).toMatchObject({
-      origin: 'linear', repoOwner: 'acme', repoName: 'widget', branch: 'eng-42-ship-it',
+    expect(prepareLinearPromotion(item, { projectId: 'project-widget', owner: 'acme', repo: 'widget' })).toMatchObject({
+      origin: 'linear', projectId: 'project-widget', branch: 'eng-42-ship-it',
       links: [{ connectionId: 'linear-work', identifier: 'ENG-42' }],
     })
   })

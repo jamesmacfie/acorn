@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import * as coreFs from '@acorn/node-core/main/core/fs.ts'
-import { createRepoService } from '@acorn/node-core/main/core/repos.ts'
+import { createProjectService } from '@acorn/node-core/main/core/projects.ts'
 import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import { RepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
 import { resolveDbUrl, type DatabaseCoreServices } from './database'
@@ -36,16 +36,21 @@ describe('resolveDbUrl: repo-authored url_script trust gate', () => {
 
   beforeEach(async () => {
     testDb = makeTestDb()
-    core = { tasks: createTaskService(testDb.db), repos: createRepoService(testDb.db), fs: coreFs }
+    core = { tasks: createTaskService(testDb.db), projects: createProjectService(testDb.db), fs: coreFs }
     dir = mkdtempSync(join(tmpdir(), 'acorn-db-trust-'))
     repo = join(dir, 'repo')
     marker = join(dir, 'EXECUTED')
     mkdirSync(join(repo, '.acorn'), { recursive: true })
     const now = Date.now()
-    await testDb.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: repo, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.projects).values({
+      id: 'project-widget', name: 'widget', path: repo, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
     // worktreePath === the checkout, so taskRoot resolves without any git work.
     await testDb.db.insert(schema.tasks).values({
-      id: 'task1', title: 'Task', origin: 'local', repoOwner: 'acme', repoName: 'widget', branch: 'main',
+      id: 'task1', title: 'Task', origin: 'local', projectId: 'project-widget', branch: 'main',
       worktreePath: repo, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
     })
   })

@@ -5,14 +5,15 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import { Hono } from 'hono'
-import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed, type TaskSeed } from '@acorn/protocol/api.ts'
+import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { externalRefForConnection, getConnection } from '../integrations/connections'
 import { ProviderOperationError } from '../integrations/types'
 import { ownerId } from '../middleware/requireUser'
 import { integrationProviderRegistry } from '../integrations/registry'
+import { getProject } from '../../main/projects'
 
-// Tasks (docs/workspaces-and-tasks.md): the single-repo unit of work. Machine-scoped like repo_paths /
+// Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects /
 // terminal_sessions — no user_id — but still auth-gated (it's a logged-in app). CRUD: create /
 // list-active / rename / archive. Worktree teardown on archive is the main process's job (it owns
 // git/fs); this route only flips the status.
@@ -31,15 +32,19 @@ const taskPatchBody = z.object({
 
 const cleanIcon = (v: unknown): string | null => (typeof v === 'string' && ICON_NAME_RE.test(v) ? v : null)
 
-function rowToTask(row: Row, links: TaskLink[]): Task {
+function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<typeof getProject>>): Task | null {
+  const projectId = row.projectId
+  const github = project?.githubOwner && project.githubName
+    ? { owner: project.githubOwner, name: project.githubName }
+    : null
   return {
     id: row.id,
     title: row.title,
     icon: row.icon,
     origin: row.origin as Task['origin'],
-    repoOwner: row.repoOwner,
-    repoName: row.repoName,
+    projectId,
     branch: row.branch,
+    github,
     worktreePath: row.worktreePath,
     pullNumber: row.pullNumber,
     status: row.status as Task['status'],
@@ -57,6 +62,21 @@ function rowToTask(row: Row, links: TaskLink[]): Task {
 // The columns keep their names — renaming them is a migration for no behavioural gain, and `rowLink`
 // below is the one place that maps between the two vocabularies, which is where a mapping belongs.
 type LinkInput = Partial<TaskLinkSeed>
+
+const taskSeedBody = z.object({
+  title: z.string().optional(),
+  icon: z.string().optional(),
+  origin: z.string().min(1),
+  projectId: z.string().min(1),
+  branch: z.string().optional(),
+  pullNumber: z.int().positive().optional(),
+  links: z.array(z.object({
+    connectionId: z.string().min(1),
+    identifier: z.string().min(1),
+    providerId: z.string().optional(),
+    ref: z.record(z.string(), z.unknown()).optional(),
+  })).optional(),
+})
 
 const parseLinkInput = (input: LinkInput): { connectionId: string; identifier: string; ref?: Partial<ExternalRef>; claimedProviderId?: string } | null => {
   if (!input.connectionId || !input.identifier) return null
@@ -106,14 +126,21 @@ export const tasks = new Hono<AppEnv>()
       list.push(rowLink(l))
       byTask.set(l.taskId, list)
     }
-    return c.json(rows.map((r) => rowToTask(r, byTask.get(r.id) ?? [])))
+    const projects = new Map<string, Awaited<ReturnType<typeof getProject>>>()
+    for (const row of rows) {
+      if (row.projectId) projects.set(row.projectId, await getProject(db, row.projectId))
+    }
+    return c.json(rows.map((r) => rowToTask(r, byTask.get(r.id) ?? [], r.projectId ? projects.get(r.projectId) ?? null : null)).filter((task): task is Task => task !== null))
   })
   .post('/', async (c) => {
-    const seed = (await c.req.json().catch(() => ({}))) as Partial<TaskSeed>
-    if (!seed.origin || !seed.repoOwner || !seed.repoName || !seed.branch) return respondError(c, 400, 'bad_request')
+    const parsedSeed = taskSeedBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsedSeed.success) return respondError(c, 400, 'bad_request')
+    const seed = parsedSeed.data
     const db = getDb(c.env)
     const uid = ownerId(c)
-    const linkInputs = Array.isArray(seed.links) ? (seed.links as LinkInput[]) : []
+    const project = await getProject(db, seed.projectId)
+    if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
+    const linkInputs = (seed.links ?? []) as LinkInput[]
     let links: TaskLink[]
     try {
       links = await Promise.all(linkInputs.map((link) => stampedLink(db, uid, link)))
@@ -124,7 +151,9 @@ export const tasks = new Hono<AppEnv>()
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
     const now = Date.now()
     const id = randomUUID()
-    const title = seed.title?.trim() || (seed.pullNumber ? `#${seed.pullNumber} ${seed.repoName}` : `${seed.repoName} · ${seed.branch}`)
+    const branch = project.vcs === 'git' ? seed.branch?.trim() || null : null
+    const projectLabel = project.githubName ?? project.name
+    const title = seed.title?.trim() || (seed.pullNumber ? `#${seed.pullNumber} ${projectLabel}` : branch ? `${project.name} · ${branch}` : project.name)
     const sort = (value ?? -1) + 1
     const icon = cleanIcon(seed.icon)
     await db.insert(schema.tasks).values({
@@ -132,9 +161,8 @@ export const tasks = new Hono<AppEnv>()
       title,
       icon,
       origin: seed.origin,
-      repoOwner: seed.repoOwner,
-      repoName: seed.repoName,
-      branch: seed.branch,
+      projectId: project.id,
+      branch,
       pullNumber: seed.pullNumber ?? null,
       worktreePath: null,
       status: 'active',
@@ -151,8 +179,9 @@ export const tasks = new Hono<AppEnv>()
     }
     return c.json(
       rowToTask(
-        { id, title, icon, origin: seed.origin, repoOwner: seed.repoOwner, repoName: seed.repoName, branch: seed.branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
+        { id, title, icon, origin: seed.origin, projectId: project.id, branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
         links,
+        project,
       ),
     )
   })

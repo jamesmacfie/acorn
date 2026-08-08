@@ -1,5 +1,5 @@
-// The API panel. Mounted twice: as the left-rail Source (repo tree, no task) and as a task pane
-// (that task's ad-hoc requests on top of the repo tree). Everything below is shared between them —
+// The API panel. Mounted twice: as the left-rail Source (project tree, no task) and as a task pane
+// (that task's ad-hoc requests on top of the project tree). Everything below is shared between them —
 // the only difference is `taskId`.
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { Button, Input, Select, SectionHeader } from '@acorn/client-core/ui/primitives.tsx'
@@ -33,7 +33,7 @@ function groupByFolder(requests: HttpRequest[]): Group[] {
 
 const methodTone = (method: string): string => method.toLowerCase()
 
-export default function HttpPanel(props: { owner: string; repo: string; taskId?: string }) {
+export default function HttpPanel(props: { projectId: string; projectName: string; taskId?: string }) {
   const blank = () => emptyDraft(props.taskId ?? null)
   const [selection, setSelection] = createSignal<Selection>({ kind: 'new' })
   const [draft, setDraft] = createSignal<Draft>(blank())
@@ -43,11 +43,11 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
   const [saving, setSaving] = createSignal(false)
   const [saveOpen, setSaveOpen] = createSignal(false)
 
-  const scope = () => ({ owner: props.owner, repo: props.repo, taskId: props.taskId })
+  const scope = () => ({ projectId: props.projectId, taskId: props.taskId })
 
   // The repo tree. A task pane also lists that task's ad-hoc requests, in their own group above it.
-  const [saved, savedActions] = createResource(scope, (s) => listRequests(s.owner, s.repo))
-  const [adhoc, adhocActions] = createResource(scope, (s) => (s.taskId ? listRequests(s.owner, s.repo, s.taskId) : Promise.resolve([])))
+  const [saved, savedActions] = createResource(scope, (s) => listRequests(s.projectId))
+  const [adhoc, adhocActions] = createResource(scope, (s) => (s.taskId ? listRequests(s.projectId, s.taskId) : Promise.resolve([])))
 
   const refresh = () => {
     void savedActions.refetch()
@@ -88,7 +88,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
   const saveTarget = createMemo<SaveTarget>(() => ({
     name: draft().name,
     folder: draft().folder,
-    scope: draft().taskId ? 'task' : 'repo',
+    scope: draft().taskId ? 'task' : 'project',
   }))
 
   // `error` is shared with the send path, and the dialog shows it — don't open onto a stale one.
@@ -107,7 +107,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
     setError(null)
     try {
       const row = current()
-      const next = row ? await updateRequest(props.owner, props.repo, row.id, d) : await createRequest(props.owner, props.repo, d)
+      const next = row ? await updateRequest(props.projectId, row.id, d) : await createRequest(props.projectId, d)
       setSelection({ kind: 'saved', id: next.id })
       setDraft(toDraft(next))
       setSaveOpen(false)
@@ -122,7 +122,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
   async function remove(row: HttpRequest) {
     if (!confirm(`Delete "${row.name}"?`)) return
     try {
-      await deleteRequest(props.owner, props.repo, row.id)
+      await deleteRequest(props.projectId, row.id)
       if (current()?.id === row.id) startNew()
       refresh()
     } catch (err) {
@@ -138,7 +138,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
     try {
       // The panel decides where commands run. A repo-saved request still executes in the current
       // task when opened here; its persisted taskId remains only its filing/ownership scope.
-      setResult(await sendRequest(props.owner, props.repo, toSendInput(draft(), props.taskId ?? null)))
+      setResult(await sendRequest(props.projectId, toSendInput(draft(), props.taskId ?? null)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed')
     } finally {
@@ -167,7 +167,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
     <div class="http-panel">
       <aside class="http-sidebar">
         <SectionHeader level="pane" actions={<Button size="sm" variant="ghost" onClick={() => startNew()}>+ Request</Button>}>
-          {props.repo}
+          {props.projectName}
         </SectionHeader>
 
         <nav class="http-tree">
@@ -190,7 +190,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
           </For>
 
           <Show when={saved.state === 'ready' && !(saved() ?? []).length && !props.taskId}>
-            <p class="http-empty">No saved requests for this repo yet.</p>
+            <p class="http-empty">No saved requests for this project yet.</p>
           </Show>
         </nav>
 
@@ -202,7 +202,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
       <div class="http-main">
         <Show
           when={selection().kind !== 'variables'}
-          fallback={<HttpVariables owner={props.owner} repo={props.repo} />}
+          fallback={<HttpVariables projectId={props.projectId} projectName={props.projectName} />}
         >
           <div class="http-urlbar">
             <Select
@@ -276,7 +276,7 @@ export default function HttpPanel(props: { owner: string; repo: string; taskId?:
               ...draft(),
               name: target.name,
               // A task-scoped request has no folder — the task is its home.
-              folder: target.scope === 'repo' ? target.folder : '',
+              folder: target.scope === 'project' ? target.folder : '',
               taskId: target.scope === 'task' ? (props.taskId ?? null) : null,
             }
             setDraft(next)

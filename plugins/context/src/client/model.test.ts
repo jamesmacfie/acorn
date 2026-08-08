@@ -4,7 +4,7 @@ import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary } from
 import { bytesOf, formatSize } from '@acorn/client-core/lib/formatSize.ts'
 
 const ctx: TaskContext = {
-  task: { id: 't', title: 'x', repo: 'a/b', branch: 'm', worktreePath: null, pullNumber: null },
+  task: { id: 't', title: 'x', projectId: 'project-1', repo: 'a/b', branch: 'm', worktreePath: null, pullNumber: null },
   sections: [
     { id: 'notes', label: 'Notes', defaultIncluded: true, budget: { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' }, items: [{ id: 'n', kind: 'note', label: 'Plan' }], compact: '## Notes\n### Plan\nbody', omitted: 0 },
     { id: 'memory', label: 'Memory', defaultIncluded: false, budget: { maxItems: 30, overflow: 'index-only' }, items: [], compact: '## Repo memory', omitted: 0, absent: { reason: 'missing-cache', detail: 'missing' } },

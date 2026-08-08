@@ -3,7 +3,7 @@
 // by `toSendInput`, so opening a repo-saved row inside a task does not lose that task's worktree.
 import type { HttpRequest, HttpSendInput } from '../shared/model'
 
-export type Draft = Omit<HttpRequest, 'id' | 'repoOwner' | 'repoName' | 'createdAt' | 'updatedAt'>
+export type Draft = Omit<HttpRequest, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>
 
 export const emptyDraft = (taskId: string | null = null): Draft => ({
   folder: '',

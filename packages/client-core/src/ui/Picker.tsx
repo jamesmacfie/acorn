@@ -3,7 +3,7 @@ import { Portal } from 'solid-js/web'
 
 // Searchable popover picker: a button showing the current value opens a filter input + scrollable
 // list. Presentational chrome only — the parent supplies results(query) so it owns filtering and
-// ordering (pinned-first repos, substring branches, …). Shared by RepoPicker and the create-PR
+// ordering (pinned-first projects, substring branches, …). Shared by project pickers and the create-PR
 // branch selectors so they look and behave identically. Esc / outside-click close it.
 //
 // The popover is rendered through a Portal and positioned `fixed` to the button's rect: panes set

@@ -7,7 +7,7 @@
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { NotesStoreCapability, SeedTask } from '../contract/store'
 
-export type SeedCoreServices = Pick<CoreServices, 'tasks'>
+export type SeedCoreServices = Pick<CoreServices, 'tasks' | 'projects'>
 
 // The slices of the mirror composites we render into notes (bodies are sanitized bodyHTML / markdown).
 type PrComment = { author: string | null; body: string | null; createdAt: number | null }
@@ -75,9 +75,10 @@ export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesSto
   // stay visible; only the workflow+scratch combo is a seed.
   const seed = (title: string, body: string) => notesStore.create(location, title, { author: 'workflow', kind: 'scratch', originTaskId: task.id, included: true, body })
 
-  if (task.pullNumber != null) {
+  const project = await core.projects.byId(task.projectId)
+  if (task.pullNumber != null && project?.github) {
     // pullDetail refreshes the mirror on staleness before returning the composite (serve-then-revalidate).
-    const pr = await fetchJson<PrComposite>(`${base}/v2/p/github/repos/${task.repoOwner}/${task.repoName}/pulls/${task.pullNumber}`, token)
+    const pr = await fetchJson<PrComposite>(`${base}/v2/p/github/repos/${project.github.owner}/${project.github.name}/pulls/${task.pullNumber}`, token)
     if (pr?.pull) {
       await seed(`PR #${pr.pull.number}: ${pr.pull.title}`, pr.pull.body?.trim() || '_(no description)_')
       const comments = buildCommentsBody(pr)

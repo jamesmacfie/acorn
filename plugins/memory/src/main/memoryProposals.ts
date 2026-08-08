@@ -12,7 +12,7 @@ import { isValidMemoryName, MEMORY_TYPES, type MemoryType } from './memory'
 export type MemoryProposal = {
   id: string
   taskId: string
-  repo: string | null
+  projectId: string | null
   name: string
   type: MemoryType
   description: string
@@ -26,19 +26,24 @@ export type MemoryProposal = {
   createdAt: number
 }
 
-const memoryProposalSchema = z.strictObject({
-  id: z.string().min(1),
-  taskId: z.string().min(1),
-  repo: z.string().nullable(),
-  name: z.string(),
-  type: z.enum(MEMORY_TYPES),
-  description: z.string(),
-  body: z.string(),
-  flags: z.array(z.string()).default([]),
-  originSessionId: z.string().nullable(),
-  status: z.enum(['pending', 'accepted', 'rejected']),
-  createdAt: z.number(),
-})
+const memoryProposalSchema = z
+  .object({
+    id: z.string().min(1),
+    taskId: z.string().min(1),
+    projectId: z.string().nullable().optional(),
+    // Pre-Phase-4 proposals used a repo pair string. It remains readable but is deliberately
+    // discarded instead of being guessed into a project id.
+    repo: z.string().nullable().optional(),
+    name: z.string(),
+    type: z.enum(MEMORY_TYPES),
+    description: z.string(),
+    body: z.string(),
+    flags: z.array(z.string()).default([]),
+    originSessionId: z.string().nullable(),
+    status: z.enum(['pending', 'accepted', 'rejected']),
+    createdAt: z.number(),
+  })
+  .transform(({ repo: _repo, projectId, ...proposal }) => ({ ...proposal, projectId: projectId ?? null }))
 
 export class MemoryProposalStore {
   constructor(private root: string) {

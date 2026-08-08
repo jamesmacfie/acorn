@@ -5,7 +5,7 @@
 // `workspaceLinearIssuesKey`'s '-v2' suffix is load-bearing: it orphans persisted pre-redesign rows
 // that would otherwise hydrate and crash the browse model.
 import { readJson } from '@acorn/client-core/apiClient.ts'
-import type { WorkspaceProject } from '@acorn/protocol/api.ts'
+import type { WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import { linearIssueKey, linearIssueRoute, linearProjectsKey, linearProjectsRoute, linearProjectIssuesRoute, type LinearIssueDetail, type LinearProjectsResponse, type LinearProjectIssuesResponse } from '../shared/api'
 
 type QueryContext = { signal?: AbortSignal }
@@ -23,9 +23,9 @@ export const linearProjectsOptions = (enabled: boolean) => ({
 // merging the results. Each issue carries its integrationId (stamped server-side) for promotion.
 // v2: LinearProjectIssue grew required labels/priority/updatedAt fields — the version suffix orphans
 // persisted pre-redesign rows that would otherwise hydrate and crash the browse model.
-export const workspaceLinearIssuesKey = (selection: WorkspaceProject[]) =>
+export const workspaceLinearIssuesKey = (selection: WorkspaceExternalProject[]) =>
   ['workspace-linear-issues-v2', ...selection.map((p) => `${p.integrationId}:${p.externalId}`).sort()] as const
-export const workspaceLinearIssuesOptions = (selection: WorkspaceProject[], enabled: boolean) => ({
+export const workspaceLinearIssuesOptions = (selection: WorkspaceExternalProject[], enabled: boolean) => ({
   queryKey: workspaceLinearIssuesKey(selection),
   enabled,
   refetchOnMount: 'always' as const,

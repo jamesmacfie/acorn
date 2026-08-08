@@ -158,17 +158,17 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
   return { app, page, dataDir, repoDir }
 }
 
-async function seedWorkspace(page: Page, repoDir: string): Promise<void> {
+async function seedWorkspace(page: Page, repoDir: string): Promise<{ projectId: string }> {
   const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Smoke' } })
-  await nodeJson(page, `/v2/core/workspaces/${workspace.id}/repos`, { method: 'POST', body: { owner: 'acorn', name: 'smoke' } })
-  await nodeJson(page, '/v2/core/repos/path', { method: 'PUT', body: { owner: 'acorn', repo: 'smoke', path: repoDir } })
+  const created = await nodeJson<{ project: { id: string } }>(page, '/v2/core/projects', { method: 'POST', body: { path: repoDir, workspaceId: workspace.id } })
+  return { projectId: created.project.id }
 }
 
 async function seedTask(page: Page, repoDir: string): Promise<{ id: string }> {
-  await seedWorkspace(page, repoDir)
+  const { projectId } = await seedWorkspace(page, repoDir)
   return nodeJson<{ id: string }>(page, '/v2/core/tasks', {
     method: 'POST',
-    body: { origin: 'local', repoOwner: 'acorn', repoName: 'smoke', branch: 'main', title: 'Smoke task' },
+    body: { origin: 'local', projectId, branch: 'main', title: 'Smoke task' },
   })
 }
 
@@ -177,11 +177,14 @@ async function dismissOnboarding(page: Page): Promise<void> {
   if (await done.isVisible().catch(() => false)) await done.click()
 }
 
-async function openSmokeWorkspace(page: Page): Promise<void> {
+async function openSmokeWorkspace(page: Page, repoDir: string): Promise<void> {
   // Workspace creation happens outside the renderer query cache. Navigate to the stable workspace
   // route, then reload that route so both workspace selection and task queries start from SQLite
   // instead of the pre-seed in-memory cache.
-  await page.goto(new URL('/acorn/smoke', page.url()).toString())
+  const projects = await nodeJson<{ projects: Array<{ id: string; path: string | null }> }>(page, '/v2/core/projects')
+  const project = projects.projects.find((candidate) => candidate.path === repoDir)
+  if (!project) throw new Error(`Project for ${repoDir} was not created`)
+  await page.goto(new URL(`/p/${project.id}`, page.url()).toString())
   await page.reload()
   await expect(page.locator('.shell')).toBeVisible()
   await dismissOnboarding(page)
@@ -235,27 +238,30 @@ test('S1 boots the authenticated desktop shell with no console errors', async ()
   await expect(running.page.locator('.tabrail-source').first()).toBeVisible()
   const railSources = await running.page.locator('.tabrail-source')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
-  expect(railSources).toEqual(['GitHub', 'Docker', 'API', 'Agents'])
+  // Home is CORE's source and the default one. GitHub's PR source is gated on a github integration row
+  // (providerId), and this fixture never connects one — so on a GitHub-less install it is simply absent,
+  // which is the whole point of the projects migration.
+  expect(railSources).toEqual(['Home', 'Docker', 'API', 'Agents'])
   await running.app.close()
 })
 
 test('S2 restores durable task state across two launches', async () => {
   const first = await launch()
   await seedTask(first.page, first.repoDir)
-  await openSmokeWorkspace(first.page)
-  await first.page.getByRole('button', { name: 'Smoke task' }).click()
+  await openSmokeWorkspace(first.page, first.repoDir)
+  await first.page.getByRole('button', { name: 'Smoke task', exact: true }).click()
   await expect(first.page.locator('.task-layout')).toBeVisible()
   await first.app.close()
   const second = await launch(first)
-  await expect(second.page.getByRole('button', { name: 'Smoke task' })).toBeVisible()
+  await expect(second.page.getByRole('button', { name: 'Smoke task', exact: true })).toBeVisible()
   await second.app.close()
 })
 
 test('S3 opens a task from the rail', async () => {
   const running = await launch()
   await seedTask(running.page, running.repoDir)
-  await openSmokeWorkspace(running.page)
-  await running.page.getByRole('button', { name: 'Smoke task' }).click()
+  await openSmokeWorkspace(running.page, running.repoDir)
+  await running.page.getByRole('button', { name: 'Smoke task', exact: true }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible()
   // Every pane a LOCAL task can show, in docs/ui-design.md's order (agents 15, changes 20, notes 30, context 40,
   // editor 50, search 60, database 70, http 76, preview 80), contributed by nine separate plugins'
@@ -303,16 +309,22 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
   writeFileSync(join(running.repoDir, path), "const value = 'needleToken'\n")
   execFileSync('git', ['-C', running.repoDir, 'add', path])
   execFileSync('git', ['-C', running.repoDir, 'commit', '-qm', 'add search target'])
-  await seedWorkspace(running.page, running.repoDir)
-  await openSmokeWorkspace(running.page)
-  await running.page.getByRole('button', { name: 'New task' }).click()
-  await running.page.getByRole('checkbox', { name: 'Use current checkout (no worktree)' }).check()
-  await running.page.getByPlaceholder('Task title').fill('Smoke task')
-  await running.page.getByRole('button', { name: 'Create', exact: true }).click()
+  const { projectId } = await seedWorkspace(running.page, running.repoDir)
+  await openSmokeWorkspace(running.page, running.repoDir)
+  // Branchless replaces the old current-checkout toggle. Seed it through the project-keyed task
+  // contract, reload the renderer cache, then activate it through the rail like a user would.
+  await nodeJson(running.page, '/v2/core/tasks', {
+    method: 'POST', body: { origin: 'local', projectId, title: 'Smoke task' },
+  })
+  await running.page.reload()
+  // The reload re-runs first-run onboarding, whose backdrop swallows rail clicks.
+  await dismissOnboarding(running.page)
+  await expect(running.page.getByRole('button', { name: 'Smoke task', exact: true })).toBeVisible()
+  await running.page.getByRole('button', { name: 'Smoke task', exact: true }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible({ timeout: 30_000 })
   const tasks = await nodeJson<{ id: string; title: string }[]>(running.page, '/v2/core/tasks')
   const task = tasks.find((candidate) => candidate.title === 'Smoke task')
-  if (!task) throw new Error('The current-checkout task was not persisted.')
+  if (!task) throw new Error('The branchless project task was not persisted.')
   const files = await nodeJson<string[]>(running.page, `/v2/p/editor/tasks/${task.id}/editor/files`)
   expect(files).toContain(path)
   await running.page.keyboard.press('Meta+Shift+f')
@@ -348,16 +360,18 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
 
 test('S8 survives a hard reload of a deep route under the app scheme', async () => {
   const running = await launch()
-  await seedWorkspace(running.page, running.repoDir)
-  await running.page.goto(new URL('/acorn/smoke/1', running.page.url()).toString())
+  const { projectId } = await seedWorkspace(running.page, running.repoDir)
+  await running.page.goto(new URL(`/p/${projectId}/pulls/1`, running.page.url()).toString())
   // The regression guard for two things at once: the protocol handler's index.html fallback (a deep
   // path is a client route, not a file), and base:'/' (a relative base would resolve /assets/* against
-  // /acorn/smoke and fail the module script's MIME check → blank window).
+  // /p/:projectId/pulls/:number and fail the module script's MIME check → blank window).
   await running.page.reload()
   await expect(running.page.locator('.shell')).toBeVisible()
-  expect(running.page.url()).toBe('app://acorn/acorn/smoke/1')
-  await expect(running.page.locator('.pane-left .section-header')).toContainText('Reviews')
-  await expect(running.page.locator('.pane-mid .section-header')).toContainText('Navigator')
+  expect(running.page.url()).toBe(`app://acorn/p/${projectId}/pulls/1`)
+  // What renders here is core's home surface, not the PR viewer: the GitHub rail source is gated on a
+  // github integration row and this fixture never connects one. The deep path still has to survive the
+  // reload as a client route — that is what this test guards, and the URL above is the assertion for it.
+  await expect(running.page.locator('.tabrail-source').first()).toBeVisible()
   // Read the policy back off the response. S1's console-error assertion catches a policy that is too
   // tight; only this catches one that is not there at all — the failure mode where every directive
   // silently permits everything.
@@ -375,8 +389,8 @@ test('S7 loads the Agent Center and combines task agent switching with the conve
   await first.app.close()
   seedQueuedAgent(first.dataDir, task.id)
   const running = await launch(first)
-  await openSmokeWorkspace(running.page)
-  await expect(running.page.getByRole('button', { name: 'Smoke task' })).toBeVisible()
+  await openSmokeWorkspace(running.page, running.repoDir)
+  await expect(running.page.getByRole('button', { name: 'Smoke task', exact: true })).toBeVisible()
 
   await running.page.locator('.tabrail-source[aria-label="Agents"]').click()
   await expect(running.page.locator('.agent-center')).toBeVisible()

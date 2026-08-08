@@ -1,10 +1,9 @@
 import { createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../queries'
-import { archiveTask, createCheckoutTask, createTask, patchTask } from '../tasks/mutations'
+import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../queries'
+import { archiveTask, createTask, patchTask } from '../tasks/mutations'
 import { applyRailOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailOrder } from './railOrder'
-import { shellPullChecksOptions } from '../queries'
 import { checksState } from '../ui/displayMeta'
 import { createDismissable } from '../ui/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
@@ -16,7 +15,7 @@ import { taskStatus } from '../tasks/taskStatus'
 import { railStatusItems } from '../tasks/railStatus'
 import { workingCountFor } from '../tasks/agentSessions'
 import { unreadForTask } from '../notifications/notifications'
-import { workspaceForRepo } from '../workspaces/activeWorkspace'
+import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveWorkspaceColor } from '@acorn/protocol/workspaceIdentity.ts'
 import { dedupeBranch, slugifyBranch, withBranchPrefix } from '@acorn/protocol/branch.ts'
 import { taskBridge } from '../tasks/taskBridge'
@@ -43,6 +42,7 @@ export default function TabRail() {
   const queryClient = useQueryClient()
   const query = createQuery(() => tasksOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
+  const projects = createQuery(() => projectsOptions(true))
   const integrations = createQuery(() => integrationsOptions(true))
   const prefs = createQuery(() => prefsOptions(true))
   const [menuId, setMenuId] = createSignal<string | null>(null)
@@ -64,39 +64,33 @@ export default function TabRail() {
   const [text, setText] = createSignal('')
   // Chosen icon for the task being created/renamed. null = let the origin derive it.
   const [iconDraft, setIconDraft] = createSignal<string | null>(null)
-  const [newRepo, setNewRepo] = createSignal('') // "owner/name" for the new-task repo selector
-  // Repo options are snapshotted when the modal opens, not bound to the reactive activeWorkspace().
+  const [newProject, setNewProject] = createSignal('')
+  // Project options are snapshotted when the modal opens, not bound to the reactive activeWorkspace().
   // Otherwise a workspace switch mid-modal (App.tsx restore-nav / workspaces refetch) repopulates the
   // <select> while newRepo() stays on the previously selected repo → the task is created in the wrong
   // workspace.
-  const [newRepoOptions, setNewRepoOptions] = createSignal<{ owner: string; name: string }[]>([])
+  const [newProjectOptions, setNewProjectOptions] = createSignal<Project[]>([])
   // Custom branch name (docs/terminal-and-agents.md): defaults to a de-duped slug of the title until the user
   // edits the branch field directly, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
-  // "Use the current checkout" (docs/terminal-and-agents.md): borrow the mapped checkout + its current
-  // branch instead of cutting an isolated worktree. Hides the branch field (main picks the branch).
-  const [useCheckout, setUseCheckout] = createSignal(false)
-
-  // The selected repo's branch prefix (repo settings). Desktop-only — the repo_paths row is behind the
+  // The selected project's branch prefix. Desktop-only — project config is behind the
   // main-process bridge; on web there's no checkout to prefix branches for. Read through taskBridge,
   // not the terminal plugin's client: core must not import plugins (core/boundaries.test.ts).
   const [prefixRow] = createResource(
-    () => (draft()?.mode === 'new' ? newRepo() : undefined),
-    (key) => {
-      const [owner, repo] = key.split('/')
-      return owner && repo ? (taskBridge()?.repoPath.get(owner, repo) ?? null) : null
-    },
+    () => (draft()?.mode === 'new' ? newProject() : undefined),
+    (id) => id ? (taskBridge()?.project.get(id) ?? null) : null,
   )
-  const branchPrefix = () => prefixRow()?.branchPrefix ?? null
+  const branchPrefix = () => prefixRow()?.config.branchPrefix ?? null
 
-  const branchesInRepo = (repoKey: string) =>
-    (query.data ?? []).filter((t) => `${t.repoOwner}/${t.repoName}` === repoKey).map((t) => t.branch)
+  const selectedProject = () => projects.data?.find((project) => project.id === newProject())
+  const branchesInProject = (projectId: string) =>
+    (query.data ?? []).filter((task) => task.projectId === projectId).flatMap((task) => task.branch ? [task.branch] : [])
   // Prefix first, then de-dupe: existing branches are already prefixed, so the suffix has to be
   // chosen against the final name (`me/fix`, `me/fix-2`), not the bare slug.
   const defaultBranch = (title: string) => {
     const slug = withBranchPrefix(branchPrefix(), slugifyBranch(title))
-    return slug ? dedupeBranch(slug, branchesInRepo(newRepo())) : ''
+    return slug ? dedupeBranch(slug, branchesInProject(newProject())) : ''
   }
   const effectiveBranch = () => (branchTouched() ? slugifyBranch(branchText()) : defaultBranch(text()))
   // What the icon picker shows while no icon is chosen: the same default the rail row would derive.
@@ -107,14 +101,15 @@ export default function TabRail() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: tasksKey })
 
-  // Scope the rail to the active workspace (partition: derived from the current repo). Tasks whose
-  // repo isn't in the active workspace are hidden so switching workspaces swaps the roster.
-  const activeWorkspace = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  // Scope the rail to the active workspace through project IDs. Tasks whose project is not in the
+  // active workspace are hidden so switching workspaces swaps the roster.
+  const activeProjectId = () => params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId
+  const activeWorkspace = () => workspaceForProject(workspaces.data, activeProjectId())
   const visibleTasks = () => {
     const ws = activeWorkspace()
     const all = query.data ?? []
-    const inWs = ws ? new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`)) : null
-    const scoped = inWs ? all.filter((t) => inWs.has(`${t.repoOwner}/${t.repoName}`)) : all
+    const inWs = ws ? new Set(ws.projects.map((project) => project.id)) : null
+    const scoped = inWs ? all.filter((task) => inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden) : all
     return applyRailOrder(scoped, railOrder())
   }
 
@@ -167,20 +162,18 @@ export default function TabRail() {
 
   function openNew() {
     setMenuId(null)
-    const repos = activeWorkspace()?.repos ?? []
-    if (!repos.length) {
-      setArchiveErr('This workspace has no repos yet. Add one in the workspace setup first.')
+    const options = (projects.data ?? []).filter((project) => !project.hidden && project.workspaceId === activeWorkspace()?.id)
+    if (!options.length) {
+      setArchiveErr('This workspace has no visible projects yet. Add one in Projects settings first.')
       return
     }
-    // Default the repo to the current one if it's in this workspace, else the first.
-    const cur = `${params.owner}/${params.repo}`
-    setNewRepoOptions(repos)
-    setNewRepo(repos.some((r) => `${r.owner}/${r.name}` === cur) ? cur : `${repos[0].owner}/${repos[0].name}`)
+    const current = params.projectId
+    setNewProjectOptions(options)
+    setNewProject(options.some((project) => project.id === current) ? current! : options[0].id)
     setText('')
     setIconDraft(null)
     setBranchText('')
     setBranchTouched(false)
-    setUseCheckout(false)
     setDraft({ mode: 'new' })
   }
 
@@ -199,14 +192,11 @@ export default function TabRail() {
     if (!d || !value) return setDraft(null)
     try {
       if (d.mode === 'new') {
-        const [owner, repo] = newRepo().split('/')
-        if (!owner || !repo) return setDraft(null)
-        // Current-checkout task: main adopts the checkout's real branch; the seed branch is only the
-        // fallback when the desktop bridge is absent. Otherwise cut a worktree on the derived branch.
-        const branch = useCheckout() ? effectiveBranch() || 'HEAD' : effectiveBranch()
-        if (!branch) return
-        const seed = { origin: 'local' as const, repoOwner: owner, repoName: repo, branch, title: value, icon: iconDraft() ?? undefined }
-        const w = useCheckout() ? await createCheckoutTask(seed) : await createTask(seed)
+        const project = selectedProject()
+        if (!project) return setDraft(null)
+        const branch = project.vcs === 'git' ? effectiveBranch() : undefined
+        const seed = { origin: 'local' as const, projectId: project.id, branch, title: value, icon: iconDraft() ?? undefined }
+        const w = await createTask(seed)
         await invalidate()
         activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
         navigate(pathForTask(w))
@@ -285,13 +275,9 @@ export default function TabRail() {
       <div class="tabrail-list">
         <For each={visibleTasks()}>
           {(w) => {
-            const detail = createQuery(() => shellPullChecksOptions(
-              w.repoOwner,
-              w.repoName,
-              w.pullNumber != null ? String(w.pullNumber) : '',
-              false,
-            ))
-            const checks = () => detail.data?.checks ?? []
+            // CI checks are provider-owned data. The shared rail no longer reaches through a
+            // repository source seam; the GitHub PR pane remains the authoritative check surface.
+            const checks = () => []
             const st = () => taskStatus(w.id)
             // Active rail markers — one source of truth for the overlay icons below and the hover
             // tooltip's legend, so the two never drift.
@@ -304,7 +290,7 @@ export default function TabRail() {
               })
             // Workspace identity derived onto the row (docs/workspaces-and-tasks.md): 3px accent in the
             // workspace's colour, matching the active-row accent convention in docs/ui-design.md.
-            const ws = () => workspaceForRepo(workspaces.data, w.repoOwner, w.repoName)
+            const ws = () => workspaceForProject(workspaces.data, w.projectId)
             const accent = () => {
               const g = ws()
               return g ? resolveWorkspaceColor(g.color, g.name) : undefined
@@ -336,7 +322,7 @@ export default function TabRail() {
                 classList={{ active: !selectedSource() && w.id === activeTaskId() }}
                 style={accent() ? { 'border-left-color': accent() } : undefined}
                 data-tip={w.title}
-                data-tip-sub={w.branch}
+                data-tip-sub={w.branch ?? 'project folder'}
                 data-tip-legend={statusItems().length ? JSON.stringify(statusItems().map((s) => ({ g: s.glyph, d: s.dotCls, t: s.tone, l: s.label }))) : undefined}
                 aria-label={w.title}
                 onClick={() => onRowClick(w)}
@@ -358,7 +344,7 @@ export default function TabRail() {
               <Show when={menuId() === w.id}>
                 <div class="tabrail-menu">
                   <div class="tabrail-menu-title">{w.title}</div>
-                  <div class="tabrail-menu-title">{w.branch}</div>
+                  <div class="tabrail-menu-title">{w.branch ?? 'Project folder'}</div>
                   <button
                     type="button"
                     class="tabrail-close"
@@ -393,16 +379,12 @@ export default function TabRail() {
               <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
               <div class="overlay-body">
                 <Show when={d().mode === 'new'}>
-                  <p class="muted">{useCheckout() ? "Works in the repo's current checkout and branch — no worktree." : 'A local-first task on a new branch.'}</p>
-                  <select class="ui-input" value={newRepo()} onChange={(e) => setNewRepo(e.currentTarget.value)}>
-                    <For each={newRepoOptions()}>
-                      {(r) => <option value={`${r.owner}/${r.name}`}>{r.owner}/{r.name}</option>}
+                  <p class="muted">{selectedProject()?.vcs === 'git' ? 'A local-first task on a new branch.' : 'Runs in the project folder.'}</p>
+                  <select class="ui-input" value={newProject()} onChange={(e) => setNewProject(e.currentTarget.value)}>
+                    <For each={newProjectOptions()}>
+                      {(project) => <option value={project.id}>{project.name}</option>}
                     </For>
                   </select>
-                  <label class="muted" style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
-                    <input type="checkbox" checked={useCheckout()} onChange={(e) => setUseCheckout(e.currentTarget.checked)} />
-                    Use current checkout (no worktree)
-                  </label>
                 </Show>
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
                   <Show when={draftErr()}><div class="action-error" role="alert">{draftErr()}</div></Show>
@@ -418,7 +400,7 @@ export default function TabRail() {
                       onInput={(e) => setText(e.currentTarget.value)}
                     />
                   </div>
-                  <Show when={d().mode === 'new' && !useCheckout()}>
+                  <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
                     <input
                       class="ui-input"
                       type="text"
@@ -431,7 +413,7 @@ export default function TabRail() {
                       }}
                       />
                   </Show>
-                  <button type="submit" class="ui-btn" disabled={!text().trim() || (d().mode === 'new' && !useCheckout() && !effectiveBranch())}>
+                  <button type="submit" class="ui-btn" disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !effectiveBranch())}>
                     {d().mode === 'new' ? 'Create' : 'Save'}
                   </button>
                 </form>

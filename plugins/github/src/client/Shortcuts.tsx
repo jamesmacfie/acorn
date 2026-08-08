@@ -6,6 +6,9 @@ import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
 import type { PullFile } from '../contract/api'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
+import { createQuery } from '@tanstack/solid-query'
+import { projectsOptions } from '@acorn/client-core/queries.ts'
+import { githubCreateRoute } from './routes'
 
 // Global keyboard shortcuts + the file finder. Mounted once in App. PullList owns j/k (next/prev
 // PR) — those keys are deliberately untouched here. Global shortcut dispatch lives in the command
@@ -16,12 +19,15 @@ import { registerKeybindings } from '@acorn/client-core/registries/keybindings.t
 export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   const params = useParams()
   const navigate = useNavigate()
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
+  const github = () => project()?.github
   let lastRouteKey = ''
 
   // Current PR's changed files (same source/order PullDetail uses). Only fetched when a PR is open.
   const route = createMemo(() => {
-    if (!params.owner || !params.repo || !params.number) return null
-    return { owner: params.owner, repo: params.repo, number: params.number, key: `${params.owner}/${params.repo}#${params.number}` }
+    if (!github()?.owner || !github()?.name || !params.number) return null
+    return { owner: github()!.owner, repo: github()!.name, number: params.number, key: `${params.projectId}#${params.number}` }
   })
   const changedFiles = useChangedFiles(route)
   const allFiles = changedFiles.files
@@ -42,8 +48,8 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
       { id: 'github.files.previous', title: 'Previous changed file', category: 'navigation', when: () => !!route(), run: () => changedFiles.cycleFile(-1) },
       {
         id: 'github.pull.create', title: 'Create pull request', category: 'navigation',
-        when: () => !!params.owner && !!params.repo,
-        run: () => navigate(`/${params.owner}/${params.repo}/new`),
+        when: () => !!params.projectId && !!github(),
+        run: () => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? ''))),
       },
     ])
     const bindings = registerKeybindings([
@@ -51,7 +57,7 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
       { id: 'github.files.find', command: 'github.files.find', description: 'Find file in this pull request', category: 'Pull requests', defaultChord: '/', when: 'typing-exempt', active: () => !!route() },
       { id: 'github.files.next', command: 'github.files.next', description: 'Next changed file', category: 'Pull requests', defaultChord: ']', when: 'typing-exempt', active: () => !!route() },
       { id: 'github.files.previous', command: 'github.files.previous', description: 'Previous changed file', category: 'Pull requests', defaultChord: '[', when: 'typing-exempt', active: () => !!route() },
-      { id: 'github.pull.create', command: 'github.pull.create', description: 'Create pull request', category: 'Pull requests', defaultChord: 'c', when: 'typing-exempt', active: () => !!params.owner && !!params.repo },
+      { id: 'github.pull.create', command: 'github.pull.create', description: 'Create pull request', category: 'Pull requests', defaultChord: 'c', when: 'typing-exempt', active: () => !!params.projectId && !!github() },
     ])
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })

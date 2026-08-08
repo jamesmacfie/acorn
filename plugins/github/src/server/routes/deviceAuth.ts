@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import { connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
 import { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -12,8 +11,7 @@ import { GITHUB_PROVIDER } from '../githubToken'
 // Chosen over the redirect web flow for three reasons, in order of weight:
 //   1. No client secret. The web flow needs one to exchange the code, and a secret shipped inside a
 //      distributed binary is recoverable — a caveat V1 documented and could not fix. The device flow
-//      exchanges on `client_id` alone, so nothing reads GITHUB_CLIENT_SECRET any more. (The binding is
-//      still declared, read optionally, at the owner's explicit request — see main/bindings.ts.)
+//      exchanges on `client_id` alone.
 //   2. No redirect URI. The renderer no longer has a server-served origin to redirect back to, and a
 //      remote node would need its own registered callback URL. Device flow has neither problem, so
 //      local and remote nodes run the identical code path.
@@ -45,16 +43,16 @@ const form = (body: Record<string, string>): RequestInit => ({
   body: new URLSearchParams(body).toString(),
 })
 
-// A factory over CoreServices, like every other router in this plugin: connecting an account is what
-// binds the machine identity, and binding is core's to do (main/core/identity.ts).
-export const githubDeviceAuth = (core: CoreServices) => new Hono<AppEnv>()
+export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
   // Open a device-flow window. Returns what the UI must display: the code, where to type it, and how
   // often to poll. The device_code is a bearer for the pending grant, so it is returned to the
   // client rather than held server-side — it authorizes nothing on this node and keeping per-owner
   // pending state would only add a lifecycle to get wrong.
   .post('/auth/device/start', async (c) => {
     ownerId(c) // owner-gated: only the owner may begin connecting an account
-    const response = await fetch(DEVICE_CODE_URL, form({ client_id: c.env.GITHUB_CLIENT_ID, scope: SCOPES }))
+    const id = clientId()
+    if (!id) return respondError(c, 503, 'provider_unavailable', ['GitHub integration is not configured on this node.'])
+    const response = await fetch(DEVICE_CODE_URL, form({ client_id: id, scope: SCOPES }))
     if (!response.ok) return respondError(c, 502, 'provider_unavailable', ['GitHub did not issue a device code.'])
     const body = (await response.json().catch(() => ({}))) as Partial<DeviceCodeResponse>
     if (!body.device_code || !body.user_code || !body.verification_uri) {
@@ -76,10 +74,12 @@ export const githubDeviceAuth = (core: CoreServices) => new Hono<AppEnv>()
     const { deviceCode } = (await c.req.json().catch(() => ({}))) as { deviceCode?: string }
     if (!deviceCode) return respondError(c, 400, 'bad_request')
 
+    const id = clientId()
+    if (!id) return respondError(c, 503, 'provider_unavailable', ['GitHub integration is not configured on this node.'])
     const response = await fetch(
       TOKEN_URL,
       form({
-        client_id: c.env.GITHUB_CLIENT_ID,
+        client_id: id,
         device_code: deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       }),
@@ -108,11 +108,9 @@ export const githubDeviceAuth = (core: CoreServices) => new Hono<AppEnv>()
         { providerId: GITHUB_PROVIDER, credentials: { accessToken: body.access_token } },
         c.env.SECRETS,
       )
-      // Bind the machine identity so internal callers (MCP, agents) resolve to this account. Through
-      // core's seam, not `c.env.ACTIVE_IDENTITY` — this plugin knows the login first, but it does not
-      // own what the node's identity IS.
-      core.identity.bind(integration.label)
-      // The token itself is never echoed back — the client only needs to know it worked.
+      // The token itself is never echoed back — the client only needs to know it worked. The machine
+      // identity is NOT touched here: it is minted at boot (core's ensureBoundIdentity), and the GitHub
+      // login is just this integration's account metadata.
       return c.json({ status: 'connected', integration } as const)
     } catch (error) {
       return providerError(c, error)

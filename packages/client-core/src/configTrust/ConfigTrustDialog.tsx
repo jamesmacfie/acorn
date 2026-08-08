@@ -61,10 +61,10 @@ export default function ConfigTrustDialog() {
           onClick={dismiss.onContainerClick}
           onKeyDown={dismiss.onKeyDown}
         >
-          <div class="overlay-title" id="config-trust-title">Review repo configuration</div>
+          <div class="overlay-title" id="config-trust-title">Review project configuration</div>
           <div class="overlay-body config-trust-body">
             <p>
-              <strong>{review()?.repo ?? 'This repo'}</strong> contains committed configuration that can run commands on this machine.
+              <strong>This project</strong> contains committed configuration that can run commands on this machine.
               Trust only text you have reviewed.
             </p>
             <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>

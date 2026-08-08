@@ -66,6 +66,13 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     plugin = makeTestPluginDb('github', migrationsDir())
     // The GitHub token comes from a stored integration row now, not from the caller's identity.
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
+    const now = Date.now()
+    await core.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await core.db.insert(schema.projects).values({
+      id: 'project-runn', name: 'runn', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/Runn-Fast/runn.git', githubOwner: 'Runn-Fast', githubName: 'runn', githubRepoId: REPO_ID,
+      createdAt: now, updatedAt: now,
+    })
     // Seed the repo so resolveRepoForUser hits the mirror (no GitHub round-trip for resolution).
     await plugin.db.insert(repos).values({ userId: 'james', id: REPO_ID, owner: 'Runn-Fast', name: 'runn', private: true, defaultBranch: 'main', pushedAt: 0, fetchedAt: Date.now() })
     app = new Hono<AppEnv>()
@@ -86,7 +93,7 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
   it('cold: blocks on GitHub, mirrors the list, and adopts a matching local task (Flow B)', async () => {
     // A local-first task on the same branch with no PR yet — the refresh should adopt PR #42.
     await core.db.insert(schema.tasks).values({
-      id: 'task-1', title: 'wip', origin: 'local', repoOwner: 'Runn-Fast', repoName: 'runn', branch: 'feature-x', status: 'active', createdAt: 0, updatedAt: 0,
+      id: 'task-1', title: 'wip', origin: 'local', projectId: 'project-runn', branch: 'feature-x', status: 'active', createdAt: 0, updatedAt: 0,
     })
     vi.mocked(gh).mockResolvedValueOnce(responseJson([ghPull], { headers: { etag: '"pulls-v1"' } }))
 

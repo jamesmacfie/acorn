@@ -5,7 +5,7 @@
 import type { DockerContainerSummary } from '../shared/model'
 import { defaultOverrides, type DockerMatchOverrides } from './dockerConfig'
 
-export type MatchableTask = { worktreePath: string | null; branch: string }
+export type MatchableTask = { worktreePath: string | null; branch: string | null }
 export type MatchableContainer = Pick<DockerContainerSummary, 'name' | 'composeProject' | 'composeWorkingDir' | 'labels'>
 
 export const branchSlug = (branch: string): string => branch.replace(/[^A-Za-z0-9._-]/g, '-')
@@ -24,6 +24,7 @@ const isInside = (child: string, parent: string): boolean => {
 export function containerMatchesTask(container: MatchableContainer, task: MatchableTask, overrides: DockerMatchOverrides = defaultOverrides): boolean {
   if (task.worktreePath && container.composeWorkingDir && isInside(container.composeWorkingDir, task.worktreePath)) return true
   if (overrides.composeProject && container.composeProject === overrides.composeProject) return true
+  if (!task.branch) return false
   const slug = branchSlug(task.branch)
   if (overrides.matchLabels.some((key) => container.labels[key] === slug)) return true
   if (!overrides.matchName) return false

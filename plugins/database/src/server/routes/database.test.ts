@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DatabaseBridge } from './database'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
+import { createProjectService } from '@acorn/node-core/main/core/projects.ts'
 import type { GenerateTextRequest, ModelService } from '@acorn/node-core/main/core/index.ts'
 import { ProviderOperationError } from '@acorn/node-core/server/integrations/types.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -48,7 +49,7 @@ const fixture = (): Fixture => {
   const core = makeTestDb()
   const plugin = makeTestPluginDb('database', migrationsDir())
   const generateText = vi.fn<ModelService['generateText']>()
-  const router = () => databaseRoutes(plugin.db, { tasks: createTaskService(core.db), models: { generateText } })
+  const router = () => databaseRoutes(plugin.db, { tasks: createTaskService(core.db), projects: createProjectService(core.db), models: { generateText } })
   return {
     core,
     plugin,
@@ -153,18 +154,17 @@ describe('database routes', () => {
   })
 })
 
-// Saved queries are repo-scoped rows addressed through a task, so these need both databases. Two tasks
-// on different repos prove the scoping.
+// Saved queries are project-scoped rows addressed through a task, so these need both databases. Two tasks
+// on different projects prove the scoping.
 describe('saved queries (docs/pg.md)', () => {
   let f: Fixture
   let app: Hono<AppEnv>
 
-  const task = (id: string, repoName: string) => ({
+  const task = (id: string, projectName: string) => ({
     id,
     title: 'T',
     origin: 'local' as const,
-    repoOwner: 'acme',
-    repoName,
+    projectId: `project-${projectName}`,
     branch: 'feat/x',
     worktreePath: null,
     pullNumber: null,
@@ -184,6 +184,12 @@ describe('saved queries (docs/pg.md)', () => {
       await next()
     })
     app.route('/api/tasks', f.router())
+    const now = Date.now()
+    await f.core.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await f.core.db.insert(schema.projects).values([
+      { id: 'project-widget', name: 'widget', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: 1, createdAt: now, updatedAt: now },
+      { id: 'project-gadget', name: 'gadget', path: null, workspaceId: 'workspace-1', sort: 1, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'gadget', githubRepoId: 2, createdAt: now, updatedAt: now },
+    ])
     await f.core.db.insert(schema.tasks).values([task('task1', 'widget'), task('other', 'gadget')])
   })
   afterEach(() => f.cleanup())
@@ -208,7 +214,7 @@ describe('saved queries (docs/pg.md)', () => {
     expect(await list()).toEqual([{ ...second, notes: null, sql: 'SELECT 2;' }])
   })
 
-  it('scopes rows to the task\'s repo — a sibling repo neither sees nor deletes them', async () => {
+  it('scopes rows to the task\'s project — a sibling project neither sees nor deletes them', async () => {
     const mine: DbSavedQuery = await (await save({ name: 'mine', notes: '', sql: 'SELECT 1;' })).json()
     expect(await list('other')).toEqual([])
     await app.fetch(req(`/api/tasks/other/database/queries/${mine.id}`, 'DELETE'), {} as Env)

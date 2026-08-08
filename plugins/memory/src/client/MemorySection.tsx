@@ -7,7 +7,7 @@ const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decisi
 // The memory surfaces of the Manifest pane (docs/agent-tools.md), kept as a child in the memory
 // plugin so it owns every memoryApi() call: the human gate over auto-generated proposals — accept
 // (with an optional description edit) writes to the task worktree + index, reject leaves no trace —
-// and the manual "+ memory" form (repo scope → the task worktree, lands via its PR; private scope →
+// and the manual "+ memory" form (project scope → the task worktree, lands via its PR; private scope →
 // ~/.acorn/memory). `onChanged` lets the host refresh its assembled-context view after a write;
 // `onPendingChange` surfaces the pending-proposal count on the Manifest's memory section row.
 export default function MemorySection(props: {
@@ -44,7 +44,7 @@ export default function MemorySection(props: {
   const [memName, setMemName] = createSignal('')
   const [memDesc, setMemDesc] = createSignal('')
   const [memType, setMemType] = createSignal<MemoryType>('convention')
-  const [memScope, setMemScope] = createSignal<'repo' | 'private'>('repo')
+  const [memScope, setMemScope] = createSignal<'project' | 'private'>('project')
   const [memBody, setMemBody] = createSignal('')
   const [memMsg, setMemMsg] = createSignal('')
 
@@ -120,8 +120,8 @@ export default function MemorySection(props: {
             <select class="ui-input" value={memType()} onChange={(e) => setMemType(e.currentTarget.value as MemoryType)}>
               <For each={MEMORY_TYPE_OPTIONS}>{(k) => <option value={k}>{k}</option>}</For>
             </select>
-            <select class="ui-input" value={memScope()} onChange={(e) => setMemScope(e.currentTarget.value as 'repo' | 'private')}>
-              <option value="repo">repo (worktree, committed)</option>
+            <select class="ui-input" value={memScope()} onChange={(e) => setMemScope(e.currentTarget.value as 'project' | 'private')}>
+              <option value="project">project (worktree, committed)</option>
               <option value="private">private (~/.acorn)</option>
             </select>
           </div>

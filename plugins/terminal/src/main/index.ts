@@ -5,4 +5,4 @@ export {
   reconcileTmux,
   refreshAcornMcpRegistrations,
 } from './terminal'
-export { registerRepoPickerIpc } from './pickerIpc'
+export { registerFolderPickerIpc } from './folderPickerIpc'

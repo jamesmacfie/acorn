@@ -39,7 +39,7 @@ export const NOTES_STORE = capabilityId<NotesStoreCapability>('notes.store')
 
 // The task slice needed for an external-context snapshot. Kept structural so this contract does not
 // import core's database row across the plugin boundary.
-export type SeedTask = { id: string; pullNumber: number | null; repoOwner: string; repoName: string }
+export type SeedTask = { id: string; projectId: string; pullNumber: number | null }
 export type SeedTaskNotes = (task: SeedTask) => Promise<void>
 
 export const NOTES_SEED_TASK = capabilityId<SeedTaskNotes>('notes.seedTask')

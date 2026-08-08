@@ -6,7 +6,7 @@ const row = (name: string, over: Partial<NodePluginRow> = {}): NodePluginRow =>
   ({ name, required: false, disabled: false, running: true, ...over })
 
 const ROWS: NodePluginRow[] = [
-  row('github', { required: true }),
+  row('github'),
   row('docker'),
   row('rollbar', { disabled: true, running: false }),
   row('linear'),
@@ -30,11 +30,12 @@ describe('nextDisabledList', () => {
   })
 
   it('refuses a required plugin instead of sending a list the route will reject', () => {
-    expect(() => nextDisabledList(ROWS, 'github', true)).toThrow(/required plugin/)
+    const rows = [...ROWS, row('terminal', { required: true })]
+    expect(() => nextDisabledList(rows, 'terminal', true)).toThrow(/required plugin/)
   })
 
   it('never carries a required plugin through from the rows', () => {
-    const stale = [row('github', { required: true, disabled: true }), row('docker')]
+    const stale = [row('terminal', { required: true, disabled: true }), row('docker')]
     expect(nextDisabledList(stale, 'docker', true)).toEqual(['docker'])
   })
 })

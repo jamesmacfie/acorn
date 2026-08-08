@@ -25,10 +25,10 @@ import {
 import { openHttpValue } from './storage'
 
 // What this module needs from core, now that it has no handle to core's database: resolve the execution
-// task and its worktree, find the repo's primary checkout for the fallback cwd, and open its own
-// ciphertext. `tasks.root` is passed the request's identity because creating a worktree consults that
-// login's per-repo base-ref preference.
-export type SendCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'secrets'>
+// task and its worktree, find the project's folder for fallback cwd, and open its own ciphertext.
+// `tasks.root` is passed the request's identity because creating a worktree consults that login's
+// per-project base-ref preference.
+export type SendCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'secrets'>
 
 const exec = promisify(execFile)
 
@@ -48,7 +48,7 @@ const ANSI = /\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g
 const lastLine = (stdout: string): string | null => stdout.replace(ANSI, '').split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? null
 
 // Command variables are executable, so resolve only names the request actually references. A
-// per-request override also shadows the repo variable before execution; precedence must not mean
+// per-request override also shadows the project variable before execution; precedence must not mean
 // "run a lower layer for its side effects, then discard it".
 export function referencedVariableNames(input: HttpSendInput): Set<string> {
   const fields = [input.url]
@@ -76,7 +76,7 @@ export function referencedVariableNames(input: HttpSendInput): Set<string> {
 
 /**
  * Flattens every variable layer into one lookup for interpolation.
- * Precedence, lowest first: task builtins < repo variables < per-request overrides.
+ * Precedence, lowest first: task builtins < project variables < per-request overrides.
  *
  * `command` variables persist the user's shell command, then run it at send time without persisting
  * its output — the same mechanism the Database pane uses for `dbUrlScript`
@@ -90,8 +90,7 @@ async function resolveVarsWithSensitivity(
   db: PluginDatabase,
   core: SendCoreServices,
   userId: string,
-  repoOwner: string,
-  repoName: string,
+  projectId: string,
   input: HttpSendInput,
 ): Promise<ResolvedVariables> {
   const vars: Record<string, string> = {}
@@ -102,24 +101,29 @@ async function resolveVarsWithSensitivity(
   if (input.executionTaskId) {
     const task = await core.tasks.load(input.executionTaskId)
     if (!task) throw new SendError('The task used to send this request no longer exists')
-    if (task.repoOwner !== repoOwner || task.repoName !== repoName) {
-      throw new SendError(`The selected task belongs to ${task.repoOwner}/${task.repoName}, not ${repoOwner}/${repoName}`)
+    const project = task.projectId ? await core.projects.byId(task.projectId) : null
+    if (task.projectId !== projectId) {
+      throw new SendError(`The selected task belongs to ${project?.name ?? task.projectId ?? 'another project'}, not this project`)
     }
     // taskRoot is null until a worktree exists (and always under dev:node) — fall back to the
-    // repo checkout, exactly as resolveDbUrl and the preview resolver do.
+    // project checkout, exactly as resolveDbUrl and the preview resolver do.
     cwd = (await core.tasks.root(input.executionTaskId, userId)) ?? null
-    vars.repo = `${task.repoOwner}/${task.repoName}`
-    vars.branch = task.branch
+    if (project) {
+      vars.projectId = project.id
+      vars.project = project.name
+    }
+    if (project?.github) vars.repo = `${project.github.owner}/${project.github.name}`
+    if (task.branch) vars.branch = task.branch
     vars.taskId = task.id
-    taskInfo = { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title }
+    if (project) taskInfo = { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
   }
-  if (!cwd) cwd = (await core.repos.path(repoOwner, repoName))?.path ?? null
+  if (!cwd) cwd = (await core.projects.byId(projectId))?.path ?? null
   if (cwd) vars.worktree = cwd
 
   const rows = await db
     .select()
     .from(httpVariables)
-    .where(and(eq(httpVariables.userId, userId), eq(httpVariables.repoOwner, repoOwner), eq(httpVariables.repoName, repoName)))
+    .where(and(eq(httpVariables.userId, userId), eq(httpVariables.projectId, projectId)))
   const referenced = referencedVariableNames(input)
   const enabled = rows.filter((r) => r.enabled && referenced.has(r.name) && !(r.name in input.vars))
 
@@ -139,7 +143,7 @@ async function resolveVarsWithSensitivity(
   // Commands run concurrently under one shared deadline.
   const commands = enabled.filter((r) => r.kind === 'command')
   if (commands.length) {
-    if (!cwd) throw new SendError('Command variables need a repo checkout — set the repo path first')
+    if (!cwd) throw new SendError('Command variables need a project checkout — set the project path first')
     const env = buildSessionEnv({ taskId: input.executionTaskId ?? '', cwd, task: taskInfo })
     const deadline = AbortSignal.timeout(ALL_COMMANDS_TIMEOUT_MS)
     const results = await Promise.all(
@@ -164,7 +168,7 @@ async function resolveVarsWithSensitivity(
     if (row.kind === 'secret') vars[row.name] = opened.get(row.id)!
   }
 
-  // Per-request overrides win over repo variables, by design.
+  // Per-request overrides win over project variables, by design.
   for (const [name, value] of Object.entries(input.vars)) vars[name] = value
   return {
     values: vars,
@@ -179,11 +183,10 @@ export async function resolveVars(
   db: PluginDatabase,
   core: SendCoreServices,
   userId: string,
-  repoOwner: string,
-  repoName: string,
+  projectId: string,
   input: HttpSendInput,
 ): Promise<Record<string, string>> {
-  return (await resolveVarsWithSensitivity(db, core, userId, repoOwner, repoName, input)).values
+  return (await resolveVarsWithSensitivity(db, core, userId, projectId, input)).values
 }
 
 // --- execution ----------------------------------------------------------------------------
@@ -255,11 +258,10 @@ export async function send(
   db: PluginDatabase,
   core: SendCoreServices,
   userId: string,
-  repoOwner: string,
-  repoName: string,
+  projectId: string,
   input: HttpSendInput,
 ): Promise<SendResult> {
-  const resolved = await resolveVarsWithSensitivity(db, core, userId, repoOwner, repoName, input)
+  const resolved = await resolveVarsWithSensitivity(db, core, userId, projectId, input)
   const { target, headers, body } = buildRequest(input, resolved.values)
 
   const started = Date.now()

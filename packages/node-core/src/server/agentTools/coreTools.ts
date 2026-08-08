@@ -2,8 +2,7 @@ import { z } from 'zod'
 import { assembleContext, parseInclude } from './contextSections.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from './registry.ts'
 import type { AppDatabase } from '../db/index.ts'
-import { loadTask } from '../../main/taskWorktree.ts'
-import { repoMirrorSource } from '../repoMirror.ts'
+import { loadTask, projectForTask } from '../../main/taskWorktree.ts'
 
 // The owner id for the core-owned contributions. Registration is idempotent across service boots.
 const OWNER = 'core'
@@ -84,12 +83,9 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       handler: async (_a, ctx) => {
         const t = await loadTask(db, ctx.taskId)
         if (!t) throw new ToolError('not_found', 'no such task')
-        // Everything but the default branch is core's `tasks` row. The default branch is only GitHub's
-        // opinion and its mirror is that plugin's own SQLite file now, so it arrives through the one slot
-        // core fills with it (@acorn/node-core/server/repoMirror.ts). null was already a valid answer for an
-        // unmirrored repo, so a disabled github plugin degrades into a case this tool's callers handle.
-        const defaultBranch = await repoMirrorSource().defaultBranch(ctx.userLogin, t.repoOwner, t.repoName)
-        return { owner: t.repoOwner, name: t.repoName, defaultBranch, branch: t.branch, worktreePath: t.worktreePath }
+        const project = await projectForTask(db, t)
+        const defaultBranch = project?.defaultBranch ?? null
+        return { owner: project?.githubOwner ?? null, name: project?.githubName ?? null, defaultBranch, branch: t.branch, worktreePath: t.worktreePath, projectId: t.projectId }
       },
     },
 

@@ -7,8 +7,10 @@ import { and, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import type { TaskStatus, TerminalSession } from '@acorn/protocol/terminal.ts'
+import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from './runConfig'
-import { getRepoPath } from './repoPaths'
+import { getProject, type ProjectRow } from './projects'
+import { getProjectConfig } from './projectConfig'
 import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
 import { capabilityId, type CapabilityRegistry } from '../server/plugin/capabilities'
 
@@ -39,16 +41,16 @@ export const loadTask = async (db: AppDatabase, id: string): Promise<TaskRow | u
   return t
 }
 
-// Per-repo preferred base ref for NEW branches (docs/terminal-and-agents.md): the prefs key
-// `base_ref:<owner>/<repo>`. It is user-owned state, so main-process callers must carry the
+// Per-project preferred base ref for NEW branches (docs/terminal-and-agents.md): the prefs key
+// `base_ref:<projectId>`. It is user-owned state, so main-process callers must carry the
 // identity that authorized the operation. A missing identity fails closed to git's normal
 // origin/main fallback instead of selecting a stale preference from another login.
-export const baseRefPref = async (db: AppDatabase, userId: string | null, owner: string, repo: string): Promise<string | null> => {
+export const baseRefPref = async (db: AppDatabase, userId: string | null, projectId: string): Promise<string | null> => {
   if (!userId) return null
   const [row] = await db
     .select()
     .from(schema.prefs)
-    .where(and(eq(schema.prefs.userId, userId), eq(schema.prefs.key, `base_ref:${owner}/${repo}`)))
+    .where(and(eq(schema.prefs.userId, userId), eq(schema.prefs.key, `base_ref:${projectId}`)))
     .limit(1)
   return row?.value ?? null
 }
@@ -106,12 +108,16 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
 
 // Repo / branch / PR context for a session, derived through the taskId → tasks join
 // (docs/workspaces-and-tasks.md). The session row no longer denormalizes repo/pull; this is the single read.
-export function taskContext(t: TaskRow | undefined): Pick<TerminalSession, 'repo' | 'pull'> {
+export function taskContext(t: TaskRow | undefined, github?: { owner: string; name: string } | null): Pick<TerminalSession, 'repo' | 'pull'> {
   if (!t) return {}
   return {
-    repo: { owner: t.repoOwner, name: t.repoName },
+    repo: github ?? undefined,
     pull: t.pullNumber != null ? { number: t.pullNumber } : undefined,
   }
+}
+
+export async function projectForTask(db: AppDatabase, t: TaskRow): Promise<ProjectRow | null> {
+  return getProject(db, t.projectId)
 }
 
 // Fired once per task, right after its worktree is first created and configured files are copied.
@@ -130,24 +136,39 @@ export async function resolveTaskCwd(
   userId: string | null = null,
   capabilities?: CapabilityReader,
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
-  if (t?.worktreePath && isDir(t.worktreePath)) return { cwd: t.worktreePath, isWorktree: true, created: false }
-  if (!t || !baseCheckout || !isDir(baseCheckout)) return { cwd: baseCheckout && isDir(baseCheckout) ? baseCheckout : homedir(), isWorktree: false, created: false }
+  const project = t ? await projectForTask(db, t) : null
+  const projectRoot = project?.path && isDir(project.path) ? project.path : undefined
+  // The project row is authoritative. `baseCheckout` remains in the seam for callers compiled against
+  // the pre-project API, but accepting it here would let a renderer steer a project with a null/moved
+  // path into an arbitrary folder.
+  const checkout = projectRoot
+  if (!t || !checkout) return { cwd: homedir(), isWorktree: false, created: false }
+  // Branchless tasks never use a persisted worktree. This also normalises old checkout-marker rows
+  // (0047 preserves their path for archive safety) back to the project root at runtime.
+  if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
+  if (t.worktreePath && isDir(t.worktreePath)) {
+    const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
+    return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
+  }
+  const branch = t.branch
   const inflight = inflightCreates.get(t.id)
   if (inflight) return inflight
   const create = (async () => {
+    const owner = project?.githubOwner ?? 'p'
+    const repo = project?.githubName ?? slugifyProjectName(project?.name ?? 'project')
     const wt = await ensureWorktree(
       worktreesRoot,
-      baseCheckout,
-      t.repoOwner,
-      t.repoName,
-      t.branch,
+      checkout,
+      owner,
+      repo,
+      branch,
       t.pullNumber,
-      await baseRefPref(db, userId, t.repoOwner, t.repoName),
+      project ? await baseRefPref(db, userId, project.id) : null,
     )
-    if (!wt.ok) return { cwd: baseCheckout, isWorktree: false, created: false }
+    if (!wt.ok) return { cwd: checkout, isWorktree: false, created: false }
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
     if (wt.created) {
-      await copyConfiguredFiles(db, t, baseCheckout, wt.path)
+      await copyConfiguredFiles(db, t, checkout, wt.path)
       await capabilities?.get(WORKTREE_CREATED)?.(t, wt.path).catch((e) => console.warn('[worktrees] created-hook failed:', e))
     }
     return { cwd: wt.path, isWorktree: true, created: wt.created }
@@ -166,8 +187,8 @@ export async function resolveTaskCwd(
 export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null, capabilities?: CapabilityReader): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
-  const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-  const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
+  const project = await projectForTask(db, t)
+  const baseCheckout = project?.path && isDir(project.path) ? project.path : undefined
   if (!baseCheckout) return null
   const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId, capabilities)
   return resolve(cwd)
@@ -175,13 +196,13 @@ export async function taskRoot(db: AppDatabase, taskId: string, userId: string |
 
 export { resolveInRoot } from './core/fs'
 
-// The setup script and trigger configured for this repository. 'off' never runs, 'created' pre-creates
+// The setup script and trigger configured for this project. 'off' never runs, 'created' pre-creates
 // the worktree at task creation, and 'terminal' leaves creation lazy. The script runs once when the
 // worktree is first created through the onWorktreeCreated hook.
 export type SetupTrigger = 'off' | 'created' | 'terminal'
-export async function repoSetup(db: AppDatabase, owner: string, repo: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
-  const rp = await getRepoPath(db, owner, repo)
-  return { script: rp?.setupScript ?? null, trigger: rp?.setupScriptTrigger ?? 'terminal' }
+export async function projectSetup(db: AppDatabase, projectId: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
+  const config = await getProjectConfig(db, projectId)
+  return { script: config?.config.setupScript ?? null, trigger: config?.config.setupScriptTrigger ?? 'terminal' }
 }
 
 // Files-to-copy on a fresh worktree (docs/workflows.md §2): read the config from the SOURCE
@@ -189,8 +210,9 @@ export async function repoSetup(db: AppDatabase, owner: string, repo: string): P
 // worktree. Best-effort — warnings are logged, never thrown.
 export async function copyConfiguredFiles(db: AppDatabase, t: TaskRow, checkout: string, worktreePath: string): Promise<void> {
   try {
-    const rp = await getRepoPath(db, t.repoOwner, t.repoName)
-    const cfg = loadRepoConfig(checkout, homedir(), { setupScript: rp?.setupScript, teardownScript: rp?.teardownScript })
+    const project = await projectForTask(db, t)
+    const config = project ? (await getProjectConfig(db, project.id))?.config : null
+    const cfg = loadRepoConfig(checkout, homedir(), { setupScript: config?.setupScript, teardownScript: config?.teardownScript })
     if (!cfg.copy.length) return
     const res = copyWorktreeFiles(checkout, worktreePath, cfg.copy)
     for (const w of res.warnings) console.warn(`[worktrees] ${w}`)
@@ -199,21 +221,16 @@ export async function copyConfiguredFiles(db: AppDatabase, t: TaskRow, checkout:
   }
 }
 
-// The workspace a repo belongs to (its grouping membership). Repo config no longer lives on the
-// workspace (repo-level-settings), so this resolves membership only: repo → workspaceRepos → id.
-export async function workspaceIdForRepo(db: AppDatabase, owner: string, repo: string): Promise<string | null> {
-  const [wr] = await db
-    .select({ workspaceId: schema.workspaceRepos.workspaceId })
-    .from(schema.workspaceRepos)
-    .where(and(eq(schema.workspaceRepos.repoOwner, owner), eq(schema.workspaceRepos.repoName, repo)))
-  return wr?.workspaceId ?? null
+export async function workspaceIdForProject(db: AppDatabase, projectId: string): Promise<string | null> {
+  const project = await getProject(db, projectId)
+  return project?.workspaceId ?? null
 }
 
 // The task's workspace id — the scoping key the knowledge + harness surfaces use.
 export async function workspaceIdFor(db: AppDatabase, taskId: string): Promise<string> {
   const t = await loadTask(db, taskId)
   if (!t) throw new Error('Task not found.')
-  const workspaceId = await workspaceIdForRepo(db, t.repoOwner, t.repoName)
+  const workspaceId = await workspaceIdForProject(db, t.projectId)
   if (!workspaceId) throw new Error('Task has no workspace.')
   return workspaceId
 }
@@ -221,7 +238,8 @@ export async function workspaceIdFor(db: AppDatabase, taskId: string): Promise<s
 export async function repoFor(db: AppDatabase, taskId: string): Promise<string> {
   const t = await loadTask(db, taskId)
   if (!t) throw new Error('Task not found.')
-  return `${t.repoOwner}/${t.repoName}`
+  const project = await projectForTask(db, t)
+  return project?.githubOwner && project.githubName ? `${project.githubOwner}/${project.githubName}` : project?.name ?? ''
 }
 
 // Merged run-target config + the cwd to run in (the task worktree, created lazily like a terminal).
@@ -232,16 +250,21 @@ export async function taskRunConfig(
 ): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] } | { error: string }> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
-  const mapped = await getRepoPath(db, t.repoOwner, t.repoName)
-  const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
+  const project = await projectForTask(db, t)
+  const baseCheckout = project?.path && isDir(project.path) ? project.path : undefined
   if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
   const { cwd } = await resolveTaskCwd(db, t, baseCheckout, null, capabilities)
+  const config = project ? (await getProjectConfig(db, project.id))?.config : null
   const cfg = loadRepoConfig(cwd, homedir(), {
-    setupScript: mapped?.setupScript,
-    teardownScript: mapped?.teardownScript,
-    devScript: mapped?.devScript,
-    devRestartScript: mapped?.devRestartScript,
-    runTargetsJson: mapped?.runTargets,
+    setupScript: config?.setupScript,
+    teardownScript: config?.teardownScript,
+    devScript: config?.devScript,
+    devRestartScript: config?.devRestartScript,
+    runTargetsJson: config?.runTargets,
   })
   return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts, repoTargetIds: cfg.repoTargetIds }
+}
+
+function slugifyProjectName(name: string): string {
+  return slugifyBranch(name) || 'project'
 }

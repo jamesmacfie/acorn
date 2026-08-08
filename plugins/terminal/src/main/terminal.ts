@@ -66,9 +66,9 @@ const OUTPUT_COALESCE_MS = 16
 const sessions = new Map<string, Session>()
 
 // What this engine needs from core, now that it cannot read core's tables at all: resolve a taskId to
-// a row and to the cwd its commands run in, and read the repo's setup script. `proc` and
-// `repos.assertConfigTrusted` are for the run-target service built over this engine (runIpc.ts).
-export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'proc'>
+// a row and to the cwd its commands run in, and read the project's setup script. `proc` and
+// `projects.assertConfigTrusted` are for the run-target service built over this engine (runIpc.ts).
+export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'proc'>
 
 // This engine is a PROCESS singleton by construction — one PTY table, one idle watch, one session map
 // per node — so its database handle and core services live in module state alongside them rather than
@@ -334,7 +334,8 @@ function startIdleWatch() {
 // onCreated eager pre-create, run config, workflows). Ordered before any requested session so a
 // setup spawned from create() is tab #1.
 async function maybeRunSetup(t: TaskRow, cwd: string): Promise<void> {
-  const { script, trigger } = await services().repos.setup(t.repoOwner, t.repoName)
+  if (!t.projectId) return
+  const { script, trigger } = await services().projects.setup(t.projectId)
   if (trigger === 'off' || !script?.trim()) return
   await spawnOne({ taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
   statusBroadcast() // panel re-lists to show the Setup tab even when no other spawn follows
@@ -363,12 +364,15 @@ async function spawnOne(
   // merged in; otherwise the profile's binary. resolveCommand stays the path for shells/agents.
   const command = opts.command?.trim() || resolveCommand(profile)
   const id = randomUUID()
+  const project = task?.projectId ? await services().projects.byId(task.projectId) : null
   // Every task-scoped session carries the ACORN_* identity vars (docs/terminal-and-agents.md, docs/agent-tools.md §4) plus its own
   // session id — MCP notes/memory writes use it for `author: agent` provenance (docs/notes-and-memory.md).
   const env = buildSessionEnv({
     taskId: opts.taskId,
     cwd,
-    task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
+    task: task && project
+      ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
+      : null,
     env: { ...internalEnv({ scope: 'task', taskId: opts.taskId, sessionId: id }), ACORN_SESSION_ID: id, ...opts.env },
   })
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())

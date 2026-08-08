@@ -33,10 +33,9 @@ is the client activation list. The host validates unique names, applies the per-
 set, initializes enabled plugins, runs the optional ready/activation pass, and owns disposal of their
 registrations.
 
-Required plugins are agents, GitHub, memory, notes, and terminal — the same five on the Node and on
-the client, because core (or the shell in front of it) assumes their contributions exist. This
-paragraph used to say "GitHub, terminal, and agents" while the code required five, and hand-waved
-notes and memory as client-only when both are required Node plugins too.
+Required plugins are agents, memory, notes, and terminal. GitHub is optional: when enabled it contributes
+the provider, PR rail, importer, and mirror routes; when disabled core Home and the remaining plugins
+still boot.
 
 Optional plugins can be disabled per Node through Settings → Plugins; their SQLite files remain on
 disk and can be re-enabled later.

@@ -29,7 +29,13 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, s
 
 // Task identity fields a session env needs — a projection of the tasks row, so this stays free of
 // drizzle types and testable under plain Node.
-export type SessionTaskInfo = { repoOwner: string; repoName: string; branch: string; title: string }
+export type SessionTaskInfo = {
+  projectId: string
+  projectName: string
+  github?: { owner: string; name: string } | null
+  branch?: string | null
+  title: string
+}
 
 // Environment for every task-scoped session and lifecycle script (docs/terminal-and-agents.md, docs/agent-tools.md §4): the childEnv
 // whitelist (never secrets), plus the ACORN_* identity vars agents / MCP / setup / teardown scripts
@@ -47,9 +53,13 @@ export function buildSessionEnv(opts: {
     ACORN_WORKTREE_PATH: opts.cwd,
   }
   if (opts.task) {
-    out.ACORN_REPO = `${opts.task.repoOwner}/${opts.task.repoName}`
-    out.ACORN_BRANCH = opts.task.branch
-    out.ACORN_TASK_SLUG = branchSlug(opts.task.branch)
+    out.ACORN_PROJECT_ID = opts.task.projectId
+    out.ACORN_PROJECT_NAME = opts.task.projectName
+    if (opts.task.github) out.ACORN_REPO = `${opts.task.github.owner}/${opts.task.github.name}`
+    if (opts.task.branch) {
+      out.ACORN_BRANCH = opts.task.branch
+      out.ACORN_TASK_SLUG = branchSlug(opts.task.branch)
+    }
     out.ACORN_TASK_TITLE = opts.task.title
   }
   return { ...out, ...opts.env }

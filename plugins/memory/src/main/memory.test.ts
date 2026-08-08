@@ -8,6 +8,7 @@ import {
   contentHashId,
   listMemories,
   memoryIndexSlice,
+  memorySources,
   parseMemory,
   reconcileMemories,
   renderMemoryIndex,
@@ -54,9 +55,9 @@ describe('memory store + index over temp checkouts', () => {
   let home: string
 
   const sources = () => [
-    { dir: join(checkoutA, '.acorn', 'memory'), scope: 'repo' as const, repo: 'acme/api' },
-    { dir: join(checkoutB, '.acorn', 'memory'), scope: 'repo' as const, repo: 'acme/api' },
-    { dir: join(home, '.acorn', 'memory'), scope: 'private' as const, repo: null },
+    { dir: join(checkoutA, '.acorn', 'memory'), scope: 'project' as const, projectId: 'project-api' },
+    { dir: join(checkoutB, '.acorn', 'memory'), scope: 'project' as const, projectId: 'project-api' },
+    { dir: join(home, '.acorn', 'memory'), scope: 'private' as const, projectId: null },
   ]
 
   beforeEach(() => {
@@ -118,7 +119,7 @@ describe('memory store + index over temp checkouts', () => {
     expect(rows[0].description).toBe('NEWER take on auth')
   })
 
-  it('FTS search ranks by BM25 with the repo-scope filter (private rides along)', async () => {
+  it('FTS search ranks by BM25 with the project-scope filter (private rides along)', async () => {
     await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({}))
     await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({ name: 'db-layout', description: 'tables and mirrors', type: 'architecture', body: 'The pull mirror caches PRs.\n' }))
     await writeMemoryFile(join(home, '.acorn', 'memory'), mem({ name: 'my-shortcuts', description: 'private auth shortcuts', type: 'user', body: 'Auth token helper on my machine.\n' }))
@@ -126,19 +127,19 @@ describe('memory store + index over temp checkouts', () => {
       join(checkoutB, '.acorn', 'memory', 'other-repo.md'),
       serializeMemory(mem({ name: 'other-repo', description: 'auth notes for another repo' })),
     )
-    const src = [...sources().slice(0, 1), { dir: join(checkoutB, '.acorn', 'memory'), scope: 'repo' as const, repo: 'zzz/other' }, sources()[2]]
+    const src = [...sources().slice(0, 1), { dir: join(checkoutB, '.acorn', 'memory'), scope: 'project' as const, projectId: 'project-other' }, sources()[2]]
     await reconcileMemories(t.db, src)
 
-    const hits = await searchMemories(t.db, 'auth token', { repo: 'acme/api' })
+    const hits = await searchMemories(t.db, 'auth token', { projectId: 'project-api' })
     expect(hits.map((h) => h.name)).toContain('auth-conventions')
     expect(hits.map((h) => h.name)).toContain('my-shortcuts') // private scope rides along
     expect(hits.map((h) => h.name)).not.toContain('other-repo') // other repo filtered out
     // Porter stemming: 'rotating' matches 'rotate'.
-    expect((await searchMemories(t.db, 'rotating tokens', { repo: 'acme/api' }))[0]?.name).toBe('auth-conventions')
+    expect((await searchMemories(t.db, 'rotating tokens', { projectId: 'project-api' }))[0]?.name).toBe('auth-conventions')
     // FTS syntax can't be injected.
-    expect(await searchMemories(t.db, '"unclosed OR (', { repo: 'acme/api' })).toEqual([])
+    expect(await searchMemories(t.db, '"unclosed OR (', { projectId: 'project-api' })).toEqual([])
     // Type filter.
-    expect((await searchMemories(t.db, 'auth', { repo: 'acme/api', type: 'user' })).map((h) => h.name)).toEqual(['my-shortcuts'])
+    expect((await searchMemories(t.db, 'auth', { projectId: 'project-api', type: 'user' })).map((h) => h.name)).toEqual(['my-shortcuts'])
   })
 
   it('formatMemoryInjection caps the slice + bodies and returns null when empty', async () => {
@@ -158,7 +159,28 @@ describe('memory store + index over temp checkouts', () => {
   it('memoryIndexSlice returns the injection index; renderMemoryIndex is stable-sorted', async () => {
     await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({}))
     await reconcileMemories(t.db, sources())
-    expect(await memoryIndexSlice(t.db, 'acme/api')).toEqual([{ name: 'auth-conventions', description: 'how auth flows work in this repo' }])
+    expect(await memoryIndexSlice(t.db, 'project-api')).toEqual([{ name: 'auth-conventions', description: 'how auth flows work in this repo' }])
     expect(renderMemoryIndex([])).toBe('')
+  })
+
+  it('reconciles by project id, keeps plain-folder memory unanchored, and includes private memory', async () => {
+    await writeMemoryFile(join(checkoutA, '.acorn', 'memory'), mem({ commitSha: null, body: 'Project A guidance.\n' }))
+    await writeMemoryFile(join(checkoutB, '.acorn', 'memory'), mem({ commitSha: null, body: 'Project B guidance.\n' }))
+    await writeMemoryFile(join(home, '.acorn', 'memory'), mem({ name: 'private-note', type: 'user', commitSha: null, body: 'Private guidance.\n' }))
+
+    const sourceSet = memorySources(
+      [{ dir: checkoutA, projectId: 'project-a' }],
+      [{ id: 'project-a', path: checkoutA }, { id: 'project-b', path: checkoutB }],
+      home,
+    )
+    await reconcileMemories(t.db, sourceSet)
+    expect((await listMemories(t.db, { projectId: 'project-a' })).map((row) => [row.name, row.projectId, row.commitSha])).toEqual([
+      ['auth-conventions', 'project-a', null],
+      ['private-note', null, null],
+    ])
+    expect((await listMemories(t.db, { projectId: 'project-b' })).map((row) => [row.name, row.projectId])).toEqual([
+      ['auth-conventions', 'project-b'],
+      ['private-note', null],
+    ])
   })
 })

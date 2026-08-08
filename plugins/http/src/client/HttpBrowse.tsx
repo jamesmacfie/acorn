@@ -2,44 +2,29 @@
 // nothing passed), so the repo comes from the route — the same way RollbarBrowse scopes itself.
 // With no repo routed yet, offer the picker rather than a dead end.
 import { createQuery } from '@tanstack/solid-query'
-import { useNavigate, useParams } from '@solidjs/router'
-import { createMemo, Show } from 'solid-js'
-import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
-import { pinsOptions, reposOptions } from '@acorn/client-core/queries.ts'
+import { useParams } from '@solidjs/router'
+import { Show } from 'solid-js'
+import { projectsOptions } from '@acorn/client-core/queries.ts'
 import HttpPanel from './HttpPanel'
 import './http.css'
 
 export default function HttpBrowse() {
   const params = useParams()
-  const navigate = useNavigate()
-  const repos = createQuery(() => reposOptions(true))
-  const pins = createQuery(() => pinsOptions(true))
-  // Neither an owner nor a repo name can contain '/', so one string is a safe carrier — and with
-  // `keyed` below it makes the panel rebuild on a repo switch rather than leaking the previous
-  // repo's draft and response into the new one.
-  const target = createMemo(() => (params.owner && params.repo ? `${params.owner}/${params.repo}` : null))
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((candidate) => candidate.id === params.projectId && !candidate.hidden)
 
   return (
     <Show
-      when={target()}
+      when={project()}
       keyed
       fallback={
         <div class="http-choose-repo">
           <h2>API</h2>
-          <p class="http-hint">Saved requests belong to a repo. Pick one to get started.</p>
-          <RepoPicker
-            repos={repos.data ?? []}
-            pinned={pins.data ?? []}
-            selected=""
-            onSelect={(value) => navigate(`/${value}`)}
-          />
+          <p class="http-hint">Select a project from the project menu to browse its saved requests.</p>
         </div>
       }
     >
-      {(key) => {
-        const [owner, repo] = key.split('/')
-        return <HttpPanel owner={owner} repo={repo} />
-      }}
+      {(selected) => <HttpPanel projectId={selected.id} projectName={selected.name} />}
     </Show>
   )
 }

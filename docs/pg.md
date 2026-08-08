@@ -16,7 +16,7 @@ task/runtime is disposed.
 ## Database pane
 
 The pane supports schema introspection, paged tables/rows, primary-key edits, SQL execution, saved
-repository-scoped queries, and model-assisted SQL generation from a live or configured schema
+project-scoped queries, and model-assisted SQL generation from a live or configured schema
 description. SQL execution is always treated as a mutation for retry purposes; an ambiguous network
 failure is surfaced rather than replayed.
 

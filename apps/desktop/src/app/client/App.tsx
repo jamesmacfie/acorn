@@ -3,11 +3,9 @@ import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-que
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
-import { pinsOptions, prefsOptions, reposOptions, tasksOptions, workspacesKey, workspacesOptions } from '@acorn/client-core/queries.ts'
-import { bootstrapWorkspaces } from '@acorn/client-core/workspaces/mutations.ts'
-import RepoPicker from '@acorn/client-core/ui/RepoPicker.tsx'
+import { integrationsOptions, prefsOptions, projectsOptions, tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/workspaces/fleetWorkspaces.ts'
 import { planWorkspaceViewTransition } from '@acorn/client-core/workspaces/workspaceViewTransition.ts'
 import AccountMenu from '@acorn/client-core/AccountMenu.tsx'
@@ -36,6 +34,7 @@ import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
 import { defaultSourceId, sourcePath, sourceRegistry, sourceRoutePath } from '@acorn/client-core/registries/sources.ts'
+import { availableSources } from '@acorn/client-core/tabs/sources.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
@@ -182,18 +181,27 @@ export default function App() {
 
   // Gated on having a node to ask, not on an identity: there is no login. NodeGate below holds the
   // screen until `nodeReady()`, so these only ever fire against a selected node.
-  const repos = createQuery(() => reposOptions(nodeReady()))
   const prefs = createQuery(() => prefsOptions(nodeReady()))
-  const pins = createQuery(() => pinsOptions(nodeReady()))
+  const integrations = createQuery(() => integrationsOptions(nodeReady()))
+  const projects = createQuery(() => projectsOptions(nodeReady()))
   const tasks = createQuery(() => tasksOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
   const [collapsed, setCollapsed] = createSignal(false)
+
+  createEffect(() => {
+    const current = selectedSource()
+    const connected = integrations.data?.integrations
+    if (!current || !connected) return
+    if (!availableSources(connected).some((source) => source.id === current)) {
+      setSelectedSource(defaultSourceId() ?? null)
+    }
+  })
 
   createAppStartupRestore({
     queryClient,
     prefs: () => prefs.data,
     cacheRestoring: isRestoring,
-    repos: () => repos.data,
+    projects: () => projects.data,
     tasks: () => tasks.data,
     params,
     navigate,
@@ -201,21 +209,10 @@ export default function App() {
     setCollapsed,
   })
 
-  // First-run bootstrap (idempotent): ensure a Default workspace exists and every mirrored repo is
-  // assigned to a workspace, so the top selector + repo scoping always have data. Runs once the
-  // repos mirror has loaded (so newly-fetched repos get assigned). The onboarding modal (P4) lets
-  // the user re-group afterwards.
-  let bootstrapped = false
-  createEffect(() => {
-    if (bootstrapped || !nodeReady() || !repos.data) return
-    bootstrapped = true
-    void bootstrapWorkspaces().then(() => queryClient.invalidateQueries({ queryKey: workspacesKey }))
-  })
-
-  // Active workspace is derived from the current repo (partition — a repo is in exactly one). The ACTIVE
+  // Active workspace is derived from the current project. The ACTIVE
   // node's list, deliberately: the route carries no node, so the workspace the shell is showing is
   // whichever one the active node has for this repo.
-  const activeWorkspace = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  const activeWorkspace = () => workspaceForProject(workspaces.data, params.projectId)
   // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
   // exactly one node, and two nodes both having a "Default" is the normal case.
   const fleetWorkspaces = createFleetWorkspaces()
@@ -224,18 +221,18 @@ export default function App() {
     if (!workspace) return null
     return fleetWorkspaces().entries.find((entry) => entry.nodeId === activeNodeId() && entry.workspace.id === workspace.id) ?? null
   }
-  // Repos scoped to the active workspace for the topbar sub-selector. Falls back to all repos before
+  // Projects scoped to the active workspace for the topbar selector. Falls back to all projects before
   // the workspace mapping has loaded so the picker is never empty.
-  const scopedRepos = () => {
+  const scopedProjects = () => {
     const ws = activeWorkspace()
-    if (!ws) return repos.data ?? []
-    const set = new Set((ws.repos ?? []).map((r) => `${r.owner}/${r.name}`))
-    return (repos.data ?? []).filter((r) => set.has(`${r.owner}/${r.name}`))
+    const all = (projects.data ?? []).filter((project) => !project.hidden)
+    if (!ws) return all
+    return all.filter((project) => project.workspaceId === ws.id)
   }
 
   // Remember the last view per workspace (a rail source or a task) so switching workspaces returns
-  // you to exactly what you were looking at, not always GitHub. On each real workspace change: record
-  // the view we're leaving, then restore the one we're entering (default GitHub). `defer` skips the
+  // you to exactly what you were looking at, not always Home. On each real workspace change: record
+  // the view we're leaving, then restore the one we're entering (core Home by default). `defer` skips the
   // startup null→workspace resolution so the persisted-state pipeline's `last_source`/`last_task`
   // restore still wins on first load; the `prevWs` guard likewise leaves that first entry untouched.
   createEffect(
@@ -286,7 +283,6 @@ export default function App() {
 
   const toggleCollapsed = () => setCollapsed((value) => !value)
 
-  const selected = () => (params.owner && params.repo ? `${params.owner}/${params.repo}` : '')
   // Create-PR mode: the source contribution owns the static route shape.
   const newMatch = useMatch(() => sourceRoutePath('create') ?? '')
   const isNew = () => !!newMatch()
@@ -324,39 +320,34 @@ export default function App() {
               onSelect={(entry) => selectFleetWorkspace(entry, navigate)}
             />
           </Show>
-          <Show when={scopedRepos().length}>
-            <RepoPicker
-              repos={scopedRepos()}
-              pinned={pins.data ?? []}
-              selected={selected()}
-              /* In a task view the repo is fixed to that worktree — switching repos is meaningless,
-                 so disable it. The workspace selector stays live (it swaps the whole UI). */
+          <Show when={scopedProjects().length}>
+            <select
+              class="ui-input project-picker"
+              aria-label="Project"
+              value={params.projectId ?? ''}
               disabled={!selectedSource() && !!activeTask()}
-              onSelect={(value) => {
-                // From a task view, picking a repo returns to the default browse; from a source
-                // it just re-scopes that source to the chosen repo.
+              onChange={(event) => {
+                const projectId = event.currentTarget.value
+                if (!projectId) return
                 if (!selectedSource()) {
                   const source = defaultSourceId()
                   if (source) setSelectedSource(source)
                 }
-                const [owner, repo] = value.split('/')
-                navigate(sourcePath('repo', { owner, repo }))
+                navigate(sourcePath('project', { projectId }))
               }}
-            />
+            >
+              <For each={scopedProjects()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
+            </select>
           </Show>
         </div>
         <div class="breadcrumb">
-          <Show when={params.owner} fallback={<span class="brand">acorn</span>}>
-            <button type="button" class="crumb crumb-link" onClick={() => navigate(sourcePath('repo', { owner: params.owner ?? '', repo: params.repo ?? '' }))}>
-              {params.owner}
-            </button>
-            <span class="crumb-sep">/</span>
-            <button type="button" class="crumb crumb-link" onClick={() => navigate(sourcePath('repo', { owner: params.owner ?? '', repo: params.repo ?? '' }))}>
-              {params.repo}
+          <Show when={params.projectId} fallback={<span class="brand">acorn</span>}>
+            <button type="button" class="crumb crumb-link" onClick={() => navigate(sourcePath('project', { projectId: params.projectId ?? '' }))}>
+              {projects.data?.find((project) => project.id === params.projectId)?.name ?? params.projectId}
             </button>
             <Show when={params.number}>
               <span class="crumb-sep">/</span>
-              <a class="crumb crumb-num crumb-link" href={`https://github.com/${params.owner}/${params.repo}/pull/${params.number}`} target="_blank" rel="noopener noreferrer">#{params.number}</a>
+              <span class="crumb crumb-num">#{params.number}</span>
             </Show>
             <Show when={isNew()}>
               <span class="crumb-sep">/</span>

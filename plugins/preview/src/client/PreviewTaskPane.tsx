@@ -10,8 +10,8 @@ import PreviewPane from './PreviewPane'
 export function PreviewTaskPane(props: { task: Task }) {
   const api = taskBridge()
   const [config] = createResource(
-    () => `${props.task.repoOwner}/${props.task.repoName}`,
-    () => api?.repoPath.get(props.task.repoOwner, props.task.repoName) ?? null,
+    () => props.task.projectId,
+    async () => api ? (await api.project.get(props.task.projectId))?.config ?? null : null,
   )
   const [targets] = createResource(
     () => props.task.id,

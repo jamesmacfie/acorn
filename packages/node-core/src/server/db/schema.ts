@@ -13,10 +13,10 @@ export const syncState = sqliteTable(
 
 // --- App-state tables: data GitHub doesn't have, we are the source of truth ---
 //
-// user_id on prefs is the SINGLE canonical user id: the authenticated GitHub login (auth middleware's
-// user.login). This is a single-user app, so the column isn't multi-tenancy — it just pins app state to
-// the GitHub identity so a login switch doesn't inherit another account's state. Newer app-state tables
-// (tasks, repo_paths, …) are machine-scoped and drop it.
+// user_id on prefs is the SINGLE canonical user id: the node's opaque owner id, minted at boot
+// (main/core/identity/identity.ts). Installs that predate boot-minting carry their old GitHub login as
+// the value — same column, same semantics, never rewritten. Single-user app, so the column isn't
+// multi-tenancy. Newer app-state tables (tasks, projects, …) are machine-scoped and drop it.
 
 export const prefs = sqliteTable(
   'prefs',
@@ -32,8 +32,7 @@ export const prefs = sqliteTable(
 // user can connect several Linears / Rollbars, so the key is an opaque `id`, not (userId, provider).
 // `label` disambiguates them in the UI ("Linear – work"). authRef is ENCRYPTED at rest (JWE via
 // SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server — same posture as the
-// GitHub token. GitHub is the identity root — connecting it is what binds ACTIVE_IDENTITY, and userId
-// is derived from it — so it also *appears* as a synthesized entry in the list endpoint.
+// GitHub token. GitHub also *appears* as a synthesized entry in the list endpoint.
 export const integrations = sqliteTable('integrations', {
   id: text('id').primaryKey(), // opaque uuid
   userId: text('user_id').notNull(),
@@ -52,61 +51,21 @@ export const integrations = sqliteTable('integrations', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-// Local checkout for a GitHub repo (docs/workspaces-and-tasks.md). Machine-scoped, NOT user-scoped: it describes
-// *this machine's* filesystem, so there's no userId — the terminal service in the Electron main
-// process reads it outside any GitHub user context. PK is (owner, repo).
-export const repoPaths = sqliteTable(
-  'repo_paths',
-  {
-    owner: text('owner').notNull(),
-    repo: text('repo').notNull(),
-    githubRepoId: integer('github_repo_id'),
-    path: text('path').notNull(),
-    // Named run targets (docs/workflows.md §2): JSON RunTarget[] — the DB fallback below a committed
-    // .acorn/config.toml (parsed by main/runConfig.ts legacyRunTargets). The legacy scalar
-    // run_command/dev_port columns were folded into this JSON by migration 0017 and dropped in 0018.
-    runTargets: text('run_targets'),
-    // External editor command for this repo's worktrees (docs/workspaces-and-tasks.md): 'code' | 'zed' |
-    // 'cursor -n' | an absolute path. null → the prefs 'editor_command_default' → 'code'.
-    editorCommand: text('editor_command'),
-    // Repo-level lifecycle/build config (docs/workspaces-and-tasks.md). These are the machine-local DB
-    // fallback layer beneath a committed .acorn/config.toml (loadRepoConfig precedence). A workspace is
-    // a group of repositories; these fields describe how to build, run, and inspect one repository.
-    setupScript: text('setup_script'), // shell command run once when a task worktree is created; null/blank = none
-    setupScriptTrigger: text('setup_script_trigger'), // 'off' | 'created' | 'terminal' — when to run it; null → 'terminal'
-    devScript: text('dev_script'), // "run dev" command → a base `dev` run target; null/blank = no run button
-    devRestartScript: text('dev_restart_script'), // restart command for the `dev` target; when set, run_restart runs it instead of stop+start
-    teardownScript: text('teardown_script'), // shell command run in the worktree just before removal (docs/terminal-and-agents.md); null/blank = none
-    dbUrlScript: text('db_url_script'), // shell command run in the worktree to print a Postgres connection URL for the Database pane (docs/pg.md); null/blank = auto-detect from .env / $DATABASE_URL
-    dbSchemaMode: text('db_schema_mode'), // 'auto' | 'script' | 'file' — where the Database pane's AI-generation schema text comes from; null → 'auto' (live introspection)
-    dbSchemaValue: text('db_schema_value'), // the shell command or worktree-relative file path per dbSchemaMode; null/blank = unset
-    dbSchemaNotes: text('db_schema_notes'), // free-form prose sent with the schema on every AI generate: JSONB shapes, enum meanings, which tables are live; null/blank = none
-    previewMode: text('preview_mode'), // 'url' | 'port' | 'script' — how the browser-preview URL is resolved; null → dev-server port
-    previewValue: text('preview_value'), // the URL, port, or shell command per previewMode; null/blank = unset
-    browserRules: text('browser_rules'), // JSON BrowserRule[] — preview-browser page rules (docs/panes.md); null = none
-    // Prefix prepended to the branch a NEW task derives from its title, e.g. 'jamesmacfie/' →
-    // 'jamesmacfie/fix-the-thing'. Stored already-normalised (slug + a trailing '/' or '-'
-    // separator). DB-only like browser_rules — a naming convention is personal, not committed.
-    branchPrefix: text('branch_prefix'),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.owner, t.repo] })],
-)
-
-// Machine-scoped acknowledgement of repo-authored executable configuration. The hash identifies
+// Machine-scoped acknowledgement of project-authored executable configuration. The hash identifies
 // the exact committed config snapshot; retaining that snapshot lets the next prompt show a diff.
 // Multiple hashes are kept as a small audit trail and make changing back to a previously approved
 // config trusted without another prompt.
 export const configAcks = sqliteTable(
   'config_acks',
   {
-    repo: text('repo').notNull(), // owner/name
+    // NULL means the pre-project GitHub pair had no surviving project during 0048. These rows
+    // retain their bytes for recovery/audit but are deliberately inert to project trust reads.
+    projectId: text('project_id'),
     hash: text('hash').notNull(), // sha256 of the repo config/workflow snapshot
     snapshot: text('snapshot').notNull(), // verbatim grouped source shown to the user
     ackedAt: integer('acked_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.repo, t.hash] }), index('config_acks_repo_acked_idx').on(t.repo, t.ackedAt)],
+  (t) => [primaryKey({ columns: [t.projectId, t.hash] }), index('config_acks_project_acked_idx').on(t.projectId, t.ackedAt)],
 )
 
 export const workspaces = sqliteTable('workspaces', {
@@ -120,40 +79,61 @@ export const workspaces = sqliteTable('workspaces', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-// Repo → Workspace membership (partition). PK is (repoOwner, repoName): a repo lives in exactly one
-// workspace. The on-disk path is NOT here — it stays in repo_paths, joined by (owner, repo).
-export const workspaceRepos = sqliteTable(
-  'workspace_repos',
+// A project: a folder on this machine a workspace groups and tasks run in. The successor to the
+// (owner, name)-keyed legacy tables, which were backfilled by migration 0046.
+//
+// The VCS and GitHub facets are nullable columns, not side tables — both are strictly 1:1 — and
+// they are a CACHE of disk truth: `vcs`/`remote_url`/`default_branch` are re-detected on demand,
+// never authoritative. `path` is null for a project imported from a remote (GitHub) that has not
+// been cloned or mapped to a folder yet. Machine-scoped, no user_id.
+export const projects = sqliteTable(
+  'projects',
   {
-    workspaceId: text('workspace_id').notNull(), // → workspaces.id
-    repoOwner: text('repo_owner').notNull(),
-    repoName: text('repo_name').notNull(),
+    id: text('id').primaryKey(), // opaque uuid
+    name: text('name').notNull(), // display name; defaults to basename(path) or the remote repo name
+    path: text('path'), // absolute folder; null = known but not on disk yet. Uniqueness is app-enforced.
+    workspaceId: text('workspace_id').notNull(), // → workspaces.id; a project lives in exactly one workspace
     sort: integer('sort').notNull().default(0),
+    hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
+    // VCS facet: 'git' when a .git entry was detected at `path`, null for a plain folder.
+    vcs: text('vcs'),
+    defaultBranch: text('default_branch'), // cached from origin/HEAD or the GitHub API; null when unknown
+    // GitHub facet: parsed from the origin remote and/or stamped by the GitHub import flow.
+    remoteUrl: text('remote_url'),
+    githubOwner: text('github_owner'),
+    githubName: text('github_name'),
+    githubRepoId: integer('github_repo_id'),
+    // Machine-local project configuration.
+    runTargets: text('run_targets'),
+    editorCommand: text('editor_command'),
+    setupScript: text('setup_script'),
+    setupScriptTrigger: text('setup_script_trigger'),
+    devScript: text('dev_script'),
+    devRestartScript: text('dev_restart_script'),
+    teardownScript: text('teardown_script'),
+    dbUrlScript: text('db_url_script'),
+    dbSchemaMode: text('db_schema_mode'),
+    dbSchemaValue: text('db_schema_value'),
+    dbSchemaNotes: text('db_schema_notes'),
+    previewMode: text('preview_mode'),
+    previewValue: text('preview_value'),
+    browserRules: text('browser_rules'),
+    branchPrefix: text('branch_prefix'),
     createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.repoOwner, t.repoName] })],
+  (t) => [
+    index('projects_workspace_idx').on(t.workspaceId),
+    // Non-unique on purpose: two clones of one GitHub repo are legal, each its own project.
+    index('projects_github_idx').on(t.githubOwner, t.githubName),
+  ],
 )
 
-// Repos the user has chosen to hide from workspaces (docs/workspaces-and-tasks.md). Ignoring only inserts a
-// row here — the repo KEEPS its workspace_repos membership; readers filter it out of the
-// selector/rail/scoping (workspaces.ts ignoredRepoSet). The onboarding modal still lists it,
-// greyed under its workspace, so it can be un-ignored in place. Bootstrap skips ignored repos so
-// they don't silently reappear in Default.
-export const ignoredRepos = sqliteTable(
-  'ignored_repos',
-  {
-    owner: text('owner').notNull(),
-    repo: text('repo').notNull(),
-    createdAt: integer('created_at').notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.owner, t.repo] })],
-)
-
-// External projects (Linear/Rollbar/…) linked to a workspace. One project → many repos follows from the
+// External projects (Linear/Rollbar/…) linked to a workspace. One workspace can link many local projects
 // workspace grouping. `integrationId` records which connection the project belongs to, so a workspace
 // can link projects across several integrations (docs/workspaces-and-tasks.md).
-export const workspaceProjects = sqliteTable(
-  'workspace_projects',
+export const workspaceExternalProjects = sqliteTable(
+  'workspace_external_projects',
   {
     workspaceId: text('workspace_id').notNull(), // → workspaces.id
     integrationId: text('integration_id').notNull(), // → integrations.id
@@ -163,23 +143,21 @@ export const workspaceProjects = sqliteTable(
   (t) => [primaryKey({ columns: [t.workspaceId, t.integrationId, t.externalId] })],
 )
 
-// A Task is the single-repo unit of work (docs/workspaces-and-tasks.md/03-data-model.md): a repo + branch +
-// optional worktree + optional linked PR + its panes/terminals. Shown as a row in the rail. Its
-// parent Workspace is derived via workspaceRepos on (repoOwner, repoName). Machine-scoped — it owns
-// a local worktree, so no user_id.
+// A Task is the single-project unit of work (docs/workspaces-and-tasks.md/03-data-model.md): a project +
+// optional branch + optional worktree + optional linked PR + its panes/terminals. Shown as a row in the rail.
+// `project_id` is the authoritative owner.
 export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(), // opaque uuid
   title: text('title').notNull(), // editable label; seeded from origin (PR title, ticket, …)
   icon: text('icon'), // optional Lucide icon name; null = derive from origin (see ui/Icon.tsx)
   origin: text('origin').notNull(), // 'github-pr' | 'linear' | 'rollbar' | 'local'
-  repoOwner: text('repo_owner').notNull(), // a task always belongs to a repo
-  repoName: text('repo_name').notNull(),
-  branch: text('branch').notNull(), // the branch this task works on
+  projectId: text('project_id').notNull(),
+  branch: text('branch'), // null = run in the project root; non-null = isolated Git worktree
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)
   pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
   status: text('status').notNull(), // 'active' | 'archived' | 'cancelled' (workflow child task)
   parentId: text('parent_id'), // task tree (docs/workflows.md): set on fan-out children; null = root
-  sort: integer('sort').notNull().default(0), // rail ordering, like pinned_repos.sort
+  sort: integer('sort').notNull().default(0), // rail ordering
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
   archivedAt: integer('archived_at'), // set on archive; row kept for history/teardown audit

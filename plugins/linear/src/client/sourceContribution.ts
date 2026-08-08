@@ -20,7 +20,7 @@ export const linearSourceContribution: SourceContribution<LinearProjectIssue> = 
   promotion: {
     // A Linear issue carries its own branch name; what it cannot supply is which repo the work lands
     // in, so promotion needs a repo picked in the modal first.
-    canPromote: (_item, context) => !!context.owner && !!context.repo,
+    canPromote: (_item, context) => !!context.projectId,
     prepare: prepareLinearPromotion,
     create: createTask,
     attachToCurrentTask: (taskId, item) =>

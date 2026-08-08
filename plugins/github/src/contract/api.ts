@@ -19,6 +19,22 @@ export type Repo = {
   defaultBranch: string | null
   pushedAt: number | null
 }
+export type GithubImportAction = 'map' | 'clone' | 'defer'
+export type GithubImportItem =
+  | { repoId: number; action: 'map'; path: string }
+  | { repoId: number; action: 'clone'; parentDir: string }
+  | { repoId: number; action: 'defer' }
+export type GithubImportRequest = { repositories: GithubImportItem[] }
+export type GithubImportResult = {
+  repoId: number
+  owner: string
+  name: string
+  action: GithubImportAction
+  ok: boolean
+  projectId?: string
+  error?: string
+}
+export type GithubImportResponse = { results: GithubImportResult[] }
 export type Pull = {
   number: number
   title: string
@@ -97,6 +113,7 @@ export const pullRoute = (owner: string, repo: string, number: string | number, 
 
 export const reposRoute = '/v2/p/github/repos'
 export const reposRefreshRoute = '/v2/p/github/repos/refresh'
+export const githubImportRoute = '/v2/p/github/import'
 
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`

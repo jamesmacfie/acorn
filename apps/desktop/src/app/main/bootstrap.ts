@@ -1,7 +1,7 @@
 import { app, dialog, shell, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { registerPreviewIpc } from '@acorn/plugin-preview/main/index.ts'
-import { registerRepoPickerIpc } from '@acorn/plugin-terminal/main/index.ts'
+import { registerFolderPickerIpc } from '@acorn/plugin-terminal/main/index.ts'
 import type { ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { LOCAL_TOKEN_SCOPE, readDeviceToken } from './deviceTokenStore'
 import { FleetStore, toNodeRecord } from './fleetStore'
@@ -64,7 +64,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
 
   // Native IPC is installed before the renderer exists. Page rules cross the service boundary as
   // data; neither previewService nor the picker adapter can reach SQLite.
-  const disposePicker = registerRepoPickerIpc()
+  const disposePicker = registerFolderPickerIpc()
 
   // The connection broker, likewise installed before the renderer: its first act on load is to ask
   // for the fleet, so the handler must already exist. Registering the IPC also reconnects every node

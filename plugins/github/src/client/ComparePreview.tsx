@@ -1,7 +1,8 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
-import { compareOptions, reposOptions } from './queries'
+import { compareOptions } from './queries'
+import { projectsOptions } from '@acorn/client-core/queries.ts'
 import { getHighlighter } from '@acorn/client-core/highlight/shiki.ts'
 import { DiffLine, NonCodeRow } from '@acorn/client-core/ui/diff/DiffRows.tsx'
 import { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'
@@ -29,11 +30,13 @@ const noop = async () => {}
 export default function ComparePreview() {
   const params = useParams()
   const [searchParams] = useSearchParams()
-  const o = () => params.owner ?? ''
-  const r = () => params.repo ?? ''
-  const repos = createQuery(() => reposOptions(true))
-  const repo = () => repos.data?.find((x) => x.owner === o() && x.name === r())
-  const base = () => (typeof searchParams.base === 'string' && searchParams.base) || repo()?.defaultBranch || ''
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((x) => x.id === params.projectId)
+  const github = () => project()?.github
+  const o = () => github()?.owner ?? ''
+  const r = () => github()?.name ?? ''
+  const repo = () => github()
+  const base = () => (typeof searchParams.base === 'string' && searchParams.base) || project()?.defaultBranch || ''
   const head = () => (typeof searchParams.head === 'string' ? searchParams.head : '')
   const comparable = () => !!head() && head() !== base()
   const compare = createQuery(() => compareOptions(o(), r(), base(), head(), !!repo() && comparable()))

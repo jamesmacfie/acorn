@@ -7,8 +7,8 @@ export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'r
 
 export type MemoryRow = {
   id: string
-  scope: 'repo' | 'private'
-  repo: string | null
+  scope: 'project' | 'private'
+  projectId: string | null
   name: string
   type: MemoryType
   description: string
@@ -24,7 +24,7 @@ export type MemoryRow = {
 export type MemoryProposalRow = {
   id: string
   taskId: string
-  repo: string | null
+  projectId: string | null
   name: string
   type: MemoryType
   description: string
@@ -38,9 +38,9 @@ export type MemoryProposalRow = {
 }
 
 export type MemoryApi = {
-  list(repo?: string): Promise<MemoryRow[] | { error: string }>
-  search(query: string, repo?: string, type?: MemoryType): Promise<(MemoryRow & { rank: number })[] | { error: string }>
-  add(p: { taskId: string; scope: 'repo' | 'private'; name: string; description: string; type: MemoryType; body: string }): Promise<{ path: string } | { error: string }>
+  list(projectId?: string): Promise<MemoryRow[] | { error: string }>
+  search(query: string, projectId?: string, type?: MemoryType): Promise<(MemoryRow & { rank: number })[] | { error: string }>
+  add(p: { taskId: string; scope: 'project' | 'private'; name: string; description: string; type: MemoryType; body: string }): Promise<{ path: string } | { error: string }>
   // `options` is the fleet escape hatch (client-core's node/fanout.ts): the attention inbox asks every
   // paired node for its pending proposals, so this one read has to be addressable. Everything else here
   // stays on the ambient active node, which is right for a pane bound to one task.
@@ -52,8 +52,8 @@ const post = <T>(url: string, body?: unknown) =>
   writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
 
 const api: MemoryApi = {
-  list: (repo) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(repo)),
-  search: (query, repo, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, repo, type)),
+  list: (projectId) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(projectId)),
+  search: (query, projectId, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, projectId, type)),
   add: (p) => post<{ path: string } | { error: string }>(memoryAddRoute(p.taskId), { scope: p.scope, name: p.name, description: p.description, type: p.type, body: p.body }),
   proposals: (taskId, options) => readJson<MemoryProposalRow[]>(memoryProposalsRoute(taskId), options ?? {}),
   resolveProposal: (id, approved, edited) => post<{ ok: boolean; reason?: string }>(memoryResolveProposalRoute(id), { approved, edited }),

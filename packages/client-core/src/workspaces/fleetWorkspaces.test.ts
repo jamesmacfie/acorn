@@ -12,8 +12,8 @@ const node = (nodeId: string, label: string): NodeRecord => ({
   nodeId, label, endpoint: `https://127.0.0.1:9${nodeId.length}00`, local: nodeId === 'a',
 })
 
-const workspace = (id: string, name: string, repos: { owner: string; name: string }[] = []): Workspace =>
-  ({ id, name, color: null, icon: null, sort: 0, repos } as unknown as Workspace)
+const workspace = (id: string, name: string, projects: { id: string; name: string }[] = []): Workspace =>
+  ({ id, name, color: null, icon: null, sort: 0, projects } as unknown as Workspace)
 
 const entry = (nodeId: string, label: string, ws: Workspace): FleetWorkspace =>
   ({ workspace: ws, nodeId, node: node(nodeId, label) })
@@ -21,7 +21,7 @@ const entry = (nodeId: string, label: string, ws: Workspace): FleetWorkspace =>
 beforeEach(async () => {
   routeDisposable = sourceRegistry.register({
     id: 'test.fleet-routes', order: 1, glyph: 'x', label: 'Routes',
-    routes: [{ id: 'test.fleet-repo', path: '/:owner/:repo', kind: 'repo', order: 1 }],
+    routes: [{ id: 'test.fleet-project', path: '/p/:projectId', kind: 'project', order: 1 }],
   })
   _resetFleet()
   ;(globalThis as { window?: unknown }).window = {
@@ -47,25 +47,24 @@ afterEach(() => {
 
 describe('selectFleetWorkspace', () => {
   it('switches the node BEFORE navigating', () => {
-    // The order is the whole contract. Routes are `/:owner/:repo` with no node in them, and the shell
-    // derives the active workspace from that repo against the ACTIVE node's cache — navigating first
-    // would resolve the path against the wrong node, which either finds nothing or finds a different repo
-    // that happens to share the owner/name.
+    // The order is the whole contract. Routes carry no node in them, and the shell derives the active
+    // workspace from the project against the ACTIVE node's cache — navigating first would resolve the
+    // path against the wrong node.
     const observed: { path: string; node: string | null }[] = []
     selectFleetWorkspace(
-      entry('b', 'Node B', workspace('ws-1', 'Beta', [{ owner: 'acorn', name: 'widget' }])),
+      entry('b', 'Node B', workspace('ws-1', 'Beta', [{ id: 'project-widget', name: 'widget' }])),
       (path) => observed.push({ path, node: activeNodeId() }),
     )
-    expect(observed).toEqual([{ path: '/acorn/widget', node: 'b' }])
+    expect(observed).toEqual([{ path: '/p/project-widget', node: 'b' }])
   })
 
   it('does not switch nodes for a workspace on the node already active', () => {
     const observed: string[] = []
     selectFleetWorkspace(
-      entry('a', 'Node A', workspace('ws-2', 'Alpha', [{ owner: 'acorn', name: 'other' }])),
+      entry('a', 'Node A', workspace('ws-2', 'Alpha', [{ id: 'project-other', name: 'other' }])),
       (path) => observed.push(path),
     )
-    expect(observed).toEqual(['/acorn/other'])
+    expect(observed).toEqual(['/p/project-other'])
     expect(activeNodeId()).toBe('a')
   })
 

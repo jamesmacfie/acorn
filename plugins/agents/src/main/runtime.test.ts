@@ -28,11 +28,11 @@ type Seed = {
   worktree: string
 }
 
-async function seedTask(testDb: TestDb, root: string, repoName = 'runtime-test'): Promise<Seed> {
+async function seedTask(testDb: TestDb, root: string, projectName = 'runtime-test'): Promise<Seed> {
   const timestamp = Date.now()
   const taskId = randomUUID()
   const workspaceId = randomUUID()
-  const worktree = join(root, `worktree-${repoName}`)
+  const worktree = join(root, `worktree-${projectName}`)
   await import('node:fs/promises').then((fs) => fs.mkdir(worktree))
   await testDb.db.insert(schema.workspaces).values({
     id: workspaceId,
@@ -40,16 +40,19 @@ async function seedTask(testDb: TestDb, root: string, repoName = 'runtime-test')
     createdAt: timestamp,
     updatedAt: timestamp,
   })
-  await testDb.db.insert(schema.workspaceRepos).values({
-    workspaceId,
-    repoOwner: 'acorn',
-    repoName,
-    createdAt: timestamp,
-  })
-  await testDb.db.insert(schema.repoPaths).values({
-    owner: 'acorn',
-    repo: repoName,
+  await testDb.db.insert(schema.projects).values({
+    id: `project-${projectName}`,
+    name: projectName,
     path: worktree,
+    workspaceId,
+    sort: 0,
+    hidden: false,
+    vcs: 'git',
+    defaultBranch: 'main',
+    remoteUrl: null,
+    githubOwner: 'acorn',
+    githubName: projectName,
+    githubRepoId: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   })
@@ -57,8 +60,7 @@ async function seedTask(testDb: TestDb, root: string, repoName = 'runtime-test')
     id: taskId,
     title: 'Runtime test',
     origin: 'local',
-    repoOwner: 'acorn',
-    repoName,
+    projectId: `project-${projectName}`,
     branch: 'test',
     worktreePath: worktree,
     status: 'active',
@@ -192,7 +194,7 @@ class FailingStartDriver implements AgentDriver {
 
 describe('managed agent runtime conformance', () => {
   // Two real databases, because that is now the shape of the thing under test. `testDb` is CORE's — it
-  // holds the workspaces/repo_paths/tasks rows seedTask writes, and it is what the runtime reaches
+  // holds the workspace/project/task rows seedTask writes, and it is what the runtime reaches
   // through CoreServices. `pluginDb` is this plugin's own migrated file, holding every `agent_*` table
   // and the `agent_events_fts` virtual table the workspace search case exercises.
   //

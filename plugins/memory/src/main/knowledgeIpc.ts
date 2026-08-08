@@ -24,7 +24,7 @@ export type KnowledgeDeps = {
   notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
 }
 
-export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'context' | 'identity'>
+export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity'>
 
 // Reads over the derived index, BOUND to this plugin's own database. This is what lets the app-layer
 // agent-tool and context-section wiring keep working: it can no longer hold a handle to the file these
@@ -34,16 +34,16 @@ export type MemoryIndex = {
   // Exposed as well as used internally, because a caller that then reads through some OTHER path (core's
   // context assembler) still needs the index fresh.
   reconciled(): Promise<void>
-  list(opts: { repo?: string | null; type?: MemoryType }): Promise<MemoryRow[]>
-  get(opts: { repo?: string | null; name: string }): Promise<MemoryRow | null>
-  search(query: string, opts: { repo?: string | null; type?: MemoryType }): Promise<MemoryHit[]>
+  list(opts: { projectId?: string | null; type?: MemoryType }): Promise<MemoryRow[]>
+  get(opts: { projectId?: string | null; name: string }): Promise<MemoryRow | null>
+  search(query: string, opts: { projectId?: string | null; type?: MemoryType }): Promise<MemoryHit[]>
   // The always-safe injection slice: index lines only (name + description), capped.
-  indexSlice(repo: string, cap?: number): Promise<{ name: string; description: string }[]>
+  indexSlice(projectId: string, cap?: number): Promise<{ name: string; description: string }[]>
 }
 
 export type MemoryKnowledge = MemoryIndex & {
   proposals: MemoryProposalStore
-  // Push the combined launch block (task context + repo memory) into a fresh agent session
+  // Push the combined launch block (task context + project memory) into a fresh agent session
   // (docs/notes-and-memory.md). Best-effort — a session must never fail to launch over it.
   launchInjector(taskId: string, sessionId: string): Promise<void>
   // Memory auto-generation trigger: fired when an agent session for a task exits, with that session's
@@ -80,21 +80,23 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
   const buildMemorySources = async () => {
     const active = (await core.tasks.active())
       .filter((t) => t.worktreePath && isDir(t.worktreePath))
-      .map((t) => ({ dir: t.worktreePath!, repo: `${t.repoOwner}/${t.repoName}` }))
-    const checkouts = (await core.repos.checkouts()).filter((p) => isDir(p.path)).map((p) => ({ dir: p.path, repo: `${p.owner}/${p.repo}` }))
+      .filter((t) => t.projectId)
+      .map((t) => ({ dir: t.worktreePath!, projectId: t.projectId! }))
+    const checkouts = (await core.projects.checkouts()).filter((p) => isDir(p.path))
     return memorySources(active, checkouts, homedir())
   }
   const reconciled = async () => reconcileMemories(db, await buildMemorySources())
 
   const launchInjector = async (taskId: string, sessionId: string) => {
     // Launch injection (docs/notes-and-memory.md): one first-prompt block combining task context
-    // (PR + linked issues + notes, gated by the startup_context_injection pref) and the repo-memory
+    // (PR + linked issues + notes, gated by the startup_context_injection pref) and the project-memory
     // block (MEMORY.md index slice + feedback/convention bodies). Queued 'after-ready' so it lands
     // as the agent's first prompt once the CLI settles. Best-effort — never blocks a launch.
     try {
       const t = await core.tasks.load(taskId)
       if (!t) return
-      const repo = `${t.repoOwner}/${t.repoName}`
+      const projectId = t.projectId
+      if (!projectId) return
       const blocks: string[] = []
 
       const userId = core.identity.active()
@@ -105,8 +107,8 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
       }
 
       await reconciled()
-      const slice = await memoryIndexSlice(db, repo)
-      const key = (await listMemories(db, { repo })).filter((m) => m.type === 'feedback' || m.type === 'convention')
+      const slice = await memoryIndexSlice(db, projectId)
+      const key = (await listMemories(db, { projectId })).filter((m) => m.type === 'feedback' || m.type === 'convention')
       const memoryBlock = formatMemoryInjection(slice, key)
       if (memoryBlock) blocks.push(memoryBlock)
 
@@ -127,13 +129,15 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
       const profile = memoryReviewProfile()
       if (!profile) return // no headless-capable agent CLI installed → no auto-generation
       const worktree = t.worktreePath
-      const repo = `${t.repoOwner}/${t.repoName}`
+      const project = t.projectId ? await core.projects.byId(t.projectId) : null
+      if (!project) return
       const out = await generateMemoryProposals({
         runReview: (prompt, schema0) => {
           const argv = buildHeadlessArgv(profile.id, resolveCommand(profile), { prompt, schema: schema0 })!
-          return runHeadless(argv, { cwd: worktree, env: buildSessionEnv({ taskId, cwd: worktree, task: t }) })
+          return runHeadless(argv, { cwd: worktree, env: buildSessionEnv({ taskId, cwd: worktree, task: { projectId: project.id, projectName: project.name, github: project.github, branch: t.branch, title: t.title } }) })
         },
         taskDiff: async () => {
+          if (!existsSync(join(worktree, '.git'))) return ''
           try {
             const { stdout } = await gitOrThrow(['diff', 'HEAD'], { cwd: worktree, timeoutMs: 15_000 })
             return stdout
@@ -144,13 +148,13 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
         transcriptTail: async () => transcriptTail,
         existingIndex: async () => {
           await reconciled()
-          return (await listMemories(db, { repo })).map((m) => ({ id: m.id, name: m.name, description: m.description, body: m.body }))
+          return (await listMemories(db, { projectId: project.id })).map((m) => ({ id: m.id, name: m.name, description: m.description, body: m.body }))
         },
         fileExists: (p) => existsSync(join(worktree, p)),
         propose: async (c, flags) =>
           void (await proposals.propose({
             taskId,
-            repo,
+            projectId: project.id,
             name: c.name,
             type: c.type,
             description: c.description,
@@ -170,17 +174,17 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
   // surface); this is the human-facing pane. guard() keeps the `| { error }` contract the clients
   // union on. Backed by the same stores, so it 503s under dev:node.
   const route: KnowledgeBridge = {
-    memoryList: (repo) =>
+    memoryList: (projectId) =>
       guard(async () => {
         await reconciled()
-        return listMemories(db, { repo: repo ?? null })
+        return listMemories(db, { projectId: projectId ?? null })
       }),
-    memorySearch: (query, repo, type) =>
+    memorySearch: (query, projectId, type) =>
       guard(async () => {
         await reconciled()
-        return searchMemories(db, query, { repo: repo ?? null, type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
+        return searchMemories(db, query, { projectId: projectId ?? null, type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
       }),
-    // Manual add (12 P1): repo scope writes into the TASK'S WORKTREE (reviewed via its PR — never
+    // Manual add (12 P1): project scope writes into the TASK'S WORKTREE (reviewed via its PR — never
     // the user's primary checkout); private scope into ~/.acorn/memory.
     memoryAdd: (taskId, p) =>
       guard(async () => {
@@ -189,11 +193,13 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
         let dir: string
         if (p.scope === 'private') dir = join(homedir(), '.acorn', 'memory')
         else {
-          if (!t?.worktreePath || !isDir(t.worktreePath)) throw new Error('Repo-scoped memory needs the task worktree (open a terminal first).')
-          dir = join(t.worktreePath, '.acorn', 'memory')
+          const project = t?.projectId ? await core.projects.byId(t.projectId) : null
+          const root = t?.worktreePath && isDir(t.worktreePath) ? t.worktreePath : project?.path
+          if (!root || !isDir(root)) throw new Error('Project memory needs a mapped project folder (or task worktree).')
+          dir = join(root, '.acorn', 'memory')
         }
         let commitSha: string | null = null
-        if (t?.worktreePath && isDir(t.worktreePath)) {
+        if (t?.worktreePath && isDir(t.worktreePath) && existsSync(join(t.worktreePath, '.git'))) {
           try {
             const { stdout } = await gitOrThrow(['rev-parse', 'HEAD'], { cwd: t.worktreePath, timeoutMs: 5_000 })
             commitSha = stdout.trim()
@@ -224,7 +230,8 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
       const proposal = await proposals.get(id)
       if (!proposal) return { ok: false, reason: 'Proposal not found.' }
       const t = await core.tasks.load(proposal.taskId)
-      return acceptProposal(proposals, proposal.id, t?.worktreePath ?? null, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
+      const project = t?.projectId ? await core.projects.byId(t.projectId) : null
+      return acceptProposal(proposals, proposal.id, t?.worktreePath ?? project?.path ?? null, reconciled, edited as { name: string; type: MemoryType; description: string; body: string } | undefined)
     },
     // --- notes ---
     //
@@ -269,6 +276,6 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
     list: (opts) => listMemories(db, opts),
     get: (opts) => getMemory(db, opts),
     search: (query, opts) => searchMemories(db, query, opts),
-    indexSlice: (repo, cap) => memoryIndexSlice(db, repo, cap),
+    indexSlice: (projectId, cap) => memoryIndexSlice(db, projectId, cap),
   }
 }

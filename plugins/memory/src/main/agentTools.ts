@@ -18,26 +18,27 @@ import { MEMORY_TYPES, type MemoryType } from './memory'
 import type { MemoryProposalStore } from './memoryProposals'
 
 // The one core read these tools need: `tasks` is a CORE table and this plugin owns its own SQLite file,
-// so the repo a memory is scoped to is resolved through core rather than queried here
+// so the project a memory is scoped to is resolved through core rather than queried here
 // (docs/data-layer.md § Plugin DBs).
 type ToolCore = Pick<CoreServices, 'tasks'>
 
 const asMemoryType = (type: string | undefined): MemoryType | undefined =>
   MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined
 
-// The memory scope key, 'owner/name'. A missing task is `not_found` rather than a bare failure, matching
+// The memory scope key is the task's project id. A missing task is `not_found` rather than a bare failure, matching
 // every other task-addressed tool on this surface.
-async function repoFor(core: ToolCore, taskId: string): Promise<string> {
+async function projectIdFor(core: ToolCore, taskId: string): Promise<string> {
   const task = await core.tasks.load(taskId)
   if (!task) throw new ToolError('not_found', 'no such task')
-  return `${task.repoOwner}/${task.repoName}`
+  if (!task.projectId) throw new ToolError('bad_request', 'task has no project')
+  return task.projectId
 }
 
 export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalStore, core: ToolCore): AgentToolContribution[] {
   return [
     {
       name: 'memory_search',
-      description: 'Search repo memory (conventions, architecture, past fixes) — ranked, repo-scoped.',
+      description: 'Search project memory (conventions, architecture, past fixes) — ranked, project-scoped.',
       input: z.object({ query: z.string(), type: z.string().optional() }),
       scope: 'task',
       risk: 'read',
@@ -45,18 +46,18 @@ export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalSt
         // Every read reconciles from the markdown files first — they are the truth, the index is derived.
         await index.reconciled()
         const { query, type } = a as { query: string; type?: string }
-        return index.search(query, { repo: await repoFor(core, ctx.taskId), type: asMemoryType(type) })
+        return index.search(query, { projectId: await projectIdFor(core, ctx.taskId), type: asMemoryType(type) })
       },
     },
     {
       name: 'memory_list',
-      description: 'The repo memory index (name + description per memory).',
+      description: 'The project memory index (name + description per memory).',
       input: z.object({ type: z.string().optional() }),
       scope: 'task',
       risk: 'read',
       handler: async (a, ctx) => {
         await index.reconciled()
-        return index.list({ repo: await repoFor(core, ctx.taskId), type: asMemoryType((a as { type?: string }).type) })
+        return index.list({ projectId: await projectIdFor(core, ctx.taskId), type: asMemoryType((a as { type?: string }).type) })
       },
     },
     {
@@ -67,7 +68,7 @@ export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalSt
       risk: 'read',
       handler: async (a, ctx) => {
         await index.reconciled()
-        const found = await index.get({ repo: await repoFor(core, ctx.taskId), name: (a as { name: string }).name })
+        const found = await index.get({ projectId: await projectIdFor(core, ctx.taskId), name: (a as { name: string }).name })
         if (!found) throw new ToolError('not_found', 'no such memory')
         return found
       },
@@ -88,7 +89,7 @@ export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalSt
               taskId: ctx.taskId,
               // An unresolvable task does not block the proposal: it lands unscoped and a reviewer sees
               // it, which is better than losing what the agent learned.
-              repo: await repoFor(core, ctx.taskId).catch(() => null),
+              projectId: await projectIdFor(core, ctx.taskId).catch(() => null),
               name: p.name,
               type: p.type as MemoryType,
               description: p.description,

@@ -84,7 +84,7 @@ export class AgentStore extends AgentSessionRepository {
   async listSessions(filter: SessionListFilter = {}): Promise<AgentSessionList> {
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), 100)
     // The fourth of the workspace joins (sessionRepository.ts holds the other three). Resolved to task
-    // ids through core rather than joined, because `tasks` and `workspace_repos` are in core's database
+    // ids through core rather than joined, because `tasks` and workspace membership are in core's database
     // file and this table is in the plugin's. An empty workspace narrows to nothing — deliberately not
     // to "unfiltered", which is how an id round trip could silently leak another workspace's sessions
     // into the Agent Center.

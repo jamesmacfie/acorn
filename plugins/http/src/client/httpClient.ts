@@ -15,7 +15,7 @@ import {
 
 // The stored-request write shape retains `taskId` because it owns filing. Sending uses
 // HttpSendInput instead, whose executionTaskId comes from the panel context.
-export type RequestPayload = Omit<HttpRequest, 'id' | 'repoOwner' | 'repoName' | 'createdAt' | 'updatedAt'>
+export type RequestPayload = Omit<HttpRequest, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>
 
 const json = (method: string, body: unknown): WriteInit => ({
   method,
@@ -23,31 +23,31 @@ const json = (method: string, body: unknown): WriteInit => ({
   body: JSON.stringify(body),
 })
 
-export const listRequests = (owner: string, repo: string, taskId?: string): Promise<HttpRequest[]> =>
-  readJson(`${httpRequestsRoute(owner, repo)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`)
+export const listRequests = (projectId: string, taskId?: string): Promise<HttpRequest[]> =>
+  readJson(`${httpRequestsRoute(projectId)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`)
 
-export const createRequest = (owner: string, repo: string, body: RequestPayload): Promise<HttpRequest> =>
-  writeJson(httpRequestsRoute(owner, repo), json('POST', body))
+export const createRequest = (projectId: string, body: RequestPayload): Promise<HttpRequest> =>
+  writeJson(httpRequestsRoute(projectId), json('POST', body))
 
-export const updateRequest = (owner: string, repo: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
-  writeJson(httpRequestRoute(owner, repo, id), json('PUT', body))
+export const updateRequest = (projectId: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
+  writeJson(httpRequestRoute(projectId, id), json('PUT', body))
 
-export const deleteRequest = (owner: string, repo: string, id: string): Promise<void> =>
-  sendJson<void>(httpRequestRoute(owner, repo, id), { method: 'DELETE' }, 'Could not delete request')
+export const deleteRequest = (projectId: string, id: string): Promise<void> =>
+  sendJson<void>(httpRequestRoute(projectId, id), { method: 'DELETE' }, 'Could not delete request')
 
-export const listVariables = (owner: string, repo: string): Promise<HttpVariable[]> => readJson(httpVariablesRoute(owner, repo))
+export const listVariables = (projectId: string): Promise<HttpVariable[]> => readJson(httpVariablesRoute(projectId))
 
-export const createVariable = (owner: string, repo: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
-  writeJson(httpVariablesRoute(owner, repo), json('POST', body))
+export const createVariable = (projectId: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+  writeJson(httpVariablesRoute(projectId), json('POST', body))
 
-export const updateVariable = (owner: string, repo: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
-  writeJson(httpVariableRoute(owner, repo, id), json('PUT', body))
+export const updateVariable = (projectId: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+  writeJson(httpVariableRoute(projectId, id), json('PUT', body))
 
-export const deleteVariable = (owner: string, repo: string, id: string): Promise<void> =>
-  sendJson<void>(httpVariableRoute(owner, repo, id), { method: 'DELETE' }, 'Could not delete variable')
+export const deleteVariable = (projectId: string, id: string): Promise<void> =>
+  sendJson<void>(httpVariableRoute(projectId, id), { method: 'DELETE' }, 'Could not delete variable')
 
-export const sendRequest = (owner: string, repo: string, body: HttpSendInput): Promise<SendResult> =>
-  writeJson(httpSendRoute(owner, repo), json('POST', body))
+export const sendRequest = (projectId: string, body: HttpSendInput): Promise<SendResult> =>
+  writeJson(httpSendRoute(projectId), json('POST', body))
 
 // The response body arrives base64'd so binary survives the JSON hop. Decode as UTF-8 for display;
 // callers that know it's binary use the byte array.

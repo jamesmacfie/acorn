@@ -20,7 +20,7 @@ describe('memory proposals (docs/notes-and-memory.md — the human gate)', () =>
   it('propose lands a pending proposal — and NO memory file is written until the gate', async () => {
     const p = await store.propose({
       taskId: 't1',
-      repo: 'acme/api',
+      projectId: 'project-api',
       name: 'null-token-redirect-guard',
       type: 'fix',
       description: 'SSO login crashed when the token was null before redirect.',
@@ -35,20 +35,26 @@ describe('memory proposals (docs/notes-and-memory.md — the human gate)', () =>
   })
 
   it('resolve records the verdict (with optional edits); junk input is rejected', async () => {
-    const p = await store.propose({ taskId: 't1', repo: null, name: 'a-fix', type: 'fix', description: 'd', body: 'b', originSessionId: null })
+    const p = await store.propose({ taskId: 't1', projectId: null, name: 'a-fix', type: 'fix', description: 'd', body: 'b', originSessionId: null })
     const accepted = await store.resolve(p.id, 'accepted', { name: 'a-fix', description: 'edited', body: 'b2', type: 'fix' })
     expect(accepted?.status).toBe('accepted')
     expect(accepted?.description).toBe('edited')
     expect((await store.list('pending')).length).toBe(0)
-    await expect(store.propose({ taskId: 't', repo: null, name: '../evil', type: 'fix', description: 'd', body: '', originSessionId: null })).rejects.toThrow('Invalid memory name')
-    await expect(store.propose({ taskId: 't', repo: null, name: 'ok', type: 'novel' as never, description: 'd', body: '', originSessionId: null })).rejects.toThrow('Invalid memory type')
+    await expect(store.propose({ taskId: 't', projectId: null, name: '../evil', type: 'fix', description: 'd', body: '', originSessionId: null })).rejects.toThrow('Invalid memory name')
+    await expect(store.propose({ taskId: 't', projectId: null, name: 'ok', type: 'novel' as never, description: 'd', body: '', originSessionId: null })).rejects.toThrow('Invalid memory type')
     expect(await store.resolve('nope', 'rejected')).toBeNull()
   })
 
   it('skips a persisted proposal whose fields no longer match the stored contract', async () => {
     const file = join(dir, 'proposals', 'corrupt.json')
-    writeFileSync(file, JSON.stringify({ id: 'corrupt', taskId: 't1', repo: null, name: 'x', type: 'fix', description: 'd', body: 'b', flags: ['ok'], originSessionId: null, status: 'pending', createdAt: 'y' }))
+    writeFileSync(file, JSON.stringify({ id: 'corrupt', taskId: 't1', projectId: null, name: 'x', type: 'fix', description: 'd', body: 'b', flags: ['ok'], originSessionId: null, status: 'pending', createdAt: 'y' }))
     expect(await store.list()).toEqual([])
     expect(await store.get('corrupt')).toBeNull()
+  })
+
+  it('reads pre-Phase-4 repo proposals without assigning them to a project', async () => {
+    const file = join(dir, 'proposals', 'legacy.json')
+    writeFileSync(file, JSON.stringify({ id: 'legacy', taskId: 't1', repo: 'acme/api', name: 'legacy', type: 'fix', description: 'd', body: 'b', flags: [], originSessionId: null, status: 'pending', createdAt: 1 }))
+    expect(await store.get('legacy')).toMatchObject({ id: 'legacy', projectId: null })
   })
 })

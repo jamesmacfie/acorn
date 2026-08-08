@@ -19,8 +19,9 @@ links. The provider mirror is disposable and is never treated as the upstream so
 
 ## GitHub
 
-GitHub is connected with the OAuth device authorization flow. It is also the active identity used to
-scope identity-owned records, but it is not an acorn login. See [github-integration.md](./github-integration.md).
+GitHub is connected with the OAuth device authorization flow. Its account metadata is separate from
+the node-owner identity used to scope identity-owned records; it is not an acorn login. See
+[github-integration.md](./github-integration.md).
 
 ## Linear
 

@@ -73,11 +73,10 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
           if (managed) return managed
           // The headless fallback: a profile with no managed driver, or a node with agents disabled.
           const task = await core.tasks.load(taskId)
-          const mapped = task ? await core.repos.path(task.repoOwner, task.repoName) : null
-          const baseCheckout = mapped?.path && isDir(mapped.path) ? mapped.path : undefined
           // The identity is passed through because creating the worktree consults the owner's per-repo
           // base_ref preference — dropping it would silently fall back to git's origin/main.
-          const { cwd } = task ? await core.tasks.resolveCwd(task, baseCheckout, core.identity.active()) : { cwd: homedir() }
+          const { cwd } = task ? await core.tasks.resolveCwd(task, undefined, core.identity.active()) : { cwd: homedir() }
+          const project = task?.projectId ? await core.projects.byId(task.projectId) : null
           const profile = requireProfile(def.profileId ?? DEFAULT_PROFILE_ID)
           const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
           if (!argv) {
@@ -91,7 +90,9 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
           const env = buildSessionEnv({
             taskId,
             cwd,
-            task: task ? { repoOwner: task.repoOwner, repoName: task.repoName, branch: task.branch, title: task.title } : null,
+            task: task && project
+              ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
+              : null,
             // 'task'-scoped, bound to the step's own task: a workflow step is a child process, so it is
             // denied the owner's provider credentials and confined to this task's tool surface.
             env: { ...deps.internalEnv({ scope: 'task', taskId }), ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}) },
@@ -164,7 +165,7 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
         // is created lazily by resolveCwd the moment its step runs.
         createChildTask: (parentTaskId, seed) => core.tasks.createChild(parentTaskId, seed),
         cancelChildTask: (taskId) => core.tasks.cancel(taskId),
-        authorizeRepoConfig: (taskId) => core.repos.assertConfigTrusted(taskId),
+        authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
       })
       // Kept so dispose can abort in-flight steps before the database closes.
       live = runner
@@ -180,8 +181,8 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
         defs: async (taskId) => {
           const task = await core.tasks.load(taskId)
           if (!task) return { workflows: [], errors: [] }
-          const mapped = await core.repos.path(task.repoOwner, task.repoName)
-          const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : mapped?.path && isDir(mapped.path) ? mapped.path : null
+          const project = await core.projects.byId(task.projectId)
+          const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
           return loadWorkflowFiles(repoDir, homedir(), runner.validationCatalog())
         },
         start: async (taskId, def) => {

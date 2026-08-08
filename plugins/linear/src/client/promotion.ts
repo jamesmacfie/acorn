@@ -7,8 +7,7 @@ import type { LinearProjectIssue } from '../shared/api'
 // core's vocabulary, not Linear's.
 export const prepareLinearPromotion = (item: LinearProjectIssue, context: SourcePromotionContext): TaskSeed => ({
   origin: 'linear',
-  repoOwner: context.owner,
-  repoName: context.repo,
+  projectId: context.projectId,
   branch: item.branchName || item.identifier.toLowerCase(),
   title: `${item.identifier} ${item.title}`,
   links: [{ connectionId: item.integrationId, identifier: item.identifier, ref: { displayId: item.identifier, url: item.url } }],

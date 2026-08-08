@@ -32,7 +32,7 @@ export type ClientCapabilityRequirement = 'none' | keyof Capabilities
 // global is declared HERE, in core, because core's own capability map reads it — declaring it in a
 // feature would mean core's contract was typed by a plugin. One declaration site only.
 export type TerminalStreamBridge = {
-  repoPath: { pick(): Promise<string | null> }
+  folderPath: { pick(): Promise<string | null> }
 }
 
 // Re-exported so consumers of the bridge get the wire types without importing protocol themselves.

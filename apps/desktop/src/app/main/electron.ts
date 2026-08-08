@@ -34,9 +34,8 @@ const dataDir = e2e && process.env.ACORN_E2E_DATA_DIR
   : app.isPackaged ? app.getPath('userData') : devDataDir()
 
 // Dev: load secrets from .env. Packaged builds have no bundled .env (that load no-ops); instead a
-// user-provided .env in the data dir (~/Library/Application Support/acorn/.env) supplies
-// GITHUB_CLIENT_* until their keychain path lands. SESSION_ENC_KEY falls through to safeStorage
-// (resolveSessionKey, in whenReady below) either way.
+// user-provided .env in the data dir (~/Library/Application Support/acorn/.env) supplies the runtime
+// secrets. SESSION_ENC_KEY falls through to safeStorage (resolveSessionKey, in whenReady below) either way.
 for (const envFile of [join(import.meta.dirname, '../../.env'), join(dataDir, '.env')]) {
   try {
     process.loadEnvFile(envFile)
@@ -44,11 +43,6 @@ for (const envFile of [join(import.meta.dirname, '../../.env'), join(dataDir, '.
     // no .env at this location — secrets must come from the other file / environment / keychain
   }
 }
-// Release builds bake the GitHub OAuth app credentials in at build time (MAIN_VITE_* env vars in
-// CI, statically replaced by vite). Anything set via .env / the environment above wins.
-process.env.GITHUB_CLIENT_ID ??= import.meta.env.MAIN_VITE_GITHUB_CLIENT_ID
-process.env.GITHUB_CLIENT_SECRET ??= import.meta.env.MAIN_VITE_GITHUB_CLIENT_SECRET
-
 // Single-instance: a second launch focuses the existing window. The data root's exclusive lock
 // (node-core/main/dataRoot.ts) is the real mutual exclusion; this keeps a second launch from getting
 // as far as fighting over it.

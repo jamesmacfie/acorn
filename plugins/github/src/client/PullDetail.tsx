@@ -7,8 +7,8 @@ import { checksState, FAILED_STATUSES, fileStatusMeta, summarizeFileStats } from
 import { requestFileScroll, routeKey } from './fileNavigation'
 import Picker from '@acorn/client-core/ui/Picker.tsx'
 import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
-import { integrationsOptions, type Task } from '@acorn/client-core/queries.ts'
-import { mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions, reposOptions } from './queries'
+import { integrationsOptions, projectsOptions, type Task } from '@acorn/client-core/queries.ts'
+import { mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions } from './queries'
 import { pullPrefixKey, pullsPrefixKey, type Label } from '../contract/api'
 import { linearIssuesOptions } from '@acorn/plugin-linear/contract/issues.ts'
 import MentionTextarea from '@acorn/client-core/ui/MentionTextarea.tsx'
@@ -44,11 +44,12 @@ export default function PullDetail(props: { task?: Task } = {}) {
   // surface still uses params, so only acquire router context for that variant.
   const params = props.task ? null : useParams()
   const qc = useQueryClient()
-  const repos = createQuery(() => reposOptions(true))
-  const o = () => props.task?.repoOwner ?? params?.owner ?? ''
-  const r = () => props.task?.repoName ?? params?.repo ?? ''
+  const projects = createQuery(() => projectsOptions(true))
+  const routedProject = () => projects.data?.find((project) => project.id === params?.projectId)
+  const o = () => props.task?.github?.owner ?? routedProject()?.github?.owner ?? ''
+  const r = () => props.task?.github?.name ?? routedProject()?.github?.name ?? ''
   const n = () => (props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number ?? '')
-  const repoKnown = () => !!repos.data?.some((repo) => repo.owner === o() && repo.name === r())
+  const repoKnown = () => !!o() && !!r()
   const hasRepoParams = () => !!o() && !!r()
   const hasPullParams = () => hasRepoParams() && !!n()
   const detail = createQuery(() => pullDetailOptions(o(), r(), n(), hasPullParams()))
@@ -101,9 +102,14 @@ export default function PullDetail(props: { task?: Task } = {}) {
     },
   })
 
-  // Open in-app links found inside rendered bodies (Linear issues → panel; GitHub PRs/repos → SPA).
+  // Open in-app links found inside rendered bodies (Linear issues → panel; GitHub PRs/repos resolve
+  // through the current project's GitHub facet before entering the project-keyed SPA route).
   const navigate = useNavigate()
-  const onContentClick = makeContentLinkHandler(navigate, setOpenIssue)
+  const onContentClick = makeContentLinkHandler(
+    navigate,
+    setOpenIssue,
+    (owner, repo) => projects.data?.find((project) => project.github?.owner === owner && project.github?.name === repo)?.id,
+  )
   const linearPrefixes = createMemo(() => [...new Set(linearRefs().map((rf) => rf.identifier.split('-')[0]))])
 
   // After GitHub bodies render (innerHTML, opaque to Solid), wrap bare Linear ids in clickable
@@ -192,7 +198,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
 
   return (
     <Show when={n()} fallback={<p class="placeholder">Select a PR.</p>}>
-      <Show when={repoKnown() || !repos.data} fallback={<p class="placeholder">Not found.</p>}>
+      <Show when={repoKnown() || !projects.data} fallback={<p class="placeholder">Not found.</p>}>
       <Show when={detail.data?.pull} fallback={<p class="placeholder">{detail.isError ? 'Not found.' : 'Loading…'}</p>}>
         {(pull) => (
           <>

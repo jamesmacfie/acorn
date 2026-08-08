@@ -1,19 +1,20 @@
 import { createSignal, For, Show } from 'solid-js'
-import { useQueryClient } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { taskBridge } from '../tasks/taskBridge'
-import { workspacesKey } from '../queries'
+import { projectsOptions, workspacesKey } from '../queries'
 import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon } from '../workspaces/mutations'
 import type { Workspace } from '@acorn/protocol/api.ts'
 import { resolveWorkspaceColor, WORKSPACE_COLORS } from '@acorn/protocol/workspaceIdentity.ts'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
-import { RepoConfig } from './WorkspaceRepoSettings'
+import { ProjectConfig } from './WorkspaceProjectSettings'
 
 // Settings → per-workspace page: workspace IDENTITY (name / icon / colour) + membership + delete.
 // Build/run/db/preview config is REPO-level (repo-level-settings): a workspace groups repos, but
-// setup/dev/db/preview describe one repo, so those editors live in RepoConfig, one per repo.
+// setup/dev/db/preview describe one project, so those editors live in ProjectConfig, one per project.
 export default function WorkspaceSettings(props: { workspace: Workspace; onDeleted: () => void }) {
   const qc = useQueryClient()
+  const projects = createQuery(() => projectsOptions(true))
   const [name, setName] = createSignal(props.workspace.name)
   const [busy, setBusy] = createSignal(false)
   const [emoji, setEmoji] = createSignal(props.workspace.icon?.kind === 'emoji' ? props.workspace.icon.value : '')
@@ -146,15 +147,15 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
         </Show>
       </label>
 
-      <Show when={taskBridge() && (props.workspace.repos ?? []).length}>
+      <Show when={taskBridge() && (projects.data ?? []).some((project) => project.workspaceId === props.workspace.id)}>
         <div class="settings-field">
-          <span class="settings-label">Repository settings</span>
+          <span class="settings-label">Project settings</span>
           <span class="muted settings-hint">
-            Build, run, database and preview config for each repo in this workspace. A committed{' '}
+            Build, run, database and preview config for each project in this workspace. A committed{' '}
             <code>.acorn/config.toml</code> overrides these machine-local values.
           </span>
-          <For each={props.workspace.repos ?? []}>
-            {(r) => <RepoConfig owner={r.owner} name={r.name} />}
+          <For each={(projects.data ?? []).filter((project) => project.workspaceId === props.workspace.id)}>
+            {(project) => <ProjectConfig projectId={project.id} name={project.name} />}
           </For>
         </div>
       </Show>

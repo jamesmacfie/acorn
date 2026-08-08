@@ -31,9 +31,9 @@ async function refExists(checkout: string, ref: string): Promise<boolean> {
   }
 }
 
-// Base-ref precedence for a NEW branch (docs/terminal-and-agents.md, verne's order): per-repo preferred ref
-// (prefs key `base_ref:<owner>/<repo>`, resolved by the caller) → origin/main → origin/master →
-// null (= HEAD, today's behaviour).
+// Base-ref precedence for a NEW branch (docs/terminal-and-agents.md, verne's order): per-project
+// preferred ref (prefs key `base_ref:<projectId>`, resolved by the caller) → origin/main →
+// origin/master → null (= HEAD, today's behaviour).
 export async function resolveBaseRef(checkout: string, preferred?: string | null): Promise<string | null> {
   for (const candidate of [...(preferred?.trim() ? [preferred.trim()] : []), 'origin/main', 'origin/master']) {
     if (await refExists(checkout, candidate)) return candidate

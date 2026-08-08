@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 import type { MirroredPullRequest } from '../contract/mirror'
@@ -51,13 +51,15 @@ export async function mirroredPullRequest(
  */
 export async function failingChecksFor(
   db: PluginDatabase,
-  core: Pick<CoreServices, 'tasks'>,
+  core: Pick<CoreServices, 'tasks' | 'projects'>,
   userId: string | null,
   taskId: string,
 ): Promise<string | null> {
   const task = await core.tasks.load(taskId)
   if (!task || task.pullNumber == null || !userId) return null
-  const repoId = await mirroredRepoId(db, userId, task.repoOwner, task.repoName)
+  const project = await core.projects.byId(task.projectId)
+  if (!project?.github) return null
+  const repoId = await mirroredRepoId(db, userId, project.github.owner, project.github.name)
   if (repoId == null) return null
   const rows = await db
     .select()
@@ -66,43 +68,6 @@ export async function failingChecksFor(
   if (!rows.length) return null
   const bad = rows.filter((r) => r.status && !['success', 'neutral', 'skipped'].includes(r.status.toLowerCase()))
   return bad.length ? bad.map((r) => `- ${r.name}: ${r.status}${r.url ? ` (${r.url})` : ''}`).join('\n') : ''
-}
-
-/**
- * The candidate repo list behind core's workspace bootstrap and the onboarding master toggle. Ordered by
- * the mirror's own `pushedAt` desc / name, so the Default workspace's `sort` column comes out in the same
- * most-recently-pushed-first order the repo selector shows — bootstrap assigns `sort: i` from this list.
- */
-export async function mirroredRepoList(db: PluginDatabase, userId: string): Promise<{ owner: string; name: string }[]> {
-  return db
-    .select({ owner: repos.owner, name: repos.name })
-    .from(repos)
-    .where(eq(repos.userId, userId))
-    .orderBy(desc(repos.pushedAt), repos.name)
-}
-
-/** GitHub's default branch for a mirrored repo, for core's `repo_info` tool. */
-export async function mirroredDefaultBranch(
-  db: PluginDatabase,
-  userId: string,
-  owner: string,
-  name: string,
-): Promise<string | null> {
-  const [row] = await db
-    .select({ defaultBranch: repos.defaultBranch })
-    .from(repos)
-    .where(and(eq(repos.userId, userId), eq(repos.owner, owner), eq(repos.name, name)))
-  return row?.defaultBranch ?? null
-}
-
-/**
- * Distinct owner logins with mirror rows, for `CoreServices.identity.sole()`. Deliberately the whole table
- * rather than a count: `sole()` has to distinguish one identity from two, and a count of rows would answer
- * neither.
- */
-export async function mirroredIdentities(db: PluginDatabase): Promise<string[]> {
-  const rows = await db.selectDistinct({ userId: repos.userId }).from(repos)
-  return rows.map((row) => row.userId)
 }
 
 /**

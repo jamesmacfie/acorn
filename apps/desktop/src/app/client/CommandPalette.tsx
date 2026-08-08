@@ -4,7 +4,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { tasksOptions } from '@acorn/client-core/queries.ts'
 import { tasksRoute, type Task } from '@acorn/protocol/api.ts'
 import { readJson } from '@acorn/client-core/apiClient.ts'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/workspaces/fleetWorkspaces.ts'
 import { createFleetQuery } from '@acorn/client-core/node/fanout.ts'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
@@ -24,13 +24,6 @@ export default function CommandPalette() {
   const tasks = createQuery(() => tasksOptions(true))
   const fleetWorkspaces = createFleetWorkspaces()
   const [actionError, setActionError] = createSignal('')
-  const fanTasks = () => palette.open() && nodes().length > 1
-  const [fleetTasks] = createFleetQuery(
-    () => ['tasks', 'palette', 'fleet'] as const,
-    async (nodeId, dep: boolean, signal) => (dep ? await readJson<Task[]>(tasksRoute, { nodeId, signal }) : []),
-    fanTasks,
-  )
-
   const palette = createOverlayPalette({
     id: 'commands',
     title: 'Command palette',
@@ -44,6 +37,16 @@ export default function CommandPalette() {
     // is a resource keyed on `palette.open()` rather than a mount-time fetch.
     onOpen: () => void refetch(),
   })
+
+  // Below `palette`, not above it: createFleetQuery reads its dependency during setup, so a fanTasks
+  // declared earlier would touch `palette` in its temporal dead zone and take the whole contribution
+  // down with "Cannot access 'palette' before initialization".
+  const fanTasks = () => palette.open() && nodes().length > 1
+  const [fleetTasks] = createFleetQuery(
+    () => ['tasks', 'palette', 'fleet'] as const,
+    async (nodeId, dep: boolean, signal) => (dep ? await readJson<Task[]>(tasksRoute, { nodeId, signal }) : []),
+    fanTasks,
+  )
 
   // Every eligible source, in parallel, keyed on the palette being open. A source that throws contributes an
   // ERROR ROW rather than taking the palette down: a broken run-target fetch must not also hide the workflow
@@ -105,21 +108,21 @@ export default function CommandPalette() {
       .map((row) => ({
         id: `${row.nodeId}:${row.task.id}`,
         label: `Go to task: ${row.task.title}`,
-        hint: `${row.task.repoOwner}/${row.task.repoName}${row.nodeLabel ? ` · ${row.nodeLabel}` : ''}`,
+        hint: `${row.task.github ? `${row.task.github.owner}/${row.task.github.name}` : row.task.projectId}${row.nodeLabel ? ` · ${row.nodeLabel}` : ''}`,
       }))
   }
 
   // Switch-workspace rows: every workspace on every node except the current one. Same key shape and the
   // same reason — two nodes may hold the same workspace UUID.
   const workspaceItems = () => {
-    const active = workspaceForRepo(fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace), params.owner, params.repo)
+    const active = workspaceForProject(fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace), params.projectId)
     const activeNode = activeNodeId() ?? ''
     return fleetWorkspaces().entries
       .filter((entry) => !(entry.workspace.id === active?.id && entry.nodeId === activeNode))
       .map((entry) => ({
         id: `${entry.nodeId}:${entry.workspace.id}`,
         label: `Switch workspace: ${entry.workspace.name}`,
-        hint: `${(entry.workspace.repos ?? []).length} repos${fleetWorkspaces().grouped ? ` · ${entry.node.label}` : ''}`,
+        hint: `${entry.workspace.projects.length} projects${fleetWorkspaces().grouped ? ` · ${entry.node.label}` : ''}`,
       }))
   }
 

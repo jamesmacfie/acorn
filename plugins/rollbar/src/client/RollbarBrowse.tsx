@@ -5,21 +5,21 @@ import {
   integrationsOptions,
   tasksKey,
   tasksOptions,
-  workspaceProjectsKey,
-  workspaceProjectsOptions,
+  workspaceExternalProjectsKey,
+  workspaceExternalProjectsOptions,
   workspacesOptions,
 } from '@acorn/client-core/queries.ts'
 import { rollbarItemsOptions } from './queries'
-import type { Integration, Task, WorkspaceProject } from '@acorn/protocol/api.ts'
+import type { Integration, Task, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import type { RollbarItemSummary } from '../shared/api'
 import { sourceRegistry, type SourceContribution } from '@acorn/client-core/registries/sources.ts'
 import { activeTaskId } from '@acorn/client-core/tasks/tasks.ts'
 import { createDismissable } from '@acorn/client-core/ui/dismissable.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { PromoteToTaskModal } from '@acorn/client-core/integrations/PromoteToTaskModal.tsx'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
-import { replaceWorkspaceProjectsForProvider, workspaceProjectsForProvider } from '@acorn/client-core/integrations/workspaceProjects.ts'
-import { setWorkspaceProjects } from '@acorn/client-core/workspaces/mutations.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { replaceWorkspaceExternalProjectsForProvider, workspaceExternalProjectsForProvider } from '@acorn/client-core/integrations/workspaceProjects.ts'
+import { setWorkspaceExternalProjects } from '@acorn/client-core/workspaces/mutations.ts'
 import { emptyRollbarFilter, filterRollbarItems, isRegressed, rollbarFacets, sortRollbarItems, type RollbarFilter, type RollbarSortOrder } from './model'
 import RollbarItemPanel, { type RollbarTarget } from './RollbarItemPanel'
 import './rollbar.css'
@@ -34,7 +34,7 @@ const relTime = (at: number | null): string => {
 }
 
 const itemKey = (i: { integrationId: string; identifier: string }) => `${i.integrationId}:${i.identifier}`
-const projectKey = (project: WorkspaceProject) => `${project.integrationId}:${project.externalId}`
+const projectKey = (project: WorkspaceExternalProject) => `${project.integrationId}:${project.externalId}`
 
 // The Rollbar Source browse (docs/integrations.md): a two-column master/detail. The left column lists
 // active items across projects mapped to the routed workspace; selection opens detail on the right.
@@ -44,14 +44,14 @@ export default function RollbarBrowse() {
   const params = useParams()
   const qc = useQueryClient()
   const workspaces = createQuery(() => workspacesOptions(true))
-  const workspace = () => workspaceForRepo(workspaces.data, params.owner, params.repo)
+  const workspace = () => workspaceForProject(workspaces.data, params.projectId)
   const workspaceId = () => workspace()?.id ?? null
-  const linked = createQuery(() => workspaceProjectsOptions(workspaceId(), true))
+  const linked = createQuery(() => workspaceExternalProjectsOptions(workspaceId(), true))
   const integrations = createQuery(() => integrationsOptions(true))
   const allLinkedProjects = () => linked.data?.projects ?? []
   const connections = () => integrations.data?.integrations ?? []
   const rollbarConnections = () => connections().filter((connection) => connection.providerId === 'rollbar')
-  const linkedProjects = () => workspaceProjectsForProvider(allLinkedProjects(), connections(), 'rollbar')
+  const linkedProjects = () => workspaceExternalProjectsForProvider(allLinkedProjects(), connections(), 'rollbar')
   const linkedConnectionIds = () => linkedProjects().map((project) => project.integrationId)
   const tasks = createQuery(() => tasksOptions(true))
   const items = createQuery(() => rollbarItemsOptions(linkedConnectionIds(), linkedConnectionIds().length > 0))
@@ -68,7 +68,7 @@ export default function RollbarBrowse() {
   const selectedSummary = () => rows().find((i) => selected() !== null && targetKeyEq(selected()!, i))
   // Selection/filter state is session-only and scoped to the routed repo; reset both when a repo
   // switch changes the workspace mapping so an old connection filter cannot hide the new list.
-  createEffect(on(() => `${params.owner ?? ''}/${params.repo ?? ''}`, () => {
+  createEffect(on(() => params.projectId ?? '', () => {
     setSelected(null)
     setFilter(emptyRollbarFilter)
     setSort('recent')
@@ -82,7 +82,7 @@ export default function RollbarBrowse() {
   const pickerDismiss = createDismissable({ onDismiss: () => setPickerOpen(false), container: () => pickerDialog })
   const [pickerError, setPickerError] = createSignal('')
   const [checked, setChecked] = createSignal<Set<string>>(new Set())
-  const projectForConnection = (connection: Integration): WorkspaceProject => ({
+  const projectForConnection = (connection: Integration): WorkspaceExternalProject => ({
     integrationId: connection.id,
     externalId: connection.account?.id ?? connection.id,
   })
@@ -113,11 +113,11 @@ export default function RollbarBrowse() {
     const chosen = rollbarConnections()
       .map(projectForConnection)
       .filter((project) => checked().has(projectKey(project)))
-    await setWorkspaceProjects(
+    await setWorkspaceExternalProjects(
       id,
-      replaceWorkspaceProjectsForProvider(allLinkedProjects(), connections(), 'rollbar', chosen),
+      replaceWorkspaceExternalProjectsForProvider(allLinkedProjects(), connections(), 'rollbar', chosen),
     )
-    await qc.invalidateQueries({ queryKey: workspaceProjectsKey(id) })
+    await qc.invalidateQueries({ queryKey: workspaceExternalProjectsKey(id) })
     setSelected(null)
     setPickerOpen(false)
   }
@@ -129,8 +129,8 @@ export default function RollbarBrowse() {
 
   // Active tasks eligible to attach to: scoped to the routed workspace, matching the rail roster.
   const attachTasks = () => {
-    const inWs = new Set((workspace()?.repos ?? []).map((r) => `${r.owner}/${r.name}`))
-    return (tasks.data ?? []).filter((t) => t.status === 'active' && (inWs.size === 0 || inWs.has(`${t.repoOwner}/${t.repoName}`)))
+    const inWs = new Set(workspace()?.projects.map((project) => project.id) ?? [])
+    return (tasks.data ?? []).filter((t) => t.status === 'active' && (inWs.size === 0 || inWs.has(t.projectId)))
   }
 
   async function promote(item: RollbarItemSummary) {
@@ -311,7 +311,7 @@ export default function RollbarBrowse() {
             headerLabel={`+TASK — #${item().identifier}`}
             itemTitle={item().title}
             attachTasks={attachTasks()}
-            existingBranches={(tasks.data ?? []).map((t) => t.branch)}
+            existingBranches={(tasks.data ?? []).flatMap((t) => t.branch ? [t.branch] : [])}
             onClose={() => setPromoteItem(null)}
             onCreated={afterPromote}
             onAttached={afterPromote}

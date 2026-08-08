@@ -12,8 +12,8 @@ GITHUB_CLIENT_ID=...
 SESSION_ENC_KEY=<64 hexadecimal characters>
 ```
 
-`GITHUB_CLIENT_SECRET` may exist for environment compatibility but the GitHub device flow does not
-consume it. `GITHUB_CLIENT_ID` and `SESSION_ENC_KEY` are required to boot a development Node.
+`GITHUB_CLIENT_ID` is only needed when connecting GitHub; the GitHub plugin owns that configuration.
+There is no GitHub client secret. `SESSION_ENC_KEY` is the only required application secret at boot.
 
 The data root defaults to `apps/node/.acorn/` and is gitignored. Set `ACORN_DATA_DIR` to isolate a
 run. Set `ACORN_PORT` to force a port for tests or a standalone process; otherwise the Node prefers

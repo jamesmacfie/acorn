@@ -17,9 +17,14 @@ describe('repo config trust', () => {
     repo = join(dir, 'repo')
     mkdirSync(join(repo, '.acorn', 'workflows'), { recursive: true })
     const now = Date.now()
-    await testDb.db.insert(schema.repoPaths).values({ owner: 'acme', repo: 'widget', path: repo, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db.insert(schema.projects).values({
+      id: 'project-widget', name: 'widget', path: repo, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
     await testDb.db.insert(schema.tasks).values({
-      id: 'task1', title: 'Task', origin: 'local', repoOwner: 'acme', repoName: 'widget', branch: 'main',
+      id: 'task1', title: 'Task', origin: 'local', projectId: 'project-widget', branch: 'main',
       worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
     })
   })
@@ -58,5 +63,15 @@ describe('repo config trust', () => {
 
   it('treats a repo with no executable config files as trusted', async () => {
     expect(await repoConfigTrustReview(testDb.db, 'task1')).toMatchObject({ trusted: true, current: null })
+  })
+
+  it('does not treat an unresolved migration row as project trust', async () => {
+    const config = join(repo, '.acorn', 'config.toml')
+    writeFileSync(config, '[scripts.run.dev]\ncommand = "pnpm dev"\n')
+    const snapshot = readRepoConfigSnapshot(repo)!
+    await testDb.db.insert(schema.configAcks).values({ projectId: null, hash: snapshot.hash, snapshot: snapshot.text, ackedAt: Date.now() })
+
+    await expect(repoConfigTrustReview(testDb.db, 'task1')).resolves.toMatchObject({ projectId: 'project-widget', trusted: false })
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
   })
 })

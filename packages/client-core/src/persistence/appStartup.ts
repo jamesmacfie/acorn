@@ -2,15 +2,14 @@ import { createEffect, onCleanup, type Accessor, type Setter } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { NavigateOptions } from '@solidjs/router'
 import type { Task } from '@acorn/protocol/api.ts'
-import type { ShellRepo as Repo } from '../queries'
-import { nodes } from '../node/fleet'
+import type { Project } from '../queries'
 import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../tasks/tasks'
 import { defaultSourceId, sourcePath } from '../registries/sources'
 import { PrefKeys } from './prefKeys'
 import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'
 import { createStartupRestore } from './startupRestore'
 
-type Params = { owner?: string; repo?: string; number?: string }
+type Params = { projectId?: string; number?: string }
 type Navigate = (to: string, options?: Partial<NavigateOptions>) => void
 
 const stringCodec = {
@@ -48,7 +47,7 @@ export type AppStartupOptions = {
   queryClient: QueryClient
   prefs: Accessor<Readonly<Record<string, string>> | undefined>
   cacheRestoring: Accessor<boolean>
-  repos: Accessor<Repo[] | undefined>
+  projects: Accessor<Project[] | undefined>
   tasks: Accessor<Task[] | undefined>
   params: Params
   navigate: Navigate
@@ -72,16 +71,16 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       id: 'core.last-path', key: PrefKeys.lastPath, scope: 'app', restore: 'workspace', version: 1,
       codec: stringCodec, empty: () => '', unknownIds: 'drop', maxBytes: 2 * 1024,
       binding: appStateBinding(
-        () => options.params.owner && options.params.repo
-          ? `/${options.params.owner}/${options.params.repo}${options.params.number ? `/${options.params.number}` : ''}`
+        () => options.params.projectId
+          ? `/p/${options.params.projectId}${options.params.number ? `/pulls/${options.params.number}` : ''}`
           : '',
         (saved) => {
-          const repos = options.repos() ?? []
-          if (!repos.length || options.params.owner) return
-          const [, owner, repo] = saved.split('/')
-          const valid = !!saved && repos.some((candidate) => candidate.owner === owner && candidate.name === repo)
-          const fallback = repos[0]
-          options.navigate(valid ? saved : sourcePath('repo', { owner: fallback.owner, repo: fallback.name }), { replace: true })
+          const projects = options.projects() ?? []
+          if (!projects.length || options.params.projectId) return
+          const match = /^\/p\/([^/]+)/.exec(saved)
+          const valid = !!match && projects.some((project) => project.id === decodeURIComponent(match[1]))
+          const fallback = projects.find((project) => !project.hidden) ?? projects[0]
+          options.navigate(valid ? saved : sourcePath('project', { projectId: fallback.id }), { replace: true })
         },
       ),
       legacy: legacyScalar(PrefKeys.lastPath),
@@ -106,14 +105,9 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       binding: appStateBinding(
         () => selectedSource() ?? '',
         (saved) => {
-          // docs/ui-design.md § New surfaces: "Fleet home — the landing view when more than one node is paired."
-          // Only when NOTHING was saved: a returning owner's last view always wins, and with a single
-          // node the source is not even registered, so this can never fire on first run.
-          if (!saved && nodes().length > 1) {
-            setSelectedSource('fleet')
-            return
-          }
-          setSelectedSource(saved || null)
+          // Home is the core-owned default. A saved optional source is restored here and App.tsx
+          // corrects it after integrations/plugin contributions are known if that source is disabled.
+          setSelectedSource(saved || defaultSourceId() || null)
         },
       ),
       legacy: legacyScalar(PrefKeys.lastSource),
@@ -133,7 +127,7 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
   return createStartupRestore({
     queryClient: options.queryClient,
     prefs: options.prefs,
-    ready: () => !options.cacheRestoring() && options.repos() !== undefined && options.tasks() !== undefined,
+    ready: () => !options.cacheRestoring() && options.projects() !== undefined && options.tasks() !== undefined,
     slices: () => [...persistedStateRegistry.entries(), ...shellSlices],
   })
 }

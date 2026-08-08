@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
+import { eq } from 'drizzle-orm'
 import { schema } from '../server/db/index'
 import { makeTestDb, type TestDb } from '../testkit/db'
 import { setRunBridge, type RunBridge } from '../server/routes/harness'
@@ -14,18 +15,23 @@ const OWNER = 'acorn'
 const REPO = 'widget'
 
 const seedTask = async (): Promise<string> => {
+  const now = Date.now()
+  await db.db.insert(schema.workspaces).values({ id: 'workspace-widget', name: 'Widget', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+  await db.db.insert(schema.projects).values({
+    id: 'project-widget', name: 'widget', path: '/tmp/widget', workspaceId: 'workspace-widget', sort: 0, hidden: false,
+    vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: OWNER, githubName: REPO, githubRepoId: null,
+    createdAt: now, updatedAt: now,
+  })
   const id = randomUUID()
   await db.db.insert(schema.tasks).values({
-    id, title: 'T', repoOwner: OWNER, repoName: REPO, branch: 'main', origin: 'local', status: 'active', sort: 0,
+    id, title: 'T', projectId: 'project-widget', branch: 'main', origin: 'local', status: 'active', sort: 0,
     createdAt: Date.now(), updatedAt: Date.now(),
-  } as never)
+  })
   return id
 }
 
 const setRepoConfig = async (patch: { previewMode?: string; previewValue?: string }): Promise<void> => {
-  await db.db.insert(schema.repoPaths).values({
-    owner: OWNER, repo: REPO, path: '/tmp/widget', createdAt: Date.now(), updatedAt: Date.now(), ...patch,
-  } as never)
+  await db.db.update(schema.projects).set(patch).where(eq(schema.projects.id, 'project-widget'))
 }
 
 const bridge = (targets: unknown, defaultUrl?: string): RunBridge => ({

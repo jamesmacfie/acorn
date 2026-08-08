@@ -8,8 +8,7 @@ import type { RollbarItemSummary } from '../shared/api'
 // protocol: those are core's vocabulary, not Rollbar's.
 export const prepareRollbarPromotion = (item: RollbarItemSummary, context: SourcePromotionContext): TaskSeed => ({
   origin: 'rollbar',
-  repoOwner: context.owner,
-  repoName: context.repo,
+  projectId: context.projectId,
   branch: slugifyBranch(context.branch ?? '') || dedupeBranch(
     slugifyBranch(`fix ${item.title}`.slice(0, 50)) || `fix-rollbar-${item.identifier}`,
     context.existingBranches ?? [],

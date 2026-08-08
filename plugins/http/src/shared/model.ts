@@ -17,8 +17,9 @@ export type AuthMode = AuthConfig['mode']
 
 export type HttpRequest = {
   id: string
-  repoOwner: string
-  repoName: string
+  // Project is the renderer identity. GitHub is an optional facet on the Project and is not a
+  // second storage key for HTTP data.
+  projectId: string
   folder: string // slash path, '' = tree root
   taskId: string | null // set = ad-hoc request owned by a task
   name: string
@@ -343,9 +344,9 @@ export const defaultContentType = (mode: BodyMode): string | null => {
 
 // --- routes -------------------------------------------------------------------------------
 
-const repoScope = (owner: string, repo: string) => `/v2/p/http/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
-export const httpRequestsRoute = (owner: string, repo: string): string => `${repoScope(owner, repo)}/requests`
-export const httpRequestRoute = (owner: string, repo: string, id: string): string => `${repoScope(owner, repo)}/requests/${encodeURIComponent(id)}`
-export const httpVariablesRoute = (owner: string, repo: string): string => `${repoScope(owner, repo)}/vars`
-export const httpVariableRoute = (owner: string, repo: string, id: string): string => `${repoScope(owner, repo)}/vars/${encodeURIComponent(id)}`
-export const httpSendRoute = (owner: string, repo: string): string => `${repoScope(owner, repo)}/send`
+const projectScope = (projectId: string) => `/v2/p/http/projects/${encodeURIComponent(projectId)}`
+export const httpRequestsRoute = (projectId: string): string => `${projectScope(projectId)}/requests`
+export const httpRequestRoute = (projectId: string, id: string): string => `${projectScope(projectId)}/requests/${encodeURIComponent(id)}`
+export const httpVariablesRoute = (projectId: string): string => `${projectScope(projectId)}/vars`
+export const httpVariableRoute = (projectId: string, id: string): string => `${projectScope(projectId)}/vars/${encodeURIComponent(id)}`
+export const httpSendRoute = (projectId: string): string => `${projectScope(projectId)}/send`

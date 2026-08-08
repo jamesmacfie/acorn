@@ -22,7 +22,7 @@ import { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
 const { Pool } = pg
 const exec = promisify(execFile)
 
-export type DatabaseCoreServices = Pick<CoreServices, 'tasks' | 'repos' | 'fs'>
+export type DatabaseCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'fs'>
 
 const pools = new Map<string, { pool: InstanceType<typeof Pool>; url: string; database: string }>()
 
@@ -51,7 +51,7 @@ const qid = (id: string): string => `"${id.replace(/"/g, '""')}"`
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 // Resolve the connection URL for a task WITHOUT persisting it: repo dbUrlScript (committed
-// .acorn/config.toml [database].url_script wins over the repo_paths fallback; run in the worktree)
+// .acorn/config.toml [database].url_script wins over the project-config fallback; run in the worktree)
 // → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
 // Exported for database.test.ts: this is where the repo-config trust gate sits, and it's the only
 // place the "did the untrusted script execute?" question can be asked without a live Postgres.
@@ -59,8 +59,9 @@ export async function resolveDbUrl(core: DatabaseCoreServices, taskId: string): 
   const t = await core.tasks.load(taskId)
   if (!t) return null
   const root = await core.tasks.root(taskId) // the task worktree (created lazily), or null
-  const rp = await core.repos.path(t.repoOwner, t.repoName)
-  const cfg = loadRepoConfig(root ?? rp?.path ?? null, homedir(), { dbUrlScript: rp?.dbUrlScript })
+  const project = t.projectId ? await core.projects.byId(t.projectId) : null
+  const config = t.projectId ? await core.projects.config(t.projectId) : null
+  const cfg = loadRepoConfig(root ?? project?.path ?? null, homedir(), { dbUrlScript: config?.config.dbUrlScript })
   const script = cfg.dbUrlScript?.trim()
   if (script && root) {
     // A committed `[database].url_script` is executable content from the checkout, so it carries the
@@ -69,7 +70,7 @@ export async function resolveDbUrl(core: DatabaseCoreServices, taskId: string): 
     // a trust failure must propagate to the caller, never fall through to the .env/env fallbacks as
     // if the script had merely errored. User/DB-authored scripts (dbUrlFromRepo false) are the
     // user's own input and are not gated.
-    if (cfg.dbUrlFromRepo) await core.repos.assertConfigTrusted(taskId)
+    if (cfg.dbUrlFromRepo) await core.projects.assertConfigTrusted(taskId)
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })
       // Scripts may echo noise before the URL — strip ANSI escapes (some CLIs emit them even when
@@ -309,11 +310,11 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
       try {
         const t = await core.tasks.load(taskId)
         if (!t) return { error: 'Task not found.' }
-        const rp = await core.repos.path(t.repoOwner, t.repoName)
-        const mode = rp?.dbSchemaMode === 'script' || rp?.dbSchemaMode === 'file' ? rp.dbSchemaMode : 'auto'
-        const value = rp?.dbSchemaValue?.trim()
-        // Free-form repo notes ride along with every source so the route never has to read repo_paths.
-        const notesText = rp?.dbSchemaNotes?.trim()
+        const config = t.projectId ? (await core.projects.config(t.projectId))?.config : null
+        const mode = config?.dbSchemaMode === 'script' || config?.dbSchemaMode === 'file' ? config.dbSchemaMode : 'auto'
+        const value = config?.dbSchemaValue?.trim()
+        // Free-form project notes ride along with every source so the route needs no second lookup.
+        const notesText = config?.dbSchemaNotes?.trim()
         const notes = notesText ? { notes: notesText } : {}
         if (mode === 'script') {
           if (!value) return { error: 'No schema script configured in the repo settings.' }

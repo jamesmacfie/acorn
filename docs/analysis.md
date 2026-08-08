@@ -7,8 +7,8 @@ none of which exist yet, and none of which should require a disruptive rewrite w
 
 Method: the whole tree was read (apps, packages, plugins, tools, scripts, docs) with sizes, import
 graphs, and every claim below verified against the working tree at the time of writing. File and
-line references are anchors, not exhaustive lists. Beware: the phase notes under `docs/legacy/vNext/`
-are historical and several of their "not done" items have since landed (provider-credential gating
+line references are anchors, not exhaustive lists. Beware: the project migration notes under
+`docs/legacy/projects/` are historical and several of their "not done" items have since landed (provider-credential gating
 via `requireProviderAccess`, the idempotency middleware). Trust this file and the code over the
 legacy notes.
 
@@ -173,7 +173,7 @@ are imported by plugins** — `server/routes/testDb.ts` (30 references), `testAu
 `testIntegration.ts`.
 
 *Recommendation:* do **not** resurrect a `plugin-api` package (it was dropped for good reasons —
-see `docs/legacy/vNext/phase2-notes.md:124`). Instead: (a) move the three test helpers to an
+the current package and boundary docs are the source of truth). Instead: (a) move the three test helpers to an
 explicit `testkit/` path so the intent is visible in every import; (b) add a boundary rule that
 lists the core module roots plugins may import (`server/middleware/`, `server/respond.ts`,
 `main/pluginStorage.ts`, `main/core/`, `server/plugin/`, `testkit/`…), seeded from today's actual
@@ -190,7 +190,8 @@ feature plugin as a side effect of connecting one provider.
 
 The *other* single-user assumptions are fine to leave: they are explicit, documented in place
 (`db/schema.ts:17` "single-user app", `deviceTokens.ts:14` "no per-token scopes because this is
-single-owner software", tasks/repo_paths/terminal sessions machine-scoped with no `user_id`), and
+single-owner software", tasks, project configuration, and terminal sessions machine-scoped with no
+`user_id`), and
 adding user scoping later is a schema migration plus a device→user mapping — real work, but
 contained, and speculative columns now would be worse. The identity write is different: it is an
 inverted dependency that every future identity feature would have to unwind first.
@@ -202,12 +203,11 @@ route); github calls it like any consumer. Cheap now, structural later.
 
 **6. [Resolved by WP-08] Three parallel late-binding mechanisms on the node.** (a) The capability registry — the
 intended seam. (b) Nine module-global bridge slots in `server/bridge.ts` and friends
-(`setConfigTrustBridge`, `setPluginsBridge`, `setRepoMirrorSource`, `setRunBridge`,
-`setOnTaskCreated`, `setOnWorktreeCreated`, `setStreamHandlers`, `setRepoMirrorSource`,
+(`setConfigTrustBridge`, `setPluginsBridge`, `setRunBridge`,
+`setOnTaskCreated`, `setOnWorktreeCreated`, `setStreamHandlers`,
 `setWorktreesRoot`). (c) Two surviving `wireX()` functions in the app wiring layer from the
 mechanism the plugin host explicitly replaced (`host.ts:4`). Three of the bridge slots are core
-code shaped for a specific first-party plugin — `setRepoMirrorSource` exists for github,
-`setRunBridge` and `setOnTaskCreated` for terminal — which is a core→plugin dependency wearing a
+code shaped for a specific first-party plugin — `setRunBridge` and `setOnTaskCreated` for terminal — which is a core→plugin dependency wearing a
 disguise. New contributors cannot tell which mechanism a new edge should use.
 
 *Recommendation:* converge on capabilities for anything plugin-provided; a bridge slot is
@@ -298,15 +298,15 @@ env-hygiene rules.
 
 Dead code:
 - `packages/client-core/src/agentToolsClient.ts` — zero references.
-- `RuntimeBindings.GITHUB_CLIENT_SECRET` (`main/bindings.ts:53`) — self-described as retained with
-  nothing reading it.
+- The GitHub client id/secret no longer belong to `RuntimeBindings`; the optional GitHub plugin reads
+  its client id from its own runtime configuration.
 - Unused `timingSafeEqual` import in `server/middleware/auth.ts:1`.
 - `apps/node/src/server/routes.ts` — now `export {}`, kept alive as a parity-test anchor.
 
 Stale references (fix the pointer or the code):
 - `client-core/src/capabilities.ts:61` references `node/nodeSocket.ts`, which does not exist.
 - `server/bridge.ts:5-9` references `main/bootstrap.ts` and `app/main/serverBridges.ts` — neither exists.
-- Root `CLAUDE.md`/`AGENTS.md` point at `docs/vNext/`, which moved to `docs/legacy/vNext/`.
+- Root `CLAUDE.md`/`AGENTS.md` point at the tracked `docs/architecture-overview.md` and topic docs.
 - `docs/plugins.md` says required plugins are "GitHub, terminal, and agents" — the code requires
   five: agents, github, memory, notes, terminal (both sides agree with each other, not with the doc).
 - `docs/http-client.md` and `docs/plugins.md` name a core HTTP service; `CoreServices` has no

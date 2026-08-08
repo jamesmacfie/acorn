@@ -8,7 +8,7 @@ from style-pack geometry so a user can choose color and shape/density independen
 ```text
 Topbar: Node/workspace context, repo/PR controls, global actions
 TabRail: sources → workspaces → tasks
-Main: Fleet home, source browse, or active task
+Main: Home, Fleet overview, source browse, or active task
 Task: ordered pane row
 Bottom drawer: terminals and raw provider sessions
 Overlays: palette, settings, onboarding, notices, confirmations

@@ -5,12 +5,12 @@ import { createVirtualizer } from '@tanstack/solid-virtual'
 import { checksState } from '@acorn/client-core/ui/displayMeta.ts'
 import { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
-import { integrationsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/queries.ts'
-import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions, reposOptions } from './queries'
+import { integrationsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/queries.ts'
+import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
 import { type Pull } from '../contract/api'
 import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterState'
-import { workspaceForRepo } from '@acorn/client-core/workspaces/activeWorkspace.ts'
+import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { createTask } from '@acorn/client-core/tasks/mutations.ts'
 import { rowHeight } from '@acorn/client-core/ui/metrics.ts'
 import { watchAppearance } from '@acorn/client-core/ui/appearance.ts'
@@ -19,6 +19,7 @@ import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activ
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
+import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
@@ -31,18 +32,21 @@ export default function PullList() {
   // derived from the routed repo, so switching repos within a workspace keeps the filter and
   // switching workspaces swaps to that workspace's saved filter.
   const workspaces = createQuery(() => workspacesOptions(true))
-  const wsId = () => workspaceForRepo(workspaces.data, params.owner, params.repo)?.id ?? ''
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
+  const owner = () => project()?.github?.owner ?? ''
+  const repo = () => project()?.github?.name ?? ''
+  const wsId = () => workspaceForProject(workspaces.data, params.projectId)?.id ?? ''
   const tab = () => prFilterFor(wsId()).tab
   const setTab = (t: 'open' | 'closed') => setPrFilter(wsId(), { tab: t })
   const filter = () => prFilterFor(wsId()).filter
   const setFilter = (f: string) => setPrFilter(wsId(), { filter: f })
   const queryClient = useQueryClient()
-  const repos = createQuery(() => reposOptions(true))
-  const repoKnown = () => !!repos.data?.some((r) => r.owner === params.owner && r.name === params.repo)
-  const hasRepoParams = () => !!params.owner && !!params.repo
+  const repoKnown = () => !!owner() && !!repo()
+  const hasRepoParams = () => repoKnown()
   // Open: full mirror in one shot. Closed: paginated on demand (load-more), so only the active tab fetches.
-  const openPulls = createQuery(() => pullsOptions(params.owner ?? '', params.repo ?? '', 'open', hasRepoParams() && tab() === 'open'))
-  const closedPulls = createInfiniteQuery(() => closedPullsInfiniteOptions(params.owner ?? '', params.repo ?? '', hasRepoParams() && tab() === 'closed'))
+  const openPulls = createQuery(() => pullsOptions(owner(), repo(), 'open', hasRepoParams() && tab() === 'open'))
+  const closedPulls = createInfiniteQuery(() => closedPullsInfiniteOptions(owner(), repo(), hasRepoParams() && tab() === 'closed'))
   const closedRows = createMemo(() => closedPulls.data?.pages?.flatMap((p) => p.pulls) ?? [])
   const list = () => (tab() === 'open' ? (openPulls.data ?? []) : closedRows())
   const ready = () => (tab() === 'open' ? openPulls.data !== undefined : closedPulls.data !== undefined)
@@ -56,11 +60,11 @@ export default function PullList() {
   // Once the repo is known on the repo overview, warm per-PR caches so navigating is instant.
   // Direct PR routes skip first-load warm-up so detail/files own the critical path.
   createEffect(on(
-    () => (repoKnown() && !params.number ? `${params.owner}/${params.repo}` : ''),
+    () => (repoKnown() && !params.number ? `${owner()}/${repo()}` : ''),
     (key) => {
       if (!key) return
       const ac = new AbortController()
-      void prefetchOpenPulls(queryClient, params.owner ?? '', params.repo ?? '', ac.signal).catch(() => {})
+      void prefetchOpenPulls(queryClient, owner(), repo(), ac.signal).catch(() => {})
       onCleanup(() => ac.abort())
     },
   ))
@@ -73,7 +77,7 @@ export default function PullList() {
     if (!list.length) return
     const i = list.findIndex((p) => String(p.number) === params.number)
     const next = direction === 1 ? Math.min((i < 0 ? -1 : i) + 1, list.length - 1) : Math.max((i < 0 ? 1 : i) - 1, 0)
-    navigate(`/${params.owner}/${params.repo}/${list[next].number}`)
+      navigate(`${githubBrowsePath(params.projectId ?? '')}/${list[next].number}`)
   }
   onMount(() => {
     const commands = registerCommands([
@@ -93,26 +97,26 @@ export default function PullList() {
   async function openAsTask(e: Event, pr: Pull) {
     e.preventDefault()
     e.stopPropagation()
-    const { owner, repo } = params
-    if (!owner || !repo || !pr.headRef) return
+    const projectId = params.projectId
+    if (!projectId || !owner() || !repo() || !pr.headRef) return
     // If a task for this PR already exists, focus it instead of creating a duplicate.
     const existing = (await queryClient.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[]))
-      .find((t) => t.status === 'active' && t.origin === 'github-pr' && t.repoOwner === owner && t.repoName === repo && t.pullNumber === pr.number)
+      .find((t) => t.status === 'active' && t.origin === 'github-pr' && t.projectId === projectId && t.pullNumber === pr.number)
     if (existing) {
       activateTaskSignals(existing, { pane: 'pr' })
       return navigate(pathForTask(existing))
     }
     // Fetch the detail (cached if warm) so the body is present, then seed a task_link for EVERY
     // Linear ticket the PR references — a PR can resolve several, and the task links them all.
-    const detail = await queryClient.ensureQueryData(pullDetailOptions(owner, repo, String(pr.number), true)).catch(() => undefined)
+    const detail = await queryClient.ensureQueryData(pullDetailOptions(owner(), repo(), String(pr.number), true)).catch(() => undefined)
     const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
     const linears = (integrations?.integrations ?? []).filter((i) => i.providerId === 'linear' && i.status === 'connected')
     const soleLinear = linears.length === 1 ? linears[0].id : null
     const links = soleLinear ? scanLinearRefs([detail?.pull?.body]).map((r) => ({ connectionId: soleLinear, identifier: r.identifier, ref: { displayId: r.identifier, url: r.url } })) : []
-    const w = await createTask({ origin: 'github-pr', repoOwner: owner, repoName: repo, branch: pr.headRef, pullNumber: pr.number, links })
+    const w = await createTask({ origin: 'github-pr', projectId, branch: pr.headRef, pullNumber: pr.number, links })
     await queryClient.invalidateQueries({ queryKey: tasksKey })
     activateTaskSignals(w, { pane: 'pr' })
-    navigate(`/${owner}/${repo}/${pr.number}`)
+    navigate(`${githubBrowsePath(projectId)}/${pr.number}`)
   }
 
   let rowPrefetch: { cancel: () => void } | null = null
@@ -121,9 +125,9 @@ export default function PullList() {
     rowPrefetch = null
   }
   const queueRowPrefetch = (number: number) => {
-    if (!params.owner || !params.repo) return
+    if (!owner() || !repo()) return
     cancelRowPrefetch()
-    rowPrefetch = schedulePullSummaryPrefetch(queryClient, params.owner, params.repo, number)
+    rowPrefetch = schedulePullSummaryPrefetch(queryClient, owner(), repo(), number)
   }
   onCleanup(cancelRowPrefetch)
 
@@ -218,13 +222,13 @@ export default function PullList() {
                 {({ vi, pr }) => {
                   // Reactively read the warmed detail cache (enabled:false → no fetch) so the rolled-up
                   // checks dot appears as prefetchOpenPulls seeds each PR. No checks → no dot.
-                  const detail = createQuery(() => pullDetailOptions(params.owner ?? '', params.repo ?? '', String(pr.number), false))
+                  const detail = createQuery(() => pullDetailOptions(owner(), repo(), String(pr.number), false))
                   const checks = () => detail.data?.checks ?? []
                   return (
                     <A
                       class="pr-row"
                       classList={{ active: params.number === String(pr.number) }}
-                      href={`/${params.owner}/${params.repo}/${pr.number}`}
+                      href={`${githubBrowsePath(params.projectId ?? '')}/${pr.number}`}
                       onFocus={() => queueRowPrefetch(pr.number)}
                       onBlur={cancelRowPrefetch}
                       onMouseEnter={() => queueRowPrefetch(pr.number)}

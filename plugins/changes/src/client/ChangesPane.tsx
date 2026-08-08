@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import type { Task } from '@acorn/client-core/queries.ts'
+import { createQuery } from '@tanstack/solid-query'
+import { projectsOptions, type Task } from '@acorn/client-core/queries.ts'
 import { readJson } from '@acorn/client-core/apiClient.ts'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { fileStatusMeta } from '@acorn/client-core/ui/displayMeta.ts'
@@ -12,6 +13,7 @@ import { formatFileReference, sendReferenceToAgent } from '@acorn/client-core/ag
 import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 import { agentSessionsFor } from '@acorn/client-core/tasks/agentSessions.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
+import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
 import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
@@ -22,6 +24,8 @@ import './changes.css'
 // dirty-poll signal (taskStatus). Read-only in P1; stage/commit actions land in P4.
 export default function ChangesPane(props: { task: Task }) {
   const api = taskBridge()
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((candidate) => candidate.id === props.task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
   const [discardArmed, setDiscardArmed] = createSignal('')
@@ -179,9 +183,23 @@ export default function ChangesPane(props: { task: Task }) {
   }
 
   return (
+    <Show when={project()?.vcs === 'git'} fallback={
+      <section class="pane changes-pane">
+        <div class="section-header changes-header">Changes</div>
+        <div class="changes-body changes-empty">
+          <p class="muted">Changes are unavailable for this non-Git project.</p>
+          <Show when={project()?.path}>
+            <p class="muted copyable">Project folder: {project()!.path}<CopyButton text={() => project()!.path ?? ''} title="Copy project folder" /></p>
+          </Show>
+        </div>
+      </section>
+    }>
     <section class="pane changes-pane">
       <div class="section-header changes-header">
         <span>Changes (uncommitted)</span>
+        <Show when={project()?.path}>
+          <span class="muted copyable">{project()!.path}<CopyButton text={() => project()!.path ?? ''} title="Copy project folder" /></span>
+        </Show>
         <Show when={groups().staged.length || groups().unstaged.length}>
           <span class="changes-toolbar">
             <button type="button" class="changes-to-agent" disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => api && void gitAction(() => localGitApi.stageAll(props.task.id))}>++</button>
@@ -335,5 +353,6 @@ export default function ChangesPane(props: { task: Task }) {
         </div>
       </div>
     </section>
+    </Show>
   )
 }

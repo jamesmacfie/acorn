@@ -13,13 +13,14 @@
 // to populate params. That is why this component takes no props even though it renders three panes.
 import { createSignal, lazy, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
-import { useQueryClient } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { forceRefreshPull } from './queries'
 import { filesKey, pullKey, pullsKey, pullsRoute, pullsPrefixKey, type Pull } from '../contract/api'
 import { readJson } from '@acorn/client-core/apiClient.ts'
 import Acorn from '@acorn/client-core/Acorn.tsx'
 import PullList from './PullList'
-import { githubCreateRoute } from './routes'
+import { githubBrowseRoute, githubCreateRoute, githubPullRoute } from './routes'
+import { projectsOptions } from '@acorn/client-core/queries.ts'
 
 // Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and the
 // create-PR form do not compete with the first interactive paint. PullList is the startup path and is
@@ -33,33 +34,40 @@ export default function GithubBrowse() {
   const params = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const projects = createQuery(() => projectsOptions(true))
+  const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
+  const owner = () => project()?.github?.owner ?? ''
+  const repo = () => project()?.github?.name ?? ''
   // Create-PR mode: the static route is contributed ahead of the parameter route.
+  const browseMatch = useMatch(() => githubBrowseRoute)
   const newMatch = useMatch(() => githubCreateRoute)
+  const pullMatch = useMatch(() => githubPullRoute)
   const isNew = () => !!newMatch()
+  const isGithubRoute = () => !!browseMatch() || !!newMatch() || !!pullMatch()
 
   const [refreshingPulls, setRefreshingPulls] = createSignal(false)
   const [refreshingPull, setRefreshingPull] = createSignal(false)
 
   async function refreshAllPulls() {
-    if (!params.owner || !params.repo) return
+    if (!owner() || !repo()) return
     setRefreshingPulls(true)
     try {
-      const data = await readJson<Pull[]>(`${pullsRoute(params.owner, params.repo, 'open')}&force=true`)
-      queryClient.setQueryData(pullsKey(params.owner, params.repo, 'open'), data)
+      const data = await readJson<Pull[]>(`${pullsRoute(owner(), repo(), 'open')}&force=true`)
+      queryClient.setQueryData(pullsKey(owner(), repo(), 'open'), data)
     } finally {
       setRefreshingPulls(false)
     }
   }
 
   async function refreshCurrentPull() {
-    if (!params.owner || !params.repo || !params.number) return
+    if (!owner() || !repo() || !params.number) return
     setRefreshingPull(true)
     try {
-      const { detail, files } = await forceRefreshPull(params.owner, params.repo, params.number)
-      queryClient.setQueryData(pullKey(params.owner, params.repo, params.number), detail)
-      queryClient.setQueryData(filesKey(params.owner, params.repo, params.number), files)
+      const { detail, files } = await forceRefreshPull(owner(), repo(), params.number)
+      queryClient.setQueryData(pullKey(owner(), repo(), params.number), detail)
+      queryClient.setQueryData(filesKey(owner(), repo(), params.number), files)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: pullsPrefixKey(params.owner, params.repo) }),
+        queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner(), repo()) }),
         // Linked Linear tickets (list enrichment + any open detail) — refetch their status too. Keyed by
         // string, not by importing plugins/linear: these are client-core query keys, and a force-refresh of
         // a PR should not make this plugin depend on whichever providers enrich it.
@@ -72,12 +80,12 @@ export default function GithubBrowse() {
   }
 
   return (
-    <Show when={params.owner} fallback={<main class="panes panes-empty"><Acorn /></main>}>
+    <Show when={isGithubRoute() && params.projectId && project()} fallback={<main class="panes panes-empty"><Acorn /></main>}>
       <main class="panes">
         <section class="pane pane-left">
           <div class="section-header">
             Reviews
-            <button type="button" class="new-pr-btn" title="New pull request" onClick={() => navigate(`/${params.owner}/${params.repo}/new`)}>
+            <button type="button" class="new-pr-btn" title="New pull request" onClick={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}>
               + New PR
             </button>
             <button type="button" class="section-refresh" title="Refresh reviews" aria-label="Refresh reviews" disabled={refreshingPulls()} onClick={refreshAllPulls}>

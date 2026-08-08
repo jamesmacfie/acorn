@@ -50,6 +50,8 @@ render(
           >
             <Router root={App}>
               <Route path="/" component={noop} />
+              <Route path="/t/:taskId" component={noop} />
+              <Route path="/settings/projects" component={noop} />
               {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
             </Router>
           </PersistQueryClientProvider>

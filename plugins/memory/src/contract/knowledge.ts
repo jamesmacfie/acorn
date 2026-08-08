@@ -13,7 +13,7 @@ import { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 // and a contract/ file may not reach into its own plugin's main/ (tools/arch/boundaries.test.ts).
 // Nothing outside the plugin ever used `proposals` anyway.
 export type MemoryLaunchHooks = {
-  // Push the combined launch block (task context + repo memory) into a fresh agent session.
+  // Push the combined launch block (task context + project memory) into a fresh agent session.
   // Best-effort — a session must never fail to launch over it.
   launchInjector(taskId: string, sessionId: string): Promise<void>
   // Fired when an agent session for a task exits, with that session's ring tail as the input.

@@ -1,7 +1,7 @@
 import { lazy } from 'solid-js'
 import type { SettingsContribution } from '@acorn/client-core/registries/settings.ts'
 
-const WorkspaceRepoAssignments = lazy(() => import('@acorn/client-core/workspaces/WorkspaceRepoAssignments.tsx'))
+const WorkspaceProjectAssignments = lazy(() => import('@acorn/client-core/workspaces/WorkspaceProjectAssignments.tsx'))
 const IntegrationsSettings = lazy(() => import('@acorn/client-core/settings/IntegrationsSettings.tsx'))
 const WorkspaceSettings = lazy(() => import('@acorn/client-core/settings/WorkspaceSettings.tsx'))
 const McpSettings = lazy(() => import('@acorn/client-core/settings/McpSettings.tsx'))
@@ -15,8 +15,8 @@ const StyleGallery = lazy(() => import('@acorn/client-core/settings/StyleGallery
 
 export const settingsPageContributions: SettingsContribution[] = [
   {
-    id: 'workspaces', label: 'Workspaces', group: 'general', order: 0,
-    component: () => <WorkspaceRepoAssignments />,
+    id: 'workspaces', label: 'Projects', group: 'general', order: 0,
+    component: () => <WorkspaceProjectAssignments />,
   },
   {
     id: 'workspace.detail', label: 'Workspace', group: 'workspace', order: 0,

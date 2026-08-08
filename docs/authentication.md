@@ -25,9 +25,11 @@ type Principal = {
 | `device` | `Authorization: Bearer acorn_dt_…` | Paired owner client; full owner authority |
 | `internal` | `x-acorn-internal: <token>` | Node-spawned process or Node service call, constrained by token scope |
 
-`userId` is the active GitHub login used to scope identity-owned records. It is bound when GitHub is
-connected through the device flow. Internal authentication fails closed when no active identity is
-bound.
+`userId` is an opaque node-owner id used to scope identity-owned records. It is minted and bound at
+first boot (`ensureBoundIdentity`); installs that bound a GitHub login under the old scheme keep
+that login as the opaque id. Providers never bind identity — a GitHub login is metadata on its
+integration row. Internal authentication still fails closed on an unbound identity, which after
+first boot only a bare test environment can produce.
 
 The bearer and internal paths are mutually exclusive during resolution. A malformed or rejected
 device bearer never falls through to internal authentication.

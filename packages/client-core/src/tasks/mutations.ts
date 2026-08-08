@@ -26,15 +26,6 @@ export const createTask = async (seed: TaskSeed) => {
   return task
 }
 
-// Create a task that borrows the mapped checkout (current dir + current branch) instead of an
-// isolated worktree. Awaits useCheckout (not onCreated) so no worktree is ever created; without the
-// desktop bridge it degrades to a normal local task on the seed branch. Callers invalidate tasksKey.
-export const createCheckoutTask = async (seed: TaskSeed) => {
-  const task = await postJson<Task>(tasksRoute, seed)
-  const patch = await taskBridge()?.task.useCheckout(task.id)
-  return patch ? { ...task, ...patch } : task
-}
-
 export async function patchTask(id: string, body: { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null }) {
   return writeJson<unknown>(taskRoute(id), {
     method: 'PATCH',

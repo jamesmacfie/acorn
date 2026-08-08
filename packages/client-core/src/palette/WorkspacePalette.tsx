@@ -71,8 +71,8 @@ export default function WorkspacePalette() {
                       <Show when={fleet().grouped}>
                         <span class="palette-hint muted">{entry.node.label}</span>
                       </Show>
-                      <Show when={(w.repos ?? []).length}>
-                        <span class="palette-hint muted">{w.repos.length} repos</span>
+                      <Show when={w.projects.length}>
+                        <span class="palette-hint muted">{w.projects.length} projects</span>
                       </Show>
                     </button>
                   </li>
