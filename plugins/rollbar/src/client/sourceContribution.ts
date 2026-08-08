@@ -5,8 +5,7 @@
 import { lazy } from 'solid-js'
 import type { RollbarItemSummary } from '../shared/api'
 import { prepareRollbarPromotion } from './promotion'
-import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
-import { addTaskLink, createTask } from '@acorn/client-core/tasks/mutations.ts'
+import { addTaskLink, createTask, type SourceContribution } from '@acorn/plugin-api/client'
 
 const RollbarBrowse = lazy(() => import('./RollbarBrowse'))
 

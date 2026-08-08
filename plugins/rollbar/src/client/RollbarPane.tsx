@@ -1,5 +1,5 @@
 import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { clientEvents, consumePaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
+import { clientEvents, consumePaneIntent } from '@acorn/plugin-api/client'
 import type { Task } from '@acorn/protocol/api.ts'
 import RollbarItemPanel, { type RollbarTarget } from './RollbarItemPanel'
 

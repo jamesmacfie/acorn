@@ -492,6 +492,22 @@ describe('architecture boundaries', () => {
     expect([...new Set(crossed)].sort()).toEqual([])
   })
 
+  it('plugin-api is a facade: re-exports only, and only of the three core packages', () => {
+    // The facade's value is that it is enumerable and boring. The moment it grows behaviour of its
+    // own it becomes a fourth core package with its own bugs, and "the plugin API" stops being a
+    // view onto the host and starts being a thing that has to be kept in sync with it.
+    const api = PACKAGES.find((p) => p.name === '@acorn/plugin-api')!
+    const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api'])
+    const foreign = EDGES.filter((e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    // Re-exports only: no plain imports, and no declarations. `export … from` is the whole file.
+    const DECLARES = /^\s*(import\s|export\s+(const|let|var|function|class|default|async)\b)/m
+    const entrypoints = walk(api.src).filter((f) => !isTestCode(f))
+    const declaring = entrypoints.filter((f) => DECLARES.test(readFileSync(f, 'utf8'))).map(rel)
+    expect(entrypoints.length).toBeGreaterThanOrEqual(4) // anti-vacuity: the walker found the entrypoints
+    expect([...new Set([...foreign, ...declaring])].sort()).toEqual([])
+  })
+
   it('client-core ui/ is pure presentation: props in, DOM out', () => {
     // ui/ is what @acorn/plugin-api/ui re-exports, so its import edges ARE the design-system
     // contract. A component that starts wanting data gets wrapped in connected/ — a thin

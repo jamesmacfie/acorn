@@ -2,7 +2,7 @@
 // (../shared/api.ts) rather than in client-core, so adding a provider does not mean editing core.
 //
 // Moved verbatim from @acorn/client-core/queries.ts — same keys, same staleTime, same refetch policy.
-import { readJson } from '@acorn/client-core/apiClient.ts'
+import { readJson } from '@acorn/plugin-api/client'
 import {
   rollbarItemKey,
   rollbarItemMetadataKey,

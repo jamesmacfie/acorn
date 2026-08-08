@@ -11,18 +11,7 @@ import {
   type RollbarProject,
 } from './'
 import { normalizeItemMetadata, normalizeSummary, rollbarItemUrl } from './normalize'
-import { encodeCached, isRecord, parseCached } from '@acorn/node-core/server/integrations/codec.ts'
-import {
-  ProviderOperationError,
-  type CachedExternalItem,
-  type CachedItemCodec,
-  type CodecResult,
-  type MirroredResourceContribution,
-  type ProviderResourceContext,
-  type ProviderResourceRefreshContext,
-} from '@acorn/node-core/server/integrations/types.ts'
-import type { RouteFailure } from '@acorn/node-core/server/sync/engine.ts'
-import { defaultBudgets, externalIdsFor, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
+import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderResourceContext, type ProviderResourceRefreshContext, publicProvider, type RouteFailure } from '@acorn/plugin-api/node'
 import {
   createRollbarOccurrenceResources,
 } from './occurrenceResources'

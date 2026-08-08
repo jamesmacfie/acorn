@@ -2,7 +2,7 @@
 //
 // Like linear: no tables of its own (core owns `issues` / `issue_resources`), so everything that makes
 // rollbar visible is here — a rail source and a pane.
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { rollbarPaneContribution } from './paneContribution'
 import { rollbarSourceContribution } from './sourceContribution'
 

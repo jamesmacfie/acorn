@@ -7,8 +7,7 @@ import type {
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
 } from '../../shared/api'
-import { ownedConnections } from '@acorn/node-core/server/integrations/connections.ts'
-import { providerResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
+import { type AppEnv, ownedConnections, providerResource, respondError } from '@acorn/plugin-api/node'
 import {
   ROLLBAR_ITEMS_RESOURCE,
   type RollbarListResult,
@@ -21,8 +20,6 @@ import {
   type RollbarOccurrencesInput,
 } from '../occurrenceResources'
 import { composeItemDetail } from '../normalize'
-import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { respondError } from '@acorn/node-core/server/respond.ts'
 
 const PROVIDER = 'rollbar'
 const RESOURCE = ROLLBAR_ITEMS_RESOURCE
