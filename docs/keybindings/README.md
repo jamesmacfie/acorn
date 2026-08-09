@@ -1,102 +1,180 @@
-# Plugin keybindings
+# Plugin keybindings — review fixes
 
-Letting a loaded plugin bind keys, without letting it steal keys that already work, and leaving
-the user able to change any of it.
+Plugin keybindings shipped. `docs/command-palette-and-shortcuts.md` is the description of how the
+system works; this file is the punch list from reviewing the implementation against what it was
+built to do.
 
-Written for the agent or developer implementing it: each phase has its own file with enough
-context to finish it without re-deriving the analysis.
+Four items. One is a user-visible regression, one is a broken test that predates this work and
+matters more than the rest, two are small.
 
-## Start here: most of this already exists
+**What came out right**, so nobody re-litigates it: `eventChord`, `isTypingTarget` and the chord
+grammar all live in `@acorn/protocol/keybindings.ts` and are shared by the manifest parser, the
+shell dispatcher and the frame SDK rather than copied — the drift risk that would have quietly
+broken the whole feature. Precedence is first-party, then plugins by lockfile `installedAt` with
+plugin id as tiebreak, under a user-override tier, with `sourceIndex` making it stable across
+reboots. Reserved claims (`escape`, `meta+k`, `meta+,`, `meta+1`–`9`) are refused at manifest
+parse, and runtime `claim()` can only narrow the declared set. The bridge budget check runs before
+the keydown branch, so a key flood trips the rate limiter. Manifest cross-validation catches
+undeclared commands, double-bound commands and surface-scope mismatches.
 
-The keybinding system is more complete than "plugins can't bind keys" suggests. What is in the
-tree today, all first-party:
+---
 
-| Piece | Where |
-| --- | --- |
-| `KeybindingContribution` — `{ id, command, description, category, defaultChord, when, pane, active? }` | `packages/client-core/src/registries/keybindings.tsx` |
-| Scopes — `global`, `task`, `pane`, `typing-exempt` | same |
-| `resolveKeybindings()` — applies user overrides, detects conflicts, unbinds the loser | same |
-| `KeybindingDispatcher` — one capture-phase `keydown` on `window`, scope and typing-target checks, dispatches to a command | same |
-| User overrides — a JSON map `{ [bindingId]: chord \| null }` in the `keybindings` pref | `readKeybindingOverrides`, `PrefKeys.keybindings` |
-| Settings → Shortcuts — rebind, unbind, reset one, reset all, live conflict warning on save | `packages/client-core/src/settings/ShortcutsSettings.tsx` (88 lines) |
-| `keybindingConflict()` — pre-save check so a rebind cannot silently steal | `registries/keybindings.tsx` |
-| Chord format — `meta+ctrl+alt+shift+key`, normalised from the event | `tasks/paneShortcuts.ts` § `eventChord` |
-| Commands — `{ id, title, category, palette?, requires?, when?, run }` and `executeCommand(id)` | `registries/commands.ts` |
+## 1. Space is swallowed inside every plugin frame
 
-So **user-settable keybindings with conflict handling already ship**. The three things missing are
-all about the *plugin* half:
+**User-visible. Fix first.**
 
-1. **A command a plugin can own.** `CommandContribution.run` is a closure. A loaded plugin cannot
-   supply one, and a keybinding with no command to run is nothing. This is the real prerequisite.
-2. **A declarative keybinding.** No manifest form, no precedence rule that protects existing
-   bindings, no namespacing that stops a plugin claiming a core command id.
-3. **The frame boundary.** A `keydown` inside an iframe does not bubble to the parent window, so
-   shell chords are dead while a plugin frame has focus, and a frame's own chords never reach the
-   dispatcher. Neither direction works today.
+`eventChord` maps Space to `" "` — a single space character, non-null. The SDK's forwarder
+(`packages/client-core/src/plugins/frames/sdk.ts`) therefore treats it as a real chord:
 
-## Phases
+```ts
+const chord = eventChord(event)            // " "
+if (!chord || claimed.has(chord)) return   // passes: truthy, not claimable
+if (isTypingTarget(event.target) && chord !== 'escape' && !hasCommandModifier(chord)) return
+event.preventDefault()                     // ← the damage
+port.postMessage({ kind: 'keydown', chord })
+```
 
-| Phase | File | Size |
-| --- | --- | --- |
-| 0 — Plugin commands | [phase-0-commands.md](./phase-0-commands.md) | M |
-| 1 — Declarative keybindings and precedence | [phase-1-bindings.md](./phase-1-bindings.md) | M |
-| 2 — Settings, persistence, and lifecycle | [phase-2-settings-lifecycle.md](./phase-2-settings-lifecycle.md) | M |
-| 3 — The frame boundary | [phase-3-frame-keys.md](./phase-3-frame-keys.md) | L |
+The broker then discards it, because `isNormalizedChord(" ")` is `false` — `parseChord` rejects
+any value where `value.trim() !== value`:
 
-Strictly ordered: 1 needs 0's commands to bind to, 2 needs 1's bindings to render, 3 needs all of
-them to have something to forward. Phases 0–2 are useful without 3 for any plugin whose surfaces
-are descriptors rather than frames; **phase 3 is what the editor move needs**
-(`docs/third-party/editor.md`).
+```ts
+if (data.kind === 'keydown') {
+  if (typeof data.chord === 'string' && isNormalizedChord(data.chord)) services.keydown(data.chord)
+  return
+}
+```
 
-## The rules this project must not break
+So Space is prevented in the frame and then thrown away by the host. Scroll-by-space is dead in
+any plugin pane whose focus is not inside an input, and nothing is gained. Confirmed by running
+both functions: `eventChord({code:'Space', key:' '})` → `" "`, `isNormalizedChord(" ")` → `false`.
 
-**Existing keybindings win, always.** A plugin binding never displaces a first-party one, and a
-plugin installed later never displaces a plugin installed earlier. The loser is *unbound*, not
-silently remapped, and the user is told. This is the rule that makes installing a plugin safe —
-`resolveKeybindings` already implements "first wins, loser gets `chord: null` plus a `conflict`
-label"; phase 1 only has to make the ordering deterministic and plugin-last.
+### The underlying shape
 
-**The user outranks everyone.** An explicit override in the `keybindings` pref beats defaults from
-any source, including a first-party default. That is already true and must stay true: a user who
-rebinds a core chord to a plugin command has made a decision, and the resolver must honour it
-rather than "protecting" them.
+`preventDefault()` runs unconditionally on every forwarded chord, before anyone knows whether a
+binding exists. Space is the case where that is obviously wrong because the chord can never match
+anything, but the same call also cancels the frame's default behaviour for any chord the shell
+does not bind.
 
-**Namespaces are host-bound.** A plugin's command and binding ids are prefixed with its plugin id
-by the host, from the manifest — never from a value in plugin code. Otherwise a plugin registers
-`palette.open` and takes `⌘K`.
+### Fix
 
-**No new global input paths.** Everything routes through the one capture-phase listener and the
-existing command indirection. A plugin does not get its own `window` listener; that is the whole
-reason the dispatcher exists.
+Two changes in `onKeyDown`, both small:
 
-**Typing safety is not negotiable.** The dispatcher's typing-target and terminal checks apply to
-plugin bindings identically. A plugin must not be able to declare a bare `a` that fires while
-someone is typing in a note.
+1. **Do not forward what the host will reject.** Add `if (!isNormalizedChord(chord)) return`
+   before the typing check. That alone fixes Space and every other `eventChord` output the
+   grammar refuses, and it removes a class of "prevented for nothing" rather than one instance.
+2. **Only prevent what could plausibly be a shortcut.** Restrict `preventDefault()` to chords
+   carrying a command modifier, plus `escape`. Bare-key first-party bindings exist (`j`, `k`, `[`,
+   `]`, `/`, `c`, all `typing-exempt` in the github plugin), so those must still *forward* — but
+   forwarding does not require cancelling the frame's default, and cancelling it is what breaks a
+   plugin's own bare-key UI.
 
-## Cross-cutting decisions, made once
+Keep the existing typing-target guard as it is; it is correct.
 
-**Chords stay a string.** `meta+shift+k`, normalised by `eventChord`. No new grammar, no key
-sequences (`⌘K ⌘S`), no per-platform variants. Chord strings are already persisted in user prefs,
-so changing the format is a data migration for zero benefit.
+### Tests
 
-**Overrides key on binding id.** Which means plugin binding ids must be stable across versions —
-worth saying loudly in the authoring guidance, because a plugin that renames a binding id in an
-update silently discards the user's override.
+In `sdk.test.ts`, over the fake port:
 
-**Prefs are per-node, per-user.** `PrefKeys.keybindings` lives in the node's `prefs` table, so
-overrides follow the node rather than the device. Phase 2 has to decide what that means when two
-nodes disagree; do not paper over it.
+- Space on a non-typing target: **not** forwarded, and `preventDefault` not called.
+- `Tab` and `ArrowDown`: `eventChord` already returns null for arrows; assert Tab's behaviour
+  explicitly so a future `baseKey` change cannot silently start eating focus navigation.
+- A bare letter (`j`) on a non-typing target: forwarded, `preventDefault` **not** called.
+- `meta+k`: forwarded and prevented.
+- A claimed chord: neither forwarded nor prevented.
 
-**No `when` expression language.** VS Code has one; this does not need one. Scopes are the existing
-four, plus a plugin-surface scope phase 1 adds. If a plugin needs finer conditions, the command's
-own handler can decide to do nothing.
+---
+
+## 2. The Rollbar dogfood no longer loads
+
+**Not caused by the keybinding work.** It arrived with the provider-seam change and has been red
+since; this review is just where it surfaced. It is listed here because it is the most important
+item in the file.
+
+```
+[plugin:rollbar] init failed; the plugin is disabled for this boot:
+Error: Plugin 'rollbar' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.
+    at Object.integration (packages/node-core/src/server/plugin/host.ts:149)
+```
+
+The gate is correct and doing exactly its job. What is stale is the plugin it is gating:
+`plugins/rollbar/src/node/index.ts` still calls
+`ctx.providers.integration(rollbarProvider, rollbar)` with a Hono router, and
+`apps/node/scripts/build-plugin.mjs` bundles that source as the dogfood.
+
+The casualty is `apps/node/test/integration/pluginLoader.test.ts`, which asserts that the loaded
+Rollbar registers exactly as the compiled-in build does. It is the only test that exercises
+install → load → register end to end, so **the loader currently has no working proof**, and the
+fetch seam has no caller at all.
+
+### Fix
+
+Give Rollbar a fetch-shaped provider registration. Its routes already go through the plugin route
+registry, and `PluginRequestContext` carries the identity and provider runtime they need, so this
+is a wrapper rather than a rewrite. If the first-party build must keep the Hono form for now, have
+`build-plugin.mjs` emit an adapter for the dogfood bundle instead — but prefer converting the
+source, because the point of the dogfood is that it runs what a third-party plugin would run.
+
+Do not "fix" this by relaxing the gate or by updating the test to expect a failure.
+
+### Done when
+
+`pnpm test` is back to the three documented environmental failures (`serviceSpawn` ×2,
+`standaloneShutdown`), with `pluginLoader.test.ts` green.
+
+---
+
+## 3. `indexOf` inside a sort comparator
+
+`packages/client-core/src/registries/keybindings.tsx`:
+
+```ts
+const sourceOrdered = [...bindings].sort((a, b) => {
+  if (!a.plugin && !b.plugin) return bindings.indexOf(a) - bindings.indexOf(b)
+  …
+})
+```
+
+`Array.prototype.sort` has been stable since ES2019, so `return 0` preserves the original order
+for two first-party bindings without an O(n) scan on every comparison. Cosmetic at the current
+binding count; worth changing because the `indexOf` reads as though the stability is being
+manufactured deliberately, which invites someone to preserve it during a future refactor.
+
+---
+
+## 4. Confirm the uninstall path for orphaned overrides
+
+`shortcutSettingsModel.ts` computes orphans against the **unfiltered** registry:
+
+```ts
+const known = new Set(bindings.map((binding) => binding.id))
+return Object.keys(overrides).filter((id) => id.startsWith('plugin.') && !known.has(id)).sort()
+```
+
+while `visibleShortcutBindings` hides rows whose plugin reports `state() === 'absent'`. So a
+binding that is still registered but absent from the active Node is invisible **and** not offered
+for cleanup.
+
+For the multi-node case that is exactly right: the plugin still exists on another Node, and
+offering to delete its settings would be wrong. It is only correct for a genuine uninstall if the
+chrome adapter fully disposes those contributions, so the binding leaves the registry entirely.
+
+### Test
+
+One round trip: install a fixture plugin → override one of its chords → uninstall → assert the
+override appears in `orphanedPluginOverrideIds` and the cleanup button counts it. If it does not,
+the adapter is holding registrations past uninstall, which is the real bug and affects more than
+shortcuts.
+
+---
 
 ## Reference
 
-- `packages/client-core/src/registries/keybindings.tsx` — read this first, all 133 lines.
-- `packages/client-core/src/registries/commands.ts` — the indirection everything routes through.
-- `packages/client-core/src/settings/ShortcutsSettings.tsx` — the UI phase 2 extends.
-- `packages/node-core/src/main/pluginManifest.ts` — where descriptors are declared and validated.
-- `packages/client-core/src/plugins/chrome/` — the descriptor host pass phases 0–1 join.
-- `docs/command-palette-and-shortcuts.md` — the user-facing description; phase 2 updates it.
-- `docs/plugins.md`, `docs/security.md` — the tiers and the trust model.
+- `packages/protocol/src/keybindings.ts` — the shared grammar, `eventChord`, `isTypingTarget`,
+  reserved claims, id qualification.
+- `packages/client-core/src/registries/keybindings.tsx` — resolution, precedence, dispatcher,
+  `resolveFrameKeybinding`.
+- `packages/client-core/src/plugins/frames/sdk.ts` — the forwarder; item 1 lives here.
+- `packages/client-core/src/plugins/frames/broker.ts` — the host side of `keydown`.
+- `packages/client-core/src/settings/ShortcutsSettings.tsx`, `shortcutSettingsModel.ts` — item 4.
+- `packages/node-core/src/main/pluginManifest.ts` — `commands`, `keybindings`, `claimsKeys` and
+  their cross-field validation.
+- `docs/command-palette-and-shortcuts.md` — how the shipped system behaves.

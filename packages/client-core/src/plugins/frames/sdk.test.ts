@@ -9,12 +9,15 @@ import { AcornBridgeError, connect, _resetConnection, type AcornBridge } from '.
 type Hello = { data: unknown; ports: MessagePort[] }
 
 let windowListeners: ((event: Hello) => void)[] = []
+let keyListeners: ((event: KeyboardEvent) => void)[] = []
 let channel: MessageChannel
 // Everything the frame sent, in order.
 let sent: Record<string, unknown>[] = []
 
 const HELLO = { acornBridge: 1 }
-const CONTEXT: PluginFrameContext = { surface: 'board', target: 'pane', nodeId: 'node-a', theme: 'dark', style: 'terminal' }
+const CONTEXT: PluginFrameContext = {
+  surface: 'board', target: 'pane', nodeId: 'node-a', theme: 'dark', style: 'terminal', claimsKeys: ['meta+f'],
+}
 
 // A stand-in host: replies to whatever the frame asks with whatever the test told it to.
 const host = (reply: (message: Record<string, unknown>) => unknown) => {
@@ -39,13 +42,16 @@ const handshake = async (context = CONTEXT): Promise<AcornBridge> => {
 beforeEach(() => {
   _resetConnection()
   windowListeners = []
+  keyListeners = []
   sent = []
   channel = new MessageChannel()
-  vi.stubGlobal('addEventListener', (type: string, listener: (event: Hello) => void) => {
-    if (type === 'message') windowListeners.push(listener)
+  vi.stubGlobal('addEventListener', (type: string, listener: ((event: Hello) => void) | ((event: KeyboardEvent) => void)) => {
+    if (type === 'message') windowListeners.push(listener as (event: Hello) => void)
+    if (type === 'keydown') keyListeners.push(listener as (event: KeyboardEvent) => void)
   })
-  vi.stubGlobal('removeEventListener', (type: string, listener: (event: Hello) => void) => {
+  vi.stubGlobal('removeEventListener', (type: string, listener: ((event: Hello) => void) | ((event: KeyboardEvent) => void)) => {
     if (type === 'message') windowListeners = windowListeners.filter((entry) => entry !== listener)
+    if (type === 'keydown') keyListeners = keyListeners.filter((entry) => entry !== listener)
   })
 })
 
@@ -79,6 +85,62 @@ describe('connect', () => {
     host(() => undefined)
     const acorn = await handshake()
     expect(await connect()).toBe(acorn)
+  })
+})
+
+describe('frame key forwarding', () => {
+  const press = (over: Partial<KeyboardEvent> = {}) => {
+    const preventDefault = vi.fn()
+    const event = {
+      code: 'KeyK', key: 'k', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false,
+      target: { nodeName: 'DIV' }, preventDefault, ...over,
+    } as unknown as KeyboardEvent
+    for (const listener of keyListeners) listener(event)
+    return preventDefault
+  }
+
+  it('forwards canonical chords without swallowing unbindable or bare-key defaults', async () => {
+    host(() => undefined)
+    const acorn = await handshake()
+
+    const space = press({ code: 'Space', key: ' ', metaKey: false })
+    const tab = press({ code: 'Tab', key: 'Tab', metaKey: false })
+    const arrow = press({ code: 'ArrowDown', key: 'ArrowDown', metaKey: false })
+    const bare = press({ code: 'KeyJ', key: 'j', metaKey: false })
+    const modified = press()
+    const claimed = press({ code: 'KeyF', key: 'f' })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    expect(space).not.toHaveBeenCalled()
+    expect(tab).not.toHaveBeenCalled()
+    expect(arrow).not.toHaveBeenCalled()
+    expect(bare).not.toHaveBeenCalled()
+    expect(modified).toHaveBeenCalled()
+    expect(claimed).not.toHaveBeenCalled()
+    expect(sent).not.toContainEqual({ kind: 'keydown', chord: ' ' })
+    expect(sent).not.toContainEqual({ kind: 'keydown', chord: 'tab' })
+    expect(sent).not.toContainEqual({ kind: 'keydown', chord: 'arrowdown' })
+    expect(sent).toContainEqual({ kind: 'keydown', chord: 'j' })
+    expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+k' })
+    expect(sent).not.toContainEqual({ kind: 'keydown', chord: 'meta+f' })
+
+    acorn.keys.claim([])
+    press({ code: 'KeyF', key: 'f' })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+f' })
+  })
+
+  it('ignores undeclared runtime claims and leaves bare typing keys inside inputs', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    host(() => undefined)
+    const acorn = await handshake()
+    acorn.keys.claim(['meta+x'])
+    press({ code: 'KeyX', key: 'x' })
+    press({ code: 'KeyA', key: 'a', metaKey: false, target: { nodeName: 'INPUT' } } as unknown as Partial<KeyboardEvent>)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('meta+x'))
+    expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+x' })
+    expect(sent).not.toContainEqual({ kind: 'keydown', chord: 'a' })
   })
 })
 

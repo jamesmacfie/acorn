@@ -23,6 +23,7 @@ import type {
 import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
+import { isNormalizedChord } from '@acorn/protocol/keybindings.ts'
 import { allowApi, isApiMethod, type ApiMethod } from './scopes'
 
 // What the frame is, as the host decided it. Nothing here is ever read from a message.
@@ -42,6 +43,8 @@ export type FrameBinding = {
   panes: readonly string[]
   // Populated only for a webview binding, from the manifest row the host read.
   hosts?: readonly string[]
+  // Host-validated declaration for this exact surface.
+  claimsKeys: readonly string[]
 }
 
 export type FrameApiResult = {
@@ -68,6 +71,7 @@ export type FrameServices = {
   importerClose(): void
   webviewNavigate?(url: string): Promise<boolean>
   webviewCommand?(action: 'back' | 'forward' | 'reload'): Promise<boolean>
+  keydown(chord: string): void
 }
 
 // A broken plugin must not be able to busy-loop the shell. These are generous for anything honest: a
@@ -314,11 +318,17 @@ export function createFrameBridge(input: {
 
   port.onmessage = (event: MessageEvent) => {
     if (!alive) return
-    const shape = requestShape(event.data)
-    if (!shape) return
+    if (!event.data || typeof event.data !== 'object') return
+    const data = event.data as Record<string, unknown>
+    if (typeof data.kind !== 'string') return
     const budget = overBudget()
     if (budget) return kill(budget)
-    const data = event.data as Record<string, unknown>
+    if (data.kind === 'keydown') {
+      if (typeof data.chord === 'string' && isNormalizedChord(data.chord)) services.keydown(data.chord)
+      return
+    }
+    const shape = requestShape(data)
+    if (!shape) return
     switch (shape.kind) {
       case 'api':
         void handleApi(shape.id, data)

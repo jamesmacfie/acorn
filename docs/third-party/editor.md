@@ -1,7 +1,8 @@
 # editor → loaded plugin, with find-in-files folded in
 
-**Blockers: keybindings have no manifest form** ([docs/keybindings/](../keybindings/)), and the
-frame-performance question [database.md](./database.md) raises applies here too. Read
+**Blockers: the component slot, and the frame-performance question** [database.md](./database.md)
+raises. Keybindings are no longer one — plugins declare them in the manifest and frames forward
+unclaimed chords (`docs/command-palette-and-shortcuts.md`). Read
 [rollbar.md](./rollbar.md) for the common mechanics.
 
 Two changes bundled in one file because they are better done together: the editor becomes a loaded
@@ -17,8 +18,8 @@ The only real cross-plugin edge is `plugins/agents/src/client/AgentMentionTextar
 `editorFilesRoute` from `plugins/editor/src/contract/api.ts` to complete a path in an @-mention —
 which is `contract/`, the sanctioned mechanism, and survives the move untouched.
 
-So editor's actual blockers are keybindings and the Monaco-in-a-frame question. That makes it a
-better candidate than the table implies, and a harder one than rollbar.
+So editor's actual blockers are the component slot and the Monaco-in-a-frame question. That makes
+it a better candidate than the table implies, and a harder one than rollbar.
 
 ## Find-in-files: what it is, and what it is not
 
@@ -96,22 +97,25 @@ iframe better than most libraries — but know the costs before committing:
   they will be if bundled, but this is the most likely thing to break and worth proving first with
   a spike before porting any UI.
 
-### Keybindings, the actual blocker
+### Keybindings
 
-An editor is the plugin that most wants keys, and loaded plugins cannot bind any. Worse, a frame
-does not receive shell chords and its own keydowns do not reach the shell dispatcher, because
-keydown inside an iframe does not bubble to the parent window.
+An editor is the plugin that most wants keys, and until recently loaded plugins could not bind any
+— nor could a frame receive shell chords or deliver its own, because keydown inside an iframe does
+not bubble to the parent window.
 
-Both halves are [docs/keybindings/](../keybindings/) — phases 0–2 for declaring bindings, phase 3
-for the frame boundary specifically. **Do not start the editor move before that project lands**;
-an editor whose `⌘P` does nothing while focused is not a port, it is a regression.
+Both halves now work: the manifest declares `commands` and `keybindings`, and the frame SDK
+forwards any chord it has not claimed to the shell dispatcher, so `⌘P` still opens the file finder
+while the editor has focus. What the editor has to get right is its `claimsKeys` list — Monaco's
+`⌘F` belongs to the frame, and the reserved set (`escape`, `⌘K`, `⌘,`, `⌘1`–`9`) can never be
+claimed. Check [keybindings/](../keybindings/) for open review items before relying on the
+forwarder.
 
 ## Sequence
 
 1. Fold search into the editor pane, still first-party. Ship it, live with it.
 2. Resolve the slot question.
 3. Spike Monaco in a frame: does it render, do workers load, how does it feel to type in.
-4. Wait for [docs/keybindings/](../keybindings/) phases 0–3.
+4. Clear the open items in [keybindings/](../keybindings/) — the frame forwarder is on that list.
 5. Then the move, per rollbar's sequence.
 
 ## Done when

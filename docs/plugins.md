@@ -30,7 +30,7 @@ import. It adds no behavior of its own: it re-exports an enumerated slice of nod
 client-core, and `tools/arch/boundaries.test.ts` enforces both halves of that — plugins reach the
 host only through the facade, and the facade only re-exports.
 
-Four entrypoints:
+Five entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
@@ -38,6 +38,7 @@ Four entrypoints:
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, and the design system's plain functions (`cx`, `token`, metrics) |
 | `@acorn/plugin-api/ui` | Everything that is a component: primitives, `Icon`, `Picker`, `Modal`, `Tabs`, the diff rows, and the registration seams that live in a `.tsx` module |
 | `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass |
+| `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims |
 
 The line between `/client` and `/ui` is drawn by the runtime, not by taste. Each entrypoint is a
 barrel, so importing one member evaluates all of them, and Solid compiles a component to code that
@@ -156,7 +157,7 @@ kinds of contribution come out of one manifest:
   isolated ephemeral partition, no preload, no CDP, no devtools, no tunnel credentials, and no script
   or message bridge. The plugin's sandboxed client frame remains the controller for only
   `navigate`, `back`, `forward`, and `reload`; it cannot read the page or type into it.
-- **Descriptors** — a rail source, task-footer badge, palette rows, attention items, node stats, and
+- **Descriptors** — a rail source, task-footer badge, commands/keybindings, attention items, node stats, and
   restricted URL recognizers (`contentLinks`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
@@ -167,6 +168,38 @@ kinds of contribution come out of one manifest:
   the modal, create-before-link ordering, and partial-failure reporting. A `contentLinks` entry uses a
   bounded `https://` host/path grammar, names a pane from the same manifest, and delivers one captured
   path segment as a `plugin:select` intent.
+
+Loaded-plugin commands and shortcuts are host-bound manifest data. A command id `search` becomes
+`plugin.<plugin-id>.search`; plugin code cannot claim a first-party command id. `palette` controls
+whether the command also appears in the palette (default `true`). A keybinding may target only a
+command from the same manifest, uses the canonical `meta+ctrl+alt+shift+key` spelling, and must include
+`meta`, `ctrl`, or `alt`:
+
+```json
+{
+  "contributions": {
+    "frames": [{ "target": "pane", "id": "editor", "label": "Editor" }],
+    "commands": [{
+      "id": "search",
+      "title": "Editor: find in files",
+      "category": "action",
+      "palette": true,
+      "action": { "verb": "openPane", "pane": "editor" }
+    }],
+    "keybindings": [{
+      "command": "search",
+      "defaultChord": "meta+shift+f",
+      "when": "surface",
+      "surface": "editor"
+    }]
+  }
+}
+```
+
+`when` is `global`, `task`, or `surface`; loaded plugins cannot request `typing-exempt`. Command and
+binding ids must remain stable across versions because the qualified binding id is the key in the
+user's persisted override map. The old `contributions.palette` descriptor remains an alias for a
+command with `palette: true` for plugin API v1 and is scheduled for removal in plugin API v2.
 
 The webview manifest shape is:
 
@@ -180,6 +213,23 @@ The webview manifest shape is:
 }
 ```
 
+A frame surface may also declare the modified chords its own UI handles:
+
+```json
+{
+  "target": "pane",
+  "id": "editor",
+  "label": "Editor",
+  "claimsKeys": ["meta+f", "meta+shift+f"]
+}
+```
+
+The frame SDK begins with that declared set and `acorn.keys.claim([...])` may narrow it at runtime.
+It cannot add undeclared keys. `meta+k`, `meta+,`, `meta+1`–`meta+9`, and `escape` are never claimable.
+All other keydowns are forwarded to the shell's one dispatcher, so global and plugin-surface shortcuts
+continue to work while the iframe has focus. Claims are disclosed in the device trust prompt and in
+Settings → Shortcuts.
+
 `urlSource` replaces `url` when the start URL is dynamic and must be inside the plugin's own
 `/v2/p/<id>/` namespace; it answers `{ "url": "..." }` and receives task/project ids as query
 parameters when present.
@@ -188,7 +238,7 @@ When a plugin has a client bundle, frames, webviews, and descriptors are gated o
 bundle: first sight of a `(plugin, hash)` pair prompts before anything registers, an update re-prompts
 with the permission diff, and a rejected bundle gets neither frames nor chrome. A descriptor-only
 plugin has no client bytes to trust and registers its data directly. The prompt renders the node-half
-permissions, enforced UI scopes, and webview host grants as **three separate lists**. Webview hosts are
+permissions, enforced UI scopes and key claims, and webview host grants as **three separate lists**. Webview hosts are
 enforced but the remote page has live network access, so folding them into the networkless UI list
 would be misleading. For the original two groups, only the second is enforced —
 `packages/client-core/src/plugins/permissions.ts` explains why they must never be merged, and it

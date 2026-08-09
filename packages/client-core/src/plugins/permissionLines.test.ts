@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
-import { nodePermissionLines, uiPermissionLines, webviewPermissionLines } from './permissions'
+import { keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, uiPermissionLines, webviewPermissionLines } from './permissions'
 
 // The permission DIFF the update prompt shows is set-difference over these strings, so the wording is
 // the diff key: a rephrasing that keeps the same grant would light every line up as "new". That makes
@@ -113,5 +113,18 @@ describe('webview grants', () => {
     expect(webviewPermissionLines(widened).filter((line) => !had.has(line))).toEqual([
       'Show web pages from *.example.com, docs.example.com in the "Docs" pane',
     ])
+  })
+})
+
+describe('frame key claims', () => {
+  it('shows only host-recognized claims and names their surface', () => {
+    const grants = keyClaimGrants({
+      frames: [{
+        target: 'pane', id: 'editor', label: 'Editor', glyph: 'puzzle', order: 1, formFactor: ['desktop'],
+        claimsKeys: ['meta+f', 'meta+k', 'not a chord'],
+      }],
+    })
+    expect(grants).toEqual([{ surface: 'editor', label: 'Editor', chords: ['meta+f'] }])
+    expect(keyClaimPermissionLines(grants)).toEqual(['Handle ⌘F in the "Editor" surface'])
   })
 })

@@ -19,6 +19,7 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
 const KEY = 'c'.repeat(64)
 const PLUGIN_ID = 'e2e-ntfy'
+const SHORTCUT_DESCRIPTION = 'Ntfy: ping'
 
 const roots: string[] = []
 const apps: ElectronApplication[] = []
@@ -50,6 +51,15 @@ function buildPackage(workshop: string, version: string, permissions: Record<str
     apiVersion: PLUGIN_API_MAJOR,
     node: './dist/node.js',
     client: './dist/client.js',
+    contributions: {
+      commands: [{
+        id: 'ping',
+        title: SHORTCUT_DESCRIPTION,
+        palette: false,
+        action: { verb: 'runNodeAction', path: `/v2/p/${PLUGIN_ID}/ping` },
+      }],
+      keybindings: [{ command: 'ping', defaultChord: 'meta+alt+n', when: 'global' }],
+    },
     // Deliberately well-formed but unknown: the trust prompt must count this as ignored and never
     // repeat plugin-authored text as an enforced grant.
     permissions: { api: ['core.quantum:read'], node: permissions },
@@ -100,6 +110,12 @@ async function nodeJson<T>(page: Page, path: string): Promise<T> {
 
 type Roster = { plugins: { name: string; running: boolean; state: string; installed?: { version: string } }[] }
 const rosterRow = async (page: Page) => (await nodeJson<Roster>(page, '/v2/core/plugins')).plugins.find((row) => row.name === PLUGIN_ID)
+const shortcutOverride = async (page: Page): Promise<string | null | undefined> => {
+  return page.evaluate((id) => {
+    const raw = localStorage.getItem('acorn-pref:keybindings')
+    return raw ? (JSON.parse(raw) as Record<string, string | null>)[id] : undefined
+  }, `plugin.${PLUGIN_ID}.ping`)
+}
 
 async function launch(dataDir: string): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
@@ -142,6 +158,14 @@ const openPluginsSettings = async (page: Page): Promise<void> => {
   await expect(page.locator('.plugin-install')).toBeVisible({ timeout: 15_000 })
 }
 
+const openShortcutsSettings = async (page: Page) => {
+  await page.keyboard.press('Meta+,')
+  const settings = page.locator('.overlay.settings')
+  await expect(settings).toBeVisible({ timeout: 15_000 })
+  await settings.locator('.settings-nav-item', { hasText: 'Shortcuts' }).click()
+  return settings
+}
+
 /** Fill the install form with a tarball URL and submit it. */
 const installFrom = async (page: Page, url: string): Promise<void> => {
   await page.locator('.plugin-install select').selectOption('url')
@@ -161,9 +185,13 @@ async function acceptTrust(page: Page): Promise<string> {
 
 /** Click Restart node and wait for the roster to come back with the plugin in the expected shape. */
 async function restartAndSettle(page: Page, expected: (row: Awaited<ReturnType<typeof rosterRow>>) => boolean): Promise<void> {
+  const reloaded = page.waitForEvent('domcontentloaded')
   await page.locator('.settings-notice').getByRole('button', { name: 'Restart node' }).click()
   // Main reloads the renderer after a supervised restart, so the settings modal is gone and every
-  // locator from before this point is stale. Poll the node itself instead.
+  // locator from before this point is stale. Waiting for the navigation is load-bearing here: the old
+  // shell remains visible while the node is already answering, but its process-local plugin registries
+  // still describe the pre-restart roster.
+  await reloaded
   await expect(page.locator('.shell')).toBeVisible({ timeout: 120_000 })
   await expect
     .poll(async () => {
@@ -221,6 +249,16 @@ test('installs, trusts, updates and uninstalls a plugin from Settings', async ()
   await restartAndSettle(page, (row) => row?.state === 'active' && row.running)
   expect((await rosterRow(page))?.installed?.version).toBe('1.0.0')
 
+  // Persist a user override while the contribution exists. A genuine uninstall must dispose the
+  // registry entry while retaining this preference, turning it into an explicit cleanup candidate.
+  const shortcuts = await openShortcutsSettings(page)
+  const shortcut = shortcuts.getByLabel(`Shortcut for ${SHORTCUT_DESCRIPTION}`)
+  await shortcut.click()
+  await page.keyboard.press('Meta+Shift+u')
+  await expect(shortcut).toHaveValue('⇧⌘U')
+  await expect.poll(() => shortcutOverride(page)).toBe('meta+shift+u')
+  await shortcuts.getByRole('button', { name: 'Close' }).click()
+
   // ── Update, with a permission the old version did not ask for ─────────────────────────────────
   host.serve(buildPackage(workshop, '1.1.0', { exec: true }))
   await settleOverlays(page)
@@ -248,4 +286,11 @@ test('installs, trusts, updates and uninstalls a plugin from Settings', async ()
   // Still serving until the restart, which the row says rather than pretending it is already gone.
   await expect.poll(async () => (await rosterRow(page))?.state, { timeout: 60_000 }).toBe('pending-restart')
   await restartAndSettle(page, (row) => row === undefined)
+  await expect.poll(() => shortcutOverride(page)).toBe('meta+shift+u')
+
+  const shortcutsAfterUninstall = await openShortcutsSettings(page)
+  await expect(shortcutsAfterUninstall.locator('.shortcut-group-heading', { hasText: PLUGIN_ID })).toHaveCount(0)
+  await expect(shortcutsAfterUninstall.getByRole('button', {
+    name: 'Remove settings for plugins that are no longer installed (1)',
+  })).toBeVisible({ timeout: 30_000 })
 })

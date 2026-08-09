@@ -37,6 +37,10 @@ panel is single-ref and handles its own content clicks. That is the whole differ
 **C. Electron main-process code** — a `src/main/` half that imports `electron`. The desktop
 surface is enumerated and boundary-tested; a loaded plugin has no main-process presence at all.
 
+Showing a web page is no longer an instance of this. The view service moved into `apps/desktop`
+and any plugin can place a `webview` surface; what still needs main is *driving* one — the CDP
+attachment behind preview's browser agent tools — plus preview's tunnel headers and page rules.
+
 **D. Publishing a capability the shell or core depends on** — a plugin whose absence would leave
 core (or the shell in front of it) with a hole it cannot degrade around. These are the `required`
 plugins: they cannot be disabled, so they cannot be optional, so they cannot be third-party.
@@ -56,9 +60,12 @@ Two things that are **not** on this list, deliberately:
 - **Hono routers.** Every first-party plugin registers routes with `ctx.routes.register`, which
   loaded plugins do not get — but that is a seam gap, not a privilege. See "The honest asterisk"
   below.
-- **Owning a SQLite file, agent tools, integration providers, panes, sources, settings pages,
-  palette rows, slots, attention items, node stats.** All available to loaded plugins today,
-  through the manifest, the frame bridge, or `ctx`.
+- **Owning a SQLite file, agent tools, integration providers, panes, ref panels, sources, settings
+  pages, palette rows, slots, attention items, node stats, content links, and a host-owned
+  webview.** All available to loaded plugins today, through the manifest, the frame bridge, or
+  `ctx`. The webview is the newest and the one most likely to be assumed unavailable: a plugin
+  declares a surface with a host allowlist and drives it with four verbs, while the
+  `WebContentsView`, the allowlist enforcement and the CDP decision stay with the host.
 
 ## The plugins
 
@@ -130,9 +137,10 @@ rather than demonstrated.
 
 Three smaller gaps in the same category. `agentContexts` and `persistedState` have no manifest
 form, which is why `context`, `http` and `database` appear more privileged than they are. And
-**keybindings** have none either — the registry, the user-override store, the conflict detection
-and the Settings UI all exist and are all first-party-only, which is what
-[keybindings/](./keybindings/) closes and what editor is waiting on.
+**keybindings** used to have none either; loaded plugins now declare `commands` and
+`keybindings` in the manifest, and a frame forwards unclaimed chords to the shell dispatcher
+(`docs/command-palette-and-shortcuts.md`). Outstanding review items are in
+[keybindings/](./keybindings/).
 
 ## Rules of thumb
 

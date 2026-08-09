@@ -3,7 +3,14 @@ import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { nodes } from '../node/fleet'
 import { createDismissable } from '../ui/dismissable'
 import { noteBundleAccepted, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
-import { nodePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
+import {
+  keyClaimGrants,
+  keyClaimPermissionLines,
+  nodePermissionLines,
+  uiPermissionLines,
+  webviewGrants,
+  webviewPermissionLines,
+} from './permissions'
 import { syncChromeContributions } from './chrome/register'
 import { syncFrameContributions } from './frames/register'
 import { recordPluginTrust } from './host'
@@ -50,6 +57,13 @@ export default function PluginTrustDialog() {
     const before = current.previous ? new Set(webviewPermissionLines(current.previous.webviews ?? [])) : null
     return lines.map((text) => ({ text, added: before ? !before.has(text) : false }))
   })
+  const keyClaimLines = createMemo(() => {
+    const current = request()
+    if (!current?.row.installed) return []
+    const lines = keyClaimPermissionLines(keyClaimGrants(current.row.installed.contributions))
+    const before = current.previous ? new Set(keyClaimPermissionLines(current.previous.keyClaims ?? [])) : null
+    return lines.map((text) => ({ text, added: before ? !before.has(text) : false }))
+  })
 
   const decide = async (decision: 'accepted' | 'rejected') => {
     const current = request()
@@ -64,6 +78,7 @@ export default function PluginTrustDialog() {
         version: current.row.installed.version,
         permissions: current.row.installed.permissions,
         webviews: webviewGrants(current.row.installed.contributions),
+        keyClaims: keyClaimGrants(current.row.installed.contributions),
         decision,
       })
       resolvePendingTrust(current.row.name, current.hash)
@@ -128,9 +143,10 @@ export default function PluginTrustDialog() {
               <p class="muted">This plugin's server code runs with the same access as acorn itself.</p>
 
               <h3>In this app — enforced</h3>
-              <Show when={uiLines().length} fallback={<p class="muted">Nothing declared.</p>}>
+              <Show when={uiLines().length || keyClaimLines().length} fallback={<p class="muted">Nothing declared.</p>}>
                 <ul class="plugin-trust-permissions">
                   <For each={uiLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
+                  <For each={keyClaimLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
                 </ul>
               </Show>
               <p class="muted">

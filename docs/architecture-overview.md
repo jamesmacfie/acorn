@@ -178,8 +178,8 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - [plugins.md](./plugins.md), [agent-tools.md](./agent-tools.md) — extension and tool boundaries.
 - [first-party-plugins.md](./first-party-plugins.md) — every shipped plugin, and which of them are
   first-party because they must be rather than because they were written first.
-- [webview/](./webview/) — the implemented host-owned webview capability any plugin can place in its
-  own surface; CDP driving remains preview-only and first-party.
-- [third-party/](./third-party/) — the four built-in plugins that could move to the loaded-plugin
-  shape, one file each, with what it would prove and what it would cost.
+- [third-party/](./third-party/) — the built-in plugins that could move to the loaded-plugin shape,
+  one file each, with what it would prove and what it would cost.
+- [keybindings/](./keybindings/) — review punch list for the shipped plugin-keybinding work;
+  `command-palette-and-shortcuts.md` is how it behaves.
 - [electron.md](./electron.md), [local-development.md](./local-development.md) — runtime and development.

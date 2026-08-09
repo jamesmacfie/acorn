@@ -18,6 +18,7 @@ const ack = (over: Partial<PluginAck> = {}): PluginAck => ({
   version: '1.0.0',
   permissions: NONE,
   webviews: [],
+  keyClaims: [],
   decision: 'accepted',
   decidedAt: 1_700_000_000_000,
   ...over,
@@ -100,9 +101,10 @@ describe('custody', () => {
   })
 
   it('reads pre-webview version-1 acknowledgements as having no webview grants', () => {
-    const { webviews: _webviews, ...legacy } = ack()
+    const { webviews: _webviews, keyClaims: _keyClaims, ...legacy } = ack()
     writeFileSync(join(dir, 'plugin-trust.json'), JSON.stringify({ version: 1, acks: [legacy] }))
     expect(store().list()[0]?.webviews).toEqual([])
+    expect(store().list()[0]?.keyClaims).toEqual([])
   })
 
   it('refuses a malformed acknowledgement rather than storing one nothing can match', () => {

@@ -132,6 +132,12 @@
 .shortcut-reset { margin-left: var(--space-4); padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; font-size: var(--fs-sm); }
 .shortcut-reset:hover { color: var(--text); text-decoration: underline; }
 .shortcut-conflict { border-color: var(--del-marker); }
+.shortcut-group { display: contents; }
+.shortcut-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+.shortcut-group-disabled .help-list { opacity: 0.62; }
+.shortcut-plugin-state { margin: 0; font-size: var(--fs-xs); }
+.shortcut-claims { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-xs); }
+.shortcut-cleanup { margin-top: var(--space-8); }
 
 /* Dev-only style gallery (StyleGallery.tsx): every primitive × variant in one place so a style
    pack can be authored against the whole vocabulary at once. */

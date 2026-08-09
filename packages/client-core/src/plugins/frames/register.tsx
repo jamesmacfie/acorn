@@ -1,4 +1,5 @@
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
+import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { paneRegistry } from '../../registries/panes'
 import { projectImporterRegistry } from '../../registries/projectImporters'
@@ -52,6 +53,9 @@ const bindingFor = (pluginId: string, surface: PluginFrameSurface, row: NodePlug
   ...(surface.target === 'webview' ? { hosts: surface.hosts ?? [] } : {}),
   // The plugin's own pane ids, which is the allowlist for the `openPane` verb.
   panes: (row.installed?.contributions.frames ?? []).filter((entry) => entry.target === 'pane' || entry.target === 'webview').map((entry) => entry.id),
+  // Roster rows are wire input. The node parsed these already, but the device re-applies the closed
+  // claim policy before handing the declaration to a frame.
+  claimsKeys: (surface.claimsKeys ?? []).filter(isPluginKeyClaim),
   ...extra,
 })
 

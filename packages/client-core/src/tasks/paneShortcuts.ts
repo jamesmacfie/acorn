@@ -1,27 +1,6 @@
-// Canonical chord encoding shared by the keybinding dispatcher and remapping UI. Binding ownership,
-// defaults, conflict detection, and legacy preference fallback live in registries/keybindings.tsx.
-const baseKey = (event: KeyboardEvent): string | null => {
-  if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase()
-  if (/^Digit[0-9]$/.test(event.code)) return event.code.slice(5)
-  if (event.code === 'BracketLeft') return '['
-  if (event.code === 'BracketRight') return ']'
-  if (event.key === 'Enter') return 'enter'
-  if (event.key === 'Escape') return 'escape'
-  const key = event.key.toLowerCase()
-  return key.length === 1 ? key : null
-}
-
-export function eventChord(event: KeyboardEvent): string | null {
-  const key = baseKey(event)
-  if (!key) return null
-  const parts: string[] = []
-  if (event.metaKey) parts.push('meta')
-  if (event.ctrlKey) parts.push('ctrl')
-  if (event.altKey) parts.push('alt')
-  if (event.shiftKey) parts.push('shift')
-  parts.push(key)
-  return parts.join('+')
-}
+// Kept as the client import seam while the implementation lives in protocol so the Node manifest
+// parser and sandboxed-frame SDK normalize exactly the same strings.
+export { eventChord } from '@acorn/protocol/keybindings.ts'
 
 const symbols: Record<string, string> = { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘' }
 const displayOrder = ['ctrl', 'alt', 'shift', 'meta']

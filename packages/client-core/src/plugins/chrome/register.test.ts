@@ -2,15 +2,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
 
 const readJson = vi.fn()
-vi.mock('../../apiClient', () => ({ readJson: (...args: unknown[]) => readJson(...args), sendRaw: vi.fn() }))
+const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
+vi.mock('../../apiClient', () => ({
+  readJson: (...args: unknown[]) => readJson(...args),
+  sendRaw: (...args: unknown[]) => sendRaw(...args),
+}))
 
 const { setActiveNode } = await import('../../node/activeNode')
 const { attentionRegistry } = await import('../../registries/attention')
 const { nodeStatRegistry } = await import('../../registries/nodeStats')
-const { paletteRowRegistry } = await import('../../registries/paletteRows')
+const { commandAvailable, commandRegistry, executeCommand } = await import('../../registries/commands')
+const { keybindingRegistry } = await import('../../registries/keybindings')
 const { contentLinkRegistry, parseInAppTarget } = await import('../../registries/contentLinks')
 const { sourceRegistry } = await import('../../registries/sources')
 const { taskSlotRegistry } = await import('../../registries/slots')
+const { orphanedPluginOverrideIds } = await import('../../settings/shortcutSettingsModel')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
 const { _resetChromeContributions, syncChromeContributions } = await import('./register')
 
@@ -51,13 +57,15 @@ const CHROME: Partial<PluginContributions> = {
 const ids = () => ({
   sources: sourceRegistry.entries().map((entry) => entry.id),
   slots: taskSlotRegistry.entries().map((entry) => entry.id),
-  palette: paletteRowRegistry.entries().map((entry) => entry.id),
+  commands: commandRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
+  keybindings: keybindingRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
   attention: attentionRegistry.entries().map((entry) => entry.id),
   nodeStats: nodeStatRegistry.entries().map((entry) => entry.id),
 })
 
 beforeEach(() => {
   readJson.mockReset()
+  sendRaw.mockClear()
   setActiveNode('node-a')
 })
 
@@ -74,7 +82,8 @@ describe('syncChromeContributions', () => {
     expect(ids()).toEqual({
       sources: ['board'],
       slots: ['board-footer'],
-      palette: ['plugin-chrome:board'],
+      commands: ['plugin.board.board.new'],
+      keybindings: [],
       attention: ['board-stuck'],
       nodeStats: ['board-count'],
     })
@@ -196,13 +205,34 @@ describe('syncChromeContributions', () => {
     expect(readJson).not.toHaveBeenCalled()
   })
 
-  it('offers palette rows only while the plugin is present on the node in view', async () => {
+  it('promotes the palette alias to one command and gates it on the active node', async () => {
     _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
     syncChromeContributions()
-    const palette = paletteRowRegistry.get('plugin-chrome:board')!
-    expect((await palette.rows(null)).rows).toEqual([{ kind: 'plugin', id: 'board.new', label: 'Board: new card' }])
+    const command = commandRegistry.get('plugin.board.board.new')!
+    expect(command.palette).toBe(true)
+    expect(commandAvailable(command)).toBe(true)
+    await executeCommand(command.id)
+    expect(sendRaw).toHaveBeenCalledWith('/v2/p/board/new', expect.objectContaining({ method: 'POST', nodeId: 'node-a' }))
     setActiveNode('node-b')
-    expect((await palette.rows(null)).rows).toEqual([])
+    expect(commandAvailable(command)).toBe(false)
+  })
+
+  it('registers commands and keybindings with host-qualified ids and preserves them while disabled', () => {
+    const declared: Partial<PluginContributions> = {
+      commands: [
+        { id: 'search', title: 'Board: search', category: 'action', palette: true, action: { verb: 'runNodeAction', path: '/v2/p/board/search' } },
+        { id: 'quiet', title: 'Board: quiet action', category: 'action', palette: false, action: { verb: 'openUrl', url: 'https://example.com' } },
+      ],
+      keybindings: [{ command: 'search', defaultChord: 'meta+shift+f', when: 'task' }],
+    }
+    _seedPluginDistribution([['node-a', [row('board', { running: false, disabled: true, state: 'disabled' }, declared)]]])
+    syncChromeContributions()
+    expect(ids().commands).toEqual(['plugin.board.search', 'plugin.board.quiet'])
+    expect(commandRegistry.get('plugin.board.quiet')?.palette).toBe(false)
+    const binding = keybindingRegistry.get('plugin.board.search')!
+    expect(binding).toMatchObject({ command: 'plugin.board.search', category: 'board', defaultChord: 'meta+shift+f' })
+    expect(binding.active?.()).toBe(false)
+    expect(binding.plugin?.state()).toBe('disabled')
   })
 
   it('keeps one plugin’s bad descriptor from costing it the rest of its chrome', () => {
@@ -218,10 +248,20 @@ describe('syncChromeContributions', () => {
   })
 
   it('takes all of a plugin’s chrome away when it stops being offered', () => {
-    _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
+    const shortcutChrome: Partial<PluginContributions> = {
+      commands: [{ id: 'search', title: 'Board: search', category: 'action', palette: false, action: { verb: 'runNodeAction', path: '/v2/p/board/search' } }],
+      keybindings: [{ command: 'search', defaultChord: 'meta+alt+b', when: 'global' }],
+    }
+    const overrideId = 'plugin.board.search'
+    const overrides = { [overrideId]: 'meta+shift+b' }
+
+    _seedPluginDistribution([['node-a', [row('board', {}, shortcutChrome)]]])
     syncChromeContributions()
+    expect(orphanedPluginOverrideIds(overrides, keybindingRegistry.entries())).toEqual([])
+
     _seedPluginDistribution([['node-a', []]])
     syncChromeContributions()
-    expect(ids()).toEqual({ sources: [], slots: [], palette: [], attention: [], nodeStats: [] })
+    expect(ids()).toEqual({ sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [] })
+    expect(orphanedPluginOverrideIds(overrides, keybindingRegistry.entries())).toEqual([overrideId])
   })
 })

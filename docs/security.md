@@ -113,6 +113,11 @@ The only way a package reaches a Node's install directory is the owner-authentic
 until a Node's owner has installed it, and nothing runs on a device until that device has separately
 acknowledged the exact bundle bytes.
 
+Frame key capture is also manifest-bounded. A frame already sees key events delivered to its own
+document, but it may suppress shell forwarding only for modified chords listed in `claimsKeys`; those
+claims are shown in the trust prompt and Settings. Runtime code may narrow the list, never extend it,
+and the palette, settings, task-switching, and Escape chords are unclaimable.
+
 A loaded plugin may declare a host-owned webview. Unlike its sandboxed interface frame, the remote
 page has live network access and its own cookies/login state for the life of the process. The trust
 prompt names the declared hosts as a separate grant. Electron enforces that allowlist across requested

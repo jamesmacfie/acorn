@@ -6,7 +6,10 @@ import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
 import { clientEvents, consumePaneIntent, openPane } from '../../registries/clientEvents'
+import { executeCommand } from '../../registries/commands'
+import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../../registries/keybindings'
 import { saveJsonPref } from '../../settings/savePref'
+import { activeTaskId } from '../../tasks/tasks'
 import { watchAppearance } from '../../ui/appearance'
 import { BRIDGE_TOKENS } from '../../ui/tokenAxes'
 import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, type FrameBinding, type FrameServices } from './broker'
@@ -125,6 +128,21 @@ export default function PluginFrame(props: PluginFrameProps) {
     importerClose: () => props.onClose?.(),
     webviewNavigate: (url) => props.webview?.navigate(url) ?? Promise.resolve(false),
     webviewCommand: (action) => props.webview?.command(action) ?? Promise.resolve(false),
+    keydown: (chord) => {
+      const frameBinding = resolveFrameKeybinding(
+        chord,
+        resolveKeybindings(keybindingRegistry.entries(), qc.getQueryData<Record<string, string>>(prefsKey) ?? {}),
+        {
+          pluginId: props.binding.pluginId,
+          surface: props.binding.surface,
+          taskActive: !!props.binding.taskId && activeTaskId() === props.binding.taskId,
+        },
+      )
+      if (!frameBinding) return
+      void executeCommand(frameBinding.command).catch((error) => {
+        console.error(`[command:${frameBinding.command}]`, error)
+      })
+    },
   })
 
   // A rail-source row that opened this pane. Retained by openPane until the pane consumes it, so a
@@ -149,6 +167,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       ...(props.refId ? { refId: props.refId } : {}),
       ...(item ? { item } : {}),
       ...currentAxes(),
+      claimsKeys: [...props.binding.claimsKeys],
     }
   }
 

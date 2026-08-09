@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
-import type { NodePluginPermissions, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 
 // This device's decisions about which plugin bundles it will run
 // (docs/plugins.md).
@@ -29,6 +29,12 @@ const webviewGrantSchema = z.strictObject({
   hosts: z.array(z.string().min(1).max(253)).min(1).max(32),
 }) as z.ZodType<PluginWebviewGrant>
 
+const keyClaimGrantSchema = z.strictObject({
+  surface: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  chords: z.array(z.string().min(1).max(64)).min(1).max(32),
+}) as z.ZodType<PluginKeyClaimGrant>
+
 const ackSchema = z.strictObject({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -40,6 +46,8 @@ const ackSchema = z.strictObject({
   // Default keeps version-1 trust files written before webviews readable. An old acknowledgement
   // simply says the previously accepted bundle had no recorded webview grant.
   webviews: z.array(webviewGrantSchema).max(32).default([]),
+  // Default keeps acknowledgements written before frame key claims readable.
+  keyClaims: z.array(keyClaimGrantSchema).max(32).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
 })

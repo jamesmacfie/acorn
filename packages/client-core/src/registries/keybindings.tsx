@@ -16,6 +16,14 @@ export type KeybindingContribution = {
   pane?: string
   legacyPaneAction?: string
   active?: () => boolean
+  // Present only on host-adapted loaded-plugin bindings. Identity and install order come from the
+  // manifest/lockfile projection, never from plugin code.
+  plugin?: {
+    id: string
+    name: string
+    installedAt: () => number | undefined
+    state: () => 'enabled' | 'disabled' | 'absent'
+  }
 }
 
 export type KeybindingPrefs = { keybindings?: string; pane_shortcuts?: string }
@@ -43,6 +51,11 @@ export const readKeybindingOverrides = (json: string | undefined): Record<string
   return result
 }
 
+export const readLegacyPaneOverrides = (json: string | undefined): Record<string, string> => {
+  const raw = parseObject(json)
+  return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+}
+
 const scopesConflict = (a: KeybindingContribution, b: KeybindingContribution): boolean => {
   const aScope = a.when ?? 'global'
   const bScope = b.when ?? 'global'
@@ -53,11 +66,19 @@ const scopesConflict = (a: KeybindingContribution, b: KeybindingContribution): b
 export function resolveKeybindings(
   bindings: readonly KeybindingContribution[],
   prefs: KeybindingPrefs = {},
+  options: { includeInactiveConflicts?: boolean } = {},
 ): ResolvedKeybinding[] {
   const overrides = readKeybindingOverrides(prefs.keybindings)
   const legacy = parseObject(prefs.pane_shortcuts)
-  const resolved: ResolvedKeybinding[] = []
-  for (const binding of bindings) {
+  const sourceOrdered = [...bindings].sort((a, b) => {
+    if (!a.plugin && !b.plugin) return 0
+    if (!a.plugin) return -1
+    if (!b.plugin) return 1
+    const installed = (a.plugin.installedAt() ?? Number.MAX_SAFE_INTEGER) - (b.plugin.installedAt() ?? Number.MAX_SAFE_INTEGER)
+    return installed || a.plugin.id.localeCompare(b.plugin.id) || a.id.localeCompare(b.id)
+  })
+
+  const candidates = sourceOrdered.map((binding, sourceIndex) => {
     const overridden = Object.prototype.hasOwnProperty.call(overrides, binding.id)
     const rawLegacyChord = binding.legacyPaneAction ? legacy[binding.legacyPaneAction] : undefined
     const legacyChord = typeof rawLegacyChord === 'string' && rawLegacyChord.length === 1 ? `meta+${rawLegacyChord.toLowerCase()}` : rawLegacyChord
@@ -66,18 +87,29 @@ export function resolveKeybindings(
       : typeof legacyChord === 'string' && legacyChord.trim()
         ? legacyChord
         : binding.defaultChord
-    if (!chord) {
-      resolved.push({ ...binding, chord: null })
-      continue
-    }
-    const conflict = resolved.find((candidate) => candidate.chord === chord && scopesConflict(binding, candidate))
-    resolved.push({
+    return { binding, chord, overridden, sourceIndex }
+  })
+
+  // Explicit user choices outrank every default. Within each tier, the deterministic source order
+  // remains the tiebreak, so a malformed persisted map containing two colliding overrides still has
+  // one stable winner and a visible loser.
+  const precedence = [...candidates].sort((a, b) => Number(b.overridden) - Number(a.overridden) || a.sourceIndex - b.sourceIndex)
+  const claimed: ResolvedKeybinding[] = []
+  const byId = new Map<string, ResolvedKeybinding>()
+  for (const { binding, chord } of precedence) {
+    const participates = options.includeInactiveConflicts || (binding.active?.() ?? true)
+    const conflict = chord && participates
+      ? claimed.find((candidate) => candidate.chord === chord && scopesConflict(binding, candidate))
+      : undefined
+    const resolved: ResolvedKeybinding = {
       ...binding,
-      chord: conflict ? null : chord,
+      chord: conflict || !chord ? null : chord,
       ...(conflict ? { conflict: conflict.description } : {}),
-    })
+    }
+    byId.set(binding.id, resolved)
+    if (resolved.chord && participates) claimed.push(resolved)
   }
-  return resolved
+  return sourceOrdered.map((binding) => byId.get(binding.id)!)
 }
 
 export const keybindingConflict = (
@@ -86,11 +118,36 @@ export const keybindingConflict = (
   bindings: readonly KeybindingContribution[],
   prefs: KeybindingPrefs,
 ): ResolvedKeybinding | undefined => {
-  const current = bindings.find((binding) => binding.id === id)
+  const current = bindings.find((binding) => binding.id === id && binding.plugin?.state() !== 'absent')
   if (!current) return undefined
-  const others = resolveKeybindings(bindings.filter((binding) => binding.id !== id), prefs)
+  const others = resolveKeybindings(
+    bindings.filter((binding) => binding.id !== id && binding.plugin?.state() !== 'absent'),
+    prefs,
+    { includeInactiveConflicts: true },
+  )
   const conflict = others.find((binding) => binding.chord === chord && scopesConflict(current, binding))
   return conflict ? { ...current, chord: null, conflict: conflict.description } : undefined
+}
+
+export const resolveFrameKeybinding = (
+  chord: string,
+  bindings: readonly ResolvedKeybinding[],
+  frame: { pluginId: string; surface: string; taskActive: boolean },
+): ResolvedKeybinding | undefined => {
+  const candidates = bindings.filter((binding) => {
+    if (binding.chord !== chord || (binding.active && !binding.active())) return false
+    const scope = binding.when ?? 'global'
+    if (scope === 'pane') {
+      if (binding.pane !== frame.surface) return false
+      // Plugin `surface` is broader than the shell's task-pane scope: settings/importer/ref-panel
+      // frames also own an exact surface. First-party pane commands (notably Escape to close) still
+      // require an active task.
+      return binding.plugin ? binding.plugin.id === frame.pluginId : frame.taskActive
+    }
+    if (scope === 'task') return frame.taskActive
+    return scope === 'global' || scope === 'typing-exempt'
+  })
+  return candidates.find((binding) => binding.when === 'pane') ?? candidates[0]
 }
 
 export function registerKeybindings(bindings: readonly KeybindingContribution[]): Disposable {

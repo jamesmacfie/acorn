@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import type { NodePluginPermissions, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { PluginCache, PutResult } from './pluginCache'
 import type { PluginAck, PluginTrustStore } from './pluginTrustStore'
 
@@ -40,6 +40,11 @@ const recordSchema = z.strictObject({
     label: z.string().min(1).max(80),
     hosts: z.array(z.string().min(1).max(253)).min(1).max(32),
   })).max(32) as z.ZodType<PluginWebviewGrant[]>,
+  keyClaims: z.array(z.strictObject({
+    surface: z.string().min(1).max(64),
+    label: z.string().min(1).max(80),
+    chords: z.array(z.string().min(1).max(64)).min(1).max(32),
+  })).max(32) as z.ZodType<PluginKeyClaimGrant[]>,
   decision: z.enum(['accepted', 'rejected']),
 })
 
