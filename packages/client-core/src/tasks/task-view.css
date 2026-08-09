@@ -119,6 +119,25 @@
 }
 .preview-url:focus { outline: none; border-color: var(--accent); }
 .preview-spinner { flex: none; font-size: var(--fs-sm); color: var(--accent); padding: 0 var(--space-2); }
+.plugin-webview-hostname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.plugin-webview-blocked {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--del-marker);
+}
 
 /* The pane-switcher mirrors the left TabRail exactly — same width and button size — for a symmetric
    pair of icon rails. (Accent sits on the right edge since this rail is on the right.) */

@@ -11,9 +11,11 @@ import { PluginCache } from './pluginCache'
 import { registerPluginIpc } from './pluginIpc'
 import { registerPluginScheme } from './pluginScheme'
 import { PluginTrustStore } from './pluginTrustStore'
+import { registerPluginWebviewIpc } from './pluginWebviewIpc'
 import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 import { MAX_CRASHES_PER_WINDOW, recordCrash } from './crashBudget'
+import { WebviewService } from './webviewService'
 
 export type BootstrapOptions = {
   dataDir: string
@@ -112,7 +114,10 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   // does not present that listener's secret (main/previewTunnel.ts). This is the injection that carries
   // it — plugins/preview may not import an app, so the header record arrives as a function. Still well
   // before the window exists, which is the ordering the picker comment above is about.
+  const webviews = new WebviewService()
+  const disposePluginWebviews = registerPluginWebviewIpc(webviews)
   const disposePreview = registerPreviewIpc({
+    viewService: webviews,
     rulesForTask: (taskId) => service.previewRules(taskId),
     tunnelHeadersFor: (url) => tunnels.headersFor(url),
   })
@@ -188,6 +193,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     broker.dispose()
     disposeBrokerIpc()
     disposePluginIpc()
+    disposePluginWebviews()
     disposePreview()
     disposePicker()
   }

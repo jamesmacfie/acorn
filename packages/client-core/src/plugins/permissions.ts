@@ -1,4 +1,5 @@
-import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginContributions, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { normalizeWebviewHost } from '@acorn/protocol/webview.ts'
 import { describeChannel, isSubscribable } from './frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
 
@@ -62,3 +63,26 @@ export const uiPermissionLines = (permissions: NodePluginPermissions): string[] 
   const ignored = permissions.api.length + permissions.events.length - scopes.length - events.length
   return [...scopes, ...events, ...(ignored ? [ignoredLine(ignored)] : [])]
 }
+
+export const webviewGrants = (contributions: PluginContributions): PluginWebviewGrant[] =>
+  (contributions.frames ?? [])
+    .filter((surface) => surface.target === 'webview' && surface.hosts?.length)
+    .flatMap((surface) => {
+      try {
+        return [{
+          surface: surface.id,
+          label: surface.label,
+          hosts: [...new Set(surface.hosts!.map((host) => normalizeWebviewHost(host)))].sort(),
+        }]
+      } catch {
+        // Roster rows are wire input. An invalid grant produces no trusted surface instead of throwing
+        // an untrusted manifest string into the consent dialog.
+        return []
+      }
+    })
+    .sort((a, b) => a.surface.localeCompare(b.surface))
+
+export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): string[] =>
+  [...grants]
+    .sort((a, b) => a.surface.localeCompare(b.surface))
+    .map((grant) => `Show web pages from ${[...grant.hosts].sort().join(', ')} in the "${grant.label}" pane`)

@@ -17,6 +17,7 @@ const ack = (over: Partial<PluginAck> = {}): PluginAck => ({
   nodeId: 'node-a',
   version: '1.0.0',
   permissions: NONE,
+  webviews: [],
   decision: 'accepted',
   decidedAt: 1_700_000_000_000,
   ...over,
@@ -96,6 +97,12 @@ describe('custody', () => {
     // Every plugin re-prompts, which is an annoyance. Guessing at a half-parsed row would mean
     // running code on the strength of it.
     expect(store().list()).toEqual([])
+  })
+
+  it('reads pre-webview version-1 acknowledgements as having no webview grants', () => {
+    const { webviews: _webviews, ...legacy } = ack()
+    writeFileSync(join(dir, 'plugin-trust.json'), JSON.stringify({ version: 1, acks: [legacy] }))
+    expect(store().list()[0]?.webviews).toEqual([])
   })
 
   it('refuses a malformed acknowledgement rather than storing one nothing can match', () => {

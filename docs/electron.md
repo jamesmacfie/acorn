@@ -100,12 +100,16 @@ are `online`, `degraded`, `offline`, `incompatible`, and `revoked`.
 Both ends run a ping/pong watchdog. A sequence gap or watchdog failure makes the Node stale and causes
 the client to reconnect/refetch. A mutation is never queued automatically while a Node is offline.
 
-## Preview views
+## Host-owned webviews
 
-Preview is a main-owned `WebContentsView`, one kept-alive view per task. It uses a task-specific
+`webviewService.ts` owns every native `WebContentsView`. Preview is one kept-alive view per task and uses a task-specific
 ephemeral session, no preload, denied permission requests, HTTP(S)-only navigation, and an external
 chrome layer rendered by the desktop. Main positions the native view over the renderer's pane host
 and hides it while overlays cover the pane.
+
+A loaded plugin may also declare a `webview` pane. Its manifest hosts are checked by the renderer
+broker and again in main, including `will-navigate` and `will-redirect`. Each surface gets an
+ephemeral isolated partition and no CDP attachment, devtools, tunnel header, preload, or page bridge.
 
 For a task whose dev server is served by another Node process, the broker creates an authenticated
 loopback preview tunnel. The tunnel accepts only a declared task port and requires its per-tunnel

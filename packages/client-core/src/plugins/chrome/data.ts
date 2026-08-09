@@ -27,8 +27,17 @@ import { wsOnStatus } from '../../wsClient'
 // plugin route, so the client holds its own copy of the one string.
 const PLUGIN_NAMESPACE = '/v2/p/'
 
-/** The path a descriptor may address. Anything else is a roster row lying about its own manifest. */
-export const ownsRoute = (pluginId: string, path: string): boolean => path.startsWith(`${PLUGIN_NAMESPACE}${pluginId}/`)
+/** The path a descriptor may address. Normalize dot segments before checking so an apparently owned
+ * `/v2/p/id/../other` route cannot escape after URL parsing. */
+export const ownsRoute = (pluginId: string, path: string): boolean => {
+  if (!path.startsWith('/')) return false
+  try {
+    const url = new URL(path, 'https://acorn.invalid')
+    return url.origin === 'https://acorn.invalid' && url.pathname.startsWith(`${PLUGIN_NAMESPACE}${pluginId}/`)
+  } catch {
+    return false
+  }
+}
 
 // ── Freshness ─────────────────────────────────────────────────────────────────────────────────────
 

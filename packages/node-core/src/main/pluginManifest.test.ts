@@ -31,6 +31,44 @@ describe('permission identifier shape', () => {
   })
 })
 
+describe('webview surfaces', () => {
+  it('accepts literal and plugin-route URL sources', () => {
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com/start', hosts: ['docs.example.com'] }],
+    }).success).toBe(true)
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v2/p/board/webview-url', hosts: ['*.example.com'] }],
+    }).success).toBe(true)
+  })
+
+  it('requires exactly one URL form and confines a source route to the plugin', () => {
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', hosts: ['docs.example.com'] }],
+    }).success).toBe(false)
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', urlSource: '/v2/p/board/url', hosts: ['docs.example.com'] }],
+    }).success).toBe(false)
+    expect(messages(manifest({
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v2/p/other/url', hosts: ['docs.example.com'] }],
+    }))).toContain('route must be inside /v2/p/board/')
+  })
+
+  it('validates hosts and requires a literal URL to stay inside them', () => {
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://other.example.com', hosts: ['docs.example.com'] }],
+    }).success).toBe(false)
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['*.*.example.com'] }],
+    }).success).toBe(false)
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'local', label: 'Local', url: 'http://localhost:3000', hosts: ['localhost'] }],
+    }).success).toBe(true)
+    expect(manifest({
+      frames: [{ target: 'webview', id: 'remote', label: 'Remote', url: 'http://docs.example.com', hosts: ['docs.example.com'] }],
+    }).success).toBe(false)
+  })
+})
+
 describe('migration entrypoint confinement', () => {
   it('accepts a relative migrations directory and rejects escapes', () => {
     expect(pluginManifestSchema.safeParse({
@@ -72,6 +110,8 @@ describe('chrome descriptors', () => {
       .toEqual(['route must be inside /v2/p/board/'])
     // A prefix match is not a namespace match.
     expect(messages(manifest({ nodeStats: [{ id: 'n', label: ['x', 'y'], data: '/v2/p/board-other/stat' }] })))
+      .toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({ attention: [{ id: 'a', items: '/v2/p/board/../other/items' }] })))
       .toEqual(['route must be inside /v2/p/board/'])
     // `runNodeAction` carries a route too, and it is checked wherever an action can appear.
     expect(messages(manifest({ palette: [{ id: 'p', title: 'P', action: { verb: 'runNodeAction', path: '/v2/p/other/go' } }] })))

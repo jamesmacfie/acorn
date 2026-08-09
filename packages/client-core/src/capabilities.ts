@@ -6,7 +6,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
@@ -48,6 +48,8 @@ export type {
 
 // Chrome state pushed from main for the active preview view (PreviewPane consumes it).
 export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+export type PluginWebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+export type PluginWebviewBlocked = { key: string; url: string; host: string }
 
 // What main holds for third-party plugins: the bundles it has cached, and this device's decisions
 // about running them. Mirrors apps/desktop/src/app/main/pluginIpc.ts; the storage behind it is
@@ -59,6 +61,7 @@ export type PluginTrustDecision = {
   nodeId: string
   version: string
   permissions: NodePluginPermissions
+  webviews: PluginWebviewGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = PluginTrustDecision & { decidedAt: number }
@@ -124,6 +127,19 @@ declare global {
         command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools'): void
         evict(taskId: string): void
         onEvent(cb: (s: PreviewState) => void): () => void
+      }
+      // Host-owned page surface for an accepted loaded plugin. The sandboxed plugin frame never sees
+      // this preload object; PluginWebview and its broker are the only renderer-side callers.
+      webview?: {
+        ensure(key: string, url: string, hosts: readonly string[]): Promise<boolean>
+        setBounds(key: string, rect: { x: number; y: number; width: number; height: number }): void
+        show(key: string): void
+        hide(key: string): void
+        load(key: string, url: string): Promise<boolean>
+        command(key: string, action: 'back' | 'forward' | 'reload'): Promise<boolean>
+        evict(key: string): void
+        onEvent(cb: (state: PluginWebviewState) => void): () => void
+        onBlocked(cb: (state: PluginWebviewBlocked) => void): () => void
       }
     }
   }

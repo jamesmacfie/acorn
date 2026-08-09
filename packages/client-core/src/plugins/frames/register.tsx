@@ -7,6 +7,7 @@ import type { Disposable } from '../../registries/registry'
 import { settingsRegistry } from '../../registries/settings'
 import { activeBundles, bundleAccepted, installedByNode, pluginEnabledOnNode } from '../distribution'
 import PluginFrame from './PluginFrame'
+import PluginWebview from './PluginWebview'
 import type { FrameBinding } from './broker'
 
 // Turning accepted manifests into shell contributions (docs/plugins.md
@@ -48,8 +49,9 @@ const bindingFor = (pluginId: string, surface: PluginFrameSurface, row: NodePlug
   nodeId: frameNode(),
   api: row.installed?.permissions.api ?? [],
   events: row.installed?.permissions.events ?? [],
+  ...(surface.target === 'webview' ? { hosts: surface.hosts ?? [] } : {}),
   // The plugin's own pane ids, which is the allowlist for the `openPane` verb.
-  panes: (row.installed?.contributions.frames ?? []).filter((entry) => entry.target === 'pane').map((entry) => entry.id),
+  panes: (row.installed?.contributions.frames ?? []).filter((entry) => entry.target === 'pane' || entry.target === 'webview').map((entry) => entry.id),
   ...extra,
 })
 
@@ -75,6 +77,18 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow): D
 
 function registerSurface(pluginId: string, hash: string, row: NodePluginRow, surface: PluginFrameSurface): Disposable {
   switch (surface.target) {
+    case 'webview':
+      return paneRegistry.register({
+        id: surface.id,
+        label: surface.label,
+        glyph: surface.glyph,
+        order: surface.order,
+        when: () => pluginEnabledOnNode(frameNode(), pluginId),
+        component: (props) => {
+          const binding = bindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId })
+          return <PluginWebview pluginId={pluginId} surface={surface} binding={binding} hash={hash} />
+        },
+      })
     case 'pane':
       return paneRegistry.register({
         id: surface.id,

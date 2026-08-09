@@ -18,6 +18,8 @@ import type {
   PluginBridgeMessage,
   PluginBridgeReply,
   PluginFrameContext,
+  PluginWebviewBlocked,
+  PluginWebviewNavigated,
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
 
@@ -67,6 +69,14 @@ export type AcornBridge = {
     done(): Promise<void>
     /** Importer surfaces only: dismiss without having imported anything. */
     close(): Promise<void>
+  }
+  webview: {
+    navigate(url: string): Promise<void>
+    back(): Promise<void>
+    forward(): Promise<void>
+    reload(): Promise<void>
+    onNavigated(listener: (state: PluginWebviewNavigated) => void): () => void
+    onBlocked(listener: (state: PluginWebviewBlocked) => void): () => void
   }
   /** Called on every appearance change, and once on connect. The tokens are already applied to
    * `:root` by the time this fires; the callback is for anything a plugin draws itself (a canvas, a
@@ -189,6 +199,25 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     const call = <T>(method: string, path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> =>
       request<T>({ kind: 'api', method, path, ...(body === undefined ? {} : { body }) }, options?.signal)
 
+    const onEvent = (channel: string, listener: (payload: unknown) => void): (() => void) => {
+      const set = listeners.get(channel) ?? new Set()
+      set.add(listener)
+      listeners.set(channel, set)
+      // Webview state is emitted by the host that owns this surface. It is intrinsic to a webview
+      // binding, not a node event the manifest must separately request.
+      const localWebviewEvent = context?.target === 'webview'
+        && (channel === 'webview:navigated' || channel === 'webview:blocked')
+      if (!localWebviewEvent && !subscribing.has(channel)) {
+        subscribing.set(
+          channel,
+          request({ kind: 'subscribe', channel }).catch((error: unknown) => {
+            console.error(`[acorn] could not subscribe to ${channel}:`, error)
+          }),
+        )
+      }
+      return () => set.delete(listener)
+    }
+
     const api: AcornBridge = {
       get context() {
         if (!context) throw new Error('acorn: context is only available after connect() resolves')
@@ -201,22 +230,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         del: (path, options) => call('DELETE', path, undefined, options),
       },
       events: {
-        on(channel, listener) {
-          const set = listeners.get(channel) ?? new Set()
-          set.add(listener)
-          listeners.set(channel, set)
-          // One subscribe per channel however many local listeners there are. A rejected subscribe is
-          // reported once and not retried: the manifest is not going to change mid-session.
-          if (!subscribing.has(channel)) {
-            subscribing.set(
-              channel,
-              request({ kind: 'subscribe', channel }).catch((error: unknown) => {
-                console.error(`[acorn] could not subscribe to ${channel}:`, error)
-              }),
-            )
-          }
-          return () => set.delete(listener)
-        },
+        on: onEvent,
       },
       state: {
         get: <T>(key: string) => request<T | null>({ kind: 'state.get', key }),
@@ -228,6 +242,14 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         openPane: async (paneId) => void (await request({ kind: 'ui', op: 'openPane', paneId })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),
         close: async () => void (await request({ kind: 'ui', op: 'importer.close' })),
+      },
+      webview: {
+        navigate: async (url) => void (await request({ kind: 'webview', op: 'navigate', url })),
+        back: async () => void (await request({ kind: 'webview', op: 'back' })),
+        forward: async () => void (await request({ kind: 'webview', op: 'forward' })),
+        reload: async () => void (await request({ kind: 'webview', op: 'reload' })),
+        onNavigated: (listener) => onEvent('webview:navigated', listener as (payload: unknown) => void),
+        onBlocked: (listener) => onEvent('webview:blocked', listener as (payload: unknown) => void),
       },
       onAppearance(listener) {
         appearanceListeners.add(listener)

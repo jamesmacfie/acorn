@@ -82,11 +82,13 @@ not.
 
 ## Status
 
-| Phase | File | Size |
+Implemented. The phase files remain the contract and rationale for the shipped design.
+
+| Phase | File | Status |
 | --- | --- | --- |
-| 0 — Generic view service in main | [phase-0-view-service.md](./phase-0-view-service.md) | M |
-| 1 — The `webview` surface and its verbs | [phase-1-surface-and-verbs.md](./phase-1-surface-and-verbs.md) | M |
-| 2 — Trust, allowlists, and what the owner is told | [phase-2-trust.md](./phase-2-trust.md) | S |
+| 0 — Generic view service in main | [phase-0-view-service.md](./phase-0-view-service.md) | complete |
+| 1 — The `webview` surface and its verbs | [phase-1-surface-and-verbs.md](./phase-1-surface-and-verbs.md) | complete |
+| 2 — Trust, allowlists, and what the owner is told | [phase-2-trust.md](./phase-2-trust.md) | complete |
 
 Ordering is strict: 1 requires 0, 2 requires 1. Phase 0 stands alone as a refactor with no new
 capability — it is worth landing on its own even if 1 and 2 are deferred, because it is the part

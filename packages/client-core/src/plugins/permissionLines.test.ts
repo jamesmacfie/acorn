@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
-import { nodePermissionLines, uiPermissionLines } from './permissions'
+import { nodePermissionLines, uiPermissionLines, webviewPermissionLines } from './permissions'
 
 // The permission DIFF the update prompt shows is set-difference over these strings, so the wording is
 // the diff key: a rephrasing that keeps the same grant would light every line up as "new". That makes
@@ -93,5 +93,25 @@ describe('the update diff', () => {
   it('does not mark a permission that was dropped', () => {
     const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [] } })
     expect(added(before, permissions(), nodePermissionLines)).toEqual([])
+  })
+})
+
+describe('webview grants', () => {
+  it('renders web pages as their own host-naming permission group', () => {
+    expect(webviewPermissionLines([{ surface: 'docs', label: 'Docs', hosts: ['docs.example.com', '*.example.com'] }])).toEqual([
+      'Show web pages from *.example.com, docs.example.com in the "Docs" pane',
+    ])
+    expect(webviewPermissionLines([])).toEqual([])
+  })
+
+  it('treats host widening as new and ignores reordering', () => {
+    const before = [{ surface: 'docs', label: 'Docs', hosts: ['docs.example.com', 'api.example.com'] }]
+    const reordered = [{ surface: 'docs', label: 'Docs', hosts: ['api.example.com', 'docs.example.com'] }]
+    const widened = [{ surface: 'docs', label: 'Docs', hosts: ['*.example.com', 'docs.example.com'] }]
+    const had = new Set(webviewPermissionLines(before))
+    expect(webviewPermissionLines(reordered).filter((line) => !had.has(line))).toEqual([])
+    expect(webviewPermissionLines(widened).filter((line) => !had.has(line))).toEqual([
+      'Show web pages from *.example.com, docs.example.com in the "Docs" pane',
+    ])
   })
 })

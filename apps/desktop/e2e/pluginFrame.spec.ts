@@ -1,6 +1,7 @@
 import { expect, test, _electron as electron, type ElectronApplication, type Frame, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
@@ -78,7 +79,7 @@ document.body.appendChild(marker)
 
 // Written straight to disk. The node reads its plugins directory once, at start-up, so this has to happen
 // before the app launches.
-function installPlugin(dataDir: string): void {
+function installPlugin(dataDir: string, webviewUrl?: string): void {
   const dir = join(dataDir, 'plugins', PLUGIN_ID)
   mkdirSync(join(dir, 'dist'), { recursive: true })
   writeFileSync(join(dir, 'dist', 'client.js'), CLIENT_BUNDLE)
@@ -98,7 +99,10 @@ function installPlugin(dataDir: string): void {
     // order 0 makes it the first pane in the switcher, so a task with no persisted layout renders it by
     // default and the test does not have to drive the pane UI to get a frame on screen.
     contributions: {
-      frames: [{ target: 'pane', id: PANE_ID, label: 'E2E widget', order: 0 }],
+      frames: [
+        { target: 'pane', id: PANE_ID, label: 'E2E widget', order: 0 },
+        ...(webviewUrl ? [{ target: 'webview', id: 'e2e-docs', label: 'E2E docs', order: 1, url: webviewUrl, hosts: ['localhost'] }] : []),
+      ],
       contentLinks: [{
         id: 'e2e-widget.item',
         match: 'https://board.example/items/{item}',
@@ -137,7 +141,7 @@ async function nodeJson<T>(page: Page, path: string, init: { method?: string; bo
 
 type Running = { app: ElectronApplication; page: Page; dataDir: string; repoDir: string }
 
-async function launch(): Promise<Running> {
+async function launch(webviewUrl?: string): Promise<Running> {
   const root = mkdtempSync(join(tmpdir(), 'acorn-plugin-frame-'))
   roots.push(root)
   const dataDir = join(root, 'data')
@@ -146,7 +150,7 @@ async function launch(): Promise<Running> {
   execFileSync('git', ['-C', repoDir, 'config', 'user.email', 'e2e@acorn.test'])
   execFileSync('git', ['-C', repoDir, 'config', 'user.name', 'Acorn E2E'])
   execFileSync('git', ['-C', repoDir, 'commit', '--allow-empty', '-qm', 'init'])
-  installPlugin(dataDir)
+  installPlugin(dataDir, webviewUrl)
 
   const app = await electron.launch({
     args: ['out/main/index.js', `--user-data-dir=${join(dataDir, 'chromium')}`],
@@ -185,13 +189,18 @@ const settleOverlays = async (page: Page): Promise<void> => {
 }
 
 // Boot, trust the plugin, put a task on screen, and hand back the plugin's frame.
-async function openPluginPane(): Promise<Running & { frame: Frame; taskId: string }> {
-  const running = await launch()
+async function openPluginPane(webviewUrl?: string): Promise<Running & { frame: Frame; taskId: string }> {
+  const running = await launch(webviewUrl)
   await dismissOnboarding(running.page)
 
   // Trust first: an unacknowledged bundle contributes nothing, so without this there is no pane to open.
   const dialog = running.page.locator('.plugin-trust-dialog')
   await expect(dialog).toBeVisible({ timeout: 60_000 })
+  if (webviewUrl) {
+    await expect(dialog.getByRole('heading', { name: 'Shows web pages — enforced hosts, live network' })).toBeVisible()
+    await expect(dialog).toContainText('Show web pages from localhost in the "E2E docs" pane')
+    await expect(dialog).toContainText('Pages load from the internet with their own cookies and logins.')
+  }
   await dialog.getByRole('button', { name: 'Trust this plugin' }).click()
   await expect(dialog).toHaveCount(0)
 
@@ -242,6 +251,57 @@ const send = (frame: Frame, message: Record<string, unknown>): Promise<Reply> =>
 test.afterEach(async () => {
   for (const app of apps.splice(0)) await app.close().catch(() => {})
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+test('a plugin webview renders allowed content and blocks an outside-host redirect', async (_fixtures, testInfo) => {
+  test.setTimeout(180_000)
+  const server = createServer((request, response) => {
+    if (request.url === '/redirect') {
+      const port = (server.address() as { port: number }).port
+      response.writeHead(302, { location: `http://127.0.0.1:${port}/outside` })
+      response.end()
+      return
+    }
+    response.writeHead(200, { 'content-type': 'text/html' })
+    response.end('<main>PLUGIN_WEBVIEW_OK</main>')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+  const port = (server.address() as { port: number }).port
+  try {
+    const running = await openPluginPane(`http://localhost:${port}/ok`)
+    await running.page.getByRole('button', { name: 'E2E docs' }).click()
+    const slot = running.page.locator('[data-pane-id="e2e-docs"]')
+    await expect(slot).toBeVisible()
+    await expect(slot.locator('.plugin-webview-hostname')).toHaveText(`localhost:${port}`)
+
+    const rendered = await running.app.evaluate(async ({ webContents }, expectedPort) => {
+      const deadline = Date.now() + 20_000
+      while (Date.now() < deadline) {
+        const view = webContents.getAllWebContents().find((contents) => contents.getURL().includes(`localhost:${expectedPort}/ok`))
+        if (view && !view.isLoading()) return view.executeJavaScript('document.body.innerText') as Promise<string>
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      return '(webview did not render)'
+    }, port)
+    expect(rendered.trim()).toBe('PLUGIN_WEBVIEW_OK')
+    await running.page.screenshot({ path: testInfo.outputPath('plugin-webview.png') })
+
+    const controller = () => running.page.frames().find((frame) =>
+      frame.url().startsWith('app-plugin://') && frame !== running.frame,
+    ) ?? running.page.frames().find((frame) => frame.url().startsWith('app-plugin://'))
+    await expect.poll(() => controller()?.evaluate(() => document.body.dataset.ready), { timeout: 15_000 }).toBe('1')
+    const reply = await send(controller()!, {
+      kind: 'webview', op: 'navigate', url: `http://localhost:${port}/redirect`,
+    })
+    expect(reply.ok).toBe(true)
+    await expect(slot.locator('.plugin-webview-blocked')).toContainText('127.0.0.1')
+    await expect.poll(
+      () => controller()!.evaluate(() => (window as unknown as { __events?: { channel: string }[] }).__events?.some((event) => event.channel === 'webview:blocked')),
+      { timeout: 15_000 },
+    ).toBe(true)
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
 })
 
 test('a plugin frame can reach nothing on this machine but its own bridge', async () => {

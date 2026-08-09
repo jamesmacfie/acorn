@@ -9,7 +9,7 @@ import { clientEvents, consumePaneIntent, openPane } from '../../registries/clie
 import { saveJsonPref } from '../../settings/savePref'
 import { watchAppearance } from '../../ui/appearance'
 import { BRIDGE_TOKENS } from '../../ui/tokenAxes'
-import { createFrameBridge, postAppearance, postSelect, type FrameBinding, type FrameServices } from './broker'
+import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, type FrameBinding, type FrameServices } from './broker'
 import { isSubscribable } from './channels'
 
 export { SUBSCRIBABLE_CHANNELS } from './channels'
@@ -43,6 +43,14 @@ export type PluginFrameProps = {
   // says when it is done.
   onImported?: () => void
   onClose?: () => void
+  // A webview's visible pixels are host-owned. Its sandboxed client bundle remains mounted offscreen
+  // solely as the typed controller that can issue the four allowed verbs.
+  controllerOnly?: boolean
+  webview?: {
+    navigate(url: string): Promise<boolean>
+    command(action: 'back' | 'forward' | 'reload'): Promise<boolean>
+    subscribe(listener: (channel: 'webview:navigated' | 'webview:blocked', payload: unknown) => void): () => void
+  }
 }
 
 const currentAxes = (): { theme: string; style: string } => ({
@@ -115,6 +123,8 @@ export default function PluginFrame(props: PluginFrameProps) {
     },
     importerDone: () => props.onImported?.(),
     importerClose: () => props.onClose?.(),
+    webviewNavigate: (url) => props.webview?.navigate(url) ?? Promise.resolve(false),
+    webviewCommand: (action) => props.webview?.command(action) ?? Promise.resolve(false),
   })
 
   // A rail-source row that opened this pane. Retained by openPane until the pane consumes it, so a
@@ -175,7 +185,11 @@ export default function PluginFrame(props: PluginFrameProps) {
       consumePaneIntent(event.taskId, event.paneId)
       postSelect(channel.port1, event.intent.item)
     })
+    const unwebview = props.webview?.subscribe((eventChannel, payload) => {
+      postBridgeEvent(channel.port1, eventChannel, payload)
+    })
     onCleanup(() => {
+      unwebview?.()
       unselect()
       unwatch()
       bridge.dispose()
@@ -199,7 +213,10 @@ export default function PluginFrame(props: PluginFrameProps) {
         src={`${pluginFrameOrigin(props.hash)}/index.html`}
         title={props.binding.surface}
         sandbox="allow-scripts allow-same-origin"
-        style={{ border: '0', width: '100%', height: '100%', display: 'block' }}
+        aria-hidden={props.controllerOnly ? 'true' : undefined}
+        style={props.controllerOnly
+          ? { border: '0', width: '1px', height: '1px', position: 'absolute', opacity: '0', 'pointer-events': 'none' }
+          : { border: '0', width: '100%', height: '100%', display: 'block' }}
         ref={(frame) => frame.addEventListener('load', () => onLoad(frame), { once: true })}
       />
     </Show>

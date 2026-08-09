@@ -37,7 +37,7 @@ export type PluginBridgeHello = { acornBridge: typeof PLUGIN_BRIDGE_VERSION }
 export type PluginFrameContext = {
   // The contribution id this frame is rendering, as declared in the manifest.
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview'
   nodeId: string
   taskId?: string
   projectId?: string
@@ -86,6 +86,12 @@ export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'importer.done' }
   | { id: number; kind: 'ui'; op: 'importer.close' }
 
+// A webview controller can address only the surface whose binding owns its port. There is no surface,
+// plugin or node identifier in the request for plugin code to forge.
+export type PluginBridgeWebviewRequest =
+  | { id: number; kind: 'webview'; op: 'navigate'; url: string }
+  | { id: number; kind: 'webview'; op: 'back' | 'forward' | 'reload' }
+
 // Abandon an in-flight request. The SDK sends this when an AbortSignal fires; the host stops caring
 // about the response rather than pretending it can un-send an HTTP request.
 export type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
@@ -95,6 +101,7 @@ export type PluginBridgeRequest =
   | PluginBridgeSubscribeRequest
   | PluginBridgeStateRequest
   | PluginBridgeUiRequest
+  | PluginBridgeWebviewRequest
   | PluginBridgeCancelRequest
 
 // ── Host → frame ──────────────────────────────────────────────────────────────────────────────────
@@ -105,6 +112,8 @@ export type PluginBridgeReply =
   | { id: number; ok: true; status: number; body: unknown }
   | ({ id: number; ok: false } & ErrorEnvelope)
 
+export type PluginWebviewNavigated = { url: string; canGoBack: boolean; canGoForward: boolean; loading: boolean }
+export type PluginWebviewBlocked = { url: string; host: string }
 export type PluginBridgeEvent = { kind: 'event'; channel: string; payload: unknown }
 
 // Pushed on connect and again whenever the host's appearance changes. `tokens` is a flat map of CSS
