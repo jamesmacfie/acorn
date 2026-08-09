@@ -50,6 +50,15 @@ contextBridge.exposeInMainWorld('acorn', {
     ipcRenderer.invoke('acorn:node-tunnel-open', request),
   nodeTunnelClose: (match: { nodeId?: string; taskId?: string }): void =>
     ipcRenderer.send('acorn:node-tunnel-close', match),
+  // Third-party plugin bundles (docs/third-party/phase-2-distribution-trust.md). `cachePut` names a
+  // node and a plugin and gets back the hash main computed from the bytes it fetched — the bundle
+  // itself never crosses this bridge, so the renderer is no more able to touch third-party code than
+  // it is to touch a device token.
+  plugins: {
+    state: () => ipcRenderer.invoke('acorn:plugins-state'),
+    cachePut: (request: unknown) => ipcRenderer.invoke('acorn:plugins-cache-put', request),
+    trustRecord: (request: unknown) => ipcRenderer.invoke('acorn:plugins-trust-record', request),
+  },
   // Node recovery screen (client-core/node/NodeGate.tsx). Only reachable when there is no node to
   // talk to, which is also why `quit` cannot go through the renderer's will-quit prompt: the shell
   // that answers it is not mounted.

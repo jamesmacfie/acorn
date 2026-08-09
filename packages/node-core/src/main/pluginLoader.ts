@@ -9,23 +9,57 @@
 // acknowledgement UI does not exist until phases 2/5, and shipping a default-on loader before the
 // consent surface exists would mean running third-party code the user never agreed to. Phase 5
 // removes the flag, at the same time as it adds the prompt.
-import { readdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { readdirSync, readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { resolveInRoot } from './core/filesystem/confinement'
+import { confineExistingFile, resolveInRoot } from './core/filesystem/confinement'
 import { PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
 import { PLUGIN_DB_DIR } from './pluginStorage'
 import type { NodePlugin } from '../server/plugin/types'
 
 export const UNSAFE_FLAG = 'ACORN_UNSAFE_PLUGINS'
 
+// A client bundle is one ESM file that has to travel a broker request and land in a device's cache
+// (docs/third-party/phase-2-distribution-trust.md). The ceiling is here rather than only in the
+// device's cache because a node should not read a gigabyte into memory to answer a GET, and it is
+// generous enough that no honest bundle meets it.
+export const MAX_CLIENT_BUNDLE_BYTES = 8 * 1024 * 1024
+
 export type LoadedPlugin = { manifest: PluginManifest; plugin: NodePlugin; dir: string; shadowsBuiltin: boolean }
+
+// Every package on disk whose manifest parsed, whether or not it has a node half to run. This is the
+// list phase 2 distributes from: a client-only plugin has nothing to load in this process but its
+// bundle still has to reach every paired device.
+export type InstalledPlugin = {
+  manifest: PluginManifest
+  dir: string
+  // sha256 (lowercase hex) and byte length of the client entrypoint, read at boot. null when the
+  // manifest declares none, or the file is missing or escapes the plugin directory.
+  //
+  // It can go stale — nothing stops the file being edited under a running node — and that is the
+  // wanted behaviour rather than a gap: the device hashes the bytes it actually received, finds they
+  // do not match this claim, and refuses them. Fail closed.
+  client: { hash: string; bytes: number } | null
+}
+
+// The `dir` -free projection the roster route takes. `dir` is an absolute path on the node's
+// filesystem and must not be reachable from a route, so the narrowing happens here rather than
+// being a discipline each composition root has to remember.
+export type InstalledPluginInfo = {
+  id: string
+  version: string
+  apiVersion: string
+  permissions: PluginManifest['permissions']
+  client: { hash: string; bytes: number } | null
+}
 
 // Why one directory did not produce a plugin. `id` is the directory name when the manifest could not
 // be read at all — it is the only handle we have on the thing that failed.
 export type PluginLoadFailure = { id: string; dir: string; reason: string }
 
-export type PluginLoadResult = { loaded: LoadedPlugin[]; failures: PluginLoadFailure[] }
+export type PluginLoadResult = { loaded: LoadedPlugin[]; installed: InstalledPlugin[]; failures: PluginLoadFailure[] }
 
 // Installed packages live beside the per-plugin SQLite files, under the same `<dataRoot>/plugins`.
 // They cannot collide: the id pattern forbids a dot, so no directory can be named `<id>.sqlite`.
@@ -43,6 +77,52 @@ function asNodePlugin(mod: unknown): NodePlugin | null {
   if (shape.ready !== undefined && typeof shape.ready !== 'function') return null
   if (shape.dispose !== undefined && typeof shape.dispose !== 'function') return null
   return candidate as NodePlugin
+}
+
+// The client entrypoint's hash and size, or null. Every failure is null rather than a throw: a
+// package whose client half is broken still has a node half worth running, and the device simply
+// never sees a bundle to cache.
+function clientDigest(dir: string, relPath: string | undefined): { hash: string; bytes: number } | null {
+  if (!relPath) return null
+  const abs = resolveInRoot(dir, relPath)
+  if (!abs) return null
+  try {
+    const bytes = readFileSync(abs)
+    if (bytes.byteLength > MAX_CLIENT_BUNDLE_BYTES) return null
+    return { hash: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength }
+  } catch {
+    return null
+  }
+}
+
+export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo => ({
+  id: entry.manifest.id,
+  version: entry.manifest.version,
+  apiVersion: entry.manifest.apiVersion,
+  permissions: entry.manifest.permissions,
+  client: entry.client,
+})
+
+// The bytes behind GET /v2/core/plugins/:id/client.js. Re-confines the path rather than trusting the
+// one resolved at boot, and re-hashes rather than reporting the boot hash: the two disagree exactly
+// when the file changed underneath us, and the honest answer is the hash of what is being sent.
+export async function readClientBundle(
+  installed: readonly InstalledPlugin[],
+  id: string,
+): Promise<{ bytes: Uint8Array<ArrayBuffer>; hash: string } | null> {
+  const entry = installed.find((candidate) => candidate.manifest.id === id)
+  if (!entry?.manifest.client) return null
+  const confined = await confineExistingFile(entry.dir, entry.manifest.client)
+  if (!confined.ok) return null
+  try {
+    const bytes = await readFile(confined.path)
+    if (bytes.byteLength > MAX_CLIENT_BUNDLE_BYTES) return null
+    // Uint8Array.from rather than a view over the Buffer: Node's Buffers sit in a shared pool, and
+    // the response body must not alias memory the next read can reuse.
+    return { bytes: Uint8Array.from(bytes), hash: createHash('sha256').update(bytes).digest('hex') }
+  } catch {
+    return null
+  }
 }
 
 function subdirectories(dir: string): string[] {
@@ -66,11 +146,12 @@ export async function loadExternalPlugins(
         'Loading third-party node code is opt-in until the install-time trust prompt ships.',
       )
     }
-    return { loaded: [], failures: [] }
+    return { loaded: [], installed: [], failures: [] }
   }
 
   const builtins = new Set(options.builtins)
   const loaded: LoadedPlugin[] = []
+  const installed: InstalledPlugin[] = []
   const failures: PluginLoadFailure[] = []
   const seen = new Set<string>()
 
@@ -96,8 +177,13 @@ export async function loadExternalPlugins(
     // A manifest may name any directory; the id is what binds the route namespace and the database
     // filename, so it has to be unique regardless of which folder it was found in.
     seen.add(manifest.id)
-    // Client-only package. Nothing to load in the Node; phase 2 serves its bundle to devices.
-    if (!manifest.node) continue
+    const install = (): void => void installed.push({ manifest, dir, client: clientDigest(dir, manifest.client) })
+    // Client-only package. Nothing to load in the Node, but its bundle still has to reach every
+    // paired device — which is the whole reason `installed` exists alongside `loaded`.
+    if (!manifest.node) {
+      install()
+      continue
+    }
 
     // Lexical + symlink confinement, the same helper CoreServices uses for worktree paths: a bundle
     // must not be able to point the loader at a file outside its own directory.
@@ -137,8 +223,12 @@ export async function loadExternalPlugins(
       console.warn(`[plugins] ${manifest.id}: loading from ${dir} INSTEAD of the built-in (${UNSAFE_FLAG} is set)`)
     }
     loaded.push({ manifest, plugin, dir, shadowsBuiltin })
+    // Only now. A package whose node half declared itself and then failed to import is broken, not
+    // client-only, and distributing the UI of a plugin whose routes will never exist would put a row
+    // on every paired device claiming a plugin that is not running anywhere.
+    install()
   }
 
   for (const failure of failures) console.error(`[plugins] ${failure.id}: ${failure.reason}`)
-  return { loaded, failures }
+  return { loaded, installed, failures }
 }

@@ -4,7 +4,7 @@ import { reconcileWorktrees } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
-import { loadExternalPlugins } from '@acorn/node-core/main/pluginLoader.ts'
+import { loadExternalPlugins, type InstalledPlugin } from '@acorn/node-core/main/pluginLoader.ts'
 import type { NodePermissions } from '@acorn/node-core/main/pluginManifest.ts'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
@@ -22,6 +22,9 @@ export type NodeComposition = {
   // The subset that came off disk, keyed by name, carrying its manifest's node permissions. The host
   // takes this as the one signal that a plugin is contained and permission-shaped.
   loaded: ReadonlyMap<string, NodePermissions>
+  // Every package on disk, including the client-only ones that produced no NodePlugin. This is what
+  // the roster route distributes from; `loaded` above is only what this process runs.
+  installed: readonly InstalledPlugin[]
   drainOrder: typeof NODE_DRAIN_ORDER
 }
 
@@ -32,7 +35,7 @@ export type NodeComposition = {
 // unflagged boot — which is every packaged boot today — gets exactly the static list and nothing else.
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
   const builtins = nodePlugins(dataDir, deps)
-  const { loaded } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
+  const { loaded, installed } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
   // A loaded plugin may deliberately replace a built-in of the same id — that is how the loader is
   // dogfooded (scripts/build-plugin.mjs). Only one of them may be in the graph: the ids are route
   // namespaces and database filenames, and initPlugins rejects a duplicate name outright.
@@ -40,6 +43,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
   return {
     plugins: [...builtins.filter((plugin) => !shadowed.has(plugin.name)), ...loaded.map((entry) => entry.plugin)],
     loaded: new Map(loaded.map((entry) => [entry.manifest.id, entry.manifest.permissions.node])),
+    installed,
     drainOrder: NODE_DRAIN_ORDER,
   }
 }

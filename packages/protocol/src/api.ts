@@ -273,9 +273,48 @@ export type NodePluginRow = {
   state: 'active' | 'failed' | 'disabled'
   // Epoch millis, present only on a failed row.
   failedAt?: number
+  // Present exactly when this plugin came off the node's disk rather than out of the app binary,
+  // which also makes it the client's answer to "is this third-party?" (docs/third-party).
+  installed?: InstalledPluginRow
+}
+
+// The major of @acorn/plugin-api a bundle was built against. A manifest that does not name exactly
+// this value is skipped — "built for a newer/older acorn" is a clearer failure than a plugin that
+// loads and then calls a `ctx` member that no longer exists.
+//
+// It lives here rather than being derived from packages/plugin-api/package.json: that manifest is
+// `private` and its version is decorative, while THIS constant is a compatibility contract that has
+// to change deliberately. @acorn/plugin-api re-exports it so plugin authors can assert against it.
+//
+// In protocol rather than node-core because both sides hold it against the same manifest: the node
+// decides what to load, the device decides which of a fleet's bundles it can run.
+export const PLUGIN_API_MAJOR = '1'
+
+// What a plugin's manifest DECLARED. Not what is enforced: until loaded plugins move out of process
+// the node block is context-shaping plus disclosure (docs/third-party/node-security.md § Design
+// rules, rule 6), so every surface that renders this says "declared" and flips to "enforced" with no
+// vocabulary change when the boundary lands.
+export type NodePluginPermissions = {
+  api: string[]
+  events: string[]
+  node: { core: string[]; capabilities: string[]; secrets: boolean; exec: boolean; net: string[] }
+}
+
+export type InstalledPluginRow = {
+  version: string
+  apiVersion: string
+  permissions: NodePluginPermissions
+  // The client bundle this node is offering, or null when the package has no client half. `hash` is
+  // the sha256 the node computed from the file; it is a CACHE KEY HINT and nothing more — the device
+  // hashes the bytes it received and refuses a mismatch, because a compromised node can lie here
+  // (docs/third-party/README.md § Trust binds to bytes, not to claims).
+  client: { hash: string; bytes: number } | null
 }
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
 export const corePluginsRoute = '/v2/core/plugins'
+// The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
+// task-scoped internal token cannot reach it (server/index.ts mounts requireDevice over both forms).
+export const corePluginBundleRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/client.js`
 // Every client paired with a node, and the revoke for one of them (docs/ui-design.md § New surfaces: "revoke this or
 // other devices"). Device-only, like the plugin list — this is node administration.
 export const coreDevicesRoute = '/v2/core/devices'

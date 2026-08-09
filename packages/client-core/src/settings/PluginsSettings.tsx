@@ -4,6 +4,7 @@ import { activeNodeId } from '../node/activeNode'
 import { nodes } from '../node/fleet'
 import { restartLocalNode } from '../node/fleetActions'
 import { refreshNodePlugins, saveDisabledNodePlugins } from '../node/nodePlugins'
+import { readPluginHostState } from '../plugins/host'
 import { Button, Select } from '../ui/primitives'
 import { nextDisabledList, pluginPending } from './pluginToggle'
 import './settings.css'
@@ -37,6 +38,15 @@ export default function PluginsSettings() {
   const optional = createMemo(() => rows().filter((row) => !row.required))
   const required = createMemo(() => rows().filter((row) => row.required))
   const restartRequired = () => state()?.restartRequired === true
+
+  // The device's own answer, which the node knows nothing about: it served the bundle, and this
+  // machine declined to run it (plugins/distribution.ts). Read once per mount rather than kept live —
+  // a decision only changes through the trust dialog, which is modal over this page.
+  const [acks] = createResource(async () => (await readPluginHostState()).acks)
+  const blockedHere = (row: NodePluginRow): boolean => {
+    const hash = row.installed?.client?.hash
+    return !!hash && (acks() ?? []).some((ack) => ack.pluginId === row.name && ack.hash === hash && ack.decision === 'rejected')
+  }
 
   const toggle = async (name: string, disabled: boolean) => {
     setError('')
@@ -114,6 +124,16 @@ export default function PluginsSettings() {
                 />
                 <span class="plugin-name">{row.name}</span>
               </label>
+              {/* Only a plugin that came off this node's disk has a version worth showing; a built-in's
+                  is the app's. Absence of the block is also how the owner tells the two apart. */}
+              <Show when={row.installed}>
+                {(installed) => <span class="plugin-version muted">{installed().version}</span>}
+              </Show>
+              {/* This device has seen these exact bytes and said no. Per-device by design, hence the
+                  wording: the same plugin may be running happily on the owner's other laptop. */}
+              <Show when={blockedHere(row)}>
+                <span class="plugin-failed" role="status">blocked on this device</span>
+              </Show>
               {/* Only when the two answers differ — otherwise every row would carry a redundant label. */}
               <Show when={pluginPending(row)}>
                 <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>

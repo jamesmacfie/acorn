@@ -45,7 +45,7 @@ describe('loading rollbar from disk', () => {
 
   it('is inert without the flag, however installed it is', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(await loadExternalPlugins(dataRoot, { builtins: [] })).toEqual({ loaded: [], failures: [] })
+    expect(await loadExternalPlugins(dataRoot, { builtins: [] })).toEqual({ loaded: [], installed: [], failures: [] })
     warn.mockRestore()
   })
 
@@ -59,6 +59,12 @@ describe('loading rollbar from disk', () => {
       // It replaces the built-in rather than colliding with it — the flagged dev boot runs the disk
       // copy, which is the whole point of dogfooding.
       expect(loaded[0].shadowsBuiltin).toBe(true)
+      // It also appears in the distribution enumeration, with nothing to distribute: build-plugin.mjs
+      // builds a node half only. Rollbar's client half is compiled into the app and is not a
+      // self-contained sandbox bundle, so a `client` entry here would advertise something phase 3
+      // could not run (docs/third-party/phase-2-distribution-trust.md).
+      const { installed } = await loadExternalPlugins(dataRoot, { builtins: ['rollbar'] })
+      expect(installed.map((entry) => [entry.manifest.id, entry.client])).toEqual([['rollbar', null]])
 
       plugins = await initPlugins([loaded[0].plugin], {
         capabilities: new CapabilityRegistry(),

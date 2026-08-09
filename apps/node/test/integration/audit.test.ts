@@ -28,6 +28,9 @@ beforeEach(async () => {
       { name: 'http', required: false, disabled: false, state: 'active' },
       { name: 'terminal', required: true, disabled: false, state: 'active' },
     ],
+    // Nothing installed from disk: this harness is about the audit record, not about distribution.
+    installed: () => [],
+    clientBundle: async () => null,
     disabled: () => disabled,
     setDisabled: (names) => {
       disabled = [...names]

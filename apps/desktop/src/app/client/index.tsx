@@ -13,6 +13,7 @@ import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-cor
 import { clientFor } from '@acorn/client-core/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/registries/sources.ts'
+import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
 
 const noop = () => null
 
@@ -33,6 +34,12 @@ await selectActiveNode()
 // than appending them. Not awaited-and-fatal: `applyNodePlugins` swallows a read failure and leaves the
 // full contribution set active, because a node that cannot answer must not cost the owner their UI.
 await applyNodePlugins(activeNodeId() ?? undefined)
+
+// Third-party plugin bundles, across the whole fleet rather than just the active node
+// (docs/third-party/phase-2-distribution-trust.md). Deliberately NOT awaited: it talks to every
+// remembered node, and a fleet with an offline machine in it must not hold up the first paint. The
+// trust dialog is an overlay contribution, so whatever it queues renders whenever this settles.
+void syncPluginDistribution()
 
 render(
   () => (
