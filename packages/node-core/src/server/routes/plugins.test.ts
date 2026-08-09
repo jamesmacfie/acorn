@@ -21,6 +21,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
+  contributions: { frames: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   ...over,
 })
@@ -153,6 +154,9 @@ describe('installed packages in the roster (docs/third-party/phase-2-distributio
       version: '2.1.0',
       apiVersion: '1',
       permissions: NO_PERMISSIONS,
+      // Passed through untouched for the device to register surfaces from
+      // (docs/third-party/phase-3-sandboxed-ui.md); the node neither reads nor renders it.
+      contributions: { frames: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -174,7 +178,13 @@ describe('installed packages in the roster (docs/third-party/phase-2-distributio
       disabled: false,
       running: true,
       state: 'active',
-      installed: { version: '1.0.0', apiVersion: '1', permissions: NO_PERMISSIONS, client: { hash: 'a'.repeat(64), bytes: 12 } },
+      installed: {
+        version: '1.0.0',
+        apiVersion: '1',
+        permissions: NO_PERMISSIONS,
+        contributions: { frames: [] },
+        client: { hash: 'a'.repeat(64), bytes: 12 },
+      },
     })
     expect(state.restartRequired).toBe(false)
   })

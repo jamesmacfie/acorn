@@ -14,6 +14,7 @@ import { clientFor } from '@acorn/client-core/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/registries/sources.ts'
 import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
+import { syncFrameContributions } from '@acorn/client-core/plugins/frames/register.tsx'
 
 const noop = () => null
 
@@ -39,7 +40,12 @@ await applyNodePlugins(activeNodeId() ?? undefined)
 // (docs/third-party/phase-2-distribution-trust.md). Deliberately NOT awaited: it talks to every
 // remembered node, and a fleet with an offline machine in it must not hold up the first paint. The
 // trust dialog is an overlay contribution, so whatever it queues renders whenever this settles.
-void syncPluginDistribution()
+// …and once it settles, register the surfaces every accepted plugin declared
+// (docs/third-party/phase-3-sandboxed-ui.md). Chained rather than awaited for the same reason: a fleet
+// with an offline machine in it must not hold up the first paint, and a plugin pane appearing a moment
+// after the shell does is the correct trade. Panes read the active node at render, so a node switch needs
+// no second pass.
+void syncPluginDistribution().then(syncFrameContributions)
 
 render(
   () => (

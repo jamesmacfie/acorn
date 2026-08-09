@@ -49,7 +49,15 @@ const state = (bridge: PluginsBridge) => {
   const declared = (name: string): Pick<NodePluginRow, 'installed'> => {
     const entry = installed.get(name)
     if (!entry) return {}
-    return { installed: { version: entry.version, apiVersion: entry.apiVersion, permissions: entry.permissions, client: entry.client } }
+    return {
+      installed: {
+        version: entry.version,
+        apiVersion: entry.apiVersion,
+        permissions: entry.permissions,
+        contributions: entry.contributions,
+        client: entry.client,
+      },
+    }
   }
   // `disabled` is what will be true after a restart; `running` is what is true now. A required plugin is
   // never disabled either way, whatever the file says.

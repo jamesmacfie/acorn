@@ -155,6 +155,42 @@ describe('the installed enumeration', () => {
   })
 })
 
+// The manifest is the only place a shell contribution can be declared, so what it parses is the whole
+// vocabulary a third-party plugin's UI has (docs/third-party/phase-3-sandboxed-ui.md).
+describe('declared frame contributions', () => {
+  const withFrames = (frames: unknown[]) =>
+    manifest('board', { client: './dist/client.js', contributions: { frames } })
+
+  it('defaults a surface to a desktop pane at order 500', async () => {
+    install('board', withFrames([{ target: 'pane', id: 'board', label: 'Board' }]), BUNDLE('board'), 'export default {}')
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installedPluginInfo(installed[0]).contributions.frames).toEqual([
+      { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] },
+    ])
+  })
+
+  it('has an empty frame list when the manifest declares no contributions at all', async () => {
+    install('plain', manifest('plain'), BUNDLE('plain'))
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installedPluginInfo(installed[0]).contributions).toEqual({ frames: [] })
+  })
+
+  it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {
+    // Phase 4's declarative chrome lands under sibling keys. A strict object here would turn "this
+    // acorn contributes less" into "this plugin does not parse".
+    install('board', manifest('board', { contributions: { frames: [], descriptors: [{ kind: 'badge' }] } }), BUNDLE('board'))
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installed[0].manifest.contributions).toMatchObject({ descriptors: [{ kind: 'badge' }] })
+  })
+
+  it('skips a package whose surface declares an unknown target', async () => {
+    install('board', withFrames([{ target: 'toolbar', id: 'board', label: 'Board' }]), BUNDLE('board'))
+    const { installed, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installed).toEqual([])
+    expect(failures).toHaveLength(1)
+  })
+})
+
 // Every case here is a SKIP plus a report. The loader must never throw: one broken installed plugin
 // cannot be allowed to stop a node from booting.
 describe('rejections', () => {

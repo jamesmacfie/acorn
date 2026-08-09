@@ -52,6 +52,10 @@ export type InstalledPluginInfo = {
   version: string
   apiVersion: string
   permissions: PluginManifest['permissions']
+  // What the manifest declared for the device to render (docs/third-party/phase-3-sandboxed-ui.md).
+  // Passed through untouched: the node neither renders nor validates these beyond the schema, and the
+  // device binds each one to this plugin's id.
+  contributions: PluginManifest['contributions']
   client: { hash: string; bytes: number } | null
 }
 
@@ -100,6 +104,7 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   version: entry.manifest.version,
   apiVersion: entry.manifest.apiVersion,
   permissions: entry.manifest.permissions,
+  contributions: entry.manifest.contributions,
   client: entry.client,
 })
 

@@ -1,5 +1,40 @@
 # Phase 3 — Sandboxed UI runtime
 
+**Status: shipped.** Six things came out differently from the design below, and each one is recorded
+where it belongs rather than only here; this list is the index.
+
+1. **No `kind: 'frame'` union.** The four registries and all four of their consumers are untouched. A
+   host-side adapter (`packages/client-core/src/plugins/frames/register.tsx`) registers ordinary
+   contributions whose component is a `PluginFrame` pre-bound to `(pluginId, surface, hash)`, so
+   component and frame contributions coexist because to the shell there is only one kind. The
+   importer's `onClose`/`onImported` become props on that component, which turns them into the bridge
+   verbs. See "Frame contribution kind" below.
+2. **`sandbox="allow-scripts allow-same-origin"`, not `allow-scripts` alone.** Dropping
+   `allow-same-origin` makes the frame's origin opaque, at which point `'self'` in the served CSP
+   matches nothing, the frame's own module script becomes a cross-origin fetch on a scheme with no
+   CORS, and the document renders blank. The pair is safe here because the embedder is a *different*
+   origin (`app://acorn`); the danger case is a framed document sharing the embedder's origin. It also
+   restores the frame-local `localStorage` this document assumes further down.
+3. **Appearance is pushed over the port, not served as `tokens.css`.** The document says pick one.
+   Pushing avoids invalidating a stylesheet at a hash-addressed origin, and main does not know the
+   renderer's appearance state anyway. The SDK applies the pushed tokens to `:root` plus `data-theme` /
+   `data-style`.
+4. **`subscribe` speaks `ClientEventMap`, not `invalidate:*`.** There is no `invalidate:` channel in
+   this codebase. The allowed vocabulary is the `runtime:*` half of the existing closed event map
+   (`SUBSCRIBABLE_CHANNELS` in `PluginFrame.tsx`); `presentation:*` is withheld because it is the
+   user's own navigation.
+5. **No wildcards in the scope table.** `core.tasks:read ⇒ GET /v2/core/tasks*` would also grant
+   `…/mcp/starter` and `…/preview-url`, which hand out an MCP configuration and a tunnel URL. Every
+   rule in `scopes.ts` names its path, and an exhaustive test fails until a newly added core route is
+   classified.
+6. **No CSS primitive kit.** The pushed tokens and both appearance axes are what make a foreign frame
+   look native; the class vocabulary waits until a real plugin asks for it.
+
+Where it lives: `main/pluginScheme.ts` (origin + CSP), `protocol/src/pluginBridge.ts` (wire),
+`client-core/src/plugins/frames/` (scopes, broker, frame host, adapter, SDK),
+`plugin-api/src/ui/sdk.ts` (the author-facing entrypoint), `apps/desktop/e2e/pluginFrame.spec.ts` (the
+acceptance checklist at the bottom of this file, as assertions).
+
 **Size: L.** Requires Phase 2. After this phase a third-party plugin can render panes, reference
 panels, and settings pages in isolated frames that can reach nothing on the host machine, while
 making permission-checked API calls and receiving events through one typed bridge.

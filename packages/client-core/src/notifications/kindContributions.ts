@@ -16,4 +16,9 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   // OS notification fires whether or not the window has focus, and this is a standing condition rather
   // than something that just happened. It belongs in the bell, where the owner finds it when they look.
   { id: 'disk-unencrypted', glyph: 'triangle-alert', severity: 'warn', toast: false },
+  // Anything a sandboxed plugin frame raises through the bridge's `toast` verb
+  // (docs/third-party/phase-3-sandboxed-ui.md). `toast: false` on purpose: an OS notification fires
+  // whether or not the window has focus, and third-party code should not be able to put text on the
+  // user's desktop. The bell is the right loudness for "the plugin has something to say".
+  { id: 'plugin', glyph: 'puzzle', severity: 'info', toast: false },
 ]

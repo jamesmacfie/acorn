@@ -7,7 +7,8 @@
     "./node": "./src/node/index.ts",
     "./client": "./src/client/index.ts",
     "./ui": "./src/ui/index.ts",
-    "./ui/diff": "./src/ui/diff.ts"
+    "./ui/diff": "./src/ui/diff.ts",
+    "./ui/sdk": "./src/ui/sdk.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

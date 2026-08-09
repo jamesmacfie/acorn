@@ -537,7 +537,9 @@ function installPluginOn(dataDir: string): void {
     version: '1.4.0',
     apiVersion: PLUGIN_API_MAJOR,
     client: './dist/client.js',
-    permissions: { api: ['tasks'], node: { core: ['projects:read'] } },
+    // `core.tasks:read` is the api vocabulary the UI bridge enforces (client-core/plugins/frames/scopes.ts);
+    // phase 2 only displays it, but a fixture spelling it the old way would be a manifest no acorn accepts.
+    permissions: { api: ['core.tasks:read'], node: { core: ['projects:read'] } },
   }))
 }
 
@@ -567,7 +569,7 @@ test('asks before running a plugin a paired node serves, then caches it for offl
   await expect(dialog).toContainText('1.4.0')
   await expect(dialog).toContainText('Second node')
   await expect(dialog).toContainText('node: core.projects:read')
-  await expect(dialog).toContainText('api: tasks')
+  await expect(dialog).toContainText('api: core.tasks:read')
 
   await dialog.getByRole('button', { name: 'Trust this plugin' }).click()
   await expect(dialog).toHaveCount(0)
