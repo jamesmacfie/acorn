@@ -92,4 +92,23 @@ contextBridge.exposeInMainWorld('acorn', {
       return () => ipcRenderer.removeListener('preview:event', listener)
     },
   },
+  webview: {
+    ensure: (key: string, url: string, hosts: readonly string[]) => ipcRenderer.invoke('plugin-webview:ensure', { key, url, hosts }),
+    setBounds: (key: string, rect: { x: number; y: number; width: number; height: number }) => ipcRenderer.send('plugin-webview:bounds', { key, rect }),
+    show: (key: string) => ipcRenderer.send('plugin-webview:show', { key }),
+    hide: (key: string) => ipcRenderer.send('plugin-webview:hide', { key }),
+    load: (key: string, url: string) => ipcRenderer.invoke('plugin-webview:load', { key, url }),
+    command: (key: string, action: 'back' | 'forward' | 'reload') => ipcRenderer.invoke('plugin-webview:command', { key, action }),
+    evict: (key: string) => ipcRenderer.send('plugin-webview:evict', { key }),
+    onEvent: (cb: (state: { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) => {
+      const listener = (_event: unknown, state: { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => cb(state)
+      ipcRenderer.on('plugin-webview:event', listener)
+      return () => ipcRenderer.removeListener('plugin-webview:event', listener)
+    },
+    onBlocked: (cb: (state: { key: string; url: string; host: string }) => void) => {
+      const listener = (_event: unknown, state: { key: string; url: string; host: string }) => cb(state)
+      ipcRenderer.on('plugin-webview:blocked', listener)
+      return () => ipcRenderer.removeListener('plugin-webview:blocked', listener)
+    },
+  },
 })

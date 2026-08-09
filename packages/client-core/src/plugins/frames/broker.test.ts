@@ -261,6 +261,35 @@ describe('ui verbs', () => {
   })
 })
 
+describe('webview verbs', () => {
+  it('forwards navigation only from the bound webview and only inside its hosts', async () => {
+    const svc = services({ webviewNavigate: vi.fn(async () => true) })
+    const h = withBridge({ target: 'webview', hosts: ['docs.example.com'] }, svc)
+    h.send({ id: 30, kind: 'webview', op: 'navigate', url: 'https://docs.example.com/guide' })
+    await h.settled(2)
+    expect(replyTo(h, 30)).toMatchObject({ ok: true })
+    expect(svc.webviewNavigate).toHaveBeenCalledWith('https://docs.example.com/guide')
+  })
+
+  it('denies an outside host before it reaches the native view service', async () => {
+    const svc = services({ webviewNavigate: vi.fn(async () => true) })
+    const h = withBridge({ target: 'webview', hosts: ['docs.example.com'] }, svc)
+    h.send({ id: 31, kind: 'webview', op: 'navigate', url: 'https://evil.example/collect' })
+    await h.settled(2)
+    expect(replyTo(h, 31)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(svc.webviewNavigate).not.toHaveBeenCalled()
+  })
+
+  it('derives the surface from the binding and refuses a normal pane', async () => {
+    const svc = services({ webviewCommand: vi.fn(async () => true) })
+    const h = withBridge({ target: 'pane', hosts: ['docs.example.com'] }, svc)
+    h.send({ id: 32, kind: 'webview', op: 'reload' })
+    await h.settled(2)
+    expect(replyTo(h, 32)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(svc.webviewCommand).not.toHaveBeenCalled()
+  })
+})
+
 describe('malformed and hostile traffic', () => {
   it('ignores anything without a usable request id', async () => {
     const h = withBridge()

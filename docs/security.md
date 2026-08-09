@@ -113,6 +113,13 @@ The only way a package reaches a Node's install directory is the owner-authentic
 until a Node's owner has installed it, and nothing runs on a device until that device has separately
 acknowledged the exact bundle bytes.
 
+A loaded plugin may declare a host-owned webview. Unlike its sandboxed interface frame, the remote
+page has live network access and its own cookies/login state for the life of the process. The trust
+prompt names the declared hosts as a separate grant. Electron enforces that allowlist across requested
+navigations and redirects, and gives each surface an isolated ephemeral partition. The plugin gets no
+page preload, CDP driver, devtools, tunnel headers, script injection, or `postMessage` path, so it can
+choose the URL but cannot inspect or operate the page.
+
 ## Node-half plugin security
 
 The section above is about bundles a Node distributes to a device. This one is about the code a
@@ -390,6 +397,7 @@ here as the checklist reviewers should hold PRs against:
 | Process spawning | Unrestricted | `exec` grant → `--allow-child-process` | Declared rung 1, enforced rung 2 |
 | Native code loading | `.node` addon in bundle | `--permission` blocks addons; never `--allow-addons` | Rung 2 |
 | Network egress | Unrestricted | Broker allowlist (brokered traffic); OS sandbox (raw sockets) | Rung 1 partial, rung 3 full |
+| Webview hosts | Loads remote content the plugin chooses | Manifest host allowlist enforced across redirects; no CDP; isolated ephemeral partition | Webview phases 1/2 |
 | Agent sessions | Tool contributions | Third-party tools default disabled/ask | Phase 1/5 |
 | Fleet devices | Routes + broadcasts | Task-token opt-in default-no; content-free broadcasts | Phase 1/3 |
 | Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule; scope by `projectId`, never mirror the project row | Rung 1 |
@@ -397,10 +405,12 @@ here as the checklist reviewers should hold PRs against:
 | Project folder paths | `core.projects.checkouts()` lists every mapped codebase | Split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 1 (disclosure), rung 2 (enforced) |
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |
 
-## Preview and browser automation
+## Host-owned webviews and browser automation
 
-Preview uses a main-owned `WebContentsView` with an ephemeral session, no preload, isolated task
-binding, navigation checks, denied permission requests, and browser chrome outside the guest page.
+The desktop view service owns every `WebContentsView`, with an ephemeral session, no preload,
+navigation checks, denied permission requests, and browser chrome outside the guest page. Loaded
+plugin surfaces add a manifest host allowlist enforced on redirects and deliberately omit CDP
+attachment. Preview supplies its task binding and is the only caller that opts into the CDP driver.
 The remote preview tunnel accepts only declared task ports and authenticates its local loopback
 request with a per-tunnel secret before forwarding it to the Node.
 

@@ -309,7 +309,7 @@ export type NodePluginPermissions = {
 // Hand-written here for the same reason NodePluginPermissions is: the node parses the manifest, and
 // this is the projection the device registers contributions from.
 export type PluginFrameSurface = {
-  target: 'pane' | 'refPanel' | 'settings' | 'importer'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview'
   // The contribution id, which is also a persisted layout key. Bound to the plugin by the HOST — a
   // bundle cannot claim a surface its manifest did not declare.
   id: string
@@ -319,7 +319,13 @@ export type PluginFrameSurface = {
   formFactor: ('desktop' | 'mobile')[]
   providerId?: string
   group?: 'general' | 'workspace'
+  // Webview-only. Exactly one URL form and a non-empty host list are guaranteed by the node's
+  // manifest parser, then re-checked by the device before use because roster rows are untrusted wire.
+  url?: string
+  urlSource?: string
+  hosts?: string[]
 }
+export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
 
 // ── Declarative chrome (docs/plugins.md) ───────────────────────────
 //

@@ -3,7 +3,7 @@ import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { nodes } from '../node/fleet'
 import { createDismissable } from '../ui/dismissable'
 import { noteBundleAccepted, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
-import { nodePermissionLines, uiPermissionLines } from './permissions'
+import { nodePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
 import { syncChromeContributions } from './chrome/register'
 import { syncFrameContributions } from './frames/register'
 import { recordPluginTrust } from './host'
@@ -43,6 +43,13 @@ export default function PluginTrustDialog() {
 
   const nodeLines = group(nodePermissionLines)
   const uiLines = group(uiPermissionLines)
+  const webviewLines = createMemo(() => {
+    const current = request()
+    if (!current?.row.installed) return []
+    const lines = webviewPermissionLines(webviewGrants(current.row.installed.contributions))
+    const before = current.previous ? new Set(webviewPermissionLines(current.previous.webviews ?? [])) : null
+    return lines.map((text) => ({ text, added: before ? !before.has(text) : false }))
+  })
 
   const decide = async (decision: 'accepted' | 'rejected') => {
     const current = request()
@@ -56,6 +63,7 @@ export default function PluginTrustDialog() {
         nodeId: current.nodeId,
         version: current.row.installed.version,
         permissions: current.row.installed.permissions,
+        webviews: webviewGrants(current.row.installed.contributions),
         decision,
       })
       resolvePendingTrust(current.row.name, current.hash)
@@ -129,6 +137,17 @@ export default function PluginTrustDialog() {
                 Its interface runs in a sandbox with no network of its own. Anything not listed here is
                 refused.
               </p>
+
+              <Show when={webviewLines().length}>
+                <h3>Shows web pages — enforced hosts, live network</h3>
+                <ul class="plugin-trust-permissions">
+                  <For each={webviewLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
+                </ul>
+                <p class="muted">
+                  Pages load from the internet with their own cookies and logins. acorn cannot see inside
+                  them, and this plugin cannot read them or type into them.
+                </p>
+              </Show>
             </div>
             <div class="overlay-actions">
               <button type="button" class="ui-btn" data-variant="ghost" disabled={saving()} onClick={() => void decide('rejected')}>

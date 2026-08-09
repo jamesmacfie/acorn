@@ -22,6 +22,7 @@ import type {
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
+import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { allowApi, isApiMethod, type ApiMethod } from './scopes'
 
 // What the frame is, as the host decided it. Nothing here is ever read from a message.
@@ -29,7 +30,7 @@ export type FrameBinding = {
   pluginId: string
   // The contribution id this frame renders, and which registry it landed in.
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview'
   nodeId: string
   taskId?: string
   projectId?: string
@@ -39,6 +40,8 @@ export type FrameBinding = {
   // The pane ids this plugin contributed. `openPane` may name one of these and nothing else — a plugin
   // cannot use the bridge to drive the rest of the shell's layout.
   panes: readonly string[]
+  // Populated only for a webview binding, from the manifest row the host read.
+  hosts?: readonly string[]
 }
 
 export type FrameApiResult = {
@@ -63,6 +66,8 @@ export type FrameServices = {
   // Importer lifecycle. `done` is the host's post-import refresh; `close` is plain dismissal.
   importerDone(): void
   importerClose(): void
+  webviewNavigate?(url: string): Promise<boolean>
+  webviewCommand?(action: 'back' | 'forward' | 'reload'): Promise<boolean>
 }
 
 // A broken plugin must not be able to busy-loop the shell. These are generous for anything honest: a
@@ -275,6 +280,38 @@ export function createFrameBridge(input: {
     }
   }
 
+  const handleWebview = async (id: number, data: Record<string, unknown>): Promise<void> => {
+    if (binding.target !== 'webview') {
+      post(denied(id, 'webview operations are only valid from a webview surface'))
+      return
+    }
+    const op = data.op
+    try {
+      if (op === 'navigate') {
+        const url = data.url
+        if (typeof url !== 'string' || !isAllowedWebviewUrl(url, binding.hosts ?? [])) {
+          post(denied(id, 'navigate must stay inside this surface’s declared hosts'))
+          return
+        }
+        if (!services.webviewNavigate || !(await services.webviewNavigate(url))) {
+          post(failed(id, 'unavailable', 'the host webview is not available'))
+          return
+        }
+      } else if (op === 'back' || op === 'forward' || op === 'reload') {
+        if (!services.webviewCommand || !(await services.webviewCommand(op))) {
+          post(failed(id, 'unavailable', 'the host webview is not available'))
+          return
+        }
+      } else {
+        post(failed(id, 'bad_request', `unknown webview op ${String(op)}`))
+        return
+      }
+      post({ id, ok: true, status: 200, body: null })
+    } catch (error) {
+      post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
+    }
+  }
+
   port.onmessage = (event: MessageEvent) => {
     if (!alive) return
     const shape = requestShape(event.data)
@@ -295,6 +332,9 @@ export function createFrameBridge(input: {
         return
       case 'ui':
         handleUi(shape.id, data)
+        return
+      case 'webview':
+        void handleWebview(shape.id, data)
         return
       case 'cancel': {
         const target = data.target
@@ -332,4 +372,9 @@ export const postAppearance = (port: MessagePort, appearance: Omit<PluginBridgeA
  * to reach a mounted frame without holding its port (docs/plugins.md). */
 export const postSelect = (port: MessagePort, item: string): void => {
   port.postMessage({ kind: 'select', item } satisfies PluginBridgeSelect)
+}
+
+/** Push a host-owned event such as webview navigation into its controller frame. */
+export const postBridgeEvent = (port: MessagePort, channel: string, payload: unknown): void => {
+  port.postMessage({ kind: 'event', channel, payload } satisfies PluginBridgeEvent)
 }

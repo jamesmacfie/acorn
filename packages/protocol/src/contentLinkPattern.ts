@@ -1,3 +1,5 @@
+import { normalizeWebviewHost } from './webview'
+
 export const CONTENT_LINK_PATTERN_MAX_LENGTH = 512
 export const CONTENT_LINK_PATTERN_MAX_CAPTURES = 8
 
@@ -8,7 +10,6 @@ export type CompiledContentLinkPattern = {
 }
 
 type Segment = { literal: string } | { capture: string }
-const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i
 const CAPTURE = /^[A-Za-z][A-Za-z0-9_]{0,31}$/
 
 const decoded = (value: string, label: string): string => {
@@ -32,11 +33,15 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
   const slash = rest.indexOf('/')
   if (slash <= 0) throw new Error('content-link pattern must include a host and absolute path')
   const declaredHost = rest.slice(0, slash).toLowerCase()
-  const wildcard = declaredHost.startsWith('*.')
-  const host = wildcard ? declaredHost.slice(2) : declaredHost
-  if (!host.includes('.') || host.includes('*') || host.split('.').some((label) => !HOST_LABEL.test(label))) {
+  let normalizedHost: string
+  try {
+    normalizedHost = normalizeWebviewHost(declaredHost)
+  } catch {
     throw new Error('content-link pattern has an invalid literal host')
   }
+  const wildcard = normalizedHost.startsWith('*.')
+  const host = wildcard ? normalizedHost.slice(2) : normalizedHost
+  if (!host.includes('.')) throw new Error('content-link pattern has an invalid literal host')
 
   const rawPath = rest.slice(slash)
   const rawSegments = rawPath === '/' ? [] : rawPath.slice(1).split('/')

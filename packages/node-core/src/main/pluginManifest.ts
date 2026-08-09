@@ -16,6 +16,12 @@ import {
   compileContentLinkPattern,
   CONTENT_LINK_PATTERN_MAX_LENGTH,
 } from '@acorn/protocol/contentLinkPattern.ts'
+import {
+  isAllowedWebviewUrl,
+  normalizeWebviewHost,
+  WEBVIEW_HOST_MAX_COUNT,
+  WEBVIEW_HOST_MAX_LENGTH,
+} from '@acorn/protocol/webview.ts'
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The constant itself
 // moved to @acorn/protocol when the client gained a stake in it: the node uses it to decide what to
@@ -60,10 +66,18 @@ const entry = z.string().min(1).max(256).refine(
 // that are persisted layout keys and chord targets, so who may claim `board` has to be decided by the
 // host reading this file — a plugin's client bundle cannot register a shell contribution at all. This
 // is the client-side twin of the route-namespace binding the node host already does.
+const webviewHost = z.string().min(1).max(WEBVIEW_HOST_MAX_LENGTH).superRefine((value, ctx) => {
+  try {
+    normalizeWebviewHost(value)
+  } catch (error) {
+    ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
+  }
+})
+
 const frameSurface = z.object({
   // Which registry this lands in. The shell renders all four the same way; what differs is the
   // surrounding chrome it supplies.
-  target: z.enum(['pane', 'refPanel', 'settings', 'importer']),
+  target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview']),
   // The contribution id. Not namespaced by us: it becomes a persisted layout key the moment a user
   // opens the pane, and prefixing it later would be a storage break (registries/plugin.ts).
   id: z.string().min(1).max(64),
@@ -79,6 +93,11 @@ const frameSurface = z.object({
   providerId: z.string().min(1).max(64).optional(),
   // `settings` only.
   group: z.enum(['general', 'workspace']).optional(),
+  // `webview` only. The URL may be static or resolved from the plugin's own node route; the declared
+  // hosts are the grant the device records and Electron enforces across redirects.
+  url: z.string().min(1).max(2_048).optional(),
+  urlSource: z.string().min(1).max(256).optional(),
+  hosts: z.array(webviewHost).min(1).max(WEBVIEW_HOST_MAX_COUNT).optional(),
 })
 
 // ── Declarative chrome (docs/plugins.md) ───────────────────────────
@@ -232,10 +251,17 @@ const manifestShape = z.object({
 // core routes, or another plugin's, on its behalf.
 export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) => {
   const own = `/v2/p/${manifest.id}/`
-  const panes = new Set(manifest.contributions.frames.filter((frame) => frame.target === 'pane').map((frame) => frame.id))
+  const panes = new Set(manifest.contributions.frames.filter((frame) => frame.target === 'pane' || frame.target === 'webview').map((frame) => frame.id))
 
   const route = (path: string, at: (string | number)[]): void => {
-    if (!path.startsWith(own)) ctx.addIssue({ code: 'custom', path: at, message: `route must be inside ${own}` })
+    let confined = false
+    try {
+      const url = new URL(path, 'https://acorn.invalid')
+      confined = path.startsWith('/') && url.origin === 'https://acorn.invalid' && url.pathname.startsWith(own)
+    } catch {
+      // Report the same confinement error for malformed and escaped paths.
+    }
+    if (!confined) ctx.addIssue({ code: 'custom', path: at, message: `route must be inside ${own}` })
   }
 
   const action = (value: PluginChromeAction, at: (string | number)[]): void => {
@@ -252,7 +278,30 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     }
   }
 
-  const { sources, slots, palette, attention, nodeStats, contentLinks } = manifest.contributions
+  const { frames, sources, slots, palette, attention, nodeStats, contentLinks } = manifest.contributions
+  frames.forEach((frame, i) => {
+    const at = ['contributions', 'frames', i] as (string | number)[]
+    if (frame.target !== 'webview') {
+      if (frame.url !== undefined || frame.urlSource !== undefined || frame.hosts !== undefined) {
+        ctx.addIssue({ code: 'custom', path: at, message: 'url, urlSource and hosts are only valid on a webview surface' })
+      }
+      return
+    }
+    if ((frame.url === undefined) === (frame.urlSource === undefined)) {
+      ctx.addIssue({ code: 'custom', path: at, message: 'a webview must declare exactly one of url or urlSource' })
+    }
+    if (!frame.hosts?.length) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'hosts'], message: 'a webview must declare at least one host' })
+    }
+    if (frame.urlSource) route(frame.urlSource, [...at, 'urlSource'])
+    if (frame.url && frame.hosts?.length && !isAllowedWebviewUrl(frame.url, frame.hosts)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'url'],
+        message: 'webview url must use https (or loopback http) and match a declared host',
+      })
+    }
+  })
   sources.forEach((entry, i) => {
     route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])

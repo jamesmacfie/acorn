@@ -495,8 +495,6 @@ describe('architecture boundaries', () => {
       'plugins/terminal/src/main/folderPickerIpc.ts',
       'plugins/preview/src/main/previewService.ts',
       'plugins/preview/src/main/browserService.ts',
-      // colocated test that mocks the electron module it exercises
-      'plugins/preview/src/main/previewService.test.ts',
     ])
     const importers = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => rel(e.fromFile)))].sort()
     const outside = importers.filter((f) => !f.startsWith('apps/desktop/'))

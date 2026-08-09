@@ -149,6 +149,13 @@ kinds of contribution come out of one manifest:
   is checked against the manifest's declared scopes by an allowlist naming each path and method
   (`packages/client-core/src/plugins/frames/`, `scopes.ts` is the choke point). The host pins which
   Node the frame talks to; the frame cannot name one.
+- **Webviews** — a host-drawn pane backed by an Electron-main `WebContentsView`. A surface declares
+  exactly one literal `url` or plugin-owned `urlSource` plus a non-empty `hosts` allowlist. HTTPS is
+  required except for `localhost`, `127.0.0.1`, and `::1`; the renderer broker validates requested
+  navigation and Electron enforces the same list on direct navigation and redirects. The page has an
+  isolated ephemeral partition, no preload, no CDP, no devtools, no tunnel credentials, and no script
+  or message bridge. The plugin's sandboxed client frame remains the controller for only
+  `navigate`, `back`, `forward`, and `reload`; it cannot read the page or type into it.
 - **Descriptors** — a rail source, task-footer badge, palette rows, attention items, node stats, and
   restricted URL recognizers (`contentLinks`).
   These are data, not code: the host renders them with its own components and fetches their content
@@ -161,11 +168,29 @@ kinds of contribution come out of one manifest:
   bounded `https://` host/path grammar, names a pane from the same manifest, and delivers one captured
   path segment as a `plugin:select` intent.
 
-When a plugin has a client bundle, both frames and descriptors are gated on trust, per device and per
+The webview manifest shape is:
+
+```json
+{
+  "target": "webview",
+  "id": "docs",
+  "label": "Docs",
+  "url": "https://docs.example.com/",
+  "hosts": ["docs.example.com", "*.example.com"]
+}
+```
+
+`urlSource` replaces `url` when the start URL is dynamic and must be inside the plugin's own
+`/v2/p/<id>/` namespace; it answers `{ "url": "..." }` and receives task/project ids as query
+parameters when present.
+
+When a plugin has a client bundle, frames, webviews, and descriptors are gated on trust, per device and per
 bundle: first sight of a `(plugin, hash)` pair prompts before anything registers, an update re-prompts
 with the permission diff, and a rejected bundle gets neither frames nor chrome. A descriptor-only
 plugin has no client bytes to trust and registers its data directly. The prompt renders the node-half
-permissions and the UI scopes as **two separate lists**, because only the second is enforced —
+permissions, enforced UI scopes, and webview host grants as **three separate lists**. Webview hosts are
+enforced but the remote page has live network access, so folding them into the networkless UI list
+would be misleading. For the original two groups, only the second is enforced —
 `packages/client-core/src/plugins/permissions.ts` explains why they must never be merged, and it
 classifies every line against what the host can actually grant rather than echoing manifest text.
 

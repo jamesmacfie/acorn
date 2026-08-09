@@ -73,7 +73,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   }
   const note = (seconds: number | undefined): void => void (seconds !== undefined && refreshes.push(seconds))
 
-  const panes = new Set((contributions.frames ?? []).filter((frame) => frame.target === 'pane').map((frame) => frame.id))
+  const panes = new Set((contributions.frames ?? []).filter((frame) => frame.target === 'pane' || frame.target === 'webview').map((frame) => frame.id))
   for (const descriptor of contributions.contentLinks ?? []) {
     if (!panes.has(descriptor.openPane)) {
       console.warn(`[plugin-chrome] ${pluginId} content link '${descriptor.id}' names an undeclared pane '${descriptor.openPane}'.`)

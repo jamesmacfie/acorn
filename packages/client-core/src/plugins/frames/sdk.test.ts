@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
 import { AcornBridgeError, connect, _resetConnection, type AcornBridge } from './sdk'
 
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node
@@ -13,7 +14,7 @@ let channel: MessageChannel
 let sent: Record<string, unknown>[] = []
 
 const HELLO = { acornBridge: 1 }
-const CONTEXT = { surface: 'board', target: 'pane' as const, nodeId: 'node-a', theme: 'dark', style: 'terminal' }
+const CONTEXT: PluginFrameContext = { surface: 'board', target: 'pane', nodeId: 'node-a', theme: 'dark', style: 'terminal' }
 
 // A stand-in host: replies to whatever the frame asks with whatever the test told it to.
 const host = (reply: (message: Record<string, unknown>) => unknown) => {
@@ -27,11 +28,11 @@ const host = (reply: (message: Record<string, unknown>) => unknown) => {
 
 const push = (message: unknown) => channel.port1.postMessage(message)
 
-const handshake = async (): Promise<AcornBridge> => {
+const handshake = async (context = CONTEXT): Promise<AcornBridge> => {
   const connecting = connect()
   // The frame's own `window.postMessage` from the host, port transferred alongside.
   for (const listener of windowListeners) listener({ data: HELLO, ports: [channel.port2 as unknown as MessagePort] })
-  push({ kind: 'ready', context: CONTEXT })
+  push({ kind: 'ready', context })
   return connecting
 }
 
@@ -218,6 +219,30 @@ describe('state and ui', () => {
     )
     const acorn = await handshake()
     await expect(acorn.ui.done()).rejects.toBeInstanceOf(AcornBridgeError)
+  })
+})
+
+describe('webview controls', () => {
+  it('sends the closed verb set and receives intrinsic host events without subscribing', async () => {
+    host((message) => (message.kind === 'webview' ? { id: message.id, ok: true, status: 200, body: null } : undefined))
+    const acorn = await handshake({ ...CONTEXT, target: 'webview' as const })
+    await acorn.webview.navigate('https://docs.example.com/start')
+    await acorn.webview.back()
+    await acorn.webview.forward()
+    await acorn.webview.reload()
+    expect(sent.filter((message) => message.kind === 'webview')).toEqual([
+      expect.objectContaining({ op: 'navigate', url: 'https://docs.example.com/start' }),
+      expect.objectContaining({ op: 'back' }),
+      expect.objectContaining({ op: 'forward' }),
+      expect.objectContaining({ op: 'reload' }),
+    ])
+
+    const navigated = vi.fn()
+    acorn.webview.onNavigated(navigated)
+    push({ kind: 'event', channel: 'webview:navigated', payload: { url: 'https://docs.example.com/start', loading: false } })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(navigated).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://docs.example.com/start' }))
+    expect(sent.some((message) => message.kind === 'subscribe' && message.channel === 'webview:navigated')).toBe(false)
   })
 })
 

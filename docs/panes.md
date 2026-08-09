@@ -47,5 +47,6 @@ client-core. Feature panes use those primitives without importing another plugin
 
 Pane reads use the active Node's typed API client and TanStack Query cache. Pane writes target the
 task's owning Node. Offline reads remain visible as stale; mutations fail fast and retain local text.
-The preview pane is backed by a main-owned `WebContentsView`; terminal and agent panes use the Node
-event/stream socket.
+Preview and loaded-plugin `webview` panes are backed by main-owned `WebContentsView`s. Plugin pages
+use manifest host allowlists and isolated ephemeral sessions and have no CDP access; terminal and
+agent panes use the Node event/stream socket.
