@@ -10,7 +10,7 @@ import { recordPluginTrust } from './host'
 import './plugin-trust.css'
 
 // The consent surface for running code a node handed this device
-// (docs/third-party/phase-2-distribution-trust.md § Trust store).
+// (docs/plugins.md).
 //
 // Modelled on ConfigTrustDialog: same overlay slot, same alertdialog semantics, same "Not now"
 // escape. The difference is scope. Config trust binds a project to the hash of a config the NODE will
@@ -20,7 +20,7 @@ import './plugin-trust.css'
 //
 // The wording says DECLARED, not enforced, everywhere permissions appear. Until loaded plugins move
 // out of process, the node block shapes a plugin's `ctx` and is disclosed — it does not contain a
-// bundle that simply imports `node:fs` (docs/third-party/node-security.md § Design rules, rule 6).
+// bundle that simply imports `node:fs` (docs/security.md § Design rules, rule 6).
 // The same UI flips to "enforced" with no vocabulary change when that boundary lands, which is the
 // payoff for being blunt about it now.
 
@@ -114,7 +114,7 @@ export default function PluginTrustDialog() {
                   <For each={nodeLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
                 </ul>
               </Show>
-              {/* The canonical wording, verbatim from docs/third-party/node-security.md. It is the whole
+              {/* The canonical wording, verbatim from docs/security.md. It is the whole
                   truth about the list above and it must not be softened: this is the one sentence
                   standing between an owner and a plugin that reads ~/.ssh. */}
               <p class="muted">This plugin's server code runs with the same access as acorn itself.</p>

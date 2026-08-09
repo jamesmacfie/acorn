@@ -464,7 +464,7 @@ describe('architecture boundaries', () => {
   })
 
   it('only main touches the third-party plugin cache and trust store', () => {
-    // Two invariants from docs/third-party/phase-2-distribution-trust.md, both of which are only
+    // Two invariants from docs/plugins.md, both of which are only
     // invariants while nothing outside main can name the stores.
     //
     // "Trust binds to bytes": the acknowledgement is bound to a hash the MAIN process computed from

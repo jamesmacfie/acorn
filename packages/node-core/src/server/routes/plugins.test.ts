@@ -21,7 +21,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
-  contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] },
+  contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [], contentLinks: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
   ...over,
@@ -174,7 +174,7 @@ describe('GET /v2/core/plugins', () => {
   })
 })
 
-describe('installed packages in the roster (docs/third-party/phase-2-distribution-trust.md)', () => {
+describe('installed packages in the roster (docs/plugins.md)', () => {
   it('attaches the manifest block to a plugin that came off disk, and to nothing else', async () => {
     wire([], { installed: [installedEntry('rollbar', { version: '2.1.0' })] })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
@@ -184,8 +184,8 @@ describe('installed packages in the roster (docs/third-party/phase-2-distributio
       apiVersion: '1',
       permissions: NO_PERMISSIONS,
       // Passed through untouched for the device to register surfaces from
-      // (docs/third-party/phase-3-sandboxed-ui.md); the node neither reads nor renders it.
-      contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] },
+      // (docs/plugins.md); the node neither reads nor renders it.
+      contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [], contentLinks: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -211,7 +211,7 @@ describe('installed packages in the roster (docs/third-party/phase-2-distributio
         version: '1.0.0',
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
-        contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] },
+        contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [], contentLinks: [] },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },
     })
@@ -346,7 +346,7 @@ describe('the device gate over /v2/core/plugins', () => {
 
   it('403s a task-scoped agent on install, update and uninstall', async () => {
     // The sharpest case in this file. A prompt-injected agent that could POST here would make the node
-    // fetch and run arbitrary code with the node's own access (docs/third-party/node-security.md).
+    // fetch and run arbitrary code with the node's own access (docs/security.md).
     wire([], { installed: [installedEntry('sparkline')] })
     const agent = gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
     const attempts = [

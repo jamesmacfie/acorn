@@ -25,14 +25,13 @@ import { confirmWillEvent } from '../registries/willPhase'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 import { completeTaskArchive } from '../tasks/archiveLifecycle'
-import { sourceRegistry } from '../registries/sources'
 import { TaskSlotHost } from '../registries/uiSlots'
 import Icon from '../ui/Icon'
 import IconPicker from '../ui/IconPicker'
 import './tabrail.css'
+import { taskOriginAppearance } from '../tasks/origin'
 
-const originIcon = (origin: string) =>
-  ({ 'github-pr': 'git-pull-request', local: 'circle-dot' })[origin] ?? sourceRegistry.get(origin)?.glyph ?? 'circle-dot'
+const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
 
 type Draft = { mode: 'new' } | { mode: 'rename'; w: Task }
 
@@ -322,13 +321,19 @@ export default function TabRail() {
                 classList={{ active: !selectedSource() && w.id === activeTaskId() }}
                 style={accent() ? { 'border-left-color': accent() } : undefined}
                 data-tip={w.title}
-                data-tip-sub={w.branch ?? 'project folder'}
+                data-tip-sub={[
+                  w.branch ?? 'project folder',
+                  taskOriginAppearance(w.origin).tooltip,
+                ].filter(Boolean).join(' · ')}
                 data-tip-legend={statusItems().length ? JSON.stringify(statusItems().map((s) => ({ g: s.glyph, d: s.dotCls, t: s.tone, l: s.label }))) : undefined}
                 aria-label={w.title}
                 onClick={() => onRowClick(w)}
               >
                 {/* The task's own icon wins, then the workspace's, then the origin default. */}
-                <Icon name={w.icon ?? wsGlyph() ?? originIcon(w.origin)} />
+                <Icon
+                  name={w.icon ?? wsGlyph() ?? originIcon(w.origin)}
+                  title={taskOriginAppearance(w.origin).tooltip}
+                />
               </button>
               {/* Live status markers (docs/workspaces-and-tasks.md): CI dot, agent-working spinner,
                   needs-you notice, dirty/repair — from railStatus.ts, mirrored in the hover tooltip. */}

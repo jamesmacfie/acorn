@@ -1,5 +1,5 @@
 // The wire between a sandboxed plugin frame and the shell that hosts it
-// (docs/third-party/phase-3-sandboxed-ui.md § The bridge).
+// (docs/plugins.md).
 //
 // A frame has no parent DOM, no `window.acorn`, and `connect-src 'none'`. Its only door is one
 // MessagePort, and these are the messages that go through it. Everything here is
@@ -45,7 +45,7 @@ export type PluginFrameContext = {
   // registry knows it. Without it a panel frame has been told to render a thing and not which thing.
   refId?: string
   // The row a declarative rail source was selected on, when the pane was opened by one
-  // (docs/third-party/phase-4-declarative-chrome.md). Present at connect only when the frame is being
+  // (docs/plugins.md). Present at connect only when the frame is being
   // created BY that selection; a later selection into an already-mounted frame arrives as a `select`
   // message, because `context` is a snapshot by contract.
   item?: string

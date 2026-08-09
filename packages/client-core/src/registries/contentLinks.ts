@@ -1,4 +1,5 @@
 import { Registry } from './registry'
+import { openPane } from './clientEvents'
 
 // Resolving an external URL in rendered content to somewhere INSIDE the app, so a link to
 // github.com/o/r/pull/9 or linear.app/acme/issue/ENG-1 opens the pane instead of the browser.
@@ -32,4 +33,24 @@ export function parseInAppTarget(href: string): InAppTarget | null {
     if (target) return target
   }
   return null
+}
+
+// Declarative recognisers carry the pane and selected item in their host-created target. Existing
+// first-party targets do not, so this is additive and an unknown target still falls through to the
+// browser.
+export function openPluginContentTarget(target: InAppTarget, taskId: string | null | undefined): boolean {
+  if (!taskId || typeof target.pane !== 'string' || typeof target.item !== 'string') return false
+  openPane(taskId, target.pane, { kind: 'plugin:select', item: target.item })
+  return true
+}
+
+export function handlePluginContentLinkClick(event: MouseEvent, taskId: string | null | undefined): boolean {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
+  const anchor = (event.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null
+  const href = anchor?.getAttribute('href')
+  if (!href) return false
+  const target = parseInAppTarget(href)
+  if (!target || !openPluginContentTarget(target, taskId)) return false
+  event.preventDefault()
+  return true
 }

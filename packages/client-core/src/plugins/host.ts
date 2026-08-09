@@ -1,7 +1,7 @@
 import { acornGlobal, type PluginHostState, type PluginPutResult, type PluginTrustDecision } from '../capabilities'
 
 // The client's platform adapter for third-party plugin bundles
-// (docs/third-party/phase-2-distribution-trust.md § Future-web note).
+// (docs/plugins.md).
 //
 // Every other module in the client reaches the bundle cache and the trust store through this one
 // file, never through `acornGlobal()?.plugins` directly. That is the whole design: today it fronts

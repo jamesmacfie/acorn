@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
-// The security acceptance checklist for docs/third-party/phase-3-sandboxed-ui.md, as assertions rather
+// The security acceptance checklist for docs/plugins.md, as assertions rather
 // than as a list someone re-reads before a release.
 //
 // Every item here is a property of the frame that only exists at runtime: a CSP is a header until a
@@ -97,7 +97,15 @@ function installPlugin(dataDir: string): void {
     },
     // order 0 makes it the first pane in the switcher, so a task with no persisted layout renders it by
     // default and the test does not have to drive the pane UI to get a frame on screen.
-    contributions: { frames: [{ target: 'pane', id: PANE_ID, label: 'E2E widget', order: 0 }] },
+    contributions: {
+      frames: [{ target: 'pane', id: PANE_ID, label: 'E2E widget', order: 0 }],
+      contentLinks: [{
+        id: 'e2e-widget.item',
+        match: 'https://board.example/items/{item}',
+        openPane: PANE_ID,
+        item: 'item',
+      }],
+    },
   }))
 }
 
@@ -363,6 +371,21 @@ test('a plugin frame can reach nothing on this machine but its own bridge', asyn
     .poll(() => frame.evaluate(() => [document.documentElement.dataset.theme, document.documentElement.dataset.style]), { timeout: 10_000 })
     .toEqual(['nord', 'modern'])
 
+  // ── Declarative content links ──────────────────────────────────────────────────────────────────
+  // Recognition is manifest data interpreted by the host. Put one of the declared URLs through a
+  // real shell markdown surface: clicking it must select the plugin pane rather than leave the app.
+  await page.getByRole('button', { name: 'Notes' }).click()
+  const editor = page.locator('.notes-editor')
+  await expect(editor).toBeVisible()
+  await editor.fill('[Open card 42](https://board.example/items/card-42)')
+  // The first edit materializes the virtual scratchpad asynchronously. Let that settle before
+  // toggling preview, otherwise the note-list refetch can finish after the click and reopen edit mode.
+  await expect(page.locator('.notes-save-state')).toContainText('saved', { timeout: 15_000 })
+  await page.getByRole('button', { name: 'Preview', exact: true }).click()
+  await expect(page.locator('.notes-preview')).toBeVisible()
+  await page.getByRole('link', { name: 'Open card 42' }).click()
+  await expect(page.locator(`[data-pane-id="${PANE_ID}"]`)).toBeVisible()
+
   // ── Top-level navigation, last ─────────────────────────────────────────────────────────────────
   // The shell's window may only ever sit on app://acorn, so a plugin bundle can never become the whole
   // window. Left until the end deliberately: main PREVENTS the navigation rather than completing it, which
@@ -391,5 +414,3 @@ test('a frame that floods the bridge loses it, and the shell stays responsive', 
   await expect(page.locator('.shell')).toBeVisible()
   expect((await nodeJson<{ id: string }[]>(page, '/v2/core/tasks')).length).toBeGreaterThan(0)
 })
-
-

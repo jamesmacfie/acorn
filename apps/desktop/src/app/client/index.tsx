@@ -38,15 +38,15 @@ await selectActiveNode()
 await applyNodePlugins(activeNodeId() ?? undefined)
 
 // Third-party plugin bundles, across the whole fleet rather than just the active node
-// (docs/third-party/phase-2-distribution-trust.md). Deliberately NOT awaited: it talks to every
+// (docs/plugins.md). Deliberately NOT awaited: it talks to every
 // remembered node, and a fleet with an offline machine in it must not hold up the first paint. The
 // trust dialog is an overlay contribution, so whatever it queues renders whenever this settles.
 // …and once it settles, register the surfaces every accepted plugin declared
-// (docs/third-party/phase-3-sandboxed-ui.md). Chained rather than awaited for the same reason: a fleet
+// (docs/plugins.md). Chained rather than awaited for the same reason: a fleet
 // with an offline machine in it must not hold up the first paint, and a plugin pane appearing a moment
 // after the shell does is the correct trade. Panes read the active node at render, so a node switch needs
 // no second pass.
-// Chrome (docs/third-party/phase-4-declarative-chrome.md) rides the same settle: it is registered from
+// Chrome (docs/plugins.md) rides the same settle: it is registered from
 // the same roster rows, and a plugin that ships descriptors but no client bundle has nothing else to
 // wait for.
 void syncPluginDistribution().then(() => {

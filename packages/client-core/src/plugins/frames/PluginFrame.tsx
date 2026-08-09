@@ -17,7 +17,7 @@ export { SUBSCRIBABLE_CHANNELS } from './channels'
 const PLUGIN_FRAME_SCHEME = 'app-plugin'
 const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${hash}`
 
-// The host component for one sandboxed plugin surface (docs/third-party/phase-3-sandboxed-ui.md).
+// The host component for one sandboxed plugin surface (docs/plugins.md).
 //
 // Everything security-relevant is either in the frame's origin (main/pluginScheme.ts serves the CSP) or
 // in the broker (scopes.ts decides every call). What is left here is wiring, and one rule: the frame is
@@ -119,7 +119,7 @@ export default function PluginFrame(props: PluginFrameProps) {
 
   // A rail-source row that opened this pane. Retained by openPane until the pane consumes it, so a
   // frame mounting for the first time gets its selection in `context` rather than racing its own load
-  // (docs/third-party/phase-4-declarative-chrome.md § Action vocabulary).
+  // (docs/plugins.md).
   const selected = (): string | undefined => {
     const taskId = props.binding.taskId
     if (!taskId) return undefined

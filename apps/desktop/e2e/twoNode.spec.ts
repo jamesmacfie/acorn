@@ -544,7 +544,7 @@ const pluginState = (page: Page) => page.evaluate(() => (window as BridgeWindow)
 
 test('asks before running a plugin a paired node serves, then caches it for offline boots', async () => {
   test.setTimeout(150_000)
-  // The exit criterion for docs/third-party/phase-2-distribution-trust.md: a plugin installed on a
+  // The exit criterion for docs/plugins.md: a plugin installed on a
   // paired node reaches a second device, is hash-verified there, and does not run until the owner
   // agrees. `pairTwoNodes` reloads after pairing, and the boot pass runs on that reload.
   const { running, remote } = await pairTwoNodes({ seedNode: installPluginOn })

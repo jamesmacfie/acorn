@@ -51,7 +51,7 @@ function, not the beneficiary of special cases.
   wire (`packages/protocol/src/api.ts`) — looser than the docs' "github-pr | linear | rollbar |
   local" wording suggests. The gap is in registered *behavior* for an origin, not the type.
 
-## What the third-party plugin project covers (docs/third-party/)
+## What the loaded-plugin tier already covers
 
 Install/trust/permissions (phases 1–5), frame panes for issue/PR/transcript viewers (phase 3),
 descriptor chrome — rail sources, badges, attention items (phase 4), and the
@@ -78,7 +78,7 @@ loader work.
 
 Build the plugin as a **compiled-in first-party plugin** (the Linear/Rollbar path: composition
 lists, `plugins/smolforge/`), then use it as the dogfood candidate when the third-party
-packaging phases (docs/third-party/) need a real plugin to load, distribute, and sandbox. Two
+loaded-plugin path needs a real plugin to load, distribute, and sandbox. Two
 reasons: the seams (phases 0–3) are the actual work and are needed either way; and a first-party
 build separates "does the integration work" from "does the loader work" — one variable at a
 time. The phase-4 doc notes what changes when it is repackaged as third-party.
@@ -94,7 +94,7 @@ time. The phase-4 doc notes what changes when it is repackaged as third-party.
 - **Provider data stays disposable.** Issues/PRs mirror into the external-item store and can be
   dropped and re-fetched; tasks, links, and transcripts-upload state are the durable rows.
 - **Secrets have no read path.** The PAT lives in a credential slot; all forge traffic goes
-  through the credential-injecting broker (docs/third-party/node-security.md). This holds even
+  through the credential-injecting broker (docs/security.md). This holds even
   while the plugin is first-party — build against the broker from day one.
 - **Capabilities are structured-clone-safe and async** (node-security.md design rules) — every
   capability added in phases 2–3 must survive a future process boundary.
@@ -105,6 +105,6 @@ time. The phase-4 doc notes what changes when it is repackaged as third-party.
 - `forge/llms.txt` — API reference: auth (§ Authentication, § Personal Access Tokens; scopes
   include `repo:read`, `repo:write`, `transcripts:write`), Issues, Pull Requests, CI/CD Actions,
   AI Transcripts (upload/list/by-commit), Webhooks.
-- `docs/third-party/` — plugin loading, sandboxing, permissions, node security.
+- `docs/plugins.md`, `docs/security.md` — plugin loading, sandboxing, permissions, node security.
 - `docs/projects/README.md` — the projects model and its invariants (phases 0/1 shipped).
 - `docs/integrations.md`, `docs/plugins.md` — current provider and plugin contracts.

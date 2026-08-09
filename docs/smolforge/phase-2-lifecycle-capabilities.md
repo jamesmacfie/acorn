@@ -26,7 +26,7 @@ needs durability records its own high-water mark and reconciles on `init` — se
 pattern" below. This mirrors the client invalidation channel's honesty: it is a nudge, not a log.
 
 All payloads must be structured-clone-safe and the subscribe signatures async-friendly
-(docs/third-party/node-security.md design rules 3/5 — these capabilities must survive a future
+(docs/security.md design rules 3/5 — these capabilities must survive a future
 process boundary where "subscribe" becomes an RPC-stream).
 
 ## The capabilities

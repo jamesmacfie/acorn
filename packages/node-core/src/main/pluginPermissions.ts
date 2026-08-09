@@ -1,4 +1,4 @@
-// Rung 1 of the containment ladder (docs/third-party/node-security.md): a loaded plugin's
+// Rung 1 of the containment ladder (docs/security.md): a loaded plugin's
 // NodePluginContext is built from its manifest's `permissions.node` block instead of being handed
 // the full context a built-in gets.
 //

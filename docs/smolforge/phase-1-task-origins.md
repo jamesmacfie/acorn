@@ -67,7 +67,7 @@ Branch naming: promoted tasks flow through the existing branch-prefix/normalizat
 
 ### Descriptor verb: `createTask`
 
-The declarative-chrome action vocabulary (docs/third-party/phase-4-declarative-chrome.md:
+The declarative-chrome action vocabulary (docs/plugins.md:
 `openPane`, `invoke`, `runNodeAction`, `openUrl`) gains one host-executed verb:
 
 ```jsonc

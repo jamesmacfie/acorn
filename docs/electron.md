@@ -68,7 +68,7 @@ exist there.
 Every response carries `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 img-src 'self' data:; font-src 'self'; connect-src 'none'`. A plugin frame therefore has no network at
 all: its only I/O is the `MessagePort` the shell transfers in, where each call is checked against the
-plugin's declared scopes (`docs/third-party/phase-3-sandboxed-ui.md`). The renderer's own CSP names
+plugin's declared scopes (`docs/plugins.md`). The renderer's own CSP names
 this scheme in `frame-src` and nothing else.
 
 Navigation policy has two halves. `will-navigate` keeps the main frame on `app://acorn`, so a plugin

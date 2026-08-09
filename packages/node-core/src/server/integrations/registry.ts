@@ -64,6 +64,17 @@ class IntegrationProviderRegistry {
     return this.#providers.get(id)
   }
 
+  ownerOf(id: string): string | undefined {
+    return this.#owners.get(id)
+  }
+
+  assertOwnedBy(id: string, plugin: string): void {
+    this.validateContribution(id, 'Plugin provider runtime')
+    if (this.#owners.get(id) !== plugin) {
+      throw new Error(`Plugin '${plugin}' cannot use integration provider '${id}' because it does not own it.`)
+    }
+  }
+
   list(): readonly IntegrationProviderContribution[] {
     return [...this.#providers.values()]
   }

@@ -93,7 +93,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode(), tunnels })
 
   // Third-party plugin bundles a node has served us, and this device's decisions about running them
-  // (docs/third-party/phase-2-distribution-trust.md). Both stores are main's: the bytes never pass
+  // (docs/plugins.md). Both stores are main's: the bytes never pass
   // through the renderer, and the acknowledgements sit beside the device tokens because they are the
   // same kind of custody — something this machine agreed to, not something a node can assert.
   //
@@ -102,7 +102,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const pluginCache = new PluginCache(userDataDir, broker)
   pluginCache.sweep()
   const disposePluginIpc = registerPluginIpc(pluginCache, new PluginTrustStore(userDataDir))
-  // The origin plugin UI renders on (docs/third-party/phase-3-sandboxed-ui.md). Registered here rather
+  // The origin plugin UI renders on (docs/plugins.md). Registered here rather
   // than beside registerAppScheme in electron.ts because it serves out of the cache above and nothing
   // else — the handler has no path parameter to be pointed at, by design.
   registerPluginScheme(pluginCache)

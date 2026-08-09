@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
-// The exit criteria for docs/third-party/phase-5-install-ux.md, as assertions: the full lifecycle from
+// The exit criteria for docs/plugins.md, as assertions: the full lifecycle from
 // Settings with no terminal involved — install, trust, restart, update with a permission change,
 // uninstall.
 //

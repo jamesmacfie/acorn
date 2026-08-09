@@ -6,7 +6,7 @@ import type { PluginRequestContext } from './plugin/types'
 import { registerRoute, removePluginRoutes } from './routeRegistry'
 
 // The fetch-shaped route seam a LOADED plugin gets instead of a Hono router
-// (docs/third-party/node-security.md § Design rules: a Hono instance cannot cross a process
+// (docs/security.md § Design rules: a Hono instance cannot cross a process
 // boundary, a (Request) → Response function can). What matters here is that the seam behaves like
 // the router seam it replaces: same mount, same auth envelope, same relative paths.
 
@@ -67,6 +67,8 @@ describe('a fetch-shaped plugin route', () => {
     const seen = install('')
     await call('/v2/p/ntfy')
     expect(seen[0].context.principal).toEqual({ kind: 'device', userId: 'james', deviceId: 'd1' })
+    expect(seen[0].context.userId).toBe('james')
+    expect(seen[0].context.providers.resource).toBeTypeOf('function')
   })
 
   it('sits behind the same requireUser gate as every other /v2 route', async () => {

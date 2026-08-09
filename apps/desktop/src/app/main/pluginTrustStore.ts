@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 
 // This device's decisions about which plugin bundles it will run
-// (docs/third-party/phase-2-distribution-trust.md § Trust store).
+// (docs/plugins.md).
 //
 // The shape is repo-config trust's, moved out one level. There, `config_acks` binds
 // `(project_id, hash)` and lives on the node, because the thing being approved is a config the node

@@ -1,5 +1,5 @@
 // The frame half of the bridge — the only runtime code a third-party client bundle imports
-// (docs/third-party/phase-3-sandboxed-ui.md § Plugin-side SDK). Reached by plugin authors as
+// (docs/plugins.md). Reached by plugin authors as
 // `@acorn/plugin-api/ui/sdk`.
 //
 // It lives in client-core rather than in plugin-api because that package is a facade held to

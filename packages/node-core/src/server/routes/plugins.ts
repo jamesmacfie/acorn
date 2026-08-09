@@ -168,7 +168,7 @@ const state = (bridge: PluginsBridge) => {
 
 export const plugins = new Hono<AppEnv>()
   .get('/', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => state(bridge)))
-  // The client bundle itself (docs/third-party/phase-2-distribution-trust.md). Not viaBridge: that
+  // The client bundle itself (docs/plugins.md). Not viaBridge: that
   // helper always JSONs, and this is the one response in the family that is bytes.
   //
   // Authentication is by MOUNT — server/index.ts puts requireDevice over `/v2/core/plugins/*` as
@@ -226,11 +226,11 @@ export const plugins = new Hono<AppEnv>()
       return state(bridge)
     })
   })
-  // ── Install, update, uninstall (docs/third-party/phase-5-install-ux.md) ────────────────────────
+  // ── Install, update, uninstall (docs/plugins.md) ────────────────────────
   //
   // Owner surface, like the rest of this router: device-gated by mount, never reachable with a
   // task-scoped internal token. A prompt-injected agent must not be able to make a node fetch and run
-  // arbitrary code (docs/third-party/node-security.md § Tokens, routes, and agents).
+  // arbitrary code (docs/security.md § Tokens, routes, and agents).
   //
   // Nothing here starts a plugin. Each answers "the disk now says this", and the roster above turns
   // that into the pending state and the restart banner.

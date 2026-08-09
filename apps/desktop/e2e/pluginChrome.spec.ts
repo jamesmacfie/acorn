@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
-// The exit criteria for docs/third-party/phase-4-declarative-chrome.md, as assertions.
+// The exit criteria for docs/plugins.md, as assertions.
 //
 // The plugin here has NO CLIENT BUNDLE AT ALL — that is the whole point of the phase. Every pixel is
 // drawn by the host from the manifest's descriptors, and every number in it comes from the plugin's
@@ -18,6 +18,7 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
 const KEY = 'c'.repeat(64)
 const PLUGIN_ID = 'e2e-board'
+const PROVIDER_ID = 'e2e-board-provider'
 const SOURCE_LABEL = 'E2E board'
 
 const roots: string[] = []
@@ -32,15 +33,63 @@ const apps: ElectronApplication[] = []
 // event type, no payload to trust.
 const NODE_BUNDLE = `
 let stuck = 1
+const provider = {
+  id: ${JSON.stringify(PROVIDER_ID)},
+  label: 'E2E board',
+  glyph: 'kanban',
+  kind: 'issue-tracker',
+  connection: {
+    authKind: 'api-key', fields: [{ id: 'apiKey', label: 'API key', type: 'password', required: true }],
+    connectable: true, disconnectable: true,
+    async validate(credentials) { return credentials.apiKey || '' },
+    normalize(_credentials, secret) {
+      return { secret, label: 'E2E board', account: null, scopes: [], config: {}, capabilities: {} }
+    },
+    async test() { return { ok: true } },
+  },
+  capabilities: {},
+  budgets: {
+    maxConcurrentRequests: 2, maxConcurrentRequestsPerConnection: 1, maxPages: 1,
+    maxCachedItemBytes: 10000, maxContextItems: 10, backoffFloorMs: 1000, maxResolutionBatch: 10,
+  },
+  externalIds: {
+    fromDisplay(connectionId, displayId) { return { providerId: ${JSON.stringify(PROVIDER_ID)}, connectionId, displayId } },
+    parse(raw, fallback) {
+      return raw && raw.providerId === ${JSON.stringify(PROVIDER_ID)} && typeof raw.connectionId === 'string' && typeof raw.displayId === 'string'
+        ? raw : fallback
+    },
+  },
+  resources: [],
+  memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none', acceptedWrites: false },
+  toPublic() {
+    return {
+      id: this.id, label: this.label, glyph: this.glyph, kind: this.kind,
+      connection: {
+        authKind: this.connection.authKind, fields: this.connection.fields,
+        connectable: true, disconnectable: true,
+      },
+      capabilities: {},
+    }
+  },
+}
 export default {
   name: ${JSON.stringify(PLUGIN_ID)},
   init(ctx) {
-    ctx.routes.fetch(async (request) => {
+    // Provider routes use the portable fetch carrier too; a loaded plugin never hands the host Hono.
+    ctx.providers.integration(provider, () => Response.json({ ok: true }))
+    ctx.routes.fetch(async (request, context) => {
       const path = new URL(request.url).pathname
       if (path === '/rail-items') {
+        const [connection] = await context.providers.connections(${JSON.stringify(PROVIDER_ID)})
         return Response.json({ items: [
           // The badge carries the mutable count, so a node-side change is visible in the rail.
-          { id: 'card-1', title: 'Ship the thing', subtitle: 'in progress', badge: String(stuck) + ' stuck' },
+          {
+            id: 'card-1', title: 'Ship the thing', subtitle: 'in progress', badge: String(stuck) + ' stuck',
+            task: connection ? {
+              branch: 'ship-the-thing',
+              link: { connectionId: connection.id, identifier: 'card-1', ref: { displayId: 'card-1' } },
+            } : undefined,
+          },
           { id: 'card-2', title: 'Write it down' },
           // Dropped by the host's defensive filter, and the two above must still render.
           { title: 'no id at all' },
@@ -74,7 +123,10 @@ function installPlugin(dataDir: string): void {
     node: './dist/node.js',
     // No `client`. Nothing about this plugin runs in the renderer.
     contributions: {
-      sources: [{ id: 'e2e-board', label: SOURCE_LABEL, glyph: 'kanban', order: 5, items: `/v2/p/${PLUGIN_ID}/rail-items` }],
+      sources: [{
+        id: 'e2e-board', label: SOURCE_LABEL, glyph: 'kanban', order: 5,
+        items: `/v2/p/${PLUGIN_ID}/rail-items`, onSelect: { verb: 'createTask' },
+      }],
       slots: [{ id: 'e2e-board-footer', slot: 'footer', data: `/v2/p/${PLUGIN_ID}/badge` }],
       palette: [{ id: 'e2e-board.bump', title: 'Board: bump the count', action: { verb: 'runNodeAction', path: `/v2/p/${PLUGIN_ID}/bump` } }],
       attention: [{ id: 'e2e-board-stuck', items: `/v2/p/${PLUGIN_ID}/attention` }],
@@ -161,7 +213,20 @@ test.afterEach(async () => {
 })
 
 test('a plugin with no client bundle contributes native chrome', async () => {
+  test.setTimeout(120_000)
   const { page, repoDir } = await launch()
+  await settleOverlays(page)
+
+  // The descriptor promotion needs a real project and a real provider connection. The row obtains
+  // the host-owned connection id through PluginProviderRuntime; no database handle crosses the seam.
+  const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Chrome' } })
+  const project = await nodeJson<{ project: { id: string } }>(page, '/v2/core/projects', {
+    method: 'POST', body: { path: repoDir, workspaceId: workspace.id },
+  })
+  await nodeJson(page, '/v2/core/integrations', {
+    method: 'POST', body: { providerId: PROVIDER_ID, credentials: { apiKey: 'e2e-key' } },
+  })
+  await page.goto(new URL(`/p/${project.project.id}`, page.url()).toString())
   await settleOverlays(page)
 
   // No trust dialog: there are no bytes to acknowledge, so the chrome is simply there. Asserting its
@@ -197,10 +262,6 @@ test('a plugin with no client bundle contributes native chrome', async () => {
   await expect(badge).toHaveText('2 stuck', { timeout: 30_000 })
 
   // ── Palette row, from the same manifest, running a declared verb ───────────────────────────────
-  const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Chrome' } })
-  const project = await nodeJson<{ project: { id: string } }>(page, '/v2/core/projects', {
-    method: 'POST', body: { path: repoDir, workspaceId: workspace.id },
-  })
   await nodeJson(page, '/v2/core/tasks', {
     method: 'POST', body: { origin: 'local', projectId: project.project.id, branch: 'main', title: 'Chrome task' },
   })
@@ -212,4 +273,18 @@ test('a plugin with no client bundle contributes native chrome', async () => {
   // `runNodeAction` POSTed to the plugin's own route, which mutated and pinged — so the rail moves
   // again, this time driven end to end by chrome the manifest declared.
   await expect(badge).toHaveText('3 stuck', { timeout: 30_000 })
+
+  // ── Descriptor promotion: row data → native modal → create, then link ─────────────────────────
+  await rows.first().click()
+  const modal = page.getByRole('dialog')
+  await expect(modal).toBeVisible()
+  await expect(modal.getByPlaceholder('Task title')).toHaveValue('Ship the thing')
+  await modal.getByRole('button', { name: 'Create task' }).click()
+  await expect(modal).toBeHidden({ timeout: 30_000 })
+
+  await expect.poll(async () => {
+    const tasks = await nodeJson<{ origin: string; links: { providerId: string; identifier: string }[] }[]>(page, '/v2/core/tasks')
+    return tasks.some((task) => task.origin === `${PLUGIN_ID}:item`
+      && task.links.some((link) => link.providerId === PROVIDER_ID && link.identifier === 'card-1'))
+  }, { timeout: 30_000 }).toBe(true)
 })

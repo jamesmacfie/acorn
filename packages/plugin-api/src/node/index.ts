@@ -16,7 +16,16 @@
 //     third-party author gets @acorn/plugin-api/testkit if and when one is built.
 
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
-export type { NodePlugin, NodePluginContext, PluginBroadcast, PluginFetchHandler, PluginRequestContext } from '@acorn/node-core/server/plugin/types.ts'
+export type {
+  NodePlugin,
+  NodePluginContext,
+  PluginBroadcast,
+  PluginFetchHandler,
+  PluginProviderConnectionVisitor,
+  PluginProviderResourceRequest,
+  PluginProviderRuntime,
+  PluginRequestContext,
+} from '@acorn/node-core/server/plugin/types.ts'
 // The major this build of the API speaks. A loaded plugin's acorn-plugin.json must name exactly this
 // in `apiVersion`, and a build script generating a manifest should read it from here.
 export { PLUGIN_API_MAJOR } from '@acorn/node-core/main/pluginManifest.ts'

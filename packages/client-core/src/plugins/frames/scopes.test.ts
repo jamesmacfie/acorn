@@ -3,7 +3,7 @@ import * as api from '@acorn/protocol/api.ts'
 import { allowApi, classifyPath, describeScope, GRANTABLE_SCOPES } from './scopes'
 
 // The exhaustive sweep is the point of this file. Everything else here is a spot check on a case the
-// phase doc calls out by name (docs/third-party/phase-3-sandboxed-ui.md § Security acceptance
+// phase doc calls out by name (docs/plugins.md
 // checklist); the sweep is what makes a NEW core route fail the build until someone decides whether a
 // sandboxed plugin frame may reach it.
 
@@ -152,6 +152,17 @@ describe('scope checking', () => {
 
   it('denies the write half of a scope it only declared read for', () => {
     expect(allowApi(board, 'POST', api.tasksRoute)).toEqual({ allowed: false, reason: 'missing scope core.tasks:write' })
+  })
+
+  it('allows adding a task link with task write, but never allows unlinking', () => {
+    const writer = { pluginId: 'board', api: ['core.tasks:write'] }
+    expect(allowApi(writer, 'POST', api.taskLinksRoute(ID)).allowed).toBe(true)
+    expect(allowApi(board, 'POST', api.taskLinksRoute(ID))).toEqual({
+      allowed: false,
+      reason: 'missing scope core.tasks:write',
+    })
+    expect(allowApi(writer, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
+    expect(allowApi(board, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
   })
 
   it('does not let a read on the task collection leak the task’s MCP or preview credentials', () => {

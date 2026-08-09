@@ -3,7 +3,7 @@
 Design notes from the third-party-plugins session (2026-08-08). Nothing here is scheduled; this
 records the analysis so a future project starts from conclusions instead of re-deriving them.
 The three cheap preparation items at the bottom ARE worth doing early — they are annotated in
-the `docs/third-party/` phase files.
+the plugin docs (`docs/plugins.md`, `docs/security.md`).
 
 ## The shape of the demand
 
@@ -47,7 +47,7 @@ Today the Node "serves no web assets"; for web it serves the renderer bundle. Th
 inverts the plugin trust model: on desktop the app comes from us and plugin bundles come from a
 possibly-hostile node, so bytes-hash prompts are the consent surface. On web, the WHOLE app
 comes from the node — trusting the node is the ballgame, and per-bundle prompts mostly protect
-plugin-vs-plugin blast radius. When web becomes real, `docs/third-party/node-security.md` and
+plugin-vs-plugin blast radius. When web becomes real, `docs/security.md` and
 `phase-2-distribution-trust.md` need a section stating this inversion; the per-device trust
 store also moves server-side (per-user acknowledgements on the node) because per-browser
 localStorage acks are weak and evictable.
@@ -121,7 +121,7 @@ and (c) could carry pairing handshakes ("enter this code on your node"). Notes:
 
 ## Preparation items (cheap now, expensive later)
 
-These three are annotated in `docs/third-party/`; everything else in this file waits.
+These three are reflected in the shipped system (`docs/plugins.md`); everything else here waits.
 
 1. **Platform adapter seam in client-core.** Everything that touches `window.acorn` (apiClient's
    nodeFetch, stream attach, plugin cache access, trust prompts) goes behind one narrow

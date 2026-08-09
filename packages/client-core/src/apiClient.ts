@@ -213,7 +213,7 @@ export async function apiError(res: ApiResponse, fallback: string): Promise<stri
 // converts a failure into an exception, and the plugin UI bridge needs the opposite: it forwards the
 // node's envelope verbatim down a MessagePort to a sandboxed frame, so a plugin author handles one
 // error shape whether the call was denied at the bridge or refused by the node
-// (docs/third-party/phase-3-sandboxed-ui.md § Protocol).
+// (docs/plugins.md).
 export type RawApiResult = { ok: boolean; status: number; body: unknown; error?: ApiErrorBody['error'] }
 
 export async function sendRaw(url: string, init: WriteInit = {}): Promise<RawApiResult> {

@@ -23,7 +23,7 @@ const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
 //
 // Two carriers, one mount. A built-in contributes a `router`; a LOADED plugin contributes a
 // `fetch` handler, because a Hono instance is a live object from the plugin's realm and cannot
-// cross the process boundary that rung 2 will put there (docs/third-party/node-security.md § Design
+// cross the process boundary that rung 2 will put there (docs/security.md § Design
 // rules). Everything downstream — the mount path, the auth envelope, per-plugin removal — is
 // identical, which is the point: the transport changes later, the registry does not.
 export type RouteContribution = { plugin: string; prefix: string; note?: string } & (

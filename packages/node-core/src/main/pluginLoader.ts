@@ -1,4 +1,4 @@
-// Loading a plugin's node half from disk (docs/third-party/phase-1-node-loader.md § The loader).
+// Loading a plugin's node half from disk (docs/plugins.md).
 //
 // Everything here is best-effort by design: a bad manifest, an unimportable bundle or an id that
 // collides with a built-in is a SKIP plus a report, never a throw. A node that cannot run one
@@ -9,7 +9,7 @@
 // a default-on loader would have run third-party code nobody agreed to. Phase 5 removed the flag: the
 // only way a package reaches `<dataRoot>/plugins` now is through the installer, which is an
 // owner-authenticated route, and the device asks again before it runs the client half
-// (docs/third-party/phase-5-install-ux.md).
+// (docs/plugins.md).
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -23,7 +23,7 @@ import { openPluginDb } from './pluginStorage'
 import type { NodePlugin, PluginStorage } from '../server/plugin/types'
 
 // A client bundle is one ESM file that has to travel a broker request and land in a device's cache
-// (docs/third-party/phase-2-distribution-trust.md). The ceiling is here rather than only in the
+// (docs/plugins.md). The ceiling is here rather than only in the
 // device's cache because a node should not read a gigabyte into memory to answer a GET, and it is
 // generous enough that no honest bundle meets it.
 export const MAX_CLIENT_BUNDLE_BYTES = 8 * 1024 * 1024
@@ -65,7 +65,7 @@ export type InstalledPluginInfo = {
   version: string
   apiVersion: string
   permissions: PluginManifest['permissions']
-  // What the manifest declared for the device to render (docs/third-party/phase-3-sandboxed-ui.md).
+  // What the manifest declared for the device to render (docs/plugins.md).
   // Passed through untouched: the node neither renders nor validates these beyond the schema, and the
   // device binds each one to this plugin's id.
   contributions: PluginManifest['contributions']

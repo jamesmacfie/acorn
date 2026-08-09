@@ -264,7 +264,7 @@ export const prefsRoute = '/v2/core/prefs'
 // `state` is the third answer and the only one a restart cannot change: a plugin loaded from disk
 // whose init threw is 'failed'. It is deliberately NOT folded into `running` — `restartRequired` is
 // computed from `running`, and a restart cannot fix a broken plugin, so a failed row must not make
-// the page demand one (docs/third-party/phase-1-node-loader.md).
+// the page demand one (docs/plugins.md).
 export type NodePluginRow = {
   name: string
   required: boolean
@@ -295,7 +295,7 @@ export type NodePluginRow = {
 export const PLUGIN_API_MAJOR = '1'
 
 // What a plugin's manifest DECLARED. Not what is enforced: until loaded plugins move out of process
-// the node block is context-shaping plus disclosure (docs/third-party/node-security.md § Design
+// the node block is context-shaping plus disclosure (docs/security.md § Design
 // rules, rule 6), so every surface that renders this says "declared" and flips to "enforced" with no
 // vocabulary change when the boundary lands.
 export type NodePluginPermissions = {
@@ -305,7 +305,7 @@ export type NodePluginPermissions = {
 }
 
 // One sandboxed rectangle the plugin's client bundle draws, as its manifest declared it
-// (docs/third-party/phase-3-sandboxed-ui.md; the Zod schema is node-core/main/pluginManifest.ts).
+// (docs/plugins.md; the Zod schema is node-core/main/pluginManifest.ts).
 // Hand-written here for the same reason NodePluginPermissions is: the node parses the manifest, and
 // this is the projection the device registers contributions from.
 export type PluginFrameSurface = {
@@ -321,7 +321,7 @@ export type PluginFrameSurface = {
   group?: 'general' | 'workspace'
 }
 
-// ── Declarative chrome (docs/third-party/phase-4-declarative-chrome.md) ───────────────────────────
+// ── Declarative chrome (docs/plugins.md) ───────────────────────────
 //
 // The other half of what a manifest may contribute: small chrome the HOST draws natively from data,
 // with no plugin code in the renderer at all. Hand-written twins of the Zod schemas in
@@ -333,6 +333,7 @@ export type PluginChromeAction =
   // A pane the same manifest declares. The selected row's id rides along as a pane intent.
   | { verb: 'openPane'; pane: string }
   | { verb: 'runNodeAction'; path: string }
+  | { verb: 'createTask' }
   | { verb: 'openUrl'; url: string }
 
 // Every `path`/`items`/`data` below is confined to the plugin's OWN route namespace when the node
@@ -367,6 +368,12 @@ export type PluginNodeStatDescriptor = {
   data: string
   refresh?: number
 }
+export type PluginContentLinkDescriptor = {
+  id: string
+  match: string
+  openPane: string
+  item: string
+}
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
 // serves: the host is the one rendering these, so the shape is its contract and not the plugin's
@@ -375,7 +382,22 @@ export type PluginNodeStatDescriptor = {
 //
 // The client still validates what arrives. These types describe the agreement; the roster row and the
 // route body are both bytes from a node, and a malformed row is dropped rather than thrown into the shell.
-export type PluginRailItem = { id: string; title: string; subtitle?: string; icon?: string; badge?: string }
+export type PluginRailTask = {
+  title?: string
+  branch?: string
+  // Reserved seed text. The current task model has no body column; retaining it on the descriptor
+  // contract lets a future task-seed extension consume it without changing tracker row routes.
+  body?: string
+  link?: Pick<TaskLinkSeed, 'connectionId' | 'identifier' | 'ref'>
+}
+export type PluginRailItem = {
+  id: string
+  title: string
+  subtitle?: string
+  icon?: string
+  badge?: string
+  task?: PluginRailTask
+}
 export type PluginRailItems = { items: PluginRailItem[] }
 // `null` hides the badge, which is how a badge with nothing to say disappears without the host
 // needing a second route to ask.
@@ -402,6 +424,7 @@ export type PluginContributions = {
   palette?: PluginPaletteDescriptor[]
   attention?: PluginAttentionDescriptor[]
   nodeStats?: PluginNodeStatDescriptor[]
+  contentLinks?: PluginContentLinkDescriptor[]
 } & Record<string, unknown>
 
 export type InstalledPluginRow = {
@@ -412,7 +435,7 @@ export type InstalledPluginRow = {
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
   // the sha256 the node computed from the file; it is a CACHE KEY HINT and nothing more — the device
   // hashes the bytes it received and refuses a mismatch, because a compromised node can lie here
-  // (docs/third-party/README.md § Trust binds to bytes, not to claims).
+  // (docs/plugins.md § Trust binds to bytes, not to claims).
   client: { hash: string; bytes: number } | null
   // Where the package came from, as one line for the settings row ("github:owner/repo@v1.2.0",
   // "npm:acorn-board", a URL). Absent for a package that predates the installer or was copied in by
@@ -424,7 +447,7 @@ export type InstalledPluginRow = {
 }
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
 
-// Where a plugin package is fetched from (docs/third-party/phase-5-install-ux.md § Node-side
+// Where a plugin package is fetched from (docs/plugins.md
 // installer). `path` is a plugin author's dogfood loop and is refused outside a development build.
 export type PluginInstallSource =
   | { github: string; tag?: string }

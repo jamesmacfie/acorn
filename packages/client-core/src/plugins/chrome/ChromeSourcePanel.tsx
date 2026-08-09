@@ -1,5 +1,7 @@
-import { For, Show } from 'solid-js'
-import type { PluginSourceDescriptor } from '@acorn/protocol/api.ts'
+import { createSignal, For, Show } from 'solid-js'
+import { useNavigate, useParams } from '@solidjs/router'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import type { PluginRailItem, PluginSourceDescriptor, Task } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { createFleetQuery } from '../../node/fanout'
 import { FRESHNESS_LABELS } from '../../node/freshness'
@@ -7,9 +9,13 @@ import { Badge, Row, SectionHeader } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import { runChromeAction } from './actions'
 import { chromeKey, chromeRevision, readRailItems } from './data'
+import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
+import { workspaceForProject } from '../../workspaces/activeWorkspace'
+import { PromoteToTaskModal } from '../../integrations/PromoteToTaskModal'
+import { activateTaskSignals, pathForTask } from '../../tasks/activate'
 
 // The ONE rail list every descriptor source renders through
-// (docs/third-party/phase-4-declarative-chrome.md § Host adapters).
+// (docs/plugins.md).
 //
 // Native by construction: `Row`, `Badge` and `Icon` are the shell's own primitives, so a third-party
 // rail list is pixel-identical to a first-party one under every appearance pack, and stays that way
@@ -19,6 +25,9 @@ import { chromeKey, chromeRevision, readRailItems } from './data'
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
 
 export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
+  const navigate = useNavigate()
+  const params = useParams()
+  const queryClient = useQueryClient()
   // Captured at creation, not read per render. A node switch swaps the QueryClient provider this panel
   // sits under, which remounts it — the same reasoning plugins/frames/register.tsx gives for reading
   // `activeNodeId()` at frame construction.
@@ -38,8 +47,29 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   const items = () => row()?.data ?? []
   const unavailable = () => result().unavailable[0]
 
-  const select = (item: string): void => {
-    if (props.descriptor.onSelect) runChromeAction(props.descriptor.onSelect, { pluginId: props.pluginId, nodeId, item })
+  const tasks = createQuery(() => tasksOptions(true))
+  const workspaces = createQuery(() => workspacesOptions(true))
+  const workspace = () => workspaceForProject(workspaces.data, params.projectId)
+  const attachTasks = () => {
+    const projectIds = new Set(workspace()?.projects.map((project) => project.id) ?? [])
+    return (tasks.data ?? []).filter((task) => task.status === 'active' && (projectIds.size === 0 || projectIds.has(task.projectId)))
+  }
+  const [promoteItem, setPromoteItem] = createSignal<PluginRailItem | null>(null)
+
+  const select = (item: PluginRailItem): void => {
+    if (props.descriptor.onSelect) runChromeAction(props.descriptor.onSelect, {
+      pluginId: props.pluginId,
+      nodeId,
+      item,
+      promote: setPromoteItem,
+    })
+  }
+
+  const afterPromote = (task: Task): void => {
+    setPromoteItem(null)
+    void queryClient.invalidateQueries({ queryKey: tasksKey })
+    activateTaskSignals(task)
+    navigate(pathForTask(task))
   }
 
   return (
@@ -64,7 +94,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           <For each={items()} fallback={<p class="placeholder">Nothing here yet.</p>}>
             {(item) => (
               <Row
-                onActivate={props.descriptor.onSelect ? () => select(item.id) : undefined}
+                onActivate={props.descriptor.onSelect ? () => select(item) : undefined}
                 leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
                 meta={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
                 trailing={<Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>}
@@ -76,6 +106,21 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           </For>
         </Show>
       </section>
+      <Show when={promoteItem()}>
+        {(item) => (
+          <PromoteToTaskModal
+            providerId={props.descriptor.id}
+            item={item()}
+            headerLabel={`+TASK — ${item().id}`}
+            itemTitle={item().title}
+            attachTasks={attachTasks()}
+            existingBranches={(tasks.data ?? []).flatMap((task) => task.branch ? [task.branch] : [])}
+            onClose={() => setPromoteItem(null)}
+            onCreated={afterPromote}
+            onAttached={afterPromote}
+          />
+        )}
+      </Show>
     </main>
   )
 }

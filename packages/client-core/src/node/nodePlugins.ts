@@ -56,7 +56,7 @@ export async function saveDisabledNodePlugins(disabled: readonly string[], nodeI
   return state
 }
 
-// Install, update and uninstall (docs/third-party/phase-5-install-ux.md). All three are per-node for the
+// Install, update and uninstall (docs/plugins.md). All three are per-node for the
 // same reason the toggle is: a plugin is installed ON a machine, and a fleet is a set of independently
 // administered nodes.
 //

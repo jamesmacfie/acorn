@@ -12,6 +12,8 @@ import type { AppEnv, Principal } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../../main/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
+import type { RouteResult } from '../sync/engine'
+import type { StoredConnection } from '../integrations/connections'
 
 // Prefixed console. A plugin's warnings should be attributable without every call site restating
 // its own name; nothing here needs levels, transports or structured fields yet.
@@ -24,13 +26,38 @@ export type PluginRouteOptions = {
   note?: string
 }
 
-// What a fetch-shaped route handler learns about the caller. Structured-clone-safe by rule
-// (docs/third-party/node-security.md § Design rules): no live objects, no functions, no class
-// instances — everything here has to survive being posted across a process boundary unchanged the
-// day loaded plugins move out of process.
+// What a fetch-shaped route handler learns about the caller. The identity projection is plain data;
+// provider operations are an async RPC-shaped capability whose arguments and results are plain data.
+// `withConnections` is the deliberate callback exception: the host lends one decrypted credential
+// for the duration of a provider-owned operation without exposing its database or secret service.
 export type PluginRequestContext = {
-  // Already authenticated and authorized by the host's middleware before the handler is reached.
-  principal: Principal
+  // Already authenticated by the host's middleware before the handler is reached. `userId` is the
+  // stable owner projection most handlers need; `principal` remains for callers that must distinguish
+  // an interactive device from an internal service or task.
+  readonly userId: string
+  readonly principal: Principal
+  // Bound to this request, owner, and plugin. Core database and secret-service handles stay behind
+  // these calls and are never exposed to the plugin.
+  readonly providers: PluginProviderRuntime
+}
+
+export type PluginProviderResourceRequest<TInput> = {
+  providerId: string
+  connectionId: string
+  resourceId: string
+  input: TInput
+  force?: boolean
+}
+
+export type PluginProviderConnectionVisitor<T> = (
+  connection: StoredConnection,
+  secret: string,
+) => Promise<T | undefined>
+
+export type PluginProviderRuntime = {
+  resource<TInput, TOutput>(args: PluginProviderResourceRequest<TInput>): Promise<RouteResult<TOutput>>
+  connections(providerId: string): Promise<StoredConnection[]>
+  withConnections<T>(providerId: string, visit: PluginProviderConnectionVisitor<T>): Promise<T[]>
 }
 
 // The route shape a LOADED plugin serves. A Hono instance cannot cross a process boundary; a
@@ -66,10 +93,10 @@ export type PluginContextSectionRegistry = {
 // Connection, integration, and model-provider descriptors are registered by the plugin that owns
 // them. The host validates provider IDs and projects provider routes under the provider namespace.
 export type PluginProviderRegistry = {
-  // `route` is the provider's own router, mounted at /v2/p/<provider.id> through
-  // buildIntegrationProviderRoutes(). It stays gated by `requireProviderAccess` inside that projection —
-  // this seam changes who declares the provider, not who may reach it.
-  integration(provider: IntegrationProviderContribution, route?: Hono<AppEnv>): void
+  // `route` is either a built-in Hono router or a portable fetch handler, mounted at
+  // /v2/p/<provider.id> through buildIntegrationProviderRoutes(). Both remain behind
+  // `requireProviderAccess`; loaded plugins must use the fetch carrier.
+  integration(provider: IntegrationProviderContribution, route?: Hono<AppEnv> | PluginFetchHandler): void
   // A provider that owns credentials but contributes no mirrored resources (the model providers).
   connection(provider: ConnectionProviderContribution): void
   // A text-generation adapter for an already-registered connection provider. Register the connection

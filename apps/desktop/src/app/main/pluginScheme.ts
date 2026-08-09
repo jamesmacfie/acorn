@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url'
 import type { PluginCache } from './pluginCache'
 
 // `app-plugin://<sha256>/…` — the origin a third-party plugin's UI runs on
-// (docs/third-party/phase-3-sandboxed-ui.md § The `app-plugin://` scheme).
+// (docs/plugins.md).
 //
 // The host part is the bundle hash, which is doing three jobs at once:
 //
