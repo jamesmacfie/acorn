@@ -98,9 +98,12 @@ and disposal are identical.
 
 Three things differ, and all three follow from the code not being ours:
 
-- **The loader is off unless `ACORN_UNSAFE_PLUGINS=1`.** The install-time trust prompt does not exist
-  yet (docs/third-party/phase-2-distribution-trust.md, phase 5), and running third-party code the user
-  never agreed to is not a default worth having. The flag goes away when the prompt arrives.
+- **They get there through the installer.** `POST /v2/core/plugins/install` (owner/device principal,
+  `Idempotency-Key` required, audited) resolves a GitHub release, an npm package, a tarball URL or — on
+  a development build — a local folder; validates the manifest; and places the package atomically with
+  a hash-pinned lockfile beside it (`packages/node-core/src/main/pluginInstaller.ts`,
+  docs/third-party/phase-5-install-ux.md). Uninstalling removes the package and, by default, leaves its
+  SQLite file alone. Each device then asks its own owner before running the plugin's interface code.
 - **Failures are contained.** A built-in throwing from `init` still fails the boot — it is first-party
   code in the same binary, and a node that cannot assemble should say so. A loaded plugin throwing has
   its registrations rolled back, is reported through the roster (`state: 'failed'`) and the attention

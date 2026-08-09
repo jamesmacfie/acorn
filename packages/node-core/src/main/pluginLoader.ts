@@ -5,21 +5,20 @@
 // installed plugin must still boot — that is the whole difference between loaded plugins and
 // built-ins, and the reason the plugin host grows a `contained` path in the same phase.
 //
-// The loader is inert unless ACORN_UNSAFE_PLUGINS=1. That flag is not a feature toggle: the trust
-// acknowledgement UI does not exist until phases 2/5, and shipping a default-on loader before the
-// consent surface exists would mean running third-party code the user never agreed to. Phase 5
-// removes the flag, at the same time as it adds the prompt.
+// The loader used to be inert unless ACORN_UNSAFE_PLUGINS=1, because there was no consent surface and
+// a default-on loader would have run third-party code nobody agreed to. Phase 5 removed the flag: the
+// only way a package reaches `<dataRoot>/plugins` now is through the installer, which is an
+// owner-authenticated route, and the device asks again before it runs the client half
+// (docs/third-party/phase-5-install-ux.md).
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { confineExistingFile, resolveInRoot } from './core/filesystem/confinement'
+import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './pluginInstaller'
 import { PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
-import { PLUGIN_DB_DIR } from './pluginStorage'
 import type { NodePlugin } from '../server/plugin/types'
-
-export const UNSAFE_FLAG = 'ACORN_UNSAFE_PLUGINS'
 
 // A client bundle is one ESM file that has to travel a broker request and land in a device's cache
 // (docs/third-party/phase-2-distribution-trust.md). The ceiling is here rather than only in the
@@ -42,6 +41,11 @@ export type InstalledPlugin = {
   // wanted behaviour rather than a gap: the device hashes the bytes it actually received, finds they
   // do not match this claim, and refuses them. Fail closed.
   client: { hash: string; bytes: number } | null
+  // From the package's lockfile, absent when it has none (installed before phase 5, or copied in by
+  // hand). Display only — the structured source stays in the lockfile, which is the one thing that has
+  // to be able to re-resolve it.
+  source?: string
+  installedAt?: number
 }
 
 // The `dir` -free projection the roster route takes. `dir` is an absolute path on the node's
@@ -57,6 +61,12 @@ export type InstalledPluginInfo = {
   // device binds each one to this plugin's id.
   contributions: PluginManifest['contributions']
   client: { hash: string; bytes: number } | null
+  // Whether the package declares a node half at all. The roster needs it to tell a client-only package
+  // (nothing to start, so no restart is ever pending for it) from one that was installed and is waiting
+  // for the node to come back up. Not the entrypoint itself: that is a path on the node's filesystem.
+  hasNode: boolean
+  source?: string
+  installedAt?: number
 }
 
 // Why one directory did not produce a plugin. `id` is the directory name when the manifest could not
@@ -67,9 +77,9 @@ export type PluginLoadResult = { loaded: LoadedPlugin[]; installed: InstalledPlu
 
 // Installed packages live beside the per-plugin SQLite files, under the same `<dataRoot>/plugins`.
 // They cannot collide: the id pattern forbids a dot, so no directory can be named `<id>.sqlite`.
-// Absolute, like pluginDbPath: resolveInRoot compares path prefixes, so a relative root would make
-// every confinement check answer the wrong question.
-export const pluginInstallDir = (dataRoot: string): string => join(resolve(dataRoot), PLUGIN_DB_DIR)
+// Owned by the installer, which is the only thing that writes there; re-exported under the name the
+// loader has always used.
+export { pluginInstallRoot as pluginInstallDir } from './pluginInstaller'
 
 // Structural, not `instanceof`. The bundle was compiled separately, so its classes are its own even
 // though it shares this realm; identity checks would reject a perfectly good plugin.
@@ -83,6 +93,11 @@ function asNodePlugin(mod: unknown): NodePlugin | null {
   return candidate as NodePlugin
 }
 
+// Identity plus content, so a file that was replaced between two scans is re-read and one that was not
+// is not. Phase 5 made `scanInstalled` a per-request call from the roster route, and sha256 over an
+// 8 MiB bundle on every GET is a cost with no answer attached to it.
+const digestCache = new Map<string, { key: string; value: { hash: string; bytes: number } }>()
+
 // The client entrypoint's hash and size, or null. Every failure is null rather than a throw: a
 // package whose client half is broken still has a node half worth running, and the device simply
 // never sees a bundle to cache.
@@ -91,9 +106,15 @@ function clientDigest(dir: string, relPath: string | undefined): { hash: string;
   const abs = resolveInRoot(dir, relPath)
   if (!abs) return null
   try {
+    const stats = statSync(abs)
+    const key = `${stats.mtimeMs}:${stats.size}:${stats.ino}`
+    const cached = digestCache.get(abs)
+    if (cached?.key === key) return cached.value
     const bytes = readFileSync(abs)
     if (bytes.byteLength > MAX_CLIENT_BUNDLE_BYTES) return null
-    return { hash: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength }
+    const value = { hash: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength }
+    digestCache.set(abs, { key, value })
+    return value
   } catch {
     return null
   }
@@ -106,6 +127,9 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   permissions: entry.manifest.permissions,
   contributions: entry.manifest.contributions,
   client: entry.client,
+  hasNode: entry.manifest.node !== undefined,
+  ...(entry.source === undefined ? {} : { source: entry.source }),
+  ...(entry.installedAt === undefined ? {} : { installedAt: entry.installedAt }),
 })
 
 // The bytes behind GET /v2/core/plugins/:id/client.js. Re-confines the path rather than trusting the
@@ -130,37 +154,43 @@ export async function readClientBundle(
   }
 }
 
+// Directories, plus symlinks to directories — a `{ path }` dev install is a symlink, and Dirent's
+// isDirectory() is lstat-shaped so it answers false for one. Dot-prefixed names are skipped: the
+// installer stages under `.staging-*` in this same directory, and a plugin id can never start with a
+// dot anyway.
 function subdirectories(dir: string): string[] {
   try {
-    return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => !entry.name.startsWith('.'))
+      .filter((entry) => entry.isDirectory() || (entry.isSymbolicLink() && isDirectory(join(dir, entry.name))))
+      .map((entry) => entry.name)
   } catch {
     return [] // no plugins directory yet, which is the normal case
   }
 }
 
-export async function loadExternalPlugins(
-  dataRoot: string,
-  options: { builtins: readonly string[] },
-): Promise<PluginLoadResult> {
-  const root = pluginInstallDir(dataRoot)
-  const dirs = subdirectories(root)
-  if (process.env[UNSAFE_FLAG] !== '1') {
-    if (dirs.length) {
-      console.warn(
-        `[plugins] ${dirs.length} installed plugin(s) in ${root} were NOT loaded: set ${UNSAFE_FLAG}=1 to load them. ` +
-        'Loading third-party node code is opt-in until the install-time trust prompt ships.',
-      )
-    }
-    return { loaded: [], installed: [], failures: [] }
+const isDirectory = (path: string): boolean => {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
   }
+}
 
-  const builtins = new Set(options.builtins)
-  const loaded: LoadedPlugin[] = []
+/** Every package on disk whose manifest parses and whose apiVersion this node speaks — with nothing
+ * imported and nothing executed.
+ *
+ * Split out of `loadExternalPlugins` because phase 5 gave the roster route a second question to answer:
+ * the load result describes what this PROCESS assembled at boot, and after an install or an uninstall
+ * that is no longer what is on disk. This is the "right now" answer, and comparing the two is how the
+ * roster knows a restart is pending (server/routes/plugins.ts). */
+export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[]; failures: PluginLoadFailure[] } {
+  const root = pluginInstallRoot(dataRoot)
   const installed: InstalledPlugin[] = []
   const failures: PluginLoadFailure[] = []
   const seen = new Set<string>()
 
-  for (const name of dirs.sort()) {
+  for (const name of subdirectories(root).sort()) {
     const dir = join(root, name)
     const manifest = readPluginManifest(dir)
     if (!manifest) {
@@ -182,18 +212,43 @@ export async function loadExternalPlugins(
     // A manifest may name any directory; the id is what binds the route namespace and the database
     // filename, so it has to be unique regardless of which folder it was found in.
     seen.add(manifest.id)
-    const install = (): void => void installed.push({ manifest, dir, client: clientDigest(dir, manifest.client) })
+    const lock = readLockfile(dataRoot, manifest.id)
+    installed.push({
+      manifest,
+      dir,
+      client: clientDigest(dir, manifest.client),
+      ...(lock ? { source: describeSource(lock.source), installedAt: lock.installedAt } : {}),
+    })
+  }
+  return { installed, failures }
+}
+
+export async function loadExternalPlugins(
+  dataRoot: string,
+  options: { builtins: readonly string[] },
+): Promise<PluginLoadResult> {
+  // Boot is the one moment nothing is mid-install, so it is where an interrupted one gets cleaned up.
+  sweepDebris(dataRoot)
+
+  const builtins = new Set(options.builtins)
+  const scan = scanInstalled(dataRoot)
+  const loaded: LoadedPlugin[] = []
+  const installed: InstalledPlugin[] = []
+  const failures: PluginLoadFailure[] = [...scan.failures]
+
+  for (const entry of scan.installed) {
+    const { manifest, dir } = entry
     // Client-only package. Nothing to load in the Node, but its bundle still has to reach every
     // paired device — which is the whole reason `installed` exists alongside `loaded`.
     if (!manifest.node) {
-      install()
+      installed.push(entry)
       continue
     }
 
     // Lexical + symlink confinement, the same helper CoreServices uses for worktree paths: a bundle
     // must not be able to point the loader at a file outside its own directory.
-    const entry = resolveInRoot(dir, manifest.node)
-    if (!entry) {
+    const entrypoint = resolveInRoot(dir, manifest.node)
+    if (!entrypoint) {
       failures.push({ id: manifest.id, dir, reason: `node entrypoint '${manifest.node}' resolves outside the plugin directory` })
       continue
     }
@@ -201,7 +256,7 @@ export async function loadExternalPlugins(
     let mod: unknown
     try {
       // pathToFileURL, never the bare path: `import('C:\\...')` is not a valid specifier on Windows.
-      mod = await import(pathToFileURL(entry).href)
+      mod = await import(pathToFileURL(entrypoint).href)
     } catch (error) {
       failures.push({ id: manifest.id, dir, reason: `could not import ${manifest.node}: ${String(error)}` })
       continue
@@ -219,19 +274,19 @@ export async function loadExternalPlugins(
       continue
     }
 
-    // Shadowing a built-in is how phase 1 dogfoods the loader: run `scripts/build-plugin.mjs
-    // rollbar`, boot with the flag, and the compiled-in Rollbar steps aside so the disk copy is the
-    // one under test. It is reachable ONLY behind the flag, so an unflagged or packaged boot can
-    // never have a built-in replaced by something on disk.
+    // Shadowing a built-in is how the loader is dogfooded: `scripts/build-plugin.mjs rollbar` installs
+    // the disk copy and the compiled-in one steps aside. Loud rather than silent, because "the version
+    // running is not the one in this binary" is the single most confusing thing a support thread can
+    // fail to mention.
     const shadowsBuiltin = builtins.has(manifest.id)
     if (shadowsBuiltin) {
-      console.warn(`[plugins] ${manifest.id}: loading from ${dir} INSTEAD of the built-in (${UNSAFE_FLAG} is set)`)
+      console.warn(`[plugins] ${manifest.id}: loading from ${dir} INSTEAD of the built-in`)
     }
     loaded.push({ manifest, plugin, dir, shadowsBuiltin })
     // Only now. A package whose node half declared itself and then failed to import is broken, not
     // client-only, and distributing the UI of a plugin whose routes will never exist would put a row
     // on every paired device claiming a plugin that is not running anywhere.
-    install()
+    installed.push(entry)
   }
 
   for (const failure of failures) console.error(`[plugins] ${failure.id}: ${failure.reason}`)

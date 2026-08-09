@@ -94,8 +94,8 @@ exception.
 | 1 — Node loader | [phase-1-node-loader.md](./phase-1-node-loader.md) | ✅ Done | M |
 | 2 — Bundle distribution + trust | [phase-2-distribution-trust.md](./phase-2-distribution-trust.md) | ✅ Done | M |
 | 3 — Sandboxed UI runtime | [phase-3-sandboxed-ui.md](./phase-3-sandboxed-ui.md) | ✅ Done | L |
-| 4 — Declarative chrome | [phase-4-declarative-chrome.md](./phase-4-declarative-chrome.md) | ⬜ Not started | M |
-| 5 — Install and update UX | [phase-5-install-ux.md](./phase-5-install-ux.md) | ⬜ Not started | M |
+| 4 — Declarative chrome | [phase-4-declarative-chrome.md](./phase-4-declarative-chrome.md) | ✅ Done | M |
+| 5 — Install and update UX | [phase-5-install-ux.md](./phase-5-install-ux.md) | ✅ Done | M |
 
 Cross-cutting: [node-security.md](./node-security.md) — the node-half threat model, containment
 ladder, and the design rules every phase must hold to. Not a phase; reviewers hold PRs from any

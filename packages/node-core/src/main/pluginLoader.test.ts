@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './pluginManifest'
-import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, UNSAFE_FLAG } from './pluginLoader'
+import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle } from './pluginLoader'
 
 // A minimal ESM node half. Written as source rather than bundled, because the loader's contract is
 // "default-export something shaped like a NodePlugin from an ESM module" and nothing more.
@@ -35,7 +35,6 @@ beforeEach(() => {
   // A path with a SPACE on purpose: the loader must reach the bundle through pathToFileURL, and a
   // bare `import('/a b/c.js')` fails on exactly this input (and on every Windows path).
   root = mkdtempSync(join(tmpdir(), 'acorn loader-'))
-  vi.stubEnv(UNSAFE_FLAG, '1')
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
@@ -47,19 +46,33 @@ afterEach(() => {
 })
 
 describe('the loader gate', () => {
-  it('loads nothing without the unsafe flag, and says so when something is installed', async () => {
-    vi.stubEnv(UNSAFE_FLAG, '')
-    install('ntfy', manifest('ntfy'), BUNDLE('ntfy'))
-    const result = await loadExternalPlugins(root, { builtins: [] })
-    // `installed` is empty too, not just `loaded`: with the flag off there is nothing to distribute
-    // either, so an unflagged node offers no bundles rather than offering code it refuses to run.
-    expect(result).toEqual({ loaded: [], installed: [], failures: [] })
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(UNSAFE_FLAG))
-  })
-
   it('is silent and empty when there is no plugins directory at all', async () => {
     expect(await loadExternalPlugins(root, { builtins: [] })).toEqual({ loaded: [], installed: [], failures: [] })
     expect(console.warn).not.toHaveBeenCalled()
+  })
+
+  // The installer stages under `.staging-*` in this same directory, so a scan that treated every
+  // subdirectory as a package would report a failure row for a download in flight.
+  it('ignores dot-prefixed directories, which is where the installer stages', async () => {
+    mkdirSync(join(pluginInstallDir(root), '.staging-abcd1234', 'unpacked'), { recursive: true })
+    expect(await loadExternalPlugins(root, { builtins: [] })).toEqual({ loaded: [], installed: [], failures: [] })
+  })
+
+  // A `{ path }` dev install is a symlink, and Dirent.isDirectory() is lstat-shaped — it answers false
+  // for one. Without the symlink branch the author's whole dogfood loop silently loads nothing.
+  it('follows a symlinked package directory', async () => {
+    const elsewhere = mkdtempSync(join(tmpdir(), 'acorn linked-'))
+    mkdirSync(join(elsewhere, 'dist'), { recursive: true })
+    writeFileSync(join(elsewhere, 'acorn-plugin.json'), JSON.stringify(manifest('ntfy')))
+    writeFileSync(join(elsewhere, 'dist', 'node.js'), BUNDLE('ntfy'))
+    mkdirSync(pluginInstallDir(root), { recursive: true })
+    symlinkSync(elsewhere, join(pluginInstallDir(root), 'ntfy'))
+    try {
+      const { loaded } = await loadExternalPlugins(root, { builtins: [] })
+      expect(loaded.map((entry) => entry.manifest.id)).toEqual(['ntfy'])
+    } finally {
+      rmSync(elsewhere, { recursive: true, force: true })
+    }
   })
 })
 
@@ -169,10 +182,13 @@ describe('declared frame contributions', () => {
     ])
   })
 
-  it('has an empty frame list when the manifest declares no contributions at all', async () => {
+  it('has an empty list of every kind when the manifest declares no contributions at all', async () => {
     install('plain', manifest('plain'), BUNDLE('plain'))
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
-    expect(installedPluginInfo(installed[0]).contributions).toEqual({ frames: [] })
+    // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
+    // none" from "did not know about this kind".
+    expect(installedPluginInfo(installed[0]).contributions)
+      .toEqual({ frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

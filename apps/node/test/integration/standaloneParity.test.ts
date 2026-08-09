@@ -8,8 +8,8 @@ import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 describe('composition graph parity', () => {
   it('uses one plugin graph and one drain order for both Node hosts', async () => {
-    // No ACORN_UNSAFE_PLUGINS in this environment, so the loader contributes nothing and the graph
-    // is exactly the compiled-in list — which is the assertion that matters here.
+    // No install directory at this data root, so the loader contributes nothing and the graph is
+    // exactly the compiled-in list — which is the assertion that matters here.
     const graph = await assembleNodeGraph('', {} as never)
     expect(graph.plugins.map((plugin) => plugin.name)).toEqual(nodePluginNames())
     expect(graph.loaded.size).toBe(0)

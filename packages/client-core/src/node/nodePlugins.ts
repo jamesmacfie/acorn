@@ -1,5 +1,15 @@
 import { createSignal } from 'solid-js'
-import { corePluginsRoute, type NodePluginState } from '@acorn/protocol/api.ts'
+import {
+  corePluginInstallRoute,
+  corePluginRoute,
+  corePluginsRoute,
+  corePluginUpdateRoute,
+  type NodePluginState,
+  type PluginInstallResult,
+  type PluginInstallSource,
+  type PluginUninstallResult,
+  type PluginUpdateResult,
+} from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
 import { activeNodeId } from './activeNode'
 import { onScopeEvicted } from '../registries/scopeEviction'
@@ -45,6 +55,46 @@ export async function saveDisabledNodePlugins(disabled: readonly string[], nodeI
   if (!nodeId || nodeId === activeNodeId()) setNodePlugins(state)
   return state
 }
+
+// Install, update and uninstall (docs/third-party/phase-5-install-ux.md). All three are per-node for the
+// same reason the toggle is: a plugin is installed ON a machine, and a fleet is a set of independently
+// administered nodes.
+//
+// `writeJson` rather than `postJson`, which carries an idempotency key but not a node id. The key is
+// minted here because only the call site knows a retry is the same logical install — a broker-minted one
+// would defeat replay entirely (docs/api-reference.md § HTTP conventions).
+//
+// None of them touch the `nodePlugins` signal: nothing has changed in the RUNNING process yet, and the
+// caller re-reads the roster to pick up the pending row.
+const mutate = async <T>(url: string, method: string, body: unknown, nodeId?: string): Promise<T> =>
+  await writeJson<T>(
+    url,
+    {
+      method,
+      headers: { 'Content-Type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+      body: JSON.stringify(body),
+      ...(nodeId ? { nodeId } : {}),
+    },
+    (res) => `plugins ${res.status}`,
+  )
+
+export const installNodePlugin = async (
+  source: PluginInstallSource,
+  options: { allowDowngrade?: boolean } = {},
+  nodeId?: string,
+): Promise<PluginInstallResult> => await mutate(corePluginInstallRoute, 'POST', { source, ...options }, nodeId)
+
+export const updateNodePlugin = async (
+  id: string,
+  options: { allowDowngrade?: boolean } = {},
+  nodeId?: string,
+): Promise<PluginUpdateResult> => await mutate(corePluginUpdateRoute(id), 'POST', options, nodeId)
+
+export const uninstallNodePlugin = async (
+  id: string,
+  options: { purgeData?: boolean } = {},
+  nodeId?: string,
+): Promise<PluginUninstallResult> => await mutate(corePluginRoute(id), 'DELETE', options, nodeId)
 
 // Test seam, and the node-switch reset: a stale list from the previous node must not decide which
 // contributions the next node's shell gets.

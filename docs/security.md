@@ -108,8 +108,10 @@ The threats this closes, and the ones it does not:
   Every surface that renders them says *declared*. `docs/third-party/node-security.md` holds the full
   model and the route to a hard boundary.
 
-The node-side loader is inert unless `ACORN_UNSAFE_PLUGINS=1`, so nothing is distributed at all until
-a Node's owner opts in.
+The only way a package reaches a Node's install directory is the owner-authenticated install route
+(`POST /v2/core/plugins/install`, device principal only, audited). Nothing is distributed to a device
+until a Node's owner has installed it, and nothing runs on a device until that device has separately
+acknowledged the exact bundle bytes.
 
 ## Preview and browser automation
 

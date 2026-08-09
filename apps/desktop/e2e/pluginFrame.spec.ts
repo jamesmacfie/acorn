@@ -149,8 +149,6 @@ async function launch(): Promise<Running> {
       SESSION_ENC_KEY: KEY,
       GITHUB_CLIENT_ID: 'e2e-client',
       GITHUB_CLIENT_SECRET: 'e2e-secret',
-      // The loader is inert without it, and the bundled local node inherits main's environment.
-      ACORN_UNSAFE_PLUGINS: '1',
     },
   })
   apps.push(app)

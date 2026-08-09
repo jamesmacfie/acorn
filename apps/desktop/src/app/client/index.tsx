@@ -14,6 +14,7 @@ import { clientFor } from '@acorn/client-core/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/registries/sources.ts'
 import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
+import { syncChromeContributions } from '@acorn/client-core/plugins/chrome/register.ts'
 import { syncFrameContributions } from '@acorn/client-core/plugins/frames/register.tsx'
 
 const noop = () => null
@@ -45,7 +46,13 @@ await applyNodePlugins(activeNodeId() ?? undefined)
 // with an offline machine in it must not hold up the first paint, and a plugin pane appearing a moment
 // after the shell does is the correct trade. Panes read the active node at render, so a node switch needs
 // no second pass.
-void syncPluginDistribution().then(syncFrameContributions)
+// Chrome (docs/third-party/phase-4-declarative-chrome.md) rides the same settle: it is registered from
+// the same roster rows, and a plugin that ships descriptors but no client bundle has nothing else to
+// wait for.
+void syncPluginDistribution().then(() => {
+  syncFrameContributions()
+  syncChromeContributions()
+})
 
 render(
   () => (

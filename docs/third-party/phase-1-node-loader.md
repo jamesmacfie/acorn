@@ -74,10 +74,12 @@ Rules the loader enforces:
                                    sha256 of the archive and of each entrypoint
 ```
 
-In this phase installation is manual (developer copies files) and gated behind an explicit env
-flag: **`ACORN_UNSAFE_PLUGINS=1`**. Without the flag the loader logs and skips. The flag exists
-because the trust acknowledgement UI does not arrive until Phases 2/5; do not ship a default-on
-loader before the consent surface exists. Remove the flag in Phase 5.
+In this phase installation was manual (developer copies files) and gated behind an explicit env
+flag, `ACORN_UNSAFE_PLUGINS=1`, because the trust acknowledgement UI did not arrive until Phases
+2/5 and a default-on loader before the consent surface exists runs code nobody agreed to.
+**Phase 5 removed the flag** along with manual installation: the only way a package reaches the
+install directory now is the owner-authenticated install route
+([phase-5-install-ux.md](./phase-5-install-ux.md)).
 
 ### The loader
 
@@ -205,7 +207,7 @@ dogfooding. Revisit once bundle distribution has run for a while.
 - Rollbar loads from disk in dev and behaves identically to the compiled-in build.
 - A deliberately broken plugin disables cleanly with an attention item; boot continues.
 - Disable/enable round-trips through the existing Settings toggle.
-- Loader inert without `ACORN_UNSAFE_PLUGINS=1`.
+- Loader inert without `ACORN_UNSAFE_PLUGINS=1`. *(Superseded by phase 5, which removed the flag.)*
 - Boundaries test, `pnpm lint`, and suites green.
 
 ## As built
@@ -224,9 +226,10 @@ Six differences between the plan above and what shipped.
   `apps/node/src/server/plugins.ts` would have taken Rollbar's node half out of the *packaged* app,
   since nothing ships a built bundle into a data root until phase 2. Instead the loader marks a loaded
   plugin whose id matches a built-in (`shadowsBuiltin`) and the composition root drops the built-in
-  from the graph, logging it. Reachable only behind `ACORN_UNSAFE_PLUGINS=1`, so an unflagged or
-  packaged boot can never have a built-in replaced from disk — and in a flagged dev boot the disk copy
-  really is the only Rollbar running, which is what dogfooding needs.
+  from the graph, logging it loudly. In a dev boot after `build-plugin.mjs` the disk copy really is the
+  only Rollbar running, which is what dogfooding needs. (Phase 1 reached this only behind the env flag;
+  since phase 5 removed the flag, shadowing is reachable whenever a package with a built-in's id is in
+  the install directory — which the installer is what puts there.)
 - **The attention item is client-side, over the roster route.** There is no node-side attention
   surface — `attentionRegistry` lives in client-core and its sources fetch per node. So the roster
   grew `state: 'active' | 'failed' | 'disabled'` and `failedAt`, and

@@ -17,6 +17,7 @@ import type {
   PluginBridgeEvent,
   PluginBridgeMessage,
   PluginBridgeReply,
+  PluginBridgeSelect,
   PluginFrameContext,
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
@@ -328,4 +329,10 @@ export function createFrameBridge(input: {
  * theme switch without holding the port itself. */
 export const postAppearance = (port: MessagePort, appearance: Omit<PluginBridgeAppearance, 'kind'>): void => {
   port.postMessage({ kind: 'appearance', ...appearance } satisfies PluginBridgeAppearance)
+}
+
+/** Push a rail-row selection into a live frame, for the same reason postAppearance exists: the host has
+ * to reach a mounted frame without holding its port (docs/third-party/phase-4-declarative-chrome.md). */
+export const postSelect = (port: MessagePort, item: string): void => {
+  port.postMessage({ kind: 'select', item } satisfies PluginBridgeSelect)
 }

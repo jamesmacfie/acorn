@@ -270,7 +270,11 @@ export type NodePluginRow = {
   required: boolean
   disabled: boolean
   running: boolean
-  state: 'active' | 'failed' | 'disabled'
+  // 'pending-restart' is the fourth answer and the one phase 5 adds: a package sits on the node's disk
+  // that this process never loaded — freshly installed, updated to a different version, or uninstalled
+  // while still running. Like 'failed' it is about the package rather than the toggle, but unlike
+  // 'failed' a restart is exactly what fixes it, so it DOES raise the banner.
+  state: 'active' | 'failed' | 'disabled' | 'pending-restart'
   // Epoch millis, present only on a failed row.
   failedAt?: number
   // Present exactly when this plugin came off the node's disk rather than out of the app binary,
@@ -317,9 +321,88 @@ export type PluginFrameSurface = {
   group?: 'general' | 'workspace'
 }
 
-// Loose on the wire as well as in the schema: phase 4's declarative chrome arrives under sibling
-// keys, and a client that does not know them yet should contribute less rather than fail to parse.
-export type PluginContributions = { frames: PluginFrameSurface[] } & Record<string, unknown>
+// ── Declarative chrome (docs/third-party/phase-4-declarative-chrome.md) ───────────────────────────
+//
+// The other half of what a manifest may contribute: small chrome the HOST draws natively from data,
+// with no plugin code in the renderer at all. Hand-written twins of the Zod schemas in
+// node-core/main/pluginManifest.ts, for the same reason PluginFrameSurface is one — the node parses
+// the manifest, and this is the projection the device registers contributions from.
+
+// The closed verb set. `invoke` is deliberately absent in v1; adding a verb is additive.
+export type PluginChromeAction =
+  // A pane the same manifest declares. The selected row's id rides along as a pane intent.
+  | { verb: 'openPane'; pane: string }
+  | { verb: 'runNodeAction'; path: string }
+  | { verb: 'openUrl'; url: string }
+
+// Every `path`/`items`/`data` below is confined to the plugin's OWN route namespace when the node
+// parses the manifest, and confined again on the device before it is fetched. Neither the prefix nor
+// the check is spelled here: an architecture rule forbids this package from naming a plugin route at
+// all, and the two halves that do the confining are node-core/main/pluginManifest.ts and
+// client-core/plugins/chrome/data.ts.
+export type PluginSourceDescriptor = {
+  id: string
+  label: string
+  glyph: string
+  order: number
+  providerId?: string
+  items: string
+  onSelect?: PluginChromeAction
+  refresh?: number
+}
+export type PluginSlotDescriptor = {
+  id: string
+  slot: 'footer'
+  icon?: string
+  data: string
+  onClick?: PluginChromeAction
+  refresh?: number
+}
+export type PluginPaletteDescriptor = { id: string; title: string; action: PluginChromeAction }
+export type PluginAttentionDescriptor = { id: string; order: number; items: string; refresh?: number }
+export type PluginNodeStatDescriptor = {
+  id: string
+  order: number
+  label: [one: string, many: string]
+  data: string
+  refresh?: number
+}
+
+// What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
+// serves: the host is the one rendering these, so the shape is its contract and not the plugin's
+// (docs/architecture-overview.md § Who owns which contract). Re-exported from @acorn/plugin-api so a
+// plugin's node half types its handlers against the same declarations.
+//
+// The client still validates what arrives. These types describe the agreement; the roster row and the
+// route body are both bytes from a node, and a malformed row is dropped rather than thrown into the shell.
+export type PluginRailItem = { id: string; title: string; subtitle?: string; icon?: string; badge?: string }
+export type PluginRailItems = { items: PluginRailItem[] }
+// `null` hides the badge, which is how a badge with nothing to say disappears without the host
+// needing a second route to ask.
+export type PluginSlotBadge = { text: string; tone?: 'neutral' | 'accent' | 'warn'; tooltip?: string } | null
+export type PluginAttentionWireItem = {
+  id: string
+  taskId?: string
+  title: string
+  detail?: string
+  severity: 'info' | 'warn' | 'danger'
+  // Epoch millis, for the relative time on the row.
+  at: number
+}
+export type PluginAttentionItems = { items: PluginAttentionWireItem[] }
+export type PluginNodeStatValue = { value: number }
+
+// Still loose on the wire as well as in the schema, now that phase 4's keys are named: a client that
+// does not know a future sibling key should contribute less rather than fail to parse. The arrays are
+// optional because an older node's roster row will not carry them — every reader uses `?? []`.
+export type PluginContributions = {
+  frames: PluginFrameSurface[]
+  sources?: PluginSourceDescriptor[]
+  slots?: PluginSlotDescriptor[]
+  palette?: PluginPaletteDescriptor[]
+  attention?: PluginAttentionDescriptor[]
+  nodeStats?: PluginNodeStatDescriptor[]
+} & Record<string, unknown>
 
 export type InstalledPluginRow = {
   version: string
@@ -331,9 +414,34 @@ export type InstalledPluginRow = {
   // hashes the bytes it received and refuses a mismatch, because a compromised node can lie here
   // (docs/third-party/README.md § Trust binds to bytes, not to claims).
   client: { hash: string; bytes: number } | null
+  // Where the package came from, as one line for the settings row ("github:owner/repo@v1.2.0",
+  // "npm:acorn-board", a URL). Absent for a package that predates the installer or was copied in by
+  // hand, which is also why it is a display string and not the structured source: the roster's job is
+  // to say where this came from, and only the node's lockfile has to be able to re-resolve it.
+  source?: string
+  // Epoch millis.
+  installedAt?: number
 }
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
+
+// Where a plugin package is fetched from (docs/third-party/phase-5-install-ux.md § Node-side
+// installer). `path` is a plugin author's dogfood loop and is refused outside a development build.
+export type PluginInstallSource =
+  | { github: string; tag?: string }
+  | { npm: string; version?: string }
+  | { url: string }
+  | { path: string }
+
+// Always restart-required: a plugin's routes, tables and jobs are wired at init, so nothing an install
+// route can do makes the plugin live in the running process.
+export type PluginInstallResult = { id: string; version: string; state: 'installed-restart-required' }
+export type PluginUpdateResult = { id: string; fromVersion: string; toVersion: string; state: 'installed-restart-required' }
+export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
+
 export const corePluginsRoute = '/v2/core/plugins'
+export const corePluginInstallRoute = '/v2/core/plugins/install'
+export const corePluginRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}`
+export const corePluginUpdateRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/update`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
 // task-scoped internal token cannot reach it (server/index.ts mounts requireDevice over both forms).
 export const corePluginBundleRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/client.js`
