@@ -51,6 +51,9 @@ export type PluginFrameContext = {
   item?: string
   theme: string
   style: string
+  // Host-validated upper bound for the chords this frame may keep. The SDK starts with this set and
+  // lets runtime code narrow it; undeclared chords are never claimable.
+  claimsKeys?: string[]
 }
 
 // ── Frame → host ──────────────────────────────────────────────────────────────────────────────────
@@ -95,6 +98,7 @@ export type PluginBridgeWebviewRequest =
 // Abandon an in-flight request. The SDK sends this when an AbortSignal fires; the host stops caring
 // about the response rather than pretending it can un-send an HTTP request.
 export type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
+export type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
 
 export type PluginBridgeRequest =
   | PluginBridgeApiRequest
@@ -103,6 +107,7 @@ export type PluginBridgeRequest =
   | PluginBridgeUiRequest
   | PluginBridgeWebviewRequest
   | PluginBridgeCancelRequest
+  | PluginBridgeKeydown
 
 // ── Host → frame ──────────────────────────────────────────────────────────────────────────────────
 

@@ -324,8 +324,10 @@ export type PluginFrameSurface = {
   url?: string
   urlSource?: string
   hosts?: string[]
+  claimsKeys?: string[]
 }
 export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
+export type PluginKeyClaimGrant = { surface: string; label: string; chords: string[] }
 
 // ── Declarative chrome (docs/plugins.md) ───────────────────────────
 //
@@ -366,6 +368,21 @@ export type PluginSlotDescriptor = {
   refresh?: number
 }
 export type PluginPaletteDescriptor = { id: string; title: string; action: PluginChromeAction }
+export type PluginCommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
+export type PluginCommandAction = Exclude<PluginChromeAction, { verb: 'createTask' }>
+export type PluginCommandDescriptor = {
+  id: string
+  title: string
+  category: PluginCommandCategory
+  palette: boolean
+  action: PluginCommandAction
+}
+export type PluginKeybindingDescriptor = {
+  command: string
+  defaultChord: string
+  when: 'global' | 'task' | 'surface'
+  surface?: string
+}
 export type PluginAttentionDescriptor = { id: string; order: number; items: string; refresh?: number }
 export type PluginNodeStatDescriptor = {
   id: string
@@ -428,6 +445,8 @@ export type PluginContributions = {
   sources?: PluginSourceDescriptor[]
   slots?: PluginSlotDescriptor[]
   palette?: PluginPaletteDescriptor[]
+  commands?: PluginCommandDescriptor[]
+  keybindings?: PluginKeybindingDescriptor[]
   attention?: PluginAttentionDescriptor[]
   nodeStats?: PluginNodeStatDescriptor[]
   contentLinks?: PluginContentLinkDescriptor[]

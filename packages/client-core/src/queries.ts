@@ -54,6 +54,10 @@ export const prefsOptions = (enabled: boolean) => ({
     seedDevicePrefs(nodePrefs)
     return mergePrefs(nodePrefs)
   },
+  // A persisted TanStack snapshot can hydrate without running queryFn while it is still fresh. Device
+  // preferences live outside that cache, so project them at read time as well or a just-saved shortcut
+  // can disappear from every consumer until the node-backed query refetches.
+  select: (prefs: Record<string, string>): Record<string, string> => mergePrefs(prefs),
 })
 
 // Connected integrations (gates the Sources rail + settings list). Includes the synthesized GitHub

@@ -1,15 +1,23 @@
 import { createComponent, lazy } from 'solid-js'
-import type { NodePluginRow } from '@acorn/protocol/api.ts'
+import type { NodePluginRow, PluginCommandDescriptor } from '@acorn/protocol/api.ts'
+import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { attentionRegistry, type AttentionItem } from '../../registries/attention'
 import { nodeStatRegistry } from '../../registries/nodeStats'
-import { paletteRowRegistry } from '../../registries/paletteRows'
+import { commandRegistry } from '../../registries/commands'
+import { keybindingRegistry } from '../../registries/keybindings'
 import type { Disposable } from '../../registries/registry'
 import { sourceRegistry } from '../../registries/sources'
 import { taskSlotRegistry } from '../../registries/slots'
-import { bundleAccepted, installedByNode, pluginEnabledOnNode } from '../distribution'
+import {
+  bundleAccepted,
+  installedByNode,
+  loadedPluginStateOnNode,
+  pluginEnabledOnNode,
+  pluginInstalledAtOnNode,
+} from '../distribution'
 import { runChromeAction } from './actions'
-import { readAttention, readStat, unwatchChrome, watchChrome } from './data'
+import { ownsRoute, readAttention, readStat, unwatchChrome, watchChrome } from './data'
 import { descriptorPromotion } from './promotion'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../../registries/contentLinks'
@@ -72,8 +80,61 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     }
   }
   const note = (seconds: number | undefined): void => void (seconds !== undefined && refreshes.push(seconds))
+  const frames = contributions.frames ?? []
+  const surfaceIds = new Set(frames.map((surface) => surface.id))
+  const panes = new Set(frames.filter((frame) => frame.target === 'pane' || frame.target === 'webview').map((frame) => frame.id))
 
-  const panes = new Set((contributions.frames ?? []).filter((frame) => frame.target === 'pane' || frame.target === 'webview').map((frame) => frame.id))
+  // `palette` is the one-release compatibility alias. Both forms become commands, and the palette's
+  // existing command-registry pass renders only those whose `palette` flag is true.
+  const commands: PluginCommandDescriptor[] = [
+    ...(contributions.commands ?? []),
+    ...(contributions.palette ?? []).flatMap((descriptor): PluginCommandDescriptor[] =>
+      descriptor.action.verb === 'createTask'
+        ? []
+        : [{ ...descriptor, category: 'action', palette: true, action: descriptor.action }]),
+  ].filter((descriptor) => {
+    if (descriptor.action.verb === 'openPane') return panes.has(descriptor.action.pane)
+    if (descriptor.action.verb === 'runNodeAction') return ownsRoute(pluginId, descriptor.action.path)
+    return descriptor.action.url.startsWith('https://')
+  })
+  const commandById = new Map(commands.map((descriptor) => [descriptor.id, descriptor]))
+  for (const descriptor of commands) {
+    add('command', descriptor.id, () => commandRegistry.register({
+      id: qualifiedPluginCommandId(pluginId, descriptor.id),
+      title: descriptor.title,
+      category: descriptor.category,
+      palette: descriptor.palette,
+      when: () => pluginEnabledOnNode(chromeNode(), pluginId),
+      run: () => runChromeAction(descriptor.action, { pluginId, nodeId: chromeNode() }),
+    }))
+  }
+
+  for (const descriptor of contributions.keybindings ?? []) {
+    const command = commandById.get(descriptor.command)
+    if (!command || !isPluginShortcutChord(descriptor.defaultChord)) {
+      console.warn(`[plugin-chrome] ${pluginId} ignored an invalid keybinding for '${descriptor.command}'.`)
+      continue
+    }
+    if (descriptor.when === 'surface' && (!descriptor.surface || !surfaceIds.has(descriptor.surface))) continue
+    const id = qualifiedPluginCommandId(pluginId, descriptor.command)
+    add('keybinding', id, () => keybindingRegistry.register({
+      id,
+      command: id,
+      description: command.title,
+      category: row.name,
+      defaultChord: descriptor.defaultChord,
+      when: descriptor.when === 'surface' ? 'pane' : descriptor.when,
+      ...(descriptor.surface ? { pane: descriptor.surface } : {}),
+      active: () => loadedPluginStateOnNode(chromeNode(), pluginId) === 'enabled',
+      plugin: {
+        id: pluginId,
+        name: row.name,
+        installedAt: () => pluginInstalledAtOnNode(chromeNode(), pluginId),
+        state: () => loadedPluginStateOnNode(chromeNode(), pluginId),
+      },
+    }))
+  }
+
   for (const descriptor of contributions.contentLinks ?? []) {
     if (!panes.has(descriptor.openPane)) {
       console.warn(`[plugin-chrome] ${pluginId} content link '${descriptor.id}' names an undeclared pane '${descriptor.openPane}'.`)
@@ -121,25 +182,6 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       slot: 'task.footer',
       order: 500,
       component: () => createComponent(ChromeBadge, { pluginId, descriptor }),
-    }))
-  }
-
-  const palette = contributions.palette ?? []
-  if (palette.length) {
-    // ONE source per plugin covering all its rows, not one per descriptor: the palette asks every source
-    // when it opens, and a plugin with eight commands should be one question, not eight.
-    add('palette', pluginId, () => paletteRowRegistry.register({
-      id: `plugin-chrome:${pluginId}`,
-      order: 500,
-      rows: async () => ({
-        rows: pluginEnabledOnNode(chromeNode(), pluginId)
-          ? palette.map((descriptor) => ({ kind: 'plugin' as const, id: descriptor.id, label: descriptor.title }))
-          : [],
-      }),
-      invoke: async (item) => {
-        const descriptor = palette.find((candidate) => candidate.id === item.id)
-        if (descriptor) runChromeAction(descriptor.action, { pluginId, nodeId: chromeNode() })
-      },
     }))
   }
 

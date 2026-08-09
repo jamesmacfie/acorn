@@ -1,5 +1,7 @@
-import type { NodePluginPermissions, PluginContributions, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginContributions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { normalizeWebviewHost } from '@acorn/protocol/webview.ts'
+import { formatChord } from '../tasks/paneShortcuts'
 import { describeChannel, isSubscribable } from './frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
 
@@ -86,3 +88,16 @@ export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): s
   [...grants]
     .sort((a, b) => a.surface.localeCompare(b.surface))
     .map((grant) => `Show web pages from ${[...grant.hosts].sort().join(', ')} in the "${grant.label}" pane`)
+
+export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
+  (contributions.frames ?? [])
+    .flatMap((surface) => {
+      const chords = [...new Set((surface.claimsKeys ?? []).filter(isPluginKeyClaim))].sort()
+      return chords.length ? [{ surface: surface.id, label: surface.label, chords }] : []
+    })
+    .sort((a, b) => a.surface.localeCompare(b.surface))
+
+export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]): string[] =>
+  [...grants]
+    .sort((a, b) => a.surface.localeCompare(b.surface))
+    .map((grant) => `Handle ${grant.chords.map(formatChord).join(', ')} in the "${grant.label}" surface`)

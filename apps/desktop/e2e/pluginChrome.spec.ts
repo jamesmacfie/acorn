@@ -128,7 +128,8 @@ function installPlugin(dataDir: string): void {
         items: `/v2/p/${PLUGIN_ID}/rail-items`, onSelect: { verb: 'createTask' },
       }],
       slots: [{ id: 'e2e-board-footer', slot: 'footer', data: `/v2/p/${PLUGIN_ID}/badge` }],
-      palette: [{ id: 'e2e-board.bump', title: 'Board: bump the count', action: { verb: 'runNodeAction', path: `/v2/p/${PLUGIN_ID}/bump` } }],
+      commands: [{ id: 'bump', title: 'Board: bump the count', action: { verb: 'runNodeAction', path: `/v2/p/${PLUGIN_ID}/bump` } }],
+      keybindings: [{ command: 'bump', defaultChord: 'meta+alt+u', when: 'global' }],
       attention: [{ id: 'e2e-board-stuck', items: `/v2/p/${PLUGIN_ID}/attention` }],
       nodeStats: [{ id: 'e2e-board-count', label: ['card stuck', 'cards stuck'], data: `/v2/p/${PLUGIN_ID}/stat` }],
     },
@@ -233,6 +234,15 @@ test('a plugin with no client bundle contributes native chrome', async () => {
   // ABSENCE is the phase-4 half of "trust binds to bytes" — chrome is data, and data is not code.
   await expect(page.locator('.plugin-trust-dialog')).toHaveCount(0)
 
+  // The host-adapted binding is an ordinary Settings row, grouped under the plugin and scoped to
+  // this node's preference store.
+  await page.keyboard.press('Meta+,')
+  const settings = page.locator('.overlay.settings')
+  await settings.locator('.settings-nav-item', { hasText: 'Shortcuts' }).click()
+  await expect(settings.getByLabel('Shortcut for Board: bump the count')).toHaveValue('⌥⌘U')
+  await expect(settings.locator('.shortcut-group-heading', { hasText: PLUGIN_ID })).toBeVisible()
+  await settings.getByRole('button', { name: 'Close' }).click()
+
   // ── Rail source, rendered natively from the descriptor ─────────────────────────────────────────
   const railButton = page.getByRole('button', { name: SOURCE_LABEL })
   await expect(railButton).toBeVisible({ timeout: 60_000 })
@@ -273,6 +283,10 @@ test('a plugin with no client bundle contributes native chrome', async () => {
   // `runNodeAction` POSTed to the plugin's own route, which mutated and pinged — so the rail moves
   // again, this time driven end to end by chrome the manifest declared.
   await expect(badge).toHaveText('3 stuck', { timeout: 30_000 })
+
+  // The same command is the shortcut target; no second plugin invocation path exists.
+  await page.keyboard.press('Meta+Alt+u')
+  await expect(badge).toHaveText('4 stuck', { timeout: 30_000 })
 
   // ── Descriptor promotion: row data → native modal → create, then link ─────────────────────────
   await rows.first().click()

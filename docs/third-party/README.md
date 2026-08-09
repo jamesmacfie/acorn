@@ -11,7 +11,7 @@ picks the move up.
 | linear | none | [linear.md](./linear.md) |
 | http | `agentContexts` has no manifest form | [http.md](./http.md) |
 | database | `agentContexts`; and decide whether the pane is a frame or stays first-party | [database.md](./database.md) |
-| editor | keybindings ([docs/keybindings/](../keybindings/)); Monaco in a frame | [editor.md](./editor.md) |
+| editor | Monaco in a frame; the component slot | [editor.md](./editor.md) |
 
 `docs/first-party-plugins.md` is the audit these five fall out of — read it for why the other
 twelve stay put.
@@ -96,7 +96,8 @@ bridge instead, scoped to `plugin:<id>:*` and capped at 1 MiB, which is the same
 plugin's node half sees through the `prefs` facet. For these candidates the bridge verbs are
 enough; none of them needs a shell-level slice.
 
-**`keybindings`** — no manifest form, and a frame does not receive shell chords or deliver its own.
-The registry, the user-override store, conflict detection and the Settings UI all exist already and
-are all first-party-only. [docs/keybindings/](../keybindings/) is the project that closes it.
-Blocks editor, and worth having before any plugin whose surface people drive by keyboard.
+**`keybindings`** — no longer a blocker. A plugin declares `commands` and `keybindings` in its
+manifest, existing bindings win every conflict, the user can rebind or unbind any of it in
+Settings → Shortcuts, and a frame forwards chords it has not claimed to the shell dispatcher
+(`docs/command-palette-and-shortcuts.md`). Open review items:
+[docs/keybindings/](../keybindings/).

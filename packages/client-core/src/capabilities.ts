@@ -6,7 +6,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
@@ -62,6 +62,7 @@ export type PluginTrustDecision = {
   version: string
   permissions: NodePluginPermissions
   webviews: PluginWebviewGrant[]
+  keyClaims: PluginKeyClaimGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = PluginTrustDecision & { decidedAt: number }

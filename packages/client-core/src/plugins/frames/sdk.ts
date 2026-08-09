@@ -22,6 +22,7 @@ import type {
   PluginWebviewNavigated,
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
+import { eventChord, hasCommandModifier, isNormalizedChord, isPluginKeyClaim, isTypingTarget } from '@acorn/protocol/keybindings.ts'
 
 /** The error a rejected bridge call throws. `code` is the API's own vocabulary, so a plugin branches on
  * the same strings whether the call was denied at the bridge or refused by the node. */
@@ -78,6 +79,10 @@ export type AcornBridge = {
     onNavigated(listener: (state: PluginWebviewNavigated) => void): () => void
     onBlocked(listener: (state: PluginWebviewBlocked) => void): () => void
   }
+  keys: {
+    /** Replace the active claim set with a subset of this surface's manifest declaration. */
+    claim(chords: readonly string[]): void
+  }
   /** Called on every appearance change, and once on connect. The tokens are already applied to
    * `:root` by the time this fires; the callback is for anything a plugin draws itself (a canvas, a
    * chart) that has to be repainted. */
@@ -113,6 +118,7 @@ export function connect(): Promise<AcornBridge> {
 }
 
 let connection: Promise<AcornBridge> | null = null
+let detachKeyForwarding: (() => void) | null = null
 
 function handshake(): Promise<AcornBridge> {
   return new Promise<AcornBridge>((resolve, reject) => {
@@ -144,6 +150,27 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     const subscribing = new Map<string, Promise<unknown>>()
     let seq = 0
     let context: PluginFrameContext | null = null
+    let claimed = new Set<string>()
+
+    const keyTarget = globalThis as unknown as {
+      addEventListener?: (type: 'keydown', listener: (event: KeyboardEvent) => void, options?: { capture?: boolean }) => void
+      removeEventListener?: (type: 'keydown', listener: (event: KeyboardEvent) => void, options?: { capture?: boolean }) => void
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const chord = eventChord(event)
+      if (!chord || claimed.has(chord)) return
+      // Do not cancel a browser behavior for a value the host's chord grammar will reject. Space is
+      // the important case: eventChord can describe it, but it is not a bindable Acorn chord.
+      if (!isNormalizedChord(chord)) return
+      // Bare keys belong to text entry. Modified application chords still forward so shell escape
+      // hatches such as the palette work while an input inside the frame is focused.
+      if (isTypingTarget(event.target) && chord !== 'escape' && !hasCommandModifier(chord)) return
+      // Bare first-party bindings still reach the shell, but the frame keeps its own browser/UI
+      // default. Only application-modified chords and Escape are plausibly shell-owned enough to
+      // cancel locally before the host resolves them.
+      if (chord === 'escape' || hasCommandModifier(chord)) event.preventDefault()
+      port.postMessage({ kind: 'keydown', chord })
+    }
 
     const settle = (reply: PluginBridgeReply): void => {
       const waiter = pending.get(reply.id)
@@ -160,6 +187,9 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       switch (message.kind) {
         case 'ready':
           context = message.context
+          claimed = new Set((message.context.claimsKeys ?? []).filter(isPluginKeyClaim))
+          keyTarget.addEventListener?.('keydown', onKeyDown, { capture: true })
+          detachKeyForwarding = () => keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true })
           ready(api)
           return
         case 'event':
@@ -251,6 +281,20 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         onNavigated: (listener) => onEvent('webview:navigated', listener as (payload: unknown) => void),
         onBlocked: (listener) => onEvent('webview:blocked', listener as (payload: unknown) => void),
       },
+      keys: {
+        claim(chords) {
+          const declared = new Set((context?.claimsKeys ?? []).filter(isPluginKeyClaim))
+          const next = new Set<string>()
+          for (const chord of chords) {
+            if (!declared.has(chord)) {
+              console.warn(`[acorn] ignored undeclared key claim ${chord}`)
+              continue
+            }
+            next.add(chord)
+          }
+          claimed = next
+        },
+      },
       onAppearance(listener) {
         appearanceListeners.add(listener)
         return () => appearanceListeners.delete(listener)
@@ -266,5 +310,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
 /** Test seam. `connect()` memoizes a per-frame connection, and a suite that asserts on one handshake
  * must not inherit the previous one's port. */
 export function _resetConnection(): void {
+  detachKeyForwarding?.()
+  detachKeyForwarding = null
   connection = null
 }

@@ -73,6 +73,20 @@ describe('loading rollbar from disk', () => {
       // has to work for a loaded plugin to be indistinguishable from a built-in one.
       expect(integrationProviderRegistry.list().map((provider) => provider.id)).toContain('rollbar')
       expect(connectionProviderRegistry.list().map((provider) => provider.id)).toContain('rollbar')
+      const providerRoute = integrationProviderRegistry.routes().find((route) => route.providerId === 'rollbar')
+      expect(providerRoute?.fetch).toEqual(expect.any(Function))
+      expect(providerRoute?.router).toBeUndefined()
+      const response = await providerRoute!.fetch!(new Request('http://rollbar.test/items'), {
+        userId: 'dogfood-user',
+        principal: { kind: 'device', userId: 'dogfood-user', deviceId: 'dogfood-device' },
+        providers: {
+          connections: async () => [],
+          resource: async () => { throw new Error('an empty connection list must not read a resource') },
+          withConnections: async () => [],
+        },
+      })
+      expect(response.status).toBe(403)
+      expect(await response.json()).toMatchObject({ error: { code: 'provider_not_connected' } })
     } finally {
       vi.unstubAllEnvs()
       warn.mockRestore()

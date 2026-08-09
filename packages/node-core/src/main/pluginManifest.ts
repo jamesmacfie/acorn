@@ -22,6 +22,12 @@ import {
   WEBVIEW_HOST_MAX_COUNT,
   WEBVIEW_HOST_MAX_LENGTH,
 } from '@acorn/protocol/webview.ts'
+import {
+  isNormalizedChord,
+  isPluginKeyClaim,
+  isPluginShortcutChord,
+  isReservedPluginKeyClaim,
+} from '@acorn/protocol/keybindings.ts'
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The constant itself
 // moved to @acorn/protocol when the client gained a stake in it: the node uses it to decide what to
@@ -98,6 +104,15 @@ const frameSurface = z.object({
   url: z.string().min(1).max(2_048).optional(),
   urlSource: z.string().min(1).max(256).optional(),
   hosts: z.array(webviewHost).min(1).max(WEBVIEW_HOST_MAX_COUNT).optional(),
+  // Chords the frame may keep instead of forwarding to the shell. Runtime code may narrow this
+  // list, never widen it; declaring the upper bound makes the capture visible before code runs.
+  claimsKeys: z.array(z.string().min(1).max(64).superRefine((value, ctx) => {
+    if (isReservedPluginKeyClaim(value)) {
+      ctx.addIssue({ code: 'custom', message: `${value} is reserved by acorn and cannot be claimed` })
+    } else if (!isPluginKeyClaim(value)) {
+      ctx.addIssue({ code: 'custom', message: 'claimed keys must be canonical chords with meta, ctrl, or alt' })
+    }
+  })).max(32).default([]),
 })
 
 // ── Declarative chrome (docs/plugins.md) ───────────────────────────
@@ -171,6 +186,37 @@ const paletteDescriptor = z.object({
   action: chromeAction,
 })
 
+const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'terminal', 'workspace'])
+
+// `createTask` depends on a selected rail row and its host-owned promotion callback. A command has
+// neither, so exposing that otherwise-valid chrome verb here would create a command that can only fail.
+const commandAction = z.discriminatedUnion('verb', [
+  z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
+  z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
+  z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
+])
+
+const commandDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  title: z.string().min(1).max(120),
+  category: commandCategory.default('action'),
+  palette: z.boolean().default(true),
+  action: commandAction,
+})
+
+const keybindingDescriptor = z.object({
+  command: z.string().min(1).max(64),
+  defaultChord: z.string().min(1).max(64).superRefine((value, ctx) => {
+    if (!isNormalizedChord(value)) {
+      ctx.addIssue({ code: 'custom', message: 'shortcut must use canonical meta+ctrl+alt+shift+key order' })
+    } else if (!isPluginShortcutChord(value)) {
+      ctx.addIssue({ code: 'custom', message: 'plugin shortcuts require meta, ctrl, or alt' })
+    }
+  }),
+  when: z.enum(['global', 'task', 'surface']),
+  surface: z.string().min(1).max(64).optional(),
+})
+
 const attentionDescriptor = z.object({
   id: z.string().min(1).max(64),
   order: z.number().int().min(0).max(100_000).default(500),
@@ -212,6 +258,8 @@ const contributions = z.looseObject({
   sources: z.array(sourceDescriptor).max(8).default([]),
   slots: z.array(slotDescriptor).max(8).default([]),
   palette: z.array(paletteDescriptor).max(32).default([]),
+  commands: z.array(commandDescriptor).max(32).default([]),
+  keybindings: z.array(keybindingDescriptor).max(32).default([]),
   attention: z.array(attentionDescriptor).max(4).default([]),
   nodeStats: z.array(nodeStatDescriptor).max(4).default([]),
   contentLinks: z.array(contentLinkDescriptor).max(16).default([]),
@@ -219,6 +267,8 @@ const contributions = z.looseObject({
 
 export type PluginFrameSurface = z.infer<typeof frameSurface>
 export type PluginChromeAction = z.infer<typeof chromeAction>
+export type PluginCommandDescriptor = z.infer<typeof commandDescriptor>
+export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
 
 const manifestShape = z.object({
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
@@ -278,7 +328,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     }
   }
 
-  const { frames, sources, slots, palette, attention, nodeStats, contentLinks } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks } = manifest.contributions
   frames.forEach((frame, i) => {
     const at = ['contributions', 'frames', i] as (string | number)[]
     if (frame.target !== 'webview') {
@@ -311,6 +361,29 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     if (entry.onClick) action(entry.onClick, ['contributions', 'slots', i, 'onClick'])
   })
   palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
+  commands.forEach((entry, i) => action(entry.action, ['contributions', 'commands', i, 'action']))
+  const commandIds = new Set([...commands, ...palette].map((entry) => entry.id))
+  const surfaceIds = new Set(frames.map((frame) => frame.id))
+  const boundCommands = new Set<string>()
+  keybindings.forEach((entry, i) => {
+    const at = ['contributions', 'keybindings', i] as (string | number)[]
+    if (!commandIds.has(entry.command)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'command'], message: `keybinding names undeclared command '${entry.command}'` })
+    }
+    if (boundCommands.has(entry.command)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'command'], message: `command '${entry.command}' has more than one keybinding` })
+    }
+    boundCommands.add(entry.command)
+    if (entry.when === 'surface') {
+      if (!entry.surface) {
+        ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: 'surface is required when a keybinding uses surface scope' })
+      } else if (!surfaceIds.has(entry.surface)) {
+        ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `keybinding names undeclared surface '${entry.surface}'` })
+      }
+    } else if (entry.surface !== undefined) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: 'surface is only valid with surface scope' })
+    }
+  })
   attention.forEach((entry, i) => route(entry.items, ['contributions', 'attention', i, 'items']))
   nodeStats.forEach((entry, i) => route(entry.data, ['contributions', 'nodeStats', i, 'data']))
   contentLinks.forEach((entry, i) => {
@@ -338,7 +411,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...manifest.contributions.frames, ...sources, ...slots, ...palette, ...attention, ...nodeStats, ...contentLinks]) {
+  for (const entry of [...manifest.contributions.frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

@@ -21,7 +21,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
-  contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [], contentLinks: [] },
+  contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
   ...over,
@@ -185,7 +185,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       permissions: NO_PERMISSIONS,
       // Passed through untouched for the device to register surfaces from
       // (docs/plugins.md); the node neither reads nor renders it.
-      contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [], contentLinks: [] },
+      contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -211,7 +211,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
         version: '1.0.0',
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
-        contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [], contentLinks: [] },
+        contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [] },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },
     })

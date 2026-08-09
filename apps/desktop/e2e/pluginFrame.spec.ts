@@ -32,6 +32,7 @@ const CLIENT_BUNDLE = `
 const pending = new Map()
 let port = null
 let seq = 0
+let declaredClaims = new Set()
 
 window.addEventListener('message', (event) => {
   if (!event.data || event.data.acornBridge !== 1) return
@@ -47,6 +48,7 @@ window.addEventListener('message', (event) => {
     if (!message) return
     if (message.kind === 'ready') {
       window.__context = message.context
+      declaredClaims = new Set(message.context.claimsKeys || [])
       document.body.dataset.ready = '1'
     }
     if (message.kind === 'appearance') {
@@ -70,6 +72,26 @@ window.__send = (message) => new Promise((resolve) => {
 window.__spam = (count) => {
   for (let i = 0; i < count; i++) port.postMessage({ id: ++seq, kind: 'ui', op: 'copy', text: 'x' })
 }
+
+const chord = (event) => {
+  let value = ''
+  if (event.metaKey) value += 'meta+'
+  if (event.ctrlKey) value += 'ctrl+'
+  if (event.altKey) value += 'alt+'
+  if (event.shiftKey) value += 'shift+'
+  const key = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : event.key.toLowerCase()
+  return value + key
+}
+
+window.addEventListener('keydown', (event) => {
+  const value = chord(event)
+  if (declaredClaims.has(value)) {
+    window.__claimed = (window.__claimed || 0) + 1
+    return
+  }
+  event.preventDefault()
+  port.postMessage({ kind: 'keydown', chord: value })
+}, { capture: true })
 
 const marker = document.createElement('div')
 marker.id = 'widget-marker'
@@ -100,9 +122,12 @@ function installPlugin(dataDir: string, webviewUrl?: string): void {
     // default and the test does not have to drive the pane UI to get a frame on screen.
     contributions: {
       frames: [
-        { target: 'pane', id: PANE_ID, label: 'E2E widget', order: 0 },
+        { target: 'pane', id: PANE_ID, label: 'E2E widget', order: 0, claimsKeys: ['meta+f'] },
+        { target: 'pane', id: 'e2e-widget-target', label: 'E2E target', order: 99 },
         ...(webviewUrl ? [{ target: 'webview', id: 'e2e-docs', label: 'E2E docs', order: 1, url: webviewUrl, hosts: ['localhost'] }] : []),
       ],
+      commands: [{ id: 'open-target', title: 'Open E2E target', palette: false, action: { verb: 'openPane', pane: 'e2e-widget-target' } }],
+      keybindings: [{ command: 'open-target', defaultChord: 'meta+alt+y', when: 'surface', surface: PANE_ID }],
       contentLinks: [{
         id: 'e2e-widget.item',
         match: 'https://board.example/items/{item}',
@@ -196,6 +221,7 @@ async function openPluginPane(webviewUrl?: string): Promise<Running & { frame: F
   // Trust first: an unacknowledged bundle contributes nothing, so without this there is no pane to open.
   const dialog = running.page.locator('.plugin-trust-dialog')
   await expect(dialog).toBeVisible({ timeout: 60_000 })
+  await expect(dialog).toContainText('Handle ⌘F in the "E2E widget" surface')
   if (webviewUrl) {
     await expect(dialog.getByRole('heading', { name: 'Shows web pages — enforced hosts, live network' })).toBeVisible()
     await expect(dialog).toContainText('Show web pages from localhost in the "E2E docs" pane')
@@ -253,7 +279,8 @@ test.afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-test('a plugin webview renders allowed content and blocks an outside-host redirect', async (_fixtures, testInfo) => {
+// oxlint-disable-next-line no-empty-pattern -- Playwright requires an object pattern for unused fixtures.
+test('a plugin webview renders allowed content and blocks an outside-host redirect', async ({}, testInfo) => {
   test.setTimeout(180_000)
   const server = createServer((request, response) => {
     if (request.url === '/redirect') {
@@ -302,6 +329,24 @@ test('a plugin webview renders allowed content and blocks an outside-host redire
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
+})
+
+test('shell and plugin shortcuts cross a focused plugin frame', async () => {
+  test.setTimeout(180_000)
+  const { page, frame } = await openPluginPane()
+  await frame.locator('#widget-marker').click()
+
+  await page.keyboard.press('Meta+k')
+  await expect(page.locator('.palette')).toBeVisible({ timeout: 15_000 })
+  await page.keyboard.press('Escape')
+
+  await frame.locator('#widget-marker').click()
+  await page.keyboard.press('Meta+f')
+  await expect.poll(() => frame.evaluate(() => (window as unknown as { __claimed?: number }).__claimed ?? 0)).toBe(1)
+
+  await frame.locator('#widget-marker').click()
+  await page.keyboard.press('Meta+Alt+y')
+  await expect(page.locator('[data-pane-id="e2e-widget-target"]')).toBeVisible({ timeout: 15_000 })
 })
 
 test('a plugin frame can reach nothing on this machine but its own bridge', async () => {

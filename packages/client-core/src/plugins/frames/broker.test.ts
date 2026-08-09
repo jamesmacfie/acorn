@@ -18,6 +18,7 @@ const BINDING: FrameBinding = {
   api: ['core.tasks:read'],
   events: ['runtime:task-archived'],
   panes: ['board'],
+  claimsKeys: [],
 }
 
 const CONTEXT = { surface: 'board', target: 'pane' as const, nodeId: 'node-a', taskId: 'task-1', theme: 'dark', style: 'terminal' }
@@ -32,6 +33,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   openPane: vi.fn(),
   importerDone: vi.fn(),
   importerClose: vi.fn(),
+  keydown: vi.fn(),
   ...over,
 })
 
@@ -87,6 +89,23 @@ describe('the handshake', () => {
     const h = withBridge()
     await h.settled(1)
     expect(h.received[0]).toEqual({ kind: 'ready', context: CONTEXT })
+  })
+})
+
+describe('forwarded keybindings', () => {
+  it('sends a normalized chord to the host dispatcher without requiring a reply id', async () => {
+    const h = withBridge()
+    h.send({ kind: 'keydown', chord: 'meta+k' })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(h.svc.keydown).toHaveBeenCalledWith('meta+k')
+    expect(h.received).toHaveLength(1)
+  })
+
+  it('ignores a keydown spelling the shared grammar cannot produce', async () => {
+    const h = withBridge()
+    h.send({ kind: 'keydown', chord: 'Meta+K' })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(h.svc.keydown).not.toHaveBeenCalled()
   })
 })
 

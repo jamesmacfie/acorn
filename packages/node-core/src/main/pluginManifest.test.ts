@@ -100,6 +100,8 @@ describe('chrome descriptors', () => {
     expect(result.success && result.data.contributions.sources).toEqual([])
     expect(result.success && result.data.contributions.nodeStats).toEqual([])
     expect(result.success && result.data.contributions.contentLinks).toEqual([])
+    expect(result.success && result.data.contributions.commands).toEqual([])
+    expect(result.success && result.data.contributions.keybindings).toEqual([])
   })
 
   it('confines every route to the plugin’s own namespace', () => {
@@ -197,5 +199,62 @@ describe('chrome descriptors', () => {
         id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'board', item: 'id',
       }],
     }))).toContain(`content link item 'id' is not captured by its match pattern`)
+  })
+})
+
+describe('plugin commands and keybindings', () => {
+  const command = {
+    id: 'search',
+    title: 'Editor: find in files',
+    action: { verb: 'runNodeAction', path: '/v2/p/board/search' },
+  }
+
+  it('parses every command verb and supplies stable defaults', () => {
+    const result = manifest({
+      frames: [PANE],
+      commands: [
+        command,
+        { id: 'open', title: 'Open board', action: { verb: 'openPane', pane: 'board' } },
+        { id: 'docs', title: 'Open docs', palette: false, action: { verb: 'openUrl', url: 'https://example.com/docs' } },
+      ],
+    })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.commands[0]).toMatchObject({ category: 'action', palette: true })
+    expect(result.success && result.data.contributions.commands[2]?.palette).toBe(false)
+  })
+
+  it('keeps palette descriptors as a compatibility alias and rejects command action escapes', () => {
+    expect(manifest({ palette: [{ id: 'old', title: 'Old', action: { verb: 'runNodeAction', path: '/v2/p/board/old' } }] }).success).toBe(true)
+    expect(manifest({ commands: [{ ...command, action: { verb: 'runNodeAction', path: '/v2/core/tasks' } }] }).success).toBe(false)
+    expect(manifest({ commands: [{ ...command, action: { verb: 'createTask' } }] }).success).toBe(false)
+  })
+
+  it.each(['meta+shift+f', 'ctrl+alt+enter'])('accepts canonical modified chord %s', (defaultChord) => {
+    expect(manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord, when: 'task' }] }).success).toBe(true)
+  })
+
+  it.each(['Meta+Shift+F', 'shift+meta+f', 'f', 'shift+f', 'hyper+f', 'meta+f g'])('rejects unusable chord %s', (defaultChord) => {
+    expect(manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord, when: 'task' }] }).success).toBe(false)
+  })
+
+  it('requires commands and surface scopes to point inside the same manifest', () => {
+    expect(messages(manifest({ commands: [command], keybindings: [{ command: 'missing', defaultChord: 'meta+f', when: 'task' }] })))
+      .toContain("keybinding names undeclared command 'missing'")
+    expect(manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord: 'meta+f', when: 'surface' }] }).success).toBe(false)
+    expect(manifest({ frames: [PANE], commands: [command], keybindings: [{ command: 'search', defaultChord: 'meta+f', when: 'surface', surface: 'board' }] }).success).toBe(true)
+    expect(messages(manifest({
+      commands: [command],
+      keybindings: [
+        { command: 'search', defaultChord: 'meta+f', when: 'global' },
+        { command: 'search', defaultChord: 'meta+g', when: 'global' },
+      ],
+    }))).toContain("command 'search' has more than one keybinding")
+  })
+
+  it('allows declared frame claims except for shell escape hatches', () => {
+    expect(manifest({ frames: [{ ...PANE, claimsKeys: ['meta+f', 'meta+shift+f'] }] }).success).toBe(true)
+    for (const chord of ['meta+k', 'meta+,', 'meta+1', 'meta+9', 'escape']) {
+      expect(messages(manifest({ frames: [{ ...PANE, claimsKeys: [chord] }] }))).toContain(`${chord} is reserved by acorn and cannot be claimed`)
+    }
   })
 })
