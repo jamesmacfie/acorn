@@ -152,3 +152,61 @@ surprise).
   correctly scoped per node.
 - Disable/enable and version-winner changes add/remove all chrome cleanly.
 - `pnpm lint`, suites, boundaries test, desktop e2e green.
+
+## As built
+
+All exit criteria hold. The chrome-only fixture is driven end to end in
+`apps/desktop/e2e/pluginChrome.spec.ts`, and the host pass is unit-covered in
+`packages/client-core/src/plugins/chrome/register.test.ts`. The pieces:
+`node-core/main/pluginManifest.ts` (schema + cross-field validation), `protocol/api.ts` (wire twins
+and the four route response types), and `client-core/plugins/chrome/` (`data.ts`, `actions.ts`,
+`register.ts`, and the two native components). Where the implementation departs from the plan above,
+and why:
+
+**Chrome gates on "no bundle, or an accepted one" — not on bytes.** `syncFrameContributions` gates on
+`bundleAccepted` because bytes execute; a descriptor executes nothing, so a plugin that ships no client
+half gets its chrome with no trust prompt at all, which is what makes a chrome-only plugin possible.
+The other half of the rule is the part worth stating: a plugin whose bundle this device REFUSED gets no
+chrome either. Its panes were never registered, so its `openPane` could not land — and decorating the
+shell on behalf of something the owner declined is the wrong answer regardless of whether the
+decoration is code.
+
+**`slot: "footer"` is the task footer.** There is no shell-level footer slot; `docker-footer-badge` —
+the precedent this document names — is a `TaskSlotContribution` on `task.footer`. The manifest enum is
+`['footer']`, so an unknown slot is a parse error and more slot names stay additive. The consequence to
+know: `TaskSlotHost` only renders inside a task that HAS a worktree, so a descriptor badge is invisible
+until one exists. The e2e asserts the freshness round trip on the rail row's badge instead, which reads
+through the same query and the same revision signal; testing the footer would have meant testing the
+shell's worktree lifecycle.
+
+**Palette rows got their own `PaletteItem` kind.** `action`, `task` and `workspace` are intercepted by
+core's dispatch in `CommandPalette.tsx`, and `run`/`layout`/`workflow` carry a required `hint` and the
+wrong semantics. `kind: 'plugin'` renders identically (the palette is kind-agnostic apart from `error`)
+and routes back to its contributing source, which is the whole requirement. One source is registered per
+plugin covering all its rows, not one per descriptor: the palette asks every source when it opens.
+
+**`invoke` is not in the v1 verb set.** It needs a host→frame RPC into a frame that may not be mounted,
+i.e. a headless frame lifecycle the shell does not have. A manifest naming it fails to parse rather than
+parsing into a row that silently does nothing — the verb set is closed, and closed should be loud.
+
+**Item context arrives over the bridge, not as a query param.** The `openPane` row above says "appends
+context as frame query params", which predates phase 3's decision that a frame's subject travels on the
+port. So a selection reaches the plugin's pane as a retained `PaneIntent` (`plugin:select`) that
+`PluginFrame` turns into either `context.item` at connect, or a `select` message for a pane that is
+already open — remounting a frame per click would throw away everything it had drawn. This is the one
+phase-3 surface this phase grew: `PluginBridgeSelect`, `postSelect`, and `bridge.onSelect` in the SDK.
+
+**One timer and one revision signal for all chrome, not a `pollerContribution` each.**
+`startClientPollers()` snapshots the poller registry once at app mount, and the chrome pass runs after
+the distribution round trip — a poller registered there would never start. So `data.ts` owns one
+interval at the smallest declared `refresh` plus one `wsOnStatus` subscription, both torn down with the
+contributions. Note that this drives the source and slot surfaces only: attention and node stats are
+re-read by the inbox's and Fleet home's own fan-outs, which own their refresh policy.
+
+**Routes are confined twice.** The manifest check happens on the node at parse time, as designed — and
+again on the device before any fetch, because the manifest reaches the client as a roster row, and a
+roster row is bytes a node sent. That is the same argument that makes the device hash bundle bytes
+itself rather than trusting the listing.
+
+**Descriptor sources contribute no `routes` and no polling of their own**, as the Host adapters section
+requires; the deep-link decision is left open behind a host-minted prefix.

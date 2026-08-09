@@ -110,6 +110,12 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v2/core/devices/${SEG}`), scopes: {} },
   { path: shape('/v2/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },
   { path: shape(`/v2/core/plugins/${SEG}/client.js`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
+  // Permanently unmapped, and the sharpest case in this table. A frame that could reach these would let
+  // a sandboxed plugin fetch and install arbitrary code that runs unsandboxed inside the node — every
+  // other line here would stop mattering (docs/third-party/node-security.md).
+  { path: shape('/v2/core/plugins/install'), scopes: {}, note: 'Installs code that runs with the Node’s own access.' },
+  { path: shape(`/v2/core/plugins/${SEG}/update`), scopes: {} },
+  { path: shape(`/v2/core/plugins/${SEG}`), scopes: {}, note: 'Uninstall, including the option to delete another plugin’s data.' },
   { path: shape('/v2/core/prefs'), scopes: {}, note: 'Every preference on the node, including other plugins’ persisted state. Frames get their own namespaced `state` verb instead.' },
   { path: shape('/v2/core/agent-tools'), scopes: {}, note: 'Agent tool catalog and permissions.' },
   { path: shape(`/v2/core/tasks/${SEG}/renderer-tools/${SEG}`), scopes: {}, note: 'The renderer’s own agent-tool call surface.' },

@@ -128,3 +128,39 @@ Keep `{ "path": … }` dev installs behind a dev-build check.
 - Permission-diff re-prompt on update works and is e2e-covered.
 - `ACORN_UNSAFE_PLUGINS` gone.
 - `pnpm lint`, suites, boundaries test, desktop e2e green.
+
+## As built
+
+Shipped as specified, with four decisions worth writing down.
+
+- **No check-for-updates route.** The plan had an Update button that appears when the source has a
+  newer version, which needs a route that resolves a source without downloading it, plus client state
+  holding the answer. Instead the button is always present and re-resolves on click; if the resolved
+  version equals the installed one, the page says "already up to date". One fewer route, one fewer
+  piece of state that can go stale, and the posture is unchanged — still no background checking, still
+  nothing resolved until the owner asks.
+
+- **`http://` is accepted on loopback.** The installer takes `https://` from anywhere plus
+  `http://` when the host is `localhost`, `127.0.0.1` or `::1`, re-checked on the final URL after
+  redirects. Without it there is no way to hand the installer a real archive over a real socket in a
+  test or a local build script, and the alternative — a fixture directory — would exercise everything
+  except the download.
+
+- **The roster re-scans the install directory per request.** `installed()` on the plugins bridge is a
+  live `scanInstalled()` rather than the boot snapshot, and a new `booted()` reports what the process
+  actually loaded. `state: 'pending-restart'` is the difference between the two, in all three
+  directions (installed, updated, uninstalled-while-running). Client-bundle digests are memoized on
+  `(path, mtime, size)` so this costs a few `stat` calls rather than an sha256 per GET.
+
+- **Uninstall confirms inline, not in a modal.** The purge question is not yes/no — keeping the
+  plugin's data and deleting it are two different answers — and burying the second in a checkbox
+  inside a confirmation is how someone deletes a year of notes by reflex. The row becomes
+  "Remove ntfy? [Keep its data] [Delete its data] [Cancel]". Keeping is the plain button because that
+  is what disabling has always done.
+
+Two smaller notes. `subdirectories()` in the loader now follows symlinked directories and skips
+dot-prefixed names: a `{ path }` dev install is a symlink and `Dirent.isDirectory()` is lstat-shaped,
+and the installer stages under `.staging-*` in the same directory. And the three install routes are
+permanently unmapped on the phase-3 UI bridge (`client-core/plugins/frames/scopes.ts`) — a sandboxed
+frame that could reach them could install code that runs unsandboxed inside the Node, which would make
+every other line in that table irrelevant.

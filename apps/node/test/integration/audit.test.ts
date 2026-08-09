@@ -30,10 +30,16 @@ beforeEach(async () => {
     ],
     // Nothing installed from disk: this harness is about the audit record, not about distribution.
     installed: () => [],
+    booted: () => [],
     clientBundle: async () => null,
     disabled: () => disabled,
     setDisabled: (names) => {
       disabled = [...names]
+    },
+    install: () => Promise.reject(new Error('not wired in this harness')),
+    update: () => Promise.reject(new Error('not wired in this harness')),
+    uninstall: () => {
+      throw new Error('not wired in this harness')
     },
   })
   env = {

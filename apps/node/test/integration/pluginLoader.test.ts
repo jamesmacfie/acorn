@@ -43,21 +43,14 @@ describe('loading rollbar from disk', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('is inert without the flag, however installed it is', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(await loadExternalPlugins(dataRoot, { builtins: [] })).toEqual({ loaded: [], installed: [], failures: [] })
-    warn.mockRestore()
-  })
-
   it('loads the built bundle and registers rollbar exactly as the compiled-in build does', async () => {
-    vi.stubEnv('ACORN_UNSAFE_PLUGINS', '1')
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: ['rollbar'] })
       expect(failures).toEqual([])
       expect(loaded.map((entry) => entry.manifest.id)).toEqual(['rollbar'])
-      // It replaces the built-in rather than colliding with it — the flagged dev boot runs the disk
-      // copy, which is the whole point of dogfooding.
+      // It replaces the built-in rather than colliding with it — a dev boot runs the disk copy, which
+      // is the whole point of dogfooding.
       expect(loaded[0].shadowsBuiltin).toBe(true)
       // It also appears in the distribution enumeration, with nothing to distribute: build-plugin.mjs
       // builds a node half only. Rollbar's client half is compiled into the app and is not a
@@ -84,7 +77,6 @@ describe('loading rollbar from disk', () => {
   })
 
   it('drops the compiled-in rollbar from the graph when the disk copy wins', async () => {
-    vi.stubEnv('ACORN_UNSAFE_PLUGINS', '1')
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       const graph = await assembleNodeGraph(dataRoot, {} as never)

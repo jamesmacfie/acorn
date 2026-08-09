@@ -21,19 +21,32 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
-  contributions: { frames: [] },
+  contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
+  hasNode: true,
   ...over,
 })
+
+type WireOptions = {
+  installed?: InstalledPluginInfo[]
+  // What the process actually loaded. Defaults to "whatever is on disk, at that version", which is the
+  // steady state — a test says otherwise only when it is about the gap between the two.
+  booted?: { id: string; version: string }[]
+  bundles?: Record<string, string>
+  roster?: PluginRosterEntry[]
+}
 
 // The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
 // roster is the RUNNING process's view and never changes here; `disabled` is the persisted list, which a
 // PUT does change — that gap is the whole reason `restartRequired` exists.
-const wire = (initial: readonly string[], options: { installed?: InstalledPluginInfo[]; bundles?: Record<string, string> } = {}) => {
+const wire = (initial: readonly string[], options: WireOptions = {}) => {
   let saved = [...initial]
+  const installed = options.installed ?? []
+  const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[] } = { install: [], update: [], uninstall: [] }
   setPluginsBridge({
-    roster: () => ROSTER,
-    installed: () => options.installed ?? [],
+    roster: () => options.roster ?? ROSTER,
+    installed: () => installed,
+    booted: () => options.booted ?? installed.map((entry) => ({ id: entry.id, version: entry.version })),
     clientBundle: async (id) => {
       const source = options.bundles?.[id]
       if (source === undefined) return null
@@ -42,14 +55,36 @@ const wire = (initial: readonly string[], options: { installed?: InstalledPlugin
     },
     disabled: () => saved,
     setDisabled: (names) => void (saved = [...names]),
+    install: async (source, opts) => {
+      calls.install.push({ source, opts })
+      if ('url' in source && source.url === 'bad') throw new Error('That archive has no acorn-plugin.json at its root.')
+      return { id: 'ntfy', version: '1.0.0', state: 'installed-restart-required' }
+    },
+    update: async (id, opts) => {
+      calls.update.push({ id, opts })
+      return { id, fromVersion: '1.0.0', toVersion: '1.1.0', state: 'installed-restart-required' }
+    },
+    uninstall: (id, opts) => {
+      calls.uninstall.push({ id, opts })
+      return { restartRequired: true, dataPurged: opts.purgeData === true }
+    },
   })
-  return () => saved
+  return Object.assign(() => saved, { calls })
 }
 
-const request = (method: string, body?: unknown) =>
+const KEY = { 'idempotency-key': '11111111-2222-3333-4444-555555555555' }
+
+const request = (method: string, body?: unknown, headers: Record<string, string> = {}) =>
   new Request('http://acorn.test/v2/core/plugins', {
     method,
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+
+const at = (path: string, method: string, body?: unknown, headers: Record<string, string> = {}) =>
+  new Request(`http://acorn.test/v2/core/plugins${path}`, {
+    method,
+    headers: { 'content-type': 'application/json', ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
@@ -98,13 +133,7 @@ describe('GET /v2/core/plugins', () => {
     // A loaded plugin whose init threw. It is not disabled and its contributions are gone, but the
     // owner's list and the running set still agree — so the restart banner must stay down, and the
     // client learns about the failure from `state` and the attention inbox instead.
-    setPluginsBridge({
-      roster: () => [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1_700_000_000_000 }],
-      installed: () => [],
-      clientBundle: async () => null,
-      disabled: () => [],
-      setDisabled: () => {},
-    })
+    wire([], { roster: [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1_700_000_000_000 }] })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins).toEqual([
       { name: 'ntfy', required: false, disabled: false, running: true, state: 'failed', failedAt: 1_700_000_000_000 },
@@ -156,7 +185,7 @@ describe('installed packages in the roster (docs/third-party/phase-2-distributio
       permissions: NO_PERMISSIONS,
       // Passed through untouched for the device to register surfaces from
       // (docs/third-party/phase-3-sandboxed-ui.md); the node neither reads nor renders it.
-      contributions: { frames: [] },
+      contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -182,7 +211,7 @@ describe('installed packages in the roster (docs/third-party/phase-2-distributio
         version: '1.0.0',
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
-        contributions: { frames: [] },
+        contributions: { frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },
     })
@@ -313,5 +342,154 @@ describe('the device gate over /v2/core/plugins', () => {
   it('lets a device through', async () => {
     wire([])
     expect((await gated({ kind: 'device', userId: 'james', deviceId: 'd1' }).fetch(request('GET'))).status).toBe(200)
+  })
+
+  it('403s a task-scoped agent on install, update and uninstall', async () => {
+    // The sharpest case in this file. A prompt-injected agent that could POST here would make the node
+    // fetch and run arbitrary code with the node's own access (docs/third-party/node-security.md).
+    wire([], { installed: [installedEntry('sparkline')] })
+    const agent = gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
+    const attempts = [
+      at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }, KEY),
+      at('/sparkline/update', 'POST', {}, KEY),
+      at('/sparkline', 'DELETE', {}, KEY),
+    ]
+    for (const attempt of attempts) expect((await agent.fetch(attempt.clone())).status, attempt.url).toBe(403)
+    // And the ungated router would have answered — so the 403 is the gate, not the handler.
+    for (const attempt of attempts) expect((await asTaskAgent().fetch(attempt)).status, attempt.url).toBe(200)
+  })
+})
+
+describe('the pending-restart state', () => {
+  const installedNtfy = (version: string) => installedEntry('ntfy', { version })
+
+  it('reports a freshly installed plugin as pending, not running', async () => {
+    // On disk, never loaded: the whole point of the install route is that it cannot make this true in
+    // the running process, so the roster has to say so rather than claim the plugin is live.
+    wire([], { installed: [installedNtfy('1.0.0')], booted: [] })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins.find((row) => row.name === 'ntfy')).toMatchObject({ running: false, state: 'pending-restart' })
+    expect(state.restartRequired).toBe(true)
+  })
+
+  it('reports a plugin whose directory changed version under it as pending', async () => {
+    wire([], {
+      roster: [{ name: 'ntfy', required: false, disabled: false, state: 'active' }],
+      installed: [installedNtfy('1.1.0')],
+      booted: [{ id: 'ntfy', version: '1.0.0' }],
+    })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    // Still running — the OLD code. That is exactly what the banner is for.
+    expect(state.plugins[0]).toMatchObject({ running: true, state: 'pending-restart' })
+    expect(state.restartRequired).toBe(true)
+  })
+
+  it('reports an uninstalled plugin that is still serving as pending', async () => {
+    wire([], { roster: [{ name: 'ntfy', required: false, disabled: false, state: 'active' }], installed: [], booted: [{ id: 'ntfy', version: '1.0.0' }] })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins[0]).toMatchObject({ running: true, state: 'pending-restart' })
+    expect(state.restartRequired).toBe(true)
+  })
+
+  it('leaves a client-only package alone, because no restart would change anything', async () => {
+    // Its contributions are all client-side and the client re-registers on a roster change. Raising a
+    // restart banner it can never clear would train the owner to ignore the banner.
+    // `rollbar` is disabled in the default roster, so the file has to name it for the toggle half of
+    // restartRequired to be quiet and this assertion to be about the install half.
+    wire(['rollbar'], { installed: [installedEntry('sparkline', { hasNode: false })], booted: [] })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins.find((row) => row.name === 'sparkline')).toMatchObject({ running: true, state: 'active' })
+    expect(state.restartRequired).toBe(false)
+  })
+
+  it('does not turn a failed plugin into a pending one', async () => {
+    // A restart cannot fix an init that throws, so 'failed' outranks 'pending-restart' even though the
+    // package is on disk and unloaded — which is the shape a broken install leaves behind.
+    wire([], {
+      roster: [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1 }],
+      installed: [installedNtfy('1.0.0')],
+      booted: [],
+    })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins[0]).toMatchObject({ state: 'failed' })
+  })
+
+  it('carries the source and install time through to the row', async () => {
+    wire([], { installed: [installedEntry('ntfy', { source: 'github:acme/ntfy@v1.0.0', installedAt: 1_700_000_000_000 })] })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins.find((row) => row.name === 'ntfy')?.installed).toMatchObject({
+      source: 'github:acme/ntfy@v1.0.0',
+      installedAt: 1_700_000_000_000,
+    })
+  })
+})
+
+describe('the install, update and uninstall routes', () => {
+  it('installs from a source and hands the installer the parsed form', async () => {
+    const bridge = wire([])
+    const res = await asDevice().fetch(at('/install', 'POST', { source: { github: 'acme/ntfy', tag: 'v1.0.0' } }, KEY))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 'ntfy', version: '1.0.0', state: 'installed-restart-required' })
+    expect(bridge.calls.install).toEqual([{ source: { github: 'acme/ntfy', tag: 'v1.0.0' }, opts: { allowDowngrade: undefined } }])
+  })
+
+  it('demands an Idempotency-Key on every mutation', async () => {
+    // A retried install is the case this exists for: the first attempt may have finished on the node and
+    // died on the wire, and a second unkeyed POST would fetch and place the package all over again.
+    wire([], { installed: [installedEntry('ntfy')] })
+    for (const attempt of [
+      at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }),
+      at('/ntfy/update', 'POST', {}),
+      at('/ntfy', 'DELETE', {}),
+    ]) {
+      expect((await asDevice().fetch(attempt)).status, attempt.url).toBe(400)
+    }
+  })
+
+  it('rejects a source naming two forms at once rather than picking one', async () => {
+    wire([])
+    const res = await asDevice().fetch(at('/install', 'POST', { source: { github: 'acme/ntfy', npm: 'acorn-ntfy' } }, KEY))
+    expect(res.status).toBe(400)
+  })
+
+  it('turns an installer refusal into a 400 carrying its sentence', async () => {
+    // Everything the installer refuses is operator-fixable — a bad manifest, an unreachable release, a
+    // downgrade — so the owner needs the wording, not a 500.
+    wire([])
+    const res = await asDevice().fetch(at('/install', 'POST', { source: { url: 'bad' } }, KEY))
+    expect(res.status).toBe(400)
+    expect(JSON.stringify(await res.json())).toContain('acorn-plugin.json')
+  })
+
+  it('updates by id, reporting both versions', async () => {
+    const bridge = wire([], { installed: [installedEntry('ntfy')] })
+    const res = await asDevice().fetch(at('/ntfy/update', 'POST', { allowDowngrade: true }, KEY))
+    expect(await res.json()).toMatchObject({ id: 'ntfy', fromVersion: '1.0.0', toVersion: '1.1.0' })
+    expect(bridge.calls.update).toEqual([{ id: 'ntfy', opts: { allowDowngrade: true } }])
+  })
+
+  it('uninstalls, defaulting to keeping the plugin\'s data', async () => {
+    const bridge = wire([], { installed: [installedEntry('ntfy')] })
+    const res = await asDevice().fetch(at('/ntfy', 'DELETE', {}, KEY))
+    expect(await res.json()).toEqual({ restartRequired: true, dataPurged: false })
+    expect(bridge.calls.uninstall).toEqual([{ id: 'ntfy', opts: { purgeData: undefined } }])
+  })
+
+  it('purges the data only when the request says so', async () => {
+    const bridge = wire([], { installed: [installedEntry('ntfy')] })
+    const res = await asDevice().fetch(at('/ntfy', 'DELETE', { purgeData: true }, KEY))
+    expect(await res.json()).toEqual({ restartRequired: true, dataPurged: true })
+    expect(bridge.calls.uninstall).toEqual([{ id: 'ntfy', opts: { purgeData: true } }])
+  })
+
+  it('503s every mutation when there is no bridge', async () => {
+    setPluginsBridge(null)
+    for (const attempt of [
+      at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }, KEY),
+      at('/ntfy/update', 'POST', {}, KEY),
+      at('/ntfy', 'DELETE', {}, KEY),
+    ]) {
+      expect((await asDevice().fetch(attempt)).status, attempt.url).toBe(503)
+    }
   })
 })

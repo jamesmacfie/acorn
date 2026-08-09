@@ -8,6 +8,11 @@ export type PaneIntent =
   | { kind: 'editor:reveal'; path: string; line: number; column?: number }
   | { kind: 'integration:show-ref'; ref: ExternalRef }
   | { kind: 'context:reveal'; sectionId: string; itemId?: string } // → pane 'context'
+  // A row a plugin's declarative rail source was selected on, carried to that plugin's own pane
+  // (docs/third-party/phase-4-declarative-chrome.md § Action vocabulary). It reuses this mechanism
+  // rather than inventing one because the problem is identical: the pane may not be mounted yet, and
+  // the intent has to survive until it is.
+  | { kind: 'plugin:select'; item: string }
 
 export type ClientEventMap = {
   'boot:restored': { phases: ('workspace' | 'view' | 'panes')[] }

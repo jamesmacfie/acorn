@@ -3,11 +3,11 @@
 // against real code instead of a test fixture (docs/third-party/phase-1-node-loader.md § Dogfood).
 //
 //   pnpm --filter @acorn/node build:plugin rollbar
-//   ACORN_UNSAFE_PLUGINS=1 pnpm dev:node
+//   pnpm dev:node
 //
 // The result is `<dataRoot>/plugins/<id>/` holding a generated `acorn-plugin.json` and an ESM bundle
-// that default-exports a NodePlugin. On the next flagged boot the loader picks it up and the
-// compiled-in copy steps aside (main/pluginLoader.ts § shadowing), so what runs IS the disk copy.
+// that default-exports a NodePlugin. On the next boot the loader picks it up and the compiled-in copy
+// steps aside (main/pluginLoader.ts § shadowing), so what runs IS the disk copy.
 //
 // ## Why Vite and not esbuild
 //
@@ -115,4 +115,4 @@ writeFileSync(
 // that owns a database needs a manifest-driven migrations path first. Rollbar owns no database,
 // which is exactly why it is the guinea pig.
 console.log(`[build-plugin] ${id} -> ${outDir}`)
-console.log(`[build-plugin] boot with ACORN_UNSAFE_PLUGINS=1 to load it instead of the built-in`)
+console.log(`[build-plugin] restart the node to load it instead of the built-in`)

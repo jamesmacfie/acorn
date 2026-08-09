@@ -117,7 +117,7 @@ function remoteJson<T>(node: StandaloneHandshake, path: string, init: { method?:
 
 // Boot the second node and read its handshake off stdout. Resolves only once the line has arrived, so
 // nothing downstream has to guess whether it is listening.
-function startSecondNode(dataDir: string, options: { unsafePlugins?: boolean } = {}): Promise<StandaloneHandshake> {
+function startSecondNode(dataDir: string): Promise<StandaloneHandshake> {
   const child = spawn(ELECTRON_BINARY, [STANDALONE_ENTRY], {
     env: {
       ...process.env,
@@ -128,9 +128,6 @@ function startSecondNode(dataDir: string, options: { unsafePlugins?: boolean } =
       // An ACORN_PORT inherited from the runner would pin the port, and two nodes on one machine is
       // precisely what this test is for.
       ACORN_PORT: '',
-      // The loader is inert without it (node-core/main/pluginLoader.ts), so a node with an installed
-      // package still enumerates nothing unless this is set.
-      ...(options.unsafePlugins ? { ACORN_UNSAFE_PLUGINS: '1' } : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -251,7 +248,7 @@ type TwoNodes = {
   child: ChildProcess
 }
 
-async function pairTwoNodes(options: { unsafePlugins?: boolean; seedNode?: (dataDir: string) => void } = {}): Promise<TwoNodes> {
+async function pairTwoNodes(options: { seedNode?: (dataDir: string) => void } = {}): Promise<TwoNodes> {
   const running = await launch()
   const localNodeId = (await fleet(running.page)).nodes.find((node) => node.local)?.nodeId
   if (!localNodeId) throw new Error('main never adopted the local node.')
@@ -259,7 +256,7 @@ async function pairTwoNodes(options: { unsafePlugins?: boolean; seedNode?: (data
   roots.push(remoteRoot)
   // Before the node boots: the loader reads the plugins directory once, at start-up.
   options.seedNode?.(join(remoteRoot, 'data'))
-  const remote = await startSecondNode(join(remoteRoot, 'data'), { ...(options.unsafePlugins ? { unsafePlugins: true } : {}) })
+  const remote = await startSecondNode(join(remoteRoot, 'data'))
   const child = children[children.length - 1]!
 
   const { code } = await remoteJson<PairingWindow>(remote, '/v2/core/pair/start', { method: 'POST' })
@@ -550,7 +547,7 @@ test('asks before running a plugin a paired node serves, then caches it for offl
   // The exit criterion for docs/third-party/phase-2-distribution-trust.md: a plugin installed on a
   // paired node reaches a second device, is hash-verified there, and does not run until the owner
   // agrees. `pairTwoNodes` reloads after pairing, and the boot pass runs on that reload.
-  const { running, remote } = await pairTwoNodes({ unsafePlugins: true, seedNode: installPluginOn })
+  const { running, remote } = await pairTwoNodes({ seedNode: installPluginOn })
 
   // The node advertises it, with its declared permissions riding in the roster row.
   const roster = await nodeJson<{ plugins: Array<{ name: string; installed?: { version: string; client: { hash: string } | null } }> }>(
@@ -568,7 +565,13 @@ test('asks before running a plugin a paired node serves, then caches it for offl
   await expect(dialog).toContainText(PLUGIN_ID)
   await expect(dialog).toContainText('1.4.0')
   await expect(dialog).toContainText('Second node')
-  await expect(dialog).toContainText('node: core.projects:read')
+  // Two headed groups, labelled by enforcement level (phase 5). The node block is *declared* and says
+  // so; the UI scopes are enforced by the bridge. Asserting the headings as well as the lines, because
+  // collapsing them back into one list is the specific regression that would matter here.
+  await expect(dialog).toContainText('On the node — declared, not enforced')
+  await expect(dialog).toContainText('core.projects:read — including where every codebase lives on disk')
+  await expect(dialog).toContainText("This plugin's server code runs with the same access as acorn itself.")
+  await expect(dialog).toContainText('In this app — enforced')
   await expect(dialog).toContainText('api: core.tasks:read')
 
   await dialog.getByRole('button', { name: 'Trust this plugin' }).click()

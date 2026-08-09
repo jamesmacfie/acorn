@@ -31,8 +31,9 @@ export type NodeComposition = {
 // Async because loading a plugin from disk is an `await import()`. Both composition roots already
 // awaited initPlugins around this call, so the graph is assembled at the same point it always was.
 //
-// The loader is inert without ACORN_UNSAFE_PLUGINS=1 (main/pluginLoader.ts explains why), so an
-// unflagged boot — which is every packaged boot today — gets exactly the static list and nothing else.
+// A boot with an empty install directory — which is every fresh install — gets exactly the static list
+// and nothing else. Anything extra arrived through the installer, which is an owner-authenticated route
+// (docs/third-party/phase-5-install-ux.md).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
   const builtins = nodePlugins(dataDir, deps)
   const { loaded, installed } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })

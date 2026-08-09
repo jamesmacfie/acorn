@@ -3,6 +3,8 @@ import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { nodes } from '../node/fleet'
 import { createDismissable } from '../ui/dismissable'
 import { noteBundleAccepted, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
+import { nodePermissionLines, uiPermissionLines } from './permissions'
+import { syncChromeContributions } from './chrome/register'
 import { syncFrameContributions } from './frames/register'
 import { recordPluginTrust } from './host'
 import './plugin-trust.css'
@@ -22,18 +24,6 @@ import './plugin-trust.css'
 // The same UI flips to "enforced" with no vocabulary change when that boundary lands, which is the
 // payoff for being blunt about it now.
 
-// Flattened for display and for diffing. `node:` -prefixed entries are listed first and separately
-// because they are the ones that describe reach outside acorn.
-const permissionLines = (permissions: NodePluginPermissions): string[] => [
-  ...(permissions.node.secrets ? ['node: read provider secrets'] : []),
-  ...(permissions.node.exec ? ['node: run commands on the node'] : []),
-  ...permissions.node.net.map((host) => `node: reach ${host}`),
-  ...permissions.node.core.map((facet) => `node: core.${facet}`),
-  ...permissions.node.capabilities.map((id) => `node: capability ${id}`),
-  ...permissions.api.map((route) => `api: ${route}`),
-  ...permissions.events.map((event) => `events: ${event}`),
-]
-
 export default function PluginTrustDialog() {
   const [saving, setSaving] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -41,15 +31,18 @@ export default function PluginTrustDialog() {
   const request = (): PluginTrustRequest | undefined => pendingTrust()[0]
   const nodeLabel = (nodeId: string) => nodes().find((node) => node.nodeId === nodeId)?.label ?? nodeId
 
-  const lines = createMemo(() => {
-    const current = request()
-    if (!current?.row.installed) return []
-    const now = permissionLines(current.row.installed.permissions)
-    const before = current.previous ? new Set(permissionLines(current.previous.permissions)) : null
-    // On an update, everything the plugin did NOT have before is marked. An unchanged permission set
-    // renders plain, so "nothing new is being asked for" reads at a glance.
-    return now.map((text) => ({ text, added: before ? !before.has(text) : false }))
-  })
+  // On an update, everything the plugin did NOT have before is marked. An unchanged permission set
+  // renders plain, so "nothing new is being asked for" reads at a glance.
+  const group = (project: (permissions: NodePluginPermissions) => string[]) =>
+    createMemo(() => {
+      const current = request()
+      if (!current?.row.installed) return []
+      const before = current.previous ? new Set(project(current.previous.permissions)) : null
+      return project(current.row.installed.permissions).map((text) => ({ text, added: before ? !before.has(text) : false }))
+    })
+
+  const nodeLines = group(nodePermissionLines)
+  const uiLines = group(uiPermissionLines)
 
   const decide = async (decision: 'accepted' | 'rejected') => {
     const current = request()
@@ -72,6 +65,9 @@ export default function PluginTrustDialog() {
       if (decision === 'accepted') {
         noteBundleAccepted(current.row.name, current.hash)
         syncFrameContributions()
+        // A bundle-bearing plugin's chrome is gated on the same acceptance, so it appears with the rest of
+        // its surfaces rather than at the next boot (chrome/register.ts states the gate).
+        syncChromeContributions()
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision.')
@@ -110,17 +106,29 @@ export default function PluginTrustDialog() {
                   {(previous) => <> You last approved version {previous().version}.</>}
                 </Show>
               </p>
-              <p class="muted">
-                Its code runs on this device and inside the node. acorn shows what it declared; nothing here is
-                enforced yet, so trust it only if you trust whoever published it.
-              </p>
               <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
-              <h3>Declared permissions</h3>
-              <Show when={lines().length} fallback={<p class="muted">None declared.</p>}>
+
+              <h3>On the node — declared, not enforced</h3>
+              <Show when={nodeLines().length} fallback={<p class="muted">Nothing declared.</p>}>
                 <ul class="plugin-trust-permissions">
-                  <For each={lines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
+                  <For each={nodeLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
                 </ul>
               </Show>
+              {/* The canonical wording, verbatim from docs/third-party/node-security.md. It is the whole
+                  truth about the list above and it must not be softened: this is the one sentence
+                  standing between an owner and a plugin that reads ~/.ssh. */}
+              <p class="muted">This plugin's server code runs with the same access as acorn itself.</p>
+
+              <h3>In this app — enforced</h3>
+              <Show when={uiLines().length} fallback={<p class="muted">Nothing declared.</p>}>
+                <ul class="plugin-trust-permissions">
+                  <For each={uiLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
+                </ul>
+              </Show>
+              <p class="muted">
+                Its interface runs in a sandbox with no network of its own. Anything not listed here is
+                refused.
+              </p>
             </div>
             <div class="overlay-actions">
               <button type="button" class="ui-btn" data-variant="ghost" disabled={saving()} onClick={() => void decide('rejected')}>

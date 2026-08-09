@@ -1,0 +1,75 @@
+import { describe, expect, it } from 'vitest'
+import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
+import { nodePermissionLines, uiPermissionLines } from './permissions'
+
+// The permission DIFF the update prompt shows is set-difference over these strings, so the wording is
+// the diff key: a rephrasing that keeps the same grant would light every line up as "new". That makes
+// this a contract test, not a snapshot of prose.
+
+const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermissions => ({
+  api: [],
+  events: [],
+  node: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+  ...over,
+})
+
+const added = (before: NodePluginPermissions, after: NodePluginPermissions, project: (p: NodePluginPermissions) => string[]) => {
+  const had = new Set(project(before))
+  return project(after).filter((line) => !had.has(line))
+}
+
+describe('the two permission groups', () => {
+  it('keeps node reach and UI scopes apart, because only one of them is enforced', () => {
+    const all = permissions({
+      api: ['core.tasks:read'],
+      events: ['tasks'],
+      node: { core: ['issues'], capabilities: ['docker.compose'], secrets: true, exec: true, net: ['ntfy.sh'] },
+    })
+    expect(nodePermissionLines(all)).toEqual([
+      'Use your saved credentials to make requests on its behalf',
+      'Run commands on the node',
+      'Reach ntfy.sh',
+      'core.issues',
+      'capability docker.compose',
+    ])
+    expect(uiPermissionLines(all)).toEqual(['api: core.tasks:read', 'events: tasks'])
+  })
+
+  it('names the disclosure hiding inside core.projects', () => {
+    // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
+    // that is what checkouts() returns (docs/third-party/node-security.md § Rung 1).
+    expect(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [] } }))).toEqual([
+      'core.projects:read — including where every codebase lives on disk',
+    ])
+  })
+
+  it('says nothing for a plugin that declared nothing', () => {
+    expect(nodePermissionLines(permissions())).toEqual([])
+    expect(uiPermissionLines(permissions())).toEqual([])
+  })
+})
+
+describe('the update diff', () => {
+  it('marks only what is new, so an unchanged set reads as unchanged', () => {
+    const before = permissions({ api: ['core.tasks:read'], node: { core: ['issues'], capabilities: [], secrets: false, exec: false, net: [] } })
+    const after = permissions({
+      api: ['core.tasks:read', 'core.tasks:write'],
+      node: { core: ['issues'], capabilities: [], secrets: false, exec: true, net: [] },
+    })
+    expect(added(before, after, nodePermissionLines)).toEqual(['Run commands on the node'])
+    expect(added(before, after, uiPermissionLines)).toEqual(['api: core.tasks:write'])
+  })
+
+  it('marks nothing when only the version moved', () => {
+    const same = permissions({ api: ['core.tasks:read'], events: ['tasks'] })
+    expect(added(same, same, nodePermissionLines)).toEqual([])
+    expect(added(same, same, uiPermissionLines)).toEqual([])
+  })
+
+  // A permission the plugin gave UP is not marked, on purpose: the prompt asks "is this new reach
+  // acceptable", and a removal is never the thing to hesitate over.
+  it('does not mark a permission that was dropped', () => {
+    const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [] } })
+    expect(added(before, permissions(), nodePermissionLines)).toEqual([])
+  })
+})

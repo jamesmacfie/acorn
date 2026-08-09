@@ -44,6 +44,11 @@ export type PluginFrameContext = {
   // Reference-panel surfaces only: the external item the panel was opened for, as the host's ref
   // registry knows it. Without it a panel frame has been told to render a thing and not which thing.
   refId?: string
+  // The row a declarative rail source was selected on, when the pane was opened by one
+  // (docs/third-party/phase-4-declarative-chrome.md). Present at connect only when the frame is being
+  // created BY that selection; a later selection into an already-mounted frame arrives as a `select`
+  // message, because `context` is a snapshot by contract.
+  item?: string
   theme: string
   style: string
 }
@@ -115,11 +120,17 @@ export type PluginBridgeAppearance = {
 
 export type PluginBridgeReady = { kind: 'ready'; context: PluginFrameContext }
 
+// A row was selected on this plugin's declarative rail source while its pane was already mounted. The
+// first such selection arrives in `context`; this is every one after it, because remounting a frame per
+// click would throw away everything the plugin had drawn.
+export type PluginBridgeSelect = { kind: 'select'; item: string }
+
 export type PluginBridgeMessage =
   | PluginBridgeReply
   | PluginBridgeEvent
   | PluginBridgeAppearance
   | PluginBridgeReady
+  | PluginBridgeSelect
 
 // The code the bridge denies with. A domain code rather than `forbidden`, because a plugin author
 // seeing this needs to know it is their manifest that is short, not their credentials.

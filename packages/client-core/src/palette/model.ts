@@ -8,6 +8,10 @@ export type PaletteItem =
   | { kind: 'task'; id: string; label: string; hint?: string } // Go to task (docs/command-palette-and-shortcuts.md)
   | { kind: 'workspace'; id: string; label: string; hint?: string } // Switch workspace (⌘L)
   | { kind: 'action'; id: string; label: string; hint?: string }
+  // A row a third-party plugin's manifest declared (docs/third-party/phase-4-declarative-chrome.md).
+  // Its own kind rather than a reused one: `action`, `task` and `workspace` are intercepted by core's
+  // dispatch, and this row has to reach its contributing source so the host can run its declared verb.
+  | { kind: 'plugin'; id: string; label: string; hint?: string }
   | { kind: 'error'; id: string; label: string } // config parse errors (13 §B) — visible, not invocable
 
 export type PaletteSources = {

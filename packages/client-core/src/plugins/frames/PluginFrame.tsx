@@ -5,11 +5,11 @@ import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
-import { clientEvents, openPane } from '../../registries/clientEvents'
+import { clientEvents, consumePaneIntent, openPane } from '../../registries/clientEvents'
 import { saveJsonPref } from '../../settings/savePref'
 import { watchAppearance } from '../../ui/appearance'
 import { BRIDGE_TOKENS } from '../../ui/tokenAxes'
-import { createFrameBridge, postAppearance, type FrameBinding, type FrameServices } from './broker'
+import { createFrameBridge, postAppearance, postSelect, type FrameBinding, type FrameServices } from './broker'
 
 // The host component for one sandboxed plugin surface (docs/third-party/phase-3-sandboxed-ui.md).
 //
@@ -128,15 +128,30 @@ export default function PluginFrame(props: PluginFrameProps) {
     importerClose: () => props.onClose?.(),
   })
 
-  const context = (): PluginFrameContext => ({
-    surface: props.binding.surface,
-    target: props.binding.target,
-    nodeId: props.binding.nodeId,
-    ...(props.binding.taskId ? { taskId: props.binding.taskId } : {}),
-    ...(props.binding.projectId ? { projectId: props.binding.projectId } : {}),
-    ...(props.refId ? { refId: props.refId } : {}),
-    ...currentAxes(),
-  })
+  // A rail-source row that opened this pane. Retained by openPane until the pane consumes it, so a
+  // frame mounting for the first time gets its selection in `context` rather than racing its own load
+  // (docs/third-party/phase-4-declarative-chrome.md § Action vocabulary).
+  const selected = (): string | undefined => {
+    const taskId = props.binding.taskId
+    if (!taskId) return undefined
+    const intent = consumePaneIntent(taskId, props.binding.surface)
+    return intent?.kind === 'plugin:select' ? intent.item : undefined
+  }
+
+  const context = (): PluginFrameContext => {
+    // Once: consuming an intent removes it, so a second read would report no selection.
+    const item = selected()
+    return {
+      surface: props.binding.surface,
+      target: props.binding.target,
+      nodeId: props.binding.nodeId,
+      ...(props.binding.taskId ? { taskId: props.binding.taskId } : {}),
+      ...(props.binding.projectId ? { projectId: props.binding.projectId } : {}),
+      ...(props.refId ? { refId: props.refId } : {}),
+      ...(item ? { item } : {}),
+      ...currentAxes(),
+    }
+  }
 
   // The handshake. One channel per frame load: the host keeps port1 and transfers port2 in, so nothing
   // after this rides window.postMessage and there is no origin check to get wrong.
@@ -162,7 +177,17 @@ export default function PluginFrame(props: PluginFrameProps) {
     const push = () => postAppearance(channel.port1, { ...currentAxes(), tokens: currentTokens() })
     push()
     const unwatch = watchAppearance(push)
+    // Every selection after the one that opened the pane. The intent is emitted as well as retained, so
+    // an already-mounted frame is reached without being remounted and losing what it had drawn.
+    const unselect = clientEvents.on('presentation:pane-intent', (event) => {
+      if (event.taskId !== props.binding.taskId || event.paneId !== props.binding.surface) return
+      if (event.intent.kind !== 'plugin:select') return
+      // Consumed here so the retained copy does not reach a later remount as a stale selection.
+      consumePaneIntent(event.taskId, event.paneId)
+      postSelect(channel.port1, event.intent.item)
+    })
     onCleanup(() => {
+      unselect()
       unwatch()
       bridge.dispose()
     })

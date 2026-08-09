@@ -26,6 +26,12 @@ export type AuditAction =
   | 'config.trusted'
   // Node administration: which plugins run decides which routes exist and which databases open.
   | 'plugins.disabled.changed'
+  // Third-party code arriving on, changing on, or leaving this node. The versions and the archive hash
+  // ride along in `details` so "what exactly was running in March" is answerable from the trail alone
+  // (docs/third-party/node-security.md § Supply chain).
+  | 'plugins.installed'
+  | 'plugins.updated'
+  | 'plugins.uninstalled'
   // Data leaving or entering the node.
   | 'backup.created'
 

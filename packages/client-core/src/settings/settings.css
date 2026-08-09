@@ -168,7 +168,15 @@
 .plugin-pending { font-size: var(--fs-xs); }
 /* Only present on a plugin loaded from the node's disk — a built-in's version is the app's. */
 .plugin-version { font-family: var(--font-mono); font-size: var(--fs-xs); }
+.plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
+/* Row actions sit hard right, so the checkbox column stays a straight edge however long the names and
+   sources are. */
+.plugin-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.plugin-confirm { font-size: var(--fs-sm); }
+.plugin-install { display: flex; align-items: center; gap: var(--space-2); }
+.plugin-install .ui-input[data-width='full'] { flex: 1; }
+.plugin-install-hint { font-size: var(--fs-xs); margin-top: calc(var(--space-2) * -1); }
 
 /* Section headings inside a settings page. Settings → Security is the first page with two independent
    halves (backup, audit trail), and an unstyled <h3> inherits a browser default that fights every style

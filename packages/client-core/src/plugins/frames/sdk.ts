@@ -72,6 +72,9 @@ export type AcornBridge = {
    * `:root` by the time this fires; the callback is for anything a plugin draws itself (a canvas, a
    * chart) that has to be repainted. */
   onAppearance(listener: (appearance: { theme: string; style: string }) => void): () => void
+  /** A row was selected on this plugin's declarative rail source while this pane was already open. The
+   * selection that OPENED the pane is `context.item` instead — this fires only for the ones after it. */
+  onSelect(listener: (item: string) => void): () => void
 }
 
 type Pending = { resolve(value: unknown): void; reject(error: unknown): void }
@@ -127,6 +130,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     const pending = new Map<number, Pending>()
     const listeners = new Map<string, Set<(payload: unknown) => void>>()
     const appearanceListeners = new Set<(appearance: { theme: string; style: string }) => void>()
+    const selectListeners = new Set<(item: string) => void>()
     const subscribing = new Map<string, Promise<unknown>>()
     let seq = 0
     let context: PluginFrameContext | null = null
@@ -156,6 +160,9 @@ function attach(port: MessagePort): Promise<AcornBridge> {
           for (const listener of appearanceListeners) listener({ theme: message.theme, style: message.style })
           return
         }
+        case 'select':
+          for (const listener of selectListeners) listener(message.item)
+          return
       }
     }
     port.start?.()
@@ -225,6 +232,10 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       onAppearance(listener) {
         appearanceListeners.add(listener)
         return () => appearanceListeners.delete(listener)
+      },
+      onSelect(listener) {
+        selectListeners.add(listener)
+        return () => void selectListeners.delete(listener)
       },
     }
   })

@@ -19,7 +19,8 @@ import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/ser
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
 import { PLUGIN_STATE } from '@acorn/node-core/server/routes/plugins.ts'
-import { installedPluginInfo, readClientBundle } from '@acorn/node-core/main/pluginLoader.ts'
+import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/main/pluginInstaller.ts'
+import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/main/pluginLoader.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
@@ -81,12 +82,22 @@ const plugins = await initPlugins(
   // while this persisted set controls a standalone process at boot.
   { capabilities, core, disabled: disabledPlugins.get(), loaded: graph.loaded },
 )
+// A standalone node has no packaging flag to consult, so NODE_ENV is the only development signal it
+// has. It gates one thing: `{ path }` installs, which symlink an author's working tree into the install
+// directory (docs/third-party/phase-5-install-ux.md).
+const devBuild = process.env.NODE_ENV !== 'production'
 const pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
   roster: () => plugins.roster,
-  installed: () => graph.installed.map(installedPluginInfo),
-  clientBundle: (id) => readClientBundle(graph.installed, id),
+  // Re-scanned per call, not the boot snapshot: an install has to show up in the roster before the
+  // restart that runs it, and the device fetches its bundle from that same row to ask about it.
+  installed: () => scanInstalled(root.dir).installed.map(installedPluginInfo),
+  booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+  clientBundle: (id) => readClientBundle(scanInstalled(root.dir).installed, id),
   disabled: () => disabledPlugins.get(),
   setDisabled: (names) => disabledPlugins.set(names),
+  install: (source, options) => installPlugin(root.dir, source, { ...options, allowLocalPath: devBuild }),
+  update: (id, options) => updatePlugin(root.dir, id, { ...options, allowLocalPath: devBuild }),
+  uninstall: (id, options) => uninstallPlugin(root.dir, id, options),
 })
 
 // Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
