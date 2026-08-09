@@ -15,15 +15,21 @@
 //   - Keep the facet→permission mapping HERE, in one module, with exhaustive tests. A grant decided
 //     in two places is a grant nobody can audit.
 import type { CoreServices } from './core'
+import type { PrefService } from './core/identity/preferences'
 import type { ProjectService } from './core/projects'
 import type { CapabilityId, CapabilityRegistry } from '../server/plugin/capabilities'
 import type { NodePermissions } from './pluginManifest'
+import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
 
 // What `projects:read` grants. `checkouts()` is in here, and it returns the local filesystem path of
 // EVERY mapped project on the machine — where the user keeps their code, how many codebases they
 // have, often their employer's project names. "Read projects" does not sound like that, so phase 5's
 // trust prompt has to name the disclosure explicitly.
-const PROJECT_READS = ['byId', 'byGithub', 'checkouts', 'config', 'assertConfigTrusted', 'setup'] as const
+const PROJECT_READS = ['byId', 'byGithub', 'checkouts'] as const
+// Kept behind its own token because config() and setup() return the shell commands acorn executes.
+// The trust assertion belongs to the same surface: code with no reason to inspect project config has
+// no reason to assert that config's trust either.
+const PROJECT_CONFIG = ['config', 'assertConfigTrusted', 'setup'] as const
 const PROJECT_WRITES = ['create', 'update'] as const
 
 // Facet token → CoreServices key, for the facets that map one to one. `secrets` and `proc` are
@@ -40,33 +46,54 @@ const SIMPLE_FACETS = {
   tasks: 'tasks',
   context: 'context',
   models: 'models',
-  prefs: 'prefs',
   identity: 'identity',
 } as const satisfies Record<string, keyof CoreServices>
 
 const pick = <T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> =>
   Object.fromEntries(keys.map((key) => [key, source[key]])) as Pick<T, K>
 
+const utf8Bytes = (text: string): number => new TextEncoder().encode(text).byteLength
+
+// Loaded plugins share the same `plugin:<id>:*` preference namespace as their sandboxed frames.
+// Built-ins never pass through scopeCore and retain the raw service because several core-owned
+// preference keys predate loaded plugins and are intentionally shared with client surfaces.
+const prefsFor = (prefs: PrefService, pluginId: string): PrefService => ({
+  read: (userId, key) => prefs.read(userId, pluginStateKey(pluginId, key)),
+  write: async (userId, key, value) => {
+    if (utf8Bytes(value) > MAX_PLUGIN_STATE_BYTES) {
+      throw new Error(`plugin state values are capped at ${MAX_PLUGIN_STATE_BYTES} bytes`)
+    }
+    await prefs.write(userId, pluginStateKey(pluginId, key), value)
+  },
+})
+
 // The returned object is TYPED as a full CoreServices and is not one. That is deliberate: widening
 // NodePluginContext['core'] to a partial would make every facet optional for the fifteen built-in
 // plugins that legitimately have all of them, to describe a shape only loaded plugins see. The lie
 // is contained to this one cast, and the failure mode it produces — a TypeError on the first call to
 // an undeclared facet — is exactly the one this module is trying to produce.
-export function scopeCore(core: CoreServices, permissions: NodePermissions): CoreServices {
+export function scopeCore(core: CoreServices, permissions: NodePermissions, pluginId: string): CoreServices {
   const granted: Partial<CoreServices> = {}
   for (const token of permissions.core) {
+    if (token === 'prefs') {
+      granted.prefs = prefsFor(core.prefs, pluginId)
+      continue
+    }
     const simple = SIMPLE_FACETS[token as keyof typeof SIMPLE_FACETS]
     if (simple) {
       // Assigning through the union of facet types needs the widening; each key takes its own value.
       Object.assign(granted, { [simple]: core[simple] })
       continue
     }
-    // `projects:write` implies read. A caller that may create and update a project but not resolve
-    // one by id cannot do anything useful, and pretending otherwise would just make every importer
-    // declare both tokens.
-    if (token === 'projects:read' || token === 'projects:write') {
-      const keys: readonly (keyof ProjectService)[] =
-        token === 'projects:write' ? [...PROJECT_READS, ...PROJECT_WRITES] : PROJECT_READS
+    // Both wider project grants imply identity reads. A caller that may create/update a project or
+    // inspect its config but cannot resolve one by id cannot do anything useful, and pretending
+    // otherwise would just make every importer declare two tokens.
+    if (token === 'projects:read' || token === 'projects:config' || token === 'projects:write') {
+      const keys: readonly (keyof ProjectService)[] = token === 'projects:config'
+        ? [...PROJECT_READS, ...PROJECT_CONFIG]
+        : token === 'projects:write'
+          ? [...PROJECT_READS, ...PROJECT_WRITES]
+          : PROJECT_READS
       granted.projects = { ...granted.projects, ...pick(core.projects, keys) } as ProjectService
     }
     // Anything else is a facet this acorn does not have. Ignored rather than rejected: a manifest

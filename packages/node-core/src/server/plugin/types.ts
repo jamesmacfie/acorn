@@ -3,6 +3,7 @@
 // provider registries and contracts, and clients are told about change through broadcasts.
 import type { Hono } from 'hono'
 import type { CoreServices } from '../../main/core'
+import type { PluginDatabase } from '../../main/pluginStorage'
 import type { ConnectionProviderContribution, IntegrationProviderContribution } from '../integrations/types'
 import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
@@ -110,10 +111,18 @@ export type PluginBroadcast = {
 // plugin receives a filtered wrapper (main/pluginPermissions.ts) rather than the registry instance.
 export type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
 
-// A loaded plugin gets this same type with members MISSING at runtime: the facets its manifest did
-// not ask for, plus `routes.register`, `events.channel` and `events.streams`, which are permanently
-// first-party regardless of manifest. server/plugin/host.ts builds it; main/pluginPermissions.ts
-// explains why the type deliberately does not describe the reduction.
+// Host-bound storage for a loaded plugin: its manifest chooses a confined migrations directory and
+// the host binds the database filename to the manifest id. Built-ins retain their existing explicit
+// openPluginDb calls because their migration chains are staged with the app.
+export type PluginStorage = {
+  open(): PluginDatabase
+}
+
+// The two plugin tiers receive different runtime projections of this common authoring type. Loaded
+// plugins omit undeclared core facets plus the first-party route/event members, and receive storage
+// bound from their manifest. Built-ins receive the full core/route/event surface and keep their
+// compile-time database factories, so `storage` is absent. server/plugin/host.ts builds both shapes;
+// main/pluginPermissions.ts explains why the type deliberately does not describe every omission.
 export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
@@ -121,6 +130,9 @@ export type NodePluginContext = {
   contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities
+  // Present for loaded plugins. A missing manifest `migrations` declaration fails loudly on open;
+  // built-ins use their compile-time storage factories and do not receive this projection.
+  storage: PluginStorage
   // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes
   // core capability through this, rather than deep-importing whichever core module has the helper.
   core: CoreServices

@@ -18,7 +18,9 @@ import { pathToFileURL } from 'node:url'
 import { confineExistingFile, resolveInRoot } from './core/filesystem/confinement'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './pluginInstaller'
 import { PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
-import type { NodePlugin } from '../server/plugin/types'
+import { PluginMigrationsError, pluginMigrationsChain } from './pluginMigrations'
+import { openPluginDb } from './pluginStorage'
+import type { NodePlugin, PluginStorage } from '../server/plugin/types'
 
 // A client bundle is one ESM file that has to travel a broker request and land in a device's cache
 // (docs/third-party/phase-2-distribution-trust.md). The ceiling is here rather than only in the
@@ -26,7 +28,14 @@ import type { NodePlugin } from '../server/plugin/types'
 // generous enough that no honest bundle meets it.
 export const MAX_CLIENT_BUNDLE_BYTES = 8 * 1024 * 1024
 
-export type LoadedPlugin = { manifest: PluginManifest; plugin: NodePlugin; dir: string; shadowsBuiltin: boolean }
+export type LoadedPlugin = {
+  manifest: PluginManifest
+  plugin: NodePlugin
+  dir: string
+  shadowsBuiltin: boolean
+  migrationsFolder: string | null
+  storage: PluginStorage
+}
 
 // Every package on disk whose manifest parsed, whether or not it has a node half to run. This is the
 // list phase 2 distributes from: a client-only plugin has nothing to load in this process but its
@@ -245,6 +254,21 @@ export async function loadExternalPlugins(
       continue
     }
 
+    let migrationsFolder: string | null = null
+    if (manifest.migrations) {
+      const declared = resolveInRoot(dir, manifest.migrations)
+      if (!declared) {
+        failures.push({ id: manifest.id, dir, reason: `migrations path '${manifest.migrations}' resolves outside the plugin directory` })
+        continue
+      }
+      try {
+        migrationsFolder = pluginMigrationsChain(manifest.id, declared)
+      } catch (error) {
+        failures.push({ id: manifest.id, dir, reason: error instanceof Error ? error.message : String(error) })
+        continue
+      }
+    }
+
     // Lexical + symlink confinement, the same helper CoreServices uses for worktree paths: a bundle
     // must not be able to point the loader at a file outside its own directory.
     const entrypoint = resolveInRoot(dir, manifest.node)
@@ -282,7 +306,15 @@ export async function loadExternalPlugins(
     if (shadowsBuiltin) {
       console.warn(`[plugins] ${manifest.id}: loading from ${dir} INSTEAD of the built-in`)
     }
-    loaded.push({ manifest, plugin, dir, shadowsBuiltin })
+    const storage: PluginStorage = {
+      open: () => {
+        if (!migrationsFolder) {
+          throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but declares no migrations.`)
+        }
+        return openPluginDb(dataRoot, manifest.id, { migrationsFolder })
+      },
+    }
+    loaded.push({ manifest, plugin, dir, shadowsBuiltin, migrationsFolder, storage })
     // Only now. A package whose node half declared itself and then failed to import is broken, not
     // client-only, and distributing the UI of a plugin whose routes will never exist would put a row
     // on every paired device claiming a plugin that is not running anywhere.

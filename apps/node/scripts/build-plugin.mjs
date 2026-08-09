@@ -110,9 +110,8 @@ writeFileSync(
   }, null, 2)}\n`,
 )
 
-// Migrations are deliberately not staged. pluginMigrationsFolder walks UP from the bundle's own
-// import.meta.url, which from inside a data root ascends somewhere meaningless — so a loaded plugin
-// that owns a database needs a manifest-driven migrations path first. Rollbar owns no database,
-// which is exactly why it is the guinea pig.
+// Rollbar owns no database, so this dogfood package needs no manifest `migrations` entry. A loaded
+// table-owning plugin stages its chain inside the package, declares that relative directory, and
+// opens its host-bound database through ctx.storage.
 console.log(`[build-plugin] ${id} -> ${outDir}`)
 console.log(`[build-plugin] restart the node to load it instead of the built-in`)

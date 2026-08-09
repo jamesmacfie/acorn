@@ -10,10 +10,37 @@ import { pluginManifestSchema } from './pluginManifest'
 const manifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', contributions })
 
+const permissionManifest = (permissions: Record<string, unknown>) =>
+  pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', permissions })
+
 const messages = (result: ReturnType<typeof manifest>) =>
   result.success ? [] : result.error.issues.map((issue) => issue.message)
 
 const PANE = { target: 'pane', id: 'board', label: 'Board' }
+
+describe('permission identifier shape', () => {
+  it('bounds scope and event strings before they can reach the trust layout', () => {
+    expect(permissionManifest({ api: ['x'.repeat(65)] }).success).toBe(false)
+    expect(permissionManifest({ events: ['not an event'] }).success).toBe(false)
+    expect(permissionManifest({ events: [`runtime:${'x'.repeat(64)}`] }).success).toBe(false)
+  })
+
+  it('keeps unknown but well-formed requests forward compatible', () => {
+    const result = permissionManifest({ api: ['core.quantum:read'], events: ['runtime:quantum-shift'] })
+    expect(result.success).toBe(true)
+  })
+})
+
+describe('migration entrypoint confinement', () => {
+  it('accepts a relative migrations directory and rejects escapes', () => {
+    expect(pluginManifestSchema.safeParse({
+      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', migrations: './migrations',
+    }).success).toBe(true)
+    expect(pluginManifestSchema.safeParse({
+      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', migrations: '../other/migrations',
+    }).success).toBe(false)
+  })
+})
 
 describe('chrome descriptors', () => {
   it('accepts a chrome-only manifest with no frames at all', () => {

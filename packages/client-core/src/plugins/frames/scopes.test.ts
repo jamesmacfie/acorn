@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as api from '@acorn/protocol/api.ts'
-import { allowApi, classifyPath, GRANTABLE_SCOPES } from './scopes'
+import { allowApi, classifyPath, describeScope, GRANTABLE_SCOPES } from './scopes'
 
 // The exhaustive sweep is the point of this file. Everything else here is a spot check on a case the
 // phase doc calls out by name (docs/third-party/phase-3-sandboxed-ui.md § Security acceptance
@@ -40,11 +40,23 @@ describe('the route table covers every core route', () => {
 
   it('grants only scopes on the published list', () => {
     expect(GRANTABLE_SCOPES).toEqual([
+      'core.projects:config',
       'core.projects:read',
       'core.projects:write',
       'core.tasks:read',
       'core.tasks:write',
       'core.workspaces:read',
+    ])
+  })
+
+  it('has stable owner-written consent copy for every grantable scope', () => {
+    expect(GRANTABLE_SCOPES.map((scope) => [scope, describeScope(scope)])).toEqual([
+      ['core.projects:config', 'Read every project’s build, dev and database scripts'],
+      ['core.projects:read', 'Read projects, including where every codebase lives on disk'],
+      ['core.projects:write', 'Create and update projects, including their on-disk locations'],
+      ['core.tasks:read', 'Read tasks'],
+      ['core.tasks:write', 'Create and update tasks'],
+      ['core.workspaces:read', 'Read workspaces'],
     ])
   })
 
@@ -92,13 +104,24 @@ describe('the route table covers every core route', () => {
 describe('the code-execution path', () => {
   // Asserted directly rather than trusted to the table, because this is the one denial whose failure
   // mode is arbitrary code execution on the Node: config writes are shell commands a later task runs.
-  const importer = { pluginId: 'board', api: ['core.projects:read', 'core.projects:write'] }
+  const importer = { pluginId: 'board', api: ['core.projects:config', 'core.projects:write'] }
+  const reader = { pluginId: 'board', api: ['core.projects:read'] }
 
   it('denies the project config write to a frame that holds core.projects:write', () => {
     expect(allowApi(importer, 'PUT', api.projectConfigRoute(ID))).toEqual({
       allowed: false,
       reason: `PUT ${api.projectConfigRoute(ID)} cannot be granted to a plugin`,
     })
+  })
+
+  it('keeps project config reads behind their own scope', () => {
+    expect(allowApi(reader, 'GET', api.projectConfigRoute(ID))).toEqual({
+      allowed: false,
+      reason: 'missing scope core.projects:config',
+    })
+    expect(allowApi(importer, 'GET', api.projectConfigRoute(ID)).allowed).toBe(true)
+    expect(allowApi(reader, 'PUT', api.projectConfigRoute(ID)).allowed).toBe(false)
+    expect(allowApi(importer, 'PUT', api.projectConfigRoute(ID)).allowed).toBe(false)
   })
 
   it('denies the run-targets write to the same frame, by any method', () => {

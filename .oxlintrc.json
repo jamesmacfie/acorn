@@ -7,5 +7,5 @@
     "no-self-compare": "error",
     "unicorn/prefer-node-protocol": "error"
   },
-  "ignorePatterns": ["**/dist/**", "**/out/**", "**/.turbo/**", "**/node_modules/**", "**/drizzle/**", "**/*.d.ts"]
+  "ignorePatterns": ["**/dist/**", "**/out/**", "**/.turbo/**", "**/node_modules/**", "**/drizzle/**", "**/*.d.ts", "forge/**"]
 }

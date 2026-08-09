@@ -38,13 +38,14 @@ though it arrives from disk):
   "apiVersion": "1",                 // major of @acorn/plugin-api it was built against
   "node": "./dist/node.js",          // optional; ESM bundle, default-exports NodePlugin
   "client": "./dist/client.js",      // optional; used from Phase 2 on
+  "migrations": "./migrations",      // optional; loaded-plugin SQLite chain, confined to package
   "permissions": {
     "api": ["core.tasks:read"],      // UI bridge scopes — hard-enforced in Phase 3
-    "events": ["invalidate:tasks"],  // UI event channels — hard-enforced in Phase 3
+    "events": ["runtime:task-archived"], // UI event channels — hard-enforced in Phase 3
     "node": {                        // node-half facets — shape ctx in this phase (see
                                      // "Permission-shaped context" below for what this does
                                      // and does not guarantee)
-      "core": ["tasks:read", "projects:read", "git"],   // CoreServices facets on ctx.core
+      "core": ["tasks", "projects:read", "git"],   // CoreServices facets on ctx.core
       "capabilities": ["agents.onStatusChanged"],
       "secrets": false,              // use-scoped secret access via ctx.core.secrets
       "exec": false,                 // process broker facet
@@ -65,6 +66,9 @@ Rules the loader enforces:
   attention item ("built for a newer/older acorn").
 - `node` entry must resolve inside the plugin directory (no `..` escape; reuse the path
   confinement helpers CoreServices already uses).
+- `migrations`, when present, must resolve to a Drizzle chain inside the plugin directory. Loaded
+  plugins open their manifest-bound `plugins/<id>.sqlite` through `ctx.storage.open()`; opening
+  storage without the declaration is a contained startup failure, never an ancestor search.
 
 ### Install directory
 
@@ -142,15 +146,19 @@ handing over the full context built-ins get:
 - `ctx.core` exposes only the facets named under `permissions.node.core`; `secrets`, the process
   broker (`exec`), and Git are individually gated. An unrequested facet is absent from the
   object, so honest code fails at development time, not in production.
-- `projects` splits read from write, because the two are very different asks.
-  `projects:read` gives `byId`, `byGithub`, `checkouts`, `config`, and `setup`; `projects:write`
-  adds `create` and `update` — the facet a project importer needs (phase 3). Note in the trust
+- `projects` splits identity, executable configuration and writes, because the three are very
+  different asks. `projects:read` gives `byId`, `byGithub` and `checkouts`; `projects:config`
+  adds `config`, `assertConfigTrusted` and `setup`; `projects:write` adds `create` and `update` —
+  the facet a project importer needs (phase 3). The config and write grants each imply the identity
+  reads but do not imply one another. Note in the trust
   prompt that `checkouts()` returns every mapped project folder path on the node, which is a
   filesystem-layout disclosure and not obvious from the words "read projects"
   (`packages/node-core/src/main/core/projects.ts`).
 - `ctx.events.streams()` and `ctx.events.channel()` are **never** present for loaded plugins,
   regardless of manifest — WS/PTY infrastructure ownership is first-party-only (README, "Two
   tiers").
+- `ctx.storage.open()` binds both the database filename and the migration chain from the manifest.
+  A loaded plugin cannot name another plugin's file or search above its own package for DDL.
 
 Be precise about what this buys. It is **least-privilege for cooperative code**: it keeps honest
 plugins from over-reaching, makes the Phase 5 trust prompt truthful for the well-behaved
@@ -245,13 +253,11 @@ Six differences between the plan above and what shipped.
   `apps/node/scripts/build-plugin.mjs` inlines everything except `node:` builtins — including Hono, so
   the bundle hands the host a Hono instance of its own class. Same version, structurally compatible;
   the integration test is what proves it rather than the assumption.
-- **`permissions.node.core` gates the eight simple facets plus `projects:read`/`projects:write`;
+- **`permissions.node.core` gates seven simple facets, the plugin-scoped `prefs` facet, and
+  `projects:read`/`projects:config`/`projects:write`;
   `secrets` and `exec` are only reachable through their own manifest booleans**, so neither can be
-  granted by a facet list. `projects:write` implies read. `git` is grantable without `exec` and that
+  granted by a facet list. The two wider project grants imply read; `prefs` maps every key into the
+  loaded plugin's `plugin:<id>:*` namespace and shares the frame state's 1 MiB cap. `git` is
+  grantable without `exec` and that
   split is disclosure rather than containment — `core/vcs/git` wraps the same `runProcess` the broker
   exposes, which `main/pluginPermissions.ts` says out loud rather than implying otherwise.
-
-Still open, and deliberately not fixed here: `pluginMigrationsFolder` walks *up* from the bundle's
-`import.meta.url`, which from `<dataRoot>/plugins/<id>/dist/node.js` ascends out of the plugin
-directory. The first loaded plugin that owns a database needs a manifest-driven migrations path.
-Rollbar owns none, which is part of why it is the guinea pig.

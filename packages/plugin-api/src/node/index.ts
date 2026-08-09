@@ -42,6 +42,8 @@ export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 export type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
+// Compile-time factories for built-ins. A loaded plugin uses its manifest-bound ctx.storage seam,
+// so it cannot choose a database id or discover a migration chain by filesystem proximity.
 export { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
 export type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 export { pluginMigrationsFolder } from '@acorn/node-core/main/pluginMigrations.ts'

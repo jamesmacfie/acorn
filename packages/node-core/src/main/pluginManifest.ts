@@ -185,12 +185,15 @@ const manifestShape = z.object({
   apiVersion: z.string().min(1).max(16),
   node: entry.optional(),
   client: entry.optional(),
+  // Loaded-plugin storage is host-opened and host-migrated. The same confinement rule as the code
+  // entrypoints keeps its DDL chain inside the installed package.
+  migrations: entry.optional(),
   permissions: z.object({
     // Core API scopes, `core.<resource>:<read|write>`. Unvalidated as strings for the same reason the
     // node block's `core` list is: an unknown scope is one this acorn cannot grant, which the bridge
     // handles by denying it (client-core/plugins/frames/scopes.ts), not by rejecting the manifest.
-    api: z.array(z.string().min(1)).max(64).default([]),
-    events: z.array(z.string().min(1)).max(64).default([]),
+    api: z.array(z.string().min(1).max(64)).max(64).default([]),
+    events: z.array(z.string().min(1).max(64).regex(/^[a-z][a-z0-9:._-]*$/i)).max(64).default([]),
     node: nodePermissions.prefault({}),
   }).prefault({}),
   contributions,

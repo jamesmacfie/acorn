@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectConfigRoute, projectRunTargetsRoute, projectsRoute, tasksRoute } from '@acorn/protocol/api.ts'
 import type { PluginBridgeMessage } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
+import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
 import { createFrameBridge, type FrameBinding, type FrameServices } from './broker'
 
 // Over a REAL MessageChannel, not a hand-rolled fake pair: the thing under test is what happens when
@@ -208,7 +209,7 @@ describe('state', () => {
 
   it('refuses a value over the quota without calling the writer', async () => {
     const h = withBridge()
-    h.send({ id: 16, kind: 'state.set', key: 'big', value: 'x'.repeat(1024 * 1024 + 1) })
+    h.send({ id: 16, kind: 'state.set', key: 'big', value: 'x'.repeat(MAX_PLUGIN_STATE_BYTES + 1) })
     await h.settled(2)
     expect(replyTo(h, 16)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
     expect(h.svc.stateSet).not.toHaveBeenCalled()

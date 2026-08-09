@@ -5,11 +5,17 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './pluginManifest'
 import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle } from './pluginLoader'
+import { PluginMigrationsError } from './pluginMigrations'
 
 // A minimal ESM node half. Written as source rather than bundled, because the loader's contract is
 // "default-export something shaped like a NodePlugin from an ESM module" and nothing more.
 const BUNDLE = (name: string) => `export default { name: ${JSON.stringify(name)}, init: () => {} }\n`
 const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text)).digest('hex')
+const chain = (dir: string): string => {
+  mkdirSync(join(dir, 'meta'), { recursive: true })
+  writeFileSync(join(dir, 'meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
+  return dir
+}
 
 let root = ''
 
@@ -105,6 +111,32 @@ describe('loading a plugin', () => {
     install('rollbar', manifest('rollbar'), BUNDLE('rollbar'))
     const { loaded } = await loadExternalPlugins(root, { builtins: ['rollbar', 'github'] })
     expect(loaded[0].shadowsBuiltin).toBe(true)
+  })
+})
+
+describe('loaded-plugin migration ownership', () => {
+  it('resolves a declared chain inside the plugin package', async () => {
+    const dir = install('ntfy', manifest('ntfy', { migrations: './migrations' }), BUNDLE('ntfy'))
+    const expected = chain(join(dir, 'migrations'))
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded[0].migrationsFolder).toBe(expected)
+  })
+
+  it('fails a declaration that does not contain a migration chain', async () => {
+    install('ntfy', manifest('ntfy', { migrations: './missing' }), BUNDLE('ntfy'))
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(loaded).toEqual([])
+    expect(failures[0]?.reason).toMatch(/declares migrations.*no Drizzle migration chain/)
+  })
+
+  it('refuses storage without a declaration instead of adopting an ancestor decoy', async () => {
+    chain(join(root, 'migrations'))
+    install('ntfy', manifest('ntfy'), BUNDLE('ntfy'))
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(() => loaded[0].storage.open()).toThrow(PluginMigrationsError)
+    expect(() => loaded[0].storage.open()).toThrow("Plugin 'ntfy' opened storage but declares no migrations")
   })
 })
 
@@ -243,6 +275,13 @@ describe('rejections', () => {
     // The manifest schema catches the literal `..`; a symlink out would be caught by resolveInRoot.
     install('escape', manifest('escape', { node: '../../elsewhere.js' }), BUNDLE('escape'))
     expect(await reasonFor('escape')).toMatch(/manifest schema/)
+  })
+
+  it('rejects a migrations directory that symlinks outside the plugin package', async () => {
+    const outside = chain(join(root, 'outside-migrations'))
+    const dir = install('escape-migrations', manifest('escape-migrations', { migrations: './migrations' }), BUNDLE('escape-migrations'))
+    symlinkSync(outside, join(dir, 'migrations'))
+    expect(await reasonFor('escape-migrations')).toMatch(/resolves outside the plugin directory/)
   })
 
   it('rejects a bundle that cannot be imported', async () => {

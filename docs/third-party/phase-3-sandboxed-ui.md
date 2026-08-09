@@ -174,7 +174,8 @@ creation:
 
     | Scope | Routes |
     | --- | --- |
-    | `core.projects:read` | `GET /v2/core/projects`, `GET /v2/core/projects/:id/config` |
+    | `core.projects:read` | `GET /v2/core/projects`, `GET /v2/core/projects/:id` |
+    | `core.projects:config` | `GET /v2/core/projects/:id/config` |
     | `core.projects:write` | `POST /v2/core/projects`, `PATCH /v2/core/projects/:id`, `POST /v2/core/projects/:id/detect` |
     | `core.workspaces:read` | `GET /v2/core/workspaces` |
     | **unmappable** | `PUT /v2/core/projects/:id/config`, `PUT /v2/core/projects/:id/run-targets`, `DELETE /v2/core/projects/:id`, every workspace mutation |

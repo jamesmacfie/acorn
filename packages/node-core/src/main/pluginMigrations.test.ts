@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { pluginMigrationsFolder } from './pluginMigrations'
+import { pluginMigrationsChain, pluginMigrationsFolder } from './pluginMigrations'
 
 // The built layout puts a plugin's chain at out/migrations/<plugin>/ and core's at out/migrations/, one
 // directory apart. These tests pin the resolver's plugin-scoped-first ordering.
@@ -52,5 +52,21 @@ describe('pluginMigrationsFolder', () => {
     // A `migrations` directory with no journal must not end the search either.
     mkdirSync(join(dir, 'out/migrations'), { recursive: true })
     expect(() => pluginMigrationsFolder('nosuch', pathToFileURL(module).href)).toThrow("No migrations chain found for plugin 'nosuch'")
+  })
+
+  it('stops at a plugin package root instead of adopting an ancestor chain', () => {
+    const dir = root()
+    chain(join(dir, 'migrations'))
+    const module = join(dir, 'plugins/http/dist/node.js')
+    mkdirSync(join(dir, 'plugins/http/dist'), { recursive: true })
+
+    expect(() => pluginMigrationsFolder('http', pathToFileURL(module).href)).toThrow(/inside its package directory/)
+  })
+
+  it('validates an explicit manifest-resolved chain without searching', () => {
+    const dir = root()
+    const expected = chain(join(dir, 'package/db'))
+    expect(pluginMigrationsChain('http', expected)).toBe(expected)
+    expect(() => pluginMigrationsChain('http', join(dir, 'package/missing'))).toThrow(/declares migrations/)
   })
 })

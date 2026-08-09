@@ -118,6 +118,16 @@ feature packages are GitHub, terminal, agents, editor, changes, notes, memory, c
 database, Docker, HTTP, preview, Linear, Rollbar, model providers, onboarding, and the built-in
 Claude, Codex, and Aider profiles registered by `plugins/agents`.
 
+Plugins come in two tiers. Those feature packages are **compiled in**: they ship in the binary, run
+in the shell's own realm, and are trusted like the rest of the app. A Node can also **load** a
+plugin from disk — installed through an owner-authenticated route, distributed to each paired
+device by the Node that owns it, and rendered in a sandboxed frame or as host-drawn descriptors.
+The two tiers are permanent and the line between them is what a contribution needs: anything
+expressible as data plus async messages can be sandboxed, while PTY stream ownership, inline
+agent-tool renderers, and components embedded in another surface's tree need the shared realm and
+stay first-party. [plugins.md](./plugins.md) describes both tiers as they work today;
+[third-party/](./third-party/) is why they are built that way.
+
 ## Data ownership
 
 The Node separates disposable provider projections from application-owned state. GitHub, Linear, and
@@ -166,6 +176,9 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - [authentication.md](./authentication.md), [security.md](./security.md) — trust boundaries.
 - [api-reference.md](./api-reference.md), [data-layer.md](./data-layer.md), [caching.md](./caching.md) — Node contracts.
 - [plugins.md](./plugins.md), [agent-tools.md](./agent-tools.md) — extension and tool boundaries.
+- [third-party/](./third-party/) — how third-party plugins are loaded, distributed, trusted, and
+  sandboxed, and why each of those is shaped the way it is. Start at its README; each phase file
+  keeps the plan it was built from plus an "As built" section recording what differed.
+  [third-party/node-security.md](./third-party/node-security.md) is the threat model and the rules
+  any change touching plugin permissions has to hold to.
 - [electron.md](./electron.md), [local-development.md](./local-development.md) — runtime and development.
-- [legacy/projects/README.md](./legacy/projects/README.md) — completed project-model migration record
-  and retained phase notes.

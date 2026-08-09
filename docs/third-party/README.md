@@ -223,8 +223,6 @@ key anyway.
   the future ecosystem work (phase-0 already updates its plugin-api line).
 - `docs/architecture-overview.md` — runtime topology, contract ownership, wire validation.
 - `docs/workspaces-and-tasks.md` — the Workspace → Project → Task model plugins scope against.
-  `docs/legacy/projects/` is the completed migration record: read it for rationale, not for
-  current state (its phase files describe intermediate dual-write stages that no longer exist).
 - `docs/security.md`, `docs/authentication.md` — trust boundaries this design extends.
 - `docs/electron.md` — `app://` scheme, preload bridge, broker.
 - `docs/panes.md`, `docs/ui-design.md`, `docs/state.md`, `docs/caching.md` — the client surfaces

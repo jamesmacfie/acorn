@@ -1,4 +1,6 @@
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
+import { describeChannel, isSubscribable } from './frames/channels'
+import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
 
 // What a plugin's declared permissions read as in the trust prompt (PluginTrustDialog.tsx), in two
 // groups that are NOT the same kind of promise.
@@ -15,19 +17,48 @@ import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 // The update prompt's "what is new" mark is set-difference over these strings, so the WORDING is the
 // diff key — rephrasing a line without changing the grant would light it up as newly requested.
 
-export const nodePermissionLines = (permissions: NodePluginPermissions): string[] => [
-  ...(permissions.node.secrets ? ['Use your saved credentials to make requests on its behalf'] : []),
-  ...(permissions.node.exec ? ['Run commands on the node'] : []),
-  ...permissions.node.net.map((host) => `Reach ${host}`),
-  // `core.projects` is not the modest-sounding grant it reads as: checkouts() returns the local
-  // filesystem path of every codebase mapped on this machine (node-security.md § Rung 1).
-  ...permissions.node.core.map((facet) =>
-    facet.startsWith('projects') ? `core.${facet} — including where every codebase lives on disk` : `core.${facet}`,
-  ),
-  ...permissions.node.capabilities.map((id) => `capability ${id}`),
-]
+const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  fs: 'Read and write task files',
+  git: 'Read repository history and run Git commands',
+  tasks: 'Read task details',
+  context: 'Read task launch context',
+  models: 'Generate text with configured model providers',
+  prefs: 'Read and write this plugin’s saved state',
+  identity: 'Read the node owner identity',
+  'projects:read': 'Read projects, including where every codebase lives on disk',
+  'projects:config': 'Read every project’s build, dev and database scripts',
+  'projects:write': 'Create and update projects, including their on-disk locations',
+}
 
-export const uiPermissionLines = (permissions: NodePluginPermissions): string[] => [
-  ...permissions.api.map((route) => `api: ${route}`),
-  ...permissions.events.map((event) => `events: ${event}`),
-]
+const ignoredLine = (count: number, kind = ''): string =>
+  `${count} ${kind}${kind ? ' ' : ''}request${count === 1 ? '' : 's'} this version of acorn does not recognise (ignored)`
+
+export const nodePermissionLines = (permissions: NodePluginPermissions): string[] => {
+  const core = permissions.node.core.flatMap((facet) => NODE_CORE_DESCRIPTIONS[facet] ?? [])
+  const ignored = permissions.node.core.length - core.length
+  return [
+    ...(permissions.node.secrets ? ['Use your saved credentials to make requests on its behalf'] : []),
+    ...(permissions.node.exec ? ['Run commands on the node'] : []),
+    ...permissions.node.net.map((host) => `Reach ${host}`),
+    ...core,
+    ...permissions.node.capabilities.map((id) => `Use capability ${id}`),
+    ...(ignored ? [ignoredLine(ignored, 'node permission')] : []),
+  ]
+}
+
+export const uiPermissionLines = (permissions: NodePluginPermissions): string[] => {
+  // Classify instead of echoing: these strings came from an untrusted manifest, while every grant
+  // sentence under "In this app — enforced" must be copy the host owns and can actually enforce.
+  const scopes = permissions.api.flatMap((scope) => {
+    if (!GRANTABLE_SCOPES.includes(scope)) return []
+    const description = describeScope(scope)
+    return description ? [description] : []
+  })
+  const events = permissions.events.flatMap((channel) => {
+    if (!isSubscribable(channel)) return []
+    const description = describeChannel(channel)
+    return description ? [description] : []
+  })
+  const ignored = permissions.api.length + permissions.events.length - scopes.length - events.length
+  return [...scopes, ...events, ...(ignored ? [ignoredLine(ignored)] : [])]
+}

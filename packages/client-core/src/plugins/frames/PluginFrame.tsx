@@ -10,6 +10,12 @@ import { saveJsonPref } from '../../settings/savePref'
 import { watchAppearance } from '../../ui/appearance'
 import { BRIDGE_TOKENS } from '../../ui/tokenAxes'
 import { createFrameBridge, postAppearance, postSelect, type FrameBinding, type FrameServices } from './broker'
+import { isSubscribable } from './channels'
+
+export { SUBSCRIBABLE_CHANNELS } from './channels'
+
+const PLUGIN_FRAME_SCHEME = 'app-plugin'
+const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${hash}`
 
 // The host component for one sandboxed plugin surface (docs/third-party/phase-3-sandboxed-ui.md).
 //
@@ -26,23 +32,6 @@ import { createFrameBridge, postAppearance, postSelect, type FrameBinding, type 
 // served CSP stops matching, the frame's own module script becomes a cross-origin fetch on a scheme with
 // no CORS (so the document renders blank), and frame-local storage disappears. What the attribute still
 // buys with both tokens is real: no popups, no top-level navigation, no form submission, no downloads.
-
-// Channels a frame may subscribe to. A hand-written subset of ClientEventMap rather than its keys,
-// because that map is a type with no runtime form — and because most of it should not be reachable
-// anyway: `presentation:*` are the shell's own intents (open this settings tab, focus that terminal),
-// and forwarding them to third-party code would leak the user's navigation. The `runtime:*` family is
-// "something you may be showing has gone", which is exactly what a plugin needs to invalidate on.
-export const SUBSCRIBABLE_CHANNELS = [
-  'runtime:task-archived',
-  'runtime:workspace-removed',
-  'runtime:node-removed',
-  'runtime:node-switched',
-] as const
-
-type Subscribable = (typeof SUBSCRIBABLE_CHANNELS)[number]
-
-const isSubscribable = (channel: string): channel is Subscribable =>
-  (SUBSCRIBABLE_CHANNELS as readonly string[]).includes(channel)
 
 export type PluginFrameProps = {
   // What the host resolved: which plugin, which surface, which bundle, and what it is looking at.
@@ -169,10 +158,10 @@ export default function PluginFrame(props: PluginFrameProps) {
         setMisbehaving(reason)
       },
     })
-    // '*' is correct here and not a lapse: the frame is on an opaque origin (sandbox without
-    // allow-same-origin), so there is no origin string that would match. What the message conveys is the
-    // port, and a port cannot be forged or intercepted by anything else in the frame.
-    target.postMessage({ acornBridge: PLUGIN_BRIDGE_VERSION }, '*', [channel.port2])
+    // Targeted, not '*': the sandbox keeps the frame's own origin through allow-same-origin (see the
+    // block at the top of this file for why that is safe here), so naming it ensures the port can only
+    // land in the hash-addressed document we built this frame for.
+    target.postMessage({ acornBridge: PLUGIN_BRIDGE_VERSION }, pluginFrameOrigin(props.hash), [channel.port2])
 
     const push = () => postAppearance(channel.port1, { ...currentAxes(), tokens: currentTokens() })
     push()
@@ -207,7 +196,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       <iframe
         // The bundle hash is the origin, so a plugin update is a new origin and a new frame — there is
         // nothing cached under the old one to reason about.
-        src={`app-plugin://${props.hash}/index.html`}
+        src={`${pluginFrameOrigin(props.hash)}/index.html`}
         title={props.binding.surface}
         sandbox="allow-scripts allow-same-origin"
         style={{ border: '0', width: '100%', height: '100%', display: 'block' }}

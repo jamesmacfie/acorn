@@ -569,10 +569,10 @@ test('asks before running a plugin a paired node serves, then caches it for offl
   // so; the UI scopes are enforced by the bridge. Asserting the headings as well as the lines, because
   // collapsing them back into one list is the specific regression that would matter here.
   await expect(dialog).toContainText('On the node — declared, not enforced')
-  await expect(dialog).toContainText('core.projects:read — including where every codebase lives on disk')
+  await expect(dialog).toContainText('Read projects, including where every codebase lives on disk')
   await expect(dialog).toContainText("This plugin's server code runs with the same access as acorn itself.")
   await expect(dialog).toContainText('In this app — enforced')
-  await expect(dialog).toContainText('api: core.tasks:read')
+  await expect(dialog).toContainText('Read tasks')
 
   await dialog.getByRole('button', { name: 'Trust this plugin' }).click()
   await expect(dialog).toHaveCount(0)

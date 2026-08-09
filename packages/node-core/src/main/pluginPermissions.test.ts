@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
 import { CapabilityRegistry, capabilityId } from '../server/plugin/capabilities'
 import type { CoreServices } from './core'
 import { pluginManifestSchema, type NodePermissions } from './pluginManifest'
@@ -29,54 +30,97 @@ const CORE = {
 const permissions = (node: Record<string, unknown> = {}): NodePermissions =>
   pluginManifestSchema.parse({ id: 'demo', name: 'demo', version: '1', apiVersion: '1', permissions: { node } }).permissions.node
 
+const scoped = (node: Record<string, unknown> = {}, core: CoreServices = CORE): CoreServices =>
+  scopeCore(core, permissions(node), 'demo')
+
 // The facets that are NOT reachable through `core: [...]`, whatever a manifest writes there.
 const keys = (services: CoreServices) => Object.keys(services).sort()
 
 describe('scopeCore', () => {
   it('grants nothing at all by default', () => {
-    expect(keys(scopeCore(CORE, permissions()))).toEqual([])
+    expect(keys(scoped())).toEqual([])
   })
 
   it('grants exactly the simple facets that were named', () => {
-    const scoped = scopeCore(CORE, permissions({ core: ['git', 'tasks'] }))
-    expect(keys(scoped)).toEqual(['git', 'tasks'])
-    expect(scoped.git).toBe(CORE.git)
+    const services = scoped({ core: ['git', 'tasks'] })
+    expect(keys(services)).toEqual(['git', 'tasks'])
+    expect(services.git).toBe(CORE.git)
     // The point of gating by omission: an undeclared facet is `undefined`, so the plugin author gets
     // a TypeError the first time they run it rather than a silent no-op in production.
-    expect(scoped.fs).toBeUndefined()
-    expect(scoped.models).toBeUndefined()
+    expect(services.fs).toBeUndefined()
+    expect(services.models).toBeUndefined()
   })
 
   it('covers every simple facet name', () => {
     const all = ['fs', 'git', 'tasks', 'context', 'models', 'prefs', 'identity']
-    expect(keys(scopeCore(CORE, permissions({ core: all })))).toEqual([...all].sort())
+    expect(keys(scoped({ core: all }))).toEqual([...all].sort())
   })
 
   it('ignores a facet name this build does not have, rather than failing the plugin', () => {
-    expect(keys(scopeCore(CORE, permissions({ core: ['git', 'quantum'] })))).toEqual(['git'])
+    expect(keys(scoped({ core: ['git', 'quantum'] }))).toEqual(['git'])
   })
 
   it('keeps secrets and the process broker off unless each is asked for by name', () => {
     // Not reachable through the `core` list — these two have their own manifest booleans on purpose.
-    expect(keys(scopeCore(CORE, permissions({ core: ['secrets', 'proc', 'exec'] })))).toEqual([])
-    expect(keys(scopeCore(CORE, permissions({ secrets: true })))).toEqual(['secrets'])
-    expect(keys(scopeCore(CORE, permissions({ exec: true })))).toEqual(['proc'])
+    expect(keys(scoped({ core: ['secrets', 'proc', 'exec'] }))).toEqual([])
+    expect(keys(scoped({ secrets: true }))).toEqual(['secrets'])
+    expect(keys(scoped({ exec: true }))).toEqual(['proc'])
   })
 
-  it('splits projects into read and write', () => {
-    const read = scopeCore(CORE, permissions({ core: ['projects:read'] })).projects
-    expect(Object.keys(read).sort()).toEqual(['assertConfigTrusted', 'byGithub', 'byId', 'checkouts', 'config', 'setup'])
+  it('keeps project config and its executable scripts out of the read grant', () => {
+    const read = scoped({ core: ['projects:read'] }).projects
+    expect(Object.keys(read).sort()).toEqual(['byGithub', 'byId', 'checkouts'])
     // The disclosure phase 5's trust prompt has to name: "read projects" includes every mapped
     // project path on the machine.
     expect(read.checkouts).toBe(CORE.projects.checkouts)
+    expect((read as { config?: unknown }).config).toBeUndefined()
+    expect((read as { setup?: unknown }).setup).toBeUndefined()
+    expect((read as { assertConfigTrusted?: unknown }).assertConfigTrusted).toBeUndefined()
     expect((read as { create?: unknown }).create).toBeUndefined()
   })
 
-  it('lets write imply read, because a writer that cannot resolve a project is useless', () => {
-    const write = scopeCore(CORE, permissions({ core: ['projects:write'] })).projects
-    expect(Object.keys(write).sort()).toEqual(
-      ['assertConfigTrusted', 'byGithub', 'byId', 'checkouts', 'config', 'create', 'setup', 'update'],
+  it('makes the config grant imply identity reads and include the whole config surface', () => {
+    const config = scoped({ core: ['projects:config'] }).projects
+    expect(Object.keys(config).sort()).toEqual(
+      ['assertConfigTrusted', 'byGithub', 'byId', 'checkouts', 'config', 'setup'],
     )
+  })
+
+  it('lets write imply read without silently implying config access', () => {
+    const write = scoped({ core: ['projects:write'] }).projects
+    expect(Object.keys(write).sort()).toEqual(['byGithub', 'byId', 'checkouts', 'create', 'update'])
+    expect((write as { config?: unknown }).config).toBeUndefined()
+  })
+
+  it('classifies every project service method as identity, config, or write', () => {
+    const read = Object.keys(scoped({ core: ['projects:read'] }).projects)
+    const config = Object.keys(scoped({ core: ['projects:config'] }).projects)
+    const write = Object.keys(scoped({ core: ['projects:write'] }).projects)
+    expect([...new Set([...read, ...config, ...write])].sort()).toEqual(Object.keys(CORE.projects).sort())
+  })
+
+  it('scopes prefs to the loaded plugin namespace shared with its frame', async () => {
+    const read = vi.fn(async (_userId: string, key: string) => key === 'plugin:demo:columns' ? '[1,2]' : null)
+    const write = vi.fn(async () => {})
+    const services = scoped({ core: ['prefs'] }, { ...CORE, prefs: { read, write } } as CoreServices)
+
+    expect(await services.prefs.read('user-1', 'columns')).toBe('[1,2]')
+    expect(await services.prefs.read('user-1', 'plugin:other:columns')).toBeNull()
+    await services.prefs.write('user-1', 'columns', '[3]')
+
+    expect(read).toHaveBeenNthCalledWith(1, 'user-1', 'plugin:demo:columns')
+    expect(read).toHaveBeenNthCalledWith(2, 'user-1', 'plugin:demo:plugin:other:columns')
+    expect(write).toHaveBeenCalledWith('user-1', 'plugin:demo:columns', '[3]')
+  })
+
+  it('applies the shared frame-state quota to node-half preference writes', async () => {
+    const write = vi.fn(async () => {})
+    const services = scoped(
+      { core: ['prefs'] },
+      { ...CORE, prefs: { read: vi.fn(async () => null), write } } as CoreServices,
+    )
+    await expect(services.prefs.write('user-1', 'big', 'x'.repeat(MAX_PLUGIN_STATE_BYTES + 1))).rejects.toThrow(/capped/)
+    expect(write).not.toHaveBeenCalled()
   })
 })
 

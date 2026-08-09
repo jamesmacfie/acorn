@@ -75,19 +75,28 @@ tests (phase-1 test list).
 
 `ctx.core.projects` (`packages/node-core/src/main/core/projects.ts`) is the model every facet
 should copy, and also the clearest illustration of rung 1's limit. It is built for plugins rather
-than merely exposed to them: every method returns a `ProjectRef` projection, so a plugin can
-resolve project identity without seeing the config columns on the row and without ever holding the
-core database handle. That is a real reduction in what a *cooperative* plugin can touch, and it is
-why plugins key their rows by `projectId` instead of reaching for the table.
+than merely exposed to them: identity and write methods use `ProjectRef` projections, so a plugin
+can resolve project identity without seeing the config columns on the row and without ever holding
+the core database handle. The methods that do return executable configuration (`config`, `setup`
+and its trust assertion) require the separate `projects:config` token. That is a real reduction in
+what a *cooperative* plugin can touch, and it is why plugins key their rows by `projectId` instead
+of reaching for the table.
+
+`ctx.core.prefs` is the companion pattern for a raw service that cannot be narrowed by projection.
+A loaded plugin sees only `plugin:<id>:*`, the same namespace its sandboxed frame reaches through
+`state.get` and `state.set`, with the same 1 MiB value cap on both halves. Built-ins retain the raw
+preference service for core-owned keys. The scoping prevents cooperative loaded plugins from using
+the preference table as a hidden cross-plugin channel or corrupting another frame's state.
 
 Two things it does not do. It is not a barrier — a loaded bundle can still open `core.sqlite` and
 read the config columns directly; only rung 2 changes that. And even used exactly as intended,
 `checkouts()` returns the local filesystem path of every mapped project on the machine. That is a
 layout disclosure — where the user keeps their code, how many codebases they have, and often their
 employer's project names — and "read projects" does not sound like it. Say so in the phase-5 trust
-prompt, and prefer splitting read from write (`projects:read` / `projects:write`) so an importer
-that needs to create projects does not silently arrive with the same grant as a plugin that only
-wants to label a row.
+prompt. Keep identity, executable config and writes split (`projects:read` / `projects:config` /
+`projects:write`) so an importer that needs to create projects does not silently arrive with the
+same grant as a plugin that only wants to label a row, and neither silently gains the scripts acorn
+will execute.
 
 ### Rung 2 — Out of process (the future hard boundary)
 
@@ -266,6 +275,6 @@ here as the checklist reviewers should hold PRs against:
 | Agent sessions | Tool contributions | Third-party tools default disabled/ask | Phase 1/5 |
 | Fleet devices | Routes + broadcasts | Task-token opt-in default-no; content-free broadcasts | Phase 1/3 |
 | Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule; scope by `projectId`, never mirror the project row | Rung 1 |
-| Project config scripts (`setup_script`, `dev_script`, …) | Writable via the core config route; the Node executes them | Config `PUT`s permanently unmapped on the phase-3 bridge; project config trust ack on the node side | Phase 3 (frames); rung 2 (node half) |
+| Project config scripts (`setup_script`, `dev_script`, …) | Readable through `core.projects.config()` and writable via the core config route; the Node executes them | Separate `projects:config` read grant; config `PUT`s permanently unmapped on the phase-3 bridge; project config trust ack on the node side | Rung 1 (node facet); phase 3 (frames); rung 2 (node half) |
 | Project folder paths | `core.projects.checkouts()` lists every mapped codebase | Split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 1 (disclosure), rung 2 (enforced) |
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |

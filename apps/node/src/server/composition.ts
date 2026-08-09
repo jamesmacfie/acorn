@@ -4,8 +4,8 @@ import { reconcileWorktrees } from '@acorn/node-core/main/taskWorktree.ts'
 import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
+import type { LoadedPluginBinding } from '@acorn/node-core/server/plugin/host.ts'
 import { loadExternalPlugins, type InstalledPlugin } from '@acorn/node-core/main/pluginLoader.ts'
-import type { NodePermissions } from '@acorn/node-core/main/pluginManifest.ts'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/index.ts'
@@ -19,9 +19,9 @@ export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'plugin state', '
 
 export type NodeComposition = {
   plugins: NodePlugin[]
-  // The subset that came off disk, keyed by name, carrying its manifest's node permissions. The host
-  // takes this as the one signal that a plugin is contained and permission-shaped.
-  loaded: ReadonlyMap<string, NodePermissions>
+  // The subset that came off disk, keyed by name, carrying its manifest-shaped permissions and
+  // storage. The host takes this as the one signal that a plugin is contained.
+  loaded: ReadonlyMap<string, LoadedPluginBinding>
   // Every package on disk, including the client-only ones that produced no NodePlugin. This is what
   // the roster route distributes from; `loaded` above is only what this process runs.
   installed: readonly InstalledPlugin[]
@@ -43,7 +43,10 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
   const shadowed = new Set(loaded.filter((entry) => entry.shadowsBuiltin).map((entry) => entry.manifest.id))
   return {
     plugins: [...builtins.filter((plugin) => !shadowed.has(plugin.name)), ...loaded.map((entry) => entry.plugin)],
-    loaded: new Map(loaded.map((entry) => [entry.manifest.id, entry.manifest.permissions.node])),
+    loaded: new Map(loaded.map((entry) => [
+      entry.manifest.id,
+      { permissions: entry.manifest.permissions.node, storage: entry.storage },
+    ])),
     installed,
     drainOrder: NODE_DRAIN_ORDER,
   }

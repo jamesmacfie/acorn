@@ -7,10 +7,7 @@ none of which exist yet, and none of which should require a disruptive rewrite w
 
 Method: the whole tree was read (apps, packages, plugins, tools, scripts, docs) with sizes, import
 graphs, and every claim below verified against the working tree at the time of writing. File and
-line references are anchors, not exhaustive lists. Beware: the project migration notes under
-`docs/legacy/projects/` are historical and several of their "not done" items have since landed (provider-credential gating
-via `requireProviderAccess`, the idempotency middleware). Trust this file and the code over the
-legacy notes.
+line references are anchors, not exhaustive lists.
 
 ## Status ledger — 2026-08-08
 

@@ -50,7 +50,9 @@ function buildPackage(workshop: string, version: string, permissions: Record<str
     apiVersion: PLUGIN_API_MAJOR,
     node: './dist/node.js',
     client: './dist/client.js',
-    permissions: { node: permissions },
+    // Deliberately well-formed but unknown: the trust prompt must count this as ignored and never
+    // repeat plugin-authored text as an enforced grant.
+    permissions: { api: ['core.quantum:read'], node: permissions },
   }))
   const archive = join(dir, 'acorn-plugin.tgz')
   execFileSync('/usr/bin/tar', ['-czf', archive, '-C', dir, 'acorn-plugin.json', 'dist'])
@@ -206,6 +208,12 @@ test('installs, trusts, updates and uninstalls a plugin from Settings', async ()
   await expect.poll(async () => (await rosterRow(page))?.state, { timeout: 60_000 }).toBe('pending-restart')
 
   // ── Trust, from the install flow rather than at the next boot ──────────────────────────────────
+  const installDialog = page.locator('.plugin-trust-dialog')
+  await expect(installDialog).toBeVisible({ timeout: 60_000 })
+  await expect(installDialog.locator('.plugin-trust-permissions').last()).toHaveText(
+    '1 request this version of acorn does not recognise (ignored)',
+  )
+  await expect(installDialog).not.toContainText('core.quantum:read')
   expect(await acceptTrust(page)).toBe('Run a plugin from this node?')
 
   // ── Restart, and the plugin is live ───────────────────────────────────────────────────────────

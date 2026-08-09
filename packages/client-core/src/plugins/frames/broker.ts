@@ -21,6 +21,7 @@ import type {
   PluginFrameContext,
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
+import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
 import { allowApi, isApiMethod, type ApiMethod } from './scopes'
 
 // What the frame is, as the host decided it. Nothing here is ever read from a message.
@@ -69,8 +70,6 @@ export type FrameServices = {
 const MAX_IN_FLIGHT = 100
 const MAX_PER_WINDOW = 1000
 const WINDOW_MS = 10_000
-// Persisted plugin state is a preference row on the home node, not a blob store.
-const MAX_STATE_BYTES = 1024 * 1024
 
 export type FrameBridge = { dispose(): void }
 
@@ -85,8 +84,6 @@ const failed = (id: number, code: string, message: string): PluginBridgeReply =>
   ok: false,
   error: { code, message, requestId: '', retryable: false },
 })
-
-const stateKey = (pluginId: string, key: string) => `plugin:${pluginId}:${key}`
 
 // A message is only a message if it has a positive integer id and a string kind. Anything else is not
 // a malformed request — it is not a request, and there is nothing to reply to.
@@ -220,14 +217,14 @@ export function createFrameBridge(input: {
       post(failed(id, 'bad_request', 'a state operation needs a key'))
       return
     }
-    const scoped = stateKey(binding.pluginId, key)
+    const scoped = pluginStateKey(binding.pluginId, key)
     if (kind === 'state.get') {
       post({ id, ok: true, status: 200, body: services.stateGet(scoped) ?? null })
       return
     }
     const serialized = JSON.stringify(data.value ?? null)
-    if (utf8Bytes(serialized) > MAX_STATE_BYTES) {
-      post(failed(id, 'bad_request', `state values are capped at ${MAX_STATE_BYTES} bytes`))
+    if (utf8Bytes(serialized) > MAX_PLUGIN_STATE_BYTES) {
+      post(failed(id, 'bad_request', `state values are capped at ${MAX_PLUGIN_STATE_BYTES} bytes`))
       return
     }
     try {

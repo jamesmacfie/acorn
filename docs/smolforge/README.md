@@ -10,6 +10,11 @@ Read `forge/README.md` and `forge/llms.txt` first. `llms.txt` is the machine-rea
 reference (auth, PAT scopes, every endpoint); the phase files cite its sections rather than
 copying them.
 
+`forge/` is intentionally vendored as a read-only reference so integration work can inspect the
+implementation as well as its API documents without depending on a moving remote checkout. It is
+not acorn source: the workspace globs exclude it, Turbo and TypeScript do not build or test it, and
+oxlint ignores it. Changes to the reference belong upstream; this repository ships none of it.
+
 ## Why this integration, and why it is the stress test
 
 SmolForge exercises every seam acorn has for integrations, plus several it doesn't have yet:
