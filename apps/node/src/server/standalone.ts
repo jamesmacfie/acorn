@@ -19,6 +19,7 @@ import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/ser
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
 import { PLUGIN_STATE } from '@acorn/node-core/server/routes/plugins.ts'
+import { installedPluginInfo, readClientBundle } from '@acorn/node-core/main/pluginLoader.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
@@ -82,6 +83,8 @@ const plugins = await initPlugins(
 )
 const pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
   roster: () => plugins.roster,
+  installed: () => graph.installed.map(installedPluginInfo),
+  clientBundle: (id) => readClientBundle(graph.installed, id),
   disabled: () => disabledPlugins.get(),
   setDisabled: (names) => disabledPlugins.set(names),
 })

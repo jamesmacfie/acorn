@@ -1,0 +1,20 @@
+/* Plugin-trust dialog (PluginTrustDialog.tsx): the per-device acknowledgement for running a client
+   bundle a node served. Narrower than config-trust because it shows a permission list rather than
+   file contents. Every colour is a token — see the note in config-trust.css about what hardcoded
+   fallbacks did under the light themes. */
+.plugin-trust-dialog { width: min(520px, calc(100vw - 32px)); max-height: min(640px, calc(100vh - 32px)); }
+.plugin-trust-body { overflow: auto; }
+.plugin-trust-body h3 { margin: var(--space-8) 0 var(--space-3); font-size: var(--fs-sm); }
+.plugin-trust-permissions {
+  margin: 0;
+  padding: var(--space-6);
+  list-style: none;
+  border-radius: var(--radius-popover);
+  background: var(--surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+}
+/* Only ever set on an update, for a permission the previously trusted version did not declare. This
+   is the line the owner most needs to see and the reason an update re-prompts at all. */
+.plugin-trust-permissions .added { color: var(--danger-fg); font-weight: var(--fw-medium); }

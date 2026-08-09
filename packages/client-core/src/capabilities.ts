@@ -6,6 +6,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
+import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // What the hosting environment provides (docs/features.md, docs/electron.md §capability-map). The
@@ -48,6 +49,25 @@ export type {
 // Chrome state pushed from main for the active preview view (PreviewPane consumes it).
 export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 
+// What main holds for third-party plugins: the bundles it has cached, and this device's decisions
+// about running them. Mirrors apps/desktop/src/app/main/pluginIpc.ts; the storage behind it is
+// Electron's today and a browser's later (docs/future/remote.md), which is why the renderer only ever
+// sees this shape and never a path.
+export type PluginTrustDecision = {
+  pluginId: string
+  hash: string
+  nodeId: string
+  version: string
+  permissions: NodePluginPermissions
+  decision: 'accepted' | 'rejected'
+}
+export type PluginAckRecord = PluginTrustDecision & { decidedAt: number }
+export type PluginHostState = {
+  cached: Record<string, { pluginId: string; version: string; bytes: number }>
+  acks: PluginAckRecord[]
+}
+export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' }
+
 declare global {
   interface Window {
     acorn?: {
@@ -77,6 +97,15 @@ declare global {
       nodeRestartLocal?: () => Promise<void>
       nodeTunnelOpen?: (request: { nodeId: string; taskId: string; port: number }) => Promise<{ port: number }>
       nodeTunnelClose?: (match: { nodeId?: string; taskId?: string }) => void
+      // Third-party plugin bundles (docs/third-party/phase-2-distribution-trust.md). Reached only
+      // through plugins/host.ts, which is the client's platform adapter for them: bundle bytes and
+      // cache paths stay in main, so the renderer names a bundle by the hash main computed and by
+      // nothing else. `cachePut` asks main to fetch a plugin's client half from a node.
+      plugins?: {
+        state(): Promise<PluginHostState>
+        cachePut(request: { nodeId: string; pluginId: string; hash: string; version: string }): Promise<PluginPutResult>
+        trustRecord(request: PluginTrustDecision): Promise<void>
+      }
       // The two native actions the node recovery screen offers (node/NodeGate.tsx). Neither is
       // expressible in the renderer: one reveals a path in Finder, the other has to bypass the
       // will-quit prompt, whose handler lives in a shell that is not mounted behind the gate.

@@ -70,6 +70,47 @@ authenticated internal principal and therefore can spend the active owner's GitH
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to
   HTTP(S) URLs without userinfo.
 
+## Third-party plugin bundles
+
+A plugin installed on a Node is distributed by that Node: its client bundle travels the existing
+broker pipe to every paired device. That makes a Node a source of executable code, so the bundle is
+gated twice — once on content, once on consent.
+
+**Trust binds to bytes, not to claims.** The hash a Node advertises in `/v2/core/plugins` is
+untrusted input. Electron main fetches the bundle itself (the bytes never pass through the renderer),
+hashes what arrived, and stores it content-addressed under that hash. A mismatch against the
+advertised value is refused and reported, never re-keyed. Every acknowledgement therefore binds a
+plugin id to a hash no one but this device computed.
+
+**Consent is per device and per bundle.** First sight of a `(plugin, hash)` pair prompts, naming the
+Node it came from and the permissions the manifest declared. An update arrives as a new hash and
+prompts again, showing what the permissions gained. A rejection is remembered. Pairing a new machine
+re-prompts, exactly as it re-pairs — the decision is about code this machine will run, so it is this
+machine's to make. This mirrors repo-config trust one level out: that binds a project to the hash of
+a config the Node will execute and is stored on the Node; this binds a plugin to the hash of a bundle
+the device will execute and is stored beside the device token.
+
+The threats this closes, and the ones it does not:
+
+- **A compromised or hostile paired Node serving malicious JavaScript** — hash-verified bytes, a
+  per-device acknowledgement that names the Node, and (phase 3) the sandboxed frame the bundle runs
+  in. Nothing a Node pushes runs unprompted.
+- **A Node lying in its listing** about hash, version or permissions — the hash is recomputed from the
+  bytes. The permissions shown are the manifest as the Node's own loader read it; a Node that lies
+  there also controls the bytes, so the containment rather than the disclosure is what bounds it.
+- **Cache poisoning** — only main writes the cache, and content addressing means a poisoned entry
+  cannot masquerade under a previously accepted hash.
+- **Downgrade** — resolution prefers the highest version whose plugin-API major this client speaks. A
+  Node offering an older bundle adds a candidate; it cannot evict a newer accepted one.
+- **Not closed: the Node half.** A loaded plugin's node code runs in the Node's process, disclosed and
+  acknowledged — the same trust class as an editor extension. Its declared `node` permissions shape
+  the context it is handed; they are not enforced against a bundle that imports `node:fs` directly.
+  Every surface that renders them says *declared*. `docs/third-party/node-security.md` holds the full
+  model and the route to a hard boundary.
+
+The node-side loader is inert unless `ACORN_UNSAFE_PLUGINS=1`, so nothing is distributed at all until
+a Node's owner opts in.
+
 ## Preview and browser automation
 
 Preview uses a main-owned `WebContentsView` with an ephemeral session, no preload, isolated task

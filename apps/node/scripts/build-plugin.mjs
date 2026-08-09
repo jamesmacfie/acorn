@@ -55,10 +55,11 @@ if (!spec) {
 // Matches main/serverPaths.ts's dev root, and honours the same override the node itself reads.
 const dataRoot = process.env.ACORN_DATA_DIR || join(NODE_APP, '.acorn')
 const outDir = join(dataRoot, 'plugins', id)
-const apiMajor = /PLUGIN_API_MAJOR = '([^']+)'/.exec(
-  readFileSync(join(ROOT, 'packages/node-core/src/main/pluginManifest.ts'), 'utf8'),
-)?.[1]
-if (!apiMajor) throw new Error('could not read PLUGIN_API_MAJOR from packages/node-core/src/main/pluginManifest.ts')
+// Read from protocol, which is where the constant is DECLARED — node-core re-exports it, and a regex
+// over the re-export would find the name without a value.
+const API_MAJOR_SOURCE = 'packages/protocol/src/api.ts'
+const apiMajor = /PLUGIN_API_MAJOR = '([^']+)'/.exec(readFileSync(join(ROOT, API_MAJOR_SOURCE), 'utf8'))?.[1]
+if (!apiMajor) throw new Error(`could not read PLUGIN_API_MAJOR from ${API_MAJOR_SOURCE}`)
 
 // A temporary entry inside apps/node so Vite resolves the workspace package exactly as the app does.
 const entryDir = join(NODE_APP, '.plugin-build')

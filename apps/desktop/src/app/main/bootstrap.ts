@@ -7,6 +7,9 @@ import { LOCAL_TOKEN_SCOPE, readDeviceToken } from './deviceTokenStore'
 import { FleetStore, toNodeRecord } from './fleetStore'
 import { NodeBroker } from './nodeBroker'
 import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
+import { PluginCache } from './pluginCache'
+import { registerPluginIpc } from './pluginIpc'
+import { PluginTrustStore } from './pluginTrustStore'
 import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 import { MAX_CRASHES_PER_WINDOW, recordCrash } from './crashBudget'
@@ -88,6 +91,17 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   })
   const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode(), tunnels })
 
+  // Third-party plugin bundles a node has served us, and this device's decisions about running them
+  // (docs/third-party/phase-2-distribution-trust.md). Both stores are main's: the bytes never pass
+  // through the renderer, and the acknowledgements sit beside the device tokens because they are the
+  // same kind of custody — something this machine agreed to, not something a node can assert.
+  //
+  // The sweep runs before the renderer can ask for state, so a bundle no node has offered in a month
+  // is gone rather than briefly listed and then dropped.
+  const pluginCache = new PluginCache(userDataDir, broker)
+  pluginCache.sweep()
+  const disposePluginIpc = registerPluginIpc(pluginCache, new PluginTrustStore(userDataDir))
+
   // Registered here rather than beside the picker above, because it needs `tunnels`: a preview pane
   // pointed at a remote task loads a loopback URL, and the tunnel's listener refuses any connection that
   // does not present that listener's secret (main/previewTunnel.ts). This is the injection that carries
@@ -168,6 +182,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     tunnels.dispose()
     broker.dispose()
     disposeBrokerIpc()
+    disposePluginIpc()
     disposePreview()
     disposePicker()
   }

@@ -10,6 +10,7 @@ import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
 import { PLUGIN_STATE } from '@acorn/node-core/server/routes/plugins.ts'
+import { installedPluginInfo, readClientBundle } from '@acorn/node-core/main/pluginLoader.ts'
 import { buildPluginDeps } from '../server/pluginDeps'
 import { closeListener, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
@@ -209,6 +210,8 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
     pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
       roster: () => plugins.roster,
+      installed: () => graph.installed.map(installedPluginInfo),
+      clientBundle: (id) => readClientBundle(graph.installed, id),
       // The EFFECTIVE set, not the file alone. Reporting only the file made `restartRequired` permanently
       // true whenever the start config pinned a list without writing one (`dev:node`, an integration
       // harness): the page showed the plugin as enabled, not running, and a Restart banner that a restart

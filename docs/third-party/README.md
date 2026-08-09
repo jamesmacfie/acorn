@@ -92,7 +92,7 @@ exception.
 | --- | --- | --- | --- |
 | 0 — Extract `@acorn/plugin-api` + client UI layering | [phase-0-plugin-api.md](./phase-0-plugin-api.md) | ✅ Done | M–L |
 | 1 — Node loader | [phase-1-node-loader.md](./phase-1-node-loader.md) | ✅ Done | M |
-| 2 — Bundle distribution + trust | [phase-2-distribution-trust.md](./phase-2-distribution-trust.md) | ⬜ Not started | M |
+| 2 — Bundle distribution + trust | [phase-2-distribution-trust.md](./phase-2-distribution-trust.md) | ✅ Done | M |
 | 3 — Sandboxed UI runtime | [phase-3-sandboxed-ui.md](./phase-3-sandboxed-ui.md) | ⬜ Not started | L |
 | 4 — Declarative chrome | [phase-4-declarative-chrome.md](./phase-4-declarative-chrome.md) | ⬜ Not started | M |
 | 5 — Install and update UX | [phase-5-install-ux.md](./phase-5-install-ux.md) | ⬜ Not started | M |

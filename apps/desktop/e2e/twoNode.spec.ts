@@ -1,6 +1,6 @@
 import { expect, test, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer as createHttpServer, request as httpGet } from 'node:http'
 import { request as httpsRequest } from 'node:https'
@@ -9,7 +9,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import type { PairingWindow } from '@acorn/protocol/node.ts'
-import type { Workspace } from '@acorn/protocol/api.ts'
+import { PLUGIN_API_MAJOR, type Workspace } from '@acorn/protocol/api.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const STANDALONE_ENTRY = resolve(HERE, '../out/main/standalone.js')
@@ -46,6 +46,13 @@ type PageBridge = {
   // The preview surface, so the tunnel can be exercised the way the product does: through the pane's own
   // WebContentsView, whose session is what attaches the tunnel's secret.
   preview: { ensure(taskId: string, url: string): Promise<boolean> }
+  // The third-party plugin cache and this device's trust decisions (main/pluginIpc.ts).
+  plugins: {
+    state(): Promise<{
+      cached: Record<string, { pluginId: string; version: string; bytes: number }>
+      acks: Array<{ pluginId: string; hash: string; nodeId: string; decision: string }>
+    }>
+  }
 }
 type BridgeWindow = Window & { acorn?: PageBridge }
 
@@ -110,7 +117,7 @@ function remoteJson<T>(node: StandaloneHandshake, path: string, init: { method?:
 
 // Boot the second node and read its handshake off stdout. Resolves only once the line has arrived, so
 // nothing downstream has to guess whether it is listening.
-function startSecondNode(dataDir: string): Promise<StandaloneHandshake> {
+function startSecondNode(dataDir: string, options: { unsafePlugins?: boolean } = {}): Promise<StandaloneHandshake> {
   const child = spawn(ELECTRON_BINARY, [STANDALONE_ENTRY], {
     env: {
       ...process.env,
@@ -121,6 +128,9 @@ function startSecondNode(dataDir: string): Promise<StandaloneHandshake> {
       // An ACORN_PORT inherited from the runner would pin the port, and two nodes on one machine is
       // precisely what this test is for.
       ACORN_PORT: '',
+      // The loader is inert without it (node-core/main/pluginLoader.ts), so a node with an installed
+      // package still enumerates nothing unless this is set.
+      ...(options.unsafePlugins ? { ACORN_UNSAFE_PLUGINS: '1' } : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -241,13 +251,15 @@ type TwoNodes = {
   child: ChildProcess
 }
 
-async function pairTwoNodes(): Promise<TwoNodes> {
+async function pairTwoNodes(options: { unsafePlugins?: boolean; seedNode?: (dataDir: string) => void } = {}): Promise<TwoNodes> {
   const running = await launch()
   const localNodeId = (await fleet(running.page)).nodes.find((node) => node.local)?.nodeId
   if (!localNodeId) throw new Error('main never adopted the local node.')
   const remoteRoot = mkdtempSync(join(tmpdir(), 'acorn-node-b-'))
   roots.push(remoteRoot)
-  const remote = await startSecondNode(join(remoteRoot, 'data'))
+  // Before the node boots: the loader reads the plugins directory once, at start-up.
+  options.seedNode?.(join(remoteRoot, 'data'))
+  const remote = await startSecondNode(join(remoteRoot, 'data'), { ...(options.unsafePlugins ? { unsafePlugins: true } : {}) })
   const child = children[children.length - 1]!
 
   const { code } = await remoteJson<PairingWindow>(remote, '/v2/core/pair/start', { method: 'POST' })
@@ -506,6 +518,79 @@ test('reports a node as revoked when it revokes this client mid-session', async 
   // The local node is untouched, which is the fleet property under test: one node's credential failing is
   // not the fleet failing.
   expect(await stateOf(running.page, (await fleet(running.page)).nodes.find((node) => node.local)!.nodeId)).toBe('online')
+  await running.app.close()
+})
+
+// A client-only plugin package: a manifest and one ESM file. Enough to be distributed, which is the
+// whole of what phase 2 does — nothing renders it until phase 3. Written straight to disk rather than
+// built, because what is under test is the transfer and the acknowledgement, not a bundler.
+const PLUGIN_ID = 'e2e-widget'
+const PLUGIN_BUNDLE = 'export default { name: "e2e-widget" }\n'
+
+function installPluginOn(dataDir: string): void {
+  const dir = join(dataDir, 'plugins', PLUGIN_ID)
+  mkdirSync(join(dir, 'dist'), { recursive: true })
+  writeFileSync(join(dir, 'dist', 'client.js'), PLUGIN_BUNDLE)
+  writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
+    id: PLUGIN_ID,
+    name: 'E2E widget',
+    version: '1.4.0',
+    apiVersion: PLUGIN_API_MAJOR,
+    client: './dist/client.js',
+    permissions: { api: ['tasks'], node: { core: ['projects:read'] } },
+  }))
+}
+
+const pluginState = (page: Page) => page.evaluate(() => (window as BridgeWindow).acorn!.plugins.state())
+
+test('asks before running a plugin a paired node serves, then caches it for offline boots', async () => {
+  test.setTimeout(150_000)
+  // The exit criterion for docs/third-party/phase-2-distribution-trust.md: a plugin installed on a
+  // paired node reaches a second device, is hash-verified there, and does not run until the owner
+  // agrees. `pairTwoNodes` reloads after pairing, and the boot pass runs on that reload.
+  const { running, remote } = await pairTwoNodes({ unsafePlugins: true, seedNode: installPluginOn })
+
+  // The node advertises it, with its declared permissions riding in the roster row.
+  const roster = await nodeJson<{ plugins: Array<{ name: string; installed?: { version: string; client: { hash: string } | null } }> }>(
+    running.page, remote.nodeId, '/v2/core/plugins',
+  )
+  const row = roster.plugins.find((plugin) => plugin.name === PLUGIN_ID)
+  expect(row?.installed?.version).toBe('1.4.0')
+  expect(row?.installed?.client?.hash).toMatch(/^[0-9a-f]{64}$/)
+
+  // The prompt names the plugin, its version, the NODE it came from, and what it declared. Naming the
+  // node is the part that matters: the owner is being asked to run code one specific machine handed
+  // this one.
+  const dialog = running.page.locator('.plugin-trust-dialog')
+  await expect(dialog).toBeVisible({ timeout: 30_000 })
+  await expect(dialog).toContainText(PLUGIN_ID)
+  await expect(dialog).toContainText('1.4.0')
+  await expect(dialog).toContainText('Second node')
+  await expect(dialog).toContainText('node: core.projects:read')
+  await expect(dialog).toContainText('api: tasks')
+
+  await dialog.getByRole('button', { name: 'Trust this plugin' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  // Main computed the hash from the bytes it received, and the acknowledgement is bound to THAT.
+  const afterAccept = await pluginState(running.page)
+  const hash = row!.installed!.client!.hash
+  expect(Object.keys(afterAccept.cached)).toContain(hash)
+  expect(afterAccept.cached[hash]).toMatchObject({ pluginId: PLUGIN_ID, version: '1.4.0' })
+  expect(afterAccept.acks).toContainEqual(expect.objectContaining({ pluginId: PLUGIN_ID, hash, nodeId: remote.nodeId, decision: 'accepted' }))
+
+  // Offline: the node is gone, the cache is not. The bundle and the decision both survive a boot with
+  // nothing to connect to, which is what makes the cache worth having.
+  for (const child of children.splice(0)) child.kill('SIGKILL')
+  await running.page.reload()
+  await expect(running.page.locator('.shell')).toBeVisible()
+  await dismissOnboarding(running.page)
+  const offline = await pluginState(running.page)
+  expect(Object.keys(offline.cached)).toContain(hash)
+  expect(offline.acks).toContainEqual(expect.objectContaining({ pluginId: PLUGIN_ID, decision: 'accepted' }))
+  // And it does not ask a second time about bytes it has already been told about.
+  await expect(running.page.locator('.plugin-trust-dialog')).toHaveCount(0)
+
   await running.app.close()
 })
 

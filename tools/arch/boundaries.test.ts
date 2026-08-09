@@ -463,6 +463,30 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)]).toContain('packages/node-core')
   })
 
+  it('only main touches the third-party plugin cache and trust store', () => {
+    // Two invariants from docs/third-party/phase-2-distribution-trust.md, both of which are only
+    // invariants while nothing outside main can name the stores.
+    //
+    // "Trust binds to bytes": the acknowledgement is bound to a hash the MAIN process computed from
+    // the bytes it received. A renderer-side module that read or wrote either store would be a second
+    // place a hash could enter the system, which is exactly the property a compromised node needs.
+    //
+    // "The renderer stays inert": bundle bytes and cache paths never cross contextBridge. The client
+    // reaches both stores through client-core/plugins/host.ts, which speaks hashes and decisions and
+    // nothing else — and which is also the seam a future web client re-implements over IndexedDB
+    // (docs/future/remote.md), so it must stay the only door.
+    const PLUGIN_STORE_OK = new Set(['apps/desktop'])
+    const offenders = PACKAGES.flatMap((p) =>
+      walk(p.src)
+        .filter((f) => /\b(?:PluginCache|PluginTrustStore)\b/.test(readFileSync(f, 'utf8')))
+        .map(() => relative(ROOT, p.dir)),
+    )
+    expect([...new Set(offenders)].filter((p) => !PLUGIN_STORE_OK.has(p)).sort()).toEqual([])
+    // Anti-vacuity: the regex must still find the classes and their tests, or this rule passes
+    // because it stopped looking for anything.
+    expect([...new Set(offenders)]).toContain('apps/desktop')
+  })
+
   it('the Electron surface stays where it is declared', () => {
     // apps/desktop IS the Electron app, so anything in it may import electron. What matters is
     // that the surface OUTSIDE it stays tiny and enumerated — those are the files that would have

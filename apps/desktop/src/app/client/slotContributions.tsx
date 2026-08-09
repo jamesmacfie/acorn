@@ -5,9 +5,13 @@ const NotificationBell = lazy(() => import('@acorn/client-core/notifications/Not
 const CommandPalette = lazy(() => import('./CommandPalette'))
 const WorkspacePalette = lazy(() => import('@acorn/client-core/palette/WorkspacePalette.tsx'))
 const ConfigTrustDialog = lazy(() => import('@acorn/client-core/configTrust/ConfigTrustDialog.tsx'))
+const PluginTrustDialog = lazy(() => import('@acorn/client-core/plugins/PluginTrustDialog.tsx'))
 
 export const shellSlotContributions: UiSlotContribution[] = [
   { id: 'security.config-trust', slot: 'overlay', order: 5, component: () => <ConfigTrustDialog /> },
+  // Just behind config-trust: both are consent gates, and a task waiting on a config prompt is a
+  // thing the owner asked for, while a plugin prompt arrives on its own at boot.
+  { id: 'security.plugin-trust', slot: 'overlay', order: 6, component: () => <PluginTrustDialog /> },
   {
     id: 'notifications.bell', slot: 'topbar.right', order: 10,
     component: (props) => <NotificationBell onSelectTask={props.context.selectTask} />,

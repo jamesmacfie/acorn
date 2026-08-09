@@ -156,3 +156,59 @@ that id exists — `packages/client-core/src/registries/sources.ts` / tabs wirin
 - Two Nodes with different versions of one plugin resolve to one active bundle, stable within a
   session.
 - `pnpm lint`, suites, boundaries test green.
+
+## As built
+
+All four exit criteria hold; the first is asserted end to end in
+`apps/desktop/e2e/twoNode.spec.ts` ("asks before running a plugin a paired node serves"). Where the
+implementation departs from the plan above, and why:
+
+**The loader now enumerates every installed package, not just the ones it runs.**
+`loadExternalPlugins` returns `installed: InstalledPlugin[]` alongside `loaded`, carrying the
+manifest, its directory, and the client bundle's hash and size. A client-only package — legal in the
+manifest schema and previously `continue`d past — is in that list, gets a roster row the plugin host
+never produced, and is distributed normally. Its row reports `running: !disabled`, so toggling one
+never raises the restart banner: its contributions are all client-side and the client's plugin host
+disposes-then-registers on a roster change, which a Node restart would not improve on. A package
+whose node half declared itself and then failed to import is deliberately NOT enumerated: it is
+broken, not client-only, and shipping its UI to every device would advertise a plugin whose routes
+exist nowhere.
+
+**`PLUGIN_API_MAJOR` moved to `@acorn/protocol`.** Both halves now hold it against the same manifest —
+the Node decides what to load, the device decides which of a fleet's bundles it can run — so one
+compatibility constant could not stay on one side. `pluginManifest.ts` re-exports it, so nothing
+downstream changed. `scripts/build-plugin.mjs` reads it from protocol now; a regex over the
+re-export would find the name without a value.
+
+**No `app://acorn/plugin-cache/<hash>.js` route.** The section above calls it debug-only ("the
+sandbox origin is the real consumer"). `app://acorn` serves under `script-src 'self'`, so putting
+third-party JavaScript at that origin makes it importable into the host realm — a real hazard bought
+for a debugging convenience. Phase 3's `app-plugin://` is the only origin that should ever serve
+these bytes.
+
+**No `/v2/core/plugins/:id/assets/*` route.** Nothing loads an asset until phase 3 decides what a
+frame document is; adding the route now would be a guess at a shape phase 3 gets to choose. Cheap to
+add then — `confineExistingFile` is already the helper it wants.
+
+**Permissions at prompt time come from the roster row, not a re-parsed archive.** The threat-model
+section assumes a package archive travelling with the bundle. v1 serves one JavaScript file and the
+manifest never leaves the Node, so the roster row — the manifest as the Node's own loader read it —
+is the only source there is. The defence is unchanged: the acknowledgement binds to the hash the
+device computed, and phase 3's sandbox is what actually contains the code. Revisit when phase 5's
+tarball install gives the device an archive to parse.
+
+**The trust store keeps acknowledgements when a Node is forgotten.** The decision was about bytes;
+those bytes may still be offered by another Node, and re-pairing a machine should not re-prompt for
+code the owner already approved. The cache's own sweep is what eventually retires an entry no Node
+has offered in a month.
+
+**`client.js` re-hashes at read time** rather than reporting the hash computed at boot. The two
+disagree exactly when the file changed underneath a running Node, and the honest answer is the hash
+of what is being sent — which the device then finds does not match the listing, and refuses. Fail
+closed.
+
+**The client platform adapter is `packages/client-core/src/plugins/host.ts`** and nothing more: the
+one module allowed to touch `acornGlobal()?.plugins`, speaking hashes and decisions. That is the
+seam a future web client re-implements over IndexedDB (docs/future/remote.md). A boundaries rule
+(`tools/arch/boundaries.test.ts`, "only main touches the third-party plugin cache and trust store")
+keeps the stores themselves inside `apps/desktop`.

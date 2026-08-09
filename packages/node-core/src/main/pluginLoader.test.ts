@@ -1,21 +1,24 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './pluginManifest'
-import { loadExternalPlugins, pluginInstallDir, UNSAFE_FLAG } from './pluginLoader'
+import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, UNSAFE_FLAG } from './pluginLoader'
 
 // A minimal ESM node half. Written as source rather than bundled, because the loader's contract is
 // "default-export something shaped like a NodePlugin from an ESM module" and nothing more.
 const BUNDLE = (name: string) => `export default { name: ${JSON.stringify(name)}, init: () => {} }\n`
+const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text)).digest('hex')
 
 let root = ''
 
-const install = (dir: string, manifest: unknown, bundle?: string): string => {
+const install = (dir: string, manifest: unknown, bundle?: string, client?: string): string => {
   const target = join(pluginInstallDir(root), dir)
   mkdirSync(join(target, 'dist'), { recursive: true })
   writeFileSync(join(target, 'acorn-plugin.json'), JSON.stringify(manifest))
   if (bundle !== undefined) writeFileSync(join(target, 'dist', 'node.js'), bundle)
+  if (client !== undefined) writeFileSync(join(target, 'dist', 'client.js'), client)
   return target
 }
 
@@ -48,12 +51,14 @@ describe('the loader gate', () => {
     vi.stubEnv(UNSAFE_FLAG, '')
     install('ntfy', manifest('ntfy'), BUNDLE('ntfy'))
     const result = await loadExternalPlugins(root, { builtins: [] })
-    expect(result).toEqual({ loaded: [], failures: [] })
+    // `installed` is empty too, not just `loaded`: with the flag off there is nothing to distribute
+    // either, so an unflagged node offers no bundles rather than offering code it refuses to run.
+    expect(result).toEqual({ loaded: [], installed: [], failures: [] })
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(UNSAFE_FLAG))
   })
 
   it('is silent and empty when there is no plugins directory at all', async () => {
-    expect(await loadExternalPlugins(root, { builtins: [] })).toEqual({ loaded: [], failures: [] })
+    expect(await loadExternalPlugins(root, { builtins: [] })).toEqual({ loaded: [], installed: [], failures: [] })
     expect(console.warn).not.toHaveBeenCalled()
   })
 })
@@ -76,14 +81,77 @@ describe('loading a plugin', () => {
   })
 
   it('takes a client-only package without complaint and loads nothing for it', async () => {
-    install('widget', manifest('widget', { node: undefined, client: './dist/client.js' }))
-    expect(await loadExternalPlugins(root, { builtins: [] })).toEqual({ loaded: [], failures: [] })
+    install('widget', manifest('widget', { node: undefined, client: './dist/client.js' }), undefined, 'export default {}')
+    const { loaded, installed, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect({ loaded, failures }).toEqual({ loaded: [], failures: [] })
+    // Nothing to run, but everything to distribute — which is why `installed` is a separate list.
+    expect(installed.map((entry) => entry.manifest.id)).toEqual(['widget'])
   })
 
   it('marks a plugin that deliberately replaces a built-in', async () => {
     install('rollbar', manifest('rollbar'), BUNDLE('rollbar'))
     const { loaded } = await loadExternalPlugins(root, { builtins: ['rollbar', 'github'] })
     expect(loaded[0].shadowsBuiltin).toBe(true)
+  })
+})
+
+// What the node offers to devices (docs/third-party/phase-2-distribution-trust.md). The hash here is
+// a claim the device cross-checks against the bytes it receives; it is never the thing trust binds to.
+describe('the installed enumeration', () => {
+  it('reports the client bundle hash and size', async () => {
+    install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default {}')
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installed[0].client).toEqual({ hash: sha256('export default {}'), bytes: 17 })
+    expect(installedPluginInfo(installed[0])).toMatchObject({ id: 'ntfy', version: '1.0.0', apiVersion: PLUGIN_API_MAJOR })
+    // The projection the route takes must not carry the node's filesystem layout.
+    expect(installedPluginInfo(installed[0])).not.toHaveProperty('dir')
+  })
+
+  it('reports no bundle when the manifest declares none, or the file is not there', async () => {
+    install('plain', manifest('plain'), BUNDLE('plain'))
+    install('missing', manifest('missing', { client: './dist/client.js' }), BUNDLE('missing'))
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installed.map((entry) => [entry.manifest.id, entry.client])).toEqual([['missing', null], ['plain', null]])
+  })
+
+  it('reports no bundle for a client entrypoint that symlinks out of the plugin directory', async () => {
+    // The manifest schema catches a literal `..`; this is the case only the symlink gate catches, and
+    // it is the one that matters — a package can ship a link, not just a path.
+    const outside = join(root, 'outside.js')
+    writeFileSync(outside, 'export default {}')
+    const dir = install('sneak', manifest('sneak', { client: './dist/client.js' }), BUNDLE('sneak'))
+    symlinkSync(outside, join(dir, 'dist', 'client.js'))
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installed[0].client).toBeNull()
+    expect(await readClientBundle(installed, 'sneak')).toBeNull()
+  })
+
+  it('leaves a package whose node half failed to import out of the enumeration entirely', async () => {
+    // Broken, not client-only. Distributing its UI would put a row on every paired device for a plugin
+    // whose routes exist nowhere.
+    install('broken', manifest('broken', { client: './dist/client.js' }), 'nonsense(((\n', 'export default {}')
+    const { installed, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(installed).toEqual([])
+    expect(failures).toHaveLength(1)
+  })
+
+  it('re-reads and re-hashes the bytes it serves rather than trusting the boot hash', async () => {
+    const dir = install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default {}')
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    writeFileSync(join(dir, 'dist', 'client.js'), 'export default { changed: true }')
+    const served = await readClientBundle(installed, 'ntfy')
+    expect(new TextDecoder().decode(served!.bytes)).toBe('export default { changed: true }')
+    // Deliberately disagrees with installed[0].client.hash: the device hashes what arrived, sees the
+    // mismatch against the listing, and refuses. Fail closed.
+    expect(served!.hash).toBe(sha256('export default { changed: true }'))
+    expect(served!.hash).not.toBe(installed[0].client!.hash)
+  })
+
+  it('has nothing to serve for an unknown id or a package with no client half', async () => {
+    install('plain', manifest('plain'), BUNDLE('plain'))
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    expect(await readClientBundle(installed, 'plain')).toBeNull()
+    expect(await readClientBundle(installed, 'nope')).toBeNull()
   })
 })
 

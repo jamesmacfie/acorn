@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { NodePluginState } from '@acorn/protocol/api.ts'
+import type { InstalledPluginInfo } from '../../main/pluginLoader'
 import type { AppEnv } from '../middleware/auth'
 import { requireDevice } from '../middleware/requireUser'
 import type { PluginRosterEntry } from '../plugin/host'
@@ -13,13 +15,30 @@ const ROSTER: PluginRosterEntry[] = [
   { name: 'rollbar', required: false, disabled: true, state: 'disabled' },
 ]
 
+const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
+const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
+  id,
+  version: '1.0.0',
+  apiVersion: '1',
+  permissions: NO_PERMISSIONS,
+  client: { hash: 'a'.repeat(64), bytes: 12 },
+  ...over,
+})
+
 // The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
 // roster is the RUNNING process's view and never changes here; `disabled` is the persisted list, which a
 // PUT does change — that gap is the whole reason `restartRequired` exists.
-const wire = (initial: readonly string[]) => {
+const wire = (initial: readonly string[], options: { installed?: InstalledPluginInfo[]; bundles?: Record<string, string> } = {}) => {
   let saved = [...initial]
   setPluginsBridge({
     roster: () => ROSTER,
+    installed: () => options.installed ?? [],
+    clientBundle: async (id) => {
+      const source = options.bundles?.[id]
+      if (source === undefined) return null
+      const bytes = new TextEncoder().encode(source)
+      return { bytes, hash: createHash('sha256').update(bytes).digest('hex') }
+    },
     disabled: () => saved,
     setDisabled: (names) => void (saved = [...names]),
   })
@@ -32,6 +51,9 @@ const request = (method: string, body?: unknown) =>
     headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+
+const bundleRequest = (id: string, headers?: Record<string, string>) =>
+  new Request(`http://acorn.test/v2/core/plugins/${id}/client.js`, { headers })
 
 const app = (principal: AppEnv['Variables']['principal']) => {
   const hono = new Hono<AppEnv>()
@@ -77,6 +99,8 @@ describe('GET /v2/core/plugins', () => {
     // client learns about the failure from `state` and the attention inbox instead.
     setPluginsBridge({
       roster: () => [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1_700_000_000_000 }],
+      installed: () => [],
+      clientBundle: async () => null,
       disabled: () => [],
       setDisabled: () => {},
     })
@@ -117,6 +141,83 @@ describe('GET /v2/core/plugins', () => {
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins.filter((row) => row.disabled)).toEqual([])
     expect(state.restartRequired).toBe(true)
+  })
+})
+
+describe('installed packages in the roster (docs/third-party/phase-2-distribution-trust.md)', () => {
+  it('attaches the manifest block to a plugin that came off disk, and to nothing else', async () => {
+    wire([], { installed: [installedEntry('rollbar', { version: '2.1.0' })] })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    const rows = new Map(state.plugins.map((row) => [row.name, row]))
+    expect(rows.get('rollbar')?.installed).toEqual({
+      version: '2.1.0',
+      apiVersion: '1',
+      permissions: NO_PERMISSIONS,
+      client: { hash: 'a'.repeat(64), bytes: 12 },
+    })
+    // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
+    expect(rows.get('github')?.installed).toBeUndefined()
+    expect(rows.get('terminal')?.installed).toBeUndefined()
+  })
+
+  it('gives a client-only package a row the plugin host never produced', async () => {
+    // No node entrypoint, so it never entered initPlugins and has no roster entry — but its bundle is
+    // exactly what this phase distributes, so the device has to be told about it.
+    // ['rollbar'] so the shared roster fixture is itself quiet: it was disabled at boot, so naming it
+    // keeps the file and the process in agreement and leaves restartRequired to say something about
+    // the row under test.
+    wire(['rollbar'], { installed: [installedEntry('sparkline')] })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins.at(-1)).toEqual({
+      name: 'sparkline',
+      required: false,
+      disabled: false,
+      running: true,
+      state: 'active',
+      installed: { version: '1.0.0', apiVersion: '1', permissions: NO_PERMISSIONS, client: { hash: 'a'.repeat(64), bytes: 12 } },
+    })
+    expect(state.restartRequired).toBe(false)
+  })
+
+  it('never asks for a restart to apply a client-only toggle', async () => {
+    // Its contributions are all client-side and the client re-initialises its plugin host on a roster
+    // change, so `running` tracks `disabled` and the banner stays down. A restart would change nothing.
+    const saved = wire(['rollbar'], { installed: [installedEntry('sparkline')] })
+    const res = await asDevice().fetch(request('PUT', { disabled: ['rollbar', 'sparkline'] }))
+    expect(res.status).toBe(200)
+    expect(saved()).toEqual(['rollbar', 'sparkline'])
+    const state = (await res.json()) as NodePluginState
+    expect(state.plugins.at(-1)).toMatchObject({ name: 'sparkline', disabled: true, running: false, state: 'disabled' })
+    expect(state.restartRequired).toBe(false)
+  })
+})
+
+describe('GET /v2/core/plugins/:id/client.js', () => {
+  it('serves the bytes with the hash as its ETag', async () => {
+    wire([], { installed: [installedEntry('sparkline')], bundles: { sparkline: 'export default {}' } })
+    const res = await asDevice().fetch(bundleRequest('sparkline'))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('text/javascript; charset=utf-8')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(await res.text()).toBe('export default {}')
+    const expected = createHash('sha256').update(new TextEncoder().encode('export default {}')).digest('hex')
+    expect(res.headers.get('etag')).toBe(`"${expected}"`)
+  })
+
+  it('answers 304 to a device that already holds those bytes', async () => {
+    wire([], { installed: [installedEntry('sparkline')], bundles: { sparkline: 'export default {}' } })
+    const expected = createHash('sha256').update(new TextEncoder().encode('export default {}')).digest('hex')
+    const res = await asDevice().fetch(bundleRequest('sparkline', { 'if-none-match': `"${expected}"` }))
+    expect(res.status).toBe(304)
+    expect(await res.text()).toBe('')
+  })
+
+  it('404s a plugin with no client half, and 503s with no bridge', async () => {
+    wire([], { installed: [installedEntry('rollbar', { client: null })] })
+    expect((await asDevice().fetch(bundleRequest('rollbar'))).status).toBe(404)
+    expect((await asDevice().fetch(bundleRequest('nope'))).status).toBe(404)
+    setPluginsBridge(null)
+    expect((await asDevice().fetch(bundleRequest('rollbar'))).status).toBe(503)
   })
 })
 
@@ -172,6 +273,9 @@ describe('the device gate over /v2/core/plugins', () => {
       await next()
     })
     hono.use('/v2/core/plugins', requireDevice)
+    // The second form, exactly as server/index.ts mounts it. It is what keeps a route added under the
+    // prefix — the bundle route below — from arriving ungated.
+    hono.use('/v2/core/plugins/*', requireDevice)
     return hono.route('/v2/core/plugins', plugins)
   }
 
@@ -185,6 +289,15 @@ describe('the device gate over /v2/core/plugins', () => {
     }
     // And the ungated router would have answered — so the 403 is the gate, not the handler.
     expect((await asTaskAgent().fetch(request('GET'))).status).toBe(200)
+  })
+
+  it('403s a task-scoped agent on the bundle bytes', async () => {
+    // Which code a device runs is an owner decision. A task-scoped token belongs to an agent running
+    // INSIDE that decision's outcome, so it must not be able to pull a plugin's client bundle.
+    wire([], { installed: [installedEntry('sparkline')], bundles: { sparkline: 'export default {}' } })
+    const res = await gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' }).fetch(bundleRequest('sparkline'))
+    expect(res.status).toBe(403)
+    expect((await asTaskAgent().fetch(bundleRequest('sparkline'))).status).toBe(200)
   })
 
   it('lets a device through', async () => {

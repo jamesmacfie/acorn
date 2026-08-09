@@ -13,14 +13,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 
-// The major of @acorn/plugin-api a bundle was built against. A manifest that does not name exactly
-// this value is skipped — "built for a newer/older acorn" is a clearer failure than a plugin that
-// loads and then calls a `ctx` member that no longer exists.
-//
-// It lives here rather than being derived from packages/plugin-api/package.json: that manifest is
-// `private` and its version is decorative, while THIS constant is a compatibility contract that has
-// to change deliberately. @acorn/plugin-api re-exports it so plugin authors can assert against it.
-export const PLUGIN_API_MAJOR = '1'
+// Re-exported so this file stays the one import for everything manifest-shaped. The constant itself
+// moved to @acorn/protocol when the client gained a stake in it: the node uses it to decide what to
+// LOAD, the client to decide which of a fleet's bundles it can RUN
+// (client-core/plugins/resolveBundles.ts), and one compatibility contract cannot live on one side.
+export { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
 // Same shape as the route registry's and the plugin database factory's id rules, plus a length
 // bound, because this id becomes both `/v2/p/<id>` and `<dataRoot>/plugins/<id>.sqlite`.
