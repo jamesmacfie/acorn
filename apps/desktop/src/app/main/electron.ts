@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron'
 import { join, resolve } from 'node:path'
 import { APP_ORIGIN, registerAppScheme } from './appScheme'
 import { bootstrap } from './bootstrap'
+import { PLUGIN_SCHEME } from './pluginScheme'
 import { resolveSessionKey } from './sessionKeyStore'
 import { devDataDir } from '@acorn/node-core/main/serverConfig.ts'
 import { isAllowedExternalUrl } from '@acorn/node-core/main/urlGuards.ts'
@@ -20,8 +21,15 @@ const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 //   codeCache         V8 code cache across launches, which is most of the startup win.
 // Deliberately NOT corsEnabled (nothing the renderer touches is cross-origin — node traffic is IPC)
 // and NOT allowServiceWorkers (there is no offline story here, and no worker may cache the shell).
+//
+// `app-plugin` is the second origin: one per third-party plugin bundle, hashed, hosting its sandboxed UI
+// (main/pluginScheme.ts). It gets `standard` so each hash is a real origin with its own storage — that
+// separation IS the sandbox — plus `secure` and `supportFetchAPI` because plugin bundles are ESM modules.
+// Deliberately NOT `codeCache`: a cache keyed by a hash that is already content-addressed buys nothing,
+// and one fewer place third-party code persists is worth more than the milliseconds.
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
+  { scheme: PLUGIN_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ])
 
 // Writable app-data root (DB, blobs, worktrees, notes). Packaged builds must not write next to the
@@ -103,7 +111,22 @@ function hardenNavigation(win: BrowserWindow) {
     e.preventDefault()
     openExternal(url)
   })
+  // Subframes. `will-navigate` above is the MAIN frame only, and a plugin frame lives on
+  // app-plugin://<hash> (main/pluginScheme.ts). Two things must not happen: a plugin frame navigating
+  // itself somewhere else, and anything at all navigating a subframe to a scheme that is not ours. Both
+  // are the same check — a frame may only ever sit on the origin the shell gave it.
+  //
+  // Not handed to openExternal either: a plugin's link becoming a browser tab is a plugin choosing what
+  // the machine opens. Its CSP has no network, and this is the same rule at the navigation layer.
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (e.frame === win.webContents.mainFrame) return // handled by will-navigate, which runs too
+    if (e.url.startsWith(`${PLUGIN_SCHEME}://`)) return
+    e.preventDefault()
+    console.warn('[electron] blocked subframe navigation:', e.url)
+  })
   win.webContents.setWindowOpenHandler(({ url }) => {
+    // Includes `window.open` from a plugin frame: denied like everything else, and the URL is not even
+    // offered to the OS unless the scheme allowlist accepts it.
     openExternal(url)
     return { action: 'deny' }
   })

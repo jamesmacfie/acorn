@@ -209,6 +209,26 @@ export async function apiError(res: ApiResponse, fallback: string): Promise<stri
   return errorText(errorBody(res), fallback)
 }
 
+// Status, parsed body, and the node's own error envelope — without the throw. Every other export here
+// converts a failure into an exception, and the plugin UI bridge needs the opposite: it forwards the
+// node's envelope verbatim down a MessagePort to a sandboxed frame, so a plugin author handles one
+// error shape whether the call was denied at the bridge or refused by the node
+// (docs/third-party/phase-3-sandboxed-ui.md § Protocol).
+export type RawApiResult = { ok: boolean; status: number; body: unknown; error?: ApiErrorBody['error'] }
+
+export async function sendRaw(url: string, init: WriteInit = {}): Promise<RawApiResult> {
+  const res = await send(url, init)
+  const error = res.ok ? undefined : errorBody(res)
+  let body: unknown
+  try {
+    body = parseJson<unknown>(res)
+  } catch {
+    // A non-JSON body is not a failure here; it is simply not something a frame can be handed.
+    body = undefined
+  }
+  return { ok: res.ok, status: res.status, body, ...(error ? { error } : {}) }
+}
+
 type ErrorFallback = string | ((res: ApiResponse) => string)
 
 export async function writeJson<T>(url: string, init: WriteInit, fallback: ErrorFallback = (res) => `${res.status}`): Promise<T> {

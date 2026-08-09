@@ -2,7 +2,8 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { nodes } from '../node/fleet'
 import { createDismissable } from '../ui/dismissable'
-import { pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
+import { noteBundleAccepted, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
+import { syncFrameContributions } from './frames/register'
 import { recordPluginTrust } from './host'
 import './plugin-trust.css'
 
@@ -65,6 +66,13 @@ export default function PluginTrustDialog() {
         decision,
       })
       resolvePendingTrust(current.row.name, current.hash)
+      // An acceptance is what lets the plugin's surfaces exist at all (frames/register.tsx gates on it), so
+      // register them now rather than at the next boot. A rejection needs no counterpart: nothing was
+      // registered to take away.
+      if (decision === 'accepted') {
+        noteBundleAccepted(current.row.name, current.hash)
+        syncFrameContributions()
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision.')
     } finally {

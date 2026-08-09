@@ -300,10 +300,32 @@ export type NodePluginPermissions = {
   node: { core: string[]; capabilities: string[]; secrets: boolean; exec: boolean; net: string[] }
 }
 
+// One sandboxed rectangle the plugin's client bundle draws, as its manifest declared it
+// (docs/third-party/phase-3-sandboxed-ui.md; the Zod schema is node-core/main/pluginManifest.ts).
+// Hand-written here for the same reason NodePluginPermissions is: the node parses the manifest, and
+// this is the projection the device registers contributions from.
+export type PluginFrameSurface = {
+  target: 'pane' | 'refPanel' | 'settings' | 'importer'
+  // The contribution id, which is also a persisted layout key. Bound to the plugin by the HOST — a
+  // bundle cannot claim a surface its manifest did not declare.
+  id: string
+  label: string
+  glyph: string
+  order: number
+  formFactor: ('desktop' | 'mobile')[]
+  providerId?: string
+  group?: 'general' | 'workspace'
+}
+
+// Loose on the wire as well as in the schema: phase 4's declarative chrome arrives under sibling
+// keys, and a client that does not know them yet should contribute less rather than fail to parse.
+export type PluginContributions = { frames: PluginFrameSurface[] } & Record<string, unknown>
+
 export type InstalledPluginRow = {
   version: string
   apiVersion: string
   permissions: NodePluginPermissions
+  contributions: PluginContributions
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
   // the sha256 the node computed from the file; it is a CACHE KEY HINT and nothing more — the device
   // hashes the bytes it received and refuses a mismatch, because a compromised node can lie here

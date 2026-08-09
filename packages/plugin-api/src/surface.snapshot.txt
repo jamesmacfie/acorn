@@ -290,6 +290,11 @@ ui/diff: rowIdentityKeys
 ui/diff: splitBandIdentityKeys
 ui/diff: synth
 ui/diff: toBands
+ui/sdk: AcornBridge
+ui/sdk: AcornBridgeApi
+ui/sdk: AcornBridgeError
+ui/sdk: PluginFrameContext
+ui/sdk: connect
 ui: Acorn
 ui: Badge
 ui: Button

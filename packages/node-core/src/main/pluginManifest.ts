@@ -49,9 +49,44 @@ const entry = z.string().min(1).max(256).refine(
   'entrypoint must be a relative path inside the plugin directory',
 )
 
-// `api`, `events` and `contributions` are validated but unused: phase 3 hard-enforces the first two
-// on the UI bridge and phase 4 renders the third. They are parsed now so a manifest written today
-// is still valid then, and so the schema stops being a moving target for early authors.
+// A rectangle the plugin's client bundle draws, hosted by the shell in a sandboxed frame
+// (docs/third-party/phase-3-sandboxed-ui.md).
+//
+// Declared HERE and nowhere else. The shell's contribution registries are keyed by un-namespaced ids
+// that are persisted layout keys and chord targets, so who may claim `board` has to be decided by the
+// host reading this file — a plugin's client bundle cannot register a shell contribution at all. This
+// is the client-side twin of the route-namespace binding the node host already does.
+const frameSurface = z.object({
+  // Which registry this lands in. The shell renders all four the same way; what differs is the
+  // surrounding chrome it supplies.
+  target: z.enum(['pane', 'refPanel', 'settings', 'importer']),
+  // The contribution id. Not namespaced by us: it becomes a persisted layout key the moment a user
+  // opens the pane, and prefixing it later would be a storage break (registries/plugin.ts).
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  // A Lucide name, resolved client-side; an unmatched name renders as-is.
+  glyph: z.string().min(1).max(64).default('puzzle'),
+  order: z.number().int().min(0).max(100_000).default(500),
+  // Costless now while the schema is unversioned, and what lets a future mobile shell skip a
+  // desktop-shaped pane instead of rendering it unusably (docs/future/remote.md).
+  formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
+  // `refPanel` only, and checked against the plugin id by the client adapter — a panel names the
+  // provider whose items it renders, and may only name its own.
+  providerId: z.string().min(1).max(64).optional(),
+  // `settings` only.
+  group: z.enum(['general', 'workspace']).optional(),
+})
+
+// `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` is
+// loose on purpose: phase 4 adds its declarative chrome under sibling keys, and a strict object here
+// would make a manifest written for a newer acorn fail to parse on an older one rather than simply
+// contributing less.
+const contributions = z.looseObject({
+  frames: z.array(frameSurface).max(32).default([]),
+}).prefault({})
+
+export type PluginFrameSurface = z.infer<typeof frameSurface>
+
 export const pluginManifestSchema = z.object({
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
   name: z.string().min(1).max(120),
@@ -60,11 +95,14 @@ export const pluginManifestSchema = z.object({
   node: entry.optional(),
   client: entry.optional(),
   permissions: z.object({
+    // Core API scopes, `core.<resource>:<read|write>`. Unvalidated as strings for the same reason the
+    // node block's `core` list is: an unknown scope is one this acorn cannot grant, which the bridge
+    // handles by denying it (client-core/plugins/frames/scopes.ts), not by rejecting the manifest.
     api: z.array(z.string().min(1)).max(64).default([]),
     events: z.array(z.string().min(1)).max(64).default([]),
     node: nodePermissions.prefault({}),
   }).prefault({}),
-  contributions: z.record(z.string(), z.unknown()).default({}),
+  contributions,
 })
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>

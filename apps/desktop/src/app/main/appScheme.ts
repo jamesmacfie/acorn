@@ -2,6 +2,7 @@ import { net, protocol } from 'electron'
 import { statSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { PLUGIN_SCHEME } from './pluginScheme'
 
 // The renderer's own origin. It is bundled with the desktop app and no longer served by a node
 // (docs/architecture-overview.md § How the client talks to nodes): nodes serve no web assets, and the
@@ -31,7 +32,10 @@ const CSP = [
   "img-src 'self' data: blob: https:",
   "connect-src 'self'",
   "worker-src 'self' blob:", // Monaco's five ?worker chunks; blob: covers a bundler that inlines one
-  "frame-src 'none'", // the preview pane is a main-owned WebContentsView, never an iframe
+  // Exactly one scheme, and it is ours: third-party plugin UI renders in an iframe on app-plugin://,
+  // whose own responses carry `connect-src 'none'` (main/pluginScheme.ts). The browser-preview pane is
+  // still a main-owned WebContentsView rather than a frame, so this widening buys nothing for http(s).
+  `frame-src ${PLUGIN_SCHEME}:`,
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",

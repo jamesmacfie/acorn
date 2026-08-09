@@ -22,6 +22,7 @@ const ENTRYPOINTS = {
   client: 'client/index.ts',
   ui: 'ui/index.ts',
   'ui/diff': 'ui/diff.ts',
+  'ui/sdk': 'ui/sdk.ts',
 }
 
 // `export { a, b as c, type D } from '…'` and `export type { E, F } from '…'`. The entrypoints are

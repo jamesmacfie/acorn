@@ -9,6 +9,7 @@ import { NodeBroker } from './nodeBroker'
 import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
 import { PluginCache } from './pluginCache'
 import { registerPluginIpc } from './pluginIpc'
+import { registerPluginScheme } from './pluginScheme'
 import { PluginTrustStore } from './pluginTrustStore'
 import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
@@ -101,6 +102,10 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const pluginCache = new PluginCache(userDataDir, broker)
   pluginCache.sweep()
   const disposePluginIpc = registerPluginIpc(pluginCache, new PluginTrustStore(userDataDir))
+  // The origin plugin UI renders on (docs/third-party/phase-3-sandboxed-ui.md). Registered here rather
+  // than beside registerAppScheme in electron.ts because it serves out of the cache above and nothing
+  // else — the handler has no path parameter to be pointed at, by design.
+  registerPluginScheme(pluginCache)
 
   // Registered here rather than beside the picker above, because it needs `tunnels`: a preview pane
   // pointed at a remote task loads a loopback URL, and the tunnel's listener refuses any connection that
