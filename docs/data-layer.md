@@ -117,8 +117,9 @@ Every chain starts from a single baseline migration that creates the current sch
 `(owner, name)` model and its one-way data migrations were squashed away with it, so a database
 written before that baseline cannot be upgraded — start from a fresh data root.
 
-Native SQLite access is centralized. Plugins receive their own migrated plugin handle through the
-Node plugin host and use `CoreServices` for core-owned operations.
+Native SQLite access is centralized. Loaded plugins receive their own manifest-bound migrated handle
+through `ctx.storage.open()`; built-ins use the corresponding compile-time factories. Both use
+`CoreServices` for core-owned operations.
 
 ## Backup and import
 

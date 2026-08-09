@@ -43,6 +43,21 @@ The suite launches Git, PTYs, Docker probes, provider fakes, and Node children. 
 resource-sensitive; verify a failing package in isolation before changing production timeouts. Do
 not weaken runtime limits to accommodate a saturated test runner.
 
+### Known pre-existing failures
+
+Verified on a clean tree. If you see exactly these and nothing else, your change is not the cause:
+
+- `apps/node/test/integration/serviceSpawn.test.ts` and `standaloneShutdown.test.ts` fail in some
+  environments with `SyntaxError: The requested module 'electron' does not provide an export named
+  'dialog'`, from `plugins/terminal/src/main/folderPickerIpc.ts` — which the standalone
+  (Electron-free) node still pulls in through the terminal plugin's main entry.
+- One live-PTY `posix_spawnp` failure in `agentSend` tests, a native-module ABI artefact.
+  `pnpm rebuild:node` fixes the ABI class of failure; this one survives it.
+
+Also worth knowing before you read a red gate as your own: the root `lint` script is
+`oxlint && turbo run lint`, so an oxlint failure means `tsc --noEmit` never ran at all. Check
+which half failed before assuming the types are fine — or run `pnpm lint:types` on its own.
+
 ## Non-vacuity
 
 Tests that assert source shape or route mounting must fail when the behavior is removed. Boundary and

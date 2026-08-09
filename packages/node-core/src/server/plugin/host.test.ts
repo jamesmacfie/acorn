@@ -262,7 +262,10 @@ describe('loaded plugins', () => {
       loaded: new Map(
         Object.entries(loaded).map(([name, node]) => [
           name,
-          { core: [], capabilities: [], secrets: false, exec: false, net: [], ...node },
+          {
+            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], ...node },
+            storage: { open: () => { throw new Error('test storage is not configured') } },
+          },
         ]),
       ),
     })
@@ -337,13 +340,24 @@ describe('loaded plugins', () => {
     expect(ctx.capabilities.get(capabilityId('anything'))).toBeUndefined()
   })
 
+  it('hands a loaded plugin the host-bound storage seam', async () => {
+    const ctx = await ctxOf({})
+    expect(() => ctx.storage.open()).toThrow('test storage is not configured')
+  })
+
   it('leaves a built-in with the full context', async () => {
     let captured!: NodePluginContext
-    await host([plugin('terminal', { init: (ctx) => void (captured = ctx) })], {})
+    const core = createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() })
+    await initPlugins([plugin('terminal', { init: (ctx) => void (captured = ctx) })], {
+      capabilities: new CapabilityRegistry(),
+      core,
+    })
     expect(captured.routes.register).toBeTypeOf('function')
     expect(captured.events.streams).toBeTypeOf('function')
     expect(captured.core.secrets).toBeDefined()
     expect(captured.core.proc).toBeDefined()
+    expect(captured.core.prefs).toBe(core.prefs)
+    expect(captured.storage).toBeUndefined()
   })
 
   it('mounts a fetch-shaped route under the plugin namespace', async () => {

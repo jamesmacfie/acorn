@@ -87,7 +87,9 @@ Settings → Plugins grows three surfaces (per node, since install is per-node):
    `net`) as *declared* — shaped into the plugin's context (Phase 1) but, until node-half
    sandboxing ships, ultimately a statement of intent by code that runs with the Node's own
    access. The wording must not imply the `node` block is enforced; "This plugin's server code
-   runs with the same access as acorn itself" is the honest footer line. On **update with
+   runs with the same access as acorn itself" is the honest footer line. Only host-recognised scopes and channels get
+   grant wording: unknown but well-formed requests remain forward-compatible and render as a neutral
+   ignored count, never as manifest-authored prose under the enforced heading. On **update with
    changed permissions**, show the diff (added scopes highlighted, `node` additions most
    prominently) and require re-acceptance; unchanged permissions re-prompt only because the hash
    changed (framed as "Update to 1.3.0?"). Rationale for the wording and the update-as-attack-

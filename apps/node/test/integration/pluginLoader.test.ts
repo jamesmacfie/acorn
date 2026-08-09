@@ -62,7 +62,10 @@ describe('loading rollbar from disk', () => {
       plugins = await initPlugins([loaded[0].plugin], {
         capabilities: new CapabilityRegistry(),
         core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
-        loaded: new Map([['rollbar', loaded[0].manifest.permissions.node]]),
+        loaded: new Map([['rollbar', {
+          permissions: loaded[0].manifest.permissions.node,
+          storage: loaded[0].storage,
+        }]]),
       })
       expect(plugins.failed).toEqual([])
       expect(plugins.enabled).toEqual(['rollbar'])

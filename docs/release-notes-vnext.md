@@ -33,5 +33,6 @@ The desktop DMG/ZIP and standalone tarball build paths are implemented. Notariza
 manual release verification remain release-operator tasks that require Apple signing credentials and
 a fresh macOS environment.
 
-For implementation contracts, use the parent topic docs and the source. The completed phase record is
-kept under [docs/legacy/projects](./legacy/projects).
+For implementation contracts, use the parent topic docs and the source. The project-model migration
+that produced this shape is finished; its phase record has been retired, and git history is where
+that reasoning now lives.

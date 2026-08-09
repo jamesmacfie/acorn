@@ -112,7 +112,12 @@ Three things differ, and all three follow from the code not being ours:
   and capability ids the plugin can see; `ctx.routes.register` (Hono), `ctx.events.channel` and
   `ctx.events.streams` are never present, whatever the manifest says. A loaded plugin serves routes as
   `ctx.routes.fetch(handler)` instead — a `(Request) → Response` function, which is the one shape that
-  survives moving plugins out of process later.
+  survives moving plugins out of process later. Project access is deliberately three grants:
+  `projects:read` for identity and checkout paths, `projects:config` for executable build/dev/database
+  configuration, and `projects:write` for creating or updating project references. The `prefs` facet
+  is projected into `plugin:<id>:*`, the same namespace used by that plugin's frame `state.get` and
+  `state.set` verbs; this is the supported Node-half↔frame state channel. Values are capped at 1 MiB
+  from either side.
 
 That last point is least privilege for **cooperative** code and honest disclosure for users, not a
 security boundary: a loaded bundle shares the Node's process and can `import('node:fs')` and ignore
@@ -120,9 +125,47 @@ security boundary: a loaded bundle shares the Node's process and can `import('no
 renders these permissions has to say *declared*, not *enforced*.
 
 `apps/node/scripts/build-plugin.mjs` builds a first-party plugin into this shape for development; it
-is not the distribution mechanism.
+is not the distribution mechanism. It installs into the data root under the plugin's own id, so a
+package whose id matches a built-in **shadows** it: the loader drops the compiled-in copy from the
+graph and logs which directory won. That is how the loader is dogfooded, and it is the one case
+where the code running is not the code in the binary — worth knowing before debugging a plugin that
+behaves like a version you cannot find.
 
-Client initialization is synchronous registration. The host exposes contribution points for panes,
+### Loaded plugins: the client half
+
+A loaded plugin's UI is not registered by its own code. The Node hands each device the plugin's
+manifest and the hash of its client bundle in the roster (`GET /v2/core/plugins`); the device
+decides what to render from that, and the plugin's JavaScript never touches a shell registry. Two
+kinds of contribution come out of one manifest:
+
+- **Frames** — a pane, reference panel, settings page, or project importer that the plugin draws
+  itself. Each renders in an iframe on `app-plugin://<bundle-hash>`, a scheme Electron main serves
+  from its content-addressed cache with `connect-src 'none'`: the frame has no network, no
+  `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
+  is checked against the manifest's declared scopes by an allowlist naming each path and method
+  (`packages/client-core/src/plugins/frames/`, `scopes.ts` is the choke point). The host pins which
+  Node the frame talks to; the frame cannot name one.
+- **Descriptors** — a rail source, task-footer badge, palette rows, attention items, node stats.
+  These are data, not code: the host renders them with its own components and fetches their content
+  from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
+  mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
+  invalidation ping plus one shared timer. A plugin that ships only descriptors needs no client
+  bundle at all, and therefore no trust prompt — nothing of its executes on the device.
+
+Both are gated on trust, and the gate is per device and per bundle: first sight of a
+`(plugin, hash)` pair prompts before anything registers, an update re-prompts with the permission
+diff, and a rejected bundle gets neither frames nor chrome. The prompt renders the node-half
+permissions and the UI scopes as **two separate lists**, because only the second is enforced —
+`packages/client-core/src/plugins/permissions.ts` explains why they must never be merged, and it
+classifies every line against what the host can actually grant rather than echoing manifest text.
+
+Two behaviours that surprise authors, both deliberate: the `footer` slot is the **task** footer
+(the slot `docker-footer-badge` occupies), so a badge is invisible until a task has a worktree; and
+across a fleet exactly one bundle per plugin id is active — highest version at this plugin-API
+major, chosen at boot and stable for the session — because contribution ids are un-namespaced
+persisted layout keys and two versions registering at once would collide on them.
+
+Client initialization for compiled-in plugins is synchronous registration. The host exposes contribution points for panes,
 sources, settings pages, shell/task slots, context sections, provider reference panels, palette rows,
 agent contexts, agent-tool renderers, pollers, persisted-state slices, Node statistics, and attention
 items. An activation pass handles subscriptions or local storage initialization after all descriptors
@@ -159,6 +202,11 @@ migrations. Current table-owning plugins include agents, changes, database, GitH
 notes, terminal, and workflows. Core owns shared workspace/task/integration/external-item/security
 tables. Docker, editor, Linear, Rollbar, model providers, preview, and the built-in agents profiles
 use core services or provider registries without owning a database file.
+
+A loaded plugin that owns tables declares a package-relative `migrations` directory in
+`acorn-plugin.json` and calls `ctx.storage.open()`. The loader confines and validates that chain,
+while the host binds the SQLite filename to the manifest id. No declaration means no storage; there
+is no fallback search outside the package.
 
 There are no cross-file foreign keys, `ATTACH` queries, or transactions spanning plugin databases.
 Cross-plugin workflows use durable operation state and explicit IDs/capabilities.

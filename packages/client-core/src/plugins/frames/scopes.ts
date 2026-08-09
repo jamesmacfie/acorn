@@ -81,8 +81,8 @@ const RULES: readonly RouteRule[] = [
   },
   {
     path: shape(`/v2/core/projects/${SEG}/config`),
-    scopes: { GET: 'core.projects:read' },
-    note: 'PUT writes setup/dev/teardown/db-url scripts the Node later EXECUTES. Permanently unmappable; this is the code-execution path (main/repoConfigTrust.ts).',
+    scopes: { GET: 'core.projects:config' },
+    note: 'GET reads setup/dev/teardown/db-url scripts, which frequently carry credentials. PUT writes those scripts for the Node to execute and is permanently unmappable (main/repoConfigTrust.ts).',
   },
   {
     path: shape(`/v2/core/projects/${SEG}/run-targets`),
@@ -188,3 +188,16 @@ export function classifyPath(path: string): Partial<Record<ApiMethod, string>> |
 export const GRANTABLE_SCOPES: readonly string[] = [
   ...new Set(RULES.flatMap((rule) => Object.values(rule.scopes))),
 ].sort()
+
+// Consent copy for every scope this table can grant. These strings are also update-diff keys, so keep
+// them stable: changing copy marks the line as newly requested on the next plugin update.
+const SCOPE_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  'core.projects:config': 'Read every project’s build, dev and database scripts',
+  'core.projects:read': 'Read projects, including where every codebase lives on disk',
+  'core.projects:write': 'Create and update projects, including their on-disk locations',
+  'core.tasks:read': 'Read tasks',
+  'core.tasks:write': 'Create and update tasks',
+  'core.workspaces:read': 'Read workspaces',
+}
+
+export const describeScope = (scope: string): string | undefined => SCOPE_DESCRIPTIONS[scope]

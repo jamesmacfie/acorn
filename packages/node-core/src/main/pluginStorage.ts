@@ -5,9 +5,10 @@
 // Two reasons this is a separate function rather than a parameter on openDb:
 //
 //   1. Core cannot import a plugin's schema — @acorn/node-core is a lib, and a lib importing a plugin
-//      is a boundary violation (tools/arch/boundaries.test.ts rule 6). So the plugin supplies its own
-//      schema and migrations folder and core supplies the file, the hardening and the migration run.
-//   2. The handle goes to the plugin as `ctx.db`, NOT onto `Env`. `c.env` reaches every core and
+//      is a boundary violation (tools/arch/boundaries.test.ts rule 6). A built-in supplies its chain
+//      directly; the loaded-plugin host supplies the manifest-confined chain. Core owns the file,
+//      hardening and migration run in both cases.
+//   2. The handle stays in the owning plugin's closure, NOT on `Env`. `c.env` reaches every core and
 //      plugin route (main/bindings.ts), so a per-plugin DB there would be readable by all routes.
 //
 // docs/data-layer.md forbids cross-DB queries, ATTACH, and transactions spanning files. Cross-plugin references

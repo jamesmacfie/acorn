@@ -15,13 +15,18 @@ import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
-import type { NodePlugin, NodePluginContext } from './types'
+import type { NodePlugin, NodePluginContext, PluginStorage } from './types'
 import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
 import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
 
 // What each plugin claimed on the WS hub, so a re-init can take it back. The hub's slots are module
 // singletons with no duplicate guard, unlike the route and tool registries.
 const wsRegistrations = new Map<string, (() => void)[]>()
+
+export type LoadedPluginBinding = {
+  permissions: NodePermissions
+  storage: PluginStorage
+}
 
 export type PluginHostOptions = {
   // Owned by the caller, not by this module: see the note in capabilities.ts about why these are not
@@ -32,13 +37,13 @@ export type PluginHostOptions = {
   // github, terminal or agents is not a supported configuration, and silently honouring it would
   // produce a node that boots and then fails at the first task.
   disabled?: readonly string[]
-  // The plugins that came off disk, keyed by name, carrying the `permissions.node` block from their
-  // manifest. Membership in this map is the ONE flag that separates a loaded plugin from a built-in:
-  // it means both "contain its failures" and "shape its context from that manifest".
+  // The plugins that came off disk, keyed by name, carrying their permission projection and
+  // manifest-bound storage. Membership in this map is the ONE flag that separates a loaded plugin
+  // from a built-in: it means "contain its failures" and "shape its context from the manifest".
   //
   // It lives in the host's options rather than on NodePlugin because the distinction is the host's
   // to draw. A field on the plugin object would be a value the plugin's own bundle could set.
-  loaded?: ReadonlyMap<string, NodePermissions>
+  loaded?: ReadonlyMap<string, LoadedPluginBinding>
 }
 
 // One row per plugin the composition root offered, whether or not it ran. Settings → Plugins needs the
@@ -111,7 +116,8 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
     // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from
     // disk. Everything below that differs between the two tiers keys off this one value.
-    const permissions = options.loaded?.get(plugin.name)
+    const loaded = options.loaded?.get(plugin.name)
+    const permissions = loaded?.permissions
     const ctx: NodePluginContext = {
       name: plugin.name,
       routes: {
@@ -147,7 +153,8 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // facets its manifest declared. main/pluginPermissions.ts explains what that does and does not
       // buy — it is least privilege for cooperative code, not a security boundary.
       capabilities: permissions ? scopeCapabilities(options.capabilities, permissions.capabilities) : options.capabilities,
-      core: permissions ? scopeCore(options.core, permissions) : options.core,
+      storage: loaded ? loaded.storage : (undefined as never),
+      core: permissions ? scopeCore(options.core, permissions, plugin.name) : options.core,
       // The broadcast surface, projected rather than re-implemented: these are main/notify.ts and
       // main/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
       // `streams` return disposers, which the host records like any other contribution.

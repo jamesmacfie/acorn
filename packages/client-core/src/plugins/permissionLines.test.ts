@@ -22,24 +22,46 @@ describe('the two permission groups', () => {
   it('keeps node reach and UI scopes apart, because only one of them is enforced', () => {
     const all = permissions({
       api: ['core.tasks:read'],
-      events: ['tasks'],
+      events: ['runtime:task-archived'],
       node: { core: ['issues'], capabilities: ['docker.compose'], secrets: true, exec: true, net: ['ntfy.sh'] },
     })
     expect(nodePermissionLines(all)).toEqual([
       'Use your saved credentials to make requests on its behalf',
       'Run commands on the node',
       'Reach ntfy.sh',
-      'core.issues',
-      'capability docker.compose',
+      'Use capability docker.compose',
+      '1 node permission request this version of acorn does not recognise (ignored)',
     ])
-    expect(uiPermissionLines(all)).toEqual(['api: core.tasks:read', 'events: tasks'])
+    expect(uiPermissionLines(all)).toEqual(['Read tasks', 'Receive task archive events'])
   })
 
   it('names the disclosure hiding inside core.projects', () => {
     // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
     // that is what checkouts() returns (docs/third-party/node-security.md § Rung 1).
     expect(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [] } }))).toEqual([
-      'core.projects:read — including where every codebase lives on disk',
+      'Read projects, including where every codebase lives on disk',
+    ])
+  })
+
+  it('names the executable configuration carried by the config grant', () => {
+    expect(nodePermissionLines(permissions({ node: { core: ['projects:config'], capabilities: [], secrets: false, exec: false, net: [] } }))).toEqual([
+      'Read every project’s build, dev and database scripts',
+    ])
+  })
+
+  it('never echoes unknown manifest copy as an enforced grant', () => {
+    const lines = uiPermissionLines(permissions({
+      api: ['core.tasks:read', 'read-only access to nothing'],
+      events: ['none-this-plugin-does-not-use-events'],
+    }))
+    expect(lines).toEqual(['Read tasks', '2 requests this version of acorn does not recognise (ignored)'])
+    expect(lines.join(' ')).not.toContain('read-only access to nothing')
+    expect(lines.join(' ')).not.toContain('none-this-plugin')
+  })
+
+  it('renders no grant sentence when every UI request is unknown', () => {
+    expect(uiPermissionLines(permissions({ api: ['core.quantum:read'], events: ['runtime:quantum-shift'] }))).toEqual([
+      '2 requests this version of acorn does not recognise (ignored)',
     ])
   })
 
@@ -57,11 +79,11 @@ describe('the update diff', () => {
       node: { core: ['issues'], capabilities: [], secrets: false, exec: true, net: [] },
     })
     expect(added(before, after, nodePermissionLines)).toEqual(['Run commands on the node'])
-    expect(added(before, after, uiPermissionLines)).toEqual(['api: core.tasks:write'])
+    expect(added(before, after, uiPermissionLines)).toEqual(['Create and update tasks'])
   })
 
   it('marks nothing when only the version moved', () => {
-    const same = permissions({ api: ['core.tasks:read'], events: ['tasks'] })
+    const same = permissions({ api: ['core.tasks:read'], events: ['runtime:task-archived'] })
     expect(added(same, same, nodePermissionLines)).toEqual([])
     expect(added(same, same, uiPermissionLines)).toEqual([])
   })

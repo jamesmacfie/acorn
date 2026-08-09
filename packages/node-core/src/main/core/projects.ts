@@ -7,8 +7,10 @@ import { getProjectConfig } from '../projectConfig'
 import { assertRepoConfigTrusted } from '../repoConfigTrust'
 import { projectSetup, type SetupTrigger } from '../taskWorktree'
 
-// The project identity seam available to plugins. Every method returns a projection so plugins cannot
-// learn core's config columns or accidentally join/attach the core SQLite file.
+// The project seam available to plugins. Identity and write methods accept or return narrow ProjectRef
+// projections, so they never expose core's config columns or its SQLite handle. config() and setup()
+// deliberately carry executable project configuration and are gated behind `projects:config` rather
+// than the identity-level `projects:read` grant (main/pluginPermissions.ts).
 export type ProjectService = {
   byId(id: string): Promise<ProjectRef | null>
   // Oldest project wins, matching projectByGithub's legacy-pair bridge. Callers that need every clone
