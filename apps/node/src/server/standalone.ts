@@ -84,7 +84,7 @@ const plugins = await initPlugins(
 )
 // A standalone node has no packaging flag to consult, so NODE_ENV is the only development signal it
 // has. It gates one thing: `{ path }` installs, which symlink an author's working tree into the install
-// directory (docs/third-party/phase-5-install-ux.md).
+// directory (docs/plugins.md).
 const devBuild = process.env.NODE_ENV !== 'production'
 const pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
   roster: () => plugins.roster,

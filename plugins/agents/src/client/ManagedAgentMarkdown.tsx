@@ -1,5 +1,5 @@
 import { createEffect, onCleanup } from 'solid-js'
-import { getHighlighter } from '@acorn/plugin-api/client'
+import { getHighlighter, handlePluginContentLinkClick } from '@acorn/plugin-api/client'
 import { renderAgentMarkdown } from './agentMarkdown'
 
 const SHIKI_LANGUAGES = new Set([
@@ -17,7 +17,7 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   yml: 'yaml',
 }
 
-export default function AgentMarkdown(props: { text: string; class?: string }) {
+export default function AgentMarkdown(props: { text: string; taskId: string; class?: string }) {
   let root: HTMLDivElement | undefined
   let generation = 0
 
@@ -45,5 +45,11 @@ export default function AgentMarkdown(props: { text: string; class?: string }) {
   })
 
   onCleanup(() => generation++)
-  return <div ref={root} class={`agent-markdown ${props.class ?? ''}`} />
+  return (
+    <div
+      ref={root}
+      class={`agent-markdown ${props.class ?? ''}`}
+      onClick={(event) => handlePluginContentLinkClick(event, props.taskId)}
+    />
+  )
 }

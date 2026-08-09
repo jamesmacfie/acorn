@@ -1,8 +1,9 @@
 # Plugins
 
-Plugins are first-party packages compiled into acorn. A plugin can contribute Node behavior, client
-behavior, or both. There is no runtime installation system: a plugin exists only when its composition
-root registers it.
+Plugins come in two tiers. Built-ins are first-party packages compiled into acorn and registered by
+the Node/client composition roots. Loaded plugins are installed at runtime from a manifest plus ESM
+bundles. Either tier can contribute Node behavior, client behavior, or both; the available carriers
+and trust boundary differ by tier.
 
 ## Package shape
 
@@ -102,7 +103,7 @@ Three things differ, and all three follow from the code not being ours:
   `Idempotency-Key` required, audited) resolves a GitHub release, an npm package, a tarball URL or — on
   a development build — a local folder; validates the manifest; and places the package atomically with
   a hash-pinned lockfile beside it (`packages/node-core/src/main/pluginInstaller.ts`,
-  docs/third-party/phase-5-install-ux.md). Uninstalling removes the package and, by default, leaves its
+  docs/plugins.md). Uninstalling removes the package and, by default, leaves its
   SQLite file alone. Each device then asks its own owner before running the plugin's interface code.
 - **Failures are contained.** A built-in throwing from `init` still fails the boot — it is first-party
   code in the same binary, and a node that cannot assemble should say so. A loaded plugin throwing has
@@ -111,8 +112,11 @@ Three things differ, and all three follow from the code not being ours:
 - **The context is shaped by the manifest.** `permissions.node` decides which `CoreServices` facets
   and capability ids the plugin can see; `ctx.routes.register` (Hono), `ctx.events.channel` and
   `ctx.events.streams` are never present, whatever the manifest says. A loaded plugin serves routes as
-  `ctx.routes.fetch(handler)` instead — a `(Request) → Response` function, which is the one shape that
-  survives moving plugins out of process later. Project access is deliberately three grants:
+  `ctx.routes.fetch(handler)` instead — a `(Request, PluginRequestContext) → Response` function. The
+  request context projects authenticated identity plus a provider runtime; it exposes provider-owned
+  resource/connection operations without exposing Hono, the core database, or the secret service. A
+  loaded integration provider likewise passes a fetch handler to `ctx.providers.integration`; passing
+  Hono is an explicit initialization error. Project access is deliberately three grants:
   `projects:read` for identity and checkout paths, `projects:config` for executable build/dev/database
   configuration, and `projects:write` for creating or updating project references. The `prefs` facet
   is projected into `plugin:<id>:*`, the same namespace used by that plugin's frame `state.get` and
@@ -121,7 +125,7 @@ Three things differ, and all three follow from the code not being ours:
 
 That last point is least privilege for **cooperative** code and honest disclosure for users, not a
 security boundary: a loaded bundle shares the Node's process and can `import('node:fs')` and ignore
-`ctx` entirely. `docs/third-party/node-security.md` is the full threat model, and every surface that
+`ctx` entirely. `docs/security.md` is the full threat model, and every surface that
 renders these permissions has to say *declared*, not *enforced*.
 
 `apps/node/scripts/build-plugin.mjs` builds a first-party plugin into this shape for development; it
@@ -145,16 +149,22 @@ kinds of contribution come out of one manifest:
   is checked against the manifest's declared scopes by an allowlist naming each path and method
   (`packages/client-core/src/plugins/frames/`, `scopes.ts` is the choke point). The host pins which
   Node the frame talks to; the frame cannot name one.
-- **Descriptors** — a rail source, task-footer badge, palette rows, attention items, node stats.
+- **Descriptors** — a rail source, task-footer badge, palette rows, attention items, node stats, and
+  restricted URL recognizers (`contentLinks`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
   mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
   invalidation ping plus one shared timer. A plugin that ships only descriptors needs no client
-  bundle at all, and therefore no trust prompt — nothing of its executes on the device.
+  bundle at all, and therefore no trust prompt — nothing of its executes on the device. A source may
+  declare `createTask`; its row supplies the task seed and optional external link, while the host owns
+  the modal, create-before-link ordering, and partial-failure reporting. A `contentLinks` entry uses a
+  bounded `https://` host/path grammar, names a pane from the same manifest, and delivers one captured
+  path segment as a `plugin:select` intent.
 
-Both are gated on trust, and the gate is per device and per bundle: first sight of a
-`(plugin, hash)` pair prompts before anything registers, an update re-prompts with the permission
-diff, and a rejected bundle gets neither frames nor chrome. The prompt renders the node-half
+When a plugin has a client bundle, both frames and descriptors are gated on trust, per device and per
+bundle: first sight of a `(plugin, hash)` pair prompts before anything registers, an update re-prompts
+with the permission diff, and a rejected bundle gets neither frames nor chrome. A descriptor-only
+plugin has no client bytes to trust and registers its data directly. The prompt renders the node-half
 permissions and the UI scopes as **two separate lists**, because only the second is enforced —
 `packages/client-core/src/plugins/permissions.ts` explains why they must never be merged, and it
 classifies every line against what the host can actually grant rather than echoing manifest text.

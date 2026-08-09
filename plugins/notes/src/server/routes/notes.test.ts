@@ -65,7 +65,9 @@ describe('notes-owned routes', () => {
     const app = appFor({ kind: 'device', userId: 'james' })
 
     expect((await app.fetch(request('/api/tasks/task1/notes', 'POST', { title: 'Plan', kind: 'plan' }), {} as Env)).status).toBe(200)
-    expect((await app.fetch(request('/api/workspaces/ws1/notes/plan/title', 'POST', { title: 'Renamed' }), {} as Env)).status).toBe(200)
+    const renamed = await app.fetch(request('/api/workspaces/ws1/notes/plan/title', 'POST', { title: 'Renamed' }), {} as Env)
+    expect(renamed.status).toBe(200)
+    expect(await renamed.json()).toEqual({ ok: true })
     expect(calls).toEqual(['create:task:Plan:plan', 'title:workspace:plan:Renamed'])
   })
 

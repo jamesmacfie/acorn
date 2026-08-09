@@ -3,7 +3,7 @@ import { readJson } from '../apiClient'
 import type { AttentionSourceContribution } from '../registries/attention'
 
 // "Plugin X failed to start", in the notification bell, so the owner learns about it without opening
-// Settings → Plugins (docs/third-party/phase-1-node-loader.md § Contained failure).
+// Settings → Plugins (docs/plugins.md).
 //
 // Core-owned rather than plugin-contributed, and registered from the client composition root beside
 // the other core contributions — the plugin that failed is by definition not running to speak for

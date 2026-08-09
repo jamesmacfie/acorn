@@ -1,5 +1,5 @@
 // `acorn-plugin.json` — the file at the root of an installed plugin package, and the only thing the
-// loader trusts about it (docs/third-party/phase-1-node-loader.md § The manifest).
+// loader trusts about it (docs/plugins.md).
 //
 // It arrives from disk rather than from the wire, and it is still parsed with a module-level Zod
 // schema and `safeParse` (docs/architecture-overview.md § wire validation). Disk is a trust boundary
@@ -12,6 +12,10 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
+import {
+  compileContentLinkPattern,
+  CONTENT_LINK_PATTERN_MAX_LENGTH,
+} from '@acorn/protocol/contentLinkPattern.ts'
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The constant itself
 // moved to @acorn/protocol when the client gained a stake in it: the node uses it to decide what to
@@ -25,7 +29,7 @@ const ID_RE = /^[a-z][a-z0-9-]{1,31}$/
 
 // Node-half permissions. This block SHAPES `ctx` (main/pluginPermissions.ts) and is disclosed to the
 // user; it is not enforced, because a loaded bundle shares the Node's process and can import
-// `node:fs` directly. docs/third-party/node-security.md is blunt about that distinction and every
+// `node:fs` directly. docs/security.md is blunt about that distinction and every
 // surface rendering this block has to preserve it.
 const nodePermissions = z.object({
   // CoreServices facets. Tokens are validated in pluginPermissions.ts rather than here: an unknown
@@ -50,7 +54,7 @@ const entry = z.string().min(1).max(256).refine(
 )
 
 // A rectangle the plugin's client bundle draws, hosted by the shell in a sandboxed frame
-// (docs/third-party/phase-3-sandboxed-ui.md).
+// (docs/plugins.md).
 //
 // Declared HERE and nowhere else. The shell's contribution registries are keyed by un-namespaced ids
 // that are persisted layout keys and chord targets, so who may claim `board` has to be decided by the
@@ -77,7 +81,7 @@ const frameSurface = z.object({
   group: z.enum(['general', 'workspace']).optional(),
 })
 
-// ── Declarative chrome (docs/third-party/phase-4-declarative-chrome.md) ───────────────────────────
+// ── Declarative chrome (docs/plugins.md) ───────────────────────────
 //
 // Small chrome — a rail source, a footer badge, palette rows, an attention item, a node stat — is
 // DATA, not a rectangle. An iframe for a 20px badge is absurd, and a badge has to be live when no
@@ -102,6 +106,9 @@ const chromeAction = z.discriminatedUnion('verb', [
   // as a pane intent (client-core/registries/clientEvents.ts).
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
+  // Host-owned promotion. The selected rail row carries the seed; the verb itself carries no plugin
+  // callbacks and therefore survives the descriptor boundary.
+  z.object({ verb: z.literal('createTask') }),
   // https only, and opened in the real browser — never in-app (docs/electron.md § navigation policy).
   z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
 ])
@@ -163,6 +170,21 @@ const nodeStatDescriptor = z.object({
   refresh,
 })
 
+const contentLinkPattern = z.string().min(1).max(CONTENT_LINK_PATTERN_MAX_LENGTH).superRefine((value, ctx) => {
+  try {
+    compileContentLinkPattern(value)
+  } catch (error) {
+    ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
+  }
+})
+
+const contentLinkDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  match: contentLinkPattern,
+  openPane: z.string().min(1).max(64),
+  item: z.string().min(1).max(32),
+})
+
 // `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` is
 // still a loose object even now that phase 4's keys are named: a manifest written for a newer acorn
 // should contribute less on an older one rather than fail to parse.
@@ -173,6 +195,7 @@ const contributions = z.looseObject({
   palette: z.array(paletteDescriptor).max(32).default([]),
   attention: z.array(attentionDescriptor).max(4).default([]),
   nodeStats: z.array(nodeStatDescriptor).max(4).default([]),
+  contentLinks: z.array(contentLinkDescriptor).max(16).default([]),
 }).prefault({})
 
 export type PluginFrameSurface = z.infer<typeof frameSurface>
@@ -229,7 +252,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     }
   }
 
-  const { sources, slots, palette, attention, nodeStats } = manifest.contributions
+  const { sources, slots, palette, attention, nodeStats, contentLinks } = manifest.contributions
   sources.forEach((entry, i) => {
     route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])
@@ -241,11 +264,32 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
   attention.forEach((entry, i) => route(entry.items, ['contributions', 'attention', i, 'items']))
   nodeStats.forEach((entry, i) => route(entry.data, ['contributions', 'nodeStats', i, 'data']))
+  contentLinks.forEach((entry, i) => {
+    if (!panes.has(entry.openPane)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'contentLinks', i, 'openPane'],
+        message: `content link names '${entry.openPane}', which this manifest does not declare as a pane`,
+      })
+    }
+    try {
+      const compiled = compileContentLinkPattern(entry.match)
+      if (!compiled.captures.includes(entry.item)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['contributions', 'contentLinks', i, 'item'],
+          message: `content link item '${entry.item}' is not captured by its match pattern`,
+        })
+      }
+    } catch {
+      // The field refinement already reports the grammar error at `match`.
+    }
+  })
 
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...manifest.contributions.frames, ...sources, ...slots, ...palette, ...attention, ...nodeStats]) {
+  for (const entry of [...manifest.contributions.frames, ...sources, ...slots, ...palette, ...attention, ...nodeStats, ...contentLinks]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

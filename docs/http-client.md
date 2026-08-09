@@ -38,7 +38,7 @@ an owner installs a plugin. It keeps its `fetch` usage inside its own module, wi
 (https everywhere, http only on loopback, re-checked after redirects), a 32 MiB archive cap and a
 60-second timeout. Same posture as the send path above, and for the same reason: a general client
 assembled from two call sites would be a control nobody owns. The credential-injecting fetch broker
-described in `docs/third-party/node-security.md` is the third, when it lands — and it is the one that
+described in `docs/security.md` is the third, when it lands — and it is the one that
 would be worth converging the other two onto, because it is the one with a host allowlist.
 
 ## Client

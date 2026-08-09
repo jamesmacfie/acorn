@@ -2,7 +2,7 @@
 
 **Size: L.** Requires phases 0–3. Build as a **first-party compiled-in plugin**
 (`plugins/smolforge/`, both composition lists — the Linear/Rollbar path), then use it as the
-dogfood candidate for the third-party packaging work (docs/third-party/). This doc describes the
+dogfood candidate for the loaded-plugin path (docs/plugins.md § Loaded plugins). This doc describes the
 first-party build; the final section lists what changes when repackaged.
 
 API reference throughout: `forge/llms.txt` (§ Authentication, § Personal Access Tokens,
@@ -29,7 +29,7 @@ plugins/smolforge/
   § Personal Access Tokens; the connect UI should name these exact scopes and link the forge's
   PAT page).
 - **All forge traffic goes through the credential-injecting fetch broker**
-  (docs/third-party/node-security.md), even while first-party: the plugin passes
+  (docs/security.md), even while first-party: the plugin passes
   `(credentialSlot, request)` and never reads the token. If the broker doesn't exist yet when
   this phase starts, build it then — this plugin is its first customer and the design is
   already written; do not ship an interim "read the secret and fetch" path that has to be
@@ -120,7 +120,7 @@ piece uses existing contribution points — this phase adds no new registries.
   connect with a PAT, see issues, promote one to a task, complete a fake agent session, verify
   the transcript lands. This doubles as the integration smoke for phases 0–3.
 
-## When repackaged as third-party (later, with docs/third-party/)
+## When repackaged as a loaded plugin (later)
 
 - Manifest: `permissions.api` for its core reads, `events`, `node.capabilities:
   ["agents.onSessionStatus", "agents.transcriptExport", core lifecycle ids]`, `secrets: true`,

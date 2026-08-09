@@ -9,7 +9,7 @@ import { activeBundles, bundleAccepted, installedByNode, pluginEnabledOnNode } f
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 
-// Turning accepted manifests into shell contributions (docs/third-party/phase-3-sandboxed-ui.md
+// Turning accepted manifests into shell contributions (docs/plugins.md
 // § Frame contribution kind).
 //
 // A DELIBERATE DEVIATION from the phase doc, which sketches a `kind: 'component' | 'frame'` union on

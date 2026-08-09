@@ -58,7 +58,7 @@ Notes:
   and document that exports are not additionally scrubbed — the trust prompt for a plugin with
   this capability should make "can read agent conversation contents" explicit. Add
   `agents.transcriptExport` to the permission vocabulary rendered by the phase-5 trust prompt
-  (docs/third-party/phase-5-install-ux.md) with exactly that wording.
+  (docs/plugins.md) with exactly that wording.
 - `listCompleted` with `afterSessionId` exists for the reconcile pattern
   (phase-2-lifecycle-capabilities.md): consumers page forward from their own high-water mark on
   boot, then subscribe to `AGENTS_ON_SESSION_STATUS` for live completions.

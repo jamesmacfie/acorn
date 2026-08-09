@@ -8,7 +8,12 @@
 // The `splitLinearIds` / `linkifyLinearIds` pair genuinely does stay. It is not link RESOLUTION — it
 // is github's PR body rendering, turning bare `CRA-404` text into something clickable, and it runs
 // against GitHub's innerHTML in github's own pane.
-import { type ContentLinkContribution, parseInAppTarget } from '@acorn/plugin-api/client'
+import {
+  activeTaskId,
+  type ContentLinkContribution,
+  openPluginContentTarget,
+  parseInAppTarget,
+} from '@acorn/plugin-api/client'
 
 const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
 const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$/i
@@ -119,7 +124,9 @@ export function makeContentLinkHandler(
     // swallowed. A GitHub owner/name target is only routable when the current project query resolves
     // it to a project id; otherwise the external link remains the safe fallback.
     const str = (value: unknown): string => (typeof value === 'string' ? value : '')
-    if (target.kind === 'linear') {
+    if (openPluginContentTarget(target, activeTaskId())) {
+      // The host already opened the declared plugin pane with its retained selection intent.
+    } else if (target.kind === 'linear') {
       openLinear(str(target.identifier))
     } else if (target.kind === 'pr' || target.kind === 'repo') {
       const projectId = projectIdForGithub?.(str(target.owner), str(target.repo))

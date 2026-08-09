@@ -1,5 +1,5 @@
 // Which node routes a sandboxed plugin frame may reach, and under which declared scope
-// (docs/third-party/phase-3-sandboxed-ui.md § Enforcement).
+// (docs/plugins.md).
 //
 // This is the choke point. A frame has no token, no origin and no network — every call it makes is a
 // `path` on this table, forwarded by the broker through the host's per-node client. So the whole of
@@ -63,7 +63,11 @@ const RULES: readonly RouteRule[] = [
     scopes: { GET: 'core.tasks:read', PATCH: 'core.tasks:write' },
     note: 'DELETE is absent on the principle destruction is a confirmed, user-initiated act.',
   },
-  { path: shape(`/v2/core/tasks/${SEG}/links`), scopes: { GET: 'core.tasks:read' } },
+  {
+    path: shape(`/v2/core/tasks/${SEG}/links`),
+    scopes: { GET: 'core.tasks:read', POST: 'core.tasks:write' },
+    note: 'DELETE stays absent: unlinking is a user-visible edit to task history, handled by native task UI.',
+  },
   { path: shape(`/v2/core/tasks/${SEG}/context`), scopes: { GET: 'core.tasks:read' } },
   { path: shape(`/v2/core/tasks/${SEG}/archive`), scopes: { POST: 'core.tasks:write' } },
 
@@ -112,7 +116,7 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v2/core/plugins/${SEG}/client.js`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
   // Permanently unmapped, and the sharpest case in this table. A frame that could reach these would let
   // a sandboxed plugin fetch and install arbitrary code that runs unsandboxed inside the node — every
-  // other line here would stop mattering (docs/third-party/node-security.md).
+  // other line here would stop mattering (docs/security.md).
   { path: shape('/v2/core/plugins/install'), scopes: {}, note: 'Installs code that runs with the Node’s own access.' },
   { path: shape(`/v2/core/plugins/${SEG}/update`), scopes: {} },
   { path: shape(`/v2/core/plugins/${SEG}`), scopes: {}, note: 'Uninstall, including the option to delete another plugin’s data.' },

@@ -1,5 +1,5 @@
 // Putting a third-party plugin on this node, and taking it off again
-// (docs/third-party/phase-5-install-ux.md § Node-side installer).
+// (docs/plugins.md).
 //
 // Install is PER NODE. A fleet is a set of independently administered nodes, so there is no
 // cross-node transaction here and no attempt at one: this module answers "make this node carry this

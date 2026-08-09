@@ -6,7 +6,7 @@ import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 
 // The content-addressed store of plugin client bundles a node handed us
-// (docs/third-party/phase-2-distribution-trust.md § Electron main side).
+// (docs/plugins.md).
 //
 // Two properties carry the whole design, and both come from the file name being the hash of the
 // contents:

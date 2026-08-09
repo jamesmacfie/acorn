@@ -15,7 +15,7 @@ import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
-import type { NodePlugin, NodePluginContext, PluginStorage } from './types'
+import type { NodePlugin, NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
 import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
 import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
 
@@ -123,7 +123,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       routes: {
         // Absent for a loaded plugin: handing the host a live Hono instance from another realm is
         // exactly what cannot survive the process boundary rung 2 puts there
-        // (docs/third-party/node-security.md § Design rules). `undefined as never` rather than a
+        // (docs/security.md § Design rules). `undefined as never` rather than a
         // throwing stub, so the failure is the immediate "not a function" an author can act on.
         register: permissions
           ? (undefined as never)
@@ -144,7 +144,17 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         integration: (provider, route) => {
           connectionProviderRegistry.register(provider, plugin.name)
           integrationProviderRegistry.register(provider, plugin.name)
-          if (route) integrationProviderRegistry.registerRoute({ providerId: provider.id, prefix: '', router: route })
+          if (!route) return
+          if (permissions && typeof route !== 'function') {
+            throw new Error(`Plugin '${plugin.name}' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.`)
+          }
+          integrationProviderRegistry.registerRoute({
+            providerId: provider.id,
+            prefix: '',
+            ...(typeof route === 'function'
+              ? { fetch: route as PluginFetchHandler }
+              : { router: route }),
+          })
         },
         connection: (provider) => connectionProviderRegistry.register(provider, plugin.name),
         model: (adapter) => modelProviderRegistry.register(adapter, plugin.name),

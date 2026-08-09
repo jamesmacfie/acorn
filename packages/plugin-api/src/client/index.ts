@@ -63,7 +63,12 @@ export type { RefPanelContribution, RefPanelTarget } from '@acorn/client-core/re
 export type { ProjectImporterProps } from '@acorn/client-core/registries/projectImporters.ts'
 export type { IntegrationFlowContribution } from '@acorn/client-core/registries/integrationFlows.ts'
 export { registerCommands } from '@acorn/client-core/registries/commands.ts'
-export { contentLinkRegistry, parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
+export {
+  contentLinkRegistry,
+  handlePluginContentLinkClick,
+  openPluginContentTarget,
+  parseInAppTarget,
+} from '@acorn/client-core/registries/contentLinks.ts'
 export type { ContentLinkContribution } from '@acorn/client-core/registries/contentLinks.ts'
 export { contextSectionContributions } from '@acorn/client-core/registries/contextSections.ts'
 export { agentContextContributions } from '@acorn/client-core/registries/agentContexts.ts'

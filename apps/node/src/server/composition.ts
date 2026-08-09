@@ -33,7 +33,7 @@ export type NodeComposition = {
 //
 // A boot with an empty install directory — which is every fresh install — gets exactly the static list
 // and nothing else. Anything extra arrived through the installer, which is an owner-authenticated route
-// (docs/third-party/phase-5-install-ux.md).
+// (docs/plugins.md).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
   const builtins = nodePlugins(dataDir, deps)
   const { loaded, installed } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })

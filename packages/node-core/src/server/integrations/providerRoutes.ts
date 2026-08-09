@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { requireProviderAccess } from '../middleware/requireUser'
 import { integrationProviderRegistry } from './registry'
+import { PLUGIN_NAMESPACE } from '../routeRegistry'
+import { servePluginFetch } from '../plugin/fetchRoute'
 
 // One core projection for every provider-owned HTTP router. Adding a provider changes only its
 // module and the provider activation list (app/server/providers.ts); the server composition root
@@ -22,8 +24,21 @@ export function buildIntegrationProviderRoutes(): Hono<AppEnv> {
     // An adversarial review confirmed the hole: a task-scoped token reached /v2/p/linear/* and spent the
     // owner's Linear key. requireProviderAccess is device ∪ 'service' scope, so the node's own loopback
     // mirror refreshes still work.
-    const guarded = new Hono<AppEnv>().use('*', requireProviderAccess).route('/', contribution.router)
-    app.route(`/${contribution.providerId}${contribution.prefix}`, guarded)
+    const relativeMount = `/${contribution.providerId}${contribution.prefix}`
+    const guarded = new Hono<AppEnv>().use('*', requireProviderAccess)
+    if (contribution.router) {
+      guarded.route('/', contribution.router)
+    } else {
+      const pluginId = integrationProviderRegistry.ownerOf(contribution.providerId) ?? contribution.providerId
+      const serve = (c: Parameters<typeof servePluginFetch>[0]) => servePluginFetch(c, {
+        pluginId,
+        mount: `${PLUGIN_NAMESPACE}${relativeMount}`,
+        fetch: contribution.fetch,
+      })
+      guarded.all('/', serve)
+      guarded.all('/*', serve)
+    }
+    app.route(relativeMount, guarded)
   }
   return app
 }

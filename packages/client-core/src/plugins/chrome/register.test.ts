@@ -8,12 +8,13 @@ const { setActiveNode } = await import('../../node/activeNode')
 const { attentionRegistry } = await import('../../registries/attention')
 const { nodeStatRegistry } = await import('../../registries/nodeStats')
 const { paletteRowRegistry } = await import('../../registries/paletteRows')
+const { contentLinkRegistry, parseInAppTarget } = await import('../../registries/contentLinks')
 const { sourceRegistry } = await import('../../registries/sources')
 const { taskSlotRegistry } = await import('../../registries/slots')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
 const { _resetChromeContributions, syncChromeContributions } = await import('./register')
 
-// The chrome host pass (docs/third-party/phase-4-declarative-chrome.md § Host adapters).
+// The chrome host pass (docs/plugins.md).
 //
 // What is worth pinning is the pass's CONTRACT rather than the descriptors themselves: the trust gate
 // (which is different from the frame host's, deliberately), per-node presence, dispose-then-register,
@@ -77,6 +78,55 @@ describe('syncChromeContributions', () => {
       attention: ['board-stuck'],
       nodeStats: ['board-count'],
     })
+  })
+
+  it('registers host-owned promotion for a createTask source', () => {
+    const promotable: Partial<PluginContributions> = {
+      sources: [{
+        id: 'board', label: 'Board', glyph: 'kanban', order: 60,
+        items: '/v2/p/board/rail-items', onSelect: { verb: 'createTask' },
+      }],
+    }
+    _seedPluginDistribution([['node-a', [row('board', {}, promotable)]]])
+    syncChromeContributions()
+    expect(sourceRegistry.get('board')?.promotion).toBeDefined()
+  })
+
+  it('registers declarative content links in manifest order and disposes them with the plugin', () => {
+    const links = (id: string): Partial<PluginContributions> => ({
+      frames: [{ target: 'pane', id: `${id}-pane`, label: id, glyph: 'puzzle', order: 500, formFactor: ['desktop'] }],
+      contentLinks: [{
+        id: `${id}.card`,
+        match: 'https://tracker.example/cards/{key}',
+        openPane: `${id}-pane`,
+        item: 'key',
+      }],
+    })
+    _seedPluginDistribution([['node-a', [row('first', {}, links('first')), row('second', {}, links('second'))]]])
+    syncChromeContributions()
+
+    expect(contentLinkRegistry.entries().map((entry) => entry.id)).toEqual(['first.card', 'second.card'])
+    expect(parseInAppTarget('https://tracker.example/cards/ENG-42')).toEqual({
+      kind: 'first.card', key: 'ENG-42', pane: 'first-pane', item: 'ENG-42',
+    })
+
+    _seedPluginDistribution([['node-a', []]])
+    syncChromeContributions()
+    expect(contentLinkRegistry.entries()).toEqual([])
+  })
+
+  it('contributes no content recogniser when this device rejected the plugin bundle', () => {
+    const declared: Partial<PluginContributions> = {
+      frames: [{ target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] }],
+      contentLinks: [{
+        id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'board', item: 'key',
+      }],
+    }
+    const withBundle = row('board', {}, declared)
+    withBundle.installed!.client = { hash: HASH, bytes: 12 }
+    _seedPluginDistribution([['node-a', [withBundle]]])
+    syncChromeContributions()
+    expect(contentLinkRegistry.entries()).toEqual([])
   })
 
   it('replaces rather than duplicates on a second pass', () => {

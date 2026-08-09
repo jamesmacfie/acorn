@@ -37,7 +37,7 @@ describe('the two permission groups', () => {
 
   it('names the disclosure hiding inside core.projects', () => {
     // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
-    // that is what checkouts() returns (docs/third-party/node-security.md § Rung 1).
+    // that is what checkouts() returns (docs/security.md § Rung 1).
     expect(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [] } }))).toEqual([
       'Read projects, including where every codebase lives on disk',
     ])

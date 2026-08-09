@@ -1,5 +1,4 @@
-// Which client bundle wins when a fleet disagrees (docs/third-party/phase-2-distribution-trust.md §
-// Fleet version resolution).
+// Which client bundle wins when a fleet disagrees (docs/plugins.md).
 //
 // Two nodes may carry different versions of one plugin. Contribution IDs are deliberately NOT
 // namespaced — `pr`, `changes`, `palette.files` are persisted layout keys and user-visible chord

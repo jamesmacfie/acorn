@@ -1,5 +1,5 @@
 import { createEffect, createSignal, createResource, For, onCleanup, onMount, Show } from 'solid-js'
-import { bytesOf, clientEvents, consumePaneIntent, debounce, formatSize, openPane, renderMarkdown, type Task, type Workspace } from '@acorn/plugin-api/client'
+import { bytesOf, clientEvents, consumePaneIntent, debounce, formatSize, handlePluginContentLinkClick, openPane, renderMarkdown, type Task, type Workspace } from '@acorn/plugin-api/client'
 import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
@@ -326,7 +326,13 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                     <button type="button" class="editor-save" onClick={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</button>
                     <span class="notes-save-state muted">{saving() ? 'saving…' : savedOnce() ? 'saved ·' : ''}</span>
                   </div>
-                  <Show when={!preview()} fallback={<div class="notes-preview linear-md" innerHTML={renderMarkdown(body())} />}>
+                  <Show when={!preview()} fallback={
+                    <div
+                      class="notes-preview linear-md"
+                      onClick={(event) => handlePluginContentLinkClick(event, props.task.id)}
+                      innerHTML={renderMarkdown(body())}
+                    />
+                  }>
                     <textarea
                       class="notes-editor"
                       spellcheck={false}

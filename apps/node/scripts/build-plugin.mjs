@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Build a first-party plugin's node half into a loadable package, so the loader can be dogfooded
-// against real code instead of a test fixture (docs/third-party/phase-1-node-loader.md § Dogfood).
+// against real code instead of a test fixture (docs/plugins.md).
 //
 //   pnpm --filter @acorn/node build:plugin rollbar
 //   pnpm dev:node

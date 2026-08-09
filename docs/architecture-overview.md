@@ -176,9 +176,10 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - [authentication.md](./authentication.md), [security.md](./security.md) — trust boundaries.
 - [api-reference.md](./api-reference.md), [data-layer.md](./data-layer.md), [caching.md](./caching.md) — Node contracts.
 - [plugins.md](./plugins.md), [agent-tools.md](./agent-tools.md) — extension and tool boundaries.
-- [third-party/](./third-party/) — how third-party plugins are loaded, distributed, trusted, and
-  sandboxed, and why each of those is shaped the way it is. Start at its README; each phase file
-  keeps the plan it was built from plus an "As built" section recording what differed.
-  [third-party/node-security.md](./third-party/node-security.md) is the threat model and the rules
-  any change touching plugin permissions has to hold to.
+- [first-party-plugins.md](./first-party-plugins.md) — every shipped plugin, and which of them are
+  first-party because they must be rather than because they were written first.
+- [webview/](./webview/) — planned: the browser view becomes a host-owned capability any plugin can
+  place in its own surface, while CDP driving stays first-party.
+- [third-party/](./third-party/) — the four built-in plugins that could move to the loaded-plugin
+  shape, one file each, with what it would prove and what it would cost.
 - [electron.md](./electron.md), [local-development.md](./local-development.md) — runtime and development.

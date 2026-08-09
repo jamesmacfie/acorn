@@ -17,6 +17,7 @@ import type { AppEnv } from '../middleware/auth'
 import type { StoredConnection } from './connections'
 import type { ExternalItemStore } from './itemStore'
 import type { Cached, RefreshResult } from '../sync/engine'
+import type { PluginFetchHandler } from '../plugin/types'
 
 export type ProviderCredentials = Record<string, string>
 export type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'
@@ -131,11 +132,10 @@ export type MirroredResourceContribution<TInput = unknown, TOutput = unknown> = 
 // A provider-owned HTTP router. `prefix` is relative to the provider's own plugin namespace
 // (`/v2/p/<providerId>`), so it is empty for a provider that owns its whole namespace — the
 // namespace segment comes from the declared providerId, never from the prefix string.
-export type ProviderRouteContribution = {
-  providerId: string
-  prefix: '' | `/${string}`
-  router: Hono<AppEnv>
-}
+export type ProviderRouteContribution = { providerId: string; prefix: '' | `/${string}` } & (
+  | { router: Hono<AppEnv>; fetch?: never }
+  | { fetch: PluginFetchHandler; router?: never }
+)
 
 export type ConnectionProviderContribution = {
   id: string

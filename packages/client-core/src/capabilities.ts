@@ -97,7 +97,7 @@ declare global {
       nodeRestartLocal?: () => Promise<void>
       nodeTunnelOpen?: (request: { nodeId: string; taskId: string; port: number }) => Promise<{ port: number }>
       nodeTunnelClose?: (match: { nodeId?: string; taskId?: string }) => void
-      // Third-party plugin bundles (docs/third-party/phase-2-distribution-trust.md). Reached only
+      // Third-party plugin bundles (docs/plugins.md). Reached only
       // through plugins/host.ts, which is the client's platform adapter for them: bundle bytes and
       // cache paths stay in main, so the renderer names a bundle by the hash main computed and by
       // nothing else. `cachePut` asks main to fetch a plugin's client half from a node.

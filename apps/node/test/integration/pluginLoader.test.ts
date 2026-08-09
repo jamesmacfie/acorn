@@ -14,7 +14,7 @@ import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { assembleNodeGraph } from '../../src/server/composition'
 
-// The dogfood (docs/third-party/phase-1-node-loader.md § Dogfood). Rollbar's node half is built to a
+// The dogfood (docs/plugins.md). Rollbar's node half is built to a
 // real bundle and loaded off disk, which exercises the whole path end to end — manifest, import,
 // shape check, permission-shaped context, provider registration — against first-party code rather
 // than a fixture. It is the only test here that proves a real plugin survives the round trip.
@@ -55,7 +55,7 @@ describe('loading rollbar from disk', () => {
       // It also appears in the distribution enumeration, with nothing to distribute: build-plugin.mjs
       // builds a node half only. Rollbar's client half is compiled into the app and is not a
       // self-contained sandbox bundle, so a `client` entry here would advertise something phase 3
-      // could not run (docs/third-party/phase-2-distribution-trust.md).
+      // could not run (docs/plugins.md).
       const { installed } = await loadExternalPlugins(dataRoot, { builtins: ['rollbar'] })
       expect(installed.map((entry) => [entry.manifest.id, entry.client])).toEqual([['rollbar', null]])
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { pluginManifestSchema } from './pluginManifest'
 
-// The declarative-chrome half of the manifest (docs/third-party/phase-4-declarative-chrome.md).
+// The declarative-chrome half of the manifest (docs/plugins.md).
 //
 // What is worth pinning here is not the field list — Zod holds that — but the three cross-field rules,
 // because each one is a place a manifest could otherwise name something outside itself: a route in
@@ -61,6 +61,7 @@ describe('chrome descriptors', () => {
     const result = manifest({ frames: [PANE] })
     expect(result.success && result.data.contributions.sources).toEqual([])
     expect(result.success && result.data.contributions.nodeStats).toEqual([])
+    expect(result.success && result.data.contributions.contentLinks).toEqual([])
   })
 
   it('confines every route to the plugin’s own namespace', () => {
@@ -108,6 +109,20 @@ describe('chrome descriptors', () => {
     expect(manifest({ palette: [{ id: 'p', title: 'P', action: { verb: 'invoke', id: 'new-card' } }] }).success).toBe(false)
   })
 
+  it('accepts the host-owned createTask verb without embedding executable steps', () => {
+    const result = manifest({
+      sources: [{
+        id: 'board',
+        label: 'Board',
+        order: 60,
+        items: '/v2/p/board/rail-items',
+        onSelect: { verb: 'createTask' },
+      }],
+    })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.sources[0]?.onSelect).toEqual({ verb: 'createTask' })
+  })
+
   it('rejects a duplicate contribution id across descriptor kinds', () => {
     const bad = manifest({ frames: [PANE], slots: [{ id: 'board', slot: 'footer', data: '/v2/p/board/badge' }] })
     expect(messages(bad)).toEqual([`duplicate contribution id 'board'`])
@@ -116,5 +131,31 @@ describe('chrome descriptors', () => {
   it('floors the polling fallback so a descriptor cannot busy-loop a remote node', () => {
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 30 }] }).success).toBe(true)
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 5 }] }).success).toBe(false)
+  })
+
+  it('validates declarative content links against their declared pane and capture', () => {
+    const good = manifest({
+      frames: [PANE],
+      contentLinks: [{
+        id: 'board.card',
+        match: 'https://*.board.example/cards/{key}',
+        openPane: 'board',
+        item: 'key',
+      }],
+    })
+    expect(good.success).toBe(true)
+
+    expect(messages(manifest({
+      contentLinks: [{
+        id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'missing', item: 'key',
+      }],
+    }))).toContain(`content link names 'missing', which this manifest does not declare as a pane`)
+
+    expect(messages(manifest({
+      frames: [PANE],
+      contentLinks: [{
+        id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'board', item: 'id',
+      }],
+    }))).toContain(`content link item 'id' is not captured by its match pattern`)
   })
 })

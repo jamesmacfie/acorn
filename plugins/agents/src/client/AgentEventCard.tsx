@@ -33,7 +33,7 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
           return (
             <div class="agent-message agent-message-user">
               <div class="agent-message-role">You</div>
-              <AgentMarkdown text={message.text} />
+              <AgentMarkdown text={message.text} taskId={props.taskId} />
               <Show when={props.turn?.input.some((part) => part.type === 'context')}>
                 <details class="agent-turn-manifest">
                   <summary>Context manifest</summary>
@@ -69,7 +69,7 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
                 <span class="agent-message-role">Agent</span>
                 <Button variant="bare" size="sm" class="agent-copy" title="Copy response" onClick={() => copy(message.text)}>Copy</Button>
               </div>
-              <AgentMarkdown text={message.text} />
+              <AgentMarkdown text={message.text} taskId={props.taskId} />
             </div>
           )
         })()}
@@ -80,7 +80,7 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
           return (
             <details class="agent-reasoning" open>
               <summary>Thinking <span>Provider reasoning</span></summary>
-              <AgentMarkdown text={reasoning.text} />
+              <AgentMarkdown text={reasoning.text} taskId={props.taskId} />
             </details>
           )
         })()}

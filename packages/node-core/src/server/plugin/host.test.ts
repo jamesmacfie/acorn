@@ -11,8 +11,33 @@ import { pluginRouteContributions } from '../routeRegistry'
 import { initPlugins } from './host'
 import type { NodePermissions } from '../../main/pluginManifest'
 import type { NodePlugin, NodePluginContext } from './types'
+import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providers/shared'
+import { integrationProviderRegistry } from '../integrations/registry'
 
 const noop = (): void => {}
+
+const provider = (id: string) => publicProvider({
+  id,
+  label: 'Test tracker',
+  glyph: 'T',
+  kind: 'issue-tracker',
+  connection: {
+    authKind: 'api-key' as const,
+    fields: [],
+    connectable: true,
+    disconnectable: true,
+    async validate() { return 'secret' },
+    normalize(_credentials, secret) {
+      return { secret, label: 'Test tracker', account: null, scopes: [], config: {}, capabilities: {} }
+    },
+    async test() { return { ok: true as const } },
+  },
+  externalIds: externalIdsFor(id),
+  capabilities: {},
+  resources: [],
+  budgets: defaultBudgets,
+  memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
+})
 
 describe('capability registry', () => {
   const greet = capabilityId<(name: string) => string>('test.greet')
@@ -366,5 +391,36 @@ describe('loaded plugins', () => {
     expect(contribution).toMatchObject({ plugin: 'ntfy', prefix: '/send' })
     expect(contribution?.router).toBeUndefined()
     expect(contribution?.fetch).toBeTypeOf('function')
+  })
+
+  it('contains a loaded plugin that passes a Hono router through the provider side door', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    const result = await host([
+      plugin('tracker', {
+        init: (ctx) => ctx.providers.integration(provider('tracker-provider'), new Hono<AppEnv>()),
+      }),
+      plugin('after'),
+    ], { tracker: {}, after: {} })
+
+    expect(result.failed[0]).toMatchObject({
+      name: 'tracker',
+      error: "Plugin 'tracker' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.",
+    })
+    expect(result.enabled).toEqual(['after'])
+    expect(integrationProviderRegistry.get('tracker-provider')).toBeUndefined()
+    expect(integrationProviderRegistry.routes().some((route) => route.providerId === 'tracker-provider')).toBe(false)
+    error.mockRestore()
+  })
+
+  it('accepts a fetch-shaped provider route from a loaded plugin', async () => {
+    await host([
+      plugin('tracker', {
+        init: (ctx) => ctx.providers.integration(provider('tracker-fetch-provider'), () => new Response('ok')),
+      }),
+    ], { tracker: {} })
+
+    const route = integrationProviderRegistry.routes().find((entry) => entry.providerId === 'tracker-fetch-provider')
+    expect(route?.router).toBeUndefined()
+    expect(route?.fetch).toBeTypeOf('function')
   })
 })

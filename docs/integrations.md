@@ -14,6 +14,13 @@ Provider routes are projected under `/v2/p/<provider>/...` and are protected fro
 callers by the provider-access gate. The generic administration routes are under
 `/v2/core/integrations`.
 
+Built-in providers may contribute a Hono router. Loaded providers must contribute the portable fetch
+carrier instead; the host rejects a live Hono instance from that tier. Both carriers pass through the
+same provider-access gate. Fetch handlers receive an owner- and plugin-bound `PluginProviderRuntime`
+for resource execution and connection enumeration. The runtime verifies that the requested provider
+belongs to the calling plugin and keeps SQLite and the secret service behind host calls;
+`withConnections` lends each decrypted credential only for the duration of the provider callback.
+
 Deleting a connection cascades its cached external items, freshness markers, project links, and task
 links. The provider mirror is disposable and is never treated as the upstream source of truth.
 

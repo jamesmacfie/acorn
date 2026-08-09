@@ -1,4 +1,4 @@
-// The host side of one sandboxed plugin frame's bridge (docs/third-party/phase-3-sandboxed-ui.md
+// The host side of one sandboxed plugin frame's bridge (docs/plugins.md
 // § Enforcement).
 //
 // One of these per frame. It holds the binding — plugin id, node, task, project, declared scopes — and
@@ -329,7 +329,7 @@ export const postAppearance = (port: MessagePort, appearance: Omit<PluginBridgeA
 }
 
 /** Push a rail-row selection into a live frame, for the same reason postAppearance exists: the host has
- * to reach a mounted frame without holding its port (docs/third-party/phase-4-declarative-chrome.md). */
+ * to reach a mounted frame without holding its port (docs/plugins.md). */
 export const postSelect = (port: MessagePort, item: string): void => {
   port.postMessage({ kind: 'select', item } satisfies PluginBridgeSelect)
 }

@@ -62,6 +62,7 @@ client: formatRelativeTime
 client: formatSize
 client: fuzzyScore
 client: getHighlighter
+client: handlePluginContentLinkClick
 client: integrationsOptions
 client: isAppDark
 client: isDarkColor
@@ -73,6 +74,7 @@ client: nodes
 client: onClosePaneWithin
 client: onScopeEvicted
 client: openPane
+client: openPluginContentTarget
 client: openRepoConfigTrust
 client: paneContribution
 client: parseInAppTarget
@@ -170,6 +172,9 @@ node: PluginBroadcast
 node: PluginDatabase
 node: PluginFetchHandler
 node: PluginManifest
+node: PluginProviderConnectionVisitor
+node: PluginProviderResourceRequest
+node: PluginProviderRuntime
 node: PluginRequestContext
 node: PrefService
 node: Principal

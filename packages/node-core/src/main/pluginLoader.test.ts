@@ -140,7 +140,7 @@ describe('loaded-plugin migration ownership', () => {
   })
 })
 
-// What the node offers to devices (docs/third-party/phase-2-distribution-trust.md). The hash here is
+// What the node offers to devices (docs/plugins.md). The hash here is
 // a claim the device cross-checks against the bytes it receives; it is never the thing trust binds to.
 describe('the installed enumeration', () => {
   it('reports the client bundle hash and size', async () => {
@@ -201,7 +201,7 @@ describe('the installed enumeration', () => {
 })
 
 // The manifest is the only place a shell contribution can be declared, so what it parses is the whole
-// vocabulary a third-party plugin's UI has (docs/third-party/phase-3-sandboxed-ui.md).
+// vocabulary a third-party plugin's UI has (docs/plugins.md).
 describe('declared frame contributions', () => {
   const withFrames = (frames: unknown[]) =>
     manifest('board', { client: './dist/client.js', contributions: { frames } })
@@ -220,7 +220,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [] })
+      .toEqual({ frames: [], sources: [], slots: [], palette: [], attention: [], nodeStats: [], contentLinks: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

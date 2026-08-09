@@ -9,7 +9,7 @@ import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
 // code shares the node's process and can import `node:fs` whatever its manifest claims. The `api` /
 // `events` half is enforced — the UI bridge refuses anything undeclared (plugins/frames/scopes.ts).
 // Rendering them as one list would let the strong half lend credibility to the weak one, which is
-// exactly the thing docs/third-party/node-security.md § Design rules, rule 6 forbids.
+// exactly the thing docs/security.md § Design rules, rule 6 forbids.
 //
 // A plain module rather than exports on the dialog, so a node-env suite can import it: client-core's
 // tests run under plain Node with no Solid plugin, and a .tsx does not parse there.

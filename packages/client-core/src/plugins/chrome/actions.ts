@@ -1,4 +1,4 @@
-import type { PluginChromeAction } from '@acorn/protocol/api.ts'
+import type { PluginChromeAction, PluginRailItem } from '@acorn/protocol/api.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
 import { openPane } from '../../registries/clientEvents'
@@ -6,7 +6,7 @@ import { activeTaskId } from '../../tasks/tasks'
 import { ownsRoute } from './data'
 
 // The closed verb set the host executes on a descriptor's behalf
-// (docs/third-party/phase-4-declarative-chrome.md § Action vocabulary).
+// (docs/plugins.md).
 //
 // Closed is the point. Every plugin composes the same few verbs, each one is a thing the host does in
 // its OWN realm, and adding a verb later is additive. What is NOT here in v1 is `invoke` — an RPC into
@@ -19,7 +19,8 @@ export type ChromeActionContext = {
   nodeId: string
   // The row that was clicked, for the surfaces that have rows. It is the whole reason `openPane` is
   // not the same thing twenty times over on a twenty-row rail list.
-  item?: string
+  item?: PluginRailItem
+  promote?: (item: PluginRailItem) => void
 }
 
 const toast = (pluginId: string, title: string, detail?: string): void =>
@@ -35,7 +36,7 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       // The row id travels as a retained pane intent, which is the mechanism that already closed this
       // exact mount-order race for core panes (registries/clientEvents.ts): the intent is held until the
       // pane consumes it, so a pane opening for the first time is not a race against its own mount.
-      openPane(taskId, action.pane, context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item })
+      openPane(taskId, action.pane, context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item.id })
       return
     }
     case 'runNodeAction': {
@@ -45,7 +46,7 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
         method: 'POST',
         nodeId: context.nodeId,
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(context.item === undefined ? {} : { item: context.item }),
+        body: JSON.stringify(context.item === undefined ? {} : { item: context.item.id }),
       }).then((result) => {
         // Success is silent — the node's status ping is what tells the chrome to re-read. Only a failure
         // needs saying, because nothing else on screen would show it.
@@ -53,6 +54,12 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       }, (error: unknown) => toast(context.pluginId, 'action failed', error instanceof Error ? error.message : String(error)))
       return
     }
+    case 'createTask':
+      if (!context.item || !context.promote) {
+        return toast(context.pluginId, 'could not create a task', 'This action needs a selected source row.')
+      }
+      context.promote(context.item)
+      return
     case 'openUrl':
       // Manifest parsing already rejected anything but https. `window.open` is denied by main's
       // setWindowOpenHandler, which hands the URL to `openExternal` — so this opens in the owner's

@@ -9,7 +9,7 @@ import { readJson } from '../../apiClient'
 import { wsOnStatus } from '../../wsClient'
 
 // Reading a descriptor's route, and knowing when to read it again
-// (docs/third-party/phase-4-declarative-chrome.md § Data flow and freshness).
+// (docs/plugins.md).
 //
 // Two things this module is responsible for, and they are both about not trusting the far end.
 //
@@ -84,6 +84,24 @@ async function read<T>(pluginId: string, path: string, nodeId: string, signal: A
 
 const str = (value: unknown): value is string => typeof value === 'string' && value.length > 0
 const opt = (value: unknown): boolean => value === undefined || str(value)
+const stringRecord = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value)
+  && Object.values(value).every((entry) => typeof entry === 'string')
+
+const isTask = (value: unknown): boolean => {
+  if (value === undefined) return true
+  if (!value || typeof value !== 'object') return false
+  const task = value as NonNullable<PluginRailItem['task']>
+  if (!opt(task.title) || !opt(task.branch) || !opt(task.body)) return false
+  if (task.link === undefined) return true
+  if (!task.link || typeof task.link !== 'object') return false
+  const ref = task.link.ref
+  return str(task.link.connectionId) && str(task.link.identifier)
+    && (ref === undefined || (
+      !!ref && typeof ref === 'object' && str(ref.displayId)
+      && opt(ref.externalId) && opt(ref.url)
+      && (ref.locator === undefined || stringRecord(ref.locator))
+    ))
+}
 
 const drop = (pluginId: string, what: string, row: unknown): void =>
   console.warn(`[plugin-chrome] ${pluginId} returned an unusable ${what}:`, row)
@@ -92,6 +110,7 @@ const isRailItem = (row: unknown): row is PluginRailItem => {
   const item = row as PluginRailItem
   return !!item && typeof item === 'object'
     && str(item.id) && str(item.title) && opt(item.subtitle) && opt(item.icon) && opt(item.badge)
+    && isTask(item.task)
 }
 
 export async function readRailItems(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<PluginRailItem[]> {

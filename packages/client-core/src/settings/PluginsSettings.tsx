@@ -18,7 +18,7 @@ import './settings.css'
 
 // Settings → Plugins (docs/ui-design.md § New surfaces: "the list of plugins with enable/disable toggles
 // (per node)"), and since phase 5 the whole install lifecycle as well
-// (docs/third-party/phase-5-install-ux.md § Client-side UX).
+// (docs/plugins.md).
 //
 // Per NODE, and the node picker at the top is the whole reason this is not a plain list: which plugins a
 // node runs decides which routes exist and which SQLite files it opens, so "disable docker" is a statement
@@ -133,7 +133,7 @@ export default function PluginsSettings() {
 
   // No background checking and no "an update is available" badge: re-resolving every source on every
   // roster read would mean this page phones GitHub for each installed plugin, and an update is the one
-  // moment a compromised maintainer gets to run new code (docs/third-party/node-security.md § Supply
+  // moment a compromised maintainer gets to run new code (docs/security.md § Supply
   // chain). The owner asks, and the node answers with whatever the source resolves to now.
   const update = (id: string) =>
     run(async () => {
@@ -181,7 +181,7 @@ export default function PluginsSettings() {
 
       {/* The install form. Deliberately plain: there is no browse-and-discover surface and there is not
           going to be one soon, because any listing acorn could offer would be unreviewed
-          (docs/third-party/README.md § Non-goals). Someone who installs a plugin here already decided to
+          (docs/plugins.md § Non-goals). Someone who installs a plugin here already decided to
           trust its author. */}
       <form
         class="plugin-install"

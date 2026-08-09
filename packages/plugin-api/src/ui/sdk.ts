@@ -1,5 +1,5 @@
 // The bridge a third-party plugin's client bundle talks to the shell through
-// (docs/third-party/phase-3-sandboxed-ui.md § Plugin-side SDK).
+// (docs/plugins.md).
 //
 // Its own entrypoint rather than a section of ./ui, and this is the one split in the package that is
 // about the RUNTIME rather than about components. A plugin's client bundle runs inside a sandboxed
