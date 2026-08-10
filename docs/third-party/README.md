@@ -43,10 +43,20 @@ Worth stating, because the hard parts are the ones that went well:
 
 ## What is still owed, beyond these findings
 
-- **linear, http, database and editor were not moved.** All four remain in both composition lists;
-  their migration plans lived in this folder and were cleared with it. Git history has them
-  (`docs/third-party/{linear,http,database,editor}.md`) if they are wanted back — `http` in
-  particular carried the only analysis of the plugin-migrations path, which nothing has exercised.
-- **`agentContexts` still has no manifest form**, which is what blocks http and database.
+- **linear, http, database and editor were not moved.** All four remain in both composition lists.
+  Their migration briefs are back in this folder — [linear.md](./linear.md), [http.md](./http.md),
+  [database.md](./database.md), [editor.md](./editor.md) — each with a note at the top correcting what
+  the rollbar migration changed underneath it. `http` carries the only analysis of the
+  plugin-migrations path, which nothing has exercised. The rollbar brief itself was not restored; this
+  file plus `plugins/rollbar/` is the reference now.
+- **`agentContexts` has a manifest form**, so http and database are no longer blocked on the carrier.
+  A descriptor names two routes in the plugin's own namespace — `options` (GET) and `capture` (POST) —
+  and the host binds everything a plugin should not: `source` from the plugin id, the capture time,
+  and the byte measurement the 512 KiB ceiling is checked against. `revision?()` deliberately has no
+  form: it is synchronous and a descriptor answers across a fetch.
+- **Editor's blockers are now named rather than vague**: its `overlay` component slot and its
+  `persistedState` slice have no manifest form, and whether an unminified Monaco frame fits under the
+  8 MiB client-bundle cap is unmeasured. That last one gates database too, which also depends on
+  `monaco-editor`.
 - **Release validation**, as the moved doc already noted: a real-token soak and an installer-driven
   update. Finding 1 is a precondition for the second of those.

@@ -2,6 +2,7 @@ import { createComponent, lazy } from 'solid-js'
 import type { NodePluginRow, PluginCommandDescriptor } from '@acorn/protocol/api.ts'
 import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
 import { activeNodeId } from '../../node/activeNode'
+import { agentContextRegistry } from '../../registries/agentContexts'
 import { attentionRegistry, type AttentionItem } from '../../registries/attention'
 import { nodeStatRegistry } from '../../registries/nodeStats'
 import { commandRegistry } from '../../registries/commands'
@@ -17,7 +18,15 @@ import {
   pluginInstalledAtOnNode,
 } from '../distribution'
 import { runChromeAction } from './actions'
-import { ownsRoute, readAttention, readStat, unwatchChrome, watchChrome } from './data'
+import {
+  captureAgentContext,
+  ownsRoute,
+  readAgentContextOptions,
+  readAttention,
+  readStat,
+  unwatchChrome,
+  watchChrome,
+} from './data'
 import { descriptorPromotion } from './promotion'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../../registries/contentLinks'
@@ -214,6 +223,28 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       // `0` is hidden on the card, which is the right answer for a node that does not run this plugin.
       fetch: async (nodeId, signal) =>
         pluginEnabledOnNode(nodeId, pluginId) ? readStat(pluginId, descriptor.data, nodeId, signal) : 0,
+    }))
+  }
+
+  for (const descriptor of contributions.agentContexts ?? []) {
+    // The composer groups and replaces snapshots by `source`, so `source` is a namespace and the host
+    // binds it — from the plugin id plus the contribution id, in the same colon form `ownsTaskOrigin`
+    // accepts. A manifest never gets to name it: `http` claiming `context.task` would evict acorn's
+    // own task-context snapshot from someone's draft.
+    const source = `${pluginId}:${descriptor.id}`
+    // No `revision`. It is synchronous and a descriptor answers across a fetch, so there is no number
+    // to return in time; the invalidation ping the rest of the chrome rides covers the same freshness.
+    add('agent context', descriptor.id, () => agentContextRegistry.register({
+      id: descriptor.id,
+      source,
+      label: descriptor.label,
+      ...(descriptor.description ? { description: descriptor.description } : {}),
+      options: async (scope) => pluginEnabledOnNode(chromeNode(), pluginId)
+        ? readAgentContextOptions(pluginId, descriptor.options, chromeNode(), scope)
+        : [],
+      capture: async (scope, optionIds) => pluginEnabledOnNode(chromeNode(), pluginId)
+        ? captureAgentContext(pluginId, descriptor.capture, chromeNode(), scope, optionIds, { source, panes })
+        : [],
     }))
   }
 

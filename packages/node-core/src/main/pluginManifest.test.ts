@@ -100,6 +100,7 @@ describe('chrome descriptors', () => {
     expect(result.success && result.data.contributions.sources).toEqual([])
     expect(result.success && result.data.contributions.nodeStats).toEqual([])
     expect(result.success && result.data.contributions.contentLinks).toEqual([])
+    expect(result.success && result.data.contributions.agentContexts).toEqual([])
     expect(result.success && result.data.contributions.commands).toEqual([])
     expect(result.success && result.data.contributions.keybindings).toEqual([])
   })
@@ -168,6 +169,35 @@ describe('chrome descriptors', () => {
   it('rejects a duplicate contribution id across descriptor kinds', () => {
     const bad = manifest({ frames: [PANE], slots: [{ id: 'board', slot: 'footer', data: '/v2/p/board/badge' }] })
     expect(messages(bad)).toEqual([`duplicate contribution id 'board'`])
+  })
+
+  it('carries an agent-context pair and confines both of its routes', () => {
+    const good = manifest({
+      agentContexts: [{
+        id: 'saved-requests',
+        label: 'Saved HTTP requests',
+        description: 'Request shapes with credential-bearing fields redacted.',
+        options: '/v2/p/board/context-options',
+        capture: '/v2/p/board/context-capture',
+      }],
+    })
+    expect(good.success).toBe(true)
+    expect(good.success && good.data.contributions.agentContexts[0]?.capture).toBe('/v2/p/board/context-capture')
+
+    // A core route is the obvious escape; another plugin's namespace is the one that looks legal.
+    expect(messages(manifest({
+      agentContexts: [{ id: 'c', label: 'C', options: '/v2/core/tasks', capture: '/v2/p/board/capture' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({
+      agentContexts: [{ id: 'c', label: 'C', options: '/v2/p/board/options', capture: '/v2/p/http/context-capture' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+  })
+
+  it('rejects an agent-context id already taken by another contribution kind', () => {
+    expect(messages(manifest({
+      frames: [PANE],
+      agentContexts: [{ id: 'board', label: 'Board context', options: '/v2/p/board/options', capture: '/v2/p/board/capture' }],
+    }))).toEqual([`duplicate contribution id 'board'`])
   })
 
   it('floors the polling fallback so a descriptor cannot busy-loop a remote node', () => {
