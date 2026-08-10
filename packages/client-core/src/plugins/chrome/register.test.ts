@@ -3,12 +3,16 @@ import type { NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
 
 const readJson = vi.fn()
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
+const writeJson = vi.fn()
 vi.mock('../../apiClient', () => ({
   readJson: (...args: unknown[]) => readJson(...args),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
+  writeJson: (...args: unknown[]) => writeJson(...args),
 }))
 
+const { MAX_AGENT_CONTEXT_BYTES } = await import('@acorn/protocol/agentContext.ts')
 const { setActiveNode } = await import('../../node/activeNode')
+const { agentContextRegistry } = await import('../../registries/agentContexts')
 const { attentionRegistry } = await import('../../registries/attention')
 const { nodeStatRegistry } = await import('../../registries/nodeStats')
 const { commandAvailable, commandRegistry, executeCommand } = await import('../../registries/commands')
@@ -52,6 +56,12 @@ const CHROME: Partial<PluginContributions> = {
   palette: [{ id: 'board.new', title: 'Board: new card', action: { verb: 'runNodeAction', path: '/v2/p/board/new' } }],
   attention: [{ id: 'board-stuck', order: 500, items: '/v2/p/board/attention' }],
   nodeStats: [{ id: 'board-count', order: 500, label: ['card stuck', 'cards stuck'], data: '/v2/p/board/stat' }],
+  agentContexts: [{
+    id: 'board-context',
+    label: 'Board cards',
+    options: '/v2/p/board/context-options',
+    capture: '/v2/p/board/context-capture',
+  }],
 }
 
 const ids = () => ({
@@ -61,10 +71,12 @@ const ids = () => ({
   keybindings: keybindingRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
   attention: attentionRegistry.entries().map((entry) => entry.id),
   nodeStats: nodeStatRegistry.entries().map((entry) => entry.id),
+  agentContexts: agentContextRegistry.entries().map((entry) => entry.id),
 })
 
 beforeEach(() => {
   readJson.mockReset()
+  writeJson.mockReset()
   sendRaw.mockClear()
   setActiveNode('node-a')
 })
@@ -86,6 +98,7 @@ describe('syncChromeContributions', () => {
       keybindings: [],
       attention: ['board-stuck'],
       nodeStats: ['board-count'],
+      agentContexts: ['board-context'],
     })
   })
 
@@ -260,6 +273,84 @@ describe('syncChromeContributions', () => {
     clash.dispose()
   })
 
+  // The one descriptor pair whose answer leaves the shell and enters an agent's prompt, so what is
+  // pinned here is the trust boundary rather than the plumbing: the host binds `source`, measures the
+  // bytes itself, and refuses a body it cannot parse or cannot fit.
+  describe('agent contexts', () => {
+    const scope = { taskId: 'task-1' }
+    const snapshot = (over: Record<string, unknown> = {}) => ({
+      contextId: 'board:card-1', label: 'Card 1', content: '# Card 1', ...over,
+    })
+
+    beforeEach(() => {
+      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
+      syncChromeContributions()
+    })
+
+    it('reads options from the declared path with the scope as query parameters', async () => {
+      readJson.mockResolvedValue([{ id: 'card-1', label: 'Card 1' }])
+      const options = await agentContextRegistry.get('board-context')!.options(scope)
+      expect(options).toEqual([{ id: 'card-1', label: 'Card 1' }])
+      expect(readJson).toHaveBeenCalledWith('/v2/p/board/context-options?taskId=task-1', expect.objectContaining({ nodeId: 'node-a' }))
+    })
+
+    it('captures over POST and binds source, capture time and byte size host-side', async () => {
+      // Everything a plugin should not be trusted with, supplied by the plugin: another plugin's
+      // namespace, a pane it never declared, and a byte count that would walk past the composer's
+      // ceiling if it were believed.
+      writeJson.mockResolvedValue([snapshot({
+        source: 'context.task',
+        byteSize: 1,
+        estimatedTokens: 1,
+        capturedAt: 1,
+        deepLink: { pane: 'someone-elses-pane' },
+        resourceId: 'card-1',
+        sensitivity: 'private',
+      })])
+      const captured = await agentContextRegistry.get('board-context')!.capture(scope, ['card-1'])
+      expect(writeJson).toHaveBeenCalledWith('/v2/p/board/context-capture', expect.objectContaining({
+        method: 'POST',
+        nodeId: 'node-a',
+        body: JSON.stringify({ taskId: 'task-1', optionIds: ['card-1'] }),
+      }))
+      expect(captured).toHaveLength(1)
+      expect(captured[0]).toMatchObject({
+        type: 'context',
+        source: 'board:board-context',
+        contextId: 'board:board-context:board:card-1',
+        resourceId: 'card-1',
+        sensitivity: 'private',
+        byteSize: 8,
+      })
+      expect(captured[0]?.deepLink).toBeUndefined()
+      expect(captured[0]?.capturedAt).toBeGreaterThan(1)
+    })
+
+    it('yields no snapshots for a malformed capture body', async () => {
+      for (const body of [{ items: [] }, [{ contextId: 'x', label: 'X' }], ['not an object'], null]) {
+        writeJson.mockResolvedValue(body)
+        expect(await agentContextRegistry.get('board-context')!.capture(scope)).toEqual([])
+      }
+      readJson.mockResolvedValue({ options: [] })
+      expect(await agentContextRegistry.get('board-context')!.options(scope)).toEqual([])
+    })
+
+    it('rejects a capture over the shared context ceiling rather than trimming it to fit', async () => {
+      writeJson.mockResolvedValue([snapshot({ content: 'x'.repeat(MAX_AGENT_CONTEXT_BYTES) }), snapshot({ contextId: 'board:card-2' })])
+      await expect(agentContextRegistry.get('board-context')!.capture(scope)).rejects.toThrow(/512 KiB of context/)
+    })
+
+    it('asks a node that does not run the plugin for nothing', async () => {
+      setActiveNode('node-b')
+      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+      syncChromeContributions()
+      expect(await agentContextRegistry.get('board-context')!.options(scope)).toEqual([])
+      expect(await agentContextRegistry.get('board-context')!.capture(scope)).toEqual([])
+      expect(readJson).not.toHaveBeenCalled()
+      expect(writeJson).not.toHaveBeenCalled()
+    })
+  })
+
   it('takes all of a plugin’s chrome away when it stops being offered', () => {
     const shortcutChrome: Partial<PluginContributions> = {
       commands: [{ id: 'search', title: 'Board: search', category: 'action', palette: false, action: { verb: 'runNodeAction', path: '/v2/p/board/search' } }],
@@ -274,7 +365,7 @@ describe('syncChromeContributions', () => {
 
     _seedPluginDistribution([['node-a', []]])
     syncChromeContributions()
-    expect(ids()).toEqual({ sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [] })
+    expect(ids()).toEqual({ sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [] })
     expect(orphanedPluginOverrideIds(overrides, keybindingRegistry.entries())).toEqual([overrideId])
   })
 })

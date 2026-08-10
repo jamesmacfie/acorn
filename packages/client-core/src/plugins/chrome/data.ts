@@ -5,7 +5,16 @@ import type {
   PluginRailItem,
   PluginSlotBadge,
 } from '@acorn/protocol/api.ts'
-import { readJson } from '../../apiClient'
+import {
+  agentContextBudget,
+  MAX_AGENT_CONTEXT_BYTES,
+  pluginAgentContextOptionsSchema,
+  pluginAgentContextSnapshotsSchema,
+  type AgentContextCaptureScope,
+  type AgentContextOption,
+  type AgentContextSnapshot,
+} from '@acorn/protocol/agentContext.ts'
+import { readJson, writeJson } from '../../apiClient'
 import { wsOnStatus } from '../../wsClient'
 import { ownsTaskOrigin } from './ownership'
 
@@ -95,7 +104,8 @@ export const scopedSourceItemsPath = (path: string, projectId: string | undefine
   return `${path}${separator}project=${encodeURIComponent(projectId)}`
 }
 
-async function read<T>(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<T> {
+// `signal` is optional only for the agent-context reads below; every query-backed reader has one.
+async function read<T>(pluginId: string, path: string, nodeId: string, signal?: AbortSignal): Promise<T> {
   if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not read ${path}`)
   return readJson<T>(path, { nodeId, signal })
 }
@@ -185,6 +195,106 @@ export async function readAttention(pluginId: string, path: string, nodeId: stri
   const body = await read<{ items?: unknown }>(pluginId, path, nodeId, signal)
   const rows = Array.isArray(body?.items) ? body.items : []
   return rows.filter((row) => isAttentionItem(row) || (drop(pluginId, 'attention item', row), false)) as PluginAttentionWireItem[]
+}
+
+// ── Agent context ─────────────────────────────────────────────────────────────────────────────────
+//
+// The one descriptor pair whose answer leaves the shell and enters a model's prompt, so it is held to
+// a stricter standard than the badges above: a real parser (@acorn/protocol/agentContext.ts) rather
+// than a field-by-field sniff, and a hard refusal instead of a truncation when it is too big.
+//
+// No `AbortSignal` here, unlike every reader above, because there is no query: the composer calls
+// these when a person clicks, and its own capture-version guard already discards a stale answer.
+
+/** Scope rides as query parameters, minted here so a plugin route cannot see a node or a task the
+ * composer did not name. */
+const scopedContextPath = (path: string, scope: AgentContextCaptureScope): string => {
+  const separator = path.includes('?') ? '&' : '?'
+  const query = new URLSearchParams({ taskId: scope.taskId })
+  if (scope.workspaceId) query.set('workspaceId', scope.workspaceId)
+  return `${path}${separator}${query.toString()}`
+}
+
+export async function readAgentContextOptions(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  scope: AgentContextCaptureScope,
+): Promise<AgentContextOption[]> {
+  const body = await read<unknown>(pluginId, scopedContextPath(path, scope), nodeId)
+  const parsed = pluginAgentContextOptionsSchema.safeParse(body)
+  if (!parsed.success) {
+    // Same answer as a malformed badge: the picker offers nothing rather than offering something the
+    // host cannot reason about. All-or-nothing rather than per-row, because an option list with holes
+    // in it silently hides things a person expected to be able to attach.
+    drop(pluginId, 'agent context option list', body)
+    return []
+  }
+  return parsed.data
+}
+
+/** What the HOST binds on a captured snapshot, none of it readable from the plugin's response. */
+export type AgentContextBinding = {
+  // Derived from the plugin id by the caller, never taken from the manifest. The composer groups and
+  // replaces snapshots by `source`, so a plugin naming another's would evict its context.
+  source: string
+  // The panes this plugin's own manifest declares. A deep link naming anything else is dropped.
+  panes: ReadonlySet<string>
+}
+
+export async function captureAgentContext(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  scope: AgentContextCaptureScope,
+  optionIds: readonly string[] | undefined,
+  binding: AgentContextBinding,
+): Promise<AgentContextSnapshot[]> {
+  if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not read ${path}`)
+  const body = await writeJson<unknown>(path, {
+    method: 'POST',
+    nodeId,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      taskId: scope.taskId,
+      ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
+      ...(optionIds ? { optionIds: [...optionIds] } : {}),
+    }),
+  })
+  const parsed = pluginAgentContextSnapshotsSchema.safeParse(body)
+  if (!parsed.success) {
+    drop(pluginId, 'agent context capture', body)
+    return []
+  }
+  const capturedAt = Date.now()
+  const snapshots = parsed.data.map((row): AgentContextSnapshot => {
+    const byteSize = new TextEncoder().encode(row.content).byteLength
+    return {
+      type: 'context',
+      // Namespaced for the same reason attention rows are: the composer removes a snapshot by
+      // `contextId` equality, so two plugins both answering `card-1` would remove each other's.
+      contextId: `${binding.source}:${row.contextId}`,
+      label: row.label,
+      content: row.content,
+      source: binding.source,
+      ...(row.resourceId ? { resourceId: row.resourceId } : {}),
+      ...(row.provenance ? { provenance: row.provenance } : {}),
+      ...(row.deepLink && binding.panes.has(row.deepLink.pane) ? { deepLink: row.deepLink } : {}),
+      byteSize,
+      estimatedTokens: Math.ceil(byteSize / 4),
+      ...(row.freshness ? { freshness: row.freshness } : {}),
+      ...(row.sensitivity ? { sensitivity: row.sensitivity } : {}),
+      capturedAt,
+    }
+  })
+  // Rejected outright, not trimmed to fit. Truncating someone's API schema or query text in the middle
+  // produces a snapshot that looks complete to an agent and is not, which is worse than no snapshot;
+  // and unlike a malformed row this is worth telling the person about, so it throws into the
+  // composer's error line rather than disappearing into a console warning.
+  if (agentContextBudget(snapshots).overLimit) {
+    throw new Error(`${pluginId} returned more than ${MAX_AGENT_CONTEXT_BYTES / 1024} KiB of context; nothing was attached.`)
+  }
+  return snapshots
 }
 
 export async function readStat(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<number> {

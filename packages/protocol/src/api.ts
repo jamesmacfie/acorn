@@ -397,6 +397,17 @@ export type PluginContentLinkDescriptor = {
   openPane: string
   item: string
 }
+// An entry in the agent composer's "add Acorn context" list. The registry behind it takes two async
+// functions, which is why it had no manifest form for a while — but the contract was already
+// data-in/data-out, so two routes carry it. `options` is a GET, `capture` a POST; the response shapes
+// and everything the host binds rather than reads are in agentContext.ts.
+export type PluginAgentContextDescriptor = {
+  id: string
+  label: string
+  description?: string
+  options: string
+  capture: string
+}
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
 // serves: the host is the one rendering these, so the shape is its contract and not the plugin's
@@ -453,6 +464,7 @@ export type PluginContributions = {
   attention?: PluginAttentionDescriptor[]
   nodeStats?: PluginNodeStatDescriptor[]
   contentLinks?: PluginContentLinkDescriptor[]
+  agentContexts?: PluginAgentContextDescriptor[]
 } & Record<string, unknown>
 
 export type InstalledPluginRow = {

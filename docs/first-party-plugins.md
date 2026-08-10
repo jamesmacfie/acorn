@@ -47,15 +47,25 @@ attachment behind preview's browser agent tools — plus preview's tunnel header
 core (or the shell in front of it) with a hole it cannot degrade around. These are the `required`
 plugins: they cannot be disabled, so they cannot be optional, so they cannot be third-party.
 
-**E. Registries with no manifest form** — `agentContexts`, `persistedState`, `keybindings`,
-`agentToolRenderers`, and the generic `ctx.contribute(registry, entry)` escape hatch. These take
+**E. Registries with no manifest form** — `persistedState`, `agentToolRenderers`, non-`footer`
+component slots, and the generic `ctx.contribute(registry, entry)` escape hatch. These take
 functions or components. Some are inherently first-party (B); others simply have no declarative
 equivalent yet, which is a gap rather than a law — noted per row where that is the case.
 
-`contentLinks` used to be on this list and no longer is: a loaded plugin declares URL recognisers
-in its manifest (`contentLinks: [{ match, openPane, item }]`, compiled host-side from a restricted
-pattern grammar). First-party plugins still register them as functions through `ctx.contribute`,
-which is a carrier difference, not a capability one.
+Two entries have come off this list, and both by the same route — the registry took functions, but
+its contract was already data-in/data-out, so a descriptor could carry it.
+
+`contentLinks` was the first: a loaded plugin declares URL recognisers in its manifest
+(`contentLinks: [{ match, openPane, item }]`, compiled host-side from a restricted pattern grammar).
+
+`agentContexts` is the second. A descriptor names two routes on the plugin's own node half —
+`options` (GET) and `capture` (POST) — and the host performs both fetches, binds `source` from the
+plugin id, stamps the capture time, and measures the snapshot bytes itself against the shared
+512 KiB ceiling. Only `revision?()` did not survive, and deliberately: it is synchronous, and a
+descriptor answers across a fetch.
+
+First-party plugins still register both as functions through `ctx.contribute`, which is a carrier
+difference, not a capability one.
 
 Two things that are **not** on this list, deliberately:
 
@@ -92,7 +102,7 @@ Ordered by how strong the first-party claim is.
 | **changes** | Contributes an **agent-tool renderer** — the component that draws its tool's calls inline in the agents transcript, dozens per screen, sharing the list's scroll and selection. Everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) is available to loaded plugins. | B |
 | **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contribute` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. The most-privileged-looking plugin in the tree is now among the closest to portable; what actually keeps it here is `GITHUB_MIRROR` having a consumer. | D |
 | **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability rather than UI. | D, E |
-| **context** | Contributes an `agentContexts` entry and a `persistedState` slice — two registries with no manifest form. Small plugin, narrow reason. | E |
+| **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
 
 ### First-party only by history
 
@@ -102,9 +112,9 @@ written before the loader existed.
 | Plugin | What it uses | Portable? |
 | --- | --- | --- |
 | **linear** | The rollbar set plus a ref panel github renders and content-link recognisers. Publishes nothing, `required` by nothing. | **Yes, fully.** `refPanel` is a frame target and content links are declarative, so both of its apparent privileges are carrier differences |
-| **http** | Its own SQLite file, a pane, a rail source, a settings page, an `agentContexts` entry. Uses `core.secrets`. | Yes, once `agentContexts` has a manifest form |
-| **database** | Its own SQLite file, a pane, an `agentContexts` entry, publishes `DATABASE`. | Yes — `DATABASE` turns out to have no consumer outside the plugin |
-| **editor** | Monaco pane, find-in-files over ripgrep, a component slot, `EDITOR`/`SEARCH`. | Yes — neither capability has an outside consumer. Remaining questions: the component slot, and how Monaco behaves in a frame |
+| **http** | Its own SQLite file, a pane, a rail source, a settings page, an `agentContexts` entry. Uses `core.secrets`. | **Yes.** Its one remaining wrinkle is `activate: purgeStoredHttpDrafts()`, and a loaded plugin's client half has no lifecycle hook — the purge needs a new home alongside the drafts |
+| **database** | Its own SQLite file, a pane, an `agentContexts` entry, publishes `DATABASE`. Runs `bash -lc` on a repo-configured script through `core.proc`. | Yes — `DATABASE` turns out to have no consumer outside the plugin. It also depends on `monaco-editor`, so it shares editor's unanswered bundle-size question |
+| **editor** | Monaco pane, find-in-files over ripgrep, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. | Yes — neither capability has an outside consumer. Two concrete gaps first: the manifest's slot descriptor accepts `footer` only, `persistedState` has no form at all, and whether an unminified Monaco bundle fits the 8 MiB client-bundle cap is unmeasured |
 | **model-providers** | Registers connection providers and model adapters. No client half at all. | Yes — the cleanest node-only shape in the tree |
 
 Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded
@@ -128,11 +138,13 @@ Rollbar now exercises provider fetch routes, descriptor chrome, project scoping,
 distribution and frame rendering as production code. Its move found and closed two carrier gaps that
 fixtures had missed, which is exactly why the seam needed a standing caller.
 
-Three smaller gaps in the same category. `agentContexts` and `persistedState` have no manifest
-form, which is why `context`, `http` and `database` appear more privileged than they are. And
-**keybindings** used to have none either; loaded plugins now declare `commands` and
-`keybindings` in the manifest, and a frame forwards unclaimed chords to the shell dispatcher
-(`docs/command-palette-and-shortcuts.md`).
+Two smaller gaps in the same category. **`persistedState`** has no manifest form, which is why
+`context` and `editor` appear more privileged than they are, and neither does a component slot
+outside the task footer. Both **keybindings** and **`agentContexts`** used to be on that list and no
+longer are: loaded plugins declare `commands` and `keybindings` in the manifest with a frame
+forwarding unclaimed chords to the shell dispatcher
+(`docs/command-palette-and-shortcuts.md`), and an `agentContexts` descriptor names two routes the
+host fetches on the plugin's behalf. That last one is what unblocked `http` and `database`.
 
 ## Rules of thumb
 
@@ -177,8 +189,9 @@ Everything real — codecs, sync policy, routes, frame and descriptor projection
 plugin. Copy this loaded shape for an external item source.
 
 **http** — the fullest example of a self-contained feature plugin: its own SQLite file and
-migration chain, a pane, a rail source, a settings page, use-scoped secrets. The one thing a
-loaded plugin could not do today is its `agentContexts` entry.
+migration chain, a pane, a rail source, a settings page, use-scoped secrets, and an `agentContexts`
+entry that a manifest can now carry. Nothing in it is out of a loaded plugin's reach; the one thing
+that needs rehoming on the way across is the draft purge it runs from `activate`.
 
 **linear** — the second integration, and the one to read once rollbar makes sense. It differs in
 exactly the two places worth studying: promotion is looser (a Linear issue carries its own branch

@@ -171,8 +171,8 @@ kinds of contribution come out of one manifest:
   isolated ephemeral partition, no preload, no CDP, no devtools, no tunnel credentials, and no script
   or message bridge. The plugin's sandboxed client frame remains the controller for only
   `navigate`, `back`, `forward`, and `reload`; it cannot read the page or type into it.
-- **Descriptors** — a rail source, task-footer badge, commands/keybindings, attention items, node stats, and
-  restricted URL recognizers (`contentLinks`).
+- **Descriptors** — a rail source, task-footer badge, commands/keybindings, attention items, node stats,
+  restricted URL recognizers (`contentLinks`), and agent-context entries (`agentContexts`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
   mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
@@ -182,7 +182,16 @@ kinds of contribution come out of one manifest:
   the modal, origin namespace, connection ownership check, create-before-link ordering, and
   partial-failure reporting. A `contentLinks` entry uses a
   bounded `https://` host/path grammar, names a pane from the same manifest, and delivers one captured
-  path segment as a `plugin:select` intent.
+  path segment as a `plugin:select` intent. An `agentContexts` entry names two routes — `options`
+  (GET) and `capture` (POST) — and puts a row in the agent composer's context picker. Its `capture`
+  answer is the one descriptor response that ends up inside a model's prompt, so it is parsed against
+  a schema rather than sniffed field by field, and the host binds what a plugin must not: `source`
+  comes from the plugin id, the capture time is stamped here, and the bytes are measured from the
+  content received rather than believed from the response, so the shared 512 KiB
+  `MAX_AGENT_CONTEXT_BYTES` ceiling cannot be talked past. An over-budget capture is refused whole,
+  never trimmed. The `revision?()` half of the first-party contract has no manifest form on purpose:
+  it is synchronous, a descriptor answers across a fetch, and the invalidation ping already covers
+  freshness.
 
 ### Frame authoring and the UI kit
 

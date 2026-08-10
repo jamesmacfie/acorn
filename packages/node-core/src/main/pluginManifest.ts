@@ -250,6 +250,31 @@ const contentLinkDescriptor = z.object({
   item: z.string().min(1).max(32),
 })
 
+// An entry in the agent composer's "add Acorn context" list, served by two routes on the plugin's own
+// node half (@acorn/protocol/agentContext.ts holds the response schemas).
+//
+// The registry this lands in takes two async FUNCTIONS, which is what kept it off this list while
+// `http` and `database` waited — but the contract was already data-in/data-out, so a pair of routes
+// carries it with nothing lost. It follows the same argument as every descriptor above: the data lives
+// on the node anyway, the node is always running, and the host draws the picker with its own
+// components.
+//
+// `revision?()` gets NO manifest form, and that is a decision rather than an omission. It is a
+// synchronous number the composer reads while assembling its automatic-context cache key, and a
+// descriptor answers across a fetch — there is no value to return in time. The invalidation ping the
+// rest of the chrome already rides (client-core/plugins/chrome/data.ts) covers the same freshness
+// need, so a plugin loses nothing it could have used.
+const agentContextDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  description: z.string().min(1).max(240).optional(),
+  // GET ?taskId=&workspaceId= → AgentContextOption[]
+  options: pluginRoute,
+  // POST { taskId, workspaceId?, optionIds? } → snapshot bodies. The host binds `source` from the
+  // plugin id, stamps the capture time, and measures the bytes itself.
+  capture: pluginRoute,
+})
+
 // `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` is
 // still a loose object even now that phase 4's keys are named: a manifest written for a newer acorn
 // should contribute less on an older one rather than fail to parse.
@@ -263,12 +288,16 @@ const contributions = z.looseObject({
   attention: z.array(attentionDescriptor).max(4).default([]),
   nodeStats: z.array(nodeStatDescriptor).max(4).default([]),
   contentLinks: z.array(contentLinkDescriptor).max(16).default([]),
+  // Four, the same ceiling as attention and nodeStats. A composer list with more than a couple of
+  // entries from one plugin is a picker inside a picker, not a richer integration.
+  agentContexts: z.array(agentContextDescriptor).max(4).default([]),
 }).prefault({})
 
 export type PluginFrameSurface = z.infer<typeof frameSurface>
 export type PluginChromeAction = z.infer<typeof chromeAction>
 export type PluginCommandDescriptor = z.infer<typeof commandDescriptor>
 export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
+export type PluginAgentContextDescriptor = z.infer<typeof agentContextDescriptor>
 
 const manifestShape = z.object({
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
@@ -328,7 +357,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     }
   }
 
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts } = manifest.contributions
   frames.forEach((frame, i) => {
     const at = ['contributions', 'frames', i] as (string | number)[]
     if (frame.target !== 'webview') {
@@ -386,6 +415,10 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   })
   attention.forEach((entry, i) => route(entry.items, ['contributions', 'attention', i, 'items']))
   nodeStats.forEach((entry, i) => route(entry.data, ['contributions', 'nodeStats', i, 'data']))
+  agentContexts.forEach((entry, i) => {
+    route(entry.options, ['contributions', 'agentContexts', i, 'options'])
+    route(entry.capture, ['contributions', 'agentContexts', i, 'capture'])
+  })
   contentLinks.forEach((entry, i) => {
     if (!panes.has(entry.openPane)) {
       ctx.addIssue({
@@ -411,7 +444,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...manifest.contributions.frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks]) {
+  for (const entry of [...manifest.contributions.frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

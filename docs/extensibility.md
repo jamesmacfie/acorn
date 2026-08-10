@@ -246,9 +246,10 @@ Roughly in order of how much they matter:
    different: http is the only one that would exercise plugin-owned storage and a migration
    shipped through an update; editor is the hardest and most valuable, because it demands
    keybindings, latency and real cross-pane traffic.
-3. **The carriers that are still missing.** `agentContexts` (the composer's attach-to-context
-   picker) has no manifest form and is the last thing blocking two migrations. Its contract is
-   already async-data-shaped, so this is a carrier, not a redesign.
+3. **The carriers that are still missing.** `agentContexts` — the composer's attach-to-context
+   picker, and the last thing blocking http and database — now has one: two routes the host fetches
+   on the plugin's behalf, which is what its already-async-data-shaped contract needed. What is left
+   is `persistedState` and a component slot outside the task footer, both of which editor wants.
 4. **Ecosystem, if and when it is wanted** — discovery, a scaffold, an authoring guide, a written
    compatibility policy. Deliberately last: none of it is worth building before a plugin someone
    outside this repo actually wants to ship.
