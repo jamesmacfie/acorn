@@ -597,7 +597,12 @@ test('asks before running a plugin a paired node serves, then caches it for offl
     'Read projects, including where every codebase lives on disk',
   )
   await expect(dialog.locator('.plugin-trust-permissions[data-tier="enforced"]')).toContainText('Read tasks')
+  // The legend defines both words and carries the canonical disclosure. Asserted because losing that
+  // sentence is a silent regression: nothing else in the dialog says the node half is uncontained.
   await expect(dialog.locator('.plugin-trust-legend')).toContainText('acorn can’t check it')
+  await expect(dialog.locator('.plugin-trust-legend')).toContainText(
+    'This plugin’s server code runs with the same access as acorn itself.',
+  )
 
   await dialog.getByRole('button', { name: /^Trust/ }).click()
   await expect(dialog).toHaveCount(0)

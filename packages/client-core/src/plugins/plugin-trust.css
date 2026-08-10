@@ -80,6 +80,9 @@
 /* The vocabulary, once, at the foot — where a reader lands before deciding. */
 .plugin-trust-legend { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-xs); }
 .plugin-trust-legend strong { color: var(--text); font-weight: var(--fw-semibold); }
+/* The canonical disclosure about the declared half. Full contrast inside otherwise muted fine print:
+   it is the strongest statement in the dialog and must not read as the faintest. */
+.plugin-trust-plain { color: var(--text); }
 
 /* .ui-modal-actions has no top padding, so the separator that anchors the buttons needs one. */
 .plugin-trust-actions { border-top: var(--chrome-divider); padding-top: var(--pane-pad); }

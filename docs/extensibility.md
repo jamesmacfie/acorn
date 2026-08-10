@@ -164,12 +164,11 @@ declared `permissions.node` block shapes the context it receives, which is real 
 cooperative code and makes the trust prompt truthful for the honest majority — but it is not a
 boundary, because that code can ignore the context entirely.
 
-Every surface that renders those permissions says *declared*, not *enforced*, and the trust prompt
-defines the word in its legend: "Declared — the plugin's own description of what its server code
-touches; acorn can't check it." The UI half genuinely is contained, and keeping the two lists
-visually separate is deliberate — a strong claim must not lend credibility to a weaker one sitting
-next to it. `security.md` § Node-half plugin security records what that legend stopped saying when
-the prompt was redesigned, and why that is the first thing to revisit.
+Every surface that renders those permissions says *declared*, not *enforced*. The trust prompt
+defines the word in its legend, and that legend carries one sentence that must not be softened:
+"This plugin's server code runs with the same access as acorn itself." The UI half genuinely is
+contained, and keeping the two lists visually separate is deliberate — a strong claim must not lend
+credibility to a weaker one sitting next to it.
 
 The route to a real boundary is written down in `security.md` § Node-half plugin security: move
 loaded plugins out of process, under the platform's own permission model, with the context becoming
