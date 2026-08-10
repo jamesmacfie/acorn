@@ -29,19 +29,29 @@ reaches inside it and nothing inside reaches out, so it cannot be a child in ano
 render tree.
 
 The test is *embedded in a render tree*, not *rendered by another plugin*. A **ref panel** is the
-case worth being careful about: github's `PullDetail` renders linear's panel beside a PR, which
-sounds like B and is not — the panel is a rectangle the host places, so `refPanel` is one of the
-frame targets and a loaded plugin contributes one as a sandboxed frame
-(`packages/client-core/src/plugins/frames/register.tsx`). Linear now ships that way, so this is
-observed rather than argued.
+case worth being careful about: it used to look like the strongest counter-example on this page —
+github's `PullDetail` rendered linear's panel beside a PR, which sounds like B — and it was not, because
+the panel is a rectangle the host places. So `refPanel` is one of the frame targets and a loaded plugin
+contributes one as a sandboxed frame (`packages/client-core/src/plugins/frames/register.tsx`). Linear
+ships that way, so this is observed rather than argued.
+
+The argument is now stronger than "not B", because github does not render the panel at all. It calls
+`openRefPanel({ providerId, displayId })` and the shell draws it in one place
+(`client-core/registries/refPanelHost.tsx`). What was a plugin holding another plugin's component in its
+own JSX is a plugin naming an item, which is data. That the coupling could be deleted rather than
+defended is the point: reason B is about components that *must* be in someone else's render tree, and a
+panel never had to be.
 
 Three of `RefPanelProps` do not survive the boundary, and the third was found by shipping it.
-`onContentClick` and the multi-ref `refs`/`onSelectRef` chip strip do not cross, which costs nothing:
-a frame handles clicks inside its own document, and PR detail is a single-ref host. `onClose` does
-not either — the bridge's close verb is gated to importer surfaces — and a frame cannot `Portal`
-out of its iframe to draw a drawer in the first place. So the manifest adapter draws the overlay and
-the dismiss control itself, using the same classes a first-party panel would. A frame ref panel
-supplies the body; the host supplies the box.
+`onContentClick` and the multi-ref `refs`/`onSelectRef` chip strip do not cross, which costs nothing
+today: a frame handles clicks inside its own document, and every host is a single-ref host — the shell's
+panel host is single-slot by design, so `refs`/`onSelectRef` currently have no caller at all. If a
+multi-ref host ever appears, a *frame* panel will not be able to serve it and that is a real gap, not a
+detail to work around. `onClose` does not cross either — the bridge's close verb is gated to importer
+surfaces — and a frame cannot `Portal` out of its iframe to draw a drawer in the first place. So the
+manifest adapter draws the overlay and the dismiss control itself, using the same classes a first-party
+panel would, and the shell's host adds no second wrapper. A frame ref panel supplies the body; the host
+supplies the box.
 
 **C. Electron main-process code** — a `src/main/` half that imports `electron`. The desktop
 surface is enumerated and boundary-tested; a loaded plugin has no main-process presence at all.
@@ -63,10 +73,14 @@ Two entries have come off this list, and both by the same route — the registry
 its contract was already data-in/data-out, so a descriptor could carry it.
 
 `contentLinks` was the first: a loaded plugin declares URL recognisers in its manifest
-(`contentLinks: [{ match, openPane, item }]`, compiled host-side from a restricted pattern grammar).
+(`contentLinks: [{ match, openPane?, item }]`, compiled host-side from a restricted pattern grammar).
 That grammar has one sharp edge worth knowing before you write a `match`: it is exact-arity, with no
 tail wildcard, so a URL shape with an optional trailing segment needs one entry per arity. Linear's
-issue URLs come in both forms and it declares two.
+issue URLs come in both forms and it declares two. `openPane` is optional because the plugin's own
+reference panel is the other destination, and a plugin can have items worth glancing at and no task
+pane at all — but at least one of the two must exist, or the manifest is rejected. The panel is never
+named in the manifest: the host stamps the plugin id onto every recogniser it registers and resolves
+the panel by provider, which is what stops a manifest pointing a link at someone else's panel.
 
 `agentContexts` is the second. A descriptor names two routes on the plugin's own node half —
 `options` (GET) and `capture` (POST) — and the host performs both fetches, binds `source` from the
@@ -230,9 +244,14 @@ that needs rehoming on the way across is the draft purge it runs from `activate`
 package now rather than a first-party one, so read it for the same reason and expect the same shape.
 It differs from rollbar in exactly the two places worth studying: promotion is looser (a Linear issue
 carries its own branch name, so the rail ROW names the branch and the host's modal has nothing left
-to demand), and it contributes a ref panel that github's PR detail renders without importing linear.
-That ref panel is the clearest example of the tier line being about *shape* rather than ownership —
-it looks like a first-party privilege and is a plain rectangle a frame can host.
+to demand), and it contributes a ref panel that a PR opens without importing linear. That ref panel is
+the clearest example of the tier line being about *shape* rather than ownership — it looks like a
+first-party privilege and is a plain rectangle a frame can host. It is also the example that got
+smaller twice: first the direct `LinearIssuePanel` import became a registry lookup, then the lookup
+became `openRefPanel({ providerId, displayId })` and github stopped rendering the panel at all. The
+remaining github→linear coupling is one string, in one place, for a reason that is genuinely github's:
+`linkifyLinearIds` scans PR body HTML for Linear's key prefixes, so those bare-id anchors are github's
+own and carry no URL for a recogniser to claim.
 
 **database** — the same shape as http, slightly smaller, and it publishes a capability. Useful to
 read alongside http to see where "self-contained" ends and "something else depends on me" begins.

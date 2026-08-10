@@ -155,8 +155,13 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   }
 
   for (const descriptor of contributions.contentLinks ?? []) {
-    if (!taskPanes.has(descriptor.openPane)) {
-      console.warn(`[plugin-chrome] ${pluginId} content link '${descriptor.id}' names an undeclared pane '${descriptor.openPane}'.`)
+    // `openPane` is optional: a plugin whose only home for a matched item is its own reference panel
+    // declares no pane at all, and the host resolves the panel by provider at click time. An openPane that
+    // IS named still has to be a declared task pane — a roster row is bytes a node sent, so the node's
+    // parse-time check is re-run here rather than trusted.
+    const pane = descriptor.openPane
+    if (pane !== undefined && !taskPanes.has(pane)) {
+      console.warn(`[plugin-chrome] ${pluginId} content link '${descriptor.id}' names an undeclared pane '${pane}'.`)
       continue
     }
     add('content link', descriptor.id, () => {
@@ -166,11 +171,14 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       }
       return contentLinkRegistry.register({
         id: descriptor.id,
+        // Stamped from the plugin id, never read off the descriptor. It is what makes the plugin's own
+        // reference panel reachable from one of its links, and a manifest that could state it would be a
+        // manifest that could point a link at another plugin's panel.
+        providerId: pluginId,
         parse: (href) => {
           const captures = pattern.match(href)
-          return captures
-            ? { ...captures, kind: descriptor.id, pane: descriptor.openPane, item: captures[descriptor.item] }
-            : null
+          if (!captures) return null
+          return { ...captures, kind: descriptor.id, ...(pane ? { pane } : {}), item: captures[descriptor.item] }
         },
       })
     })

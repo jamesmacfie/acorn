@@ -303,7 +303,19 @@ const clientRouteDescriptor = z.object({
 const contentLinkDescriptor = z.object({
   id: z.string().min(1).max(64),
   match: contentLinkPattern,
-  openPane: z.string().min(1).max(64),
+  // A TASK-scoped pane this manifest declares, checked below. OPTIONAL, and the optionality is the whole
+  // point of the second destination: the host can also open the plugin's reference PANEL for the matched
+  // item (client-core/registries/contentLinks.ts § openContentTarget), which needs no task and no pane.
+  //
+  // Not a `destination: 'pane' | 'refPanel'` enum, because it is not the manifest's call. Which of the two
+  // fits depends on WHERE the link was clicked — a PR conversation wants the panel so the reader keeps
+  // their place, a note wants the pane — and the manifest cannot see the click. So a plugin declares what
+  // it CAN receive an item into and the clicking surface states its preference; declaring both is normal,
+  // and linear does.
+  //
+  // A panel is not named here either. It is addressed by PROVIDER, and a `refPanel` frame's provider must
+  // already equal the plugin id, so naming it again would only create a second thing to keep in step.
+  openPane: z.string().min(1).max(64).optional(),
   item: z.string().min(1).max(32),
 })
 
@@ -535,14 +547,29 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
       ctx.addIssue({ code: 'custom', path: at, message: `project-scoped pane '${frame.id}' needs a source whose onSelect navigates to it; it has nowhere else to mount` })
     }
   })
+  // A reference panel is addressed by provider and a panel's provider must be the plugin itself, so
+  // "this manifest declares a panel" is all a content link needs to have that destination available.
+  const declaresRefPanel = frames.some((frame) => frame.target === 'refPanel')
   contentLinks.forEach((entry, i) => {
-    // Task-scoped, because resolving one opens a pane in the active task's layout
+    const at = ['contributions', 'contentLinks', i] as (string | number)[]
+    // Task-scoped when named, because that rung opens a pane in the active task's layout
     // (client-core/registries/contentLinks.ts).
-    if (!taskPanes.has(entry.openPane)) {
+    if (entry.openPane !== undefined && !taskPanes.has(entry.openPane)) {
       ctx.addIssue({
         code: 'custom',
-        path: ['contributions', 'contentLinks', i, 'openPane'],
+        path: [...at, 'openPane'],
         message: `content link names '${entry.openPane}', which this manifest does not declare as a task-scoped pane`,
+      })
+    }
+    // The same rule the project-scoped pane check above states, applied to the other direction: a
+    // contribution that parses and can never do anything is worse than a parse error, because it looks
+    // installed. A recogniser with neither destination would match a URL, hand the host a target with
+    // nowhere to put it, and fall through to the browser on every click.
+    if (entry.openPane === undefined && !declaresRefPanel) {
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `content link '${entry.id}' has nowhere to open: declare openPane, or a refPanel surface for this plugin's items`,
       })
     }
     try {

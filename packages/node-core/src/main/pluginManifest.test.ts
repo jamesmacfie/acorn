@@ -234,6 +234,25 @@ describe('chrome descriptors', () => {
       }],
     }))).toContain(`content link item 'id' is not captured by its match pattern`)
   })
+
+  it('accepts a content link whose only destination is this plugin reference panel', () => {
+    // `openPane` is optional because a plugin can have items worth glancing at and no task pane at all. The
+    // panel is addressed by provider, and a refPanel's provider is already the plugin id, so declaring one is
+    // the whole declaration.
+    expect(manifest({
+      frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', providerId: 'board' }],
+      contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
+    }).success).toBe(true)
+  })
+
+  it('rejects a content link with no destination at all', () => {
+    // The rule the project-scoped pane checks already state, in the other direction: a contribution that
+    // parses and can never do anything is worse than a parse error, because it looks installed.
+    expect(messages(manifest({
+      frames: [PANE],
+      contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
+    }))).toContain(`content link 'board.card' has nowhere to open: declare openPane, or a refPanel surface for this plugin's items`)
+  })
 })
 
 // A project-scoped pane plus the route that addresses it and the source that mounts it. Written out once
