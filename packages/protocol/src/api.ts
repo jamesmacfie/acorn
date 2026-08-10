@@ -315,8 +315,13 @@ export type NodePluginPermissions = {
 // this is the projection the device registers contributions from.
 export type PluginFrameSurface = {
   target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview'
-  // The contribution id, which is also a persisted layout key. Bound to the plugin by the HOST — a
-  // bundle cannot claim a surface its manifest did not declare.
+  // `pane` only, and OPTIONAL on the wire rather than defaulted: an older node's roster row does not
+  // carry it, and absent has to mean `task` — the scope a pane has always had. A project-scoped pane is
+  // the detail half of its plugin's rail Source browse, not a rectangle in a task's layout, and it lands
+  // in a different registry (client-core/registries/projectSurfaces.ts).
+  scope?: 'task' | 'project'
+  // The contribution id, which is also a persisted layout key for a task-scoped pane. Bound to the
+  // plugin by the HOST — a bundle cannot claim a surface its manifest did not declare.
   id: string
   label: string
   glyph: string
@@ -343,8 +348,11 @@ export type PluginKeyClaimGrant = { surface: string; label: string; chords: stri
 
 // The closed verb set. `invoke` is deliberately absent in v1; adding a verb is additive.
 export type PluginChromeAction =
-  // A pane the same manifest declares. The selected row's id rides along as a pane intent.
+  // A task-scoped pane the same manifest declares. The selected row's id rides along as a pane intent.
   | { verb: 'openPane'; pane: string }
+  // A project-scoped pane the same manifest declares, reached by navigating to its declared route. The
+  // selected row's id becomes the addressed item, because for this scope the URL IS the selection.
+  | { verb: 'navigate'; surface: string }
   | { verb: 'runNodeAction'; path: string }
   | { verb: 'createTask' }
   | { verb: 'openUrl'; url: string }
@@ -374,7 +382,9 @@ export type PluginSlotDescriptor = {
 }
 export type PluginPaletteDescriptor = { id: string; title: string; action: PluginChromeAction }
 export type PluginCommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
-export type PluginCommandAction = Exclude<PluginChromeAction, { verb: 'createTask' }>
+// `createTask` needs a selected rail row; `navigate` needs a routed project and the shell's navigator. A
+// command registry row has none of the three, so neither verb is expressible here.
+export type PluginCommandAction = Exclude<PluginChromeAction, { verb: 'createTask' } | { verb: 'navigate' }>
 export type PluginCommandDescriptor = {
   id: string
   title: string
@@ -401,6 +411,18 @@ export type PluginContentLinkDescriptor = {
   match: string
   openPane: string
   item: string
+}
+// A renderer URL the host matches on the plugin's behalf, addressing one item inside a project-scoped
+// surface. `path` is confined to a host-minted prefix when the node parses the manifest, and confined
+// again on the device before a Route is registered from it — the same two-sided rule every plugin path
+// gets, for the same reason: a roster row is bytes a node sent. The prefix itself is not spelled in this
+// package; client-core/registries/corePaths.ts mints it.
+export type PluginClientRouteDescriptor = {
+  id: string
+  path: string
+  surface: string
+  item: string
+  order: number
 }
 // An entry in the agent composer's "add Acorn context" list. The registry behind it takes two async
 // functions, which is why it had no manifest form for a while — but the contract was already
@@ -470,6 +492,7 @@ export type PluginContributions = {
   nodeStats?: PluginNodeStatDescriptor[]
   contentLinks?: PluginContentLinkDescriptor[]
   agentContexts?: PluginAgentContextDescriptor[]
+  routes?: PluginClientRouteDescriptor[]
 } & Record<string, unknown>
 
 export type InstalledPluginRow = {

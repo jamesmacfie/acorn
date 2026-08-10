@@ -210,7 +210,9 @@ describe('declared frame contributions', () => {
     install('board', withFrames([{ target: 'pane', id: 'board', label: 'Board' }]), BUNDLE('board'), 'export default {}')
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     expect(installedPluginInfo(installed[0]).contributions.frames).toEqual([
-      { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'], claimsKeys: [] },
+      // `scope: 'task'` is part of the default set: a pane written before the field existed is a pane in a
+      // task's layout, which is the only thing a pane has ever been.
+      { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, scope: 'task', formFactor: ['desktop'], claimsKeys: [] },
     ])
   })
 
@@ -220,7 +222,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [] })
+      .toEqual({ frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], routes: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

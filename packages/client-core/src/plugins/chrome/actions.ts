@@ -2,6 +2,7 @@ import type { PluginChromeAction, PluginRailItem } from '@acorn/protocol/api.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
 import { openPane } from '../../registries/clientEvents'
+import { projectSurfacePath } from '../../registries/projectSurfaces'
 import { activeTaskId } from '../../tasks/tasks'
 import { ownsRoute } from './data'
 
@@ -21,6 +22,11 @@ export type ChromeActionContext = {
   // not the same thing twenty times over on a twenty-row rail list.
   item?: PluginRailItem
   promote?: (item: PluginRailItem) => void
+  // The routed project and the shell's navigator, for `navigate`. Supplied only by the callers that have
+  // them — which is why the manifest refuses to let a COMMAND name that verb at all: a command registry row
+  // runs with neither in scope, the same argument that already keeps `createTask` off the command list.
+  projectId?: string
+  navigate?: (path: string) => void
 }
 
 const toast = (pluginId: string, title: string, detail?: string): void =>
@@ -29,14 +35,32 @@ const toast = (pluginId: string, title: string, detail?: string): void =>
 export function runChromeAction(action: PluginChromeAction, context: ChromeActionContext): void {
   switch (action.verb) {
     case 'openPane': {
-      // A pane lives in a task's layout, so there is nothing to open into outside a task. Saying so is
-      // better than a click that appears to do nothing — the rail is reachable with no task open.
+      // A TASK-scoped pane lives in a task's layout, so there is nothing to open into outside a task.
+      // Saying so is better than a click that appears to do nothing — the rail is reachable with no task
+      // open. This refusal used to fire for every rail row of a plugin whose detail belonged to the
+      // project rather than to a task, which was the carrier gap and not the message being wrong: the
+      // manifest now only lets this verb name a task-scoped pane, and a project-scoped one has `navigate`.
       const taskId = activeTaskId()
       if (!taskId) return toast(context.pluginId, 'open a task first', 'This opens a pane, and a pane belongs to a task.')
       // The row id travels as a retained pane intent, which is the mechanism that already closed this
       // exact mount-order race for core panes (registries/clientEvents.ts): the intent is held until the
       // pane consumes it, so a pane opening for the first time is not a race against its own mount.
       openPane(taskId, action.pane, context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item.id })
+      return
+    }
+    case 'navigate': {
+      // A project-scoped surface is ADDRESSED, not opened. Its selection lives in the URL — it has no task
+      // layout to keep one in — so changing the URL is the selection, and the surface is already on screen
+      // beside the list that was clicked. No task is involved anywhere, which is the point: this is the
+      // verb a rail row uses when its detail belongs to the project.
+      //
+      // The path is minted from the pattern the host registered, never from anything on the row.
+      const item = context.item?.id
+      const path = context.projectId && item ? projectSurfacePath(action.surface, context.projectId, item) : null
+      if (!path || !context.navigate) {
+        return toast(context.pluginId, 'pick a project first', 'This opens beside a project’s list, so it needs one selected.')
+      }
+      context.navigate(path)
       return
     }
     case 'runNodeAction': {

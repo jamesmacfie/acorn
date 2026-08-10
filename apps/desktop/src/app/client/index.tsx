@@ -13,6 +13,7 @@ import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-cor
 import { clientFor } from '@acorn/client-core/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/registries/sources.ts'
+import { projectSurfaceRoutes } from '@acorn/client-core/registries/projectSurfaces.ts'
 import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
 import { syncChromeContributions } from '@acorn/client-core/plugins/chrome/register.ts'
 import { syncFrameContributions } from '@acorn/client-core/plugins/frames/register.tsx'
@@ -75,6 +76,13 @@ render(
               <Route path="/t/:taskId" component={noop} />
               <Route path="/settings/projects" component={noop} />
               {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
+              {/* A loaded plugin's project-scoped surfaces, whose patterns the host minted from the plugin
+                  id (client-core/registries/corePaths.ts). Read here rather than folded into the line above
+                  because they belong to a surface rather than to a rail source, and they arrive LATER than
+                  compiled routes do — the distribution pass settles after the first paint, and this
+                  expression is inside the Router's `children` memo, so a route registered then is picked up
+                  rather than missed. */}
+              {projectSurfaceRoutes().map((route) => <Route path={route.path} component={noop} />)}
             </Router>
           </PersistQueryClientProvider>
         )

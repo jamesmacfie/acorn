@@ -1,5 +1,6 @@
 import { Registry } from './registry'
 import { openPane } from './clientEvents'
+import { paneContribution } from './panes'
 
 // Resolving an external URL in rendered content to somewhere INSIDE the app, so a link to
 // github.com/o/r/pull/9 or linear.app/acme/issue/ENG-1 opens the pane instead of the browser.
@@ -45,6 +46,11 @@ export function parseInAppTarget(href: string): InAppTarget | null {
 // can send the owner to its browse surface instead.
 export function openPluginContentTarget(target: InAppTarget, taskId: string | null | undefined): boolean {
   if (!taskId || typeof target.pane !== 'string' || typeof target.item !== 'string') return false
+  // It has to be a registered TASK pane. Without this check, a target naming anything else — a plugin whose
+  // surface is project-scoped, or one not installed on this device at all — would push its id into the
+  // task's PERSISTED layout, where nothing can render it and it stays until the owner removes it by hand.
+  // `parseTaskDeepLink` already applies exactly this check to the URL form of the same intent.
+  if (!paneContribution(target.pane)) return false
   openPane(taskId, target.pane, { kind: 'plugin:select', item: target.item })
   return true
 }
