@@ -14,6 +14,11 @@ export const nodeIdentitySchema = z.strictObject({
   protocolVersion: z.number().int().positive(),
   // Absent until the first successful bind. 0 is never persisted — it means "pick an ephemeral port".
   port: z.number().int().min(1).max(65535).optional(),
+  // The host(s) this node answers to besides loopback, comma-separated — set once, when the operator
+  // confirms it on first boot (main/advertise.ts). Its presence is what makes the listener bind
+  // beyond 127.0.0.1, so it is a deliberate record of an exposure decision, not a cache of a lookup.
+  // The empty string is a real answer meaning "loopback only, stop asking".
+  advertiseHost: z.string().optional(),
 })
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>

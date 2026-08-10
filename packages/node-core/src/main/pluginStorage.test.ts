@@ -55,7 +55,8 @@ describe('plugin storage', () => {
   it('opens in WAL mode', () => {
     const db = openPluginDb(dir, 'widgets', { migrationsFolder: migrations })
     try {
-      expect(String(db.$client.pragma('journal_mode', { simple: true })).toLowerCase()).toBe('wal')
+      const [mode] = Object.values(db.$client.prepare('PRAGMA journal_mode').get() as Record<string, unknown>)
+      expect(String(mode).toLowerCase()).toBe('wal')
     } finally {
       db.close()
     }

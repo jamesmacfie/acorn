@@ -13,7 +13,10 @@ SESSION_ENC_KEY=<64 hexadecimal characters>
 ```
 
 `GITHUB_CLIENT_ID` is only needed when connecting GitHub; the GitHub plugin owns that configuration.
-There is no GitHub client secret. `SESSION_ENC_KEY` is the only required application secret at boot.
+There is no GitHub client secret. `SESSION_ENC_KEY` is optional — the desktop supplies one from
+safeStorage, and a node with neither generates its own into the data root (see
+[node-distribution.md](./node-distribution.md)). Setting it in `.env` pins a stable key across
+throwaway data roots, which is why it is still listed here.
 
 The data root defaults to `apps/node/.acorn/` and is gitignored. Set `ACORN_DATA_DIR` to isolate a
 run. Set `ACORN_PORT` to force a port for tests or a standalone process; otherwise the Node prefers
@@ -33,8 +36,10 @@ handshake line containing endpoint, fingerprint, certificate, Node ID, and devic
 
 ## Native ABI
 
-`better-sqlite3` and `node-pty` are native modules. Rebuild once at the workspace root for the
-process that will load them:
+`node-pty` is the only native module. SQLite is the runtime's own `node:sqlite`
+(`packages/node-core/src/main/sqlite.ts`), so there is no ABI to match for it. Rebuild once at the
+workspace root for the process that will load node-pty — where its prebuilt binary applies, the
+rebuild script detects that and does nothing:
 
 ```sh
 pnpm rebuild:node       # plain Node: tests, dev:node, database commands

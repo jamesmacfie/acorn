@@ -1,3 +1,11 @@
+// A certificate fingerprint rendered as words, so a human can actually compare two of them.
+//
+// In `protocol` rather than in the client because BOTH ends have to say the same thing: the node
+// prints this phrase on its own terminal at boot and the desktop shows it on the pairing confirm
+// step, and comparing those two is the entire security of pairing (docs/api-reference.md § Pairing).
+// Two copies of the word list would be two things that can drift into a comparison that always
+// passes.
+
 const WORDS: readonly string[] = [
   'able', 'acid', 'acorn', 'actor', 'agent', 'air', 'album', 'alert', 'alley', 'almond', 'amber', 'anchor',
   'angle', 'ankle', 'apple', 'apron', 'arch', 'arena', 'armour', 'arrow', 'artist', 'ash', 'aspen', 'atlas',

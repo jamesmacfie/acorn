@@ -5,7 +5,7 @@ import solid from 'vite-plugin-solid'
 
 // Bundle our own source (relative imports AND @acorn/* workspace packages); keep every other
 // bare/node: specifier external so it's required from node_modules at runtime. Critically this
-// keeps the native better-sqlite3 (and `electron` itself) out of the bundle — bundling the native
+// keeps the native node-pty (and `electron` itself) out of the bundle — bundling the native
 // loader breaks .node resolution.
 //
 // @acorn/* must stay INTERNAL. Those packages ship TypeScript source (exports './*': './src/*'),

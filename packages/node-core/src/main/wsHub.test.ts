@@ -64,7 +64,7 @@ beforeEach(async () => {
   devices = stubDevices()
   // 20ms sweep everywhere: the interval is injected rather than faked, so the sweep runs for real and
   // the assertion is about the socket closing, not about a timer having been scheduled.
-  attachWsHub(server, { internalToken: INTERNAL, allowedHost: host, devices, revocationCheckMs: 20 })
+  attachWsHub(server, { internalToken: INTERNAL, allowedHosts: new Set([host]), devices, revocationCheckMs: 20 })
 })
 
 afterEach(() => {

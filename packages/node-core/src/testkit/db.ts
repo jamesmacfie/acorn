@@ -1,12 +1,11 @@
-// Test-only helper: a real better-sqlite3 DB in a tmp dir with all Drizzle migrations applied.
+// Test-only helper: a real SQLite DB (node:sqlite, main/sqlite.ts) in a tmp dir with all Drizzle
+// migrations applied — no native build to match, whichever runtime hosts the tests.
 //
 // In testkit/ rather than server/routes/, where it and its two siblings used to live. It was never a
 // route; it sat there because that is where it was first needed, and eleven packages then imported a
 // test helper through a path that reads like production surface. The directory is the documentation
 // now: every `@acorn/node-core/testkit/...` import says out loud that it is test scaffolding, and the
 // arch suite fails one from a production file.
-// Requires the Node ABI build of
-// better-sqlite3 (`pnpm --filter @acorn/desktop node:rebuild`); vitest runs under plain Node.
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

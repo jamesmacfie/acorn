@@ -12,7 +12,9 @@
 // main; this entry supplies explicit headless adapters where a plugin still needs one.
 import { join } from 'node:path'
 import { closeListener, devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
+import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/main/advertise.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { pruneAudit } from '@acorn/node-core/server/audit.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
@@ -36,6 +38,11 @@ import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabiliti
 // Opening it takes the root's exclusive lock, so a standalone node and a running desktop app refuse to
 // share one root explicitly instead of racing over SQLite.
 const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
+// Asked before anything else prints, and only on a first boot at a real terminal: the answer decides
+// whether the listener binds beyond loopback, and burying that question under two screens of plugin
+// boot output would be a good way to have nobody read it. Silent under a service manager
+// (main/advertise.ts).
+await confirmAdvertiseHost(root)
 const capabilities = new CapabilityRegistry()
 const runtime = makeRuntime(root, undefined, capabilities)
 const disabledPlugins = disabledPluginsStore(root.dir)
@@ -116,18 +123,12 @@ apiUrl = listener.endpoint.origin
 const reconcileTask = reconcileNode({ db: runtime.DB, dataDir: root.dir, capabilities }).finally(() => finishReconcile())
 await reconcileTask
 
-console.log(
-  JSON.stringify({
-    nodeId: root.nodeId,
-    endpoint: listener.endpoint.origin,
-    fingerprint: listener.fingerprint,
-    certPem: listener.certPem,
-    deviceToken: await resolveDeviceToken(runtime.DEVICES, process.env.ACORN_DEVICE_TOKEN, 'Standalone node launcher'),
-  }),
-)
+// Counted BEFORE the handshake below, which issues a launcher device of its own when
+// ACORN_DEVICE_TOKEN is unset — after it, every node looks paired.
+const alreadyPaired = (await runtime.DEVICES.list()).filter((device) => device.revokedAt === null).length
 
-// SIGINT and SIGTERM close the listener first, dispose plugins, close SQLite, and release the data-root
-// lock. The ordered drain is bounded so shutdown cannot hang indefinitely on one plugin.
+// SIGINT and SIGTERM close the listener first, dispose plugins, close SQLite, and release the
+// data-root lock. The ordered drain is bounded so shutdown cannot hang indefinitely on one plugin.
 let stopping = false
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   if (stopping) return
@@ -144,5 +145,63 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   if (outcome === 'timeout') console.warn('[node] drain exceeded its deadline; exiting anyway')
   process.exit(0)
 }
+
+// Signals are wired BEFORE anything announces readiness, and the order is load-bearing rather than
+// tidy. Until `process.once('SIGTERM')` runs, SIGTERM still has its default disposition, so the
+// kernel kills the process outright — no drain, no lock release, exit status "killed by signal". A
+// supervisor (or the shutdown integration test) acts the instant it sees the handshake line, so
+// anything printed before this point is an invitation to be killed mid-boot.
+//
+// SIGUSR1 reopens a pairing window. A signal rather than a route or a flag: it needs no token (the
+// pairing route requires one, which is the credential you do not have yet), no second port, and it
+// demands shell access on this machine — the same "the owner is present" property the pairing window
+// is built on. Restarting to get a code would kill every live agent and terminal session this node
+// is hosting.
+process.on('SIGUSR1', () => printPairingBanner(runtime.PAIRING_CODES.issue()))
 process.once('SIGINT', (signal) => void shutdown(signal))
 process.once('SIGTERM', (signal) => void shutdown(signal))
+
+console.log(
+  JSON.stringify({
+    nodeId: root.nodeId,
+    endpoint: listener.endpoint.origin,
+    fingerprint: listener.fingerprint,
+    certPem: listener.certPem,
+    deviceToken: await resolveDeviceToken(runtime.DEVICES, process.env.ACORN_DEVICE_TOKEN, 'Standalone node launcher'),
+  }),
+)
+
+// The terminal this was started from IS the out-of-band channel pairing depends on: the owner compares
+// the identity words here against the ones the client shows, and that comparison is the whole security
+// of pairing (docs/api-reference.md § Pairing). Printing it is what turns pairing from "read a device
+// token out of a JSON blob and curl the code route" into copy, compare, paste.
+//
+// A code is opened automatically only while nothing is paired yet, so a restart of a working node does
+// not leave a live window nobody asked for. It is no more sensitive than the device token the
+// handshake line above already prints — that one does not expire.
+function printPairingBanner(code: string | null): void {
+  const port = listener.endpoint.port
+  const reachable = advertisedHosts(root).map((host) => `https://${host}:${port}`)
+  console.log('')
+  console.log('  acorn node ready')
+  console.log('')
+  if (reachable.length > 0) console.log(`    Connect to    ${reachable.join('\n                  ')}`)
+  else console.log(`    Connect to    https://127.0.0.1:${port}  (this machine only)`)
+  console.log(`    Identity      ${fingerprintPhrase(listener.fingerprint) ?? listener.fingerprint}`)
+  if (code) console.log(`    Pairing code  ${code}   (valid 10 minutes)`)
+  console.log('')
+  if (code) {
+    console.log('  In acorn: Settings → Nodes → add a node. Paste the address, check the identity')
+    console.log('  words match what acorn shows you, then paste the code.')
+  } else {
+    console.log(`  ${alreadyPaired} device(s) already paired. For another, run:  kill -USR1 ${process.pid}`)
+  }
+  if (reachable.length === 0) {
+    console.log('  To reach this node from another machine, set advertiseHost in this data root\'s')
+    console.log('  node.json (or ACORN_ADVERTISE_HOST) and restart.')
+  }
+  console.log('')
+}
+
+printPairingBanner(alreadyPaired === 0 ? runtime.PAIRING_CODES.issue() : null)
+

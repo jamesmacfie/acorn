@@ -21,7 +21,6 @@
     "test": "node scripts/rebuild-node-abi.mjs && turbo run test --concurrency=6"
   },
   "devDependencies": {
-    "better-sqlite3": "^12.11.1",
     "drizzle-kit": "^0.31.10",
     "node-pty": "^1.0.0",
     "oxlint": "^1.77.0",

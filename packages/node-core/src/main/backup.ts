@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { runProcess } from './core/proc'
 import { PLUGIN_DB_DIR } from './pluginStorage'
 import { resolveDatabasePath } from './serverPaths'
-import { loadDatabase } from './sqliteLoader'
+import { openSqlite } from './sqlite'
 
 // `POST /v2/core/backup` (docs/data-layer.md § Backup). The spec's own words are "keep it boring", and
 // this is that: SQLite's online-backup API into a staging directory, a scrub, a manifest, and `tar`.
@@ -32,7 +32,7 @@ import { loadDatabase } from './sqliteLoader'
 // ## Why a fresh readonly handle per file rather than the live one
 //
 // `AppDatabase` and `PluginDatabase` deliberately expose only `batch` and `close` — the raw
-// better-sqlite3 handle is not reachable from a caller, and threading every plugin's handle through the
+// SQLite handle is not reachable from a caller, and threading every plugin's handle through the
 // route to get at `.backup()` would mean giving every plugin's storage a new public method for one
 // consumer. SQLite's online-backup API works from any handle to the same file, including a readonly one,
 // and it is safe against concurrent writers by design: that is the entire point of it over `cp`.
@@ -48,6 +48,7 @@ const EXCLUDED = [
   'credentials (integrations.access_token)',
   'device tokens (the devices table)',
   'the TLS private key',
+  'the session encryption key (session.key)',
   'the loopback internal token',
   'the blob cache (content-addressed, refetchable)',
   'worktrees (git checkouts — clone instead)',
@@ -55,8 +56,9 @@ const EXCLUDED = [
 
 // Copy one SQLite file with the online-backup API. Returns the destination path.
 async function backupDatabase(source: string, destination: string): Promise<void> {
-  const Database = loadDatabase()
-  const handle = new Database(source, { readonly: true, fileMustExist: true })
+  // readonly also stands in for better-sqlite3's `fileMustExist`: opening a file that is not there
+  // read-only fails, which is the same refusal by a different route.
+  const handle = openSqlite(source, { readonly: true })
   try {
     await handle.backup(destination)
   } finally {
@@ -68,8 +70,7 @@ async function backupDatabase(source: string, destination: string): Promise<void
 // because the online-backup API copies a file rather than a query — and doing it as a copy-then-scrub
 // keeps the source database untouched, which is the property that lets this run against a live node.
 function scrubCore(copy: string): void {
-  const Database = loadDatabase()
-  const handle = new Database(copy)
+  const handle = openSqlite(copy)
   try {
     // Blanked rather than deleted: a restored node should still show that a Linear connection existed
     // and needs re-entering, which is the state docs/data-layer.md describes ("secrets and pairings are
@@ -85,7 +86,7 @@ function scrubCore(copy: string): void {
     //
     // PRECAUTIONARY, and labelled as such rather than claimed: backup.test.ts scans the raw archived
     // bytes for the ciphertext and passes with this line REMOVED, because a database this small keeps
-    // the row in place and better-sqlite3's close() checkpoints the WAL away. It earns its keep on a
+    // the row in place and close() checkpoints the WAL away. It earns its keep on a
     // real data root, where an UPDATE can relocate a row and leave the old page free. Cheap insurance
     // against a case a test at this size cannot construct.
     handle.exec('VACUUM')

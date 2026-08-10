@@ -4,7 +4,6 @@ import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readd
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { type AppDatabase, schema } from '../server/db'
 import type { CapabilityRegistry } from '../server/plugin/capabilities'
@@ -14,7 +13,8 @@ import { deviceService, type DeviceService } from '../server/auth/deviceTokens'
 import { idempotencyStore, type IdempotencyStore } from '../server/auth/idempotency'
 import { pairingCodes, type PairingCodes } from '../server/auth/pairingCodes'
 import { SecretService } from './core/secrets'
-import { loadDatabase } from './sqliteLoader'
+import { drizzleOverSqlite, openSqlite } from './sqlite'
+import { ensureSessionKey } from './sessionKey'
 import { ensureCert } from './tls'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
@@ -129,27 +129,29 @@ const migrationsFolder = (() => {
 export function openDb(dbPath: string): AppDatabase {
   const databasePath = resolve(dbPath)
   const dataDir = dirname(databasePath)
-  mkdirSync(dataDir, { recursive: true, mode: 0o700 }) // better-sqlite3 won't create parent dirs
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 }) // SQLite won't create parent dirs
   chmodSync(dataDir, 0o700) // migrate an existing installation created under a permissive umask
   // Pre-create the database privately. SQLite derives WAL/SHM permissions from the database file,
   // so hardening before journal_mode prevents newly-created sidecars inheriting 0644.
   closeSync(openSync(databasePath, 'a', 0o600))
   chmodSync(databasePath, 0o600)
-  const Database = loadDatabase()
-  const sqlite = new Database(databasePath)
+  const sqlite = openSqlite(databasePath)
   // WAL for concurrent read/write, and a short busy timeout instead of immediate SQLITE_BUSY.
   // No foreign_keys pragma: the schema declares no FK constraints (docs/data-layer.md), so
-  // enabling enforcement would be a misleading no-op.
+  // enabling enforcement would be a misleading no-op — and main/sqlite.ts holds it off explicitly,
+  // because node:sqlite would otherwise turn it on where better-sqlite3 did not.
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('busy_timeout = 5000')
 
-  const db = drizzle(sqlite, { schema })
+  // Drizzle's own better-sqlite3 session, over a node:sqlite handle that presents the same shape
+  // (main/sqlite.ts explains why this does not go through drizzle's `drizzle()` front door).
+  const db = drizzleOverSqlite(sqlite, schema)
   migrate(db, { migrationsFolder })
   for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
     if (existsSync(path)) chmodSync(path, 0o600)
   }
 
-  // `.batch([...])` (which better-sqlite3 lacks) as a synchronous transaction — all-or-nothing
+  // `.batch([...])` (which this driver lacks) as a synchronous transaction — all-or-nothing
   // semantics. Statements are built on `db`, so they run on this connection inside the
   // BEGIN/COMMIT, keeping the route call sites untouched.
   const withBatch = db as unknown as AppDatabase
@@ -195,16 +197,14 @@ export type BindingsOptions = {
 // (app.getPath('userData') when packaged, the repo-local apps/node/.acorn in dev) and passes
 // the paths in; the standalone entry takes ACORN_DATA_DIR or that same dev root.
 export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilities }: BindingsOptions): RuntimeBindings {
-  const secret = (name: string): string => {
-    const value = process.env[name]
-    if (!value) throw new Error(`Missing required env var ${name} (set it in .env or the environment)`)
-    return value
-  }
   const databasePath = resolve(dbPath)
   const blobCachePath = resolve(blobsDir)
   const db = openDb(databasePath)
-  const encKey = secret('SESSION_ENC_KEY')
   const dataDir = dirname(databasePath)
+  // Was a required env var that threw at boot. It still wins when set — the desktop puts a
+  // safeStorage-backed value there before this runs — but a headless node now mints its own into the
+  // data root instead of refusing to start (main/sessionKey.ts).
+  const encKey = ensureSessionKey(dataDir)
   const activeIdentity = activeIdentityStore(dataDir)
   // Mint the owner id on first boot and adopt any pre-identity ''-scoped rows. Before this ran at
   // boot, the identity was bound as a side effect of connecting GitHub, and every internal caller

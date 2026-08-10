@@ -15,9 +15,8 @@
 // are plain IDs, dereferenced through the owning plugin.
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
-import { loadDatabase } from './sqliteLoader'
+import { drizzleOverSqlite, openSqlite } from './sqlite'
 
 // One directory for every plugin DB, so a backup can enumerate them without knowing the plugin list
 // (docs/data-layer.md § Backup) and so `plugins/` is visibly separate from core.sqlite in a data root.
@@ -25,7 +24,7 @@ export const PLUGIN_DB_DIR = 'plugins'
 
 const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
 
-export type PluginDatabase = ReturnType<typeof drizzle> & {
+export type PluginDatabase = ReturnType<typeof drizzleOverSqlite> & {
   batch: <T extends readonly unknown[]>(statements: T) => Promise<unknown[]>
   close: () => void
 }
@@ -46,12 +45,14 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
   closeSync(openSync(databasePath, 'a', 0o600))
   chmodSync(databasePath, 0o600)
 
-  const Database = loadDatabase()
-  const sqlite = new Database(databasePath)
+  const sqlite = openSqlite(databasePath)
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('busy_timeout = 5000')
 
-  const db = drizzle(sqlite)
+  // Same session and same handle as openDb (main/bindings.ts). Note a plugin schema MAY declare
+  // foreign keys — main/sqlite.ts keeps enforcement off, matching what better-sqlite3 did, so no
+  // plugin gets enforcement it was never written against.
+  const db = drizzleOverSqlite(sqlite)
   migrate(db, { migrationsFolder: options.migrationsFolder })
   for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
     if (existsSync(path)) chmodSync(path, 0o600)

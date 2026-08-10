@@ -6,10 +6,33 @@ workspace production dependencies, and native modules.
 
 ## Runtime
 
-The standalone entry uses `ACORN_DATA_DIR` or a local `.acorn` root, binds HTTPS/TLS 1.3 on loopback,
-and prints one JSON handshake line. The line contains `nodeId`, endpoint, certificate fingerprint and
-PEM, and a device token for the launcher/first client. It also runs plugin initialization,
-reconciliation, WebSocket/tunnel listeners, and bounded shutdown.
+The standalone entry uses `ACORN_DATA_DIR` or a local `.acorn` root, binds HTTPS/TLS 1.3, and prints
+one JSON handshake line. The line contains `nodeId`, endpoint, certificate fingerprint and PEM, and a
+device token for the launcher/first client. It also runs plugin initialization, reconciliation,
+WebSocket/tunnel listeners, and bounded shutdown.
+
+After the handshake it prints a human pairing banner: the address to connect to, the certificate
+fingerprint as six words, and a live pairing code. Compare those words against the ones acorn shows
+on its pairing screen — that comparison is what makes pairing safe. A code is opened automatically
+only while no device is paired yet; `kill -USR1 <pid>` opens another without restarting the node and
+killing its live agent and terminal sessions.
+
+## Reaching a node from another machine
+
+A node answers on loopback only until someone says otherwise. On first boot at a terminal it lists
+this machine's IPv4 addresses and asks which to advertise; pressing Enter keeps it private. The
+answer is recorded as `advertiseHost` in the data root's `node.json`, so it is asked once.
+
+Set `ACORN_ADVERTISE_HOST` for an install with no terminal to answer — launchd, systemd, Docker, CI.
+It accepts a comma-separated list when a machine is reached by both an IP and a hostname, and it
+overrides the recorded answer. With it set the listener binds `0.0.0.0` and accepts that Host as well
+as loopback; every other Host still gets a 403, which is what keeps a DNS-rebinding page out.
+
+Understand what this exposes before setting it. A node runs PTYs, spawns agents and executes
+repo-configured commands, and what stands between the network and all of that is a device bearer
+token plus a rate-limited pairing code. Advertise on a network you trust. An SSH tunnel
+(`ssh -N -L <port>:127.0.0.1:<port>`) reaches a loopback-only node with no exposure at all, as long
+as the local and remote ports match — the Host guard compares the port too.
 
 It supports pure-Node features such as workspaces, tasks, providers, Git, files, database, Docker,
 HTTP, and core routes. Electron-only operations such as native dialogs, browser views, and window
@@ -31,13 +54,21 @@ pnpm rebuild
 ACORN_DATA_DIR=/var/lib/acorn-node pnpm start
 ```
 
-The target machine needs Node, OpenSSL for the Node certificate, and the native build prerequisites
-required by `better-sqlite3`/`node-pty`. If package installation ignores lifecycle scripts, native
-bindings may remain unbuilt; run the package's rebuild step before diagnosing a missing-bindings
-failure.
+The target machine needs Node 24.4+ (or 22.18+ on the 22 LTS line — the `node:sqlite` surface the
+shim uses is newer than the module itself, and the packed `package.json` pins this in `engines`) and
+OpenSSL for the Node certificate.
+`node-pty` is the only native module left; it ships prebuilt binaries for macOS and Windows and
+compiles from source on Linux, so a Linux target also needs the usual build prerequisites. If package
+installation ignores lifecycle scripts, native bindings may remain unbuilt; run the package's rebuild
+step before diagnosing a missing-bindings failure.
 
-`SESSION_ENC_KEY` must be supplied to boot. If GitHub is enabled, its plugin reads the optional
-`GITHUB_CLIENT_ID`; connection uses device flow and does not need a client secret or callback URL.
+`SESSION_ENC_KEY` is optional. Supply it and it is used; leave it unset and the node generates one
+into `session.key` in the data root at mode 0600, beside the TLS private key that already has the
+same blast radius. It is never re-minted — a damaged key file is an error, because silently
+generating a replacement would turn "this file is wrong" into "every stored credential is gone".
+
+If GitHub is enabled, its plugin reads the optional `GITHUB_CLIENT_ID`; connection uses device flow
+and does not need a client secret or callback URL.
 
 ## Operations
 

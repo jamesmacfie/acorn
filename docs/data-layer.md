@@ -1,7 +1,7 @@
 # Data layer
 
-The Node is the only owner of authoritative application data. SQLite uses `better-sqlite3` and
-Drizzle, with one core database and one database for each table-owning plugin. The owning package
+The Node is the only owner of authoritative application data. SQLite uses the runtime's
+`node:sqlite` and Drizzle, with one core database and one database for each table-owning plugin. The owning package
 contains the schema and migration chain.
 
 ## Data root
