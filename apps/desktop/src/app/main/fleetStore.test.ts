@@ -76,6 +76,33 @@ describe('FleetStore', () => {
     expect(fleet.tokenFor('node-remote')).toBe('tok-2')
   })
 
+  it('keeps the local node a singleton when the data root comes back under a new identity', () => {
+    // The local node is one node whose nodeId can change: replace the data root and the same machine
+    // reports a new one. A leftover `local: true` row is never connected — the boot loop skips local rows
+    // and `adoptLocalNode` only upserts the id it just started — so `homeNode()`, which takes the FIRST
+    // local row, would point the whole window at an address the broker answers `Unknown node` for.
+    const fleet = new FleetStore(dir)
+    fleet.remember({ ...remote }, 'tok-remote')
+    fleet.remember({ nodeId: 'node-was', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-old')
+    fleet.remember({ nodeId: 'node-now', label: 'This computer', endpoint: 'https://127.0.0.1:2', local: true }, 'tok-new')
+
+    expect(fleet.list().filter((node) => node.local).map((node) => node.nodeId)).toEqual(['node-now'])
+    expect(fleet.get('node-was')).toBeUndefined()
+    // Pairings are untouched, and the shared local token scope now holds the live node's credential.
+    expect(fleet.get('node-remote')?.endpoint).toBe(remote.endpoint)
+    expect(fleet.tokenFor('node-now')).toBe('tok-new')
+    expect(new FleetStore(dir).list().filter((node) => node.local)).toHaveLength(1)
+  })
+
+  it('does not let a pairing displace the local node', () => {
+    // The singleton rule is one-directional: remembering a remote node must leave the local row alone.
+    const fleet = new FleetStore(dir)
+    fleet.remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
+    fleet.remember({ ...remote }, 'tok-remote')
+
+    expect(fleet.list().map((node) => node.nodeId)).toEqual(['node-local', 'node-remote'])
+  })
+
   it('renames without touching the token', () => {
     const fleet = new FleetStore(dir)
     fleet.remember({ ...remote }, 'tok-remote')

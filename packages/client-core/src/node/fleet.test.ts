@@ -110,6 +110,21 @@ describe('selectActiveNode', () => {
     expect(activeCacheId()).toBe('local-node')
   })
 
+  it('moves the cache id on every switch, which is what remounts the shell and every plugin frame with it', () => {
+    // Load-bearing well beyond the query cache. A plugin frame pins its node when the frame MOUNTS
+    // (plugins/frames/register.tsx) and holds it as a plain string for the life of that mount, which is
+    // only safe because a switch cannot leave a frame mounted: index.tsx keys the provider — and the whole
+    // shell under it — on this value. If a switch ever stopped moving the cache id, every open frame would
+    // go on addressing the node it was born on and its fetches would land on the wrong node or none.
+    setActiveNode('node-a')
+    expect(activeCacheId()).toBe('node-a')
+    setActiveNode('node-b')
+    expect(activeCacheId()).toBe('node-b')
+    // Including the drop to no node at all, which is what removing the last node does.
+    setActiveNode(null)
+    expect(activeCacheId()).toBe('origin')
+  })
+
   it('keeps a still-known selection across a refresh', async () => {
     stubBridge([record('remote'), record('local-node', true)])
     setActiveNode('remote')

@@ -40,8 +40,19 @@ const registered = new Map<string, Disposable[]>()
 
 // `activeNodeId()` is the frame's node, and there is no other candidate: a task belongs to whichever node
 // the window is talking to (Task has no nodeId of its own), and a rail-scoped surface is looking at that
-// node too. Read at frame construction, not baked in — a node switch re-runs the client plugin host and
-// remounts the panes.
+// node too. The frame never names one — docs/plugins.md: "The host pins which Node the frame talks to."
+//
+// READ PER FRAME, not per registration, which is what makes a plain string safe here rather than an
+// accessor. `bindingFor` is called inside each contribution's `component`, so the id is resolved when a
+// frame MOUNTS; the pin cannot then go stale under it, because a node switch moves `activeCacheId()` and
+// the composition root keys the whole shell on that value — every mounted frame is disposed and rebuilt
+// (node/fleet.test.ts pins the switch half of that). Registration cannot lose the race to selection
+// either: `selectActiveNode()` is awaited before anything that leads here. This has been misread as a
+// snapshot taken at registration time; it is not, and the `when` gates below are getters because what a
+// REGISTRATION reads has to stay reactive across the same switch.
+//
+// `''` when there is no node at all is deliberate rather than a hole: that is the browser-served
+// `dev:node` mode, where the origin IS the node and apiClient's same-origin fallback is the right target.
 const frameNode = (): string => activeNodeId() ?? ''
 
 const bindingFor = (pluginId: string, surface: PluginFrameSurface, row: NodePluginRow, extra: Partial<FrameBinding> = {}): FrameBinding => ({
@@ -177,7 +188,8 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
 
 /**
  * Register every accepted plugin's declared surfaces. Idempotent: called after the distribution pass and
- * again on a node switch, and each call replaces what the previous one contributed.
+ * again when a trust decision lands, and each call replaces what the previous one contributed. NOT called
+ * on a node switch, and it does not need to be — nothing registered here holds a node id (see `frameNode`).
  */
 export function syncFrameContributions(): void {
   const bundles = activeBundles()
