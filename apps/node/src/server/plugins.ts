@@ -14,7 +14,6 @@ import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
 import { modelProvidersPlugin } from '@acorn/plugin-model-providers/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin, type PreviewPluginDeps } from '@acorn/plugin-preview/node/index.ts'
-import { rollbarPlugin } from '@acorn/plugin-rollbar/node/index.ts'
 import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/node/index.ts'
 import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflows/node/index.ts'
 
@@ -49,7 +48,6 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   modelProvidersPlugin(),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(deps.preview),
-  rollbarPlugin(),
   terminalPlugin(dataDir, deps.terminal),
   workflowsPlugin(dataDir, deps.workflows),
 ]

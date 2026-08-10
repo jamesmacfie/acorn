@@ -8,7 +8,7 @@ import { FRESHNESS_LABELS } from '../../node/freshness'
 import { Badge, Row, SectionHeader } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import { runChromeAction } from './actions'
-import { chromeKey, chromeRevision, readRailItems } from './data'
+import { chromeKey, chromeRevision, readRailItems, scopedSourceItemsPath } from './data'
 import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
 import { workspaceForProject } from '../../workspaces/activeWorkspace'
 import { PromoteToTaskModal } from '../../integrations/PromoteToTaskModal'
@@ -38,7 +38,12 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   // offline node shows the list it last had, badged stale, exactly like every native surface.
   const [result] = createFleetQuery(
     () => chromeKey(props.pluginId, props.descriptor.id),
-    (node, _revision, signal) => readRailItems(props.pluginId, props.descriptor.items, node, signal),
+    (node, _revision, signal) => readRailItems(
+      props.pluginId,
+      scopedSourceItemsPath(props.descriptor.items, params.projectId),
+      node,
+      signal,
+    ),
     chromeRevision,
     { nodeIds: [nodeId] },
   )
@@ -55,6 +60,11 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
     return (tasks.data ?? []).filter((task) => task.status === 'active' && (projectIds.size === 0 || projectIds.has(task.projectId)))
   }
   const [promoteItem, setPromoteItem] = createSignal<PluginRailItem | null>(null)
+
+  const promote = (event: MouseEvent, item: PluginRailItem): void => {
+    event.stopPropagation()
+    setPromoteItem(item)
+  }
 
   const select = (item: PluginRailItem): void => {
     if (props.descriptor.onSelect) runChromeAction(props.descriptor.onSelect, {
@@ -97,7 +107,22 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
                 onActivate={props.descriptor.onSelect ? () => select(item) : undefined}
                 leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
                 meta={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
-                trailing={<Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>}
+                trailing={(
+                  <>
+                    <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>
+                    <Show when={item.task && props.descriptor.onSelect?.verb !== 'createTask'}>
+                      <button
+                        type="button"
+                        class="ui-btn"
+                        data-size="sm"
+                        aria-label={`Create or attach task for ${item.title}`}
+                        onClick={(event) => promote(event, item)}
+                      >
+                        +TASK
+                      </button>
+                    </Show>
+                  </>
+                )}
                 title={item.title}
               >
                 {item.title}

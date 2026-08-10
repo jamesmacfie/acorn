@@ -1,6 +1,5 @@
 import type { NodePluginPermissions, PluginContributions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
-import { normalizeWebviewHost } from '@acorn/protocol/webview.ts'
+import { pluginKeyClaimGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { formatChord } from '../tasks/paneShortcuts'
 import { describeChannel, isSubscribable } from './frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
@@ -67,22 +66,7 @@ export const uiPermissionLines = (permissions: NodePluginPermissions): string[] 
 }
 
 export const webviewGrants = (contributions: PluginContributions): PluginWebviewGrant[] =>
-  (contributions.frames ?? [])
-    .filter((surface) => surface.target === 'webview' && surface.hosts?.length)
-    .flatMap((surface) => {
-      try {
-        return [{
-          surface: surface.id,
-          label: surface.label,
-          hosts: [...new Set(surface.hosts!.map((host) => normalizeWebviewHost(host)))].sort(),
-        }]
-      } catch {
-        // Roster rows are wire input. An invalid grant produces no trusted surface instead of throwing
-        // an untrusted manifest string into the consent dialog.
-        return []
-      }
-    })
-    .sort((a, b) => a.surface.localeCompare(b.surface))
+  pluginWebviewGrants(contributions)
 
 export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): string[] =>
   [...grants]
@@ -90,12 +74,7 @@ export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): s
     .map((grant) => `Show web pages from ${[...grant.hosts].sort().join(', ')} in the "${grant.label}" pane`)
 
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
-  (contributions.frames ?? [])
-    .flatMap((surface) => {
-      const chords = [...new Set((surface.claimsKeys ?? []).filter(isPluginKeyClaim))].sort()
-      return chords.length ? [{ surface: surface.id, label: surface.label, chords }] : []
-    })
-    .sort((a, b) => a.surface.localeCompare(b.surface))
+  pluginKeyClaimGrants(contributions)
 
 export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]): string[] =>
   [...grants]

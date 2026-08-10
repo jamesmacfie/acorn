@@ -1,6 +1,5 @@
 import { Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
 import { cx } from './cx'
-import Icon from './Icon'
 
 /* ── Button ──────────────────────────────────────────────────────────────────────────────────
    Replaces the action buttons only. Rows, tabs, tree nodes and popover triggers that happen to be
@@ -113,7 +112,11 @@ export function Badge(props: {
 export function Spinner(props: { size?: 'sm' | 'md'; label?: string }) {
   return (
     <span class="ui-spinner spin" data-size={props.size ?? 'sm'} role="status" aria-label={props.label ?? 'Working'}>
-      <Icon name="loader-circle" />
+      {/* Fixed Lucide loader-circle geometry. Keeping this inline avoids making every Button import
+          the generic icon registry and its full icon-node catalogue just for the busy state. */}
+      <svg class="glyph" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      </svg>
     </span>
   )
 }

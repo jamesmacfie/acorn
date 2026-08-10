@@ -4,12 +4,12 @@ import type { NavigateOptions } from '@solidjs/router'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { Project } from '../queries'
 import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../tasks/tasks'
-import { defaultSourceId, sourcePath } from '../registries/sources'
+import { defaultSourceId } from '../registries/sources'
+import { isProjectPath, projectIdFromPath, projectPath } from '../registries/corePaths'
 import { PrefKeys } from './prefKeys'
 import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'
 import { createStartupRestore } from './startupRestore'
 
-type Params = { projectId?: string; number?: string }
 type Navigate = (to: string, options?: Partial<NavigateOptions>) => void
 
 const stringCodec = {
@@ -49,7 +49,10 @@ export type AppStartupOptions = {
   cacheRestoring: Accessor<boolean>
   projects: Accessor<Project[] | undefined>
   tasks: Accessor<Task[] | undefined>
-  params: Params
+  // The current location's pathname. Read whole rather than rebuilt from route params: this slice used to
+  // assemble `/p/:projectId/pulls/:number` by hand, which meant core was writing one plugin's URL shape and
+  // could remember no other. Any project-scoped path a source contributes now round-trips unchanged.
+  path: Accessor<string>
   navigate: Navigate
   collapsed: Accessor<boolean>
   setCollapsed: Setter<boolean>
@@ -71,16 +74,16 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       id: 'core.last-path', key: PrefKeys.lastPath, scope: 'app', restore: 'workspace', version: 1,
       codec: stringCodec, empty: () => '', unknownIds: 'drop', maxBytes: 2 * 1024,
       binding: appStateBinding(
-        () => options.params.projectId
-          ? `/p/${options.params.projectId}${options.params.number ? `/pulls/${options.params.number}` : ''}`
-          : '',
+        // Only project-scoped paths are worth remembering — a task path is restored by `core.last-task`
+        // and a settings path is not a place to come back to.
+        () => (isProjectPath(options.path()) ? options.path() : ''),
         (saved) => {
           const projects = options.projects() ?? []
-          if (!projects.length || options.params.projectId) return
-          const match = /^\/p\/([^/]+)/.exec(saved)
-          const valid = !!match && projects.some((project) => project.id === decodeURIComponent(match[1]))
+          if (!projects.length || isProjectPath(options.path())) return
+          const savedProjectId = projectIdFromPath(saved)
+          const valid = !!savedProjectId && projects.some((project) => project.id === savedProjectId)
           const fallback = projects.find((project) => !project.hidden) ?? projects[0]
-          options.navigate(valid ? saved : sourcePath('project', { projectId: fallback.id }), { replace: true })
+          options.navigate(valid ? saved : projectPath(fallback.id), { replace: true })
         },
       ),
       legacy: legacyScalar(PrefKeys.lastPath),

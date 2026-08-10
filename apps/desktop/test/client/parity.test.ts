@@ -13,8 +13,8 @@ import { clientPlugins } from '../../src/app/client/plugins'
 initClientPlugins(clientPlugins)
 for (const source of coreSourceContributions) sourceRegistry.register(source)
 
-// docs/ui-design.md § Parity: the 13 panes with their shipped order and chords. Reproduced from that
-// list, in its order — including `docker (75)` having no chord, which is the one exception.
+// Compiled-client parity: the 12 built-in panes with their shipped order and chords. Loaded frames
+// are asserted by their package/e2e coverage instead of being smuggled back into this static graph.
 const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['pr', 10, 'meta+shift+r'],
   ['agents', 15, 'meta+shift+a'],
@@ -28,7 +28,6 @@ const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['http', 76, 'meta+shift+h'],
   ['preview', 80, 'meta+shift+b'],
   ['linear', 90, 'meta+shift+l'],
-  ['rollbar', 100, 'meta+shift+o'],
 ]
 
 // Core Home is the stable default; Fleet is additive and gated on a second node. Provider browse sources
@@ -38,7 +37,6 @@ const SOURCES: Array<[id: string, order: number]> = [
   ['fleet', 1],
   ['github', 10],
   ['linear', 20],
-  ['rollbar', 30],
   ['docker', 40],
   ['http', 50],
   ['agents', 60],
@@ -65,8 +63,8 @@ describe('docs/ui-design.md § Parity — the panes', () => {
 describe('docs/ui-design.md § Parity — the rail sources', () => {
   it('is exactly the core and provider sources, in rail order', () => {
     // Read from the REGISTRY rather than through `availableSources`, deliberately: that accessor applies
-    // the provider gate, so linear and rollbar vanish without a connected integration — which is exactly
-    // why e2e S1 can only assert four of these and why this belongs in a unit test.
+    // the provider gate, so linear vanishes without a connected integration — which is exactly why
+    // this belongs in a unit test. Loaded sources have their own descriptor/runtime coverage.
     const actual = sourceRegistry
       .entries()
       .map((source) => [source.id, source.order] as const)

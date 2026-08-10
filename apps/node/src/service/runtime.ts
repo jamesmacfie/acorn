@@ -12,6 +12,7 @@ import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
 import { PLUGIN_STATE } from '@acorn/node-core/server/routes/plugins.ts'
 import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/main/pluginInstaller.ts'
 import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/main/pluginLoader.ts'
+import { reconcileBundledPlugins } from '@acorn/node-core/main/bundledPlugins.ts'
 import { buildPluginDeps } from '../server/pluginDeps'
 import { closeListener, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
@@ -91,6 +92,15 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   } catch (error) {
     stateChanged('failed', error instanceof Error ? error.message : String(error))
     throw error
+  }
+  if (config.bundledPluginsDir) {
+    const bundled = reconcileBundledPlugins(config.dataDir, config.bundledPluginsDir)
+    if (bundled.installed.length || bundled.updated.length) {
+      console.log(`[plugins] bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
+    }
+    for (const failure of bundled.failures) {
+      console.error(`[plugins] bundled ${failure.id} was not reconciled: ${failure.reason}`)
+    }
   }
   const capabilities = new CapabilityRegistry()
   try {

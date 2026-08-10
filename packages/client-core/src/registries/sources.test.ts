@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defaultSourceId, sourcePath, sourceRegistry, sourceRouteContributions, sourceRoutePath, type SourceContribution } from './sources'
+import { defaultSourceId, sourceRegistry, sourceRouteContributions, taskPathFromSources, type SourceContribution } from './sources'
+import type { Task } from '../queries'
 
 const source = (id: string, order: number, isDefault?: boolean): SourceContribution => ({
   id,
@@ -32,21 +33,43 @@ describe('source defaults', () => {
     }
   })
 
-  it('orders contributed route shapes by declared order and composes parameters generically', () => {
+  it('orders contributed route shapes by declared order', () => {
     const disposable = sourceRegistry.register({
       id: 'test.routes', order: 1, glyph: 'x', label: 'Routes',
       routes: [
-        { id: 'test.detail', path: '/p/:projectId/pulls/:number', kind: 'detail', order: 30 },
-        { id: 'test.create', path: '/p/:projectId/new', kind: 'create', order: 20 },
-        { id: 'test.project', path: '/p/:projectId', kind: 'project', order: 10 },
+        { id: 'test.detail', path: '/p/:projectId/pulls/:number', order: 30 },
+        { id: 'test.create', path: '/p/:projectId/new', order: 20 },
+        { id: 'test.project', path: '/p/:projectId', order: 10 },
       ],
     })
     try {
       expect(sourceRouteContributions().map((route) => route.id)).toEqual(['test.project', 'test.create', 'test.detail'])
-      expect(sourceRoutePath('create')).toBe('/p/:projectId/new')
-      expect(sourcePath('detail', { projectId: 'project-web', number: 42 })).toBe('/p/project-web/pulls/42')
     } finally {
       disposable.dispose()
+    }
+  })
+})
+
+describe('task paths', () => {
+  const task = (id: string): Task => ({ id } as Task)
+
+  it('takes the first source that claims the task', () => {
+    const declines = sourceRegistry.register({ id: 'test.declines', order: 1, glyph: 'x', label: 'Declines', taskPath: () => undefined })
+    const claims = sourceRegistry.register({ id: 'test.claims', order: 2, glyph: 'x', label: 'Claims', taskPath: (t) => `/claimed/${t.id}` })
+    try {
+      expect(taskPathFromSources(task('task-1'))).toBe('/claimed/task-1')
+    } finally {
+      claims.dispose()
+      declines.dispose()
+    }
+  })
+
+  it('leaves an unclaimed task to core', () => {
+    const declines = sourceRegistry.register({ id: 'test.declines', order: 1, glyph: 'x', label: 'Declines', taskPath: () => undefined })
+    try {
+      expect(taskPathFromSources(task('task-1'))).toBeUndefined()
+    } finally {
+      declines.dispose()
     }
   })
 })

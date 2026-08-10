@@ -173,8 +173,29 @@ async function seedTask(page: Page, repoDir: string): Promise<{ id: string }> {
 }
 
 async function dismissOnboarding(page: Page): Promise<void> {
-  const done = page.getByRole('button', { name: 'Done' })
-  if (await done.isVisible().catch(() => false)) await done.click()
+  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
+  // its own button can no longer land. So record the preference on the node, which survives the
+  // reloads these specs do, and close the wizard directly if it has already painted.
+  await page.evaluate(async () => {
+    const bridge = (window as BridgeWindow).acorn
+    if (!bridge) return
+    const fleet = await bridge.fleetList()
+    const node = fleet.nodes.find((candidate) => candidate.local) ?? fleet.nodes[0]
+    if (!node) return
+    await bridge.nodeFetch(node.nodeId, {
+      requestId: `e2e-onboarded-${Math.random().toString(36).slice(2)}`,
+      path: '/v2/core/prefs',
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify({ key: 'onboarded', value: '1' })) },
+    })
+  })
+  // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
+  // it this click cannot land. The preference above is what actually settles it — this is only here to
+  // close a wizard that is already reachable.
+  const skip = page.getByRole('button', { name: 'skip for now' })
+  if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
 
 async function openSmokeWorkspace(page: Page, repoDir: string): Promise<void> {
@@ -317,7 +338,8 @@ test('S6 find-in-files copies paths and double-clicks into the match', async () 
     method: 'POST', body: { origin: 'local', projectId, title: 'Smoke task' },
   })
   await running.page.reload()
-  // The reload re-runs first-run onboarding, whose backdrop swallows rail clicks.
+  // Belt and braces: the wizard is gated on zero projects and this run has seeded one, but the
+  // reload races the projects query, and its backdrop swallows rail clicks.
   await dismissOnboarding(running.page)
   await expect(running.page.getByRole('button', { name: 'Smoke task', exact: true })).toBeVisible()
   await running.page.getByRole('button', { name: 'Smoke task', exact: true }).click()

@@ -19,11 +19,13 @@ export type Repo = {
   defaultBranch: string | null
   pushedAt: number | null
 }
-export type GithubImportAction = 'map' | 'clone' | 'defer'
+// There is no 'defer': not importing a repository is what deferring meant, and the placeholder
+// project it used to create was a duplicate waiting to happen — map the same repo later and the
+// account ended up with two rows for one repository.
+export type GithubImportAction = 'map' | 'clone'
 export type GithubImportItem =
   | { repoId: number; action: 'map'; path: string }
   | { repoId: number; action: 'clone'; parentDir: string }
-  | { repoId: number; action: 'defer' }
 export type GithubImportRequest = { repositories: GithubImportItem[] }
 export type GithubImportResult = {
   repoId: number

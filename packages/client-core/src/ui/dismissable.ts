@@ -4,8 +4,8 @@ import { trapOverlayFocus } from './focus'
 //
 // This was hand-written at nine call sites, and inconsistently — SettingsModal, willPhase and the
 // two Database modals had the full pattern; ConfigTrustDialog, PromoteToTaskModal, TabRail,
-// LinearBrowse and RollbarBrowse had a backdrop click and nothing else, so Tab walked straight out
-// of the dialog into the page behind it and Escape did nothing.
+// LinearBrowse and the former compiled Rollbar browser had a backdrop click and nothing else, so Tab
+// walked straight out of the dialog into the page behind it and Escape did nothing.
 //
 // The overlay PALETTES (⌘K, ⌘P, workspace) deliberately do not use this: createOverlayPalette
 // already owns their dismissal, plus focus restore and single-active-overlay coordination.

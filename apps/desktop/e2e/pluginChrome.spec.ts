@@ -195,8 +195,29 @@ async function launch(): Promise<Running> {
 }
 
 const dismissOnboarding = async (page: Page): Promise<void> => {
-  const done = page.getByRole('button', { name: 'Done' })
-  if (await done.isVisible().catch(() => false)) await done.click()
+  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
+  // its own button can no longer land. So record the preference on the node, which survives the
+  // reloads these specs do, and close the wizard directly if it has already painted.
+  await page.evaluate(async () => {
+    const bridge = (window as BridgeWindow).acorn
+    if (!bridge) return
+    const fleet = await bridge.fleetList()
+    const node = fleet.nodes.find((candidate) => candidate.local) ?? fleet.nodes[0]
+    if (!node) return
+    await bridge.nodeFetch(node.nodeId, {
+      requestId: `e2e-onboarded-${Math.random().toString(36).slice(2)}`,
+      path: '/v2/core/prefs',
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify({ key: 'onboarded', value: '1' })) },
+    })
+  })
+  // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
+  // it this click cannot land. The preference above is what actually settles it — this is only here to
+  // close a wizard that is already reachable.
+  const skip = page.getByRole('button', { name: 'skip for now' })
+  if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
 
 const settleOverlays = async (page: Page): Promise<void> => {
@@ -216,6 +237,8 @@ test.afterEach(async () => {
 test('a plugin with no client bundle contributes native chrome', async () => {
   test.setTimeout(120_000)
   const { page, repoDir } = await launch()
+  // Straight after boot: these fixtures have zero projects, so the first-run wizard opens over them.
+  await dismissOnboarding(page)
   await settleOverlays(page)
 
   // The descriptor promotion needs a real project and a real provider connection. The row obtains

@@ -11,15 +11,21 @@
 //
 // Params-driven, like the components it hosts: PullList reads `useParams()` itself, and the routes exist only
 // to populate params. That is why this component takes no props even though it renders three panes.
+//
+// The routed project is the only thing this surface needs to render — the same gate every other Source
+// applies (plugins/http HttpBrowse). It deliberately does NOT require one of this plugin's own routes to
+// match: the rail selects a Source by signal and never navigates, so a route-match gate made the whole
+// surface unreachable from anywhere except a PR link. The routes still exist, and still address a PR; they
+// refine what is shown here rather than deciding whether anything is.
 import { createSignal, lazy, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { forceRefreshPull } from './queries'
 import { filesKey, pullKey, pullsKey, pullsRoute, pullsPrefixKey, type Pull } from '../contract/api'
 import { projectsOptions, readJson } from '@acorn/plugin-api/client'
-import { Acorn } from '@acorn/plugin-api/ui'
+import { Acorn } from '@acorn/plugin-api/ui/host'
 import PullList from './PullList'
-import { githubBrowseRoute, githubCreateRoute, githubPullRoute } from './routes'
+import { githubCreateRoute } from './routes'
 
 // Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and the
 // create-PR form do not compete with the first interactive paint. PullList is the startup path and is
@@ -37,12 +43,21 @@ export default function GithubBrowse() {
   const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
   const owner = () => project()?.github?.owner ?? ''
   const repo = () => project()?.github?.name ?? ''
+  // Pull requests need the GitHub facet, not just a project: a project with no github.com remote has no
+  // PRs to list, and without this gate PullList sits on "Loading…" forever (its queries never enable).
+  const linked = () => !!project()?.github
   // Create-PR mode: the static route is contributed ahead of the parameter route.
-  const browseMatch = useMatch(() => githubBrowseRoute)
   const newMatch = useMatch(() => githubCreateRoute)
-  const pullMatch = useMatch(() => githubPullRoute)
   const isNew = () => !!newMatch()
-  const isGithubRoute = () => !!browseMatch() || !!newMatch() || !!pullMatch()
+
+  // Why the routed project is missing, said plainly. `undefined` while the projects query is in flight,
+  // so the first paint shows the mark rather than flashing "select a project".
+  const emptyMessage = () => {
+    if (!projects.data) return undefined
+    const selected = project()
+    if (!selected) return 'Select a project from the project menu to browse pull requests.'
+    return `${selected.name} has no GitHub remote.`
+  }
 
   const [refreshingPulls, setRefreshingPulls] = createSignal(false)
   const [refreshingPull, setRefreshingPull] = createSignal(false)
@@ -79,7 +94,16 @@ export default function GithubBrowse() {
   }
 
   return (
-    <Show when={isGithubRoute() && params.projectId && project()} fallback={<main class="panes panes-empty"><Acorn /></main>}>
+    <Show
+      when={linked()}
+      fallback={
+        <main class="panes panes-empty">
+          <Show when={emptyMessage()} fallback={<Acorn />}>
+            {(message) => <p class="placeholder">{message()}</p>}
+          </Show>
+        </main>
+      }
+    >
       <main class="panes">
         <section class="pane pane-left">
           <div class="section-header">

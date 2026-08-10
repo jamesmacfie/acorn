@@ -45,6 +45,16 @@ describe('ConnectionProviderRegistry', () => {
     expect(registry.list()).toEqual([contribution])
   })
 
+  it('records provider ownership without exposing another plugin\'s ids', () => {
+    const registry = new ConnectionProviderRegistry()
+    registry.register(provider('alpha-one'), 'alpha')
+    registry.register(provider('beta'), 'beta')
+    registry.register(provider('alpha-two'), 'alpha')
+
+    expect(registry.idsForOwner('alpha')).toEqual(['alpha-one', 'alpha-two'])
+    expect(registry.idsForOwner('missing')).toEqual([])
+  })
+
   it('rejects duplicate providers and credential field ids', () => {
     const registry = new ConnectionProviderRegistry()
     registry.register(provider())

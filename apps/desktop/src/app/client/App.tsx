@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
-import { useMatch, useNavigate, useParams } from '@solidjs/router'
+import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
@@ -33,7 +33,8 @@ import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@ac
 import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
-import { defaultSourceId, sourcePath, sourceRegistry, sourceRoutePath } from '@acorn/client-core/registries/sources.ts'
+import { defaultSourceId, sourceRegistry } from '@acorn/client-core/registries/sources.ts'
+import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/registries/corePaths.ts'
 import { availableSources } from '@acorn/client-core/tabs/sources.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
@@ -46,6 +47,7 @@ const SettingsModal = lazy(() => import('@acorn/client-core/settings/SettingsMod
 export default function App() {
   const queryClient = useQueryClient()
   const params = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
   // The Settings page (account menu → Settings): workspace mapping, per-workspace pages,
@@ -203,7 +205,7 @@ export default function App() {
     cacheRestoring: isRestoring,
     projects: () => projects.data,
     tasks: () => tasks.data,
-    params,
+    path: () => location.pathname,
     navigate,
     collapsed,
     setCollapsed,
@@ -283,8 +285,8 @@ export default function App() {
 
   const toggleCollapsed = () => setCollapsed((value) => !value)
 
-  // Create-PR mode: the source contribution owns the static route shape.
-  const newMatch = useMatch(() => sourceRoutePath('create') ?? '')
+  // New-task mode: core's own route, so the pattern is a constant rather than a registry lookup.
+  const newMatch = useMatch(() => CREATE_TASK_ROUTE)
   const isNew = () => !!newMatch()
 
   async function clearCache() {
@@ -333,7 +335,7 @@ export default function App() {
                   const source = defaultSourceId()
                   if (source) setSelectedSource(source)
                 }
-                navigate(sourcePath('project', { projectId }))
+                navigate(projectPath(projectId))
               }}
             >
               <For each={scopedProjects()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
@@ -342,7 +344,7 @@ export default function App() {
         </div>
         <div class="breadcrumb">
           <Show when={params.projectId} fallback={<span class="brand">acorn</span>}>
-            <button type="button" class="crumb crumb-link" onClick={() => navigate(sourcePath('project', { projectId: params.projectId ?? '' }))}>
+            <button type="button" class="crumb crumb-link" onClick={() => navigate(projectPath(params.projectId ?? ''))}>
               {projects.data?.find((project) => project.id === params.projectId)?.name ?? params.projectId}
             </button>
             <Show when={params.number}>

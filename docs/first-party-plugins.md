@@ -1,11 +1,13 @@
 # First-party plugins
 
-acorn has two plugin tiers. This document is about the first: the seventeen packages under
-`plugins/` that ship inside the binary, run in the shell's own realm, and are trusted like the
-rest of the app. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
+acorn has two plugin tiers. This document is about the first: the packages under `plugins/` that are
+registered in the Node or desktop composition, ship inside the binary, run in the shell's own realm,
+and are trusted like the rest of the app. Rollbar remains in the workspace as source for a loaded
+package and is not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
 trust model behind the second one.
 
-The question this file answers is narrower and keeps coming up: **which first-party plugins are
+[extensibility.md](./extensibility.md) covers why the two tiers exist and what the line between
+them is. The question this file answers is narrower and keeps coming up: **which first-party plugins are
 first-party because they have to be, and which are just first-party because they were written
 before there was another option?** Being in the binary is not a privilege in itself. What makes a
 plugin genuinely first-party is using something a loaded plugin cannot be given.
@@ -81,7 +83,7 @@ Ordered by how strong the first-party claim is.
 | **preview** | Its display lifecycle now calls the host-owned webview service any plugin surface can use. Its thin main adapter still supplies preview-only tunnel headers and page rules, and its CDP driver remains behind the six browser agent tools. Those driving and credential-bearing capabilities—not merely showing a page—are why preview remains first-party. | C |
 | **memory** | `required`. Publishes `KNOWLEDGE`/`MEMORY_KNOWLEDGE` and contributes two task-context sections that core's assembler depends on existing. | D |
 | **notes** | `required`. Publishes `NOTES_STORE` and `NOTES_SEED_TASK`, consumed by two other plugins; contributes a context section. `notes.ts` remains in protocol because `NoteLocation` is core's own task/workspace/global addressing scheme. | D |
-| **onboarding** | A component in the `overlay` slot, rendered above the whole shell before a node is configured. Sandboxing the first-run experience behind a trust prompt for a plugin the user never installed is circular. | B, D |
+| **onboarding** | A component in the `overlay` slot: a full-screen first-run wizard, opened when the node is ready and has zero projects. Sandboxing the first-run experience behind a trust prompt for a plugin the user never installed is circular. | B, D |
 
 ### First-party for one specific reason
 
@@ -99,48 +101,38 @@ written before the loader existed.
 
 | Plugin | What it uses | Portable? |
 | --- | --- | --- |
-| **rollbar** | An integration provider, a rail source with promotion, a pane. No tables, no capabilities, no streams. | **Yes, fully.** The provider-route and promotion gaps that used to qualify this are closed — see below |
 | **linear** | The rollbar set plus a ref panel github renders and content-link recognisers. Publishes nothing, `required` by nothing. | **Yes, fully.** `refPanel` is a frame target and content links are declarative, so both of its apparent privileges are carrier differences |
 | **http** | Its own SQLite file, a pane, a rail source, a settings page, an `agentContexts` entry. Uses `core.secrets`. | Yes, once `agentContexts` has a manifest form |
 | **database** | Its own SQLite file, a pane, an `agentContexts` entry, publishes `DATABASE`. | Yes — `DATABASE` turns out to have no consumer outside the plugin |
-| **editor** | Monaco pane, find-in-files over ripgrep, a component slot, `EDITOR`/`SEARCH`. | Yes — neither capability has an outside consumer; blocked on keybindings and the slot ([third-party/editor.md](./third-party/editor.md)) |
+| **editor** | Monaco pane, find-in-files over ripgrep, a component slot, `EDITOR`/`SEARCH`. | Yes — neither capability has an outside consumer. Remaining questions: the component slot, and how Monaco behaves in a frame |
 | **model-providers** | Registers connection providers and model adapters. No client half at all. | Yes — the cleanest node-only shape in the tree |
 
-Rollbar's qualification is worth spelling out, because it was the sharpest case and is now the
-best evidence the tier boundary is real. A loaded plugin can serve provider routes through
+Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded
+package serves provider routes through
 `ctx.providers.integration` with a fetch handler; it can create a task from an item and link the
-item to it (`POST /v2/core/tasks/:id/links` under `core.tasks:write`, plus the `createTask`
-descriptor verb); and it can declare its URL recognisers. Everything rollbar does, an outside
-author can now do — the plugin stays compiled in because rewriting a working integration to prove
-a point is churn, not because it needs anything.
+item to it through the host-owned descriptor promotion flow. Everything Rollbar does, an outside
+author can now do. Review findings from the move are in [third-party/](./third-party/).
 
 ## The honest asterisk
 
-**Every first-party plugin registers routes with `ctx.routes.register`, and none uses
-`ctx.routes.fetch`.** Loaded plugins only get `fetch`. So on the route seam, every plugin above is
-"first-party" in a way that says nothing about the plugin and everything about a seam with no
-production caller.
+**Every remaining route-owning first-party plugin registers routes with `ctx.routes.register`.**
+Loaded plugins only get `fetch`; Rollbar is the standing production caller of that portable seam. So on the route seam, most plugins above are
+"first-party" in a way that says nothing about the plugin and everything about which carrier they
+were originally written against.
 
 The fetch seam is no longer *incomplete* — it carries a `PluginRequestContext` with the
 authenticated identity and a provider runtime, so a loaded plugin can serve provider routes
 without ever seeing Hono, the core database, or the secret service; and passing a Hono router to
 `ctx.providers.integration` is now an explicit initialization error rather than a silent bypass.
-What remains is that no shipped plugin exercises any of it.
-
-That still matters, and it is the same failure mode this codebase has already paid for once: the
-post-implementation audit of the third-party phases found three real gaps precisely because no
-production plugin walked those paths. The fetch shape is also the one that survives moving plugins
-out of process, so it is the seam least affordable to leave unwalked.
-Moving one of the four portable built-ins onto the loaded path is the answer
-([third-party/](./third-party/)), and until something does that, treat "the seam works" as tested
-rather than demonstrated.
+Rollbar now exercises provider fetch routes, descriptor chrome, project scoping, promotion, client
+distribution and frame rendering as production code. Its move found and closed two carrier gaps that
+fixtures had missed, which is exactly why the seam needed a standing caller.
 
 Three smaller gaps in the same category. `agentContexts` and `persistedState` have no manifest
 form, which is why `context`, `http` and `database` appear more privileged than they are. And
 **keybindings** used to have none either; loaded plugins now declare `commands` and
 `keybindings` in the manifest, and a frame forwards unclaimed chords to the shell dispatcher
-(`docs/command-palette-and-shortcuts.md`). Outstanding review items are in
-[keybindings/](./keybindings/).
+(`docs/command-palette-and-shortcuts.md`).
 
 ## Rules of thumb
 
@@ -162,26 +154,27 @@ whether a contribution can be expressed as data plus async messages.
 
 ## Appendix: plugins that already follow the third-party guidelines
 
-These four use only mechanisms a third-party plugin has, or will have once the named gap closes.
+These worked examples use only mechanisms a third-party plugin has, or will have once the named gap closes.
 Read them as the worked examples — they are what an outside author should copy, in this order:
 
 **model-providers** — the minimal node-only plugin. Registers connection providers and model
 adapters through `ctx.providers`, no client half, no tables, no capabilities. Start here to see
 how small a plugin can be.
 
-**rollbar** — the reference integration, and the whole node half is:
+**rollbar** — the loaded reference integration. Its node half chooses the portable fetch carrier,
+and its client half is a sandbox bundle rather than a `ClientPlugin`. Build it with
+`pnpm --filter @acorn/node build:plugin rollbar`; [third-party/](./third-party/) records what the
+move exposed. The provider registration remains conceptually:
 
 ```ts
 export const rollbarPlugin = (): NodePlugin => ({
   name: 'rollbar',
-  init: (ctx) => ctx.providers.integration(rollbarProvider, rollbar),
+  init: (ctx) => ctx.providers.integration(rollbarProvider, createRollbarFetch(ctx.core.projects)),
 })
 ```
 
-Everything real — codecs, sync policy, routes, panes, promotion — lives in the plugin. Copy this
-for any external item source. A loaded plugin writes the same thing with a fetch handler in place
-of the Hono router; the two gaps that used to make this only *nearly* portable — provider routes
-and promotion — are closed; [third-party/rollbar.md](./third-party/rollbar.md) is the move.
+Everything real — codecs, sync policy, routes, frame and descriptor projection — lives in the
+plugin. Copy this loaded shape for an external item source.
 
 **http** — the fullest example of a self-contained feature plugin: its own SQLite file and
 migration chain, a pane, a rail source, a settings page, use-scoped secrets. The one thing a

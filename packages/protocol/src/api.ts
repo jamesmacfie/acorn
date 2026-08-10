@@ -406,6 +406,9 @@ export type PluginContentLinkDescriptor = {
 // The client still validates what arrives. These types describe the agreement; the roster row and the
 // route body are both bytes from a node, and a malformed row is dropped rather than thrown into the shell.
 export type PluginRailTask = {
+  // Optional so established providers can preserve their pre-loader task origin. Other plugins use
+  // the host-derived `<plugin>:item` value and never need to set it.
+  origin?: string
   title?: string
   branch?: string
   // Reserved seed text. The current task model has no body column; retaining it on the descriptor

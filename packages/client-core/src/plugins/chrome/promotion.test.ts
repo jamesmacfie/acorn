@@ -12,10 +12,11 @@ const ITEM: PluginRailItem = {
 }
 
 const TASK = { id: 'task-1' } as Task
+const owned = { ownsConnection: vi.fn(async () => true) }
 
 describe('descriptor promotion', () => {
   it('derives a host-owned origin and row seed', async () => {
-    const promotion = descriptorPromotion('tracker', { create: vi.fn(), link: vi.fn() })
+    const promotion = descriptorPromotion('tracker', { create: vi.fn(), link: vi.fn(), ...owned })
     expect(await Promise.resolve(promotion.prepare(ITEM, {
       projectId: 'project-1', owner: '', repo: '', branch: 'fallback',
     }))).toEqual({
@@ -26,11 +27,34 @@ describe('descriptor promotion', () => {
     })
   })
 
+  it('preserves an established provider origin when the row declares one', async () => {
+    const promotion = descriptorPromotion('rollbar', { create: vi.fn(), link: vi.fn(), ...owned })
+    expect(await promotion.prepare(
+      { ...ITEM, task: { ...ITEM.task, origin: 'rollbar' } },
+      { projectId: 'project-1', owner: '', repo: '' },
+    )).toMatchObject({ origin: 'rollbar' })
+  })
+
+  it('replaces an origin owned by another plugin while preserving owned subtypes', async () => {
+    const promotion = descriptorPromotion('rollbar', { create: vi.fn(), link: vi.fn(), ...owned })
+    const context = { projectId: 'project-1', owner: '', repo: '' }
+
+    await expect(promotion.prepare(
+      { ...ITEM, task: { ...ITEM.task, origin: 'linear' } },
+      context,
+    )).resolves.toMatchObject({ origin: 'rollbar:item' })
+    await expect(promotion.prepare(
+      { ...ITEM, task: { ...ITEM.task, origin: 'rollbar:error' } },
+      context,
+    )).resolves.toMatchObject({ origin: 'rollbar:error' })
+  })
+
   it('creates first and links second', async () => {
     const order: string[] = []
     const promotion = descriptorPromotion('tracker', {
       create: async () => { order.push('create'); return TASK },
       link: async () => { order.push('link') },
+      ownsConnection: async () => true,
     })
     const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1', owner: '', repo: '' }))
     await promotion.afterCreate?.(task, ITEM, { projectId: 'project-1', owner: '', repo: '' })
@@ -42,6 +66,7 @@ describe('descriptor promotion', () => {
     const promotion = descriptorPromotion('tracker', {
       create: async () => { order.push('create'); return TASK },
       link: async () => { order.push('link'); throw new Error('link failed') },
+      ownsConnection: async () => true,
     })
     const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1', owner: '', repo: '' }))
     await expect(promotion.afterCreate?.(task, ITEM, { projectId: 'project-1', owner: '', repo: '' }))
@@ -52,11 +77,23 @@ describe('descriptor promotion', () => {
   it('attaches the row link to an existing task without creating another one', async () => {
     const create = vi.fn()
     const link = vi.fn().mockResolvedValue(undefined)
-    const promotion = descriptorPromotion('tracker', { create, link })
+    const promotion = descriptorPromotion('tracker', { create, link, ownsConnection: async () => true })
 
     await promotion.attachToCurrentTask?.('task-existing', ITEM)
 
     expect(create).not.toHaveBeenCalled()
     expect(link).toHaveBeenCalledWith('task-existing', ITEM.task?.link)
+  })
+
+  it('refuses to attach a connection owned by another provider', async () => {
+    const link = vi.fn()
+    const promotion = descriptorPromotion('tracker', {
+      create: vi.fn(),
+      link,
+      ownsConnection: async () => false,
+    })
+
+    await expect(promotion.attachToCurrentTask?.('task-existing', ITEM)).rejects.toThrow(/does not own/)
+    expect(link).not.toHaveBeenCalled()
   })
 })

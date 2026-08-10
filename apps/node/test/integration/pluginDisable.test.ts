@@ -59,8 +59,8 @@ const buildPlugins = (dataDir: string) =>
   } as never)
 
 // Every registry a node plugin can write to. The three PROVIDER registries were missing, and that was not a
-// gap at the margin: providers are the ENTIRE contribution of linear, rollbar and model-providers, so three
-// of the ten cases below were asserting nothing whatsoever about the plugin they disabled.
+// gap at the margin: providers are the ENTIRE contribution of linear and model-providers, so cases
+// for either could otherwise assert nothing whatsoever about the plugin they disabled.
 type Snapshot = {
   routes: string[]
   tools: string[]
@@ -99,7 +99,6 @@ const OWNED: Record<string, Partial<Snapshot>> = {
   linear: { connectionProviders: ['linear'], integrationProviders: ['linear'], providerRoutes: ['linear'] },
   'model-providers': { connectionProviders: ['anthropic', 'openai'], modelProviders: ['anthropic', 'openai'] },
   preview: { tools: ['browser_click', 'browser_console', 'browser_fill', 'browser_navigate', 'browser_screenshot', 'browser_snapshot'] },
-  rollbar: { connectionProviders: ['rollbar'], integrationProviders: ['rollbar'], providerRoutes: ['rollbar'] },
   workflows: { routes: ['workflows'], databases: ['workflows.sqlite'] },
   github: { routes: [...Array.from({ length: 12 }, () => 'github/repos'), 'github/pins', 'github', 'github'], sections: ['pr'], databases: ['github.sqlite'], connectionProviders: ['github'], integrationProviders: ['github'] },
 }
@@ -192,7 +191,7 @@ describe('disabling a node plugin', () => {
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     // Every case below asserts "the others are still there", which an empty list satisfies trivially.
-    expect(all.length).toBeGreaterThanOrEqual(15)
+    expect(all.length).toBeGreaterThanOrEqual(14)
     expect(optional.length).toBeGreaterThanOrEqual(8)
     expect(required.sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     // The ledger covers exactly the plugins that get cycled — a plugin added to the list without an entry
@@ -216,10 +215,10 @@ describe('disabling a node plugin', () => {
     expect(snapshot.routes.length).toBeGreaterThanOrEqual(15)
     // The provider registries have real content, so the ledger's provider expectations are not satisfiable by
     // an empty registry.
-    expect(snapshot.connectionProviders).toEqual(['anthropic', 'github', 'linear', 'openai', 'rollbar'])
-    expect(snapshot.integrationProviders).toEqual(['github', 'linear', 'rollbar'])
+    expect(snapshot.connectionProviders).toEqual(['anthropic', 'github', 'linear', 'openai'])
+    expect(snapshot.integrationProviders).toEqual(['github', 'linear'])
     expect(snapshot.modelProviders).toEqual(['anthropic', 'openai'])
-    expect(snapshot.providerRoutes).toEqual(['linear', 'rollbar'])
+    expect(snapshot.providerRoutes).toEqual(['linear'])
   })
 
   for (const name of optional) {
@@ -283,9 +282,9 @@ describe('disabling a node plugin', () => {
   it('reports a roster covering every offered plugin, including the skipped ones', async () => {
     // `enabled` + `skipped` is not the list Settings → Plugins needs: it says nothing about which names
     // are `required` and therefore not togglable, and a disabled plugin still has to appear as a row.
-    const { roster } = await start(['docker', 'rollbar'])
+    const { roster } = await start(['docker', 'linear'])
     expect(roster.map((entry) => entry.name)).toEqual(all.map((p) => p.name))
     expect(roster.filter((entry) => entry.required).map((entry) => entry.name).sort()).toEqual(required.sort())
-    expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['docker', 'rollbar'])
+    expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['docker', 'linear'])
   })
 })

@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-// Version 2: the service chooses and reports its endpoint, and `service.start` resolves a complete
-// start result instead of only a state. A version bump is a hard break; parent and child ship together.
-export const SERVICE_PROTOCOL_VERSION = 2
+// Version 3: the parent may hand the service a read-only directory of app-bundled plugin packages to
+// reconcile before plugin discovery. A version bump is a hard break; parent and child ship together.
+export const SERVICE_PROTOCOL_VERSION = 3
 
 export const serviceStateSchema = z.enum([
   'starting',
@@ -29,6 +29,9 @@ export const serviceStartConfigSchema = z.strictObject({
   isPackaged: z.boolean(),
   electronPath: z.string().min(1),
   mcpEntry: z.string().min(1),
+  // Trusted application resources, never a renderer- or node-supplied path. The service copies these
+  // into its writable data root before discovery; package ownership policy lives with that copy.
+  bundledPluginsDir: z.string().min(1).optional(),
   // The device token this client remembered from a previous boot, if any. The service reuses it when
   // it still authenticates, so the local bundle keeps ONE device row instead of accruing one per
   // launch; otherwise (first run, a reset data root, or a revoked device) the service issues a new one

@@ -93,6 +93,15 @@ export class ConnectionProviderRegistry {
   list(): readonly ConnectionProviderContribution[] {
     return [...this.#providers.values()]
   }
+
+  /** Provider ids contributed by one loaded plugin. Ownership is bound by the host at registration;
+   * the plugin never gets to choose the value used for this lookup. */
+  idsForOwner(owner: string): readonly string[] {
+    return [...this.#owners.entries()]
+      .filter(([, candidate]) => candidate === owner)
+      .map(([id]) => id)
+      .sort()
+  }
 }
 
 export const connectionProviderRegistry = new ConnectionProviderRegistry()

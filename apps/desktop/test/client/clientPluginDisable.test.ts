@@ -61,10 +61,11 @@ const snapshot = (): Snapshot =>
   )
 
 // The complete contribution set, as a literal. `panes` and `sources` are docs/ui-design.md contracts in their own
-// right (13 panes, 6 default sources), so this doubles as the parity assertion for both.
+// right, so this doubles as the parity assertion for the compiled graph. Loaded packages are covered
+// through their manifest adapters and do not belong in this static ownership ledger.
 const FULL: Snapshot = {
-  panes: ['agents', 'changes', 'context', 'database', 'docker', 'editor', 'search', 'pr', 'http', 'linear', 'notes', 'preview', 'rollbar'],
-  sources: ['agents', 'docker', 'github', 'http', 'linear', 'rollbar'],
+  panes: ['agents', 'changes', 'context', 'database', 'docker', 'editor', 'search', 'pr', 'http', 'linear', 'notes', 'preview'],
+  sources: ['agents', 'docker', 'github', 'http', 'linear'],
   settingsPages: ['agent-pricing', 'docker', 'http', 'terminal', 'workflows'],
   slots: ['overlay/palette.files', 'overlay/palette.pull-files', 'overlay/onboarding.first-run', 'topbar.right/terminal.topbar-toggle', 'drawer/terminal.drawer'],
   taskSlots: ['task.footer/docker-footer-badge', 'tabrail.task-row/docker-rail-badge'],
@@ -104,7 +105,6 @@ const OWNED: Record<string, Partial<Snapshot>> = {
   linear: { panes: ['linear'], sources: ['linear'], refPanels: ['linear.issue-panel'], contentLinks: ['linear.issue'] },
   onboarding: { slots: ['overlay/onboarding.first-run'] },
   preview: { panes: ['preview'] },
-  rollbar: { panes: ['rollbar'], sources: ['rollbar'] },
   github: {
     panes: ['pr'],
     sources: ['github'],
@@ -142,7 +142,7 @@ describe('disabling a client plugin', () => {
   afterEach(() => void activate())
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
-    expect(NAMES.length).toBeGreaterThanOrEqual(16)
+    expect(NAMES.length).toBeGreaterThanOrEqual(15)
     expect([...REQUIRED].sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     expect(OPTIONAL.length).toBeGreaterThanOrEqual(10)
     // Every optional plugin is in the ledger, and every ledger entry claims something. A plugin

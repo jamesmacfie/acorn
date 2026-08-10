@@ -11,7 +11,7 @@ import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '
 import { saveJsonPref } from '../../settings/savePref'
 import { activeTaskId } from '../../tasks/tasks'
 import { watchAppearance } from '../../ui/appearance'
-import { BRIDGE_TOKENS } from '../../ui/tokenAxes'
+import { FRAME_TOKENS } from '../../ui/tokenAxes'
 import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, type FrameBinding, type FrameServices } from './broker'
 import { isSubscribable } from './channels'
 
@@ -63,13 +63,13 @@ const currentAxes = (): { theme: string; style: string } => ({
   style: document.documentElement.dataset.style ?? 'terminal',
 })
 
-// The token values a frame gets. BRIDGE_TOKENS is the existing list of tokens read by string from
-// JavaScript, which is exactly the right set: those are the ones already contracted to survive a rename
-// review (ui/tokenAxes.ts), and a frame is one more JS consumer of them.
+// The token values a frame gets. A frame can render the shared primitive stylesheet, so it needs the
+// complete theme + style + invariant projection rather than BRIDGE_TOKENS' deliberately small canvas
+// contract. The stylesheet itself is served by Electron main at the frame's hash origin.
 const currentTokens = (): Record<string, string> => {
   const computed = getComputedStyle(document.documentElement)
   const tokens: Record<string, string> = {}
-  for (const name of BRIDGE_TOKENS) tokens[name] = computed.getPropertyValue(name).trim()
+  for (const name of FRAME_TOKENS) tokens[name] = computed.getPropertyValue(name).trim()
   return tokens
 }
 

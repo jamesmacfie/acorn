@@ -118,7 +118,6 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['POST', '/v2/p/github/auth/device/start'],
   ['POST', '/v2/p/github/import'],
   ['GET', '/v2/p/linear/projects'],
-  ['GET', '/v2/p/rollbar/items'],
 ]
 
 describe('assembled routes', () => {
@@ -179,11 +178,11 @@ describe('assembled routes', () => {
   })
 
   it('registers every built-in provider from its own plugin, in both registries', () => {
-    const expected = ['anthropic', 'github', 'linear', 'openai', 'rollbar']
+    const expected = ['anthropic', 'github', 'linear', 'openai']
     expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
     // The integration registry holds only providers with mirrored resources — the model providers
     // contribute credentials and adapters, not resources.
-    expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(['github', 'linear', 'rollbar'])
+    expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(['github', 'linear'])
     expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual(['anthropic', 'openai'])
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BRIDGE_TOKENS,
+  FRAME_TOKENS,
   INVARIANT_TOKENS,
   STYLE_TOKENS,
   THEME_TOKENS,
@@ -159,6 +160,19 @@ describe('canvas bridge tokens', () => {
       const stray = [...declaredIn(pack.text)].filter((t) => (BRIDGE_TOKENS as readonly string[]).includes(t))
       expect(stray, `${pack.name} shadows a bridge token`).toEqual([])
     }
+  })
+})
+
+describe('plugin frame tokens', () => {
+  it('projects every appearance and invariant token exactly once', () => {
+    const expected = [...theme, ...style, ...invariant].sort()
+    expect([...FRAME_TOKENS].sort()).toEqual(expected)
+    expect(new Set(FRAME_TOKENS).size).toBe(FRAME_TOKENS.length)
+  })
+
+  it('declares every projected token in an axis sheet', () => {
+    const declared = new Set(readAxisSheets().flatMap((file) => [...declaredIn(file.text)]))
+    expect([...FRAME_TOKENS].filter((token) => !declared.has(token))).toEqual([])
   })
 })
 

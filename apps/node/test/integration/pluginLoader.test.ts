@@ -14,10 +14,10 @@ import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { assembleNodeGraph } from '../../src/server/composition'
 
-// The dogfood (docs/plugins.md). Rollbar's node half is built to a
-// real bundle and loaded off disk, which exercises the whole path end to end — manifest, import,
-// shape check, permission-shaped context, provider registration — against first-party code rather
-// than a fixture. It is the only test here that proves a real plugin survives the round trip.
+// The dogfood (docs/plugins.md). Rollbar's two halves are built into a real package and loaded off
+// disk, which exercises the whole path end to end — manifest, bundles, shape check, permission-shaped
+// context, provider registration and descriptor projection — against production plugin code rather
+// than a fixture.
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 describe('loading rollbar from disk', () => {
@@ -43,21 +43,20 @@ describe('loading rollbar from disk', () => {
     rmSync(dataRoot, { recursive: true, force: true })
   })
 
-  it('loads the built bundle and registers rollbar exactly as the compiled-in build does', async () => {
+  it('loads the built package and registers the portable provider, frame and native source', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
-      const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: ['rollbar'] })
+      const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
       expect(failures).toEqual([])
       expect(loaded.map((entry) => entry.manifest.id)).toEqual(['rollbar'])
-      // It replaces the built-in rather than colliding with it — a dev boot runs the disk copy, which
-      // is the whole point of dogfooding.
-      expect(loaded[0].shadowsBuiltin).toBe(true)
-      // It also appears in the distribution enumeration, with nothing to distribute: build-plugin.mjs
-      // builds a node half only. Rollbar's client half is compiled into the app and is not a
-      // self-contained sandbox bundle, so a `client` entry here would advertise something phase 3
-      // could not run (docs/plugins.md).
-      const { installed } = await loadExternalPlugins(dataRoot, { builtins: ['rollbar'] })
-      expect(installed.map((entry) => [entry.manifest.id, entry.client])).toEqual([['rollbar', null]])
+      expect(loaded[0].shadowsBuiltin).toBe(false)
+      const { installed } = await loadExternalPlugins(dataRoot, { builtins: [] })
+      expect(installed[0]?.client).toMatchObject({ hash: expect.stringMatching(/^[0-9a-f]{64}$/) })
+      expect(installed[0]?.client?.bytes).toBeGreaterThan(1_000)
+      expect(installed[0]?.manifest.contributions).toMatchObject({
+        frames: [{ target: 'pane', id: 'rollbar' }],
+        sources: [{ id: 'rollbar-items', items: '/v2/p/rollbar/rail-items' }],
+      })
 
       plugins = await initPlugins([loaded[0].plugin], {
         capabilities: new CapabilityRegistry(),
@@ -87,20 +86,58 @@ describe('loading rollbar from disk', () => {
       })
       expect(response.status).toBe(403)
       expect(await response.json()).toMatchObject({ error: { code: 'provider_not_connected' } })
+
+      const rail = await providerRoute!.fetch!(new Request('http://rollbar.test/rail-items'), {
+        userId: 'dogfood-user',
+        principal: { kind: 'device', userId: 'dogfood-user', deviceId: 'dogfood-device' },
+        providers: {
+          connections: async () => [{ id: 'rollbar-production', label: 'Production' } as never],
+          resource: async () => ({
+            ok: true,
+            value: {
+              capped: false,
+              items: [{
+                integrationId: 'rollbar-production', integrationLabel: 'Production', identifier: '142', itemId: '999',
+                url: 'https://rollbar.com/item/999/', title: 'Checkout failed', level: 'error', environment: 'production',
+                status: 'active', totalOccurrences: 12, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
+              }],
+            },
+          }) as never,
+          withConnections: async () => [],
+        },
+      })
+      expect(rail.status).toBe(200)
+      expect(await rail.json()).toEqual({
+        items: [{
+          id: 'rollbar-production:142',
+          title: 'Checkout failed',
+          subtitle: '#142 · error · production · Production',
+          badge: '12 occurrences',
+          task: {
+            origin: 'rollbar',
+            title: 'Checkout failed',
+            link: {
+              connectionId: 'rollbar-production', identifier: '142',
+              ref: { displayId: '142', externalId: '999', url: 'https://rollbar.com/item/999/' },
+            },
+          },
+        }],
+      })
     } finally {
       vi.unstubAllEnvs()
       warn.mockRestore()
     }
   })
 
-  it('drops the compiled-in rollbar from the graph when the disk copy wins', async () => {
+  it('adds Rollbar to the graph only when the loaded package is installed', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       const graph = await assembleNodeGraph(dataRoot, {} as never)
-      // Exactly one rollbar in the graph. Two would fail initPlugins' duplicate-name guard, and
-      // silently keeping the built-in would make the dogfood prove nothing.
+      // Exactly one Rollbar in the graph, and it is the contained loaded entry rather than a binary
+      // contribution that happens to share its name.
       expect(graph.plugins.filter((plugin) => plugin.name === 'rollbar')).toHaveLength(1)
       expect(graph.loaded.has('rollbar')).toBe(true)
+      expect(graph.loaded.get('rollbar')?.permissions.core).toEqual(['projects:read'])
     } finally {
       vi.unstubAllEnvs()
       warn.mockRestore()

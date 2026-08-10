@@ -197,9 +197,6 @@ importers:
       '@acorn/plugin-preview':
         specifier: workspace:*
         version: link:../../plugins/preview
-      '@acorn/plugin-rollbar':
-        specifier: workspace:*
-        version: link:../../plugins/rollbar
       '@acorn/plugin-terminal':
         specifier: workspace:*
         version: link:../../plugins/terminal
@@ -299,9 +296,6 @@ importers:
       '@acorn/plugin-preview':
         specifier: workspace:*
         version: link:../../plugins/preview
-      '@acorn/plugin-rollbar':
-        specifier: workspace:*
-        version: link:../../plugins/rollbar
       '@acorn/plugin-terminal':
         specifier: workspace:*
         version: link:../../plugins/terminal
@@ -324,6 +318,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@acorn/plugin-rollbar':
+        specifier: workspace:*
+        version: link:../../plugins/rollbar
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
@@ -336,6 +333,9 @@ importers:
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
@@ -1167,27 +1167,12 @@ importers:
 
   plugins/rollbar:
     dependencies:
-      '@acorn/client-core':
-        specifier: workspace:*
-        version: link:../../packages/client-core
-      '@acorn/node-core':
-        specifier: workspace:*
-        version: link:../../packages/node-core
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@solidjs/router':
-        specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13)
-      '@tanstack/solid-query':
-        specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13)
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.11.1)(pg@8.22.0)
       hono:
         specifier: 'catalog:'
         version: 4.12.32
@@ -1204,9 +1189,6 @@ importers:
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
-      vite-plugin-solid:
-        specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))

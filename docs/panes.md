@@ -19,7 +19,7 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `http` | 76 | API request client |
 | `preview` | 80 | browser preview |
 | `linear` | 90 | linked Linear issue |
-| `rollbar` | 100 | linked Rollbar item |
+| `rollbar` | 100 | loaded Rollbar frame; linked item or selected descriptor row |
 
 Provider-gated panes appear when their linked provider is connected and the task has relevant data.
 
@@ -42,6 +42,13 @@ palette rows, commands/keybindings, agent-tool renderers, and persisted state th
 
 Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.
+
+Find-in-files is a separate pane backed by a ripgrep subprocess, not an editor feature, and that is
+not a stopgap: Monaco is an editor component with no filesystem or process access, so it provides
+find-within-a-file and nothing wider. Every editor that offers project-wide search — including the
+one Monaco was extracted from — implements it exactly this way. Folding the results UI into the
+editor pane would be a reasonable product change; replacing the subprocess with an editor feature
+is not available.
 
 ## Data and actions
 

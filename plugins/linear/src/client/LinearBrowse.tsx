@@ -1,11 +1,12 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activateTaskSignals, createDismissable, formatRelativeTime, integrationsOptions, pathForTask, replaceWorkspaceExternalProjectsForProvider, setWorkspaceExternalProjects, tasksKey, tasksOptions, workspaceExternalProjectsForProvider, workspaceExternalProjectsKey, workspaceExternalProjectsOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, createDismissable, formatRelativeTime, integrationsOptions, pathForTask, projectPath, replaceWorkspaceExternalProjectsForProvider, setWorkspaceExternalProjects, tasksKey, tasksOptions, workspaceExternalProjectsForProvider, workspaceExternalProjectsKey, workspaceExternalProjectsOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { linearIssuePath } from './routes'
 import { linearProjectsOptions, workspaceLinearIssuesOptions } from './queries'
 import type { Task, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import type { LinearProjectIssue } from '../shared/api'
-import { PromoteToTaskModal } from '@acorn/plugin-api/ui'
+import { PromoteToTaskModal } from '@acorn/plugin-api/ui/host'
 import { emptyLinearFilter, filterLinearIssues, groupLinearIssuesByState, linearFacets, priorityMeta, sortLinearIssues, type LinearFilter } from './model'
 import LinearIssuePanel from './LinearIssuePanel'
 
@@ -32,11 +33,13 @@ export default function LinearBrowse() {
   const issues = createQuery(() => workspaceLinearIssuesOptions(linkedProjects(), linkedProjects().length > 0))
   const allIssues = () => issues.data?.issues ?? []
   const facets = createMemo(() => linearFacets(allIssues()))
-  const [selectedIssue, setSelectedIssue] = createSignal<LinearProjectIssue | null>(null)
-  const isSelected = (issue: LinearProjectIssue) => {
-    const selected = selectedIssue()
-    return selected !== null && issueKey(selected) === issueKey(issue)
-  }
+  // Selection lives in the URL, not in a signal: an issue is a thing worth linking to, and a linear.app
+  // link pasted anywhere in the app now has somewhere to land (./routes.ts). It resolves against the loaded
+  // list, so it is briefly empty while the issues query is in flight — the same as GitHub's PR detail.
+  const selectedIssue = () => allIssues().find((issue) => issue.identifier === params.identifier) ?? null
+  const isSelected = (issue: LinearProjectIssue) => selectedIssue()?.identifier === issue.identifier
+  const selectIssue = (issue: LinearProjectIssue | null) =>
+    navigate(issue ? linearIssuePath(params.projectId ?? '', issue.identifier) : projectPath(params.projectId ?? ''))
 
   // Triage is client-side over the one browse fetch (mirrors the Rollbar browse). Filter → sort by
   // priority/recency → group by workflow-state.

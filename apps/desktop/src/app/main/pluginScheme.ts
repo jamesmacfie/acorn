@@ -1,6 +1,7 @@
 import { net, protocol } from 'electron'
 import { pathToFileURL } from 'node:url'
 import type { PluginCache } from './pluginCache'
+import { pluginFrameStyles } from './pluginFrameStyles'
 
 // `app-plugin://<sha256>/…` — the origin a third-party plugin's UI runs on
 // (docs/plugins.md).
@@ -54,9 +55,9 @@ const CSP = [
 
 const HASH_RE = /^[0-9a-f]{64}$/
 
-// The generated document. Deliberately tiny: a module script and nothing else. No inline script (the
-// CSP has no `unsafe-inline` for scripts and must not need one), no favicon, no title a plugin could
-// use to impersonate the shell in a devtools list.
+// The generated document. Deliberately tiny: the host's shared presentation stylesheet and the
+// plugin's module script. No inline script (the CSP has no `unsafe-inline` for scripts and must not
+// need one), no favicon, no title a plugin could use to impersonate the shell in a devtools list.
 //
 // `color-scheme` and the two body rules are the only styling here. Everything else a plugin renders is
 // its own CSS over the tokens the host pushes down the port.
@@ -65,6 +66,7 @@ const documentFor = (): string => `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui.css">
 <style>
   :root { color-scheme: light dark; }
   html, body { margin: 0; height: 100%; background: var(--bg, transparent); color: var(--fg, inherit); font: inherit; }
@@ -108,9 +110,11 @@ export function registerPluginScheme(cache: Pick<PluginCache, 'path'>): void {
 
     const path = decodeURIComponent(url.pathname)
     if (path === '/' || path === '/index.html') return respond(documentFor(), 200, 'text/html; charset=utf-8')
-    // One bundle per plugin, one file per bundle. There is no asset tree here: a plugin that wants an
-    // image or a font inlines it, which is also what keeps the origin's contents exactly as auditable as
-    // its hash claims.
+    // One host-owned stylesheet, identical at every plugin origin. The plugin cannot replace it, and
+    // its contents are the same shared presentation modules the shell build uses.
+    if (path === '/ui.css') return respond(pluginFrameStyles, 200, 'text/css; charset=utf-8')
+    // One bundle per plugin, one file per bundle. There is no plugin-controlled asset tree: a plugin
+    // that wants an image or font inlines it, keeping its hash claim exactly as auditable as one file.
     if (path !== '/client.js') return respond(null, 404, 'text/plain')
 
     const file = cache.path(hash)
