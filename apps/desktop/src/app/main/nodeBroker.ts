@@ -143,7 +143,13 @@ export class NodeBroker {
 
     const controller = new AbortController()
     this.inFlight.set(request.requestId, controller)
-    const timeout = setTimeout(() => controller.abort(), request.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+    // Which side aborted is the whole difference between "the node is gone" and "we changed our mind".
+    // The timer's abort is evidence about the node; `abort(requestId)` from the renderer is not.
+    let timedOut = false
+    const timeout = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, request.timeoutMs ?? DEFAULT_TIMEOUT_MS)
     try {
       const response = await nodeRequest({
         // `new URL(path, endpoint)` with a path validated to start with '/' cannot escape the
@@ -162,7 +168,18 @@ export class NodeBroker {
       this.noteHttpResult(connection, response)
       return response
     } catch (error) {
+      // A cancellation the RENDERER asked for says nothing about the node's health. Marking it `offline`
+      // here was a live bug: a query aborted on unmount (or superseded by a refetch) flipped a perfectly
+      // healthy node to `offline`, and apiClient then fail-fasts every mutation with "This node is
+      // offline" until the next successful read happens to clear it.
+      if (isAbort(error) && !timedOut) throw error
       this.noteHttpFailure(connection, error)
+      // Renamed so the two aborts stay distinguishable one layer up (nodeBrokerIpc.ts swallows the
+      // renderer's cancellation and must not swallow this), and because "the operation was aborted" is a
+      // useless thing to show someone whose node stopped answering.
+      if (isAbort(error)) {
+        throw Object.assign(new Error(`The node did not answer within ${request.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`), { name: 'TimeoutError' })
+      }
       throw error
     } finally {
       clearTimeout(timeout)
@@ -408,6 +425,9 @@ const errorCodeOf = (response: NodeFetchResponse): string | null => {
     return null
   }
 }
+
+// nodeRequest.ts raises the DOM-shaped `AbortError`; `ws`/undici-style aborts carry the same name.
+const isAbort = (error: unknown): boolean => (error as { name?: unknown } | null)?.name === 'AbortError'
 
 const isPinMismatch = (error: unknown): boolean => {
   for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {

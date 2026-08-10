@@ -197,6 +197,21 @@ describe('broker HTTP', () => {
     await expect(pending).rejects.toThrow()
   })
 
+  // The regression: a cancelled request was reported as a failed one, so the node went `offline` and
+  // apiClient then refused every mutation with "This node is offline" even though it was answering.
+  it('does not mark a node offline when the renderer cancels a request', async () => {
+    const { origin } = await listen(false)
+    respond = () => ({ status: 200, body: 'ok' })
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    await broker.fetch('n1', { requestId: 'r-warm', path: '/x' })
+
+    const pending = broker.fetch('n1', { requestId: 'r-cancel', path: '/slow', timeoutMs: 5_000 })
+    broker.abort('r-cancel')
+    await expect(pending).rejects.toThrow()
+    expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
+  })
+
   it('rejects a request for an unknown node', async () => {
     await expect(makeBroker().fetch('nope', { requestId: 'r1', path: '/x' })).rejects.toThrow(/Unknown node/)
   })
