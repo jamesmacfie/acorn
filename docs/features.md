@@ -30,7 +30,8 @@ lazily when a task first needs filesystem/process access.
 - `database` — task-scoped PostgreSQL schema, rows, SQL, and project-scoped saved queries.
 - `docker` — task-matched containers, logs, stats, exec, and lifecycle actions.
 - `http` — encrypted requests, variables, auth helpers, and response inspection.
-- `linear` / `rollbar` — linked issue panels.
+- `linear` — linked issue panel; `rollbar` provides the equivalent sandboxed pane when the loaded
+  Rollbar package is installed and trusted.
 
 The row is ordered/resizable and persisted per Node/task. Contributions are registered by plugins;
 unknown persisted pane IDs render safely as placeholders.
@@ -47,7 +48,8 @@ fork, compact, import, and terminal handoff. Aider is available through its term
 
 ## Integrations and model providers
 
-GitHub uses device-flow OAuth. Linear and Rollbar connections are managed from Settings and expose
+GitHub uses device-flow OAuth. Linear connections, and Rollbar connections when its loaded package is
+installed, are managed from Settings and expose
 provider sources and task links. OpenAI and Anthropic are model-provider connections used by features
 such as SQL generation; prompts and responses are not persisted by the model-provider plugin.
 

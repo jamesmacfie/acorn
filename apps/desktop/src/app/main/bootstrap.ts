@@ -16,6 +16,7 @@ import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 import { MAX_CRASHES_PER_WINDOW, recordCrash } from './crashBudget'
 import { WebviewService } from './webviewService'
+import { trustBundledClientPlugins } from './bundledPluginTrust'
 
 export type BootstrapOptions = {
   dataDir: string
@@ -37,6 +38,9 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   let window: BrowserWindow | null = null
   const crashTimes: number[] = []
   const userDataDir = app.getPath('userData')
+  const bundledPluginsDir = app.isPackaged
+    ? join(process.resourcesPath, 'plugins')
+    : join(import.meta.dirname, '../bundled-plugins')
 
   // Start the service and persist whatever token it ended up using. Reused on every start, including
   // crash recovery — a restart must not mint a new device row, and the endpoint can change across
@@ -55,6 +59,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
       isPackaged: app.isPackaged,
       electronPath: process.execPath,
       mcpEntry: join(import.meta.dirname, 'mcp.js'),
+      bundledPluginsDir,
     },
     {
       stateChanged: (state: ServiceState, detail?: string) => {
@@ -103,7 +108,12 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   // is gone rather than briefly listed and then dropped.
   const pluginCache = new PluginCache(userDataDir, broker)
   pluginCache.sweep()
-  const disposePluginIpc = registerPluginIpc(pluginCache, new PluginTrustStore(userDataDir))
+  const pluginTrust = new PluginTrustStore(userDataDir)
+  // In a packaged build these exact bytes are part of the application the owner installed. Cache and
+  // acknowledge them locally before the renderer asks for plugin state, so a node cannot turn the
+  // "bundled" label into an auto-trust primitive for arbitrary remote bytes.
+  if (app.isPackaged) trustBundledClientPlugins(bundledPluginsDir, app.getVersion(), pluginCache, pluginTrust)
+  const disposePluginIpc = registerPluginIpc(pluginCache, pluginTrust)
   // The origin plugin UI renders on (docs/plugins.md). Registered here rather
   // than beside registerAppScheme in electron.ts because it serves out of the cache above and nothing
   // else — the handler has no path parameter to be pointed at, by design.

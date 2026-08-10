@@ -5,6 +5,10 @@ the Node/client composition roots. Loaded plugins are installed at runtime from 
 bundles. Either tier can contribute Node behavior, client behavior, or both; the available carriers
 and trust boundary differ by tier.
 
+This file is the mechanism. [extensibility.md](./extensibility.md) is the reasoning — why there are
+two tiers, where the line between them is, and which of the constraints below are deliberate rather
+than unfinished. Read it before widening a seam.
+
 ## Package shape
 
 ```text
@@ -20,8 +24,8 @@ plugins/<name>/
 
 Not every plugin has every directory. The built-in Claude, Codex, and Aider profiles are registered
 by `plugins/agents`; there are no separate profile packages. Onboarding is a client overlay with
-core setup support. Linear and Rollbar are integration providers that use core's generic external-
-item store rather than owning a plugin database.
+core setup support. Linear and the loaded Rollbar package are integration providers that use core's
+generic external-item store rather than owning a plugin database.
 
 ## The plugin API
 
@@ -30,21 +34,23 @@ import. It adds no behavior of its own: it re-exports an enumerated slice of nod
 client-core, and `tools/arch/boundaries.test.ts` enforces both halves of that — plugins reach the
 host only through the facade, and the facade only re-exports.
 
-Five entrypoints:
+Six entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
 | `@acorn/plugin-api/node` | `NodePlugin` and the context types, the route toolkit (`AppEnv`, `requireUser` and friends, `respondError`, the bridge), per-plugin SQLite and migrations, the `CoreServices` type, capability ids, provider and integration contracts |
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, and the design system's plain functions (`cx`, `token`, metrics) |
-| `@acorn/plugin-api/ui` | Everything that is a component: primitives, `Icon`, `Picker`, `Modal`, `Tabs`, the diff rows, and the registration seams that live in a `.tsx` module |
+| `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives, `Icon`, `Picker`, `Modal`, `Tabs`, and the diff rows |
 | `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass |
+| `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims |
 
-The line between `/client` and `/ui` is drawn by the runtime, not by taste. Each entrypoint is a
-barrel, so importing one member evaluates all of them, and Solid compiles a component to code that
-touches `window` at module scope. Anything reached through a `.tsx` module therefore lands on `/ui`,
-which keeps `/client` loadable from a plugin's node-environment test suite. A boundaries rule
-enforces it.
+The line between `/client`, `/ui`, and `/ui/host` is drawn by the runtime, not by taste. Solid
+compiles a component to code that touches `window` at module scope, so `/client` remains free of
+`.tsx`. The frame-safe `/ui` barrel reaches only the pure `client-core/src/ui/` presentation tree;
+router/query/registry-connected components sit on `/ui/host`. The facade is declared side-effect
+free so a frame bundle retains only the named presentation components it imports. Boundary tests
+enforce all three properties.
 
 `packages/plugin-api/src/surface.snapshot.txt` pins every exported name. A change to the surface
 fails that test until the snapshot is regenerated
@@ -118,7 +124,9 @@ Three things differ, and all three follow from the code not being ours:
   resource/connection operations without exposing Hono, the core database, or the secret service. A
   loaded integration provider likewise passes a fetch handler to `ctx.providers.integration`; passing
   Hono is an explicit initialization error. Project access is deliberately three grants:
-  `projects:read` for identity and checkout paths, `projects:config` for executable build/dev/database
+  `projects:read` for identity, checkout paths and workspace external-project mappings scoped to
+  connection providers registered by that loaded plugin,
+  `projects:config` for executable build/dev/database
   configuration, and `projects:write` for creating or updating project references. The `prefs` facet
   is projected into `plugin:<id>:*`, the same namespace used by that plugin's frame `state.get` and
   `state.set` verbs; this is the supported Node-half↔frame state channel. Values are capped at 1 MiB
@@ -129,12 +137,18 @@ security boundary: a loaded bundle shares the Node's process and can `import('no
 `ctx` entirely. `docs/security.md` is the full threat model, and every surface that
 renders these permissions has to say *declared*, not *enforced*.
 
-`apps/node/scripts/build-plugin.mjs` builds a first-party plugin into this shape for development; it
-is not the distribution mechanism. It installs into the data root under the plugin's own id, so a
-package whose id matches a built-in **shadows** it: the loader drops the compiled-in copy from the
-graph and logs which directory won. That is how the loader is dogfooded, and it is the one case
-where the code running is not the code in the binary — worth knowing before debugging a plugin that
-behaves like a version you cannot find.
+`apps/node/scripts/build-plugin.mjs` builds a repository plugin into this shape. Its default target is
+the development data root; `--package-root` stages the same package for distribution. The desktop
+build keeps its bundled roster in `apps/desktop/scripts/build-bundled-plugins.mjs`, packages the
+result as read-only application resources, and asks the service to reconcile it before discovery.
+Only packages recorded as app-owned are updated. An existing owner-installed version wins, and
+uninstall writes a tombstone outside the package directory so a later app update does not restore it.
+Packaged client bytes are trusted only after Electron main reads and hashes its own application
+resource; a node cannot acquire that trust by labelling a roster row as bundled.
+
+Rollbar is the standing production caller and is not also present in the compiled composition. The
+loader still supports a package id shadowing a built-in during a staged migration; when that happens
+it drops the compiled copy from the graph and logs which directory won.
 
 ### Loaded plugins: the client half
 
@@ -165,9 +179,30 @@ kinds of contribution come out of one manifest:
   invalidation ping plus one shared timer. A plugin that ships only descriptors needs no client
   bundle at all, and therefore no trust prompt — nothing of its executes on the device. A source may
   declare `createTask`; its row supplies the task seed and optional external link, while the host owns
-  the modal, create-before-link ordering, and partial-failure reporting. A `contentLinks` entry uses a
+  the modal, origin namespace, connection ownership check, create-before-link ordering, and
+  partial-failure reporting. A `contentLinks` entry uses a
   bounded `https://` host/path grammar, names a pane from the same manifest, and delivers one captured
   path segment as a `plugin:select` intent.
+
+### Frame authoring and the UI kit
+
+A frame owns its document and bundle, so its framework is its choice. The repository package builder
+keeps the client Vite transform opt-in per plugin: Rollbar supplies `vite-plugin-solid`, a vanilla
+frame supplies none, and another framework can supply its own transform. A direct `solid-js`
+dependency in a Solid frame is intentional. Its separate origin and document are a separate reactive
+realm, so this is not the duplicate-Solid-in-one-realm hazard the shell dependency rules prevent.
+
+In-repo Solid frames should import presentation components from `@acorn/plugin-api/ui`, as Rollbar
+does. This workspace dependency is the accepted intermediate package location; the UI kit will be
+published separately for external plugins later, and only that import name is expected to change.
+Do not copy the primitives or hand-roll replacements while packaging catches up.
+
+Electron main owns the frame document and links `/ui.css`, a stylesheet assembled at build time from
+the same presentation-only primitive, tabs, picker, modal, copy, diff, and style-pack CSS the shell
+uses. The appearance bridge applies the complete theme/style/invariant token projection to the frame
+root. Plugins may add feature-owned CSS for their layout, but they neither bundle nor version a copy
+of acorn's UI-kit CSS. Non-Solid frames can use the same emitted class contract without sharing a
+JavaScript framework.
 
 Loaded-plugin commands and shortcuts are host-bound manifest data. A command id `search` becomes
 `plugin.<plugin-id>.search`; plugin code cannot claim a first-party command id. `palette` controls

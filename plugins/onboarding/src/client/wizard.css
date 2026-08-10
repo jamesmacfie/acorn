@@ -1,0 +1,212 @@
+/* First-run wizard. A full-screen takeover rather than a dialog: on a fresh install there is nothing
+   behind it worth seeing, and the shared .overlay is a 560px centred sheet built for form modals. */
+.wizard-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+.wizard {
+  width: min(720px, 92vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+/* Fixed-height column: the body scrolls so the footer (back / skip) is always reachable. */
+.wizard-stage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.wizard-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--pad-body);
+}
+/* The shared Acorn mark is built for a centred empty pane; on the welcome screen it is the first
+   item in a left-aligned column. */
+.wizard-body .acorn-empty {
+  flex: none;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.wizard-body h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+}
+.wizard-lede {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--text-muted);
+}
+.wizard-hint {
+  margin: 0;
+  max-width: 56ch;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+.wizard-link {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: var(--space-1);
+  cursor: pointer;
+}
+.wizard-link:hover { color: var(--text); }
+
+/* The branch point: open a folder, or connect GitHub. Both first-class, side by side. */
+.wizard-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  width: 100%;
+}
+@media (max-width: 560px) {
+  .wizard-cards { grid-template-columns: 1fr; }
+}
+.wizard-card {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--pad-surface);
+  color: var(--text);
+  background: var(--card-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  cursor: pointer;
+}
+.wizard-card:hover:not(:disabled) { background: var(--bg-hover); }
+.wizard-card:disabled { opacity: 0.5; cursor: default; }
+.wizard-card-title { font-weight: var(--fw-semibold); }
+.wizard-card-desc { color: var(--text-muted); font-size: var(--fs-sm); }
+.wizard-card-tag {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+}
+
+/* A hosted importer is a full-width block, not a flex item sized to its widest row — without this the
+   repo list stretches the column and every label wraps mid-word. */
+.wizard-importer {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Device grant: the code is the thing to read, so it gets the size. */
+.wizard-device {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--pad-surface);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+}
+.wizard-device-url { color: var(--text-muted); font-size: var(--fs-sm); }
+.wizard-device-code {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.wizard-device-code code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xl);
+  letter-spacing: var(--heading-tracking);
+  color: var(--text);
+}
+.wizard-waiting { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* Running tally on the repository screen, so adding several is a visible act rather than a leap. */
+.wizard-added {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  width: 100%;
+}
+.wizard-added-count { color: var(--state-ok); font-weight: var(--fw-semibold); }
+.wizard-added-names { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.wizard-added-name {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius-chip);
+  padding: var(--pad-chip);
+}
+
+/* Name & organize. */
+.wizard-project {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--pad-surface);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+}
+/* Pushed to the trailing edge: the name field is the thing to act on, the facets are what the row
+   already knows about itself. */
+.wizard-facets { display: flex; gap: var(--space-2); margin-left: auto; }
+.wizard-path {
+  flex: 1 1 100%;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.wizard-home {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.wizard-field { max-width: 380px; width: 100%; }
+
+/* Done: chord → what it does. */
+.wizard-keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-3) var(--space-6);
+  margin: 0;
+}
+.wizard-keys dt { justify-self: start; }
+.wizard-keys dd { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); align-self: center; }
+.wizard-keys kbd {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius);
+  padding: 1px var(--space-3);
+}
+
+.wizard-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--pane-pad) var(--pad-body);
+  border-top: var(--chrome-divider);
+}
+.wizard-dots { display: flex; gap: var(--space-2); flex: 1; }
+.wizard-dots i {
+  width: var(--marker-w);
+  height: var(--marker-w);
+  border-radius: var(--radius-circle);
+  background: var(--bg-selected);
+}
+.wizard-dots i.on { background: var(--accent); }

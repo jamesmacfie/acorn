@@ -1,19 +1,3 @@
-.onboarding {
-  max-width: 640px;
-  width: 90vw;
-}
-/* The overlay is a fixed-height flex column; let the body scroll so the footer (Done) stays
-   visible instead of being clipped by the overlay's overflow:hidden. */
-.onboarding .overlay-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-/* Stretch so the Add button matches the input's height (input has slightly more padding). */
-.onboarding-newrow {
-  margin-bottom: var(--space-2);
-  align-items: stretch;
-}
 .onboarding-listhead {
   display: flex;
   align-items: center;
@@ -22,21 +6,10 @@
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
 }
-.onboarding-list {
+.onboarding-actions {
   display: flex;
-  flex-direction: column;
   gap: var(--space-3);
-}
-.onboarding-row {
-  display: grid;
-  grid-template-columns: auto 1fr 180px auto;
-  align-items: center;
-  gap: var(--space-4);
-}
-/* Hidden repos: fade the label to a lighter grey; the disabled select/button grey themselves.
-   (Avoid row-level opacity — it'd dim the eye toggle too, since opacity makes a compositing group.) */
-.onboarding-row.onboarding-ignored .onboarding-repo {
-  color: var(--text-muted);
+  margin-left: auto;
 }
 .onboarding-eye {
   font: inherit;
@@ -49,22 +22,102 @@
   opacity: 0.85;
 }
 .onboarding-eye:hover { opacity: 1; }
-.onboarding-eye.hidden { opacity: 1; }
-.onboarding-repo {
+
+/* ── Projects, grouped by workspace ─────────────────────────────────────────────────────────────
+   The grouping IS the model being edited, so it is the layout: one bordered card per workspace, its
+   projects inside. */
+.ws-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: var(--space-5) 0;
+}
+/* The CARD owns the column tracks and the header and every row subgrid into them, so the workspace
+   name, the project names, the selects and the buttons line up in one set of columns. Each row is
+   still its own element, which is what keeps per-row borders, hover and hidden-state styling. */
+/* Fixed tracks for the two controls, flexible ones for the text. `auto` tracks size to max-content
+   and are served BEFORE any fr, so leaving the select and the action buttons on `auto` let them eat
+   the row and squeezed the path down to an ellipsis. */
+.ws-group {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) minmax(80px, 2fr) auto 160px auto;
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  overflow: hidden;
+}
+.ws-group-head,
+.ws-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--pad-cell);
+  /* The last column is right-aligned against the card edge, so it carries the trailing breathing
+     room itself rather than relying on the cell padding it shares with a wider neighbour. */
+  padding-right: var(--space-5);
+}
+.ws-group-head {
+  background: var(--bg-subtle);
+  border-bottom: var(--chrome-divider);
+}
+.ws-group-count { grid-column: 3 / span 2; font-size: var(--fs-sm); white-space: nowrap; }
+.ws-group-delete { justify-self: end; }
+/* An empty workspace is its header and nothing else, so that header is not dividing anything. */
+.ws-group-head:last-child { border-bottom: 0; }
+.ws-group-name-static { font-weight: var(--fw-semibold); }
+
+/* Both name fields edit in place: chrome-free until hover or focus, so a list of projects reads as a
+   list rather than a column of form controls. */
+.ws-group-name,
+.ws-row-name {
+  border-color: transparent;
+  background: none;
+}
+.ws-group-name { font-weight: var(--fw-semibold); }
+.ws-group-name:hover:not(:disabled),
+.ws-row-name:hover:not(:disabled) { border-color: var(--border); }
+.ws-group-name:focus,
+.ws-row-name:focus { background: var(--input-bg); }
+
+.ws-row { border-bottom: var(--divider); }
+.ws-row:last-child { border-bottom: 0; }
+/* Fade the labels rather than the row: opacity on the row would make a compositing group and dim the
+   eye toggle, which is the one control a hidden project still needs. */
+.ws-row-hidden .ws-row-facets,
+.ws-row-hidden .ws-row-path { opacity: 0.5; }
+.ws-row-facets {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+}
+/* The path is reference, not a control — it takes the slack and ellipsizes so the controls to its
+   right keep the same x across every row. */
+.ws-row-path {
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs);
 }
-.onboarding-browse {
+/* Absence of a folder is the one thing on this row worth prompting about, so it says what to do
+   rather than trailing off into an ellipsis. */
+.ws-row-nopath { color: var(--warn); }
+.ws-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
   white-space: nowrap;
 }
-/* Pinned footer below the scrolling body. */
-.onboarding-footer {
-  flex: none;
+
+.ws-delete-warning { margin: 0; color: var(--danger); }
+.ws-add { align-self: flex-start; }
+.ws-add-form {
   display: flex;
-  justify-content: flex-end;
-  gap: var(--space-4);
-  padding: var(--pane-pad);
-  border-top: var(--chrome-divider);
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 420px;
 }

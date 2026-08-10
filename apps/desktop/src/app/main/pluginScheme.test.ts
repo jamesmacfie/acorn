@@ -28,6 +28,12 @@ vi.mock('electron', () => ({
   },
 }))
 
+// Main-process Vitest intentionally replaces CSS imports with empty modules. Route behavior is the
+// unit under test here; the desktop production build verifies the real ?raw stylesheet aggregation.
+vi.mock('./pluginFrameStyles', () => ({
+  pluginFrameStyles: ".ui-btn{} .ui-badge{} .ui-tabs{} :root[data-style='modern'] .ui-btn{}",
+}))
+
 const { PLUGIN_SCHEME, registerPluginScheme } = await import('./pluginScheme')
 
 const HASH = 'a'.repeat(64)
@@ -86,6 +92,7 @@ describe('the generated document', () => {
     const response = await get(`${PLUGIN_SCHEME}://${HASH}/index.html`)
     const html = await response.text()
     expect(response.headers.get('content-type')).toContain('text/html')
+    expect(html).toContain('<link rel="stylesheet" href="/ui.css">')
     expect(html).toContain('<script type="module" src="/client.js">')
     // No inline script anywhere: the CSP has no `unsafe-inline` for scripts and must never need one.
     expect(html).not.toMatch(/<script(?![^>]*\bsrc=)/)
@@ -104,6 +111,18 @@ describe('custody', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/javascript')
     expect(await response.text()).toBe('export default 1\n')
+  })
+
+  it('serves the host-owned UI kit without consulting the plugin cache', async () => {
+    const response = await get(`${PLUGIN_SCHEME}://${HASH}/ui.css`)
+    const css = await response.text()
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/css')
+    expect(css).toContain('.ui-btn')
+    expect(css).toContain('.ui-badge')
+    expect(css).toContain('.ui-tabs')
+    expect(css).toContain(":root[data-style='modern'] .ui-btn")
+    expect(fetched).toEqual([])
   })
 
   it('404s a hash this device does not hold, rather than fetching anything', async () => {

@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { ApiError, createDismissable } from '@acorn/plugin-api/client'
-import { defaultModelIdFor, ModelConnectionPicker, Picker } from '@acorn/plugin-api/ui'
+import { Picker } from '@acorn/plugin-api/ui'
+import { defaultModelIdFor, ModelConnectionPicker } from '@acorn/plugin-api/ui/host'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
 import { GENERATE_MAX_PROMPT_CHARS } from '../shared/database'

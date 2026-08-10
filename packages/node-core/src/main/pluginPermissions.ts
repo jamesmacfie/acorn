@@ -20,12 +20,13 @@ import type { ProjectService } from './core/projects'
 import type { CapabilityId, CapabilityRegistry } from '../server/plugin/capabilities'
 import type { NodePermissions } from './pluginManifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
+import { connectionProviderRegistry } from '../server/integrations/connectionRegistry'
 
 // What `projects:read` grants. `checkouts()` is in here, and it returns the local filesystem path of
 // EVERY mapped project on the machine — where the user keeps their code, how many codebases they
 // have, often their employer's project names. "Read projects" does not sound like that, so phase 5's
 // trust prompt has to name the disclosure explicitly.
-const PROJECT_READS = ['byId', 'byGithub', 'checkouts'] as const
+const PROJECT_READS = ['byId', 'byGithub', 'checkouts', 'externalProjects'] as const
 // Kept behind its own token because config() and setup() return the shell commands acorn executes.
 // The trust assertion belongs to the same surface: code with no reason to inspect project config has
 // no reason to assert that config's trust either.
@@ -67,12 +68,34 @@ const prefsFor = (prefs: PrefService, pluginId: string): PrefService => ({
   },
 })
 
+type ProviderOwnership = Pick<typeof connectionProviderRegistry, 'idsForOwner'>
+
+const projectsFor = (
+  projects: ProjectService,
+  keys: readonly (keyof ProjectService)[],
+  pluginId: string,
+  providers: ProviderOwnership,
+): Partial<ProjectService> => ({
+  ...pick(projects, keys),
+  // `externalProjects` is the exceptional project read: unlike byId/checkouts, each row belongs to
+  // an integration provider. Resolve ownership lazily because providers are registered during the
+  // plugin's init, after this scoped context has been constructed.
+  ...(keys.includes('externalProjects')
+    ? { externalProjects: (workspaceId: string) => projects.externalProjects(workspaceId, providers.idsForOwner(pluginId)) }
+    : {}),
+})
+
 // The returned object is TYPED as a full CoreServices and is not one. That is deliberate: widening
 // NodePluginContext['core'] to a partial would make every facet optional for the fifteen built-in
 // plugins that legitimately have all of them, to describe a shape only loaded plugins see. The lie
 // is contained to this one cast, and the failure mode it produces — a TypeError on the first call to
 // an undeclared facet — is exactly the one this module is trying to produce.
-export function scopeCore(core: CoreServices, permissions: NodePermissions, pluginId: string): CoreServices {
+export function scopeCore(
+  core: CoreServices,
+  permissions: NodePermissions,
+  pluginId: string,
+  providers: ProviderOwnership = connectionProviderRegistry,
+): CoreServices {
   const granted: Partial<CoreServices> = {}
   for (const token of permissions.core) {
     if (token === 'prefs') {
@@ -94,7 +117,7 @@ export function scopeCore(core: CoreServices, permissions: NodePermissions, plug
         : token === 'projects:write'
           ? [...PROJECT_READS, ...PROJECT_WRITES]
           : PROJECT_READS
-      granted.projects = { ...granted.projects, ...pick(core.projects, keys) } as ProjectService
+      granted.projects = { ...granted.projects, ...projectsFor(core.projects, keys, pluginId, providers) } as ProjectService
     }
     // Anything else is a facet this acorn does not have. Ignored rather than rejected: a manifest
     // naming a facet from a newer build should lose that one grant, not fail to load.

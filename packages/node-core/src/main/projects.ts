@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
-import { and, asc, eq, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { git } from './core/git'
@@ -235,7 +235,21 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
 
 // Removes the row only — never touches the folder, and tasks pointing at it keep their absolute
 // worktree paths.
+/**
+ * Delete a project and the tasks that belong to it.
+ *
+ * The tasks go because nothing else would ever collect them: `tasks.project_id` carries no foreign
+ * key, so leaving them behind produces rows pointing at a project that no longer exists, invisible in
+ * every rail and impossible to remove. Their links go with them for the same reason.
+ *
+ * Still row-only on disk: the project's folder and any task worktrees are never touched from here.
+ */
 export async function deleteProject(db: AppDatabase, id: string): Promise<void> {
+  const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)
+  if (taskIds.length) {
+    await db.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds))
+    await db.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds))
+  }
   await db.delete(schema.projects).where(eq(schema.projects.id, id))
 }
 

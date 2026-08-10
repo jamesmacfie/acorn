@@ -5,9 +5,9 @@
 // That split is load-bearing, not cosmetic. These entrypoints are barrels, so importing one helper
 // evaluates every module on the surface — and Solid compiles a component to code that touches
 // `window` at module scope. A plugin's node-environment test suite can import this file; it cannot
-// import ./ui. So the rule is mechanical: nothing here comes from a .tsx module. That sends two
-// registration seams (keybindings, the will phase) to ./ui, and brings the design system's plain
-// functions — cx, token, the metrics — here.
+// import ./ui. So the rule is mechanical: nothing here comes from a .tsx module. Registration and
+// connected .tsx surfaces live on ./ui/host; frame-safe presentation components live on ./ui; and
+// the design system's plain functions — cx, token, the metrics — stay here.
 //
 // Everything below is a RE-EXPORT of client-core. Contribution TYPES are here; the registration
 // functions are not — a plugin registers through ctx, never by reaching into a registry. The
@@ -55,12 +55,19 @@ export { paneContribution } from '@acorn/client-core/registries/panes.ts'
 export type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
 export { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 export type { SourceContribution, SourcePromotionContext, SourceRouteContribution } from '@acorn/client-core/registries/sources.ts'
+// Core's own URL for a project. A plugin building its own routes on top of `/p/:projectId` needs to be
+// able to get back to the bare project path — deselecting an item, a breadcrumb — without hardcoding a
+// shape core owns.
+export { projectPath } from '@acorn/client-core/registries/corePaths.ts'
 export type { TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
 export type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
 export type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
 export { refPanelFor } from '@acorn/client-core/registries/refPanels.ts'
 export type { RefPanelContribution, RefPanelTarget } from '@acorn/client-core/registries/refPanels.ts'
-export type { ProjectImporterProps } from '@acorn/client-core/registries/projectImporters.ts'
+// The registry value, not just the props type: first-run onboarding hosts whichever importers are
+// registered rather than importing another plugin's component.
+export { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
+export type { ProjectImporterContribution, ProjectImporterProps } from '@acorn/client-core/registries/projectImporters.ts'
 export type { IntegrationFlowContribution } from '@acorn/client-core/registries/integrationFlows.ts'
 export { registerCommands } from '@acorn/client-core/registries/commands.ts'
 export {
@@ -109,7 +116,8 @@ export { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 
 // ── Workspaces and projects ───────────────────────────────────────────────────────────────────
 export { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
-export { setWorkspaceExternalProjects } from '@acorn/client-core/workspaces/mutations.ts'
+export { createProject, createWorkspace, patchProject, renameWorkspace, setWorkspaceExternalProjects } from '@acorn/client-core/workspaces/mutations.ts'
+export type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 
 // ── The fleet: which node a request goes to ───────────────────────────────────────────────────
 export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
@@ -133,6 +141,8 @@ export { saveJsonPref, savePref } from '@acorn/client-core/settings/savePref.ts'
 export { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.ts'
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
+export { createDeviceFlow } from '@acorn/client-core/integrations/deviceFlow.ts'
+export type { DeviceFlowController } from '@acorn/client-core/integrations/deviceFlow.ts'
 export { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
 export {
   replaceWorkspaceExternalProjectsForProvider,

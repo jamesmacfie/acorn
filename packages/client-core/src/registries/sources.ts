@@ -18,11 +18,18 @@ export type SourcePromotion<Item> = {
   attachToCurrentTask?(taskId: string, item: Item): Promise<void>
 }
 
-export type SourceRouteKind = 'project' | 'create' | 'browse' | 'detail'
+// A URL pattern a source wants registered on the Router. `order` decides registration order, so a static
+// path can be declared ahead of a parameter path that would otherwise swallow it.
+//
+// There is deliberately no `kind` here any more. It existed so a caller could ask for "the detail route"
+// and get a path back, but the lookup scanned EVERY source and took the first match — which meant core's
+// `pathForTask` was resolving GitHub's PR route by accident, and the second plugin to register a route of
+// the same kind would have silently taken it over. Core's own paths are constants now (./corePaths.ts),
+// and the one thing core needs from a plugin — where a task lives — is asked for explicitly via
+// `taskPath` below.
 export type SourceRouteContribution = {
   id: string
   path: string
-  kind: SourceRouteKind
   order: number
 }
 
@@ -61,6 +68,13 @@ export type SourceContribution<Item = unknown> = {
   // making the shell know which provider happens to be bundled first.
   isDefault?: boolean
   routes?: readonly SourceRouteContribution[]
+  // Where a task belongs in the router, when this source owns it — a PR-backed task lives at GitHub's PR
+  // URL, not at the generic task path. Returning undefined means "not mine"; the first source to claim a
+  // task wins and core falls back to `/t/:taskId`.
+  //
+  // This replaces core reaching into the route registry for `kind: 'detail'`. The knowledge that a task
+  // with a pull number belongs at a PR URL is GitHub's, and it now lives in GitHub.
+  taskPath?: (task: Task) => string | undefined
   promotion?: SourcePromotion<Item>
 }
 
@@ -82,10 +96,12 @@ export const sourceRouteContributions = (): SourceRouteContribution[] => sourceR
   .flatMap((source) => source.routes ?? [])
   .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
-export const sourceRoutePath = (kind: SourceRouteKind): string | undefined => sourceRouteContributions().find((route) => route.kind === kind)?.path
-
-export const sourcePath = (kind: SourceRouteKind, params: Record<string, string | number>): string => {
-  const path = sourceRoutePath(kind)
-  if (!path) return '/'
-  return path.replace(/:([A-Za-z0-9_]+)/g, (_match, name: string) => encodeURIComponent(String(params[name] ?? '')))
+// Ask every source whether it owns this task's URL. Registry order decides a tie, so two sources that both
+// claim a task resolve deterministically rather than by whichever plugin loaded first.
+export function taskPathFromSources(task: Task): string | undefined {
+  for (const source of sourceRegistry.entries()) {
+    const path = source.taskPath?.(task)
+    if (path) return path
+  }
+  return undefined
 }

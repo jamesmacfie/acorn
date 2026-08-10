@@ -28,6 +28,25 @@ describe('CoreServices.projects', () => {
         id: 'project-plain', name: 'plain', path: join(dir, 'plain'), workspaceId: 'workspace-1', createdAt: 5, updatedAt: 5,
       },
     ])
+    await testDb.db.insert(schema.integrations).values([
+      {
+        id: 'rollbar-a', userId: 'owner', provider: 'rollbar', label: 'Rollbar A', authRef: 'secret',
+        createdAt: now, updatedAt: now,
+      },
+      {
+        id: 'rollbar-b', userId: 'owner', provider: 'rollbar', label: 'Rollbar B', authRef: 'secret',
+        createdAt: now, updatedAt: now,
+      },
+      {
+        id: 'linear-a', userId: 'owner', provider: 'linear', label: 'Linear A', authRef: 'secret',
+        createdAt: now, updatedAt: now,
+      },
+    ])
+    await testDb.db.insert(schema.workspaceExternalProjects).values([
+      { workspaceId: 'workspace-1', integrationId: 'rollbar-b', externalId: 'project-b', createdAt: now },
+      { workspaceId: 'workspace-1', integrationId: 'rollbar-a', externalId: 'project-a', createdAt: now },
+      { workspaceId: 'workspace-1', integrationId: 'linear-a', externalId: 'team-a', createdAt: now },
+    ])
   })
 
   afterEach(() => {
@@ -52,6 +71,28 @@ describe('CoreServices.projects', () => {
       { id: 'project-old', path: join(dir, 'old') },
       { id: 'project-new', path: join(dir, 'new') },
     ])
+  })
+
+  it('returns opaque external-project mappings in deterministic order', async () => {
+    const projects = createProjectService(testDb.db)
+    expect(await projects.externalProjects('workspace-1')).toEqual([
+      { connectionId: 'linear-a', externalId: 'team-a' },
+      { connectionId: 'rollbar-a', externalId: 'project-a' },
+      { connectionId: 'rollbar-b', externalId: 'project-b' },
+    ])
+    expect(await projects.externalProjects('missing')).toEqual([])
+  })
+
+  it('filters external-project mappings at the database boundary by provider', async () => {
+    const projects = createProjectService(testDb.db)
+    expect(await projects.externalProjects('workspace-1', ['rollbar'])).toEqual([
+      { connectionId: 'rollbar-a', externalId: 'project-a' },
+      { connectionId: 'rollbar-b', externalId: 'project-b' },
+    ])
+    expect(await projects.externalProjects('workspace-1', ['linear'])).toEqual([
+      { connectionId: 'linear-a', externalId: 'team-a' },
+    ])
+    expect(await projects.externalProjects('workspace-1', [])).toEqual([])
   })
 
   it('supports controlled deferred creation and mapping updates', async () => {

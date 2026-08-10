@@ -90,6 +90,15 @@ export const BRIDGE_TOKENS = [
   '--font-mono', '--is-dark', '--term-fs',
 ] as const
 
+/** Complete CSS-variable projection for isolated plugin documents. Unlike BRIDGE_TOKENS, which is
+ * the small canvas/JavaScript contract, frames render the shared CSS itself and therefore need every
+ * token from both appearance axes plus the invariant stacking/brand values. */
+export const FRAME_TOKENS = [
+  ...THEME_TOKENS,
+  ...STYLE_TOKENS,
+  ...INVARIANT_TOKENS,
+] as const
+
 /** Ordering constraints that are behavioural, not cosmetic. Asserted by the test. */
 export const Z_ORDER_INVARIANTS: readonly (readonly [above: string, below: string])[] = [
   // A Picker opened inside a modal is portalled to <body>, making it a sibling of the backdrop

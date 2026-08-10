@@ -167,7 +167,10 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       ...(descriptor.providerId ? { providerId: descriptor.providerId } : {}),
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
       component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }),
-      ...(descriptor.onSelect?.verb === 'createTask' ? { promotion: descriptorPromotion(pluginId) } : {}),
+      // A row's `task` block is the promotion capability. Register it independently of row selection
+      // so an integration can use the row click for detail navigation and a separate host-drawn
+      // +TASK affordance for promotion.
+      promotion: descriptorPromotion(pluginId),
       // No `routes`. `SourceRouteContribution`'s `project` and `create` kinds are core-owned URLs, so a
       // descriptor source claiming them would take over project navigation for the whole shell; deep
       // links for descriptor sources want a host-minted prefix and are a later, additive decision.

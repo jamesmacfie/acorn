@@ -28,6 +28,10 @@ extraResources:
   # review simulating the walk from out/main/service.js.
   - from: out/migrations
     to: migrations
+  # Loaded first-party plugins use the same package shape as ecosystem plugins. The service seeds
+  # these packaged/read-only app resources into its writable data root before plugin discovery.
+  - from: out/bundled-plugins
+    to: plugins
 # Never auto-publish from CI; the workflow uploads the dmg as an artifact instead.
 publish: null
 mac:

@@ -9,7 +9,7 @@ import { type Pull } from '../contract/api'
 import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { scanLinearRefs } from '@acorn/plugin-linear/contract/scanRefs.ts'
-import { registerKeybindings } from '@acorn/plugin-api/ui'
+import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
 

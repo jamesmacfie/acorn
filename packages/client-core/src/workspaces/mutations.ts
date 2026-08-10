@@ -37,6 +37,9 @@ export const createProject = (seed: ProjectSeed) => postJson<{ project: Project 
 export const patchProject = (id: string, patch: ProjectPatch) =>
   writeJson<{ project: Project }>(projectRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }, (res) => `project ${res.status}`)
 export const detectProject = (id: string) => postJson<{ project: Project }>(projectDetectRoute(id))
+// Takes the project's tasks with it (main/projects.ts). Folders and worktrees on disk are untouched.
+export const deleteProject = (id: string) =>
+  writeJson<{ ok: true }>(projectRoute(id), { method: 'DELETE' }, (res) => `project ${res.status}`)
 export const setProjectWorkspace = (id: string, workspaceId: string) => patchProject(id, { workspaceId })
 export const setProjectHidden = (id: string, hidden: boolean) => patchProject(id, { hidden })
 export const renameWorkspace = async (id: string, name: string) => patchWorkspace(id, { name })

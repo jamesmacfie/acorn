@@ -101,6 +101,19 @@ describe('syncChromeContributions', () => {
     expect(sourceRegistry.get('board')?.promotion).toBeDefined()
   })
 
+  it('registers host-owned promotion independently of the row selection action', () => {
+    const promotable: Partial<PluginContributions> = {
+      frames: [{ target: 'pane', id: 'board-pane', label: 'Board', glyph: 'kanban', order: 60, formFactor: ['desktop'] }],
+      sources: [{
+        id: 'board', label: 'Board', glyph: 'kanban', order: 60,
+        items: '/v2/p/board/rail-items', onSelect: { verb: 'openPane', pane: 'board-pane' },
+      }],
+    }
+    _seedPluginDistribution([['node-a', [row('board', {}, promotable)]]])
+    syncChromeContributions()
+    expect(sourceRegistry.get('board')?.promotion).toBeDefined()
+  })
+
   it('registers declarative content links in manifest order and disposes them with the plugin', () => {
     const links = (id: string): Partial<PluginContributions> => ({
       frames: [{ target: 'pane', id: `${id}-pane`, label: id, glyph: 'puzzle', order: 500, formFactor: ['desktop'] }],

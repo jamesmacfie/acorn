@@ -27,6 +27,9 @@
   font-weight: 600;
   color: var(--text);
   line-height: 1.3;
+  /* Rail labels are short, but a tip may now carry a filesystem path — one unbroken token that would
+     otherwise run straight out of the bubble. */
+  overflow-wrap: anywhere;
 }
 .rail-tip-key {
   font-family: var(--font-mono);

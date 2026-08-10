@@ -9,7 +9,6 @@ import { repos } from '../../node/schema'
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ repoId: z.number().int().positive(), action: z.literal('map'), path: z.string().min(1) }),
   z.object({ repoId: z.number().int().positive(), action: z.literal('clone'), parentDir: z.string().min(1) }),
-  z.object({ repoId: z.number().int().positive(), action: z.literal('defer') }),
 ])
 
 // Accept the named request shape used by the client and the bare-array shape used by early callers.
@@ -21,6 +20,8 @@ const requestSchema = z.union([
 ])
 
 type ImportCore = Pick<CoreServices, 'projects' | 'git'>
+
+const MISSING_PROJECT = 'Project disappeared while importing.'
 
 const failed = (item: GithubImportItem, owner: string, name: string, error: unknown): GithubImportResult => ({
   repoId: item.repoId,
@@ -49,32 +50,30 @@ export const githubImport = (db: PluginDatabase, core: ImportCore) => new Hono<A
       }
 
       try {
-        let projectId: string
+        let path: string
         if (item.action === 'map') {
           if (!isAbsolute(item.path)) throw new Error('Checkout path must be absolute.')
-          const project = await core.projects.create({ name: repo.name, path: item.path })
-          const stamped = await core.projects.update(project.id, { githubRepoId: repo.id })
-          if (!stamped) throw new Error('Project disappeared while importing.')
-          projectId = stamped.id
-        } else if (item.action === 'clone') {
+          path = item.path
+        } else {
           if (!isAbsolute(item.parentDir)) throw new Error('Clone parent directory must be absolute.')
           await core.git.gitOrThrow(
             ['clone', `https://github.com/${repo.owner}/${repo.name}.git`, repo.name],
             { cwd: item.parentDir, env: { GIT_TERMINAL_PROMPT: '0' } },
           )
-          const project = await core.projects.create({ name: repo.name, path: join(item.parentDir, repo.name) })
-          const stamped = await core.projects.update(project.id, { githubRepoId: repo.id })
-          if (!stamped) throw new Error('Project disappeared while importing.')
-          projectId = stamped.id
-        } else {
-          const project = await core.projects.create({
-            name: repo.name,
-            path: null,
-            github: { owner: repo.owner, name: repo.name, repoId: repo.id },
-          })
-          projectId = project.id
+          path = join(item.parentDir, repo.name)
         }
-        results.push({ repoId: repo.id, owner: repo.owner, name: repo.name, action: item.action, ok: true, projectId })
+
+        // A path-less project for this repository is a placeholder left by an older import, not a
+        // second checkout — fill it in rather than adding a rival row. A project that already HAS a
+        // path is a real checkout, and two clones of one repository are legal (schema.ts: the
+        // projects_github_idx is deliberately non-unique), so that case still creates a new project.
+        const placeholder = await core.projects.byGithub(repo.owner, repo.name)
+        const existingId = placeholder && placeholder.path === null ? placeholder.id : null
+        const projectId = existingId ?? (await core.projects.create({ name: repo.name, path })).id
+        const stamped = await core.projects.update(projectId, { path, githubRepoId: repo.id })
+        if (!stamped) throw new Error(MISSING_PROJECT)
+
+        results.push({ repoId: repo.id, owner: repo.owner, name: repo.name, action: item.action, ok: true, projectId: stamped.id })
       } catch (error) {
         results.push(failed(item, repo.owner, repo.name, error))
       }

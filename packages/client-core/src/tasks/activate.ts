@@ -2,13 +2,13 @@ import type { Task } from '../queries'
 import { markTaskRead } from '../notifications/notifications'
 import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } from './tasks'
 import type { PaneId } from './layout'
-import { sourcePath } from '../registries/sources'
+import { taskPathFromSources } from '../registries/sources'
+import { taskPath } from '../registries/corePaths'
 
-// Where a task lives in the router (project browse, PR detail, or the task route for local work).
-export function pathForTask(t: Task): string {
-  if (t.pullNumber != null && t.github) return sourcePath('detail', { projectId: t.projectId, number: t.pullNumber })
-  return `/t/${encodeURIComponent(t.id)}`
-}
+// Where a task lives in the router. A source may claim it — GitHub puts a PR-backed task at its PR URL —
+// and everything else lands on the generic task route. Core used to encode the PR case itself, asking the
+// route registry for whatever owned `kind: 'detail'`; the claim is the owning plugin's to make now.
+export const pathForTask = (t: Task): string => taskPathFromSources(t) ?? taskPath(t.id)
 
 // Make a task the active one (signals only — the caller navigates to pathForTask). Shared by the
 // rail (row click, ⌘1–9, new-task), the browse promotes, the notification bell and the command

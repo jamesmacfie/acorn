@@ -1,5 +1,5 @@
 // The API rail Source. Source components take no props (App.tsx renders them via <Dynamic> with
-// nothing passed), so the repo comes from the route — the same way RollbarBrowse scopes itself.
+// nothing passed), so the repo comes from the route rather than from an implicit global selection.
 // With no repo routed yet, offer the picker rather than a dead end.
 import { createQuery } from '@tanstack/solid-query'
 import { useParams } from '@solidjs/router'

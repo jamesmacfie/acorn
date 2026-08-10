@@ -29,6 +29,7 @@ import { runProcess } from './core/exec/proc'
 import { resolveInRoot } from './core/filesystem/confinement'
 import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
 import { pluginDbPath, PLUGIN_DB_DIR } from './pluginStorage'
+import { markPluginRemoved, markPluginUserManaged } from './bundledPluginState'
 
 // A plugin package is source plus a bundle or two. 32 MiB is roughly four times the client-bundle
 // ceiling and leaves room for assets; anything past it is not a plugin, and a node should not spool a
@@ -388,6 +389,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
       ...(Object.keys(resolved.provenance).length ? { provenance: resolved.provenance } : {}),
       installedAt: Date.now(),
     })
+    markPluginUserManaged(dataRoot, manifest.id)
     return { id: manifest.id, version: manifest.version, state: 'installed-restart-required' }
   } finally {
     rmSync(staging, { recursive: true, force: true })
@@ -410,6 +412,7 @@ function linkLocal(dataRoot: string, source: { path: string }, expectId: string 
     entrypoints: {},
     installedAt: Date.now(),
   })
+  markPluginUserManaged(dataRoot, manifest.id)
   return { id: manifest.id, version: manifest.version, state: 'installed-restart-required' }
 }
 
@@ -426,6 +429,7 @@ function guardDowngrade(existing: PluginLockfile | null, next: string, options: 
 export function uninstallPlugin(dataRoot: string, id: string, options: { purgeData?: boolean } = {}): PluginUninstallResult {
   const target = pluginDir(dataRoot, id)
   if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id))) fail(`'${id}' is not installed on this node.`)
+  markPluginRemoved(dataRoot, id)
   // lstat, so a `{ path }` dev symlink is unlinked rather than followed into the author's working tree.
   rmSync(target, { recursive: true, force: true })
   rmSync(lockfilePath(dataRoot, id), { force: true })

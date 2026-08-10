@@ -83,12 +83,17 @@ function resolveFile(abs: string): string | null {
 type Target = { file: string | null; external: string | null; pkg: Pkg | undefined }
 
 function resolveSpec(from: string, spec: string): Target {
-  if (spec.startsWith('.')) {
-    const file = resolveFile(resolve(dirname(from), spec))
+  // Vite import queries select a loader/representation; they are not part of the filesystem path.
+  // Keep the original specifier on the edge for diagnostics and dependency rules, but resolve the
+  // underlying first-party module so `?raw`, `?url`, and future fragment-bearing imports remain
+  // covered by the same existence and boundary checks.
+  const fileSpec = spec.split(/[?#]/, 1)[0]
+  if (fileSpec.startsWith('.')) {
+    const file = resolveFile(resolve(dirname(from), fileSpec))
     return { file, external: null, pkg: file ? pkgOf(file) : undefined }
   }
-  if (spec.startsWith('@acorn/')) {
-    const [scope, name, ...rest] = spec.split('/')
+  if (fileSpec.startsWith('@acorn/')) {
+    const [scope, name, ...rest] = fileSpec.split('/')
     const pkg = byName.get(`${scope}/${name}`)
     if (!pkg) return { file: null, external: null, pkg: undefined }
     const file = resolveFile(join(pkg.src, rest.join('/')))
@@ -525,13 +530,16 @@ describe('architecture boundaries', () => {
     const DECLARES = /^\s*(import\s|export\s+(const|let|var|function|class|default|async)\b)/m
     const entrypoints = walk(api.src).filter((f) => !isTestCode(f))
     const declaring = entrypoints.filter((f) => DECLARES.test(readFileSync(f, 'utf8'))).map(rel)
-    // Only ui/index.ts may re-export from a .tsx module. Every entrypoint is a barrel, so importing
-    // one member evaluates all of them, and Solid compiles a component to code that touches
-    // `window` at module scope — a component anywhere else makes that entrypoint unloadable from a
-    // plugin's node-environment test suite. This is the rule those files' headers describe, and it
-    // is mechanical on purpose: it should not depend on anyone remembering it.
+    // Only the frame-safe ui/index.ts and compiled-host ui/host.ts barrels may re-export from a .tsx
+    // module. Components anywhere else make that entrypoint unloadable from a plugin's
+    // node-environment test suite. Keeping the two UI barrels separate prevents a sandboxed frame
+    // importing Button from also evaluating router/query/registry machinery.
+    const componentEntrypoints = new Set([
+      'packages/plugin-api/src/ui/index.ts',
+      'packages/plugin-api/src/ui/host.ts',
+    ])
     const componentLeak = entrypoints
-      .filter((f) => rel(f) !== 'packages/plugin-api/src/ui/index.ts')
+      .filter((f) => !componentEntrypoints.has(rel(f)))
       .flatMap((f) => (readFileSync(f, 'utf8').match(/'@acorn\/[^']+\.tsx'/g) ?? []).map((spec) => `${rel(f)}: ${spec}`))
     expect(entrypoints.length).toBeGreaterThanOrEqual(4) // anti-vacuity: the walker found the entrypoints
     expect([...new Set([...foreign, ...declaring, ...componentLeak])].sort()).toEqual([])

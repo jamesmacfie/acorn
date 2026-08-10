@@ -20,6 +20,7 @@ import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './
 import { PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './pluginMigrations'
 import { openPluginDb } from './pluginStorage'
+import { readBundledPluginState } from './bundledPluginState'
 import type { NodePlugin, PluginStorage } from '../server/plugin/types'
 
 // A client bundle is one ESM file that has to travel a broker request and land in a device's cache
@@ -222,11 +223,16 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
     // filename, so it has to be unique regardless of which folder it was found in.
     seen.add(manifest.id)
     const lock = readLockfile(dataRoot, manifest.id)
+    const bundled = readBundledPluginState(dataRoot, manifest.id)
     installed.push({
       manifest,
       dir,
       client: clientDigest(dir, manifest.client),
-      ...(lock ? { source: describeSource(lock.source), installedAt: lock.installedAt } : {}),
+      ...(lock
+        ? { source: describeSource(lock.source), installedAt: lock.installedAt }
+        : bundled?.status === 'installed'
+          ? { source: 'bundled with acorn', installedAt: bundled.installedAt }
+          : {}),
     })
   }
   return { installed, failures }

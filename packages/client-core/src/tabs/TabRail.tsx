@@ -8,6 +8,7 @@ import { checksState } from '../ui/displayMeta'
 import { createDismissable } from '../ui/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { defaultSourceId } from '../registries/sources'
+import { projectPath } from '../registries/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { capabilities } from '../capabilities'
 import { availableSources } from './sources'
@@ -118,6 +119,12 @@ export default function TabRail() {
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
+    // From a task view the URL is /t/:taskId, which carries no project — and every browse Source scopes
+    // itself to the routed project. Without this the rail swaps to a Source that then reports it has
+    // nothing to show. Selecting a Source keeps the project you were working in.
+    if (params.projectId) return
+    const projectId = query.data?.find((task) => task.id === activeTaskId())?.projectId
+    if (projectId) navigate(projectPath(projectId))
   }
 
   function onRowClick(w: Task) {

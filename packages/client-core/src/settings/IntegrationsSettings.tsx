@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import CopyButton from '../ui/CopyButton'
@@ -10,8 +10,8 @@ import {
   setIntegrationDisabled,
   testIntegration,
 } from '../integrations/integrationClient'
+import { createDeviceFlow } from '../integrations/deviceFlow'
 import { integrationsKey, integrationsOptions } from '../queries'
-import { integrationFlowRegistry, type DeviceFlowStart } from '../registries/integrationFlows'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   return (
@@ -46,66 +46,12 @@ export default function IntegrationsSettings() {
   // --- Device authorization grant (RFC 8628), for a provider whose descriptor says `kind:
   // 'device-flow'`. Currently only GitHub, and one branch here rather than a page of its own: this
   // component is already descriptor-driven, so "how the credential is obtained" is one more thing the
-  // descriptor answers.
-  const [device, setDevice] = createSignal<DeviceFlowStart | null>(null)
-  let poller: ReturnType<typeof setTimeout> | undefined
-  const stopPolling = () => clearTimeout(poller)
-  onCleanup(stopPolling)
-
-  const startDeviceFlow = async () => {
-    setBusy(true)
-    setError('')
-    try {
-      const flow = selectedProvider() ? integrationFlowRegistry.get(selectedProvider()!.id)?.deviceFlow : undefined
-      if (!flow) throw new Error('This provider does not expose a device connection flow.')
-      const started = await flow.start()
-      setDevice(started)
-      // The node performs the exchange; the client only paces it. `interval` is GitHub's, honoured
-      // exactly — polling faster earns a slow_down and, eventually, nothing.
-      poll(started, started.interval * 1000)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not start the connection.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const poll = (started: DeviceFlowStart, delay: number, deadline = Date.now() + started.expiresIn * 1000) => {
-    stopPolling()
-    poller = setTimeout(async () => {
-      if (Date.now() > deadline) {
-        setDevice(null)
-        setError('That code expired. Start again.')
-        return
-      }
-      try {
-        const flow = selectedProvider() ? integrationFlowRegistry.get(selectedProvider()!.id)?.deviceFlow : undefined
-        if (!flow) throw new Error('This provider does not expose a device connection flow.')
-        const result = await flow.poll(started.deviceCode)
-        if (result.status === 'connected') {
-          setDevice(null)
-          setAdding(false)
-          await refresh()
-          return
-        }
-        if (result.status !== 'pending') {
-          setDevice(null)
-          setError(result.status === 'denied' ? 'That request was declined.' : 'That code expired. Start again.')
-          return
-        }
-        // slow_down is a directive, not an error: GitHub adds 5s to the interval and expects us to keep it.
-        poll(started, result.slowDown ? delay + 5_000 : delay, deadline)
-      } catch (cause) {
-        setDevice(null)
-        setError(cause instanceof Error ? cause.message : 'Could not finish connecting.')
-      }
-    }, delay)
-  }
-
-  const cancelDeviceFlow = () => {
-    stopPolling()
-    setDevice(null)
-  }
+  // descriptor answers. The pacing itself lives in ../integrations/deviceFlow.ts because first-run
+  // onboarding runs the same grant.
+  const deviceFlow = createDeviceFlow(() => selectedProvider()?.id, async () => {
+    setAdding(false)
+    await refresh()
+  })
 
   const refresh = () => qc.invalidateQueries({ queryKey: integrationsKey })
   const valueFor = (id: string) => credentials()[id] ?? ''
@@ -244,10 +190,10 @@ export default function IntegrationsSettings() {
             }
           >
             <Show
-              when={device()}
+              when={deviceFlow.device()}
               fallback={
-                <button type="button" class="ui-btn" onClick={() => void startDeviceFlow()} disabled={busy()}>
-                  {busy() ? 'Starting…' : `Connect ${selectedProvider()?.label ?? ''}`}
+                <button type="button" class="ui-btn" onClick={() => void deviceFlow.start()} disabled={deviceFlow.busy()}>
+                  {deviceFlow.busy() ? 'Starting…' : `Connect ${selectedProvider()?.label ?? ''}`}
                 </button>
               }
             >
@@ -265,12 +211,12 @@ export default function IntegrationsSettings() {
                     Open {new URL(started().verificationUri).host}
                   </a>
                   <p class="integration-add-hint muted">Waiting for approval…</p>
-                  <button type="button" class="integration-remove" onClick={cancelDeviceFlow}>Cancel</button>
+                  <button type="button" class="integration-remove" onClick={deviceFlow.cancel}>Cancel</button>
                 </div>
               )}
             </Show>
           </Show>
-          <Show when={error()}><div class="action-error">{error()}</div></Show>
+          <Show when={error() || deviceFlow.error()}>{(message) => <div class="action-error">{message()}</div>}</Show>
         </div>
       </div>
     </div>

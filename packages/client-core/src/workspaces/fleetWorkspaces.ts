@@ -5,7 +5,7 @@ import { readJson } from '../apiClient'
 import { activeNodeId, setActiveNode } from '../node/activeNode'
 import { createFleetQuery, type FleetUnavailable } from '../node/fanout'
 import { nodes } from '../node/fleet'
-import { sourcePath } from '../registries/sources'
+import { projectPath } from '../registries/corePaths'
 
 export type FleetWorkspace = {
   workspace: Workspace
@@ -51,5 +51,5 @@ export function selectFleetWorkspace(entry: FleetWorkspace, navigate: (path: str
   const first = entry.workspace.projects[0]
   if (!first) return // an empty workspace has nowhere to go, same as the single-node picker
   if (entry.nodeId !== activeNodeId()) setActiveNode(entry.nodeId)
-  navigate(sourcePath('project', { projectId: first.id }))
+  navigate(projectPath(first.id))
 }

@@ -5,7 +5,7 @@ import { prPaneContribution } from './pullDetail/PrPane'
 import { pullFilePaletteSlotContribution } from './slotContribution'
 import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'
-import { githubRouteContributions } from './routes'
+import { githubBrowsePath, githubRouteContributions } from './routes'
 import GithubImporter from './GithubImporter'
 
 const GithubBrowse = lazy(() => import('./GithubBrowse'))
@@ -25,6 +25,10 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.sources.register({
       id: 'github', order: 10, glyph: '◇', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
       routes: githubRouteContributions,
+      // A PR-backed task lives at its PR URL. Core used to encode this itself by asking the route registry
+      // for whatever owned `kind: 'detail'` — which was only ever this plugin, by luck of being the only
+      // one with routes. The claim belongs here, where the shape of a PR URL is already known.
+      taskPath: (task) => (task.pullNumber != null && task.github ? `${githubBrowsePath(task.projectId)}/${task.pullNumber}` : undefined),
     })
     ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: '◇', component: GithubImporter })
     ctx.commands.register({

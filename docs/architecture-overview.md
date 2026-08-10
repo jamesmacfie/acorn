@@ -115,8 +115,14 @@ by one Node and one project. Task origins are `github-pr`, `linear`, `rollbar`, 
 The renderer shell is contribution-driven. Plugins register task panes, rail sources, command-palette
 rows, settings pages, slots, context sections, attention items, and node statistics. The shipped
 feature packages are GitHub, terminal, agents, editor, changes, notes, memory, context, workflows,
-database, Docker, HTTP, preview, Linear, Rollbar, model providers, onboarding, and the built-in
+database, Docker, HTTP, preview, Linear, model providers, onboarding, and the built-in
 Claude, Codex, and Aider profiles registered by `plugins/agents`.
+
+Rollbar is the first shipped loaded-plugin package: its node provider is installed from disk, its
+rail rows are host-drawn descriptors, and its detail UI is a sandboxed frame. It is deliberately not
+present in the Node or desktop compiled-plugin lists. The desktop ships its built package as an app
+resource and the service reconciles it into the writable data root before plugin discovery; app-owned
+copies update with the app, while owner-installed overrides and uninstall tombstones win.
 
 Plugins come in two tiers. Those feature packages are **compiled in**: they ship in the binary, run
 in the shell's own realm, and are trusted like the rest of the app. A Node can also **load** a
@@ -125,8 +131,9 @@ device by the Node that owns it, and rendered in a sandboxed frame or as host-dr
 The two tiers are permanent and the line between them is what a contribution needs: anything
 expressible as data plus async messages can be sandboxed, while PTY stream ownership, inline
 agent-tool renderers, and components embedded in another surface's tree need the shared realm and
-stay first-party. [plugins.md](./plugins.md) describes both tiers as they work today;
-[third-party/](./third-party/) is why they are built that way.
+stay first-party. [plugins.md](./plugins.md) describes both tiers as they work today,
+[first-party-plugins.md](./first-party-plugins.md) says which shipped plugins are in the first tier
+because they must be, and [extensibility.md](./extensibility.md) is why the split exists at all.
 
 ## Data ownership
 
@@ -175,11 +182,11 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - [frontend.md](./frontend.md), [state.md](./state.md), [panes.md](./panes.md) — renderer behavior.
 - [authentication.md](./authentication.md), [security.md](./security.md) — trust boundaries.
 - [api-reference.md](./api-reference.md), [data-layer.md](./data-layer.md), [caching.md](./caching.md) — Node contracts.
+- [extensibility.md](./extensibility.md) — **why** the plugin system is shaped the way it is, the
+  decisions behind it, and where it is going. Read before changing a plugin seam.
 - [plugins.md](./plugins.md), [agent-tools.md](./agent-tools.md) — extension and tool boundaries.
 - [first-party-plugins.md](./first-party-plugins.md) — every shipped plugin, and which of them are
   first-party because they must be rather than because they were written first.
-- [third-party/](./third-party/) — the built-in plugins that could move to the loaded-plugin shape,
-  one file each, with what it would prove and what it would cost.
-- [keybindings/](./keybindings/) — review punch list for the shipped plugin-keybinding work;
-  `command-palette-and-shortcuts.md` is how it behaves.
+- [third-party/](./third-party/) — review findings from moving Rollbar out of the binary and onto
+  the loaded-plugin path.
 - [electron.md](./electron.md), [local-development.md](./local-development.md) — runtime and development.

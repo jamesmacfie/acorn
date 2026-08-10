@@ -3,6 +3,11 @@
 The renderer is a SolidJS application bundled into the Electron desktop. It loads from
 `app://acorn`; it does not run from a Node origin and cannot make direct network requests.
 
+The framework choice is settled and is now a private implementation detail: third-party plugin UI
+runs in its own frame with its own bundle, so a plugin author's framework is their own. The shell's
+workload — a dense, always-on surface with live panes and streams — is what fine-grained reactivity
+is for. See [extensibility.md](./extensibility.md) § Some decisions that look like gaps.
+
 ## Composition
 
 `apps/desktop/src/app/client/index.tsx` creates the renderer runtime and mounts `App.tsx`. The

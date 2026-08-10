@@ -8,6 +8,7 @@ import { scopeCapabilities, scopeCore } from './pluginPermissions'
 // A stand-in CoreServices: this module only ever picks properties off the object, so identity is all
 // the assertions need and building a real one would drag a database in for nothing.
 const marker = (name: string) => ({ marker: name }) as never
+const externalProjects = vi.fn(async () => [])
 const CORE = {
   fs: marker('fs'),
   git: marker('git'),
@@ -19,7 +20,7 @@ const CORE = {
   prefs: marker('prefs'),
   identity: marker('identity'),
   projects: {
-    byId: marker('byId'), byGithub: marker('byGithub'), checkouts: marker('checkouts'),
+    byId: marker('byId'), byGithub: marker('byGithub'), checkouts: marker('checkouts'), externalProjects,
     config: marker('config'), assertConfigTrusted: marker('assertConfigTrusted'), setup: marker('setup'),
     create: marker('create'), update: marker('update'),
   },
@@ -31,7 +32,7 @@ const permissions = (node: Record<string, unknown> = {}): NodePermissions =>
   pluginManifestSchema.parse({ id: 'demo', name: 'demo', version: '1', apiVersion: '1', permissions: { node } }).permissions.node
 
 const scoped = (node: Record<string, unknown> = {}, core: CoreServices = CORE): CoreServices =>
-  scopeCore(core, permissions(node), 'demo')
+  scopeCore(core, permissions(node), 'demo', { idsForOwner: (owner) => owner === 'demo' ? ['demo-provider'] : [] })
 
 // The facets that are NOT reachable through `core: [...]`, whatever a manifest writes there.
 const keys = (services: CoreServices) => Object.keys(services).sort()
@@ -69,26 +70,48 @@ describe('scopeCore', () => {
 
   it('keeps project config and its executable scripts out of the read grant', () => {
     const read = scoped({ core: ['projects:read'] }).projects
-    expect(Object.keys(read).sort()).toEqual(['byGithub', 'byId', 'checkouts'])
+    expect(Object.keys(read).sort()).toEqual(['byGithub', 'byId', 'checkouts', 'externalProjects'])
     // The disclosure phase 5's trust prompt has to name: "read projects" includes every mapped
     // project path on the machine.
     expect(read.checkouts).toBe(CORE.projects.checkouts)
+    expect(read.externalProjects).not.toBe(CORE.projects.externalProjects)
     expect((read as { config?: unknown }).config).toBeUndefined()
     expect((read as { setup?: unknown }).setup).toBeUndefined()
     expect((read as { assertConfigTrusted?: unknown }).assertConfigTrusted).toBeUndefined()
     expect((read as { create?: unknown }).create).toBeUndefined()
   })
 
+  it('scopes external project mappings to providers registered by the loaded plugin', async () => {
+    externalProjects.mockClear()
+    const read = scoped({ core: ['projects:read'] }).projects
+
+    await expect(read.externalProjects('workspace-1')).resolves.toEqual([])
+    expect(externalProjects).toHaveBeenCalledWith('workspace-1', ['demo-provider'])
+  })
+
+  it('passes an explicit empty provider set when the plugin owns no providers', async () => {
+    const external = vi.fn(async () => [{ connectionId: 'foreign', externalId: 'project' }])
+    const services = scopeCore(
+      { ...CORE, projects: { ...CORE.projects, externalProjects: external } } as CoreServices,
+      permissions({ core: ['projects:read'] }),
+      'demo',
+      { idsForOwner: () => [] },
+    )
+
+    await services.projects.externalProjects('workspace-1')
+    expect(external).toHaveBeenCalledWith('workspace-1', [])
+  })
+
   it('makes the config grant imply identity reads and include the whole config surface', () => {
     const config = scoped({ core: ['projects:config'] }).projects
     expect(Object.keys(config).sort()).toEqual(
-      ['assertConfigTrusted', 'byGithub', 'byId', 'checkouts', 'config', 'setup'],
+      ['assertConfigTrusted', 'byGithub', 'byId', 'checkouts', 'config', 'externalProjects', 'setup'],
     )
   })
 
   it('lets write imply read without silently implying config access', () => {
     const write = scoped({ core: ['projects:write'] }).projects
-    expect(Object.keys(write).sort()).toEqual(['byGithub', 'byId', 'checkouts', 'create', 'update'])
+    expect(Object.keys(write).sort()).toEqual(['byGithub', 'byId', 'checkouts', 'create', 'externalProjects', 'update'])
     expect((write as { config?: unknown }).config).toBeUndefined()
   })
 

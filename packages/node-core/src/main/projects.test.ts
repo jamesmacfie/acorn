@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '../server/db'
 import { makeTestDb, type TestDb } from '../testkit/db'
-import { createProject, createProjectRef, detectProject, parseGithubRemote, patchProject, projectByGithub } from './projects'
+import { createProject, createProjectRef, deleteProject, detectProject, parseGithubRemote, patchProject, projectByGithub } from './projects'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' })
 
@@ -140,6 +140,37 @@ describe('createProject / detectProject', () => {
   it('canonicalizes GitHub facets written by the project import seam', async () => {
     const project = await createProjectRef(testDb.db, { name: 'web', github: { owner: ' Acme ', name: ' Web ' } })
     expect(project.github).toEqual({ owner: 'acme', name: 'web', repoId: null })
+  })
+
+  // tasks.project_id carries no foreign key, so nothing in the database enforces this. Left undone it
+  // strands rows that no rail can show and no screen can delete.
+  it('deletes a project together with its tasks and their links, and leaves other projects alone', async () => {
+    const doomed = join(dir, 'doomed')
+    const survivor = join(dir, 'survivor')
+    mkdirSync(doomed)
+    mkdirSync(survivor)
+    const a = await createProject(testDb.db, { path: doomed })
+    const b = await createProject(testDb.db, { path: survivor })
+    if (!a.ok || !b.ok) throw new Error('fixture projects were not created')
+
+    const task = (id: string, projectId: string) => ({
+      id, title: id, origin: 'local', projectId, status: 'active' as const, sort: 0, createdAt: 1, updatedAt: 1,
+    })
+    await testDb.db.insert(schema.tasks).values([
+      task('doomed-1', a.project.id),
+      task('doomed-2', a.project.id),
+      task('keeper', b.project.id),
+    ])
+    await testDb.db.insert(schema.taskLinks).values([
+      { taskId: 'doomed-1', integrationId: 'linear', provider: 'linear', identifier: 'ENG-1', createdAt: 1 },
+      { taskId: 'keeper', integrationId: 'linear', provider: 'linear', identifier: 'ENG-2', createdAt: 1 },
+    ])
+
+    await deleteProject(testDb.db, a.project.id)
+
+    expect((await testDb.db.select().from(schema.projects)).map((row) => row.id)).toEqual([b.project.id])
+    expect((await testDb.db.select().from(schema.tasks)).map((row) => row.id)).toEqual(['keeper'])
+    expect((await testDb.db.select().from(schema.taskLinks)).map((row) => row.taskId)).toEqual(['keeper'])
   })
 
 })

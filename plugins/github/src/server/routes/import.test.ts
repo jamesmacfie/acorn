@@ -10,13 +10,15 @@ import { migrationsDir } from '../../node/migrations'
 import { githubImport } from './import'
 
 const principal = { kind: 'device' as const, deviceId: 'device', userId: 'james' }
-const ref = (id: string, github: ProjectRef['github'] = null): ProjectRef => ({ id, name: id, path: null, workspaceId: 'default', github })
+const ref = (id: string, path: string | null = null, github: ProjectRef['github'] = null): ProjectRef =>
+  ({ id, name: id, path, workspaceId: 'default', github })
 
 describe('GitHub project importer', () => {
   let plugin: TestPluginDb
   let app: Hono<AppEnv>
   const create = vi.fn()
   const update = vi.fn()
+  const byGithub = vi.fn()
   const gitOrThrow = vi.fn()
 
   beforeEach(async () => {
@@ -24,15 +26,17 @@ describe('GitHub project importer', () => {
     await plugin.db.insert(repos).values([
       { userId: 'james', id: 101, owner: 'acme', name: 'map-me', private: false, defaultBranch: 'main', pushedAt: null, fetchedAt: Date.now() },
       { userId: 'james', id: 102, owner: 'acme', name: 'clone-me', private: false, defaultBranch: 'main', pushedAt: null, fetchedAt: Date.now() },
-      { userId: 'james', id: 103, owner: 'acme', name: 'defer-me', private: true, defaultBranch: 'trunk', pushedAt: null, fetchedAt: Date.now() },
+      { userId: 'james', id: 103, owner: 'acme', name: 'placeholder-me', private: true, defaultBranch: 'trunk', pushedAt: null, fetchedAt: Date.now() },
     ])
     create.mockReset()
     update.mockReset()
+    byGithub.mockReset()
     gitOrThrow.mockReset()
-    create.mockImplementation(async ({ name, path, github }: { name: string; path: string | null; github?: ProjectRef['github'] }) => ref(`${name}-${path ?? 'deferred'}`, github ?? null))
-    update.mockImplementation(async (id: string) => ref(id))
+    create.mockImplementation(async ({ name, path }: { name: string; path: string }) => ref(`${name}-${path}`, path))
+    update.mockImplementation(async (id: string, patch: { path?: string }) => ref(id, patch.path ?? null))
+    byGithub.mockResolvedValue(null)
     gitOrThrow.mockResolvedValue({ code: 0, stdout: '', stderr: '' })
-    const core = { projects: { create, update }, git: { gitOrThrow } } as never
+    const core = { projects: { create, update, byGithub }, git: { gitOrThrow } } as never
     app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api', githubImport(plugin.db, core))
   })
 
@@ -43,19 +47,14 @@ describe('GitHub project importer', () => {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   }), env())
 
-  it('maps and defers through CoreServices with per-repository results', async () => {
-    const response = await post({ repositories: [
-      { repoId: 101, action: 'map', path: '/checkouts/map-me' },
-      { repoId: 103, action: 'defer' },
-    ] })
+  it('maps a folder through CoreServices with per-repository results', async () => {
+    const response = await post({ repositories: [{ repoId: 101, action: 'map', path: '/checkouts/map-me' }] })
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ results: [
       { repoId: 101, owner: 'acme', name: 'map-me', action: 'map', ok: true, projectId: 'map-me-/checkouts/map-me' },
-      { repoId: 103, owner: 'acme', name: 'defer-me', action: 'defer', ok: true, projectId: 'defer-me-deferred' },
     ] })
-    expect(create).toHaveBeenNthCalledWith(1, { name: 'map-me', path: '/checkouts/map-me' })
-    expect(update).toHaveBeenNthCalledWith(1, 'map-me-/checkouts/map-me', { githubRepoId: 101 })
-    expect(create).toHaveBeenNthCalledWith(2, { name: 'defer-me', path: null, github: { owner: 'acme', name: 'defer-me', repoId: 103 } })
+    expect(create).toHaveBeenCalledWith({ name: 'map-me', path: '/checkouts/map-me' })
+    expect(update).toHaveBeenCalledWith('map-me-/checkouts/map-me', { path: '/checkouts/map-me', githubRepoId: 101 })
   })
 
   it('clones through core.git with terminal prompts disabled and stamps the project', async () => {
@@ -67,26 +66,46 @@ describe('GitHub project importer', () => {
       { cwd: '/checkouts', env: { GIT_TERMINAL_PROMPT: '0' } },
     )
     expect(create).toHaveBeenCalledWith({ name: 'clone-me', path: '/checkouts/clone-me' })
-    expect(update).toHaveBeenCalledWith(expect.any(String), { githubRepoId: 102 })
+    expect(update).toHaveBeenCalledWith(expect.any(String), { path: '/checkouts/clone-me', githubRepoId: 102 })
+  })
+
+  // The duplicate this closes: an older import left a path-less placeholder for the repository, and
+  // mapping a folder afterwards produced a SECOND project for the same repo.
+  it('fills in a path-less project for the same repository instead of creating a rival', async () => {
+    byGithub.mockResolvedValue(ref('placeholder-id', null))
+    const response = await post({ repositories: [{ repoId: 103, action: 'map', path: '/checkouts/placeholder-me' }] })
+    expect((await response.json()).results[0]).toMatchObject({ ok: true, projectId: 'placeholder-id' })
+    expect(create).not.toHaveBeenCalled()
+    expect(update).toHaveBeenCalledWith('placeholder-id', { path: '/checkouts/placeholder-me', githubRepoId: 103 })
+  })
+
+  // Two clones of one repository are legal (schema.ts keeps projects_github_idx non-unique), so a
+  // project that already has a path must not be repointed by the next import.
+  it('creates a new project when the existing one is already a real checkout', async () => {
+    byGithub.mockResolvedValue(ref('existing-id', '/elsewhere/map-me'))
+    await post({ repositories: [{ repoId: 101, action: 'map', path: '/checkouts/map-me' }] })
+    expect(create).toHaveBeenCalledWith({ name: 'map-me', path: '/checkouts/map-me' })
   })
 
   it('fails a clone without prompting and continues returning a repository result', async () => {
     gitOrThrow.mockRejectedValueOnce(new Error('authentication required'))
     const response = await post({ repositories: [
       { repoId: 102, action: 'clone', parentDir: '/checkouts' },
-      { repoId: 103, action: 'defer' },
+      { repoId: 101, action: 'map', path: '/checkouts/map-me' },
     ] })
     const body = await response.json()
     expect(body.results).toEqual([
       { repoId: 102, owner: 'acme', name: 'clone-me', action: 'clone', ok: false, error: 'authentication required' },
-      { repoId: 103, owner: 'acme', name: 'defer-me', action: 'defer', ok: true, projectId: 'defer-me-deferred' },
+      { repoId: 101, owner: 'acme', name: 'map-me', action: 'map', ok: true, projectId: 'map-me-/checkouts/map-me' },
     ])
   })
 
   it('validates the mutation boundary and rejects unknown mirror candidates', async () => {
-    expect((await post({ repositories: [{ repoId: '101', action: 'defer' }] })).status).toBe(400)
-    const response = await post({ repositories: [{ repoId: 999, action: 'defer' }] })
+    expect((await post({ repositories: [{ repoId: '101', action: 'map', path: '/x' }] })).status).toBe(400)
+    // 'defer' was removed from the contract: not importing is what deferring meant.
+    expect((await post({ repositories: [{ repoId: 101, action: 'defer' }] })).status).toBe(400)
+    const response = await post({ repositories: [{ repoId: 999, action: 'map', path: '/x' }] })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ results: [{ repoId: 999, owner: '', name: '', action: 'defer', ok: false, error: 'Repository is not available in the GitHub mirror.' }] })
+    expect(await response.json()).toEqual({ results: [{ repoId: 999, owner: '', name: '', action: 'map', ok: false, error: 'Repository is not available in the GitHub mirror.' }] })
   })
 })

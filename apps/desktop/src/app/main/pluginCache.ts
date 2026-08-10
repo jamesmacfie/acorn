@@ -76,6 +76,28 @@ export class PluginCache {
     return { ...this.entries() }
   }
 
+  /** Cache client code read directly from this app's packaged resources. Unlike putFromNode there is
+   * no remote hash claim to verify; the content hash computed here is the identity trusted by main. */
+  putBundled(pluginId: string, version: string, bytes: Uint8Array): string {
+    if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
+    const hash = createHash('sha256').update(bytes).digest('hex')
+    this.writeBundle(hash, bytes)
+    const now = Date.now()
+    const existing = this.entries()[hash]
+    this.writeIndex({
+      ...this.entries(),
+      [hash]: {
+        pluginId,
+        version,
+        bytes: bytes.byteLength,
+        nodeIds: existing?.nodeIds ?? [],
+        firstSeen: existing?.firstSeen ?? now,
+        lastSeen: now,
+      },
+    })
+    return hash
+  }
+
   // Main-only. Phase 3's `app-plugin://` handler is the caller; this never crosses contextBridge.
   path(hash: string): string | null {
     return this.has(hash) ? join(this.dir, `${hash}.js`) : null

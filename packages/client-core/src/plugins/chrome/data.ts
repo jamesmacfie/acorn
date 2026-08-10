@@ -7,6 +7,7 @@ import type {
 } from '@acorn/protocol/api.ts'
 import { readJson } from '../../apiClient'
 import { wsOnStatus } from '../../wsClient'
+import { ownsTaskOrigin } from './ownership'
 
 // Reading a descriptor's route, and knowing when to read it again
 // (docs/plugins.md).
@@ -86,6 +87,14 @@ export function unwatchChrome(): void {
 export const chromeKey = (pluginId: string, contributionId: string): readonly unknown[] =>
   ['plugin-chrome', pluginId, contributionId]
 
+/** Add the shell's active project without letting a plugin choose another node or namespace. Extra
+ * query parameters are advisory scope; plugins that are not project-aware simply ignore them. */
+export const scopedSourceItemsPath = (path: string, projectId: string | undefined): string => {
+  if (!projectId) return path
+  const separator = path.includes('?') ? '&' : '?'
+  return `${path}${separator}project=${encodeURIComponent(projectId)}`
+}
+
 async function read<T>(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<T> {
   if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not read ${path}`)
   return readJson<T>(path, { nodeId, signal })
@@ -96,36 +105,57 @@ const opt = (value: unknown): boolean => value === undefined || str(value)
 const stringRecord = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value)
   && Object.values(value).every((entry) => typeof entry === 'string')
 
-const isTask = (value: unknown): boolean => {
-  if (value === undefined) return true
-  if (!value || typeof value !== 'object') return false
-  const task = value as NonNullable<PluginRailItem['task']>
-  if (!opt(task.title) || !opt(task.branch) || !opt(task.body)) return false
-  if (task.link === undefined) return true
-  if (!task.link || typeof task.link !== 'object') return false
-  const ref = task.link.ref
-  return str(task.link.connectionId) && str(task.link.identifier)
-    && (ref === undefined || (
-      !!ref && typeof ref === 'object' && str(ref.displayId)
-      && opt(ref.externalId) && opt(ref.url)
-      && (ref.locator === undefined || stringRecord(ref.locator))
-    ))
-}
-
 const drop = (pluginId: string, what: string, row: unknown): void =>
   console.warn(`[plugin-chrome] ${pluginId} returned an unusable ${what}:`, row)
 
-const isRailItem = (row: unknown): row is PluginRailItem => {
+const railLink = (value: unknown): NonNullable<NonNullable<PluginRailItem['task']>['link']> | undefined => {
+  if (!value || typeof value !== 'object') return undefined
+  const link = value as NonNullable<NonNullable<PluginRailItem['task']>['link']>
+  const ref = link.ref
+  if (!str(link.connectionId) || !str(link.identifier)) return undefined
+  if (ref !== undefined && (!ref || typeof ref !== 'object' || !str(ref.displayId)
+    || !opt(ref.externalId) || !opt(ref.url)
+    || (ref.locator !== undefined && !stringRecord(ref.locator)))) return undefined
+  return link
+}
+
+/** Parse plugin row data field by field. A malformed optional task claim loses that claim; it does
+ * not get to erase an otherwise useful row from the host-owned source list. */
+export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem | null => {
   const item = row as PluginRailItem
-  return !!item && typeof item === 'object'
-    && str(item.id) && str(item.title) && opt(item.subtitle) && opt(item.icon) && opt(item.badge)
-    && isTask(item.task)
+  if (!item || typeof item !== 'object' || !str(item.id) || !str(item.title)
+    || !opt(item.subtitle) || !opt(item.icon) || !opt(item.badge)) return null
+  if (!item.task || typeof item.task !== 'object') {
+    return { id: item.id, title: item.title, ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
+      ...(str(item.icon) ? { icon: item.icon } : {}), ...(str(item.badge) ? { badge: item.badge } : {}) }
+  }
+  const task = item.task
+  const link = railLink(task.link)
+  return {
+    id: item.id,
+    title: item.title,
+    ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
+    ...(str(item.icon) ? { icon: item.icon } : {}),
+    ...(str(item.badge) ? { badge: item.badge } : {}),
+    task: {
+      ...(str(task.origin) && ownsTaskOrigin(pluginId, task.origin) ? { origin: task.origin } : {}),
+      ...(str(task.title) ? { title: task.title } : {}),
+      ...(str(task.branch) ? { branch: task.branch } : {}),
+      ...(str(task.body) ? { body: task.body } : {}),
+      ...(link ? { link } : {}),
+    },
+  }
 }
 
 export async function readRailItems(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<PluginRailItem[]> {
   const body = await read<{ items?: unknown }>(pluginId, path, nodeId, signal)
   const rows = Array.isArray(body?.items) ? body.items : []
-  return rows.filter((row) => isRailItem(row) || (drop(pluginId, 'rail item', row), false)) as PluginRailItem[]
+  return rows.flatMap((row) => {
+    const item = sanitizeRailItem(pluginId, row)
+    if (item) return [item]
+    drop(pluginId, 'rail item', row)
+    return []
+  })
 }
 
 const TONES = new Set(['neutral', 'accent', 'warn'])

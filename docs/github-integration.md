@@ -5,7 +5,9 @@ integration credential and its repositories/PRs are a disposable local mirror.
 
 ## Connecting
 
-Settings → Integrations runs the OAuth device authorization flow:
+Settings → Integrations and the first-run wizard both run the OAuth device authorization flow, through
+the same `createDeviceFlow` helper in `packages/client-core/src/integrations/deviceFlow.ts` — the
+polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated once:
 
 1. `POST /v2/p/github/auth/device/start` asks GitHub for a device code.
 2. The owner enters the user code at GitHub's verification URI.
@@ -36,11 +38,19 @@ value.
 
 ## Importing projects
 
-Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. Each selected
-repository can be mapped to an existing folder, cloned with non-interactive Git, or deferred as a
-path-null project carrying its GitHub facet. The importer returns an individual result for every
-repository, so a failed clone does not hide successful imports. The mirror remains disposable candidate
-data; project identity, checkout paths, and default branches come from core project facets and services.
+Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. A repository
+is either mapped to an existing folder or cloned with non-interactive Git; both ask for the folder
+before anything is written, so cancelling the dialog cancels the import. There is no third "defer"
+action — not importing a repository is what deferring meant, and the path-null placeholder project it
+created became a duplicate as soon as the same repository was mapped later.
+
+For that reason an import that finds an existing **path-null** project for the repository fills that
+one in rather than adding a second. A project that already has a path is a real checkout, and two
+clones of one repository stay legal (`projects_github_idx` is deliberately non-unique).
+
+The importer returns an individual result for every repository, so a failed clone does not hide
+successful imports. The mirror remains disposable candidate data; project identity, checkout paths, and
+default branches come from core project facets and services.
 
 Closed PR lists are paginated live provider reads. Open lists, details, and files use the local mirror
 with explicit force-refresh support. GraphQL errors and provider authorization failures are mapped to

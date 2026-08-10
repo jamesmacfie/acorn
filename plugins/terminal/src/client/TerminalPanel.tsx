@@ -5,7 +5,7 @@ import { activeTerminal, addSession, clientEvents, consumeTerminalFocusIntent, i
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
-import { registerKeybindings } from '@acorn/plugin-api/ui'
+import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 

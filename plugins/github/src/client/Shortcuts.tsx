@@ -3,7 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
 import { createOverlayPalette, fuzzyScore, projectsOptions, registerCommands } from '@acorn/plugin-api/client'
 import type { PullFile } from '../contract/api'
-import { registerKeybindings } from '@acorn/plugin-api/ui'
+import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { createQuery } from '@tanstack/solid-query'
 import { githubCreateRoute } from './routes'
 
