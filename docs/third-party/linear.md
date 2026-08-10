@@ -153,15 +153,32 @@ The frame CSP is `default-src 'none'` with `img-src 'self' data:`, and the ifram
 
 - **Remote images do not load.** A Linear description with an uploaded screenshot shows a broken
   image. Nothing to be done from the plugin side, and punching a hole for `uploads.linear.app` would
-  be an odd first exception.
-- **External links are inert.** `target="_blank"` cannot open a tab, and there is no bridge verb for
-  "open this in the browser" — `openUrl` is a *descriptor* verb the host executes, not something a
-  frame can ask for. The affordances are `Copy link` buttons using `bridge.ui.copy`, which is honest
-  but worse than the "Open in Linear ↗" anchor it replaces.
+  be an odd first exception. Still true.
+- **External links were inert.** `target="_blank"` cannot open a tab, and there was no bridge verb for
+  "open this in the browser" — `openUrl` was a *descriptor* verb the host executes, not something a
+  frame could ask for. So every link in a ticket description was dead, which for a Linear ticket is
+  most of it.
 
-A bridge `ui.openUrl` restricted to `https://` would close the second one and would be the same
-decision `openUrl` already made for descriptors. Not taken here, because it is a bridge-surface
-addition and this was a migration.
+**Closed.** The bridge gained `ui.openUrl`, restricted to `https` by the same shared policy the
+descriptor verb uses (`@acorn/protocol/externalUrl.ts`), plus `openLinkOnClick` in the SDK so no frame
+hand-rolls the anchor plumbing. The frame passes a URL; the host validates the scheme at the boundary and
+runs its ordinary content-link ladder — a GitHub PR in a description now resolves in-app or opens the
+owner's browser, and the presentation is inferred from the surface rather than requested by the frame
+(`docs/plugins.md`).
+
+Two things inside linear did *not* change, and both are decisions rather than leftovers:
+
+- **A `linear.app` ticket link is still re-pointed locally**, in `frame/app.tsx`, instead of going over
+  the port. The host would resolve it back into this same frame, but lossily: from a reference panel it
+  swaps the panel and remounts, losing the tab, the scroll position and the `← back` affordance; from the
+  project surface there is no task, so the pane rung cannot fire and the reader gets an overlay on top of
+  the ticket they are already reading.
+- **`Copy link` in the header stays, and "Open in Linear ↗" does not come back.** The reason changed
+  rather than went away. A frame cannot ask for "the browser specifically" — the host owns where a URL
+  goes, which is the whole shape of this tier — and the host's ladder correctly claims
+  `linear.app/…/issue/…` for in-app resolution. So the button would resolve to the ticket already on
+  screen. The clipboard remains the honest affordance for *that one URL*. Attachment links, which are
+  `github.com`/Figma/Sentry URLs and not self-references, are real anchors now.
 
 ### 6. A pane frame cannot say "only when this task links one of my items"
 

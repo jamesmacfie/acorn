@@ -78,6 +78,15 @@ origin can never become the whole window. `will-frame-navigate` keeps every subf
 blocked subframe URL is not offered to the system browser either. `setWindowOpenHandler` already
 denies `window.open` from anywhere, plugin frames included.
 
+A frame's rendered content therefore reaches the outside world only by *asking*, over the bridge:
+`ui.openUrl` hands an `https` URL to the shell, which resolves it in-app if a content-link recogniser
+claims it and otherwise calls `window.open` **from the renderer's own frame** — landing in
+`setWindowOpenHandler` and `shell.openExternal` behind the scheme allowlist, exactly as a descriptor's
+`openUrl` verb does. So this adds no navigation path in main and no exception to the two rules above: a
+blocked subframe navigation is still blocked, and the URL that reaches the OS arrived through the one
+handler that was already there. The frame is never told which of the two happened
+(`docs/plugins.md`).
+
 The renderer embeds these with `sandbox="allow-scripts allow-same-origin"`. `allow-same-origin` is
 required, not a lapse: the pair is only dangerous when the framed document shares the *embedder's*
 origin, and here the embedder is `app://acorn`. Dropping it makes the origin opaque, which breaks

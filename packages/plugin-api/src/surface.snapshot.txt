@@ -330,6 +330,7 @@ ui/sdk: AcornBridgeApi
 ui/sdk: AcornBridgeError
 ui/sdk: PluginFrameContext
 ui/sdk: connect
+ui/sdk: openLinkOnClick
 ui: Badge
 ui: Button
 ui: CopyButton

@@ -16,6 +16,7 @@ import {
   compileContentLinkPattern,
   CONTENT_LINK_PATTERN_MAX_LENGTH,
 } from '@acorn/protocol/contentLinkPattern.ts'
+import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import {
   isAllowedWebviewUrl,
   normalizeWebviewHost,
@@ -445,8 +446,10 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     }
     if (value.verb === 'runNodeAction') route(value.path, [...at, 'path'])
     // `openUrl` reaches the real browser. Anything but https is either a downgrade or a scheme handler,
-    // and neither is a thing a descriptor gets to choose for the user.
-    if (value.verb === 'openUrl' && !value.url.startsWith('https://')) {
+    // and neither is a thing a descriptor gets to choose for the user. Shared with the frame bridge's
+    // `ui.openUrl` verb rather than restated, because a plugin asking the host to open a URL is one
+    // policy however it asks (@acorn/protocol/externalUrl.ts).
+    if (value.verb === 'openUrl' && !isPluginOpenableUrl(value.url)) {
       ctx.addIssue({ code: 'custom', path: [...at, 'url'], message: 'openUrl must be https' })
     }
   }

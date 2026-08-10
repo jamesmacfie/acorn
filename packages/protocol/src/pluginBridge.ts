@@ -78,12 +78,19 @@ export type PluginBridgeStateRequest =
   | { id: number; kind: 'state.get'; key: string }
   | { id: number; kind: 'state.set'; key: string; value: unknown }
 
-// The closed verb set. Not "some UI operations": these five and nothing else, because each one is a
+// The closed verb set. Not "some UI operations": these six and nothing else, because each one is a
 // thing the host does on the frame's behalf in the host's own realm.
 export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'toast'; title: string; detail?: string }
   | { id: number; kind: 'ui'; op: 'copy'; text: string }
   | { id: number; kind: 'ui'; op: 'openPane'; paneId: string }
+  // Hand an `https` URL to the host, which then runs the same content-link ladder every shell surface
+  // runs: in-app when a recogniser claims it, the owner's browser otherwise. The frame passes a URL and
+  // learns nothing back — WHERE it lands, and which presentation it lands in, are the host's, because it
+  // is the side that knows which surface this port belongs to. A frame's anchor cannot navigate itself
+  // (the sandbox has no `allow-popups` and `will-frame-navigate` pins every subframe to its own origin),
+  // so before this verb every link inside a frame's rendered content was inert.
+  | { id: number; kind: 'ui'; op: 'openUrl'; url: string }
   // Importer lifecycle, valid only from a frame whose surface is an importer. `done` closes the modal
   // and triggers the host's post-import refresh; `close` is plain dismissal.
   | { id: number; kind: 'ui'; op: 'importer.done' }

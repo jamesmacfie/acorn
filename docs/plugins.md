@@ -190,7 +190,23 @@ kinds of contribution come out of one manifest:
   call `openRefPanel({ providerId, displayId })` and get any provider's panel. One at a time, on
   purpose — a stack of reference panels is a navigation history, which is what panes and routes are for
   — and `openRefPanel` returns `false` rather than opening an empty overlay when that provider has no
-  panel installed on this device.
+  panel installed on this device. A panel's props name its subject `target`, never `ref`: `ref` is a
+  reserved JSX attribute that Solid compiles into a DOM setter, so a props member of that name silently
+  arrives as a function instead of data. `tools/arch/boundaries.test.ts` holds the line, because
+  TypeScript cannot — Solid declares `ref` on `IntrinsicAttributes`.
+
+  A link inside a frame's own rendered content reaches the shell through `bridge.ui.openUrl(url)`,
+  because the anchor itself cannot go anywhere: the iframe has no `allow-popups` and Electron pins every
+  subframe to its own origin. The frame passes a URL and learns nothing back. The host validates the
+  scheme at the boundary — `https` only, the same policy a manifest's `openUrl` descriptor verb is held
+  to (`@acorn/protocol/externalUrl.ts`), so `file:`, `javascript:`, `data:` and the frame's own
+  `app-plugin://` origin are all refused — and then runs the same content-link ladder every shell surface
+  runs: in-app when a recogniser claims the URL, the owner's browser otherwise. *Which* in-app
+  presentation is inferred from the calling surface, not asked of the frame: a link clicked inside a
+  reference panel swaps that panel's subject, and one inside a pane opens the pane. The SDK's
+  `openLinkOnClick(bridge, event)` is the delegated anchor handler on top of it, so a frame does not
+  hand-roll the plumbing; unlike the shell's equivalent it takes modified clicks too, because in a frame
+  there is no browser default for cmd-click to preserve.
 - **Webviews** — a host-drawn pane backed by an Electron-main `WebContentsView`. A surface declares
   exactly one literal `url` or plugin-owned `urlSource` plus a non-empty `hosts` allowlist. HTTPS is
   required except for `localhost`, `127.0.0.1`, and `::1`; the renderer broker validates requested

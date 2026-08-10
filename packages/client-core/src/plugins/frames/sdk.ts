@@ -66,6 +66,15 @@ export type AcornBridge = {
     copy(text: string): Promise<void>
     /** Open another of this plugin's own panes. */
     openPane(paneId: string): Promise<void>
+    /**
+     * Hand an `https` URL to the host. It resolves in-app when something recognises it — another
+     * provider's reference panel, a task pane — and opens the owner's browser otherwise. Anything but
+     * `https` is refused, and the promise resolving says only that the host accepted the URL: which of
+     * those happened is not the frame's business, because the frame does not know which surface it is.
+     *
+     * Prefer `openLinkOnClick` below for anchors in rendered content; this is the verb underneath it.
+     */
+    openUrl(url: string): Promise<void>
     /** Importer surfaces only: finish, letting the host close the modal and refresh. */
     done(): Promise<void>
     /** Importer surfaces only: dismiss without having imported anything. */
@@ -270,6 +279,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         toast: async (title, detail) => void (await request({ kind: 'ui', op: 'toast', title, ...(detail === undefined ? {} : { detail }) })),
         copy: async (text) => void (await request({ kind: 'ui', op: 'copy', text })),
         openPane: async (paneId) => void (await request({ kind: 'ui', op: 'openPane', paneId })),
+        openUrl: async (url) => void (await request({ kind: 'ui', op: 'openUrl', url })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),
         close: async () => void (await request({ kind: 'ui', op: 'importer.close' })),
       },
@@ -305,6 +315,41 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       },
     }
   })
+}
+
+/**
+ * Delegated click handler for anchors inside a frame's own rendered content — a ticket description, a
+ * comment, an error body. Returns whether the click was taken.
+ *
+ * Here rather than left to each frame because the plumbing is identical everywhere and the wrong version
+ * of it is silent: an anchor in a frame cannot navigate anything (the iframe sandbox has no
+ * `allow-popups`, and Electron pins every subframe to its own origin), so a frame that forgets this
+ * handler renders links that simply do nothing. One helper beats every plugin rediscovering that.
+ *
+ * On @acorn/plugin-api/ui/sdk beside `connect`, and NOT on the /ui barrel beside `renderMarkdown`, even
+ * though the two are used on the same line. `renderMarkdown` qualifies there because it is pure — text
+ * in, markup out — while this needs the bridge, and /ui is a barrel of Solid components that a
+ * non-Solid frame must be able to skip entirely. The sdk is what every frame already imports.
+ *
+ * Modified clicks are taken too, unlike the shell's equivalent (client-core/registries/contentLinks.ts),
+ * and that difference is deliberate: in the shell a cmd-click is the reader asking for a browser tab, so
+ * the anchor's default is preserved. In a frame there is no default to preserve — the sandbox swallows
+ * it — so treating a cmd-click as a plain click is the difference between working and dead.
+ *
+ * A non-https href is left alone. `mailto:` is the honest casualty: `renderMarkdown` allows it, the
+ * bridge verb does not, and a frame cannot open a mail client any more than it can open a tab.
+ */
+export function openLinkOnClick(bridge: AcornBridge, event: MouseEvent): boolean {
+  if (event.defaultPrevented || event.button !== 0) return false
+  const href = (event.target as HTMLElement | null)?.closest?.('a')?.getAttribute('href')
+  // The same scheme test the host will apply. Checked here as well so a link the host would refuse keeps
+  // its (inert) default rather than becoming a denied bridge call and a console error per click.
+  if (!href?.trim().toLowerCase().startsWith('https://')) return false
+  event.preventDefault()
+  void bridge.ui.openUrl(href).catch((error: unknown) => {
+    console.error(`[acorn] could not open ${href}:`, error)
+  })
+  return true
 }
 
 /** Test seam. `connect()` memoizes a per-frame connection, and a suite that asserts on one handshake
