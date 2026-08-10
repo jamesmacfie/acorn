@@ -73,6 +73,45 @@ export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): s
     .sort((a, b) => a.surface.localeCompare(b.surface))
     .map((grant) => `Show web pages from ${[...grant.hosts].sort().join(', ')} in the "${grant.label}" pane`)
 
+// How a line is DRAWN, keyed off the sentences above. Presentation only: an icon that helps a reader
+// skim, and `high` for the handful of grants that deserve to survive a skim — credentials, running
+// commands, and the two that hand over where code lives on disk.
+//
+// Keyed off the copy rather than threading a second value out of every describe* function in three
+// files. The strings are host-owned constants, so the failure mode of a rewording is a neutral icon
+// on one row — cosmetic, not a wrong claim. Keep this table next to the copy it reads.
+const LINE_STYLES: readonly (readonly [prefix: string, icon: string, high?: boolean])[] = [
+  ['Use your saved credentials', 'key-round', true],
+  ['Run commands on the node', 'square-terminal', true],
+  ['Read projects, including where every codebase lives on disk', 'folder-tree', true],
+  ['Read every project’s build, dev and database scripts', 'file-cog', true],
+  ['Create and update projects', 'folder-plus', true],
+  ['Reach ', 'globe'],
+  ['Read and write task files', 'file-text'],
+  ['Read repository history and run Git commands', 'git-branch'],
+  ['Read task details', 'list'],
+  ['Read task launch context', 'info'],
+  ['Generate text with configured model providers', 'sparkles'],
+  ['Read and write this plugin’s saved state', 'database'],
+  ['Read the node owner identity', 'user-round'],
+  ['Use capability ', 'puzzle'],
+  ['Create and update tasks', 'square-pen'],
+  ['Read tasks', 'list'],
+  ['Read workspaces', 'layout-grid'],
+  ['Receive ', 'radio'],
+  ['Show web pages from ', 'app-window'],
+  ['Handle ', 'keyboard'],
+]
+
+export type PermissionLineStyle = { icon: string; high: boolean }
+
+export const permissionLineStyle = (text: string): PermissionLineStyle => {
+  // The ignored line opens with a count, so it is the one entry that cannot be matched by prefix.
+  if (text.includes('does not recognise')) return { icon: 'circle-dashed', high: false }
+  const hit = LINE_STYLES.find(([prefix]) => text.startsWith(prefix))
+  return { icon: hit?.[1] ?? 'shield', high: hit?.[2] ?? false }
+}
+
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   pluginKeyClaimGrants(contributions)
 

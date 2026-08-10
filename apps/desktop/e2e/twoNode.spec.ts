@@ -589,16 +589,17 @@ test('asks before running a plugin a paired node serves, then caches it for offl
   await expect(dialog).toContainText(PLUGIN_ID)
   await expect(dialog).toContainText('1.4.0')
   await expect(dialog).toContainText('Second node')
-  // Two headed groups, labelled by enforcement level (phase 5). The node block is *declared* and says
-  // so; the UI scopes are enforced by the bridge. Asserting the headings as well as the lines, because
-  // collapsing them back into one list is the specific regression that would matter here.
-  await expect(dialog).toContainText('On the node — declared, not enforced')
-  await expect(dialog).toContainText('Read projects, including where every codebase lives on disk')
-  await expect(dialog).toContainText("This plugin's server code runs with the same access as acorn itself.")
-  await expect(dialog).toContainText('In this app — enforced')
-  await expect(dialog).toContainText('Read tasks')
+  // Two separate groups, labelled by enforcement level (phase 5). The node block is *declared*; the UI
+  // scopes are enforced by the bridge. Asserting the two lists exist SEPARATELY, because collapsing
+  // them back into one is the specific regression that would matter here — a strong claim must not
+  // lend credibility to a weaker one. The legend is where the two words are defined.
+  await expect(dialog.locator('.plugin-trust-permissions[data-tier="declared"]')).toContainText(
+    'Read projects, including where every codebase lives on disk',
+  )
+  await expect(dialog.locator('.plugin-trust-permissions[data-tier="enforced"]')).toContainText('Read tasks')
+  await expect(dialog.locator('.plugin-trust-legend')).toContainText('acorn can’t check it')
 
-  await dialog.getByRole('button', { name: 'Trust this plugin' }).click()
+  await dialog.getByRole('button', { name: /^Trust/ }).click()
   await expect(dialog).toHaveCount(0)
 
   // Main computed the hash from the bytes it received, and the acknowledgement is bound to THAT.

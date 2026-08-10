@@ -1,12 +1,13 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { nodes } from '../node/fleet'
+import Icon from '../ui/Icon'
 import { createDismissable } from '../ui/dismissable'
 import { noteBundleAccepted, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
 import {
   keyClaimGrants,
   keyClaimPermissionLines,
   nodePermissionLines,
+  permissionLineStyle,
   uiPermissionLines,
   webviewGrants,
   webviewPermissionLines,
@@ -19,17 +20,23 @@ import './plugin-trust.css'
 // The consent surface for running code a node handed this device
 // (docs/plugins.md).
 //
-// Modelled on ConfigTrustDialog: same overlay slot, same alertdialog semantics, same "Not now"
+// Modelled on ConfigTrustDialog: same overlay slot, same alertdialog semantics, same "not now"
 // escape. The difference is scope. Config trust binds a project to the hash of a config the NODE will
 // execute; this binds a plugin to the hash of a bundle THIS DEVICE will execute, which is why the
 // acknowledgement lives beside the device token rather than in the node's database and why pairing a
 // new laptop asks again.
 //
-// The wording says DECLARED, not enforced, everywhere permissions appear. Until loaded plugins move
-// out of process, the node block shapes a plugin's `ctx` and is disclosed — it does not contain a
-// bundle that simply imports `node:fs` (docs/security.md § Design rules, rule 6).
-// The same UI flips to "enforced" with no vocabulary change when that boundary lands, which is the
-// payoff for being blunt about it now.
+// Three groups, and the split between them is the whole point (docs/security.md § Design rules,
+// rule 6). `Enforced` is a fence: the UI bridge refuses anything undeclared. `Declared` is a
+// disclosure and nothing more — that code shares the node's process and can ignore its manifest
+// entirely. `Web pages` is enforced by Electron but reaches the live internet, so it is neither of
+// the other two. The vocabulary is defined once in the legend rather than being spelled out on every
+// heading, and the groups may never be rendered as one list: a strong claim must not lend
+// credibility to a weaker one sitting next to it.
+
+type TierKey = 'enforced' | 'declared' | 'web'
+
+const TIER_LABEL: Record<TierKey, string> = { enforced: 'Enforced', declared: 'Declared', web: 'Web pages' }
 
 export default function PluginTrustDialog() {
   const [saving, setSaving] = createSignal(false)
@@ -38,32 +45,49 @@ export default function PluginTrustDialog() {
   const request = (): PluginTrustRequest | undefined => pendingTrust()[0]
   const nodeLabel = (nodeId: string) => nodes().find((node) => node.nodeId === nodeId)?.label ?? nodeId
 
-  // On an update, everything the plugin did NOT have before is marked. An unchanged permission set
-  // renders plain, so "nothing new is being asked for" reads at a glance.
-  const group = (project: (permissions: NodePluginPermissions) => string[]) =>
-    createMemo(() => {
-      const current = request()
-      if (!current?.row.installed) return []
-      const before = current.previous ? new Set(project(current.previous.permissions)) : null
-      return project(current.row.installed.permissions).map((text) => ({ text, added: before ? !before.has(text) : false }))
+  // Every declared line, decorated with the tier that owns it and — on an update — whether the
+  // version the owner last approved had it. The diff is still set-difference over the permission
+  // STRINGS (plugins/permissions.ts states why the wording is the key).
+  const tiers = createMemo(() => {
+    const current = request()
+    const installed = current?.row.installed
+    if (!installed) return []
+    const previous = current?.previous
+    const groups: { key: TierKey; now: readonly string[]; was: readonly string[] | null }[] = [
+      {
+        key: 'enforced',
+        now: [...uiPermissionLines(installed.permissions), ...keyClaimPermissionLines(keyClaimGrants(installed.contributions))],
+        was: previous ? [...uiPermissionLines(previous.permissions), ...keyClaimPermissionLines(previous.keyClaims ?? [])] : null,
+      },
+      {
+        key: 'declared',
+        now: nodePermissionLines(installed.permissions),
+        was: previous ? nodePermissionLines(previous.permissions) : null,
+      },
+      {
+        key: 'web',
+        now: webviewPermissionLines(webviewGrants(installed.contributions)),
+        was: previous ? webviewPermissionLines(previous.webviews ?? []) : null,
+      },
+    ]
+    return groups.map(({ key, now, was }) => {
+      const before = was ? new Set(was) : null
+      return {
+        key,
+        lines: now.map((text) => ({ text, tier: key, added: before ? !before.has(text) : false, ...permissionLineStyle(text) })),
+      }
     })
+  })
 
-  const nodeLines = group(nodePermissionLines)
-  const uiLines = group(uiPermissionLines)
-  const webviewLines = createMemo(() => {
-    const current = request()
-    if (!current?.row.installed) return []
-    const lines = webviewPermissionLines(webviewGrants(current.row.installed.contributions))
-    const before = current.previous ? new Set(webviewPermissionLines(current.previous.webviews ?? [])) : null
-    return lines.map((text) => ({ text, added: before ? !before.has(text) : false }))
-  })
-  const keyClaimLines = createMemo(() => {
-    const current = request()
-    if (!current?.row.installed) return []
-    const lines = keyClaimPermissionLines(keyClaimGrants(current.row.installed.contributions))
-    const before = current.previous ? new Set(keyClaimPermissionLines(current.previous.keyClaims ?? [])) : null
-    return lines.map((text) => ({ text, added: before ? !before.has(text) : false }))
-  })
+  const has = (key: TierKey) => tiers().some((tier) => tier.key === key && tier.lines.length > 0)
+  // What an update is actually about. Leading with it is the reason an update re-prompts at all.
+  const addedLines = createMemo(() => tiers().flatMap((tier) => tier.lines.filter((line) => line.added)))
+  const keptTiers = createMemo(() =>
+    tiers()
+      .map((tier) => ({ ...tier, lines: tier.lines.filter((line) => !line.added) }))
+      .filter((tier) => tier.lines.length > 0),
+  )
+  const previousVersion = () => request()?.previous?.version
 
   const decide = async (decision: 'accepted' | 'rejected') => {
     const current = request()
@@ -100,16 +124,33 @@ export default function PluginTrustDialog() {
   }
 
   let dialog!: HTMLElement
-  // Dismissing is "not now", never "yes". A prompt the owner clicked past re-appears at the next
-  // boot, because nothing has been decided.
-  const dismiss = createDismissable({ onDismiss: () => void decide('rejected'), container: () => dialog })
+  // Escape is "not now", and it records NOTHING. It used to call decide('rejected'), which is a
+  // remembered answer (main/pluginTrustStore.ts: a rejection is kept so a turned-away plugin does not
+  // ask every boot) — so a stray keypress permanently disabled a plugin, with no surface anywhere to
+  // undo it. Dropping the queue entry leaves the bundle undecided, which is what brings it back at the
+  // next boot pass, and is what the footer promises.
+  const dismiss = createDismissable({
+    onDismiss: () => {
+      const current = request()
+      if (current) resolvePendingTrust(current.row.name, current.hash)
+    },
+    container: () => dialog,
+  })
 
   return (
     <Show when={request()}>
       {(current) => (
         <div class="overlay-backdrop">
           <section
-            ref={dialog}
+            ref={(el) => {
+              dialog = el
+              // This prompt appears on its own at the end of a boot pass rather than from a click, so
+              // nothing has moved focus into it — and Escape is handled ON this element, as is the Tab
+              // trap. Without this the footer's promise is simply false and Tab walks the page behind.
+              // Bare `autofocus` is unreliable under Solid; queueMicrotask is the pattern that holds.
+              queueMicrotask(() => el.focus())
+            }}
+            tabindex="-1"
             class="overlay plugin-trust-dialog"
             role="alertdialog"
             aria-modal="true"
@@ -117,65 +158,124 @@ export default function PluginTrustDialog() {
             onClick={dismiss.onContainerClick}
             onKeyDown={dismiss.onKeyDown}
           >
-            <div class="overlay-title" id="plugin-trust-title">
-              {current().previous ? 'A plugin has been updated' : 'Run a plugin from this node?'}
-            </div>
+            <div class="overlay-title">{previousVersion() ? 'Plugin update' : 'Plugin trust'}</div>
             <div class="overlay-body plugin-trust-body">
-              <p>
-                <strong>{current().row.name}</strong> <span class="muted">{current().row.installed?.version}</span>
-                {' came from '}
-                <strong>{nodeLabel(current().nodeId)}</strong>.
-                <Show when={current().previous}>
-                  {(previous) => <> You last approved version {previous().version}.</>}
+              <header class="plugin-trust-identity">
+                <span class="plugin-trust-glyph" aria-hidden="true">{current().row.name.slice(0, 1).toUpperCase()}</span>
+                <div>
+                  <h2 id="plugin-trust-title">
+                    <code>{current().row.name}</code>
+                    {previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
+                  </h2>
+                  <p class="plugin-trust-meta">
+                    <span class="ui-badge" data-size="xs">
+                      {previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}
+                    </span>
+                    <span class="ui-badge" data-size="xs">
+                      <Icon name="monitor" /> from {nodeLabel(current().nodeId)}
+                    </span>
+                    <Show when={!previousVersion()}><span class="ui-badge" data-size="xs">first time</span></Show>
+                  </p>
+                </div>
+              </header>
+
+              <p class="muted plugin-trust-intro">
+                <Show
+                  when={previousVersion()}
+                  fallback="None of its code has run yet. Review what it asks for below — you’ll only be asked once for this version."
+                >
+                  {(version) => (
+                    <Show
+                      when={addedLines().length}
+                      fallback={`You last approved ${version()}. This version asks for nothing new — its code changed, which is why you’re being asked again.`}
+                    >
+                      {`You last approved ${version()}. This version asks for ${addedLines().length === 1 ? 'one thing' : `${addedLines().length} things`} it did not have before; everything else is unchanged.`}
+                    </Show>
+                  )}
                 </Show>
               </p>
+
               <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
 
-              <h3>On the node — declared, not enforced</h3>
-              <Show when={nodeLines().length} fallback={<p class="muted">Nothing declared.</p>}>
-                <ul class="plugin-trust-permissions">
-                  <For each={nodeLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
-                </ul>
+              <Show when={addedLines().length}>
+                <section class="plugin-trust-group" data-tier="new">
+                  <h3><span class="plugin-trust-dot" aria-hidden="true" />New in this version</h3>
+                  <ul class="plugin-trust-permissions" data-tier="new">
+                    <For each={addedLines()}>
+                      {(line) => (
+                        <li class="added" classList={{ high: line.high }}>
+                          <Icon name={line.icon} />
+                          <span>{line.text}</span>
+                          <span class="ui-badge" data-size="xs" data-tone={line.tier === 'declared' ? 'warn' : 'accent'}>
+                            {TIER_LABEL[line.tier]}
+                          </span>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </section>
               </Show>
-              {/* The canonical wording, verbatim from docs/security.md. It is the whole
-                  truth about the list above and it must not be softened: this is the one sentence
-                  standing between an owner and a plugin that reads ~/.ssh. */}
-              <p class="muted">This plugin's server code runs with the same access as acorn itself.</p>
 
-              <h3>In this app — enforced</h3>
-              <Show when={uiLines().length || keyClaimLines().length} fallback={<p class="muted">Nothing declared.</p>}>
-                <ul class="plugin-trust-permissions">
-                  <For each={uiLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
-                  <For each={keyClaimLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
-                </ul>
+              {/* On an update the unchanged grants fold away, so the two lines that changed are not
+                  buried in the twenty that did not. On a first install there is nothing to fold. */}
+              <Show
+                when={addedLines().length}
+                fallback={<For each={keptTiers()}>{(tier) => <TierGroup tier={tier} />}</For>}
+              >
+                <Show when={keptTiers().length}>
+                  <details class="plugin-trust-unchanged">
+                    <summary>Everything {previousVersion()} already had — unchanged</summary>
+                    <For each={keptTiers()}>{(tier) => <TierGroup tier={tier} />}</For>
+                  </details>
+                </Show>
               </Show>
-              <p class="muted">
-                Its interface runs in a sandbox with no network of its own. Anything not listed here is
-                refused.
+
+              {/* The vocabulary, once. `Declared` is the honest half and says so here rather than in a
+                  heading nobody reads twice (docs/security.md § Node-half plugin security). */}
+              <p class="muted plugin-trust-legend">
+                <Show when={has('enforced')}>
+                  <span><strong>Enforced</strong> — acorn checks these; its interface runs in a sandbox and anything not listed is refused.</span>
+                </Show>
+                <Show when={has('declared')}>
+                  <span><strong>Declared</strong> — the plugin’s own description of what its server code touches; acorn can’t check it.</span>
+                </Show>
+                <Show when={has('web')}>
+                  <span><strong>Web pages</strong> — these load from the internet with their own cookies and logins. The plugin cannot read them or type into them.</span>
+                </Show>
               </p>
-
-              <Show when={webviewLines().length}>
-                <h3>Shows web pages — enforced hosts, live network</h3>
-                <ul class="plugin-trust-permissions">
-                  <For each={webviewLines()}>{(line) => <li classList={{ added: line.added }}>{line.text}</li>}</For>
-                </ul>
-                <p class="muted">
-                  Pages load from the internet with their own cookies and logins. acorn cannot see inside
-                  them, and this plugin cannot read them or type into them.
-                </p>
-              </Show>
             </div>
-            <div class="overlay-actions">
+            <div class="ui-modal-actions plugin-trust-actions">
+              <p class="plugin-trust-escape">
+                Not sure? Press <kbd>Esc</kbd> — {previousVersion() ? `${previousVersion()} keeps running and ` : ''}acorn asks again next launch.
+              </p>
               <button type="button" class="ui-btn" data-variant="ghost" disabled={saving()} onClick={() => void decide('rejected')}>
-                Don't run it
+                {previousVersion() ? `Keep ${previousVersion()}` : 'Don’t run it'}
               </button>
               <button type="button" class="ui-btn" disabled={saving()} onClick={() => void decide('accepted')}>
-                {saving() ? 'Saving…' : current().previous ? 'Trust the update' : 'Trust this plugin'}
+                {saving() ? 'Saving…' : previousVersion() ? 'Trust the update' : `Trust ${current().row.name} ${current().row.installed?.version}`}
               </button>
             </div>
           </section>
         </div>
       )}
     </Show>
+  )
+}
+
+function TierGroup(props: { tier: { key: TierKey; lines: readonly { text: string; icon: string; high: boolean }[] } }) {
+  return (
+    <section class="plugin-trust-group" data-tier={props.tier.key}>
+      <h3><span class="plugin-trust-dot" aria-hidden="true" />{TIER_LABEL[props.tier.key]}</h3>
+      <ul class="plugin-trust-permissions" data-tier={props.tier.key}>
+        <For each={props.tier.lines}>
+          {(line) => (
+            <li classList={{ high: line.high }}>
+              <Icon name={line.icon} />
+              <span>{line.text}</span>
+            </li>
+          )}
+        </For>
+      </ul>
+    </section>
   )
 }

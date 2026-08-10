@@ -157,7 +157,7 @@ test('the loaded Rollbar package renders native rows and its real sandbox frame'
   await expect(trust).toBeVisible({ timeout: 60_000 })
   await expect(trust).toContainText('Read tasks')
   await expect(trust).toContainText('api.rollbar.com')
-  await trust.getByRole('button', { name: 'Trust this plugin' }).click()
+  await trust.getByRole('button', { name: /^Trust/ }).click()
 
   const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Rollbar' } })
   const project = await nodeJson<{ project: { id: string } }>(page, '/v2/core/projects', {

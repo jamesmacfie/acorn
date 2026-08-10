@@ -249,7 +249,7 @@ async function openPluginPane(webviewUrl?: string): Promise<Running & { frame: F
     await expect(dialog).toContainText('Show web pages from localhost in the "E2E docs" pane')
     await expect(dialog).toContainText('Pages load from the internet with their own cookies and logins.')
   }
-  await dialog.getByRole('button', { name: 'Trust this plugin' }).click()
+  await dialog.getByRole('button', { name: /^Trust/ }).click()
   await expect(dialog).toHaveCount(0)
 
   const workspace = await nodeJson<{ id: string }>(running.page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Frames' } })
