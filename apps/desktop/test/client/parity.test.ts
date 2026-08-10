@@ -13,8 +13,11 @@ import { clientPlugins } from '../../src/app/client/plugins'
 initClientPlugins(clientPlugins)
 for (const source of coreSourceContributions) sourceRegistry.register(source)
 
-// Compiled-client parity: the 12 built-in panes with their shipped order and chords. Loaded frames
-// are asserted by their package/e2e coverage instead of being smuggled back into this static graph.
+// Compiled-client parity: the built-in panes with their shipped order and chords. Loaded frames are
+// asserted by their package/e2e coverage instead of being smuggled back into this static graph — which is
+// why `linear` (90, ⌘⇧L) is absent even though the pane and its chord still exist: both are manifest
+// data now, in apps/node/scripts/build-plugin.mjs, and the chord is still unique because no compiled pane
+// may claim it.
 const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['pr', 10, 'meta+shift+r'],
   ['agents', 15, 'meta+shift+a'],
@@ -27,7 +30,6 @@ const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['docker', 75, undefined],
   ['http', 76, 'meta+shift+h'],
   ['preview', 80, 'meta+shift+b'],
-  ['linear', 90, 'meta+shift+l'],
 ]
 
 // Core Home is the stable default; Fleet is additive and gated on a second node. Provider browse sources
@@ -36,14 +38,13 @@ const SOURCES: Array<[id: string, order: number]> = [
   ['home', 0],
   ['fleet', 1],
   ['github', 10],
-  ['linear', 20],
   ['docker', 40],
   ['http', 50],
   ['agents', 60],
 ]
 
 describe('docs/ui-design.md § Parity — the panes', () => {
-  it('is exactly the thirteen, in their shipped order, with their shipped chords', () => {
+  it('is exactly the compiled panes, in their shipped order, with their shipped chords', () => {
     const actual = paneRegistry
       .entries()
       .map((pane) => [pane.id, pane.order, pane.defaultChord] as const)
@@ -63,7 +64,7 @@ describe('docs/ui-design.md § Parity — the panes', () => {
 describe('docs/ui-design.md § Parity — the rail sources', () => {
   it('is exactly the core and provider sources, in rail order', () => {
     // Read from the REGISTRY rather than through `availableSources`, deliberately: that accessor applies
-    // the provider gate, so linear vanishes without a connected integration — which is exactly why
+    // the provider gate, so github vanishes without a connected integration — which is exactly why
     // this belongs in a unit test. Loaded sources have their own descriptor/runtime coverage.
     const actual = sourceRegistry
       .entries()

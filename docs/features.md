@@ -30,8 +30,9 @@ lazily when a task first needs filesystem/process access.
 - `database` — task-scoped PostgreSQL schema, rows, SQL, and project-scoped saved queries.
 - `docker` — task-matched containers, logs, stats, exec, and lifecycle actions.
 - `http` — encrypted requests, variables, auth helpers, and response inspection.
-- `linear` — linked issue panel; `rollbar` provides the equivalent sandboxed pane when the loaded
-  Rollbar package is installed and trusted.
+- `linear` and `rollbar` — the two external-item panes, each a sandboxed frame supplied by a loaded
+  package that is installed and trusted. Linear's also renders as the reference panel beside a pull
+  request.
 
 The row is ordered/resizable and persisted per Node/task. Contributions are registered by plugins;
 unknown persisted pane IDs render safely as placeholders.

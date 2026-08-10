@@ -210,7 +210,7 @@ aliases for one release and resolve through the same notes store.
 | `http` | encrypted request/variable storage and send |
 | `memory` | memory entries and proposals; deprecated notes aliases |
 | `notes` | task, workspace, and global note CRUD |
-| `linear` | projects, issues, comments, and reference resolution |
+| `linear` | projects, issues, comments, reference resolution, and rail rows (loaded package) |
 | `rollbar` | normalized items, occurrences, and details |
 | `preview` | preview rules and browser-agent operations |
 

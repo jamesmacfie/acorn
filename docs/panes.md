@@ -18,10 +18,13 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `docker` | 75 | task container surface |
 | `http` | 76 | API request client |
 | `preview` | 80 | browser preview |
-| `linear` | 90 | linked Linear issue |
+| `linear` | 90 | loaded Linear frame; linked issue, selected descriptor row, or content-link target |
 | `rollbar` | 100 | loaded Rollbar frame; linked item or selected descriptor row |
 
-Provider-gated panes appear when their linked provider is connected and the task has relevant data.
+Compiled provider panes appear when their linked provider is connected and the task has relevant data.
+The two loaded ones — `linear` and `rollbar` — are frame surfaces declared in a manifest, which has no
+form for either condition: they are offered whenever the plugin is running on the node the window is
+talking to, and a task with nothing linked gets the frame's own empty state.
 
 ## Layout model
 

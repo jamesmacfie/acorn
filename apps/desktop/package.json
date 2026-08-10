@@ -63,7 +63,6 @@
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/plugin-github": "workspace:*",
     "@acorn/plugin-http": "workspace:*",
-    "@acorn/plugin-linear": "workspace:*",
     "@acorn/plugin-memory": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-onboarding": "workspace:*",

@@ -82,6 +82,7 @@ describe('loading rollbar from disk', () => {
           connections: async () => [],
           resource: async () => { throw new Error('an empty connection list must not read a resource') },
           withConnections: async () => [],
+          items: () => { throw new Error('rollbar reads no item store directly') },
         },
       })
       expect(response.status).toBe(403)
@@ -104,6 +105,7 @@ describe('loading rollbar from disk', () => {
             },
           }) as never,
           withConnections: async () => [],
+          items: () => { throw new Error('rollbar reads no item store directly') },
         },
       })
       expect(rail.status).toBe(200)

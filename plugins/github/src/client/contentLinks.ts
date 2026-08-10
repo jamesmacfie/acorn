@@ -126,8 +126,12 @@ export function makeContentLinkHandler(
     const str = (value: unknown): string => (typeof value === 'string' ? value : '')
     if (openPluginContentTarget(target, activeTaskId())) {
       // The host already opened the declared plugin pane with its retained selection intent.
-    } else if (target.kind === 'linear') {
-      openLinear(str(target.identifier))
+    } else if (target.kind === 'linear' || target.pane === 'linear') {
+      // No active task means there was no pane to open into, so the side panel is the fallback — and it
+      // is a REAL fallback here, because classic PR browse has no task. `kind` is whichever contribution
+      // id claimed the URL, and it changed when linear became a loaded package (`linear.issue` and
+      // `linear.issue-slug` now, `linear` before), so the pane the target names is what identifies it.
+      openLinear(str(target.identifier) || str(target.item))
     } else if (target.kind === 'pr' || target.kind === 'repo') {
       const projectId = projectIdForGithub?.(str(target.owner), str(target.repo))
       if (!projectId) return

@@ -22,7 +22,6 @@
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/plugin-github": "workspace:*",
     "@acorn/plugin-http": "workspace:*",
-    "@acorn/plugin-linear": "workspace:*",
     "@acorn/plugin-memory": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-preview": "workspace:*",
@@ -36,6 +35,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
+    "@acorn/plugin-linear": "workspace:*",
     "@acorn/plugin-model-providers": "workspace:*",
     "@acorn/plugin-rollbar": "workspace:*",
     "tsx": "^4.22.4",

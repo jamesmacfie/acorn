@@ -1,9 +1,16 @@
 // Linear's wire contract (docs/integrations.md): issues, projects and their comment threads.
 //
-// Types, route builders and query keys together, following the docker/http convention — the plugin
-// that owns the namespace owns the shape of what crosses it. Moved verbatim out of
-// @acorn/protocol/api.ts: route strings and query keys are byte-identical, because the persisted
-// query cache has no buster and a changed key value would orphan a user's IndexedDB.
+// Types and route builders together, following the docker/http convention — the plugin that owns the
+// namespace owns the shape of what crosses it. Moved verbatim out of @acorn/protocol/api.ts, and the
+// route strings are byte-identical for it.
+//
+// ONE query key is left, and it is not this plugin's. `linearIssuesKey` belongs to the TanStack query
+// github runs through `contract/issues.ts`, and its value is load-bearing: the persisted query cache has
+// no buster, so a changed key orphans a user's IndexedDB. The rest went with the client half — a frame
+// calls these routes over the bridge and keeps no query cache of its own, so a key with no client is a
+// value nothing can compare against.
+
+import type { PluginRailItem } from '@acorn/protocol/api.ts'
 
 export type LinearIssueState = { name: string; type: string; color: string } | null
 export type LinearIssueSummary = { identifier: string; title: string; url: string; state: LinearIssueState; assignee: string | null }
@@ -62,6 +69,10 @@ export type LinearProjectIssue = LinearIssueSummary & {
   labels: LinearLabel[]
 }
 export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
+// The declarative rail source's body. `PluginRailItems` is the host's own alias for the same shape; this
+// names it locally so the route can `satisfies` it without the plugin's wire contract importing the
+// host's descriptor vocabulary into every consumer of this file.
+export type LinearRailItemsResponse = { items: PluginRailItem[] }
 
 export const linearIssuesRoute = '/v2/p/linear/issues'
 export const linearProjectsRoute = '/v2/p/linear/projects'
@@ -74,8 +85,3 @@ export const linearCommentsRoute = (identifier: string, connectionId?: string) =
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
 
 export const linearIssuesKey = (identifiers: string[]) => ['linear-issues', ...[...identifiers].sort()] as const
-export const linearProjectsKey = ['linear-projects'] as const
-export const linearProjectIssuesKey = (integrationId: string, projectIds: string[]) =>
-  ['linear-project-issues', integrationId, ...[...projectIds].sort()] as const
-export const linearIssueKey = (identifier: string, connectionId?: string) =>
-  ['linear-issue', connectionId ?? 'unscoped', identifier] as const

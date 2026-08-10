@@ -61,7 +61,11 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 A PR can promote to a task. The task stores the core project ID and pull number; the project's GitHub
 facet supplies provider owner/name metadata. Subsequent task context and changes use the owning Node.
 Linear reference panels are contributed through a provider contract, so the GitHub plugin does not
-import Linear's implementation.
+import Linear's implementation — and since Linear became a loaded plugin, the panel it renders there is
+a sandboxed frame whose overlay chrome the host draws. GitHub does still depend on
+`@acorn/plugin-linear` for two things in `contract/`: the ticket-reference text scanner and the
+query-options factory over `/v2/p/linear/issues`. Both are the sanctioned cross-plugin surface and
+neither reaches Linear's UI.
 
 ## Actions and logs
 

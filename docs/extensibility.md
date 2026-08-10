@@ -242,10 +242,11 @@ Roughly in order of how much they matter:
 
 1. **Node-half containment.** The one honest weakness. Everything else is defence in depth around
    a server half that is disclosed rather than contained.
-2. **The remaining migration candidates** — linear, http, database, editor. Each proves something
+2. **The remaining migration candidates** — http, database, editor. Each proves something
    different: http is the only one that would exercise plugin-owned storage and a migration
    shipped through an update; editor is the hardest and most valuable, because it demands
-   keybindings, latency and real cross-pane traffic.
+   keybindings, latency and real cross-pane traffic. linear has moved, and it is the one that found a
+   capability the tier cannot carry rather than merely reshape (docs/third-party/linear.md).
 3. **The carriers that are still missing.** `agentContexts` — the composer's attach-to-context
    picker, and the last thing blocking http and database — now has one: two routes the host fetches
    on the plugin's behalf, which is what its already-async-data-shaped contract needed. What is left

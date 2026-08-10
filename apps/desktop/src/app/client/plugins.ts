@@ -7,7 +7,6 @@ import { dockerClientPlugin } from '@acorn/plugin-docker/client/index.ts'
 import { editorClientPlugin } from '@acorn/plugin-editor/client/index.ts'
 import { githubClientPlugin } from '@acorn/plugin-github/client/index.ts'
 import { httpClientPlugin } from '@acorn/plugin-http/client/index.ts'
-import { linearClientPlugin } from '@acorn/plugin-linear/client/index.ts'
 import { memoryClientPlugin } from '@acorn/plugin-memory/client/index.ts'
 import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
 import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts'
@@ -24,7 +23,6 @@ export const clientPlugins: readonly ClientPlugin[] = [
   editorClientPlugin,
   githubClientPlugin,
   httpClientPlugin,
-  linearClientPlugin,
   memoryClientPlugin,
   notesClientPlugin,
   onboardingClientPlugin,

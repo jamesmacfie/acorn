@@ -2,7 +2,7 @@
 
 acorn has two plugin tiers. This document is about the first: the packages under `plugins/` that are
 registered in the Node or desktop composition, ship inside the binary, run in the shell's own realm,
-and are trusted like the rest of the app. Rollbar and model-providers remain in the workspace as
+and are trusted like the rest of the app. Linear, rollbar and model-providers remain in the workspace as
 source for loaded packages and are not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
 trust model behind the second one.
 
@@ -32,9 +32,16 @@ The test is *embedded in a render tree*, not *rendered by another plugin*. A **r
 case worth being careful about: github's `PullDetail` renders linear's panel beside a PR, which
 sounds like B and is not — the panel is a rectangle the host places, so `refPanel` is one of the
 frame targets and a loaded plugin contributes one as a sandboxed frame
-(`packages/client-core/src/plugins/frames/register.tsx`). Two of `RefPanelProps` do not survive
-the boundary — `onContentClick` and the multi-ref `refs`/`onSelectRef` chip strip — so a frame
-panel is single-ref and handles its own content clicks. That is the whole difference.
+(`packages/client-core/src/plugins/frames/register.tsx`). Linear now ships that way, so this is
+observed rather than argued.
+
+Three of `RefPanelProps` do not survive the boundary, and the third was found by shipping it.
+`onContentClick` and the multi-ref `refs`/`onSelectRef` chip strip do not cross, which costs nothing:
+a frame handles clicks inside its own document, and PR detail is a single-ref host. `onClose` does
+not either — the bridge's close verb is gated to importer surfaces — and a frame cannot `Portal`
+out of its iframe to draw a drawer in the first place. So the manifest adapter draws the overlay and
+the dismiss control itself, using the same classes a first-party panel would. A frame ref panel
+supplies the body; the host supplies the box.
 
 **C. Electron main-process code** — a `src/main/` half that imports `electron`. The desktop
 surface is enumerated and boundary-tested; a loaded plugin has no main-process presence at all.
@@ -57,6 +64,9 @@ its contract was already data-in/data-out, so a descriptor could carry it.
 
 `contentLinks` was the first: a loaded plugin declares URL recognisers in its manifest
 (`contentLinks: [{ match, openPane, item }]`, compiled host-side from a restricted pattern grammar).
+That grammar has one sharp edge worth knowing before you write a `match`: it is exact-arity, with no
+tail wildcard, so a URL shape with an optional trailing segment needs one entry per arity. Linear's
+issue URLs come in both forms and it declares two.
 
 `agentContexts` is the second. A descriptor names two routes on the plugin's own node half —
 `options` (GET) and `capture` (POST) — and the host performs both fetches, binds `source` from the
@@ -111,7 +121,6 @@ written before the loader existed.
 
 | Plugin | What it uses | Portable? |
 | --- | --- | --- |
-| **linear** | The rollbar set plus a ref panel github renders and content-link recognisers. Publishes nothing, `required` by nothing. | **Yes, fully.** `refPanel` is a frame target and content links are declarative, so both of its apparent privileges are carrier differences |
 | **http** | Its own SQLite file, a pane, a rail source, a settings page, an `agentContexts` entry. Uses `core.secrets`. | **Yes.** Its one remaining wrinkle is `activate: purgeStoredHttpDrafts()`, and a loaded plugin's client half has no lifecycle hook — the purge needs a new home alongside the drafts |
 | **database** | Its own SQLite file, a pane, an `agentContexts` entry, publishes `DATABASE`. Runs `bash -lc` on a repo-configured script through `core.proc`. | Yes — `DATABASE` turns out to have no consumer outside the plugin. It also depends on `monaco-editor`, so it shares editor's unanswered bundle-size question |
 | **editor** | Monaco pane, find-in-files over ripgrep, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. | Yes — neither capability has an outside consumer. Two concrete gaps first: the manifest's slot descriptor accepts `footer` only, `persistedState` has no form at all, and whether an unminified Monaco bundle fits the 8 MiB client-bundle cap is unmeasured |
@@ -122,6 +131,14 @@ no bundle to trust and no prompt to answer; no routes, so nothing to convert to 
 no tables, no capabilities, and no `secrets` grant, because core resolves the stored credential and
 hands the adapter a key. The whole migration was one manifest row and four deletions, which is what
 "portable" should feel like when nothing is in the way.
+
+**linear** has moved too, and it was the opposite kind of move: the only one so far that exercised a
+frame ref panel and declarative content links, and the only one that came back with a capability
+genuinely lost rather than reshaped. Its answer to "portable? yes, fully" turned out to be almost
+right. The pane, the ref panel, the recognisers, the rail rows and host-owned promotion all crossed;
+the browse's **workspace project picker** did not, because choosing which Linear projects a workspace
+follows writes core's workspace state, and that write is unmappable on the frame bridge and absent
+from `CoreServices`. [third-party/linear.md](./third-party/linear.md) is the full record.
 
 Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded
 package serves provider routes through
@@ -201,12 +218,13 @@ migration chain, a pane, a rail source, a settings page, use-scoped secrets, and
 entry that a manifest can now carry. Nothing in it is out of a loaded plugin's reach; the one thing
 that needs rehoming on the way across is the draft purge it runs from `activate`.
 
-**linear** — the second integration, and the one to read once rollbar makes sense. It differs in
-exactly the two places worth studying: promotion is looser (a Linear issue carries its own branch
-name, so its `canPromote` asks for less than rollbar's), and it contributes a ref panel that
-github's PR detail renders without importing linear. That ref panel is the clearest example of
-the tier line being about *shape* rather than ownership — it looks like a first-party privilege
-and is a plain rectangle a frame can host.
+**linear** — the second integration, and the one to read once rollbar makes sense; also a loaded
+package now rather than a first-party one, so read it for the same reason and expect the same shape.
+It differs from rollbar in exactly the two places worth studying: promotion is looser (a Linear issue
+carries its own branch name, so the rail ROW names the branch and the host's modal has nothing left
+to demand), and it contributes a ref panel that github's PR detail renders without importing linear.
+That ref panel is the clearest example of the tier line being about *shape* rather than ownership —
+it looks like a first-party privilege and is a plain rectangle a frame can host.
 
 **database** — the same shape as http, slightly smaller, and it publishes a capability. Useful to
 read alongside http to see where "self-contained" ends and "something else depends on me" begins.

@@ -135,6 +135,16 @@ const dismissOnboarding = async (page: Page): Promise<void> => {
   if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
 
+// Drop the persisted query cache (IndexedDB, via idb-keyval's default store) so the next load reads the
+// node instead of the empty task list this document snapshotted at first paint. The snapshot is persisted
+// across reloads and its staleTime outlives the spec, so a task seeded afterwards can stay invisible.
+const clearPersistedQueries = async (page: Page): Promise<void> => {
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase('keyval-store')
+    request.onsuccess = request.onerror = request.onblocked = () => resolve()
+  }))
+}
+
 const settle = async (page: Page): Promise<void> => {
   await expect.poll(async () => {
     await dismissOnboarding(page)
@@ -153,11 +163,23 @@ test('the loaded Rollbar package renders native rows and its real sandbox frame'
   const { page, repo } = await launch()
   await dismissOnboarding(page)
 
+  // One prompt per bundle, and the desktop bundles more than one package with a client half — so the
+  // first prompt queued is not necessarily rollbar's, and answering only rollbar's leaves another modal
+  // over everything after it. Advance to the one this spec is about, then clear what is left.
   const trust = page.locator('.plugin-trust-dialog')
+  const answerUntil = async (done: () => Promise<boolean>): Promise<void> => {
+    await expect.poll(async () => {
+      if (await done()) return true
+      await trust.getByRole('button', { name: /^Trust/ }).click({ timeout: 5_000 }).catch(() => {})
+      return false
+    }, { timeout: 60_000 }).toBe(true)
+  }
   await expect(trust).toBeVisible({ timeout: 60_000 })
+  await answerUntil(async () => (await trust.filter({ hasText: 'rollbar wants to run in acorn' }).count()) > 0)
   await expect(trust).toContainText('Read tasks')
   await expect(trust).toContainText('api.rollbar.com')
   await trust.getByRole('button', { name: /^Trust/ }).click()
+  await answerUntil(async () => (await trust.count()) === 0)
 
   const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Rollbar' } })
   const project = await nodeJson<{ project: { id: string } }>(page, '/v2/core/projects', {
@@ -173,6 +195,7 @@ test('the loaded Rollbar package renders native rows and its real sandbox frame'
     },
   })
 
+  await clearPersistedQueries(page)
   await page.goto(new URL(`/t/${task.id}`, page.url()).toString())
   await page.reload()
   await settle(page)
