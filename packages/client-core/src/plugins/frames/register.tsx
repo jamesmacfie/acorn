@@ -177,7 +177,11 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             <div class="integrations-panel-backdrop" onClick={props.onClose} />
             <aside class="integrations-panel plugin-ref-panel">
               <header class="integrations-panel-head">
-                <span class="integrations-panel-title">{props.ref.displayId}</span>
+                {/* No fallback, deliberately. `openRefPanel` refuses a falsy `displayId`, so a panel with
+                    no subject is unreachable and a `?? 'Reference'` here would only be able to hide a bug
+                    — which is precisely what it would have done: the empty title was the visible half of
+                    the reserved-`ref`-prop defect, and the reason it was found at all. */}
+                <span class="integrations-panel-title">{props.target.displayId}</span>
                 <button
                   type="button"
                   class="integrations-panel-close"
@@ -191,7 +195,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
               <PluginFrame
                 binding={bindingFor(pluginId, surface, row)}
                 hash={hash}
-                refId={props.ref.displayId}
+                refId={props.target.displayId}
                 onClose={props.onClose}
               />
             </aside>
