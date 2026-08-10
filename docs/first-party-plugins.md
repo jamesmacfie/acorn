@@ -2,8 +2,8 @@
 
 acorn has two plugin tiers. This document is about the first: the packages under `plugins/` that are
 registered in the Node or desktop composition, ship inside the binary, run in the shell's own realm,
-and are trusted like the rest of the app. Rollbar remains in the workspace as source for a loaded
-package and is not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
+and are trusted like the rest of the app. Rollbar and model-providers remain in the workspace as
+source for loaded packages and are not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
 trust model behind the second one.
 
 [extensibility.md](./extensibility.md) covers why the two tiers exist and what the line between
@@ -115,7 +115,13 @@ written before the loader existed.
 | **http** | Its own SQLite file, a pane, a rail source, a settings page, an `agentContexts` entry. Uses `core.secrets`. | **Yes.** Its one remaining wrinkle is `activate: purgeStoredHttpDrafts()`, and a loaded plugin's client half has no lifecycle hook — the purge needs a new home alongside the drafts |
 | **database** | Its own SQLite file, a pane, an `agentContexts` entry, publishes `DATABASE`. Runs `bash -lc` on a repo-configured script through `core.proc`. | Yes — `DATABASE` turns out to have no consumer outside the plugin. It also depends on `monaco-editor`, so it shares editor's unanswered bundle-size question |
 | **editor** | Monaco pane, find-in-files over ripgrep, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. | Yes — neither capability has an outside consumer. Two concrete gaps first: the manifest's slot descriptor accepts `footer` only, `persistedState` has no form at all, and whether an unminified Monaco bundle fits the 8 MiB client-bundle cap is unmeasured |
-| **model-providers** | Registers connection providers and model adapters. No client half at all. | Yes — the cleanest node-only shape in the tree |
+
+**model-providers** used to head this table and has moved: it is a loaded package now, in neither
+composition list. It was the easiest possible second move and worth saying why — no client half, so
+no bundle to trust and no prompt to answer; no routes, so nothing to convert to the fetch carrier;
+no tables, no capabilities, and no `secrets` grant, because core resolves the stored credential and
+hands the adapter a key. The whole migration was one manifest row and four deletions, which is what
+"portable" should feel like when nothing is in the way.
 
 Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded
 package serves provider routes through
@@ -169,9 +175,11 @@ whether a contribution can be expressed as data plus async messages.
 These worked examples use only mechanisms a third-party plugin has, or will have once the named gap closes.
 Read them as the worked examples — they are what an outside author should copy, in this order:
 
-**model-providers** — the minimal node-only plugin. Registers connection providers and model
-adapters through `ctx.providers`, no client half, no tables, no capabilities. Start here to see
-how small a plugin can be.
+**model-providers** — the minimal loaded plugin, and node-only. Registers connection providers and
+model adapters through `ctx.providers`, no client half, no tables, no capabilities, no `secrets`.
+Build it with `pnpm --filter @acorn/node build:plugin model-providers`. Start here to see how small a
+plugin can be: a manifest with two egress hosts and an empty `contributions`, and 33 lines of node
+half.
 
 **rollbar** — the loaded reference integration. Its node half chooses the portable fetch carrier,
 and its client half is a sandbox bundle rather than a `ClientPlugin`. Build it with

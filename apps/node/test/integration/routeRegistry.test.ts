@@ -178,11 +178,15 @@ describe('assembled routes', () => {
   })
 
   it('registers every built-in provider from its own plugin, in both registries', () => {
-    const expected = ['anthropic', 'github', 'linear', 'openai']
+    const expected = ['github', 'linear']
     expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
-    // The integration registry holds only providers with mirrored resources — the model providers
-    // contribute credentials and adapters, not resources.
+    // The integration registry holds only providers with mirrored resources. Both of the compiled
+    // providers happen to have them, so the two lists coincide today; they are still asserted
+    // separately because a connection provider need not be an integration one.
     expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(['github', 'linear'])
-    expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual(['anthropic', 'openai'])
+    // Empty, and that is the point. `openai` and `anthropic` come from the loaded model-providers
+    // package, and this suite assembles the COMPILED list only — so an adapter turning up here would
+    // mean a plugin in the binary had started registering one.
+    expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual([])
   })
 })

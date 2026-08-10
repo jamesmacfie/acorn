@@ -11,7 +11,6 @@ import { githubPlugin } from '@acorn/plugin-github/node/index.ts'
 import { httpPlugin } from '@acorn/plugin-http/node/index.ts'
 import { linearPlugin } from '@acorn/plugin-linear/node/index.ts'
 import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
-import { modelProvidersPlugin } from '@acorn/plugin-model-providers/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin, type PreviewPluginDeps } from '@acorn/plugin-preview/node/index.ts'
 import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/node/index.ts'
@@ -45,7 +44,6 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   httpPlugin(dataDir),
   linearPlugin(),
   memoryPlugin(dataDir),
-  modelProvidersPlugin(),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(deps.preview),
   terminalPlugin(dataDir, deps.terminal),

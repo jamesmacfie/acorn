@@ -146,9 +146,13 @@ uninstall writes a tombstone outside the package directory so a later app update
 Packaged client bytes are trusted only after Electron main reads and hashes its own application
 resource; a node cannot acquire that trust by labelling a roster row as bundled.
 
-Rollbar is the standing production caller and is not also present in the compiled composition. The
-loader still supports a package id shadowing a built-in during a staged migration; when that happens
-it drops the compiled copy from the graph and logs which directory won.
+Two first-party packages ship this way and neither is also present in the compiled composition.
+Rollbar is the standing production caller of the route, descriptor and frame seams. `model-providers`
+is the other end of the range: node-only, no client bundle, no routes, no storage, `contributions: {}`
+— it registers two connection providers and two model adapters and stops, which is proof the loaded
+tier costs a small plugin nothing. The loader still supports a package id shadowing a built-in during
+a staged migration; when that happens it drops the compiled copy from the graph and logs which
+directory won.
 
 ### Loaded plugins: the client half
 

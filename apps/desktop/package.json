@@ -65,7 +65,6 @@
     "@acorn/plugin-http": "workspace:*",
     "@acorn/plugin-linear": "workspace:*",
     "@acorn/plugin-memory": "workspace:*",
-    "@acorn/plugin-model-providers": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-onboarding": "workspace:*",
     "@acorn/plugin-preview": "workspace:*",
