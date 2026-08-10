@@ -41,6 +41,12 @@ export type RefPanelContribution = {
   // The provider whose items this panel renders. Bound to the registering plugin's own name by the client
   // plugin host (registries/plugin.ts § declaredProvider), so a plugin cannot claim another's items.
   providerId: string
+  // Per-node presence, the same predicate the pane registry takes (plugins/frames/register.tsx). A panel
+  // whose plugin is installed but stopped on the node being looked at is not a destination, and without
+  // this the click that named it was still CLAIMED — `openRefPanel` said yes, the shell put a target in
+  // its single slot, and `RefPanelHost` re-resolved to nothing and drew an empty overlay. Degrading at
+  // render is not the same as declining, because declining is what lets the caller try the next rung.
+  when?: () => boolean
   component: Component<RefPanelProps>
 }
 
@@ -50,7 +56,7 @@ export const refPanelRegistry = new Registry<RefPanelContribution>('ref-panel')
 // host should render nothing rather than fail. That degradation is the point of looking it up at render
 // time instead of importing it.
 export const refPanelFor = (providerId: string): RefPanelContribution | undefined =>
-  refPanelRegistry.entries().find((entry) => entry.providerId === providerId)
+  refPanelRegistry.entries().find((entry) => entry.providerId === providerId && (!entry.when || entry.when()))
 
 // ── The presentation: one panel at a time, owned by the shell ─────────────────────────────────────
 //

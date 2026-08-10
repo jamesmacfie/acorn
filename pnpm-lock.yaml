@@ -805,9 +805,6 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
-      '@acorn/plugin-linear':
-        specifier: workspace:*
-        version: link:../linear
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -995,9 +992,6 @@ importers:
 
   plugins/model-providers:
     dependencies:
-      '@acorn/node-core':
-        specifier: workspace:*
-        version: link:../../packages/node-core
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
@@ -1011,6 +1005,9 @@ importers:
         specifier: ^6.48.0
         version: 6.48.0(ws@8.21.0)(zod@4.4.3)
     devDependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0

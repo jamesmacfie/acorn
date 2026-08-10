@@ -34,7 +34,8 @@ cross-connection identifier resolution and the storage-footprint count. The cach
 inherited is also caching this data does not want: the deleted picker reached *past* its own cache by
 hand, because an empty state must be a claim about the provider now.
 
-The fallback in finding 1's mitigation was kept — see the paragraph at the end of this section.
+The fallback in finding 1's mitigation has since been withdrawn — see the paragraph at the end of this
+section.
 
 The original finding follows.
 
@@ -57,13 +58,23 @@ project mappings — the data is core's, the route is core's, and a picker belon
 `WorkspaceProjectAssignments` rather than inside whichever plugin happens to own the provider. That
 is a deliberate host decision and was left undecided rather than smuggled in behind a migration.
 
-**The fallback stayed, now on purpose.** With a real picker in place the honest-looking alternative is
-an empty rail carrying a "link some projects" affordance — and a descriptor rail cannot draw one.
-`ChromeSourcePanel` renders every source's empty state as a fixed "Nothing here yet.", with no way for a
-contribution to say what is missing or where to go. Dropping the fallback would trade "shows your own
-open issues, unlabelled" for "shows nothing, unexplained", which is worse. Making it the right trade
-means giving `PluginSourceDescriptor` an authored empty state: a decision about the rail contract, owed
-by every source rather than by Linear, and left for whoever takes that on.
+**The fallback is gone, and the rail says why it is empty.** It stayed for one release because the only
+alternative was a blank list under a fixed "Nothing here yet.", so "your own open issues, unlabelled"
+was the less-wrong of two wrong answers. `PluginSourceDescriptor` now takes an authored `emptyState` —
+one bounded message and at most one context-free action, decided as a rail-contract question owed by
+every source rather than as a Linear feature — so the trade reversed: a connection with no mapped
+projects contributes no rows, and the rail reads *"No linked Linear projects. Choose some in Settings →
+this workspace → Linked provider projects."*
+
+It also stops costing a provider call per connection per visit for a list nobody asked for.
+
+**The gap that came with it, stated rather than worked around:** that message has no button. Its
+destination is the settings modal, and no verb in the context-free set can reach one — `openPane`
+addresses a task pane, `openUrl` leaves the app, and the modal is shell state behind a client event with
+no descriptor form. Widening the verb set for a single caller is how a closed vocabulary stops being
+closed, so the empty state ships message-only and someone navigates by hand. If a second source ever
+needs the same destination, a `openSettings` verb over the existing `presentation:open-settings` event
+is the shape to reach for — one event that already exists, not a new seam.
 
 The picker landed beside the workspace's identity and project settings rather than beside
 `WorkspaceProjectAssignments` as this note guessed. The `workspace` settings group has exactly one page
@@ -128,6 +139,21 @@ panel, not just a pull request. The adapter's overlay is untouched and the host 
 `refs`/`onSelectRef` now have no caller of any kind, first-party or not: the shell's host is single-slot,
 because a stack of reference panels is a navigation history and panes already are one.
 
+**And then it opened blank, for a reason worth the whole exercise.** `RefPanelProps` called its subject
+`ref`. `ref` is a **reserved JSX attribute**: Solid's compiler sees `ref={value}` on a component and emits
+a `ref(r$)` setter rather than passing data, because on an element that is how you capture a DOM node. So
+`props.ref` was a method — `props.ref.displayId` read `undefined`, the host header drew no title, `refId`
+was dropped by the spread in `PluginFrame.tsx`, and the frame correctly concluded it had been told nothing
+and drew its empty state. Every guard upstream held perfectly (`openRefPanel` refuses a falsy `displayId`,
+and it is the only writer of the signal); the value was intact until the JSX boundary. It was found by
+reading the compiled bundle, not the source.
+
+Renamed to `target`/`targets`/`onSelectTarget`. The guard is a rule in `tools/arch/boundaries.test.ts`
+rather than a type, because **`tsc` cannot catch a reintroduction**: Solid declares `ref` on
+`IntrinsicAttributes`, which exempts it from the excess-property check that does catch a bogus prop on the
+very same call. The blank title was deliberately left unguarded — a `?? 'Reference'` fallback there could
+only have hidden this, and the blank title is what surfaced it.
+
 ### 4. The item store had to cross, and it is the shape `resource()` cannot express
 
 `PluginProviderRuntime` gained `items(providerId)`, returning the same external-item store a mirrored
@@ -140,6 +166,14 @@ touches, dressed up as a simplification.
 
 It widens what a plugin can reach by nothing: those are its own provider's rows, which its own
 resource already writes, and the host binds both the owner and the ownership check.
+
+**Since reviewed and tightened.** The ownership check originally gated only the *ask* — the store it
+returned still took `provider` as a per-call argument, so a store built for one provider could touch
+another's rows. The store is now scoped to its provider at construction
+(`integrations/itemStore.ts`): every query carries the provider, marker keys outside the provider's
+own `provider:<id>:` namespace are refused, and the same fix covers all three doors onto the store
+(this one, `ProviderResourceContext.items`, and the compiled tier's `ownedExternalItems`, which now
+takes the provider as an argument).
 
 The **detail** route went the other way and got smaller. Its unscoped branch used to hand-roll a cache
 read across connections and then fan out a second time to resolve; it now asks each connection's
@@ -165,6 +199,13 @@ hand-rolls the anchor plumbing. The frame passes a URL; the host validates the s
 runs its ordinary content-link ladder — a GitHub PR in a description now resolves in-app or opens the
 owner's browser, and the presentation is inferred from the surface rather than requested by the frame
 (`docs/plugins.md`).
+
+**Since reviewed and tightened.** The verb was initially honoured whenever a frame called it; the
+review asked whether a frame causing a navigation should need a declared permission. The answer was a
+gate rather than a grant: the broker now honours `openUrl` only while the frame's iframe holds focus —
+which a real click or keypress inside its document gives it — and at most once per second, so
+background code cannot move the reader and a hostile frame cannot spam the browser. A frame using
+`openLinkOnClick` satisfies both without changes.
 
 Two things inside linear did *not* change, and both are decisions rather than leftovers:
 
@@ -256,7 +297,8 @@ The useful half of the record, since a verb or scope nothing used is evidence fo
   Linear token", and it does — but never through `ctx.core.secrets`. Core resolves the `integrations`
   row inside its own secret scope and lends the key to `withConnections` or to a mirrored resource for
   the length of the call. `true` would have been a grant with no call site and a disclosure that
-  overstates. Rollbar declares `secrets: true` and appears not to need it either; worth a look.
+  overstates. Rollbar declared `secrets: true` under the same misunderstanding; the look was taken —
+  no call site — and its grant is now `false` too (`plugins/rollbar/acorn-plugin.config.mjs`).
 - **No task WRITE scope, on either half.** Creating a task and linking the issue stay in the
   host-owned promotion flow, which the rail row feeds with a seed. `api` is one scope,
   `core.tasks:read`, for the pane's "which tickets does this task link" read; the ref-panel frame
@@ -308,33 +350,48 @@ so a spec that answers the first one is not necessarily answering its own; and t
 timing enough that the shell's persisted, still-fresh empty task list outlives the point where the spec
 seeds a task.
 
-## Still owed
+## Still owed — the manual verification pass
 
-- **The reference panel inside a GitHub pull request.** The highest-risk surface, and the one nothing has
-  exercised: it needs a mirrored pull request whose body cites a ticket. It cannot be unit tested either,
-  because vitest here cannot render a component. Finding 3 was reached by reading `frames/register.tsx` and
-  `frames/broker.ts`, and the fix follows from what they say rather than from having watched it work. Still
-  owed, and now owed for a second reason: the panel is opened from a different place (the shell's
-  `RefPanelHost`) and clicking a ticket in a PR *inside a task* reaches it where it used to swap the task's
-  pane instead. The ladder is unit-covered; the pixels are not.
-- **A real-token soak.** Everything above ran against a fake `api.linear.app`.
-- **Both appearance axes in the frame.** The frame's CSS is written entirely against tokens with
-  fallbacks and the bridge pushes the full projection, but no run has switched theme or style with the
-  pane open.
-- **A `linear.app` URL pasted into a note.** The recognisers parse (unit-covered through
-  `linearIdentifierFromHref`, and the manifest's patterns compile through the host's own grammar at parse
-  time), but the click path from a note body to the pane has not been driven. A note still prefers the
-  pane; what is new and also undriven is the fallback — a note in a context with no task now reaches the
-  reference panel instead of the browser.
-- **A manual pass over the project-mapping surface** from finding 1. The seam, the bounding and both
-  providers' sources are unit-covered, but the picker is a component and vitest here cannot render one:
-  ticking a real Linear project and watching the row land, the failing-connection row, and both
-  appearance axes over it have not been driven.
-- **A decision on `ui.openUrl`** from finding 5.
-- **The project-scoped issue view on screen.** Finding 8's carriers are covered by unit tests on both
-  halves — the manifest rules including a route that escapes the prefix and one naming an undeclared
-  surface, the path minting and its round trip, and the two verbs' dispatch — but the surface itself is a
-  frame inside a component, and vitest here renders neither. Clicking a rail row with no task open,
-  pasting `/p/<id>/x/linear/issues/ENG-42`, and the back button between two tickets have not been driven in
-  the real app. Nor has the layout: the detail spans the two grid columns to the right of the rail list,
-  and only a render will say whether the iframe fills them.
+Everything here needs a running desktop app and a person watching. Nothing in this list can be covered
+by the vitest suites: they run in a node environment with no Solid transform, so no component renders,
+and no new desktop e2e specs should be written (that suite is being extracted from this repo). Tick an
+item when it has been watched working; file anything broken and link it here instead of unticking.
+
+**Before starting.** `apps/desktop` must be rebuilt — several of the fixes below are renderer code, and a
+running `electron-vite preview` keeps serving the old bundle until it is. All three bundled plugins were
+also rebuilt, so their client hashes changed: **linear, rollbar and model-providers each raise a fresh
+trust prompt on the next node start, and contribute no surfaces at all until accepted.** A missing pane
+at boot is the prompt, not a regression.
+
+- [ ] **The reference panel over a ticket, from a GitHub PR body.** The highest-risk surface, and the one
+  nothing has exercised: it needs a mirrored pull request whose body cites a ticket. Finding 3 was
+  reached by reading `frames/register.tsx` and `frames/broker.ts`, not by watching it work. Two things to
+  watch: inside a task it must open the PANEL, not swap the task's pane; and from classic browse it must
+  open at all. The ladder is unit-covered; the pixels are not.
+- [ ] **Bare `ENG-42` in a PR title and body.** The prefix-learning and the anchors the host now mints
+  (`linkifyRefs`) are unit-covered, but nothing has clicked one. A bare id whose prefix appeared on a full
+  Linear URL in the same PR should open the panel; one whose prefix did not should stay plain text.
+- [ ] **The ticket chips beside a PR.** Enrichment goes through the host's `refResolvers` carrier now
+  rather than a direct import of Linear's package, so the label and the state chip come back in a
+  different shape. Route-level and device-level coverage exists; the rendered row does not.
+- [ ] **The project-scoped issue view.** A rail row click with no task open; pasting
+  `/p/<id>/x/linear/issues/ENG-42`; the back button between two tickets; and the layout — the detail spans
+  the two grid columns to the right of the rail list, and only a render will say whether the iframe fills
+  them.
+- [ ] **The rail's new empty state.** A workspace with no linked Linear projects should now show *"No
+  linked Linear projects…"* instead of the viewer's own assigned issues, and should cost no provider call
+  at all. Mapping a project should fill the rail as before.
+- [ ] **`ui.openUrl` on screen.** The verb, the scheme refusal and the ladder are unit-covered; no real
+  anchor inside a frame has been clicked. A `github.com` link in a ticket description reaching the
+  browser, an attachment title opening, and a `linear.app` link re-pointing the frame in place rather
+  than going over the port. Plus the gates: one click works, and a second immediate click is throttled
+  without breaking the first.
+- [ ] **The workspace project-mapping picker.** Ticking a real Linear project and watching the row land,
+  and the failing-connection row. Both are components, so vitest reaches neither.
+- [ ] **A `linear.app` URL pasted into a note.** The recognisers parse and the patterns compile, but the
+  click path from a note body has not been driven. A note prefers the pane; what is new and also undriven
+  is the fallback — a note with no task in context reaches the reference panel rather than the browser.
+- [ ] **Both appearance axes over every frame surface above.** The frame's CSS is written entirely
+  against tokens with fallbacks and the bridge pushes the full projection, but no run has switched theme
+  or style with the pane open.
+- [ ] **A real Linear token.** Every run so far has been against a fake `api.linear.app`.

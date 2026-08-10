@@ -101,6 +101,7 @@ describe('chrome descriptors', () => {
     expect(result.success && result.data.contributions.nodeStats).toEqual([])
     expect(result.success && result.data.contributions.contentLinks).toEqual([])
     expect(result.success && result.data.contributions.agentContexts).toEqual([])
+    expect(result.success && result.data.contributions.refResolvers).toEqual([])
     expect(result.success && result.data.contributions.commands).toEqual([])
     expect(result.success && result.data.contributions.keybindings).toEqual([])
     expect(result.success && result.data.contributions.routes).toEqual([])
@@ -201,6 +202,62 @@ describe('chrome descriptors', () => {
     expect(messages(manifest({
       frames: [PANE],
       agentContexts: [{ id: 'board', label: 'Board context', options: '/v2/p/board/options', capture: '/v2/p/board/capture' }],
+    }))).toEqual([`duplicate contribution id 'board'`])
+  })
+
+  it('carries a source empty state, bounds its message and narrows its action', () => {
+    const source = (emptyState: unknown) => manifest({
+      frames: [PANE],
+      sources: [{ id: 's', label: 'S', order: 1, items: '/v2/p/board/rail-items', emptyState }],
+    })
+
+    expect(source({ message: 'No linked projects yet.' }).success).toBe(true)
+    expect(source({ message: 'Nothing to show.', action: { verb: 'openPane', pane: 'board' }, actionLabel: 'Open board' }).success).toBe(true)
+
+    // The two verbs an empty rail cannot carry, and the reason is the rail being EMPTY: `createTask`
+    // promotes a selected row and `navigate` substitutes a routed project into a surface path, and a
+    // state that renders in place of the list has neither.
+    expect(source({ message: 'x', action: { verb: 'createTask' } }).success).toBe(false)
+    expect(source({ message: 'x', action: { verb: 'navigate', surface: 'board' } }).success).toBe(false)
+    // The same route confinement every action gets, and the same url policy.
+    expect(messages(source({ message: 'x', action: { verb: 'runNodeAction', path: '/v2/p/other/go' } })))
+      .toEqual(['route must be inside /v2/p/board/'])
+    expect(source({ message: 'x', action: { verb: 'openUrl', url: 'http://example.com' } }).success).toBe(false)
+    // An action naming a pane this manifest never declared, which would render a button opening nothing.
+    expect(messages(source({ message: 'x', action: { verb: 'openPane', pane: 'ghost' } })))
+      .toEqual([`openPane names 'ghost', which this manifest does not declare as a task-scoped pane`])
+
+    // Bounded, because it renders in the rail: a source cannot put an essay where a list goes.
+    expect(source({ message: '' }).success).toBe(false)
+    expect(source({ message: 'x'.repeat(161) }).success).toBe(false)
+  })
+
+  it('carries a ref resolver and confines the route it spends provider credentials on', () => {
+    const good = manifest({
+      refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v2/p/board/refs' }],
+    })
+    expect(good.success).toBe(true)
+    expect(good.success && good.data.contributions.refResolvers[0]?.resolve).toBe('/v2/p/board/refs')
+
+    // The escape that matters here is naming ANOTHER plugin's resolver: the host POSTs identifiers to
+    // whatever this says and stamps the answer with the declaring plugin's provider, so an unconfined
+    // route is how a plugin would publish someone else's items under its own name.
+    expect(messages(manifest({
+      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v2/p/linear/issues' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({
+      refResolvers: [{ id: 'r', kind: 'board.card', resolve: '/v2/core/integrations' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+  })
+
+  it('caps ref resolvers at four and refuses an id another contribution kind already took', () => {
+    const five = Array.from({ length: 5 }, (_, i) => ({ id: `r${i}`, kind: 'board.card', resolve: '/v2/p/board/refs' }))
+    expect(manifest({ refResolvers: five }).success).toBe(false)
+    expect(manifest({ refResolvers: five.slice(0, 4) }).success).toBe(true)
+
+    expect(messages(manifest({
+      frames: [PANE],
+      refResolvers: [{ id: 'board', kind: 'board.card', resolve: '/v2/p/board/refs' }],
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
@@ -339,6 +396,18 @@ describe('project-scoped surfaces and their routes', () => {
       sources: [PROJECT_SOURCE],
       commands: [{ id: 'board.open', title: 'Board: open card', action: { verb: 'navigate', surface: 'board-card' } }],
     }).success).toBe(false)
+  })
+
+  it('refuses navigate and createTask from a slot badge, whose click carries no row and no project', () => {
+    const slot = (onClick: unknown) => manifest({
+      frames: [PROJECT_PANE],
+      routes: [PROJECT_ROUTE],
+      sources: [PROJECT_SOURCE],
+      slots: [{ id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge', onClick }],
+    }).success
+    expect(slot({ verb: 'navigate', surface: 'board-card' })).toBe(false)
+    expect(slot({ verb: 'createTask' })).toBe(false)
+    expect(slot({ verb: 'runNodeAction', path: '/v2/p/board/refresh' })).toBe(true)
   })
 
   it('allows only a pane to be project-scoped, and folds routes into the duplicate-id sweep', () => {

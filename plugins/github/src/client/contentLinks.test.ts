@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { contentLinkRegistry, parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
 import { activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
-import { githubContentLinkContributions, makeContentLinkHandler, splitLinearIds } from './contentLinks'
+import { githubContentLinkContributions, makeContentLinkHandler } from './contentLinks'
 
 // Only github's own recognisers are asserted here. Linear's moved to plugins/linear with the
 // contribution itself — a github test importing linear's client would be a plugin->plugin edge
@@ -28,8 +28,8 @@ describe('parseInAppTarget', () => {
   })
 })
 
-// One click, with the three fields the handler actually reads. `dataset` carries the bare-id anchors this
-// file mints out of GitHub's body HTML; `href` is the real-URL path.
+// One click, with the three fields the handler actually reads. `dataset` carries the bare-id anchors the
+// host mints out of GitHub's body HTML; `href` is the real-URL path.
 const click = (anchor: { getAttribute?: (name: string) => string | null; dataset: Record<string, string> }) => {
   const preventDefault = vi.fn()
   return {
@@ -73,14 +73,16 @@ describe('project-keyed content navigation', () => {
   })
 })
 
-describe('bare Linear ids', () => {
-  // github injects these anchors itself (linkifyLinearIds), so no recogniser can claim them and the host's
-  // URL ladder never sees them. They go straight to the provider's reference panel.
+describe('bare ref anchors reaching the panel through github’s handler', () => {
+  // The HOST mints these now (client-core § linkifyRefs), and owns both the split and the click rung —
+  // its own suite covers prefix learning and attribution. What is worth pinning HERE is that github's
+  // handler still lets them through: it wraps `handlePluginContentLinkClick` rather than reimplementing
+  // it, and a wrapper that reordered its two branches would break this without breaking anything else.
   afterEach(() => closeRefPanel())
 
   it('opens the provider reference panel when that provider has one registered', () => {
     const panel = refPanelRegistry.register({ id: 'linear-ref', providerId: 'linear', component: () => null })
-    const { event, preventDefault } = click({ dataset: { linearId: 'CRA-404' } })
+    const { event, preventDefault } = click({ dataset: { refProvider: 'linear', refItem: 'CRA-404' } })
 
     makeContentLinkHandler(vi.fn())(event)
 
@@ -89,27 +91,14 @@ describe('bare Linear ids', () => {
     panel.dispose()
   })
 
-  it('opens nothing when Linear is not installed on this device', () => {
+  it('opens nothing when that provider is not installed on this device', () => {
     // The anchor has no href, so there is nothing to fall through TO — the click is still consumed, and the
     // shell must not be left showing an overlay no contribution can fill.
-    const { event, preventDefault } = click({ dataset: { linearId: 'CRA-404' } })
+    const { event, preventDefault } = click({ dataset: { refProvider: 'linear', refItem: 'CRA-404' } })
 
     makeContentLinkHandler(vi.fn())(event)
 
     expect(activeRefPanel()).toBeNull()
     expect(preventDefault).toHaveBeenCalledOnce()
-  })
-})
-
-describe('splitLinearIds', () => {
-  it('tags only ids whose prefix is known', () => {
-    expect(splitLinearIds('Closes CRA-404 (uses UTF-8)', ['CRA'])).toEqual([
-      { text: 'Closes ' },
-      { text: 'CRA-404', id: 'CRA-404' },
-      { text: ' (uses UTF-8)' },
-    ])
-  })
-  it('returns the whole string when no prefixes are known', () => {
-    expect(splitLinearIds('Closes CRA-404', [])).toEqual([{ text: 'Closes CRA-404' }])
   })
 })

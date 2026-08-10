@@ -2,17 +2,15 @@ import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
-import { checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, openRefPanel, persistDraft, projectsOptions, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
+import { checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, learnRefPrefixes, linkifyRefs, openRefPanel, persistDraft, projectsOptions, refResolutionsOptions, scanContentRefs, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import { CopyButton, MentionTextarea, Picker, UserAvatar } from '@acorn/plugin-api/ui'
 import { mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions } from './queries'
 import { pullPrefixKey, pullsPrefixKey, type Label } from '../contract/api'
-import { linearIssuesOptions } from '@acorn/plugin-linear/contract/issues.ts'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
 import { ConversationEntryItem } from './pullDetail/Conversation'
 import ChecksPanel from './checks/ChecksPanel'
-import { scanLinearRefs } from '@acorn/plugin-linear/contract/scanRefs.ts'
-import { linkifyLinearIds, makeContentLinkHandler } from './contentLinks'
+import { makeContentLinkHandler } from './contentLinks'
 import { PullSummary } from './PullSummary'
 import { buildConversationEntries, buildThreadSnippetIndex } from './pullDetail/model'
 import { createNavigatorScrollRestoration } from './reviewScrollRestoration'
@@ -69,12 +67,19 @@ export default function PullDetail(props: { task?: Task } = {}) {
     for (const cm of d.comments) texts.push(cm.body)
     for (const rv of d.reviews) texts.push(rv.body)
     for (const th of d.threads) for (const cm of th.comments) texts.push(cm.body)
-    return scanLinearRefs(texts)
+    // The host reads every registered recogniser, so this finds any provider's URLs. It is narrowed to
+    // Linear because what is downstream of it — the enrichment route and the chip — still is.
+    return scanContentRefs(texts).filter((ref) => ref.providerId === 'linear')
   })
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
   const linearConnected = () => (integrations.data?.integrations ?? []).some((i) => i.providerId === 'linear' && i.status === 'connected')
-  const linearIssues = createQuery(() => linearIssuesOptions(linearRefs().map((rf) => rf.identifier), linearRefs().length > 0 && linearConnected()))
-  const linearSummary = createMemo(() => new Map((linearIssues.data?.issues ?? []).map((i) => [i.identifier, i])))
+  // Enrichment through the host, addressed by provider — no import of Linear's own package, which is
+  // what makes github survivable as a loaded plugin. The resolver route is Linear's and answers in the
+  // host's vocabulary (label + state chip), so what this pane renders is the same for any provider that
+  // declares one. The connection check stays: the route 403s with no connection, and asking is a wasted
+  // round trip when the "connect Linear" fallback below is what should render anyway.
+  const linearIssues = createQuery(() => refResolutionsOptions('linear', linearRefs().map((rf) => rf.item), linearConnected()))
+  const linearSummary = createMemo(() => new Map((linearIssues.data ?? []).map((i) => [i.identifier, i])))
   // Show a linked ticket without leaving the PR: the linked-ticket list below, and the bare `CRA-404` ids
   // in the title. `openRefPanel` refuses when Linear is not installed on this device, which is the right
   // degradation for a detail overlay and is why nothing here checks first.
@@ -106,18 +111,21 @@ export default function PullDetail(props: { task?: Task } = {}) {
     navigate,
     (owner, repo) => projects.data?.find((project) => project.github?.owner === owner && project.github?.name === repo)?.id,
   )
-  const linearPrefixes = createMemo(() => [...new Set(linearRefs().map((rf) => rf.identifier.split('-')[0]))])
+  // Which bare `CRA-404`-shaped tokens are safe to linkify here, and for whom. Learned from the refs
+  // already CONFIRMED in this PR by their full URLs, so the prefix was witnessed rather than guessed —
+  // the host owns both halves now, and it works for any provider whose links appear in a body.
+  const refPrefixes = createMemo(() => learnRefPrefixes(linearRefs()))
 
-  // After GitHub bodies render (innerHTML, opaque to Solid), wrap bare Linear ids in clickable
-  // anchors. Only touch .markdown nodes (never Solid-managed text). Re-runs when data/prefixes change.
+  // After GitHub bodies render (innerHTML, opaque to Solid), wrap those bare ids in clickable anchors.
+  // Only touch .markdown nodes (never Solid-managed text). Re-runs when data/prefixes change.
   let descRef: HTMLDivElement | undefined
   let convRef: HTMLDivElement | undefined
   createEffect(() => {
     detail.data
-    const prefixes = linearPrefixes()
+    const prefixes = refPrefixes()
     queueMicrotask(() => {
-      if (descRef) linkifyLinearIds(descRef, prefixes)
-      convRef?.querySelectorAll<HTMLElement>('.markdown').forEach((el) => linkifyLinearIds(el, prefixes))
+      if (descRef) linkifyRefs(descRef, prefixes)
+      convRef?.querySelectorAll<HTMLElement>('.markdown').forEach((el) => linkifyRefs(el, prefixes))
     })
   })
   const assignedLabelNames = createMemo(() => new Set((detail.data?.labels ?? []).map((label) => label.name.toLowerCase())))
@@ -202,7 +210,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
               pull={pull}
               bindNavigatorScroll={bindNavigatorScroll}
               fileSummary={fileSummary}
-              linearPrefixes={linearPrefixes}
+              refPrefixes={refPrefixes}
               onOpenIssue={showLinearIssue}
               mergeMethod={mergeMethod}
               setMergeMethod={setMergeMethod}
@@ -242,7 +250,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                           {(rf) => (
                             <li class="check-row">
                               <a class="integration-row" href={rf.url} target="_blank" rel="noreferrer">
-                                <span class="integration-row-id">{rf.identifier}</span>
+                                <span class="integration-row-id">{rf.item}</span>
                               </a>
                             </li>
                           )}
@@ -257,15 +265,15 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   <ul class="check-list">
                     <For each={linearRefs()}>
                       {(rf) => {
-                        const summary = () => linearSummary().get(rf.identifier)
+                        const summary = () => linearSummary().get(rf.item)
                         return (
                           <li class="check-row">
-                            <button type="button" class="integration-row" onClick={() => showLinearIssue(rf.identifier)}>
-                              <span class="integration-row-id">{rf.identifier}</span>
+                            <button type="button" class="integration-row" onClick={() => showLinearIssue(rf.item)}>
+                              <span class="integration-row-id">{rf.item}</span>
                               <Show when={summary()} fallback={<span class="integration-row-title muted">{linearIssues.isLoading ? 'Loading…' : ''}</span>}>
                                 {(s) => (
                                   <>
-                                    <span class="integration-row-title">{s().title}</span>
+                                    <span class="integration-row-title">{s().label}</span>
                                     <Show when={s().state}>
                                       {(st) => (
                                         <span class="integration-row-state" style={{ '--state-color': st().color }}>

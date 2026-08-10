@@ -186,7 +186,6 @@ async function upsertIssue(context: RefreshCtx, summary: RollbarItemSummary, cac
   const data = encodeCached(cached, context.limits.maxCachedItemBytes)
   await context.items.write({
     connectionId: summary.integrationId,
-    provider: 'rollbar',
     identifier: summary.identifier,
     data,
     fetchedAt: context.now,
@@ -244,7 +243,7 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
     // rather than a row, because a marker is nothing but a timestamp).
     const [listAt, rows] = await Promise.all([
       context.items.readMarker(key),
-      context.items.listForConnection(context.connection.id, 'rollbar'),
+      context.items.listForConnection(context.connection.id),
     ])
     if (listAt == null) return null // never listed → cold, force a refresh
     // Current membership is exact: only rows stamped with THIS list's fetch time (docs/caching.md).

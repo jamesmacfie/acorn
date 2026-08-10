@@ -143,12 +143,26 @@ security boundary: a loaded bundle shares the Node's process and can `import('no
 `ctx` entirely. `docs/security.md` is the full threat model, and every surface that
 renders these permissions has to say *declared*, not *enforced*.
 
-`apps/node/scripts/build-plugin.mjs` builds a repository plugin into this shape. Its default target is
+`apps/node/scripts/build-plugin.mjs` builds a repository plugin into this shape, reading the plugin's
+declaration from the plugin's own package — `plugins/<id>/acorn-plugin.config.mjs`, where the directory
+name is the plugin id — so a plugin's declared surface lives, and is reviewed, beside the code it
+describes. Its default target is
 the development data root; `--package-root` stages the same package for distribution. The desktop
 build keeps its bundled roster in `apps/desktop/scripts/build-bundled-plugins.mjs`, packages the
 result as read-only application resources, and asks the service to reconcile it before discovery.
 Only packages recorded as app-owned are updated. An existing owner-installed version wins, and
 uninstall writes a tombstone outside the package directory so a later app update does not restore it.
+An unrecorded directory sitting in the plugin root is treated as owner-installed too, with one
+exception: a package `build:plugin` wrote straight into the data root leaves a `.acorn-dev-build`
+marker, and reconciliation treats a marked package as app-owned so a newer bundled version replaces
+it. Without that, a developer's own build was indistinguishable from an installation, was recorded as
+user-managed, and then quietly outlived every rebuild of the app — which presents as a feature that
+does not exist. The marker is never written under `--package-root`, so nothing in a shipped resource
+directory carries it, and a real install is protected exactly as before. Because an owner-installed row
+is still checked first — deliberately, so a marker file cannot override ownership — `build:plugin` also
+clears a `user` row for the id it is writing: that row is a claim about how the directory got there, the
+script is authoritatively changing that, and without this a developer already trapped by a pre-marker
+build would stay trapped through any number of rebuilds.
 Packaged client bytes are trusted only after Electron main reads and hashes its own application
 resource; a node cannot acquire that trust by labelling a roster row as bundled.
 
@@ -200,7 +214,11 @@ kinds of contribution come out of one manifest:
   subframe to its own origin. The frame passes a URL and learns nothing back. The host validates the
   scheme at the boundary — `https` only, the same policy a manifest's `openUrl` descriptor verb is held
   to (`@acorn/protocol/externalUrl.ts`), so `file:`, `javascript:`, `data:` and the frame's own
-  `app-plugin://` origin are all refused — and then runs the same content-link ladder every shell surface
+  `app-plugin://` origin are all refused. A navigation must also be a person's act: the verb is honoured
+  only while the frame itself holds focus — which a real click or keypress inside its document gives it —
+  and at most once per second, so background code cannot move the reader and a hostile frame cannot spam
+  the browser. A frame using `openLinkOnClick` satisfies both for free. Then the host runs the same
+  content-link ladder every shell surface
   runs: in-app when a recogniser claims the URL, the owner's browser otherwise. *Which* in-app
   presentation is inferred from the calling surface, not asked of the frame: a link clicked inside a
   reference panel swaps that panel's subject, and one inside a pane opens the pane. The SDK's
@@ -215,8 +233,8 @@ kinds of contribution come out of one manifest:
   or message bridge. The plugin's sandboxed client frame remains the controller for only
   `navigate`, `back`, `forward`, and `reload`; it cannot read the page or type into it.
 - **Descriptors** — a rail source, task-footer badge, commands/keybindings, attention items, node stats,
-  restricted URL recognizers (`contentLinks`), renderer routes (`routes`), and agent-context entries
-  (`agentContexts`).
+  restricted URL recognizers (`contentLinks`), renderer routes (`routes`), agent-context entries
+  (`agentContexts`), and batch reference resolvers (`refResolvers`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
   mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
@@ -224,7 +242,13 @@ kinds of contribution come out of one manifest:
   bundle at all, and therefore no trust prompt — nothing of its executes on the device. A source may
   declare `createTask`; its row supplies the task seed and optional external link, while the host owns
   the modal, origin namespace, connection ownership check, create-before-link ordering, and
-  partial-failure reporting. A `contentLinks` entry uses a
+  partial-failure reporting. A source may also declare an `emptyState` — one bounded message and at most
+  one context-free action — shown when its route answered with *no items*, in place of the host's fixed
+  "Nothing here yet.". Not when the fetch failed: an unreachable node already has its own banner, and
+  telling someone "nothing is assigned to you" because a request timed out is a claim the host has no
+  business making on a plugin's behalf. It is deliberately no richer than a sentence and a button; the
+  field exists because a rail that cannot say what empty *means* pushes sources into showing a wrong
+  list instead of an empty one, which is exactly what Linear did. A `contentLinks` entry uses a
   bounded `https://` host/path grammar and delivers one captured path segment to one of **two**
   destinations: an optional **task-scoped** `openPane` from the same manifest, which receives it as a
   `plugin:select` intent in the active task; or the plugin's own **reference panel**, shown over
@@ -246,7 +270,11 @@ kinds of contribution come out of one manifest:
   "surface": … }` is what changes that URL from a clicked row — the URL is where a project-scoped
   surface's selection lives, because unlike a task pane it has no layout state to keep one in. A
   command may not carry `navigate`, for the same reason it may not carry `createTask`: a command
-  registry row has neither a routed project nor the shell's navigator in scope. An `agentContexts`
+  registry row has neither a routed project nor the shell's navigator in scope. A slot badge's
+  `onClick` takes the same narrowed verb set as a command — `openPane`, `runNodeAction`, `openUrl` —
+  for the same reason: its click carries no selected row and no routed project, so a verb that needs
+  either would parse and then only ever fail. Only a source's `onSelect` gets the full set, because a
+  rail row is the one click site with a row, a project, and the promotion callback in scope. An `agentContexts`
   entry names two routes — `options`
   (GET) and `capture` (POST) — and puts a row in the agent composer's context picker. Its `capture`
   answer is the one descriptor response that ends up inside a model's prompt, so it is parsed against
@@ -256,13 +284,70 @@ kinds of contribution come out of one manifest:
   `MAX_AGENT_CONTEXT_BYTES` ceiling cannot be talked past. An over-budget capture is refused whole,
   never trimmed. The `revision?()` half of the first-party contract has no manifest form on purpose:
   it is synchronous, a descriptor answers across a fetch, and the invalidation ping already covers
-  freshness.
+  freshness. The whole entry is two routes and a label:
+
+  ```json
+  {
+    "contributions": {
+      "agentContexts": [{
+        "id": "http-requests",
+        "label": "HTTP requests",
+        "description": "Saved requests and their latest responses",
+        "options": "/v2/p/http/agent-context/options",
+        "capture": "/v2/p/http/agent-context/capture"
+      }]
+    }
+  }
+  ```
+
+  `options` answers `GET → [{ id, label, description?, defaultSelected? }]` for the picker; `capture`
+  receives `POST { taskId, workspaceId?, optionIds? }` and answers
+  `[{ contextId, label, content, resourceId?, provenance?, deepLink?, freshness?, sensitivity? }]`
+  (`@acorn/protocol/agentContext.ts` is the schema). Everything else on a snapshot — `source`,
+  `capturedAt`, `byteSize`, `estimatedTokens` — is measured and stamped by the host, never read from
+  the response.
+
+  A `refResolvers` entry is the same carrier shape for a different question: **what another plugin's
+  surface should draw** when it is holding identifiers of this plugin's items. Recognition already has
+  an answer — `contentLinks` declares the URL shapes, and the host scans any text for every registered
+  recogniser at once (`scanContentRefs`) — so this is only the enrichment half, and it exists because
+  the alternative was a cross-plugin import (`github` importing `@acorn/plugin-linear/contract`) that
+  cannot survive either side becoming a loaded package.
+
+  ```json
+  {
+    "contributions": {
+      "refResolvers": [{
+        "id": "linear-refs",
+        "kind": "linear.issue",
+        "resolve": "/v2/p/linear/issues"
+      }]
+    }
+  }
+  ```
+
+  The host POSTs `{ identifiers }`, count-capped, and parses the answer as
+  `[{ identifier, label, state?: { name, color, kind }, url? }]`
+  (`@acorn/protocol/refResolvers.ts`). `providerId` is **not** in the body — the host stamps it from
+  the plugin whose route answered, the same rule that stops a recogniser claiming another provider,
+  because a row that could name its own provider could publish a stranger's items behind a stranger's
+  reference panel. A consumer addresses a resolver by provider and never by route
+  (`refResolutionsOptions` in `client-core/registries/refResolvers.ts` owns the query key and a
+  five-minute staleness for every provider alike), so a surface enriches Linear and a tracker nobody
+  has written yet with the same call.
+
+  The response vocabulary is deliberately a label and a state chip, and should stay that way. Every
+  field added here is a field *every* provider's answer gets rendered with, which is the descriptor-tier
+  slope this tier has declined more than once. The route spends provider credentials on a cache miss,
+  and is already behind `requireProviderAccess` through the provider mount — that gate is the
+  authorisation, the identifier cap is the budget, and neither replaces the other.
 
 ### Frame authoring and the UI kit
 
 A frame owns its document and bundle, so its framework is its choice. The repository package builder
-keeps the client Vite transform opt-in per plugin: Rollbar and Linear supply `vite-plugin-solid`, a
-vanilla frame supplies none, and another framework can supply its own transform. A direct `solid-js`
+keeps the client Vite transform opt-in per plugin: the plugin's `acorn-plugin.config.mjs` names a
+`framework` (`solid` today) that the builder maps to the right transforms, a vanilla frame omits the
+key, and adding a framework is one line in the builder's map. A direct `solid-js`
 dependency in a Solid frame is intentional. Its separate origin and document are a separate reactive
 realm, so this is not the duplicate-Solid-in-one-realm hazard the shell dependency rules prevent.
 
@@ -350,7 +435,9 @@ manifest is parsed:
 What the frame receives is unchanged: `bridge.context.projectId` and, when the URL addresses one,
 `bridge.context.item`; every later selection arrives as a `select` message rather than a remount. A
 project-scoped surface never gets a `taskId`, which is how a frame that draws both scopes tells them
-apart without asking. The `x` segment is reserved by core for exactly this, and the prefix is derived
+apart without asking. Its `label` and `glyph` are currently unused — a task pane's label names its
+switcher entry, but a project-scoped surface is drawn beside its own rail list, which already carries
+the plugin's labels — so do not expect them on screen. The `x` segment is reserved by core for exactly this, and the prefix is derived
 from the plugin id alone — a manifest cannot name it.
 
 A frame surface may also declare the modified chords its own UI handles:

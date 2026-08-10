@@ -2,13 +2,12 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { activateTaskSignals, checksState, clientEvents, createTask, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, type Task, tasksKey, tasksOptions, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, checksState, clientEvents, createTask, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, scanContentRefs, type Task, tasksKey, tasksOptions, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
 import { type Pull } from '../contract/api'
 import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterState'
-import { scanLinearRefs } from '@acorn/plugin-linear/contract/scanRefs.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
@@ -111,11 +110,20 @@ export default function PullList() {
     }
     // Fetch the detail (cached if warm) so the body is present, then seed a task_link for EVERY
     // Linear ticket the PR references — a PR can resolve several, and the task links them all.
+    //
+    // The scan is provider-agnostic (the host reads every registered recogniser); the ATTRIBUTION is
+    // not, and cannot be: a task link needs a connection id, and the only one derivable here is the
+    // sole connected Linear. Widening this means asking each provider for its own sole connection,
+    // which is a promotion-flow change rather than a scanner one.
     const detail = await queryClient.ensureQueryData(pullDetailOptions(owner(), repo(), String(pr.number), true)).catch(() => undefined)
     const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
     const linears = (integrations?.integrations ?? []).filter((i) => i.providerId === 'linear' && i.status === 'connected')
     const soleLinear = linears.length === 1 ? linears[0].id : null
-    const links = soleLinear ? scanLinearRefs([detail?.pull?.body]).map((r) => ({ connectionId: soleLinear, identifier: r.identifier, ref: { displayId: r.identifier, url: r.url } })) : []
+    const links = soleLinear
+      ? scanContentRefs([detail?.pull?.body])
+          .filter((r) => r.providerId === 'linear')
+          .map((r) => ({ connectionId: soleLinear, identifier: r.item, ref: { displayId: r.item, url: r.url } }))
+      : []
     const w = await createTask({ origin: 'github-pr', projectId, branch: pr.headRef, pullNumber: pr.number, links })
     await queryClient.invalidateQueries({ queryKey: tasksKey })
     activateTaskSignals(w, { pane: 'pr' })

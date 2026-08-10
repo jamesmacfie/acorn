@@ -247,13 +247,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Inline Linear id link (linkified bare ids in GitHub titles/bodies, and the title component). */
-.linear-inline-link {
+/* A bare `CRA-404` the host linkified in rendered text, for any provider whose prefix was witnessed in
+   the same surface (registries/contentLinks.ts § REF_LINK_CLASS). */
+.ref-inline-link {
   color: var(--accent);
   cursor: pointer;
   text-decoration: none;
 }
-.linear-inline-link:hover {
+.ref-inline-link:hover {
   text-decoration: underline;
 }
 

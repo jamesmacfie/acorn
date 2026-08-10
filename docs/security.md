@@ -298,12 +298,18 @@ call path. Generalize it as the **credential-injecting fetch broker**:
   within the allowlisted host set (a redirect to an attacker host with the header attached is
   the classic leak).
 
-Loaded integration providers currently have one compatibility exception:
+Loaded integration providers currently have three compatibility exceptions, each owner/provider
+bounded by the host and none a general read or lookup API:
 `PluginProviderRuntime.withConnections` lends a decrypted credential inside a provider-owned async
-callback, matching the existing built-in `forEachConnection` contract. It is not a general read or
-lookup API, does not expose the secret service, and is owner/provider bounded by the host. Moving the
-node half out of process must turn that callback into an explicit broker/visitor protocol—or replace
-it with the credential-injecting broker below—rather than add a long-lived secret value to RPC.
+callback, matching the existing built-in `forEachConnection` contract; a connection contribution's
+`projects.list({ connection, secret })` is the same lend for the project picker's enumeration; and
+`PluginProviderRuntime.items(providerId)` returns a provider-scoped store object synchronously rather
+than plain data over an async call. Moving the
+node half out of process must turn the two credential callbacks into an explicit broker/visitor
+protocol—or replace them
+with the credential-injecting broker below—rather than add a long-lived secret value to RPC, and must
+put a proxy in front of the item store. Each new callback- or object-shaped contract added to this
+list raises the cost of that move; prefer a route the host fetches when one can express the job.
 
 Implementation notes for the target broker: this is a `ctx.core` facet (`secrets: true` in the manifest gates it), and
 it is the *only* thing `secrets: true` grants — there is no "read secret value" call on the

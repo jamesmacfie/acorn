@@ -6,6 +6,7 @@ client: ClientPluginContext
 client: ContentLinkContribution
 client: ContentLinkOutcome
 client: ContentLinkPresentation
+client: ContentRef
 client: DeviceFlowController
 client: FAILED_STATUSES
 client: InAppTarget
@@ -16,6 +17,7 @@ client: PaneContribution
 client: PaneIntent
 client: PersistedSliceKeys
 client: PersistedStateSlice
+client: PluginRefResolution
 client: PollerContribution
 client: PrefKeys
 client: Project
@@ -23,9 +25,12 @@ client: ProjectImporterContribution
 client: ProjectImporterProps
 client: ProjectPatch
 client: ProjectSeed
+client: REF_LINK_CLASS
 client: RefPanelContribution
 client: RefPanelProps
 client: RefPanelTarget
+client: RefResolverContribution
+client: RefTokenPart
 client: SourceContribution
 client: SourcePromotionContext
 client: SourceRouteContribution
@@ -82,6 +87,8 @@ client: isDarkColor
 client: isPaneId
 client: isTerminalMax
 client: latestOnly
+client: learnRefPrefixes
+client: linkifyRefs
 client: nodeReady
 client: nodes
 client: onClosePaneWithin
@@ -109,6 +116,8 @@ client: readDraft
 client: readJson
 client: recipeBrowserUrl
 client: refPanelFor
+client: refResolutionsOptions
+client: refResolverFor
 client: refreshSessions
 client: registerCommands
 client: registerNoticeTargetHandler
@@ -124,6 +133,7 @@ client: rowHeightSm
 client: runApi
 client: saveJsonPref
 client: savePref
+client: scanContentRefs
 client: sendForm
 client: sendJson
 client: sendReferenceToAgent
@@ -135,6 +145,7 @@ client: setSelectedSource
 client: setTerminalOpen
 client: setWorkspaceExternalProjects
 client: sourceRegistry
+client: splitRefTokens
 client: summarizeFileStats
 client: taskBridge
 client: taskStatus

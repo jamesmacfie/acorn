@@ -1,6 +1,7 @@
 import { createComponent, lazy } from 'solid-js'
-import type { NodePluginRow, PluginCommandDescriptor } from '@acorn/protocol/api.ts'
+import type { NodePluginRow, PluginChromeAction, PluginCommandDescriptor, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
 import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
+import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { agentContextRegistry } from '../../registries/agentContexts'
 import { attentionRegistry, type AttentionItem } from '../../registries/attention'
@@ -24,12 +25,14 @@ import {
   readAgentContextOptions,
   readAttention,
   readStat,
+  resolveRefs,
   unwatchChrome,
   watchChrome,
 } from './data'
 import { descriptorPromotion } from './promotion'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../../registries/contentLinks'
+import { refResolverRegistry } from '../../registries/refResolvers'
 
 // Turning accepted manifests into NATIVE shell contributions — the descriptor half of what
 // plugins/frames/register.tsx does for rectangles (docs/plugins.md).
@@ -60,6 +63,31 @@ const registered = new Map<string, Disposable[]>()
 // The node the rail and the task footer are looking at. There is no other candidate — a task belongs to
 // whichever node the window is talking to.
 const chromeNode = (): string => activeNodeId() ?? ''
+
+// Can this action actually do anything from a click site with no row and no routed project? The node
+// checked all three when it parsed the manifest; a roster row is wire input, so the device checks them
+// again. Shared by commands, palette rows and a source's empty-state button, which take the same
+// narrowed verb set for the same reason (node-core/main/pluginManifest.ts § contextFreeAction).
+const contextFreeActionUsable = (pluginId: string, taskPanes: ReadonlySet<string>, action: PluginChromeAction): boolean => {
+  if (action.verb === 'openPane') return taskPanes.has(action.pane)
+  if (action.verb === 'runNodeAction') return ownsRoute(pluginId, action.path)
+  if (action.verb === 'openUrl') return isPluginOpenableUrl(action.url)
+  // `createTask` needs a selected rail row, `navigate` needs a routed project and a navigator. Refused
+  // rather than read, because the verb does not carry the field the site would need.
+  return false
+}
+
+/** An authored empty state with an unusable action reduced to its message. Exported because the
+ * descriptor it sanitises is captured inside a component closure, where a test cannot reach it — and a
+ * button that can only toast is exactly the failure worth pinning. */
+export const usableEmptyState = (
+  pluginId: string,
+  taskPanes: ReadonlySet<string>,
+  empty: PluginSourceEmptyState | undefined,
+): PluginSourceEmptyState | undefined =>
+  // The message survives on its own: it is the part the rail was missing, and losing a sentence over a
+  // button would be the worse trade.
+  empty?.action && !contextFreeActionUsable(pluginId, taskPanes, empty.action) ? { message: empty.message } : empty
 
 // Every plugin whose chrome this device may draw, one row per plugin id. The manifest travels with the
 // roster row and one version wins per id, so the first node offering it is as good as any.
@@ -107,15 +135,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       descriptor.action.verb === 'createTask' || descriptor.action.verb === 'navigate'
         ? []
         : [{ ...descriptor, category: 'action', palette: true, action: descriptor.action }]),
-  ].filter((descriptor) => {
-    if (descriptor.action.verb === 'openPane') return taskPanes.has(descriptor.action.pane)
-    if (descriptor.action.verb === 'runNodeAction') return ownsRoute(pluginId, descriptor.action.path)
-    if (descriptor.action.verb === 'openUrl') return descriptor.action.url.startsWith('https://')
-    // A verb a command cannot carry: `createTask` needs a selected rail row, `navigate` needs a routed
-    // project and a navigator. The manifest refuses both here, and a roster row is wire input, so this
-    // refuses them again rather than reading a field the verb does not have.
-    return false
-  })
+  ].filter((descriptor) => contextFreeActionUsable(pluginId, taskPanes, descriptor.action))
   const commandById = new Map(commands.map((descriptor) => [descriptor.id, descriptor]))
   for (const descriptor of commands) {
     add('command', descriptor.id, () => commandRegistry.register({
@@ -184,8 +204,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     })
   }
 
-  for (const descriptor of contributions.sources ?? []) {
-    note(descriptor.refresh)
+  for (const rawSource of contributions.sources ?? []) {
+    note(rawSource.refresh)
+    // The empty state's action is re-checked on the device for the same reason a command's is: it came
+    // off a roster row.
+    const emptyState = usableEmptyState(pluginId, taskPanes, rawSource.emptyState)
+    const descriptor = emptyState === rawSource.emptyState ? rawSource : { ...rawSource, emptyState }
     add('source', descriptor.id, () => sourceRegistry.register({
       id: descriptor.id,
       label: descriptor.label,
@@ -266,6 +290,22 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
         : [],
       capture: async (scope, optionIds) => pluginEnabledOnNode(chromeNode(), pluginId)
         ? captureAgentContext(pluginId, descriptor.capture, chromeNode(), scope, optionIds, { source, panes: taskPanes })
+        : [],
+    }))
+  }
+
+  for (const descriptor of contributions.refResolvers ?? []) {
+    // `providerId` is the plugin id and nothing else. The descriptor cannot state one, because a
+    // resolver claiming another provider's name is how a plugin would get its own rows rendered as
+    // that provider's items — the same line the content-link stamp holds one registry over.
+    add('ref resolver', descriptor.id, () => refResolverRegistry.register({
+      id: descriptor.id,
+      providerId: pluginId,
+      kind: descriptor.kind,
+      // Asking a node that is not running the plugin spends a round trip to be told nothing, and the
+      // consumer's fallback (the bare identifier) is the same either way.
+      resolve: async (identifiers) => pluginEnabledOnNode(chromeNode(), pluginId)
+        ? resolveRefs(pluginId, descriptor.resolve, chromeNode(), identifiers)
         : [],
     }))
   }

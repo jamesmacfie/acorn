@@ -37,9 +37,10 @@ export async function runProviderResource<TInput, TOutput>(args: {
   const connection = await getConnection(args.db, args.userId, args.connectionId)
   if (!connection || connection.provider !== args.providerId) return failure('provider_not_connected', 403)
 
-  // Built once per call and scoped to this owner. The provider sees only its six operations against
-  // core's external-item tables (integrations/itemStore.ts), never core's database handle.
-  const items = createExternalItemStore(args.db, args.userId)
+  // Built once per call and scoped to this owner AND this provider. The provider sees only the
+  // store's operations against its own rows in core's external-item tables
+  // (integrations/itemStore.ts), never core's database handle.
+  const items = createExternalItemStore(args.db, args.userId, args.providerId)
   const context = (): ProviderResourceContext => ({
     items,
     userId: args.userId,

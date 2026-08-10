@@ -14,6 +14,11 @@ import {
   type AgentContextOption,
   type AgentContextSnapshot,
 } from '@acorn/protocol/agentContext.ts'
+import {
+  MAX_REF_RESOLVE_IDENTIFIERS,
+  pluginRefResolutionsSchema,
+  type PluginRefResolution,
+} from '@acorn/protocol/refResolvers.ts'
 import { readJson, writeJson } from '../../apiClient'
 import { wsOnStatus } from '../../wsClient'
 import { ownsTaskOrigin } from './ownership'
@@ -295,6 +300,40 @@ export async function captureAgentContext(
     throw new Error(`${pluginId} returned more than ${MAX_AGENT_CONTEXT_BYTES / 1024} KiB of context; nothing was attached.`)
   }
   return snapshots
+}
+
+// ── Ref resolution ────────────────────────────────────────────────────────────────────────────────
+//
+// The cross-plugin enrichment POST (@acorn/protocol/refResolvers.ts). Same posture as the capture above
+// — real parser, host-bound provenance — with one extra reason for care: this route spends the
+// provider's credentials on a cache miss, which is why the identifier list is capped HERE as well as in
+// the schema. It is already behind `requireProviderAccess` through the provider mount on the node; that
+// gate is the authorisation and this cap is the budget, and neither replaces the other.
+export async function resolveRefs(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  identifiers: readonly string[],
+): Promise<PluginRefResolution[]> {
+  if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not read ${path}`)
+  const wanted = identifiers.slice(0, MAX_REF_RESOLVE_IDENTIFIERS)
+  if (!wanted.length) return []
+  const body = await writeJson<unknown>(path, {
+    method: 'POST',
+    nodeId,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ identifiers: wanted }),
+  })
+  const parsed = pluginRefResolutionsSchema.safeParse(body)
+  if (!parsed.success) {
+    // All-or-nothing, like the option list: a partially-parsed set would render some refs enriched and
+    // others bare, which reads as "that ticket does not exist" rather than "the plugin answered badly".
+    drop(pluginId, 'ref resolutions', body)
+    return []
+  }
+  // `providerId` is stamped from the plugin whose route answered, never read from the row. A resolver
+  // that could name its own provider could put its rows behind a stranger's reference panel.
+  return parsed.data.map((row) => ({ ...row, providerId: pluginId }))
 }
 
 export async function readStat(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<number> {

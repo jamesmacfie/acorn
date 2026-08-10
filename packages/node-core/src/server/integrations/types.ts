@@ -106,11 +106,11 @@ export type ProviderMutation = {
 }
 
 export type ProviderResourceContext = {
-  // The external-item read model, NOT core's database handle. A provider plugin gets exactly the six
-  // reads/writes it performs against core's `issues` / `issue_resources` / freshness markers
-  // (integrations/itemStore.ts explains why those tables stayed core's and this store exists instead of
-  // a per-plugin migration). Handing over `db: AppDatabase` was the coupling: it let a provider write
-  // any core table, and it is what kept linear and rollbar on the schema ratchet.
+  // The external-item read model, NOT core's database handle — and scoped to this provider's own
+  // rows at construction, so a provider cannot read or write another provider's cache
+  // (integrations/itemStore.ts explains why those tables stayed core's and this store exists instead
+  // of a per-plugin migration). Handing over `db: AppDatabase` was the coupling: it let a provider
+  // write any core table, and it is what kept linear and rollbar on the schema ratchet.
   items: ExternalItemStore
   userId: string
   connection: StoredConnection

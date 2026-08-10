@@ -49,9 +49,11 @@ export function pluginRequestContext(c: Context<AppEnv>, pluginId: string): Plug
     items: (providerId) => {
       // Synchronous because the store itself does no work until a method is called, and both checks
       // are synchronous too — a plugin naming a provider it does not own should fail at the ask.
+      // The store is then built FOR that provider, so the check at the ask is the truth about every
+      // row the store can reach, not just about the argument.
       assertProviderAccess(c)
       assertOwnedProvider(pluginId, providerId)
-      return createExternalItemStore(getDb(c.env), principal.userId)
+      return createExternalItemStore(getDb(c.env), principal.userId, providerId)
     },
   }
 

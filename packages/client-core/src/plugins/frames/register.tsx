@@ -165,6 +165,11 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       return refPanelRegistry.register({
         id: surface.id,
         providerId: pluginId,
+        // The same per-node gate the task pane above carries, and for the same reason: the panel's frame
+        // talks to routes on the node being looked at, so a plugin stopped there has no panel to offer.
+        // It belongs on the REGISTRY rather than only in `RefPanelHost` because `openRefPanel` consults
+        // it to decide whether to claim the click at all.
+        when: () => pluginEnabledOnNode(frameNode(), pluginId),
         // The overlay is the HOST's here, unlike a first-party panel that draws its own. Two reasons, both
         // structural rather than stylistic. A frame is an iframe: it cannot Portal out of the box the
         // consumer put it in, so `position: fixed` inside the frame positions against the frame, and a

@@ -2,7 +2,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import type { PluginRailItem, PluginSourceDescriptor, Task } from '@acorn/protocol/api.ts'
+import type { PluginRailItem, PluginSourceDescriptor, PluginSourceEmptyState, Task } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { createFleetQuery } from '../../node/fanout'
 import { FRESHNESS_LABELS } from '../../node/freshness'
@@ -25,6 +25,33 @@ import { activateTaskSignals, pathForTask } from '../../tasks/activate'
 // an iframe, but that the iframe could never look like this.
 
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
+
+// "Nothing here yet." is true and tells nobody anything, and its uselessness had a real cost: linear
+// answered an unmapped workspace by showing the viewer's own assigned issues instead, because a wrong
+// list beat a blank one (docs/third-party/linear.md § finding 1). A source can now say what empty means
+// here and offer one place to go.
+//
+// One action, no markup, no per-facet variants. The action is optional and NOT a gap to be filled later
+// by widening the verb set: linear's own empty state points at a settings page, which no context-free
+// verb can reach, and shipping the message alone is the honest answer to that.
+function EmptyState(props: { pluginId: string; nodeId: string; empty?: PluginSourceEmptyState }) {
+  return (
+    <Show when={props.empty} fallback={<p class="placeholder">Nothing here yet.</p>}>
+      {(empty) => (
+        <div class="placeholder">
+          <p>{empty().message}</p>
+          <Show when={empty().action}>
+            {(action) => (
+              <button type="button" onClick={() => runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
+                {empty().actionLabel ?? 'Open'}
+              </button>
+            )}
+          </Show>
+        </div>
+      )}
+    </Show>
+  )
+}
 
 export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   const navigate = useNavigate()
@@ -127,7 +154,11 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           when={row()}
           fallback={<p class="placeholder">{unavailable() ? 'No cached items.' : 'Loading…'}</p>}
         >
-          <For each={items()} fallback={<p class="placeholder">Nothing here yet.</p>}>
+          {/* The authored empty state, or the fixed string for a source that declares none. It renders
+              only under `row()` — i.e. the plugin's own route ANSWERED, with nothing — because an
+              unreachable node is the banner above and "nothing is assigned to you" would be a claim the
+              host has no business making on a failed fetch. */}
+          <For each={items()} fallback={<EmptyState pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}>
             {(item) => (
               <Row
                 onActivate={props.descriptor.onSelect ? () => select(item) : undefined}

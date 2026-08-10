@@ -410,6 +410,21 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
+  it('the reserved plugin route segment is spelled the same on both sides of the client/node boundary', () => {
+    // client-core/registries/corePaths.ts declares PLUGIN_ROUTE_SEGMENT and node-core/main/pluginManifest.ts
+    // re-spells the same string to confine manifest routes at parse time — it cannot import the constant,
+    // because the client is downstream of the node. Both files say they are "one edit apart on purpose";
+    // this is the test that turns that edit into a failure instead of a route the device refuses after the
+    // node accepted it.
+    const client = byName.get('@acorn/client-core')!
+    const node = byName.get('@acorn/node-core')!
+    const corePaths = readFileSync(join(client.src, 'registries/corePaths.ts'), 'utf8')
+    const manifest = readFileSync(join(node.src, 'main/pluginManifest.ts'), 'utf8')
+    const segment = /export const PLUGIN_ROUTE_SEGMENT = '([^']+)'/.exec(corePaths)?.[1]
+    expect(segment).toBe('x')
+    expect(manifest).toContain(`\`/p/:projectId/${segment}/\${manifest.id}/\``)
+  })
+
   it('protocol modules named for a plugin are an enumerated, shrinking set', () => {
     // The routes are gone (rule above), but a plugin's TYPES can still accumulate here without one.
     // This is the ratchet for that: an explicit list, in the SCHEMA_BASELINE style, so adding a
