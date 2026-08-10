@@ -4,8 +4,6 @@ import {
   ISSUE_ID_QUERY,
   ISSUES_QUERY,
   type LinearNode,
-  type LinearProjectNode,
-  PROJECTS_QUERY,
   PROJECT_ISSUES_QUERY,
   projectIssuesFilter,
   issuesFilter,
@@ -45,10 +43,8 @@ import type {
   LinearIssueDetail,
   LinearIssuesRequest,
   LinearIssuesResponse,
-  LinearProject,
   LinearProjectIssue,
   LinearProjectIssuesResponse,
-  LinearProjectsResponse,
   LinearRailItemsResponse,
 } from '../../shared/api'
 import { linearRailItem } from '../../shared/rail'
@@ -181,30 +177,16 @@ async function mappedProjects(
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
 // Provider CRUD (connect/disconnect) lives in core's routes/integrations.ts.
 export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<AppEnv>()
-  // Projects across every connected Linear integration, each tagged with its connection so a picker
-  // could span multiple Linears. Nothing in the shell calls this today — the browse that did is a
-  // host-drawn rail now and the mapping it wrote has no writer left (see ASSIGNED_ISSUES_QUERY).
-  .get('/projects', async (c) => {
-    const connections = await linearConnections(c)
-    if (!connections.length) return respondError(c, 403, 'provider_not_connected')
-    const out: LinearProject[] = []
-    for (const { row, key } of connections) {
-      const res = await providerFetch(row, key, PROJECTS_QUERY, {})
-      if (linearError(res)) continue
-      try {
-        const { projects: found } = await linearData<{ projects: { nodes: LinearProjectNode[] } }>(res)
-        out.push(...found.nodes.map((p) => ({ integrationId: row.id, integrationLabel: row.label, id: p.id, name: p.name })))
-      } catch {
-        // skip this connection
-      }
-    }
-    return c.json({ projects: out } satisfies LinearProjectsResponse)
-  })
-  // Active issues for the given project ids within ONE connection (?integration=<id>&ids=). Also without
-  // a caller in the shell, for the same reason as /projects: the rail builds its mapped rows from this
-  // query directly, and the browse that fanned out over the route is gone. Kept because it is the
-  // single-connection form of a read the rail already performs, and it is the one place the
-  // active-only filter and the branch-suggestion passthrough are covered by a test.
+  // Active issues for the given project ids within ONE connection (?integration=<id>&ids=). Without a
+  // caller in the shell: the rail builds its mapped rows from this query directly, and the browse that
+  // fanned out over the route is gone. Kept because it is the single-connection form of a read the rail
+  // already performs, and it is the one place the active-only filter and the branch-suggestion
+  // passthrough are covered by a test.
+  //
+  // Its sibling `/projects` is gone rather than kept the same way: enumerating a connection's projects
+  // is now a provider CONTRIBUTION the host calls (`linearProjectSource` in ../provider.ts), so a
+  // route doing it again would be a second answer to one question, and the plugin-owned one is the
+  // answer core cannot use.
   .get('/project-issues', async (c) => {
     const connections = await linearConnections(c)
     const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
@@ -221,6 +203,16 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
   // The declarative rail source's rows. Degrades to an empty list rather than an error at every step: a
   // rail that shouts is worse than a rail that is quiet, and none of these conditions is the user doing
   // something wrong (docs/plugins.md § Descriptors).
+  //
+  // The no-mapping FALLBACK to the viewer's own assigned issues is KEPT, now deliberately rather than
+  // for want of a writer. There is a real picker again (Settings → workspace → Linked provider
+  // projects), so the honest-looking alternative would be an empty rail with a "link some projects"
+  // affordance — and a descriptor rail cannot draw one. `ChromeSourcePanel` renders every source's empty
+  // state as a fixed "Nothing here yet.", with no way for a contribution to say what is missing or where
+  // to go. Removing the fallback would therefore trade "shows your own open issues, unlabelled" for
+  // "shows nothing, unexplained", which is less honest, not more. Making that the right trade means
+  // giving `PluginSourceDescriptor` an authored empty state — a decision about the rail contract, owed
+  // by every source rather than by Linear, and not smuggled in here.
   .get('/rail-items', async (c) => {
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)

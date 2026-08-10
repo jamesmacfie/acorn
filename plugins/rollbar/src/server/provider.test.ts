@@ -1,8 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
+import type { StoredConnection } from '@acorn/plugin-api/node'
 import { rollbarProvider } from './provider'
 
 const ref: ExternalRef = { providerId: 'rollbar', connectionId: 'conn-1', displayId: '142' }
+
+// A Rollbar token is scoped to one project, so the source answers from the connection row `normalize`
+// already wrote and never calls out. Declared anyway so the workspace mapping is writable at all — the
+// rail scopes on the mapping's connection ids, and with no writer it showed every connected Rollbar.
+describe('rollbar project source', () => {
+  const connection = (config: string) => ({ id: 'conn-1', label: 'Rollbar · acme', config } as StoredConnection)
+
+  it('offers the one project the connection is scoped to', async () => {
+    await expect(rollbarProvider.projects!.list({ connection: connection('{"projectId":"9001"}'), secret: 'unused' }))
+      .resolves.toEqual([{ id: '9001', label: 'Rollbar · acme' }])
+  })
+
+  it('offers nothing rather than an invented id when the row carries no project', async () => {
+    for (const config of ['{}', 'not json', '{"projectId":42}']) {
+      await expect(rollbarProvider.projects!.list({ connection: connection(config), secret: 'unused' })).resolves.toEqual([])
+    }
+  })
+
+  it('is advertised on the public descriptor', () => {
+    expect(rollbarProvider.toPublic().supportsProjects).toBe(true)
+  })
+})
 
 describe('rollbar provider cache contract', () => {
   it('migrates a legacy bare item into the current versioned summary', () => {

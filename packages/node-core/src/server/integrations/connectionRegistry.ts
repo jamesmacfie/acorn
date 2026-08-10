@@ -27,6 +27,10 @@ const descriptorFor = (provider: ConnectionProviderContribution): PublicIntegrat
       : { maxConnections: provider.connection.maxConnections }),
   },
   capabilities: provider.capabilities,
+  // Derived from the contribution, exactly as `publicConnectionProvider` derives it — so a provider
+  // cannot claim `supportsProjects` in a hand-written `toPublic()` without a source behind it, and the
+  // picker's filter cannot be talked into asking a provider that has nothing to answer with.
+  ...(provider.projects === undefined ? {} : { supportsProjects: true }),
   ...(provider.models === undefined ? {} : { models: provider.models }),
   ...(provider.defaultModelId === undefined ? {} : { defaultModelId: provider.defaultModelId }),
 })

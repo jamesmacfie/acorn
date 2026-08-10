@@ -136,6 +136,11 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v2/core/integrations'), scopes: {}, note: 'Connected-account rows. Cross-plugin reads happen server-side via capabilities, never here.' },
   { path: shape(`/v2/core/integrations/${SEG}`), scopes: {} },
   { path: shape(`/v2/core/integrations/${SEG}/test`), scopes: {}, note: 'Spends another plugin’s credential.' },
+  // Read-shaped and still unmappable, for both halves of the rule above it: the call spends another
+  // plugin's credential on an outbound request, and what it returns is the project names inside someone
+  // else's connected account. A provider reaches its OWN projects through its own descriptor, which is
+  // where it declared them; nothing needs to read a sibling's through the bridge.
+  { path: shape(`/v2/core/integrations/${SEG}/projects`), scopes: {} },
 ]
 
 export type ApiDecision = { allowed: true } | { allowed: false; reason: string }

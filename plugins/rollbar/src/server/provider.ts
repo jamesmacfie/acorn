@@ -11,7 +11,7 @@ import {
   type RollbarProject,
 } from './'
 import { normalizeItemMetadata, normalizeSummary, rollbarItemUrl } from './normalize'
-import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderResourceContext, type ProviderResourceRefreshContext, publicProvider, type RouteFailure } from '@acorn/plugin-api/node'
+import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, parseJson, ProviderOperationError, type ProviderProjectSource, type ProviderResourceContext, type ProviderResourceRefreshContext, publicProvider, type RouteFailure } from '@acorn/plugin-api/node'
 import {
   createRollbarOccurrenceResources,
 } from './occurrenceResources'
@@ -24,6 +24,25 @@ type RollbarCached = CachedExternalItem<RollbarItemSummary, RollbarItemMetadata>
 export type RollbarResourceInput = { kind: 'list' } | { kind: 'detail'; identifier: string }
 export type RollbarListResult = { items: RollbarItemSummary[]; capped: boolean }
 export type RollbarResourceOutput = RollbarListResult | RollbarItemMetadata
+
+// A Rollbar credential is a PROJECT access token — "one connection per project", as the field hint
+// says — so this provider has exactly one project to offer and already knows which: `normalize` wrote
+// it into the connection's config and account when the token was validated. No fetch, and the secret
+// goes unused.
+//
+// Worth declaring anyway rather than leaving Rollbar out of the picker. Rollbar's rail scoping reads
+// only the CONNECTION ids out of a workspace's mapping (routes/rollbar.ts § scopedConnections), so
+// without a writable mapping a workspace shows every connected Rollbar — the same silent
+// unscoping Linear had. One row the owner can tick is what makes that mapping expressible.
+const rollbarProjectSource: ProviderProjectSource = {
+  list({ connection }) {
+    const config = parseJson(connection.config)
+    const projectId = isRecord(config) && typeof config.projectId === 'string' ? config.projectId : null
+    // No project id means the row predates `normalize` writing one; offering a project whose id we
+    // would have to invent is worse than offering none, since that id becomes a database row.
+    return Promise.resolve(projectId ? [{ id: projectId, label: connection.label }] : [])
+  },
+}
 
 const isSummary = (value: unknown): value is RollbarItemSummary =>
   isRecord(value) && typeof value.integrationId === 'string' && typeof value.identifier === 'string' &&
@@ -355,6 +374,7 @@ export const rollbarProvider = publicProvider({
     browse: true, linkExisting: true, promoteToTask: true, comments: 'none', repoAffinity: 'none', contextFormat: true,
   },
   resources: [rollbarItemsResource, occurrenceResources.occurrences, occurrenceResources.occurrence],
+  projects: rollbarProjectSource,
   codec: rollbarCodec,
   taskContext: {
     summarize(ref, item, state) {

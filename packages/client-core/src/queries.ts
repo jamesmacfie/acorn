@@ -7,10 +7,10 @@
 import { readJson } from './apiClient'
 import { homeNodeTarget } from './node/fleet'
 import { mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
-import { integrationsKey, integrationsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import { integrationProjectsRoute, integrationsKey, integrationsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
-export type { Integration, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
+export type { Integration, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
 
@@ -44,6 +44,23 @@ export const workspaceExternalProjectsOptions = (workspaceId: string | null, ena
   enabled: enabled && !!workspaceId,
   queryFn: async ({ signal }: QueryContext): Promise<WorkspaceExternalProjectsResponse> =>
     readJson<WorkspaceExternalProjectsResponse>(workspaceExternalProjectsRoute(workspaceId as string), { signal }),
+})
+
+// The projects ONE connection offers, for the workspace mapping picker
+// (settings/WorkspaceExternalProjects.tsx). Per connection, so a provider that is down shows its own
+// error row and its siblings still list.
+//
+// No staleTime and no retry, both deliberate. A picker's list is a claim about the provider now — the
+// surface this replaced had to reach past a five-minute cache by hand to get that — and a connection
+// that failed should say so at once with a Retry button rather than after three silent attempts.
+export const integrationProjectsKey = (connectionId: string) => ['integration-projects', connectionId] as const
+export const integrationProjectsOptions = (connectionId: string, enabled: boolean) => ({
+  queryKey: integrationProjectsKey(connectionId),
+  enabled: enabled && !!connectionId,
+  retry: false,
+  gcTime: 0,
+  queryFn: async ({ signal }: QueryContext): Promise<IntegrationProject[]> =>
+    (await readJson<IntegrationProjectsResponse>(integrationProjectsRoute(connectionId), { signal })).projects,
 })
 
 export const prefsOptions = (enabled: boolean) => ({

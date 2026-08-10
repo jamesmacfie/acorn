@@ -54,10 +54,10 @@ export type LinearIssueDetail = LinearIssueSummary & {
 export type LinearCommentRequest = { body: string; parentId?: string }
 export type LinearIssuesRequest = { identifiers: string[] }
 export type LinearIssuesResponse = { issues: LinearIssueSummary[] }
-// Linear projects + project-scoped issue browse (docs/workspaces-and-tasks.md — Linear source per repo). Each
-// project carries which connection it came from, so the picker can span multiple Linear integrations.
-export type LinearProject = { integrationId: string; integrationLabel: string; id: string; name: string }
-export type LinearProjectsResponse = { projects: LinearProject[] }
+// A project LIST is no longer a Linear wire type. Core's workspace picker reads projects through the
+// provider's `projects` contribution and its own `IntegrationProject` shape, so the plugin no longer
+// owns a response type for them (docs/workspaces-and-tasks.md).
+//
 // Browse-row triage fields ride the live /project-issues fetch (internal only, not the public
 // schema), so they are required here.
 export type LinearProjectIssue = LinearIssueSummary & {

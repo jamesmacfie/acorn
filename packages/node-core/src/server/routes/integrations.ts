@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { ConnectIntegrationRequest, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
+import type { ConnectIntegrationRequest, IntegrationProjectsResponse, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import { auditRequest } from '../auditRequest'
 import { getDb } from '../db'
 import {
@@ -14,6 +14,7 @@ import {
   testConnection,
 } from '../integrations/connections'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
+import { listConnectionProjects } from '../integrations/projectSource'
 import { providerError } from '../integrations/respondProvider'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
@@ -72,6 +73,22 @@ export const integrations = new Hono<AppEnv>()
     } catch (error) {
       return providerError(c, error)
     }
+  })
+  // What this connection offers to be mapped to a workspace. A core route, because the mapping it
+  // feeds (`workspace_external_projects`) is core's table and the picker that reads it is core's
+  // surface — asking each provider's own `/v2/p/<id>/...` namespace by convention would put the host
+  // in the position of guessing at a path a plugin defines.
+  //
+  // Nothing is cached: see integrations/projectSource.ts for why a picker must not serve a stale list.
+  .get('/:id/projects', async (c) => {
+    const result = await listConnectionProjects({
+      db: getDb(c.env),
+      userId: ownerId(c),
+      secrets: c.env.SECRETS,
+      connectionId: c.req.param('id'),
+    })
+    if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
+    return c.json({ projects: result.value } satisfies IntegrationProjectsResponse)
   })
   .post('/:id/test', async (c) => {
     try {
