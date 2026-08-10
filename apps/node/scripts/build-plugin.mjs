@@ -156,8 +156,14 @@ const PLUGINS = {
       }],
       // Still `openPane: 'linear'`, the TASK pane, and deliberately not the project surface. A content link
       // is clicked inside something — a PR conversation, a note, an agent transcript — and every one of
-      // those already has a task or its own better answer (github renders `linear-ref` beside the pull
-      // request, which keeps the reader where they were instead of navigating away).
+      // those already has a task or its own better answer.
+      //
+      // It is no longer the only destination, and that is the interesting part. Naming a pane here says
+      // "an item can land in this pane"; the `linear-ref` panel above says "an item can also be shown on
+      // its own, over whatever the reader was looking at". WHICH of the two a click gets is the clicking
+      // surface's call, not this file's — a PR conversation asks for the panel so the reader keeps their
+      // place, a note takes the pane (client-core/registries/contentLinks.ts § ContentLinkPresentation).
+      // A plugin with items but no task pane would omit `openPane` entirely and get the panel alone.
       //
       // TWO entries for one URL shape, and that is the finding rather than a style choice. The pattern
       // grammar is exact-arity by design — a bounded host/path form with no tail wildcard, so a manifest

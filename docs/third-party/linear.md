@@ -90,8 +90,11 @@ worked around:
   identifier filter only accepts the upper-case form).
 - **`kind` is the contribution id.** A descriptor target's `kind` is forced to the descriptor's id, so
   it became `linear.issue` where the compiled recogniser returned `linear`. github's PR-detail handler
-  narrowed on `kind === 'linear'` to open the side panel when there is no active task; it now narrows
-  on the pane the target names, which is stable across both tiers.
+  narrowed on `kind === 'linear'` to open the side panel when there is no active task; then on the pane
+  the target named, which was stable across both tiers; and now on neither. The host stamps the
+  contributing plugin's id onto the target as `providerId` and resolves the reference panel by provider,
+  so nothing outside linear spells any part of linear's namespace to get its panel open — which is what
+  makes the same route work for a plugin that does not exist yet.
 
 ### 3. A `refPanel` frame could not draw its own chrome, or close itself
 
@@ -115,6 +118,15 @@ Also confirmed by reading rather than trusting the brief: `onContentClick` and t
 clicks inside its own document — a `linear.app` link in a description re-points the view in place, which
 is better than what the compiled panel did — and a task linking several tickets gets its switcher from
 the task read the pane frame already makes.
+
+**Since then**, this finding has been generalised. It turned out to be the whole story of where a ref
+panel lives: because a frame portals out to a fixed overlay no matter where its consumer put it, github's
+placement of the panel inside its own conversation column was already doing nothing. So the mount point
+moved to one `RefPanelHost` in the shell (`client-core/registries/refPanelHost.tsx`) and the open ref
+became shell state — a change that is invisible on screen and is the reason any surface can now open a
+panel, not just a pull request. The adapter's overlay is untouched and the host adds no second wrapper.
+`refs`/`onSelectRef` now have no caller of any kind, first-party or not: the shell's host is single-slot,
+because a stack of reference panels is a navigation history and panes already are one.
 
 ### 4. The item store had to cross, and it is the shape `resource()` cannot express
 
@@ -284,14 +296,19 @@ seeds a task.
 - **The reference panel inside a GitHub pull request.** The highest-risk surface, and the one nothing has
   exercised: it needs a mirrored pull request whose body cites a ticket. It cannot be unit tested either,
   because vitest here cannot render a component. Finding 3 was reached by reading `frames/register.tsx` and
-  `frames/broker.ts`, and the fix follows from what they say rather than from having watched it work.
+  `frames/broker.ts`, and the fix follows from what they say rather than from having watched it work. Still
+  owed, and now owed for a second reason: the panel is opened from a different place (the shell's
+  `RefPanelHost`) and clicking a ticket in a PR *inside a task* reaches it where it used to swap the task's
+  pane instead. The ladder is unit-covered; the pixels are not.
 - **A real-token soak.** Everything above ran against a fake `api.linear.app`.
 - **Both appearance axes in the frame.** The frame's CSS is written entirely against tokens with
   fallbacks and the bridge pushes the full projection, but no run has switched theme or style with the
   pane open.
 - **A `linear.app` URL pasted into a note.** The recognisers parse (unit-covered through
   `linearIdentifierFromHref`, and the manifest's patterns compile through the host's own grammar at parse
-  time), but the click path from a note body to the pane has not been driven.
+  time), but the click path from a note body to the pane has not been driven. A note still prefers the
+  pane; what is new and also undriven is the fallback — a note in a context with no task now reaches the
+  reference panel instead of the browser.
 - **A manual pass over the project-mapping surface** from finding 1. The seam, the bounding and both
   providers' sources are unit-covered, but the picker is a component and vitest here cannot render one:
   ticking a real Linear project and watching the row land, the failing-connection row, and both

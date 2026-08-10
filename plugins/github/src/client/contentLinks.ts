@@ -11,7 +11,8 @@
 import {
   activeTaskId,
   type ContentLinkContribution,
-  openPluginContentTarget,
+  openContentTarget,
+  openRefPanel,
   parseInAppTarget,
 } from '@acorn/plugin-api/client'
 
@@ -22,6 +23,12 @@ const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$
 const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'marketplace', 'explore', 'topics', 'about'])
 
 // Registered from client/index.ts through ctx.contribute, like every other contribution.
+//
+// Neither declares a `providerId`, and the omission is deliberate rather than an oversight now that the
+// field exists: it is what makes a link resolve into the OWNING plugin's reference panel, and github has no
+// panel — a pull request is a whole review surface, not a card you glance at. So these two targets reach the
+// project route below and nothing else. If github ever grows one, adding `providerId: 'github'` here is the
+// entire change on this side.
 //
 // This used to be a module-scope loop guarded by `if (!contentLinkRegistry.entries().length)`, which
 // worked only while github was also the module that DEFINED the registry and so was guaranteed to
@@ -96,48 +103,59 @@ export function linkifyLinearIds(root: HTMLElement, prefixes: string[]): void {
 }
 
 
-// A delegated click handler for a content container: routes recognised links in-app (Linear issues
-// open the side panel via `openLinear`; GitHub links resolve their facet to a project first) and
-// leaves everything else — and modified/middle clicks — to the browser. A missing project mapping
-// deliberately falls through to the real GitHub URL; owner/name alone is not a valid app route after
-// the project cutover.
+// A delegated click handler for a PR content container. What is left here is only what is github's:
+//
+//   1. the bare-id anchors `linkifyLinearIds` above minted out of github's own body HTML, which are not
+//      URLs and so no recogniser can claim them;
+//   2. owner/name → project resolution, which needs the project query this pane already holds.
+//
+// Everything general — which recogniser claims the href, and whether the matched item lands in a task pane
+// or the provider's reference panel — moved to client-core/registries/contentLinks.ts § openContentTarget.
+// It had to: this function decided, for the whole app, that a Linear issue opens a side panel, so no other
+// surface could do the same and no third provider could be opened this way at all.
+//
+// `prefer: 'refPanel'` is the request that made the move worth making. A reader half-way through a diff who
+// clicks a ticket wants to glance at it, not to have the pane under them swapped, and the panel stays over
+// the page either way (client-core/registries/refPanelHost.tsx). It is a preference: when the provider has
+// no panel installed here, the host still tries its task pane.
 export function makeContentLinkHandler(
   navigate: (to: string) => void,
-  openLinear: (identifier: string) => void,
   projectIdForGithub?: (owner: string, repo: string) => string | null | undefined,
 ) {
   return (e: MouseEvent) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
     const anchor = (e.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null
     if (!anchor) return
-    // Bare-id anchors injected by linkifyLinearIds carry the identifier directly.
+    // A bare `CRA-404` this file wrapped itself. It carries no href, so there is no browser fallback to
+    // preserve and the click is ours whether or not Linear's panel is installed to receive it. Naming
+    // another plugin's provider is the CONSUMER side of ownership and is allowed — a panel may only be
+    // REGISTERED under its own provider — and github is already the one scanning for Linear's prefixes.
     if (anchor.dataset.linearId) {
       e.preventDefault()
-      openLinear(anchor.dataset.linearId)
+      openRefPanel({ providerId: 'linear', displayId: anchor.dataset.linearId })
       return
     }
     const href = anchor.getAttribute('href')
     if (!href) return
     const target = parseInAppTarget(href)
     if (!target) return
-    // Narrowed on `kind`, and an UNRECOGNISED kind falls through to the browser rather than being
-    // swallowed. A GitHub owner/name target is only routable when the current project query resolves
-    // it to a project id; otherwise the external link remains the safe fallback.
+    // The host's rungs first: the panel, then the declared task pane. `'external'` means it found neither,
+    // and the two branches below are the only ones this plugin adds before the browser gets the click.
+    if (openContentTarget(target, { taskId: activeTaskId(), prefer: 'refPanel' }) !== 'external') {
+      e.preventDefault()
+      return
+    }
     const str = (value: unknown): string => (typeof value === 'string' ? value : '')
-    if (openPluginContentTarget(target, activeTaskId())) {
-      // The host already opened the declared plugin pane with its retained selection intent.
-    } else if (target.kind === 'linear' || target.pane === 'linear') {
-      // No active task means there was no pane to open into, so the side panel is the fallback — and it
-      // is a REAL fallback here, because classic PR browse has no task. `kind` is whichever contribution
-      // id claimed the URL, and it changed when linear became a loaded package (`linear.issue` and
-      // `linear.issue-slug` now, `linear` before), so the pane the target names is what identifies it.
-      openLinear(str(target.identifier) || str(target.item))
-    } else if (target.kind === 'pr' || target.kind === 'repo') {
-      const projectId = projectIdForGithub?.(str(target.owner), str(target.repo))
-      if (!projectId) return
-      const suffix = target.kind === 'pr' ? `/${encodeURIComponent(str(target.number))}` : ''
-      navigate(`/p/${encodeURIComponent(projectId)}/pulls${suffix}`)
-    } else return
+    if (target.kind !== 'pr' && target.kind !== 'repo') return
+    const projectId = projectIdForGithub?.(str(target.owner), str(target.repo))
+    // A DELIBERATE PRODUCT DECISION, not an unfinished branch: a GitHub URL for a repo acorn does not
+    // track has no in-app destination, so the real github.com URL opens. owner/name alone stopped being a
+    // valid app route at the project cutover, and inventing a destination — importing the repo, or a
+    // read-only view of a project that does not exist — is separate work. Do not "fix" this to swallow
+    // the click.
+    if (!projectId) return
+    const suffix = target.kind === 'pr' ? `/${encodeURIComponent(str(target.number))}` : ''
+    navigate(`/p/${encodeURIComponent(projectId)}/pulls${suffix}`)
     e.preventDefault()
   }
 }
