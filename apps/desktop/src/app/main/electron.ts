@@ -160,7 +160,9 @@ async function createMainWindow() {
       win.webContents.send('acorn:close-pane')
     }
   })
-  win.once('ready-to-show', () => win.show())
+  // Under e2e the window still has to be visible (Playwright drives a real renderer), but it must not
+  // steal the developer's focus mid-run: showInactive keeps whatever they were doing on top.
+  win.once('ready-to-show', () => (e2e ? win.showInactive() : win.show()))
   // The renderer comes from the app scheme, not from a node. Nothing about the window depends on where
   // the service bound any more — that endpoint is the broker's business (main/nodeBroker.ts).
   await win.loadURL(`${APP_ORIGIN}/`)
@@ -171,6 +173,9 @@ app.whenReady().then(async () => {
   // One call into the composition root: it migrates, constructs services, installs bridges, starts
   // the loopback listener, then creates the window (main/bootstrap.ts owns the order + teardown).
   try {
+    // Accessory apps can't become the active app on macOS, so a test run never takes the foreground
+    // (no dock icon either). CDP input still reaches the renderer, so the specs are unaffected.
+    if (e2e && process.platform === 'darwin') app.setActivationPolicy('accessory')
     resolveSessionKey(dataDir) // safeStorage-backed SESSION_ENC_KEY before any binding reads it
     registerAppScheme() // protocol.handle must wait for ready; registerSchemesAsPrivileged could not
     mainWindow = await bootstrap({
