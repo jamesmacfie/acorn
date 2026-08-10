@@ -39,17 +39,23 @@ export async function savePref(
     else pushBackgroundError('', `Could not save ${descriptor.id}`, `Persisted value exceeds ${descriptor.maxBytes} bytes.`)
     return false
   }
-  const previous = qc.getQueryData<Record<string, string>>(prefsKey)
-  qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
-
   // A DEVICE pref never reaches a node (persistence/devicePrefs.ts): it is a property of this
   // installation, `localStorage.setItem` cannot fail in a way a retry would fix, and the whole
   // optimistic-write-and-roll-back dance below exists for a network round trip that no longer happens.
-  // The cache write above is what every reactive reader sees, so it stays and this returns straight away.
+  //
+  // localStorage FIRST, cache second. `prefsOptions.select` is `mergePrefs(raw, readDevicePrefs())`
+  // and device wins, so a cache write that lands before the localStorage write recomputes `select`
+  // against the OLD device value and throws the new one away — silently, because structural sharing
+  // then sees an unchanged result and notifies nobody. That is why picking a theme or style used to
+  // do nothing until some unrelated pref write happened to re-run `select` seconds later.
   if (isDevicePref(key)) {
     writeDevicePref(key, value)
+    qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
     return true
   }
+
+  const previous = qc.getQueryData<Record<string, string>>(prefsKey)
+  qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
 
   const state = writes.get(key) ?? {
     tail: Promise.resolve(),
