@@ -119,14 +119,16 @@ by one Node and one project. Task origins are `github-pr`, `linear`, `rollbar`, 
 The renderer shell is contribution-driven. Plugins register task panes, rail sources, command-palette
 rows, settings pages, slots, context sections, attention items, and node statistics. The shipped
 feature packages are GitHub, terminal, agents, editor, changes, notes, memory, context, workflows,
-database, Docker, HTTP, preview, Linear, model providers, onboarding, and the built-in
+database, Docker, HTTP, preview, Linear, onboarding, and the built-in
 Claude, Codex, and Aider profiles registered by `plugins/agents`.
 
-Rollbar is the first shipped loaded-plugin package: its node provider is installed from disk, its
-rail rows are host-drawn descriptors, and its detail UI is a sandboxed frame. It is deliberately not
-present in the Node or desktop compiled-plugin lists. The desktop ships its built package as an app
-resource and the service reconciles it into the writable data root before plugin discovery; app-owned
-copies update with the app, while owner-installed overrides and uninstall tombstones win.
+Two packages ship as loaded plugins instead, present in neither compiled-plugin list. Rollbar was the
+first: its node provider is installed from disk, its rail rows are host-drawn descriptors, and its
+detail UI is a sandboxed frame. Model providers — the OpenAI and Anthropic connections and text
+adapters — is the second, and the minimal shape: a node bundle and a manifest, no client bundle at
+all, so there is nothing on the device to trust. The desktop ships both built packages as app
+resources and the service reconciles them into the writable data root before plugin discovery;
+app-owned copies update with the app, while owner-installed overrides and uninstall tombstones win.
 
 Plugins come in two tiers. Those feature packages are **compiled in**: they ship in the binary, run
 in the shell's own realm, and are trusted like the rest of the app. A Node can also **load** a

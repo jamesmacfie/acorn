@@ -59,8 +59,8 @@ const buildPlugins = (dataDir: string) =>
   } as never)
 
 // Every registry a node plugin can write to. The three PROVIDER registries were missing, and that was not a
-// gap at the margin: providers are the ENTIRE contribution of linear and model-providers, so cases
-// for either could otherwise assert nothing whatsoever about the plugin they disabled.
+// gap at the margin: providers are the ENTIRE contribution of linear, so its case could otherwise assert
+// nothing whatsoever about the plugin it disabled.
 type Snapshot = {
   routes: string[]
   tools: string[]
@@ -97,7 +97,6 @@ const OWNED: Record<string, Partial<Snapshot>> = {
   editor: { routes: ['editor/tasks', 'editor/tasks'] },
   http: { routes: ['http'], databases: ['http.sqlite'] },
   linear: { connectionProviders: ['linear'], integrationProviders: ['linear'], providerRoutes: ['linear'] },
-  'model-providers': { connectionProviders: ['anthropic', 'openai'], modelProviders: ['anthropic', 'openai'] },
   preview: { tools: ['browser_click', 'browser_console', 'browser_fill', 'browser_navigate', 'browser_screenshot', 'browser_snapshot'] },
   workflows: { routes: ['workflows'], databases: ['workflows.sqlite'] },
   github: { routes: [...Array.from({ length: 12 }, () => 'github/repos'), 'github/pins', 'github', 'github'], sections: ['pr'], databases: ['github.sqlite'], connectionProviders: ['github'], integrationProviders: ['github'] },
@@ -168,8 +167,11 @@ describe('disabling a node plugin', () => {
         sections: getContextSections().map((s) => s.id),
         // The three provider registries. Connection and integration are separate lists on purpose (see
         // server/integrations/connectionRegistry.ts): a model provider is a CONNECTION provider without being
-        // an integration one, so snapshotting only the integration list would have missed model-providers'
-        // entire contribution. `providerRoutes` is the fourth thing a `ctx.providers.integration(p, router)`
+        // an integration one, so snapshotting only the integration list would miss the entire contribution of
+        // a plugin whose only contribution is model adapters. `modelProviders` comes out empty here and stays
+        // snapshotted regardless — model-providers is a LOADED package now and this file assembles only the
+        // compiled list, so an entry appearing in it would mean something in the binary had quietly started
+        // registering adapters. `providerRoutes` is the fourth thing a `ctx.providers.integration(p, router)`
         // call registers, and it is validated against a registered provider — so it is the entry that would
         // strand if the clear order in host.ts were ever reversed.
         connectionProviders: connectionProviderRegistry.list().map((p) => p.id).sort(),
@@ -191,7 +193,7 @@ describe('disabling a node plugin', () => {
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     // Every case below asserts "the others are still there", which an empty list satisfies trivially.
-    expect(all.length).toBeGreaterThanOrEqual(14)
+    expect(all.length).toBeGreaterThanOrEqual(13)
     expect(optional.length).toBeGreaterThanOrEqual(8)
     expect(required.sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     // The ledger covers exactly the plugins that get cycled — a plugin added to the list without an entry
@@ -213,11 +215,13 @@ describe('disabling a node plugin', () => {
     expect(snapshot.sections).toEqual(['pr', 'issues', 'notes', 'memory'])
     expect(snapshot.databases.length).toBeGreaterThanOrEqual(8)
     expect(snapshot.routes.length).toBeGreaterThanOrEqual(15)
-    // The provider registries have real content, so the ledger's provider expectations are not satisfiable by
-    // an empty registry.
-    expect(snapshot.connectionProviders).toEqual(['anthropic', 'github', 'linear', 'openai'])
+    // The connection and integration registries have real content, so the ledger's provider expectations are
+    // not satisfiable by an empty registry. `modelProviders` is empty and asserted as empty: openai and
+    // anthropic are registered by the LOADED model-providers package, which this boot does not assemble, so
+    // their absence here is what "the compiled composition no longer owns them" looks like.
+    expect(snapshot.connectionProviders).toEqual(['github', 'linear'])
     expect(snapshot.integrationProviders).toEqual(['github', 'linear'])
-    expect(snapshot.modelProviders).toEqual(['anthropic', 'openai'])
+    expect(snapshot.modelProviders).toEqual([])
     expect(snapshot.providerRoutes).toEqual(['linear'])
   })
 

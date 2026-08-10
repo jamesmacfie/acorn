@@ -43,6 +43,10 @@ Worth stating, because the hard parts are the ones that went well:
 
 ## What is still owed, beyond these findings
 
+- **model-providers has since moved**, and needed none of what follows. It is node-only with no client
+  bundle, no routes, no storage and no `secrets` grant, so the move was a manifest row in
+  `apps/node/scripts/build-plugin.mjs`, a line in the bundled roster, and four deletions. Nothing in
+  it exercised a seam that was not already there, which is why it produced no findings of its own.
 - **linear, http, database and editor were not moved.** All four remain in both composition lists.
   Their migration briefs are back in this folder — [linear.md](./linear.md), [http.md](./http.md),
   [database.md](./database.md), [editor.md](./editor.md) — each with a note at the top correcting what

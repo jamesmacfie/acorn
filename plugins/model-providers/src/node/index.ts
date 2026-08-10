@@ -3,6 +3,12 @@
 // Replaces six calls in apps/node/src/server/providers.ts: two connection-provider registrations and two
 // model-adapter registrations, plus the two imports that made the composition root name this package.
 //
+// This ships as a LOADED package, so grep of apps/node/src/server/plugins.ts will not find it: the
+// manifest row is in apps/node/scripts/build-plugin.mjs and the distribution roster is in
+// apps/desktop/scripts/build-bundled-plugins.mjs. Nothing below changes across that boundary —
+// `ctx.providers.connection` and `ctx.providers.model` are identical for both tiers — which is the
+// point of the move. There is no client bundle, so no device ever has interface code of ours to trust.
+//
 // **No database and no routes**, and both absences are the design rather than a gap. This plugin is
 // adapters: it turns "generate text with this stored credential" into an OpenAI or Anthropic HTTP call.
 // Consumers own their own route and call `CoreServices.models.generateText` — there is deliberately no
