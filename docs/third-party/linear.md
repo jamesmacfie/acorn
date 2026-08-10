@@ -1,8 +1,9 @@
 # linear → loaded plugin — what the move exposed
 
 **Done.** linear is out of both compiled composition lists and ships as a loaded package: a node
-bundle serving `/v2/p/linear` through the portable fetch carrier, a client bundle drawing two frames,
-and manifest descriptors for the rail source, the content-link recognisers, the command and its chord.
+bundle serving `/v2/p/linear` through the portable fetch carrier, a client bundle drawing three frames,
+and manifest descriptors for the rail source, its route, the content-link recognisers, the command and
+its chord.
 `id: "linear"` is preserved, so provider ids, route paths, stored connections, task links and the
 `linear` task origin all carry over untouched.
 
@@ -176,6 +177,48 @@ Everything else the compiled panel imported from the shell — `formatRelativeTi
 filter, date formatting — is a few lines each and was reimplemented in the frame rather than widening
 the surface.
 
+### 8. Every frame surface was task-scoped or modal, so the issue detail had nowhere to render — carrier added
+
+The one the move got wrong quietly, and the one a user hit. The compiled plugin declared a
+`SourceRouteContribution` — `{ id: 'linear.issue', path: '/p/:projectId/issues/:identifier', order: 60 }` —
+and its browse rendered at core's `/p/:projectId` like every other Source, with the issue detail beside the
+list. The loaded manifest had no way to say that. `frames` targets are `pane`, `refPanel`, `settings`,
+`importer` and `webview`; a `pane` lives in a task's layout, and the other four are modal or opened by
+someone else. So the rail's `onSelect: { verb: 'openPane', pane: 'linear' }` was the only thing available,
+and it is refused outside a task with *"linear: open a task first — this opens a pane, and a pane belongs to
+a task."* The rail is reachable with no task open, so that was every row click on a fresh workspace.
+
+The record here had this as accepted loss. It was a missing carrier, and three additive pieces close it:
+
+- **`scope` on a pane surface** — `task` (the default, so rollbar and every existing manifest are
+  unchanged) or `project`. A project-scoped pane is drawn beside its own rail Source's list, has no task,
+  and lands in its own registry rather than `paneRegistry`, because a pane contribution's component takes a
+  `Task` and its id is a persisted layout key — neither of which is true here.
+- **`contributions.routes`** — `{ id, path, surface, item, order }`. `path` is confined at parse time to the
+  prefix the host mints from the plugin id, `/p/:projectId/x/<plugin-id>/`. That confinement is the reason
+  this was deferred rather than shipped with the descriptor tier: a manifest free to write its own pattern
+  could have claimed `/p/:projectId` and taken over project navigation for the whole shell. `x` is reserved
+  by core, the prefix is derived from `id` alone, and a plugin cannot name it — so a collision with core, or
+  between two plugins, is a manifest error and never a race between two loads.
+- **A `navigate` verb**, naming a project-scoped surface. Separate from `openPane` rather than a
+  scope-aware widening of it: `openPane` mutates a task's layout, `navigate` changes the URL, and keeping
+  them disjoint is what lets `openPane`'s refusal stay honest. It is deliberately not available to a
+  `commands` entry, for the same reason `createTask` is not — a command registry row has neither a routed
+  project nor the shell's navigator in scope.
+
+Linear declares **three** frames now, not two, and that is the part worth copying. `linear` stays a
+task-scoped pane — the keybinding, the command, the task's linked tickets and every `linear.app` URL clicked
+inside a note or an agent transcript all go there, and all of them have a task. `linear-issue` is the new
+project-scoped surface. Had the existing pane simply been re-scoped, all of those would have stopped
+resolving silently.
+
+The URL is where a project-scoped surface's selection lives, because it has no layout state to keep one in —
+which is what makes a clicked rail row, a pasted link and the back button one mechanism rather than three.
+A rail row carries `<connection>:<identifier>` into the path, so it is unambiguous; a pasted URL carries a
+bare identifier and the route resolves it across every connection, exactly as the ref panel does. Keying on
+the identifier alone is the same trade the compiled route made: two connected Linear workspaces whose teams
+share a prefix would collide, and the upgrade is a connection id in the path.
+
 ## What was NOT needed
 
 The useful half of the record, since a verb or scope nothing used is evidence for deleting surface.
@@ -195,12 +238,14 @@ The useful half of the record, since a verb or scope nothing used is evidence fo
 - **No `refresh` on the source descriptor.** The invalidation ping covers it, and the browse it
   replaced fetched once per mount anyway.
 - **No `slots`, `attention`, `nodeStats`, `agentContexts` or `palette` descriptor**, and no `webview`
-  or `settings` frame. The two frame targets and one source descriptor were the whole client surface.
+  or `settings` frame. Three frame surfaces, one source descriptor and one route are the whole client
+  surface.
 
 ## What the descriptor tier could not express, and was accepted
 
-Beyond finding 1, the browse lost its **triage filters** (search, assignee, label), its **workflow-state
-grouping**, and the **facet lists** that fed the selects. The rail is a flat host-drawn list. Ordering
+Beyond finding 1 — and no longer including the issue detail, which finding 8 closed — the browse lost its
+**triage filters** (search, assignee, label), its **workflow-state grouping**, and the **facet lists** that
+fed the selects. The rail is a flat host-drawn list. Ordering
 survived and moved to the node — priority first, recency within a priority — because a list still needs
 an order; `filterLinearIssues`, `groupLinearIssuesByState` and `linearFacets` lost their only caller and
 were deleted with their tests rather than kept as dead code.
@@ -235,7 +280,6 @@ timing enough that the shell's persisted, still-fresh empty task list outlives t
 seeds a task.
 
 ## Still owed
-## Still owed
 
 - **The reference panel inside a GitHub pull request.** The highest-risk surface, and the one nothing has
   exercised: it needs a mirrored pull request whose body cites a ticket. It cannot be unit tested either,
@@ -253,3 +297,10 @@ seeds a task.
   ticking a real Linear project and watching the row land, the failing-connection row, and both
   appearance axes over it have not been driven.
 - **A decision on `ui.openUrl`** from finding 5.
+- **The project-scoped issue view on screen.** Finding 8's carriers are covered by unit tests on both
+  halves — the manifest rules including a route that escapes the prefix and one naming an undeclared
+  surface, the path minting and its round trip, and the two verbs' dispatch — but the surface itself is a
+  frame inside a component, and vitest here renders neither. Clicking a rail row with no task open,
+  pasting `/p/<id>/x/linear/issues/ENG-42`, and the back button between two tickets have not been driven in
+  the real app. Nor has the layout: the detail spans the two grid columns to the right of the rail list,
+  and only a render will say whether the iframe fills them.

@@ -140,6 +140,14 @@ the browse's **workspace project picker** did not, because choosing which Linear
 follows writes core's workspace state, and that write is unmappable on the frame bridge and absent
 from `CoreServices`. [third-party/linear.md](./third-party/linear.md) is the full record.
 
+Its **project-scoped issue view** was the other loss, and that one is closed. Every frame target the
+manifest had was task-scoped or modal, so the issue detail Linear used to render at `/p/:projectId`
+through a `SourceRouteContribution` had no manifest form, and every rail row click outside a task was
+refused with "open a task first". Panes now declare a `scope`, a manifest may declare `routes` under a
+host-minted `/p/:projectId/x/<plugin-id>/` prefix, and a source's `onSelect` may `navigate` to a
+project-scoped surface — so the capability is carried by the tier rather than by a compiled exception.
+The picker remains open.
+
 Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded
 package serves provider routes through
 `ctx.providers.integration` with a fetch handler; it can create a task from an item and link the
