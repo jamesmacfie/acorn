@@ -9,7 +9,6 @@ import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
 import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
 import { githubPlugin } from '@acorn/plugin-github/node/index.ts'
 import { httpPlugin } from '@acorn/plugin-http/node/index.ts'
-import { linearPlugin } from '@acorn/plugin-linear/node/index.ts'
 import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin, type PreviewPluginDeps } from '@acorn/plugin-preview/node/index.ts'
@@ -42,7 +41,6 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   editorPlugin(),
   githubPlugin(dataDir),
   httpPlugin(dataDir),
-  linearPlugin(),
   memoryPlugin(dataDir),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(deps.preview),

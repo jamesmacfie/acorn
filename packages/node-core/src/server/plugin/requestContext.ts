@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { getDb } from '../db'
 import { forEachConnection, listProviderConnections } from '../integrations/connections'
 import { integrationProviderRegistry } from '../integrations/registry'
+import { createExternalItemStore } from '../integrations/itemStore'
 import { runProviderResource } from '../integrations/resourceRuntime'
 import type { AppEnv } from '../middleware/auth'
 import { canUseProviderCredential } from '../middleware/requireUser'
@@ -44,6 +45,13 @@ export function pluginRequestContext(c: Context<AppEnv>, pluginId: string): Plug
       assertProviderAccess(c)
       assertOwnedProvider(pluginId, providerId)
       return forEachConnection(getDb(c.env), principal.userId, providerId, c.env.SECRETS, visit)
+    },
+    items: (providerId) => {
+      // Synchronous because the store itself does no work until a method is called, and both checks
+      // are synchronous too — a plugin naming a provider it does not own should fail at the ask.
+      assertProviderAccess(c)
+      assertOwnedProvider(pluginId, providerId)
+      return createExternalItemStore(getDb(c.env), principal.userId)
     },
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as api from './api'
-import { linearIssueKey, linearProjectIssuesKey, linearProjectIssuesRoute } from './api'
+import { linearIssuesKey, linearProjectIssuesRoute } from './api'
 
 // Protocol's api.test.ts had no Linear cases, so these are new rather than moved. They pin the two
 // things tsc cannot see: a retyped route template compiles fine and 404s, and a changed query key
@@ -11,11 +11,11 @@ describe('linear wire contract', () => {
       .toBe('/v2/p/linear/project-issues?integration=conn-1&ids=p2%2Cp1')
   })
 
-  it('preserves the query key shapes for cache compatibility', () => {
-    expect(linearProjectIssuesKey('conn-1', ['p2', 'p1'])).toEqual(['linear-project-issues', 'conn-1', 'p1', 'p2'])
-    // The connection-scoped and unscoped forms must stay distinct: they resolve different tickets.
-    expect(linearIssueKey('ENG-42')).toEqual(['linear-issue', 'unscoped', 'ENG-42'])
-    expect(linearIssueKey('ENG-42', 'conn-1')).toEqual(['linear-issue', 'conn-1', 'ENG-42'])
+  // The one remaining key, and it is github's: `linearIssuesOptions` in contract/issues.ts runs the batch
+  // query on PR detail. Order-independent by construction, because the identifier set a PR body yields is
+  // not ordered — two scans of the same PR must not be two cache entries.
+  it('preserves the batch query key shape for cache compatibility', () => {
+    expect(linearIssuesKey(['ENG-2', 'ENG-1'])).toEqual(['linear-issues', 'ENG-1', 'ENG-2'])
   })
 
   // The same net protocol's api.test.ts keeps over its own builders, scoped to this plugin:

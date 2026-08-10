@@ -70,6 +70,75 @@ const PLUGINS = {
       keybindings: [{ command: 'open', defaultChord: 'meta+shift+o', when: 'task' }],
     },
   },
+  // The first row to use every kind of contribution at once, and the first to have another plugin
+  // rendering one of its surfaces: plugins/github draws `linear-ref` beside a pull request through the
+  // ref-panel registry, without importing linear.
+  //
+  // `id: "linear"` is load-bearing and must never change. It binds `/v2/p/linear`, the provider id on
+  // every stored `integrations` row, the `providerId` on every `task_links` row, and the `linear` task
+  // origin. Renaming it orphans real user data.
+  //
+  // On the permissions, and where they differ from what the migration brief guessed:
+  //
+  //   secrets: false — the brief expected `true` "because the provider spends the owner's Linear token",
+  //     and it does, but never through `ctx.core.secrets`. Core resolves the `integrations` row inside
+  //     its own secret scope and lends the key to `withConnections` / a mirrored resource for the length
+  //     of the call. `true` here would be a grant with no call site, and a disclosure that overstates.
+  //   core: ['projects:read'] — only `byId` and `externalProjects`, to turn the rail's routed project
+  //     into the workspace's linked Linear projects. Not `projects:config` (no scripts), not
+  //     `projects:write`, no `tasks` facet: creating and linking a task stays in the host-owned
+  //     promotion flow, which is why the frame's `api` list has no task WRITE scope either.
+  //   api: ['core.tasks:read'] — the pane frame reads `/v2/core/tasks` to find which tickets this task
+  //     links. The ref-panel frame needs none of it; one list covers both surfaces, which is the
+  //     coarsest thing here and the reason it stays a one-item list.
+  'linear': {
+    name: 'Linear',
+    package: '@acorn/plugin-linear',
+    entry: '@acorn/plugin-linear/node/index.ts',
+    factory: 'linearPlugin',
+    client: {
+      entry: resolve(ROOT, 'plugins/linear/src/frame/index.tsx'),
+      vitePlugins: [solid()],
+    },
+    permissions: {
+      api: ['core.tasks:read'],
+      events: [],
+      node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: ['api.linear.app'] },
+    },
+    contributions: {
+      // Two surfaces, one bundle: it decides what to draw from `bridge.context`. `providerId` on the
+      // reference panel must equal the plugin id or the client adapter refuses to register it.
+      frames: [
+        { target: 'pane', id: 'linear', label: 'Linear', glyph: 'square-check', order: 90 },
+        { target: 'refPanel', id: 'linear-ref', label: 'Linear issue', providerId: 'linear' },
+      ],
+      sources: [{
+        id: 'linear-issues',
+        label: 'Linear',
+        glyph: 'square-check',
+        order: 20,
+        providerId: 'linear',
+        items: '/v2/p/linear/rail-items',
+        onSelect: { verb: 'openPane', pane: 'linear' },
+      }],
+      // TWO entries for one URL shape, and that is the finding rather than a style choice. The pattern
+      // grammar is exact-arity by design — a bounded host/path form with no tail wildcard, so a manifest
+      // string cannot backtrack the renderer — and Linear's own "copy link" appends a title slug. One
+      // entry would silently recognise only the short form, which is the rarer of the two in practice.
+      contentLinks: [
+        { id: 'linear.issue', match: 'https://linear.app/{workspace}/issue/{identifier}', openPane: 'linear', item: 'identifier' },
+        { id: 'linear.issue-slug', match: 'https://linear.app/{workspace}/issue/{identifier}/{slug}', openPane: 'linear', item: 'identifier' },
+      ],
+      commands: [{
+        id: 'open',
+        title: 'Linear: open linked issues',
+        category: 'pane',
+        palette: false,
+        action: { verb: 'openPane', pane: 'linear' },
+      }],
+      keybindings: [{ command: 'open', defaultChord: 'meta+shift+l', when: 'task' }],
+    },
+  },
   // The smallest thing this table can describe, and the two absences are the interesting part.
   //
   // No `client` key, because there is no frame — the plugin registers two connection providers and two

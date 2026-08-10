@@ -33,9 +33,16 @@ the node-owner identity used to scope identity-owned records; it is not an acorn
 ## Linear
 
 Linear uses GraphQL and supports multiple connections. Projects and issues carry the connection ID;
-issue keys are not globally unique across connections. The Linear source browses projects/issues,
-promotes an issue to a task, links issues, posts comments, and contributes PR reference panels and
-context sections.
+issue keys are not globally unique across connections — which is why a rail row and a task link both
+carry the connection, and why a bare `ENG-42` from PR text is resolved by asking each connected
+workspace in turn.
+
+Linear ships as a LOADED plugin. Its rail source lists issues, promotes one to a task with the issue's
+own suggested branch, links issues, posts comments, recognises `linear.app` issue URLs, and renders
+the reference panel github's PR detail shows — as manifest descriptors and a sandboxed frame rather
+than compiled contributions. The rail lists the issues of the projects the workspace has linked; with
+no linked projects it falls back to the viewer's own open issues, because choosing linked projects is a
+workspace write no loaded plugin can perform ([third-party/linear.md](./third-party/linear.md)).
 
 ## Rollbar
 

@@ -102,6 +102,62 @@ describe('Linear provider parity', () => {
     expect(vi.mocked(linearFetch).mock.calls.map(([secret]) => secret)).toEqual(['token-b'])
   })
 
+  // The reference-panel path, and the one with no connection to name: github scans `ENG-42` out of a PR
+  // body and cannot know which connected Linear owns it. Asking each workspace in turn IS the resolution
+  // — it replaced a hand-rolled cache read plus a second fan-out — so this is the case that has to keep
+  // working, and the one nothing covered before.
+  it('resolves a bare identifier by asking each connection until one answers', async () => {
+    vi.mocked(linearFetch).mockImplementation(async (secret) =>
+      graphQl({ issues: { nodes: secret === 'token-b' ? [node('Workspace B')] : [] } }))
+
+    const response = await app.fetch(new Request('http://acorn.test/api/linear/issues/ENG-42?refresh=1'), env())
+
+    expect(response.status).toBe(200)
+    expect(((await response.json()) as LinearIssueDetail).title).toBe('Workspace B')
+    expect(vi.mocked(linearFetch).mock.calls.map(([secret]) => secret)).toEqual(['token-a', 'token-b'])
+  })
+
+  it('reports "not found" rather than the first workspace’s miss when no connection has it', async () => {
+    vi.mocked(linearFetch).mockImplementation(async () => graphQl({ issues: { nodes: [] } }))
+
+    const response = await app.fetch(new Request('http://acorn.test/api/linear/issues/ENG-42?refresh=1'), env())
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ error: { code: 'provider_resource_not_found' } })
+  })
+
+  // The declarative rail source. This router carries no `projects` scope — the loaded package's does —
+  // so every connection takes the unmapped fallback, which is the branch that exists because choosing
+  // Linear projects for a workspace has no writer left on the loaded tier.
+  it('projects rail rows from the viewer’s own issues when no project is mapped', async () => {
+    vi.mocked(linearFetch).mockImplementation(async (secret) => graphQl({
+      viewer: { assignedIssues: { nodes: secret === 'token-a'
+        ? [node('Low', { identifier: 'ENG-1', priority: 4, updatedAt: '2026-01-01T00:00:00.000Z', branchName: 'eng-1-low' })]
+        : [node('Urgent', { identifier: 'ENG-2', priority: 1, updatedAt: '2026-01-02T00:00:00.000Z' })] } },
+    }))
+
+    const response = await app.fetch(new Request('http://acorn.test/api/linear/rail-items'), env())
+
+    expect(response.status).toBe(200)
+    // Urgent first across BOTH workspaces: ordering is applied to the merged list, not per connection.
+    expect(await response.json()).toEqual({
+      items: [
+        expect.objectContaining({ id: 'linear-b:ENG-2', task: expect.objectContaining({ origin: 'linear', branch: 'eng-2' }) }),
+        expect.objectContaining({ id: 'linear-a:ENG-1', task: expect.objectContaining({ branch: 'eng-1-low' }) }),
+      ],
+    })
+  })
+
+  it('answers the rail with an empty list, never an error, when nothing is connected', async () => {
+    await t.db.delete(schema.integrations)
+
+    const response = await app.fetch(new Request('http://acorn.test/api/linear/rail-items'), env())
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ items: [] })
+    expect(linearFetch).not.toHaveBeenCalled()
+  })
+
   it('routes threaded comments to the linked connection', async () => {
     vi.mocked(linearFetch).mockImplementation(async (secret, query) => {
       if (query.includes('commentCreate')) return graphQl({ commentCreate: { success: true } })

@@ -77,10 +77,15 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['GET', '/v2/core/integrations'],
 ]
 
-// One representative route per app/server/routes.ts contribution, plus the provider projection.
-// Router unit tests cover behavior; this table proves the composition root actually mounts them —
-// and it is where the deliberate segment doubling is visible (see the note in routes.ts): a router
-// that names its own top-level segment repeats it under its plugin namespace.
+// One representative route per app/server/routes.ts contribution. Router unit tests cover behavior;
+// this table proves the composition root actually mounts them — and it is where the deliberate segment
+// doubling is visible (see the note in routes.ts): a router that names its own top-level segment repeats
+// it under its plugin namespace.
+//
+// No provider projection row any more. `/v2/p/linear/projects` was the one, and linear is a LOADED
+// package now: its routes reach the mount table through the loader's fetch carrier, which this suite
+// does not assemble. `apps/node/test/integration/pluginLoader.test.ts` is where a loaded plugin's routes
+// are exercised, and `linear.test.ts` drives linear's own router directly.
 const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
   ['GET', '/v2/p/changes/tasks/:id/review-notes'],
   ['GET', '/v2/p/changes/tasks/:id/local/changes'],
@@ -117,7 +122,6 @@ const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: strin
   ['PUT', '/v2/p/github/pins'],
   ['POST', '/v2/p/github/auth/device/start'],
   ['POST', '/v2/p/github/import'],
-  ['GET', '/v2/p/linear/projects'],
 ]
 
 describe('assembled routes', () => {
@@ -178,15 +182,16 @@ describe('assembled routes', () => {
   })
 
   it('registers every built-in provider from its own plugin, in both registries', () => {
-    const expected = ['github', 'linear']
+    // One left. github is the only provider still compiled in; linear, openai and anthropic all come
+    // from loaded packages, and this suite assembles the COMPILED list only — so their absence is the
+    // assertion, and any of them appearing would mean something in the binary had started registering
+    // a provider again.
+    const expected = ['github']
     expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
-    // The integration registry holds only providers with mirrored resources. Both of the compiled
-    // providers happen to have them, so the two lists coincide today; they are still asserted
-    // separately because a connection provider need not be an integration one.
-    expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(['github', 'linear'])
-    // Empty, and that is the point. `openai` and `anthropic` come from the loaded model-providers
-    // package, and this suite assembles the COMPILED list only — so an adapter turning up here would
-    // mean a plugin in the binary had started registering one.
+    // The integration registry holds only providers with mirrored resources. github happens to have
+    // them, so the two lists coincide today; they are still asserted separately because a connection
+    // provider need not be an integration one.
+    expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
     expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual([])
   })
 })

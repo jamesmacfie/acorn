@@ -17,15 +17,18 @@ plugins/<name>/
     node/       NodePlugin entry, schema, and Node-owned behavior
     server/     Hono route handlers and provider logic
     main/       Electron-free runtime engines and adapters
-    client/     SolidJS panes, sources, settings, and contributions
+    client/     SolidJS panes, sources, settings, and contributions (compiled-in plugins)
+    frame/      the sandboxed-frame bundle a LOADED plugin's UI is instead
     contract/   narrow cross-plugin types, capability IDs, and provider contracts
     shared/     types/logic shared by this plugin's runtimes
 ```
 
 Not every plugin has every directory. The built-in Claude, Codex, and Aider profiles are registered
 by `plugins/agents`; there are no separate profile packages. Onboarding is a client overlay with
-core setup support. Linear and the loaded Rollbar package are integration providers that use core's
-generic external-item store rather than owning a plugin database.
+core setup support. The loaded Linear and Rollbar packages are integration providers that use core's
+generic external-item store rather than owning a plugin database; a loaded plugin's UI lives in
+`frame/` rather than `client/`, because it is a bundle for a sandboxed document and not a
+`ClientPlugin`.
 
 ## The plugin API
 
@@ -121,7 +124,10 @@ Three things differ, and all three follow from the code not being ours:
   `ctx.events.streams` are never present, whatever the manifest says. A loaded plugin serves routes as
   `ctx.routes.fetch(handler)` instead — a `(Request, PluginRequestContext) → Response` function. The
   request context projects authenticated identity plus a provider runtime; it exposes provider-owned
-  resource/connection operations without exposing Hono, the core database, or the secret service. A
+  resource, connection and external-item operations without exposing Hono, the core database, or the
+  secret service. The external-item calls exist for the read no per-connection resource can express —
+  the same cached item across every connection of one provider, which is how a bare ticket id gets
+  attributed to a workspace — and the host binds the owner and the provider ownership check. A
   loaded integration provider likewise passes a fetch handler to `ctx.providers.integration`; passing
   Hono is an explicit initialization error. Project access is deliberately three grants:
   `projects:read` for identity, checkout paths and workspace external-project mappings scoped to
@@ -146,11 +152,14 @@ uninstall writes a tombstone outside the package directory so a later app update
 Packaged client bytes are trusted only after Electron main reads and hashes its own application
 resource; a node cannot acquire that trust by labelling a roster row as bundled.
 
-Two first-party packages ship this way and neither is also present in the compiled composition.
-Rollbar is the standing production caller of the route, descriptor and frame seams. `model-providers`
-is the other end of the range: node-only, no client bundle, no routes, no storage, `contributions: {}`
-— it registers two connection providers and two model adapters and stops, which is proof the loaded
-tier costs a small plugin nothing. The loader still supports a package id shadowing a built-in during
+Three first-party packages ship this way and none is also present in the compiled composition.
+Rollbar was the first production caller of the route, descriptor and frame seams. `model-providers` is
+one end of the range: node-only, no client bundle, no routes, no storage, `contributions: {}` — it
+registers two connection providers and two model adapters and stops, which is proof the loaded tier
+costs a small plugin nothing. Linear is the other end, and the widest manifest here: a pane frame plus
+a `refPanel` frame that ANOTHER plugin renders, a descriptor rail source with host-owned promotion,
+declarative `contentLinks`, a command and a keybinding. Read it for the two surfaces rollbar does not
+exercise, and read `docs/third-party/linear.md` for what they cost. The loader still supports a package id shadowing a built-in during
 a staged migration; when that happens it drops the compiled copy from the graph and logs which
 directory won.
 
@@ -167,7 +176,10 @@ kinds of contribution come out of one manifest:
   `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
   is checked against the manifest's declared scopes by an allowlist naming each path and method
   (`packages/client-core/src/plugins/frames/`, `scopes.ts` is the choke point). The host pins which
-  Node the frame talks to; the frame cannot name one.
+  Node the frame talks to; the frame cannot name one. A `refPanel` frame is the one surface whose
+  surrounding chrome the host draws rather than the plugin: an iframe cannot `Portal` out of the box
+  its consumer placed it in, and the bridge's close verb is importer-only, so the manifest adapter
+  supplies the drawer and its dismiss control while the frame supplies the body.
 - **Webviews** — a host-drawn pane backed by an Electron-main `WebContentsView`. A surface declares
   exactly one literal `url` or plugin-owned `urlSource` plus a non-empty `hosts` allowlist. HTTPS is
   required except for `localhost`, `127.0.0.1`, and `::1`; the renderer broker validates requested
@@ -200,13 +212,13 @@ kinds of contribution come out of one manifest:
 ### Frame authoring and the UI kit
 
 A frame owns its document and bundle, so its framework is its choice. The repository package builder
-keeps the client Vite transform opt-in per plugin: Rollbar supplies `vite-plugin-solid`, a vanilla
-frame supplies none, and another framework can supply its own transform. A direct `solid-js`
+keeps the client Vite transform opt-in per plugin: Rollbar and Linear supply `vite-plugin-solid`, a
+vanilla frame supplies none, and another framework can supply its own transform. A direct `solid-js`
 dependency in a Solid frame is intentional. Its separate origin and document are a separate reactive
 realm, so this is not the duplicate-Solid-in-one-realm hazard the shell dependency rules prevent.
 
-In-repo Solid frames should import presentation components from `@acorn/plugin-api/ui`, as Rollbar
-does. This workspace dependency is the accepted intermediate package location; the UI kit will be
+In-repo Solid frames should import presentation components from `@acorn/plugin-api/ui`, as Rollbar and
+Linear do. This workspace dependency is the accepted intermediate package location; the UI kit will be
 published separately for external plugins later, and only that import name is expected to change.
 Do not copy the primitives or hand-roll replacements while packaging catches up.
 

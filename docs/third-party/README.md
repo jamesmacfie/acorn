@@ -16,6 +16,9 @@ This folder is the review record for that work. All four findings are resolved.
 The common rule is now explicit in code: plugin-supplied ids are claims; host-bound ownership is the
 authority used before a claim can cross into core state.
 
+Two more first-party packages have moved since: `model-providers` (which needed nothing new) and
+`linear` (which needed several things, all recorded in [linear.md](./linear.md)).
+
 ## What came out right
 
 Worth stating, because the hard parts are the ones that went well:
@@ -47,12 +50,20 @@ Worth stating, because the hard parts are the ones that went well:
   bundle, no routes, no storage and no `secrets` grant, so the move was a manifest row in
   `apps/node/scripts/build-plugin.mjs`, a line in the bundled roster, and four deletions. Nothing in
   it exercised a seam that was not already there, which is why it produced no findings of its own.
-- **linear, http, database and editor were not moved.** All four remain in both composition lists.
-  Their migration briefs are back in this folder — [linear.md](./linear.md), [http.md](./http.md),
-  [database.md](./database.md), [editor.md](./editor.md) — each with a note at the top correcting what
-  the rollbar migration changed underneath it. `http` carries the only analysis of the
-  plugin-migrations path, which nothing has exercised. The rollbar brief itself was not restored; this
-  file plus `plugins/rollbar/` is the reference now.
+- **linear has since moved as well**, and unlike model-providers it produced findings — seven of them,
+  written up in [linear.md](./linear.md), which is now an outcome record rather than a brief. It was the
+  first plugin to run a frame reference panel and declarative content links, and both were broken in
+  ways nothing had noticed: a refPanel frame could neither draw its own drawer nor reach `onClose`, and
+  the content-link grammar is exact-arity so one URL shape needs an entry per arity. It also found the
+  one thing the brief was simply wrong about — it said "Blockers: none", and the workspace↔Linear-project
+  picker turns out to have no home on this tier at all, because that write is unmappable on the bridge
+  and absent from `CoreServices`.
+- **http, database and editor were not moved.** All three remain in both composition lists. Their
+  migration briefs are in this folder — [http.md](./http.md), [database.md](./database.md),
+  [editor.md](./editor.md) — each with a note at the top correcting what the rollbar migration changed
+  underneath it. `http` carries the only analysis of the plugin-migrations path, which nothing has
+  exercised. The rollbar brief itself was not restored; this file plus `plugins/rollbar/` is the
+  reference now.
 - **`agentContexts` has a manifest form**, so http and database are no longer blocked on the carrier.
   A descriptor names two routes in the plugin's own namespace — `options` (GET) and `capture` (POST) —
   and the host binds everything a plugin should not: `source` from the plugin id, the capture time,

@@ -14,6 +14,7 @@ import type { StreamHandlers, WsChannelHandler } from '../../main/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
+import type { ExternalItemStore } from '../integrations/itemStore'
 
 // Prefixed console. A plugin's warnings should be attributable without every call site restating
 // its own name; nothing here needs levels, transports or structured fields yet.
@@ -30,6 +31,8 @@ export type PluginRouteOptions = {
 // provider operations are an async RPC-shaped capability whose arguments and results are plain data.
 // `withConnections` is the deliberate callback exception: the host lends one decrypted credential
 // for the duration of a provider-owned operation without exposing its database or secret service.
+// `items` is the same idea for state rather than credentials: row-shaped calls against core's
+// external-item cache, with the owner and the provider bound here rather than passed in.
 export type PluginRequestContext = {
   // Already authenticated by the host's middleware before the handler is reached. `userId` is the
   // stable owner projection most handlers need; `principal` remains for callers that must distinguish
@@ -58,6 +61,18 @@ export type PluginProviderRuntime = {
   resource<TInput, TOutput>(args: PluginProviderResourceRequest<TInput>): Promise<RouteResult<TOutput>>
   connections(providerId: string): Promise<StoredConnection[]>
   withConnections<T>(providerId: string, visit: PluginProviderConnectionVisitor<T>): Promise<T[]>
+  // The provider's slice of core's external-item cache — the same store a mirrored RESOURCE already
+  // receives on `ProviderResourceContext.items`, and the route-side twin of `ownedExternalItems`.
+  //
+  // A route needs it for the one shape `resource()` cannot express: resolution that spans connections.
+  // A bare `ENG-42` has not been attributed to a Linear workspace yet, so its cached row has to be read
+  // across every connection of the provider before there is a connectionId to key a resource call on.
+  // Without this, a loaded provider's batch route has no local cache at all and calls the vendor on
+  // every read — which is a latency and rate-limit regression, not a simplification.
+  //
+  // Rows in, rows out. The owner and the provider's ownership of `providerId` are bound by the host, so
+  // this widens what a plugin can REACH by nothing: its own resource already writes these same rows.
+  items(providerId: string): ExternalItemStore
 }
 
 // The route shape a LOADED plugin serves. A Hono instance cannot cross a process boundary; a

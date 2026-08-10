@@ -33,14 +33,17 @@ export type Viewer = { viewer: { name: string; organization: { name: string } } 
 export const PROJECTS_QUERY = `query { projects(first: 250) { nodes { id name } } }`
 export type LinearProjectNode = { id: string; name: string }
 
-// Active issues for a set of projects (the Linear source browse). Excludes completed/canceled so the
-// list is signal, not history. branchName is Linear's suggested git branch — the promote default.
+// The fields a rail/browse row needs. branchName is Linear's suggested git branch — the promote default.
+const TRIAGE_FIELDS = `id identifier title url branchName priority priorityLabel updatedAt
+      state { name type color } assignee { name }
+      labels { nodes { id name color } }`
+
+// Active issues for a set of projects (the Linear rail source). Excludes completed/canceled so the
+// list is signal, not history.
 export const PROJECT_ISSUES_QUERY = `query($filter: IssueFilter) {
   issues(filter: $filter, first: 100) {
     nodes {
-      id identifier title url branchName priority priorityLabel updatedAt
-      state { name type color } assignee { name }
-      labels { nodes { id name color } }
+      ${TRIAGE_FIELDS}
     }
   }
 }`
@@ -48,6 +51,26 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
   project: { id: { in: projectIds } },
   state: { type: { nin: ['completed', 'canceled'] } },
 })
+
+// The rail's fallback set, for a workspace with no Linear projects linked to it.
+//
+// It exists because of a gap the loaded tier has, not because anyone asked for a second rail mode.
+// Choosing which Linear projects a workspace follows writes `workspace_external_projects`, which is
+// core's workspace state: `PUT /v2/core/workspaces/:id/external-projects` is permanently unmappable on
+// the frame bridge and `CoreServices.projects` has no write for it, so the picker the browse used to
+// carry has nowhere to live now. Without a fallback the rail would be empty forever on a fresh install.
+// "Your open Linear issues" is the honest default for "no projects chosen", and it disappears the moment
+// a mapping exists. docs/third-party/linear.md records this as the finding it is.
+export const ASSIGNED_ISSUES_QUERY = `query {
+  viewer {
+    assignedIssues(filter: { state: { type: { nin: ["completed", "canceled"] } } }, first: 100) {
+      nodes {
+        ${TRIAGE_FIELDS}
+      }
+    }
+  }
+}`
+export type ViewerAssignedIssues = { viewer: { assignedIssues: { nodes: LinearNode[] } } }
 
 // A single issue-history event. Linear records each change with from/to fields; one event may
 // carry several changes (state + assignee at once). Labels arrive as IDs — resolved to names via

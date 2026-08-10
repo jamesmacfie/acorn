@@ -24,6 +24,11 @@ export { Modal } from '@acorn/client-core/ui/Modal.tsx'
 export { Tabs } from '@acorn/client-core/ui/Tabs.tsx'
 export type { TabDef } from '@acorn/client-core/ui/Tabs.tsx'
 export { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
+// Provider markdown → sanitised HTML. On ./client as well, because the compiled shell reaches it
+// through that barrel; it is here because a sandboxed frame rendering a ticket description needs it and
+// must not pull the router/query/apiClient half of ./client in to get one pure string function. It
+// qualifies on this barrel's own terms — no imports, no DOM, text in and markup out.
+export { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.

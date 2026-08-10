@@ -36,6 +36,7 @@ describe('Rollbar loaded routes', () => {
           value: { items: [item(request.connectionId)], capped: false },
         }) as never,
         withConnections: async () => [],
+        items: () => { throw new Error('rollbar resolves through resources, so it reads no item store directly') },
       },
     }
 

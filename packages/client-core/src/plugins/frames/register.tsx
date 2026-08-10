@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { activeNodeId } from '../../node/activeNode'
@@ -115,13 +116,37 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       return refPanelRegistry.register({
         id: surface.id,
         providerId: pluginId,
+        // The overlay is the HOST's here, unlike a first-party panel that draws its own. Two reasons, both
+        // structural rather than stylistic. A frame is an iframe: it cannot Portal out of the box the
+        // consumer put it in, so `position: fixed` inside the frame positions against the frame, and a
+        // ref panel rendered inline into a PR conversation would be a 150px letterbox in the middle of a
+        // page. And a refPanel frame has no way to CALL `onClose` — the bridge's close verb is gated to
+        // importer surfaces (frames/broker.ts), deliberately, so the dismiss affordance has to live on
+        // this side of the port too. Same classes the first-party panels use, so the two look identical.
         component: (props) => (
-          <PluginFrame
-            binding={bindingFor(pluginId, surface, row)}
-            hash={hash}
-            refId={props.ref.displayId}
-            onClose={props.onClose}
-          />
+          <Portal>
+            <div class="integrations-panel-backdrop" onClick={props.onClose} />
+            <aside class="integrations-panel plugin-ref-panel">
+              <header class="integrations-panel-head">
+                <span class="integrations-panel-title">{props.ref.displayId}</span>
+                <button
+                  type="button"
+                  class="integrations-panel-close"
+                  style={{ 'margin-left': 'auto' }}
+                  onClick={props.onClose}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </header>
+              <PluginFrame
+                binding={bindingFor(pluginId, surface, row)}
+                hash={hash}
+                refId={props.ref.displayId}
+                onClose={props.onClose}
+              />
+            </aside>
+          </Portal>
         ),
       })
     }

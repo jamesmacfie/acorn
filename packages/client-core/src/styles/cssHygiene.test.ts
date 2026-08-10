@@ -33,10 +33,11 @@ describe('literal ratchets (these may only go down)', () => {
   // `\s*` backtracks to zero width and the lookahead then succeeds against the space itself.
   const count = (re: RegExp) => (withoutComments(corpus).match(re) ?? []).length
 
-  // Remaining: `.linear-priority i`, a 1px radius on a 3px-wide bar. A genuine hairline one-off —
-  // the smallest scale rung (2px) would read as a pill at that width.
+  // Zero. The last one was `.linear-priority i`, a 1px radius on a 3px-wide bar — a genuine hairline
+  // one-off the scale had no rung for — and it went with the Linear browse when that plugin moved to the
+  // loaded tier. A ratchet that reaches zero should say zero.
   it('border-radius literals', () => {
-    expect(count(/border-radius:(?!\s*var\()[^;]+;/g)).toBeLessThanOrEqual(1)
+    expect(count(/border-radius:(?!\s*var\()[^;]+;/g)).toBe(0)
   })
 
   it('border widths not using a width token', () => {

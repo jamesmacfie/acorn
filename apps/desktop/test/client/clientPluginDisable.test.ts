@@ -64,13 +64,16 @@ const snapshot = (): Snapshot =>
 // right, so this doubles as the parity assertion for the compiled graph. Loaded packages are covered
 // through their manifest adapters and do not belong in this static ownership ledger.
 const FULL: Snapshot = {
-  panes: ['agents', 'changes', 'context', 'database', 'docker', 'editor', 'search', 'pr', 'http', 'linear', 'notes', 'preview'],
-  sources: ['agents', 'docker', 'github', 'http', 'linear'],
+  panes: ['agents', 'changes', 'context', 'database', 'docker', 'editor', 'search', 'pr', 'http', 'notes', 'preview'],
+  sources: ['agents', 'docker', 'github', 'http'],
   settingsPages: ['agent-pricing', 'docker', 'http', 'terminal', 'workflows'],
   slots: ['overlay/palette.files', 'overlay/palette.pull-files', 'overlay/onboarding.first-run', 'topbar.right/terminal.topbar-toggle', 'drawer/terminal.drawer'],
   taskSlots: ['task.footer/docker-footer-badge', 'tabrail.task-row/docker-rail-badge'],
   contextSections: ['memory.section'],
-  refPanels: ['linear.issue-panel'],
+  // Empty, and worth stating rather than dropping the key: the registry's only entry was linear's, and
+  // linear is a loaded package now, so its panel reaches this registry through the manifest adapter in
+  // client-core/plugins/frames/register.tsx. A compiled panel reappearing here is a real change.
+  refPanels: [],
   paletteRows: ['terminal.run', 'workflows.defs'],
   agentContexts: ['acorn-task-context', 'acorn-database', 'acorn-docker', 'acorn-http', 'acorn-terminals'],
   agentToolRenderers: ['changes.agent-file-tool'],
@@ -78,7 +81,7 @@ const FULL: Snapshot = {
   persistedState: ['context.section-selection', 'docker.prefs', 'editor.open-files', 'github.pr-filters'],
   nodeStats: ['agents.active'],
   attention: ['agents.sessions', 'memory.proposals'],
-  contentLinks: ['github.pull-request', 'github.repository', 'linear.issue'],
+  contentLinks: ['github.pull-request', 'github.repository'],
   projectImporters: ['github'],
 }
 
@@ -98,11 +101,6 @@ const OWNED: Record<string, Partial<Snapshot>> = {
   },
   editor: { panes: ['editor', 'search'], slots: ['overlay/palette.files'], persistedState: ['editor.open-files'] },
   http: { panes: ['http'], sources: ['http'], settingsPages: ['http'], agentContexts: ['acorn-http'] },
-  // `linear.issue` belongs to linear now. It used to be registered by plugins/github, so disabling
-  // linear left the recogniser behind — a link to a ticket the app could no longer open still claimed
-  // to be handled in-app. Finding 10 moved the contribution to the plugin that can answer for it, and
-  // this row is what says so.
-  linear: { panes: ['linear'], sources: ['linear'], refPanels: ['linear.issue-panel'], contentLinks: ['linear.issue'] },
   onboarding: { slots: ['overlay/onboarding.first-run'] },
   preview: { panes: ['preview'] },
   github: {
@@ -142,9 +140,9 @@ describe('disabling a client plugin', () => {
   afterEach(() => void activate())
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
-    expect(NAMES.length).toBeGreaterThanOrEqual(15)
+    expect(NAMES.length).toBeGreaterThanOrEqual(14)
     expect([...REQUIRED].sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
-    expect(OPTIONAL.length).toBeGreaterThanOrEqual(10)
+    expect(OPTIONAL.length).toBeGreaterThanOrEqual(9)
     // Every optional plugin is in the ledger, and every ledger entry claims something. A plugin
     // contributing nothing would make its own case below pass vacuously — this fails instead.
     expect(Object.keys(OWNED).sort()).toEqual([...OPTIONAL].sort())

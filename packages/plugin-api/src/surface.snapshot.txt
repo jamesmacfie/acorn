@@ -343,3 +343,4 @@ ui: Tabs
 ui: Textarea
 ui: ThreadCollapseController
 ui: UserAvatar
+ui: renderMarkdown

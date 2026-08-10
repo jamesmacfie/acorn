@@ -1,0 +1,110 @@
+/* Linear's frame layout. Feature CSS only: the primitive, tabs, overlay and copy stylesheets arrive as
+   the host-served /ui.css, and the token values for the active theme/style axes arrive over the bridge.
+   Every value below is a token with a fallback, so the frame follows an appearance change without
+   knowing which pack won — and still renders if a token is ever dropped. */
+:root {
+  color-scheme: light dark;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--fs-md, .8125rem);
+}
+
+* { box-sizing: border-box; }
+button { font: inherit; }
+
+.ln-app { height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--bg); color: var(--text); }
+.ln-brandbar { min-height: 2.375rem; display: flex; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
+.ln-brand-mark { color: var(--brand-linear, var(--accent)); }
+.ln-brand { letter-spacing: .01em; }
+.ln-layout { min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); }
+.ln-targets { width: 8.5rem; overflow-y: auto; border-right: var(--control-bw, .0625rem) solid var(--border); padding: var(--space-3, .375rem); }
+.ln-target.ui-row { padding-inline: var(--space-4, .5rem); color: var(--text-muted); font-family: var(--font-mono, monospace); }
+.ln-target.ui-row[data-selected] { color: var(--text); }
+.ln-content { min-width: 0; min-height: 0; overflow: auto; }
+
+.ln-muted { color: var(--text-muted); font-size: var(--fs-sm, .75rem); }
+.ln-placeholder { display: flex; min-height: 10rem; align-items: center; justify-content: center; gap: var(--space-3, .375rem); padding: var(--space-8, 1.5rem); color: var(--text-muted); text-align: center; }
+.ln-error { margin: var(--space-7, 1rem); padding: var(--space-6, .75rem); display: grid; gap: var(--space-2, .25rem); border: var(--control-bw, .0625rem) solid var(--danger, var(--del-marker)); color: var(--danger, var(--del-marker)); }
+
+.ln-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-7, 1rem); padding: var(--space-7, 1rem) var(--space-8, 1.25rem) var(--space-5, .625rem); }
+.ln-heading { min-width: 0; }
+.ln-heading h1 { margin: var(--space-2, .25rem) 0 0; font-size: var(--fs-xl, 1.125rem); overflow-wrap: anywhere; }
+.ln-eyebrow { color: var(--text-muted); font-family: var(--font-mono, monospace); font-size: var(--fs-sm, .75rem); }
+.ln-head-actions { display: flex; flex-wrap: wrap; gap: var(--space-3, .375rem); }
+
+.ln-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-8, 1.25rem) var(--space-6, .75rem); }
+/* The workflow-state pill and the label chip both take their colour from Linear's own hex, passed in as
+   a custom property rather than an inline background so the border/tint relationship stays one rule. */
+.ln-state, .ln-label-chip {
+  display: inline-flex; align-items: center; gap: var(--space-2, .25rem);
+  padding: 0 var(--space-3, .375rem);
+  font-size: var(--fs-sm, .75rem);
+  border: var(--control-bw, .0625rem) solid var(--state-color, var(--label-color, var(--border)));
+  border-radius: var(--radius-pill, 999px);
+  color: var(--text);
+}
+.ln-state::before, .ln-label-chip::before {
+  content: ''; width: .5rem; height: .5rem; border-radius: var(--radius-pill, 999px);
+  background: var(--state-color, var(--label-color, var(--border-strong)));
+}
+
+.ln-content > .ui-tabs { padding-inline: var(--space-8, 1.25rem); }
+.ln-panel { padding: var(--space-7, 1rem) var(--space-8, 1.25rem) var(--space-9, 1.5rem); }
+.ln-panel[hidden] { display: none; }
+.ln-section-head { margin: var(--space-7, 1rem) 0 var(--space-4, .5rem); font-size: var(--fs, .8125rem); }
+
+.ln-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr)); gap: 0; margin: 0 0 var(--space-7, 1rem); border-top: var(--control-bw, .0625rem) solid var(--border); }
+.ln-facts > div { min-width: 0; display: grid; gap: var(--space-2, .25rem); padding: var(--space-5, .625rem) var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
+.ln-facts dt { color: var(--text-muted); font-size: var(--fs-sm, .75rem); }
+.ln-facts dd { margin: 0; overflow-wrap: anywhere; }
+.ln-branch { display: flex; align-items: center; gap: var(--space-3, .375rem); }
+.ln-branch code { font-family: var(--font-mono, monospace); }
+
+.ln-links { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3, .375rem); }
+.ln-links li { display: flex; align-items: center; gap: var(--space-3, .375rem); min-width: 0; }
+.ln-attachment-kind { color: var(--text-muted); font-size: var(--fs-sm, .75rem); text-transform: uppercase; }
+.ln-attachment-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ln-subissue-bar { height: .25rem; background: var(--bg-subtle, var(--bg-hover)); margin-bottom: var(--space-4, .5rem); }
+.ln-subissue-bar i { display: block; height: 100%; background: var(--accent); }
+.ln-related { display: grid; gap: var(--space-2, .25rem); }
+.ln-related-label { color: var(--text-muted); font-size: var(--fs-sm, .75rem); }
+.ln-related-row {
+  display: flex; align-items: center; gap: var(--space-3, .375rem); min-width: 0;
+  padding: var(--space-3, .375rem) var(--space-4, .5rem);
+  background: none; border: var(--control-bw, .0625rem) solid var(--border); color: inherit; text-align: left; cursor: pointer;
+}
+.ln-related-row:hover { background: var(--bg-hover); }
+.ln-related-row.ln-done { color: var(--text-muted); }
+.ln-related-id { font-family: var(--font-mono, monospace); color: var(--text-muted); }
+.ln-related-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ln-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3, .375rem); }
+.ln-activity-row { display: flex; align-items: baseline; gap: var(--space-3, .375rem); min-width: 0; }
+.ln-activity-icon { width: 1rem; text-align: center; color: var(--text-muted); }
+.ln-activity-text { min-width: 0; overflow-wrap: anywhere; }
+.ln-activity-actor { color: var(--text); font-weight: 600; }
+
+.ln-comments, .ln-comment-children { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5, .625rem); }
+.ln-comment-children { margin-top: var(--space-4, .5rem); padding-left: var(--space-6, .75rem); border-left: var(--control-bw, .0625rem) solid var(--border); }
+.ln-comment-head { display: flex; align-items: center; gap: var(--space-3, .375rem); margin-bottom: var(--space-2, .25rem); }
+.ln-comment-author { font-weight: 600; }
+.ln-composer { display: grid; gap: var(--space-3, .375rem); margin-top: var(--space-6, .75rem); }
+.ln-composer-actions { display: flex; align-items: center; gap: var(--space-3, .375rem); }
+
+/* Rendered ticket markdown. Mirrors github's rules for the same content, because a Linear description in
+   a PR view and one in this pane should not read differently. Remote images will not load: the frame's
+   CSP is `img-src 'self' data:` and there is no exception worth punching for a ticket attachment. */
+.markdown { font-size: var(--fs-sm, .75rem); line-height: var(--lh, 1.5); overflow-wrap: anywhere; }
+.markdown :is(pre, code) { font-family: var(--font-mono, monospace); background: var(--bg-subtle, var(--bg-hover)); }
+.markdown pre { padding: var(--space-4, .5rem); overflow-x: auto; border: var(--control-bw, .0625rem) solid var(--border); }
+.markdown :is(h1, h2, h3) { font-size: var(--fs, .8125rem); margin: var(--space-4, .5rem) 0 var(--space-2, .25rem); }
+.markdown a { color: var(--accent); }
+.markdown img { display: block; max-width: 100%; height: auto; }
+.markdown blockquote { margin: var(--space-4, .5rem) 0; padding-left: var(--space-5, .625rem); border-left: var(--control-bw, .0625rem) solid var(--border); color: var(--text-muted); }
+
+@media (max-width: 45rem) {
+  .ln-layout { grid-template-columns: minmax(0, 1fr); }
+  .ln-targets { display: none; }
+  .ln-head { padding-inline: var(--space-6, .75rem); }
+  .ln-chips, .ln-content > .ui-tabs, .ln-panel { padding-inline: var(--space-6, .75rem); }
+}
