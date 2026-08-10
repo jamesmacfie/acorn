@@ -1,6 +1,7 @@
-import type { Component } from 'solid-js'
+import { createSignal, type Component } from 'solid-js'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { Registry } from './registry'
+import { onScopeEvicted } from './scopeEviction'
 
 // A ref a host can actually produce. `ExternalRef` — what `PaneIntent`'s `integration:show-ref` carries and
 // what `task_links` resolves to — requires a `connectionId`, and the host this registry exists for does not
@@ -41,3 +42,47 @@ export const refPanelRegistry = new Registry<RefPanelContribution>('ref-panel')
 // time instead of importing it.
 export const refPanelFor = (providerId: string): RefPanelContribution | undefined =>
   refPanelRegistry.entries().find((entry) => entry.providerId === providerId)
+
+// ── The presentation: one panel at a time, owned by the shell ─────────────────────────────────────
+//
+// The registry above was already general, and the INVOCATION was not. plugins/github's PR detail held a
+// `createSignal<string | null>` of its own and rendered `refPanelFor('linear')` beside the conversation,
+// which meant exactly one surface in the app could open exactly one plugin's panel. Anything else that
+// renders provider content — a note, an agent transcript, another plugin's pane — had no way to show a
+// referenced item at all, even though the registry would have served it.
+//
+// So the open panel becomes shell state, the same shape `willPhase.tsx` uses for a confirmation: a
+// module-level signal here, one `RefPanelHost` mounted once by the composition root (./refPanelHost.tsx),
+// and callers that only say WHAT to show.
+//
+// Single-slot on purpose. A reference panel is a "look at this without leaving where you are" affordance;
+// two of them stacked is a navigation history, which is what panes and routes are for. Opening a second
+// replaces the first — which is also what a ticket linking another ticket should do.
+const [openRef, setOpenRef] = createSignal<RefPanelTarget | null>(null)
+
+// The ref the host is currently showing, read by RefPanelHost and nothing else.
+export const activeRefPanel = openRef
+
+// Show a ref, or refuse. Refusing is the whole reason this is a function and not a setter: `providerId` on
+// the way in is a CLAIM — it arrives from a plugin-supplied content-link recogniser, or from another
+// plugin naming a provider it does not own — and a panel that no registered contribution can render would
+// put the shell into a state with no dismiss affordance and nothing inside it. Same line
+// `openPluginContentTarget` holds for task panes, for the same reason.
+//
+// A false return is not a dead end: the caller's next rung (registries/contentLinks.ts) or the real
+// browser URL is still there, which is why this reports rather than throws.
+export function openRefPanel(ref: RefPanelTarget): boolean {
+  if (!ref.providerId || !ref.displayId || !refPanelFor(ref.providerId)) return false
+  setOpenRef(ref)
+  return true
+}
+
+export const closeRefPanel = (): void => void setOpenRef(null)
+
+// A panel is not keyed by node, so a switch would leave the outgoing node's plugin frame on screen over
+// the incoming node's shell — the failure class registries/scopeEviction.ts exists to prevent. Registered
+// beside the signal it clears, as that file asks. NOT cleared on task archival: the panel is not
+// task-scoped, and a panel opened from a rail source has no task to lose.
+onScopeEvicted((eviction) => {
+  if (eviction.scope === 'node-switched') setOpenRef(null)
+})

@@ -64,6 +64,23 @@ row, a pasted link, and the back button the same mechanism. The task-scoped verb
 project-scoped one (`navigate`) name disjoint sets of surfaces, checked when the manifest is parsed, so
 neither can reach a surface it could only fail on. See `docs/plugins.md`.
 
+## Not a pane: the reference panel
+
+A **reference panel** is the other thing a plugin's item can open into, and it is deliberately none of the
+above — no layout entry, no `PaneId`, no `?pane=` address, nothing persisted. It is one item shown over
+whatever the reader was already looking at, and it is dismissed rather than closed. A plugin contributes
+one keyed by the provider whose items it renders and may only name its own provider
+(`client-core/registries/refPanels.ts`); the shell holds which ref is open and draws it in exactly one
+place, so *any* surface that renders content can call `openRefPanel({ providerId, displayId })` and get
+*any* installed provider's panel. One at a time: opening a second replaces the first.
+
+The pair matters because a content link has both destinations available and they answer different
+questions. The pane is "show me this provider's items for this task" — richer, and it costs the reader the
+rectangle they were using. The panel is "let me glance at this one thing" — it needs no task, so it also
+works in classic browse and beside a rail list, and it keeps the reader's place. Which one a click gets is
+the clicking surface's preference, with the other as fallback; see `docs/plugins.md` § "Loaded plugins: the
+client half".
+
 ## Contributions
 
 Each pane contributes its ID, label, order, default chord, minimum width, component, and optional

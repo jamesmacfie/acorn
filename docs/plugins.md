@@ -184,7 +184,13 @@ kinds of contribution come out of one manifest:
   Node the frame talks to; the frame cannot name one. A `refPanel` frame is the one surface whose
   surrounding chrome the host draws rather than the plugin: an iframe cannot `Portal` out of the box
   its consumer placed it in, and the bridge's close verb is importer-only, so the manifest adapter
-  supplies the drawer and its dismiss control while the frame supplies the body.
+  supplies the drawer and its dismiss control while the frame supplies the body. It is also the one
+  surface no plugin *mounts*: the shell holds which ref is open and draws it in one place
+  (`client-core/registries/refPanels.ts` + `refPanelHost.tsx`), so any surface that renders content can
+  call `openRefPanel({ providerId, displayId })` and get any provider's panel. One at a time, on
+  purpose — a stack of reference panels is a navigation history, which is what panes and routes are for
+  — and `openRefPanel` returns `false` rather than opening an empty overlay when that provider has no
+  panel installed on this device.
 - **Webviews** — a host-drawn pane backed by an Electron-main `WebContentsView`. A surface declares
   exactly one literal `url` or plugin-owned `urlSource` plus a non-empty `hosts` allowlist. HTTPS is
   required except for `localhost`, `127.0.0.1`, and `::1`; the renderer broker validates requested
@@ -203,8 +209,17 @@ kinds of contribution come out of one manifest:
   declare `createTask`; its row supplies the task seed and optional external link, while the host owns
   the modal, origin namespace, connection ownership check, create-before-link ordering, and
   partial-failure reporting. A `contentLinks` entry uses a
-  bounded `https://` host/path grammar, names a **task-scoped** pane from the same manifest, and
-  delivers one captured path segment as a `plugin:select` intent into the active task; a target naming
+  bounded `https://` host/path grammar and delivers one captured path segment to one of **two**
+  destinations: an optional **task-scoped** `openPane` from the same manifest, which receives it as a
+  `plugin:select` intent in the active task; or the plugin's own **reference panel**, shown over
+  whatever the reader was looking at. A link must have at least one of the two, or the manifest is
+  rejected — a recogniser that matches URLs and can never open anything looks installed and is not.
+  Which destination a click gets is the *clicking surface's* call and not the manifest's, because it
+  depends on where the link was: a pull-request conversation asks for the panel so the reader keeps
+  their place, a note takes the pane. Either is a preference, and the host falls back to the other
+  when it is unavailable. The panel is never *named* — it is addressed by provider, the host stamps
+  the plugin id onto every recogniser it registers, and a `refPanel`'s provider must already be the
+  plugin itself, so a manifest cannot point a link at another plugin's panel. Likewise a target naming
   anything that is not a registered task pane resolves to nothing rather than pushing an unrenderable
   pane id into a task's persisted layout. A `routes` entry gives a project-scoped surface a URL. Its
   `path` is confined at parse time to the prefix the host mints from the plugin id —

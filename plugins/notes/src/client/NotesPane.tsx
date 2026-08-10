@@ -329,7 +329,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                   <Show when={!preview()} fallback={
                     <div
                       class="notes-preview linear-md"
-                      onClick={(event) => handlePluginContentLinkClick(event, props.task.id)}
+                      onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
                       innerHTML={renderMarkdown(body())}
                     />
                   }>

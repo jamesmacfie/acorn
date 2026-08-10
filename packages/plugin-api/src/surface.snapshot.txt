@@ -4,8 +4,11 @@ client: ApiError
 client: ClientPlugin
 client: ClientPluginContext
 client: ContentLinkContribution
+client: ContentLinkOutcome
+client: ContentLinkPresentation
 client: DeviceFlowController
 client: FAILED_STATUSES
+client: InAppTarget
 client: IntegrationFlowContribution
 client: PaletteItem
 client: PaletteRowSource
@@ -21,6 +24,7 @@ client: ProjectImporterProps
 client: ProjectPatch
 client: ProjectSeed
 client: RefPanelContribution
+client: RefPanelProps
 client: RefPanelTarget
 client: SourceContribution
 client: SourcePromotionContext
@@ -46,6 +50,7 @@ client: checksState
 client: clientCapability
 client: clientCapabilityId
 client: clientEvents
+client: closeRefPanel
 client: closeTunnelsForTask
 client: consumePaneIntent
 client: consumeTerminalFocusIntent
@@ -81,8 +86,10 @@ client: nodeReady
 client: nodes
 client: onClosePaneWithin
 client: onScopeEvicted
+client: openContentTarget
 client: openPane
 client: openPluginContentTarget
+client: openRefPanel
 client: openRepoConfigTrust
 client: paneContribution
 client: parseInAppTarget
@@ -193,6 +200,9 @@ node: Principal
 node: ProfileDef
 node: ProjectRef
 node: ProviderOperationError
+node: ProviderProject
+node: ProviderProjectContext
+node: ProviderProjectSource
 node: ProviderResourceContext
 node: ProviderResourceRefreshContext
 node: RUN_TARGETS

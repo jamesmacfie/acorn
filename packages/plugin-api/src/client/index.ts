@@ -62,8 +62,12 @@ export { projectPath } from '@acorn/client-core/registries/corePaths.ts'
 export type { TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
 export type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
 export type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
-export { refPanelFor } from '@acorn/client-core/registries/refPanels.ts'
-export type { RefPanelContribution, RefPanelTarget } from '@acorn/client-core/registries/refPanels.ts'
+// `openRefPanel` is how a plugin shows another provider's item without leaving the page. The shell owns the
+// presentation (registries/refPanelHost.tsx); a caller only says which ref, and gets `false` when that
+// provider has no panel installed here. `refPanelFor` stays exported for the one thing a caller may still
+// need to know before offering the affordance at all — whether a panel exists.
+export { closeRefPanel, openRefPanel, refPanelFor } from '@acorn/client-core/registries/refPanels.ts'
+export type { RefPanelContribution, RefPanelProps, RefPanelTarget } from '@acorn/client-core/registries/refPanels.ts'
 // The registry value, not just the props type: first-run onboarding hosts whichever importers are
 // registered rather than importing another plugin's component.
 export { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
@@ -73,10 +77,16 @@ export { registerCommands } from '@acorn/client-core/registries/commands.ts'
 export {
   contentLinkRegistry,
   handlePluginContentLinkClick,
+  openContentTarget,
   openPluginContentTarget,
   parseInAppTarget,
 } from '@acorn/client-core/registries/contentLinks.ts'
-export type { ContentLinkContribution } from '@acorn/client-core/registries/contentLinks.ts'
+export type {
+  ContentLinkContribution,
+  ContentLinkOutcome,
+  ContentLinkPresentation,
+  InAppTarget,
+} from '@acorn/client-core/registries/contentLinks.ts'
 export { contextSectionContributions } from '@acorn/client-core/registries/contextSections.ts'
 export { agentContextContributions } from '@acorn/client-core/registries/agentContexts.ts'
 // prune candidate: agent-tool renderers are in-realm components drawn inside the transcript list,

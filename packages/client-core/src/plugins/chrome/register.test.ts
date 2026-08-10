@@ -141,13 +141,30 @@ describe('syncChromeContributions', () => {
     syncChromeContributions()
 
     expect(contentLinkRegistry.entries().map((entry) => entry.id)).toEqual(['first.card', 'second.card'])
+    // `providerId` is stamped from the plugin id, which is what lets a link resolve into that plugin's own
+    // reference panel — a manifest never states it, so it cannot point at another plugin's panel.
     expect(parseInAppTarget('https://tracker.example/cards/ENG-42')).toEqual({
-      kind: 'first.card', key: 'ENG-42', pane: 'first-pane', item: 'ENG-42',
+      kind: 'first.card', key: 'ENG-42', pane: 'first-pane', item: 'ENG-42', providerId: 'first',
     })
 
     _seedPluginDistribution([['node-a', []]])
     syncChromeContributions()
     expect(contentLinkRegistry.entries()).toEqual([])
+  })
+
+  it('registers a content link whose only destination is the plugin reference panel', () => {
+    // A plugin can have items worth glancing at and no task pane at all. `openPane` is optional for exactly
+    // that shape, and the target it produces carries no `pane` — so the host's pane rung declines it and the
+    // panel rung, resolved by the stamped provider, takes it.
+    _seedPluginDistribution([['node-a', [row('board', {}, {
+      frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', glyph: 'puzzle', order: 500, formFactor: ['desktop'], providerId: 'board' }],
+      contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
+    })]]])
+    syncChromeContributions()
+
+    expect(parseInAppTarget('https://board.example/cards/ENG-42')).toEqual({
+      kind: 'board.card', key: 'ENG-42', item: 'ENG-42', providerId: 'board',
+    })
   })
 
   it('contributes no content recogniser when this device rejected the plugin bundle', () => {

@@ -409,7 +409,10 @@ export type PluginNodeStatDescriptor = {
 export type PluginContentLinkDescriptor = {
   id: string
   match: string
-  openPane: string
+  // Absent means the plugin's reference PANEL is the destination instead — a panel is addressed by provider,
+  // which for a manifest surface is always the plugin id, so there is nothing here to name. The node
+  // refuses a link with neither destination (node-core/main/pluginManifest.ts).
+  openPane?: string
   item: string
 }
 // A renderer URL the host matches on the plugin's behalf, addressing one item inside a project-scoped

@@ -30,6 +30,7 @@ import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/registries/keybindings.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/registries/willPhase.tsx'
+import { RefPanelHost } from '@acorn/client-core/registries/refPanelHost.tsx'
 import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
@@ -411,6 +412,10 @@ export default function App() {
       </Switch>
       <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
       <WillConfirmationHost />
+      {/* A referenced item from another provider, opened by any surface that renders content
+          (client-core/registries/refPanels.ts). Mounted at the shell because the STATE is the shell's —
+          before this, the only place in the app that could open one was github's PR conversation. */}
+      <RefPanelHost />
       <Show when={settingsOpen()}>
         <SettingsModal initialTab={settingsTab()} onClose={() => setSettingsOpen(false)} />
       </Show>
