@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { contentLinkRegistry, parseInAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
+import { activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
 import { githubContentLinkContributions, makeContentLinkHandler, splitLinearIds } from './contentLinks'
 
 // Only github's own recognisers are asserted here. Linear's moved to plugins/linear with the
@@ -27,17 +28,13 @@ describe('parseInAppTarget', () => {
   })
 })
 
-describe('project-keyed content navigation', () => {
-  it('resolves GitHub links through the project facet', () => {
-    const navigate = vi.fn()
-    const preventDefault = vi.fn()
-    const anchor = {
-      getAttribute: (name: string) => name === 'href' ? 'https://github.com/runn/acorn/pull/42' : null,
-      dataset: {},
-    }
-    const handler = makeContentLinkHandler(navigate, vi.fn(), (owner, repo) => owner === 'runn' && repo === 'acorn' ? 'project-acorn' : null)
-
-    handler({
+// One click, with the three fields the handler actually reads. `dataset` carries the bare-id anchors this
+// file mints out of GitHub's body HTML; `href` is the real-URL path.
+const click = (anchor: { getAttribute?: (name: string) => string | null; dataset: Record<string, string> }) => {
+  const preventDefault = vi.fn()
+  return {
+    preventDefault,
+    event: {
       defaultPrevented: false,
       button: 0,
       metaKey: false,
@@ -46,9 +43,60 @@ describe('project-keyed content navigation', () => {
       altKey: false,
       target: { closest: () => anchor },
       preventDefault,
-    } as unknown as MouseEvent)
+    } as unknown as MouseEvent,
+  }
+}
+const hrefAnchor = (href: string) => ({ getAttribute: (name: string) => (name === 'href' ? href : null), dataset: {} })
+
+describe('project-keyed content navigation', () => {
+  it('resolves GitHub links through the project facet', () => {
+    const navigate = vi.fn()
+    const { event, preventDefault } = click(hrefAnchor('https://github.com/runn/acorn/pull/42'))
+    const handler = makeContentLinkHandler(navigate, (owner, repo) => owner === 'runn' && repo === 'acorn' ? 'project-acorn' : null)
+
+    handler(event)
 
     expect(navigate).toHaveBeenCalledWith('/p/project-acorn/pulls/42')
+    expect(preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('leaves a PR in an untracked repo to the real browser URL', () => {
+    // A DELIBERATE PRODUCT DECISION (see the comment on the branch itself), pinned so a later refactor
+    // cannot quietly turn it into a swallowed click with nowhere to land.
+    const navigate = vi.fn()
+    const { event, preventDefault } = click(hrefAnchor('https://github.com/someone/untracked/pull/7'))
+
+    makeContentLinkHandler(navigate, () => null)(event)
+
+    expect(navigate).not.toHaveBeenCalled()
+    expect(preventDefault).not.toHaveBeenCalled()
+  })
+})
+
+describe('bare Linear ids', () => {
+  // github injects these anchors itself (linkifyLinearIds), so no recogniser can claim them and the host's
+  // URL ladder never sees them. They go straight to the provider's reference panel.
+  afterEach(() => closeRefPanel())
+
+  it('opens the provider reference panel when that provider has one registered', () => {
+    const panel = refPanelRegistry.register({ id: 'linear-ref', providerId: 'linear', component: () => null })
+    const { event, preventDefault } = click({ dataset: { linearId: 'CRA-404' } })
+
+    makeContentLinkHandler(vi.fn())(event)
+
+    expect(activeRefPanel()).toEqual({ providerId: 'linear', displayId: 'CRA-404' })
+    expect(preventDefault).toHaveBeenCalledOnce()
+    panel.dispose()
+  })
+
+  it('opens nothing when Linear is not installed on this device', () => {
+    // The anchor has no href, so there is nothing to fall through TO — the click is still consumed, and the
+    // shell must not be left showing an overlay no contribution can fill.
+    const { event, preventDefault } = click({ dataset: { linearId: 'CRA-404' } })
+
+    makeContentLinkHandler(vi.fn())(event)
+
+    expect(activeRefPanel()).toBeNull()
     expect(preventDefault).toHaveBeenCalledOnce()
   })
 })

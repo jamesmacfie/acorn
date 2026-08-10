@@ -1,9 +1,8 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
-import { checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, persistDraft, projectsOptions, refPanelFor, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
+import { checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, openRefPanel, persistDraft, projectsOptions, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import { CopyButton, MentionTextarea, Picker, UserAvatar } from '@acorn/plugin-api/ui'
 import { mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions } from './queries'
@@ -76,7 +75,10 @@ export default function PullDetail(props: { task?: Task } = {}) {
   const linearConnected = () => (integrations.data?.integrations ?? []).some((i) => i.providerId === 'linear' && i.status === 'connected')
   const linearIssues = createQuery(() => linearIssuesOptions(linearRefs().map((rf) => rf.identifier), linearRefs().length > 0 && linearConnected()))
   const linearSummary = createMemo(() => new Map((linearIssues.data?.issues ?? []).map((i) => [i.identifier, i])))
-  const [openIssue, setOpenIssue] = createSignal<string | null>(null)
+  // Show a linked ticket without leaving the PR: the linked-ticket list below, and the bare `CRA-404` ids
+  // in the title. `openRefPanel` refuses when Linear is not installed on this device, which is the right
+  // degradation for a detail overlay and is why nothing here checks first.
+  const showLinearIssue = (identifier: string): void => void openRefPanel({ providerId: 'linear', displayId: identifier })
 
   // The Navigator pane itself is the scroll container, outside this fragment-owned component.
   // Keep its session position per task/PR (or classic-browse PR) so disposing the review surface
@@ -96,12 +98,12 @@ export default function PullDetail(props: { task?: Task } = {}) {
     },
   })
 
-  // Open in-app links found inside rendered bodies (Linear issues → panel; GitHub PRs/repos resolve
-  // through the current project's GitHub facet before entering the project-keyed SPA route).
+  // Open in-app links found inside rendered bodies. The host resolves which provider claims the URL and
+  // shows its reference panel (any provider's, not just Linear's — see contentLinks.ts); GitHub PRs/repos
+  // resolve through the current project's GitHub facet before entering the project-keyed SPA route.
   const navigate = useNavigate()
   const onContentClick = makeContentLinkHandler(
     navigate,
-    setOpenIssue,
     (owner, repo) => projects.data?.find((project) => project.github?.owner === owner && project.github?.name === repo)?.id,
   )
   const linearPrefixes = createMemo(() => [...new Set(linearRefs().map((rf) => rf.identifier.split('-')[0]))])
@@ -201,7 +203,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
               bindNavigatorScroll={bindNavigatorScroll}
               fileSummary={fileSummary}
               linearPrefixes={linearPrefixes}
-              onOpenIssue={setOpenIssue}
+              onOpenIssue={showLinearIssue}
               mergeMethod={mergeMethod}
               setMergeMethod={setMergeMethod}
               run={run}
@@ -258,7 +260,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                         const summary = () => linearSummary().get(rf.identifier)
                         return (
                           <li class="check-row">
-                            <button type="button" class="integration-row" onClick={() => setOpenIssue(rf.identifier)}>
+                            <button type="button" class="integration-row" onClick={() => showLinearIssue(rf.identifier)}>
                               <span class="integration-row-id">{rf.identifier}</span>
                               <Show when={summary()} fallback={<span class="integration-row-title muted">{linearIssues.isLoading ? 'Loading…' : ''}</span>}>
                                 {(s) => (
@@ -465,21 +467,12 @@ export default function PullDetail(props: { task?: Task } = {}) {
             <Show when={openCheck()}>
               {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}
             </Show>
-            {/* The referenced item's own plugin renders it. Was `<LinearIssuePanel …>` — the last
-                plugin→plugin import on the boundary ledger — and the fix is not the indirection but the
-                ownership: a PR body can reference any provider's item, and the plugin that reviews pull
-                requests should not gain a dependency per provider. `refPanelFor` returning undefined (that
-                plugin disabled) renders nothing, which is the right degradation for a detail overlay. */}
-            <Show when={openIssue() ? refPanelFor('linear') : undefined}>
-              {(panel) => (
-                <Dynamic
-                  component={panel().component}
-                  ref={{ providerId: 'linear', displayId: openIssue()! }}
-                  onClose={() => setOpenIssue(null)}
-                  onContentClick={onContentClick}
-                />
-              )}
-            </Show>
+            {/* No reference panel here any more, and the deletion is the point. This was
+                `<Show when={openIssue() ? refPanelFor('linear') : undefined}>` — a local signal plus one
+                provider named in the markup, which made this the ONLY surface in the app that could show a
+                referenced item, and Linear the only provider it could show. The registry was always
+                general; the invocation was not. Both now belong to the shell
+                (client-core/registries/refPanels.ts + refPanelHost.tsx), and this pane just asks. */}
           </>
         )}
       </Show>
