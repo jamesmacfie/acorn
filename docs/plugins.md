@@ -291,6 +291,14 @@ agent contexts, agent-tool renderers, pollers, persisted-state slices, Node stat
 items. An activation pass handles subscriptions or local storage initialization after all descriptors
 exist.
 
+A source may also contribute routes. Two rules keep that seam honest. A route ADDRESSES an item inside a
+surface — it must never gate whether the surface renders, because the rail selects a source by signal and
+never navigates, so a render gated on a route match is unreachable. And a source scopes itself to the routed
+project, rendering at core's `/p/:projectId` alongside every other source; its own paths hang below that
+(`/p/:projectId/pulls/:number`, `/p/:projectId/issues/:identifier`). Core's URLs are constants in
+client-core, not registry lookups, so a contributed route can never be resolved in core's place. The one
+question core asks back is `SourceContribution.taskPath`: where a task the source owns should live.
+
 ## Collaboration rules
 
 Plugins collaborate through four mechanisms:

@@ -7,13 +7,12 @@ import type { SourceRouteContribution } from '@acorn/plugin-api/client'
 // Project-scoped because the issue list is derived from the routed project's WORKSPACE: linked Linear
 // projects hang off the workspace (docs/workspaces-and-tasks.md), and the route has no workspace in it.
 //
-// ponytail: keyed by identifier alone, while an issue is really (integrationId, identifier). Two connected
+// Keyed by identifier alone, while an issue is really (integrationId, identifier). Two connected
 // Linear workspaces whose teams share a prefix would collide here and open whichever loaded first. The
 // upgrade is a connection id in the path; not worth the URL noise until someone has two.
 export const linearRouteContributions: readonly SourceRouteContribution[] = [
   { id: 'linear.issue', path: '/p/:projectId/issues/:identifier', order: 60 },
 ]
 
-export const linearIssueRoute = linearRouteContributions[0].path
 export const linearIssuePath = (projectId: string, identifier: string): string =>
   `/p/${encodeURIComponent(projectId)}/issues/${encodeURIComponent(identifier)}`

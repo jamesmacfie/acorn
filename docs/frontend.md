@@ -34,10 +34,25 @@ The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `Comman
 registry entries and client-core contracts. A feature that needs native behavior uses typed
 `window.acorn` capabilities through client-core; plugins do not import Electron.
 
-The router is also registry-driven. A source contributes its existing `repo`, `create`, and `detail`
-path shapes with explicit order; the desktop shell composes those shapes before rendering and uses the
-same contribution to build navigation URLs. Static routes therefore remain ahead of parameter routes
-without embedding a provider's URL scheme in `index.tsx`, `App.tsx`, or workspace selection.
+The router is registry-driven. A source contributes path shapes with an explicit `order`, and the desktop
+shell composes them before rendering, so a static route stays ahead of a parameter route without embedding a
+provider's URL scheme in `index.tsx`.
+
+Core owns its own URLs as constants in `registries/corePaths.ts` — `/p/:projectId`, `/p/:projectId/new`,
+`/t/:taskId` — and never resolves them through the registry. A contributed route ADDRESSES something inside a
+surface; it does not decide whether the surface renders. Every browse source scopes itself to the routed
+project and renders at `/p/:projectId`; GitHub's `/pulls/:number` and Linear's `/issues/:identifier` select an
+item within that surface. A source that gates its render on its own route match becomes unreachable, because
+selecting a source in the rail sets a signal rather than navigating.
+
+The one thing core asks a plugin for is where a task lives: `SourceContribution.taskPath` lets a source claim
+a task's URL (GitHub puts a PR-backed task at its PR URL), and `pathForTask` falls back to `/t/:taskId`. This
+replaced a lookup that asked the registry for whichever source happened to own a route `kind` — a global
+first-match that worked only while GitHub was the sole plugin with routes.
+
+Task panes are addressed with query params rather than path segments: `/t/:taskId?pane=…&item=…` is consumed
+once into a `PaneIntent` and then stripped (`tasks/taskDeepLink.ts`). The pane layout is a row with focus and
+maximise state persisted per task, so the URL carries the intent, not the layout.
 
 ## Node data access
 

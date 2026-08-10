@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activateTaskSignals, createDismissable, formatRelativeTime, integrationsOptions, pathForTask, projectPath, replaceWorkspaceExternalProjectsForProvider, setWorkspaceExternalProjects, tasksKey, tasksOptions, workspaceExternalProjectsForProvider, workspaceExternalProjectsKey, workspaceExternalProjectsOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, createDismissable, formatRelativeTime, integrationsOptions, parseInAppTarget, pathForTask, projectPath, replaceWorkspaceExternalProjectsForProvider, setWorkspaceExternalProjects, tasksKey, tasksOptions, workspaceExternalProjectsForProvider, workspaceExternalProjectsKey, workspaceExternalProjectsOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { linearIssuePath } from './routes'
 import { linearProjectsOptions, workspaceLinearIssuesOptions } from './queries'
 import type { Task, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
@@ -15,7 +15,6 @@ import LinearIssuePanel from './LinearIssuePanel'
 // externalId) pair. Issues are scoped to the workspace's linked projects; selecting one opens its
 // detail, while the row's explicit action promotes it to a task on the current repo.
 const projKey = (p: WorkspaceExternalProject) => `${p.integrationId}:${p.externalId}`
-const issueKey = (issue: LinearProjectIssue) => `${issue.integrationId}:${issue.identifier}`
 
 export default function LinearBrowse() {
   const navigate = useNavigate()
@@ -41,20 +40,27 @@ export default function LinearBrowse() {
   const selectIssue = (issue: LinearProjectIssue | null) =>
     navigate(issue ? linearIssuePath(params.projectId ?? '', issue.identifier) : projectPath(params.projectId ?? ''))
 
+  // A linear.app link inside an issue description now has somewhere in-app to go: this same surface, one
+  // route over. It used to be inert here — the panel took an empty handler, and the only place a Linear URL
+  // resolved at all was inside github's PR conversation, which has a side panel to open it in.
+  const onPanelContentClick = (event: MouseEvent) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    const href = (event.target as HTMLElement | null)?.closest('a')?.getAttribute('href')
+    const target = href ? parseInAppTarget(href) : null
+    if (target?.kind !== 'linear' || typeof target.identifier !== 'string' || !params.projectId) return
+    event.preventDefault()
+    navigate(linearIssuePath(params.projectId, target.identifier))
+  }
+
   // Triage is client-side over the one browse fetch (mirrors the Rollbar browse). Filter → sort by
   // priority/recency → group by workflow-state.
   const [filter, setFilter] = createSignal<LinearFilter>(emptyLinearFilter)
   const patch = (part: Partial<LinearFilter>) => setFilter((f) => ({ ...f, ...part }))
   const groups = createMemo(() => groupLinearIssuesByState(sortLinearIssues(filterLinearIssues(allIssues(), filter()))))
 
-  createEffect(on(
-    () => params.projectId ?? '',
-    () => {
-      setSelectedIssue(null)
-      setFilter(emptyLinearFilter)
-    },
-    { defer: true },
-  ))
+  // Filters are per-visit, so a project change starts clean. The selection is not reset here any more —
+  // it is the route's, and changing project already changes the route.
+  createEffect(on(() => params.projectId ?? '', () => setFilter(emptyLinearFilter), { defer: true }))
 
   // Project picker — lists projects across every connected Linear, tagged by connection.
   const [pickerOpen, setPickerOpen] = createSignal(false)
@@ -195,11 +201,11 @@ export default function LinearBrowse() {
                                     role="button"
                                     tabindex="0"
                                     aria-pressed={isSelected(it)}
-                                    onClick={() => setSelectedIssue(it)}
+                                    onClick={() => selectIssue(it)}
                                     onKeyDown={(event) => {
                                       if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
                                       event.preventDefault()
-                                      setSelectedIssue(it)
+                                      selectIssue(it)
                                     }}
                                   >
                                     <span class="linear-browse-prio" data-p={prio.level} title={prio.label} aria-label={prio.label}>
@@ -248,8 +254,8 @@ export default function LinearBrowse() {
             <LinearIssuePanel
               variant="pane"
               target={{ identifier: selected().identifier, connectionId: selected().integrationId }}
-              onClose={() => setSelectedIssue(null)}
-              onContentClick={() => {}}
+              onClose={() => selectIssue(null)}
+              onContentClick={onPanelContentClick}
             />
           )}
         </Show>
