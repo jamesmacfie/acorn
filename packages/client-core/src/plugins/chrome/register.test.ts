@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
+import type { NodePluginRow, PluginContributions, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
 
 const readJson = vi.fn()
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
@@ -18,11 +18,12 @@ const { nodeStatRegistry } = await import('../../registries/nodeStats')
 const { commandAvailable, commandRegistry, executeCommand } = await import('../../registries/commands')
 const { keybindingRegistry } = await import('../../registries/keybindings')
 const { contentLinkRegistry, parseInAppTarget } = await import('../../registries/contentLinks')
+const { refResolverRegistry } = await import('../../registries/refResolvers')
 const { sourceRegistry } = await import('../../registries/sources')
 const { taskSlotRegistry } = await import('../../registries/slots')
 const { orphanedPluginOverrideIds } = await import('../../settings/shortcutSettingsModel')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
-const { _resetChromeContributions, syncChromeContributions } = await import('./register')
+const { _resetChromeContributions, syncChromeContributions, usableEmptyState } = await import('./register')
 
 // The chrome host pass (docs/plugins.md).
 //
@@ -62,6 +63,7 @@ const CHROME: Partial<PluginContributions> = {
     options: '/v2/p/board/context-options',
     capture: '/v2/p/board/context-capture',
   }],
+  refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v2/p/board/refs' }],
 }
 
 const ids = () => ({
@@ -72,6 +74,7 @@ const ids = () => ({
   attention: attentionRegistry.entries().map((entry) => entry.id),
   nodeStats: nodeStatRegistry.entries().map((entry) => entry.id),
   agentContexts: agentContextRegistry.entries().map((entry) => entry.id),
+  refResolvers: refResolverRegistry.entries().map((entry) => entry.id),
 })
 
 beforeEach(() => {
@@ -99,7 +102,29 @@ describe('syncChromeContributions', () => {
       attention: ['board-stuck'],
       nodeStats: ['board-count'],
       agentContexts: ['board-context'],
+      refResolvers: ['board-refs'],
     })
+  })
+
+  it('keeps an empty state’s message but drops an action the device cannot honour', () => {
+    // A roster row is wire input, so the empty state's action is re-checked here exactly as a command's
+    // is — the node's parse is not evidence about the bytes that arrived. Dropping the action rather
+    // than the whole state is deliberate: the sentence is the part the rail was missing.
+    const message = 'No boards linked yet.'
+    const authored = (action: PluginSourceEmptyState['action']): PluginSourceEmptyState =>
+      ({ message, action, actionLabel: 'Link one' })
+    const panes = new Set(['board'])
+
+    // Another plugin's route, a pane this manifest never declared, and a verb that needs a row.
+    expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v2/p/other/go' }))).toEqual({ message })
+    expect(usableEmptyState('board', panes, authored({ verb: 'openPane', pane: 'ghost' }))).toEqual({ message })
+    expect(usableEmptyState('board', panes, authored({ verb: 'openUrl', url: 'http://example.com' }))).toEqual({ message })
+    expect(usableEmptyState('board', panes, authored({ verb: 'createTask' } as never))).toEqual({ message })
+
+    const usable = authored({ verb: 'runNodeAction', path: '/v2/p/board/link' })
+    expect(usableEmptyState('board', panes, usable)).toBe(usable)
+    expect(usableEmptyState('board', panes, { message })).toEqual({ message })
+    expect(usableEmptyState('board', panes, undefined)).toBeUndefined()
   })
 
   it('registers host-owned promotion for a createTask source', () => {
@@ -368,6 +393,45 @@ describe('syncChromeContributions', () => {
     })
   })
 
+  describe('ref resolvers', () => {
+    const row1 = { identifier: 'ENG-1', label: 'Ship the thing', state: { name: 'In Progress', color: '#f2c94c', kind: 'started' } }
+
+    beforeEach(() => {
+      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
+      syncChromeContributions()
+    })
+
+    it('POSTs the identifiers to the declared route and stamps the answer with the declaring plugin', async () => {
+      // The row claims a provider, as a plugin's output always may. The host overwrites it, because a
+      // resolver naming another provider is how its rows would end up behind that provider's panel.
+      writeJson.mockResolvedValue([{ ...row1, providerId: 'linear', url: 'https://board.example/c/ENG-1' }])
+      const resolved = await refResolverRegistry.get('board-refs')!.resolve(['ENG-1'])
+      expect(writeJson).toHaveBeenCalledWith('/v2/p/board/refs', expect.objectContaining({
+        method: 'POST',
+        nodeId: 'node-a',
+        body: JSON.stringify({ identifiers: ['ENG-1'] }),
+      }))
+      expect(resolved).toEqual([{ ...row1, url: 'https://board.example/c/ENG-1', providerId: 'board' }])
+    })
+
+    it('resolves nothing rather than partly when the answer does not parse', async () => {
+      // Including the shape the route used to answer with, `{ issues: [...] }` — a wrapped body is
+      // exactly what a plugin written against the old contract would send.
+      for (const body of [{ issues: [row1] }, [{ identifier: 'ENG-1' }], [{ ...row1, label: 'x'.repeat(400) }], null]) {
+        writeJson.mockResolvedValue(body)
+        expect(await refResolverRegistry.get('board-refs')!.resolve(['ENG-1'])).toEqual([])
+      }
+    })
+
+    it('asks a node that does not run the plugin for nothing', async () => {
+      setActiveNode('node-b')
+      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+      syncChromeContributions()
+      expect(await refResolverRegistry.get('board-refs')!.resolve(['ENG-1'])).toEqual([])
+      expect(writeJson).not.toHaveBeenCalled()
+    })
+  })
+
   it('takes all of a plugin’s chrome away when it stops being offered', () => {
     const shortcutChrome: Partial<PluginContributions> = {
       commands: [{ id: 'search', title: 'Board: search', category: 'action', palette: false, action: { verb: 'runNodeAction', path: '/v2/p/board/search' } }],
@@ -382,7 +446,7 @@ describe('syncChromeContributions', () => {
 
     _seedPluginDistribution([['node-a', []]])
     syncChromeContributions()
-    expect(ids()).toEqual({ sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [] })
+    expect(ids()).toEqual({ sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [], refResolvers: [] })
     expect(orphanedPluginOverrideIds(overrides, keybindingRegistry.entries())).toEqual([overrideId])
   })
 })

@@ -7,9 +7,11 @@ import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import { linearFetch, type LinearNode } from '@acorn/plugin-linear/server/index.ts'
 import { linearProvider, linearRef } from '@acorn/plugin-linear/server/provider.ts'
 import '../registerProviders'
+import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
-import { linear } from '@acorn/plugin-linear/server/routes/linear.ts'
+import { createLinearFetch } from '@acorn/plugin-linear/server/routes/linear.ts'
+import { servePluginFetch } from '@acorn/node-core/server/plugin/fetchRoute.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
@@ -54,7 +56,11 @@ describe('Linear provider parity', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/linear', linear)
+    // Through the portable carrier, exactly as production mounts it — linear has no compiled router
+    // to hand `app.route` any more. `servePluginFetch` builds the identity-bound request context the
+    // routes' helpers require.
+    const fetch = createLinearFetch()
+    app.all('/api/linear/*', (c) => servePluginFetch(c, { pluginId: 'linear', mount: '/api/linear', fetch }))
     await t.db.insert(schema.integrations).values([
       {
         id: 'linear-a', userId: 'james', provider: 'linear', label: 'Linear A',
@@ -127,25 +133,19 @@ describe('Linear provider parity', () => {
   })
 
   // The declarative rail source. This router carries no `projects` scope — the loaded package's does —
-  // so every connection takes the unmapped fallback, which is the branch that exists because choosing
-  // Linear projects for a workspace has no writer left on the loaded tier.
-  it('projects rail rows from the viewer’s own issues when no project is mapped', async () => {
-    vi.mocked(linearFetch).mockImplementation(async (secret) => graphQl({
-      viewer: { assignedIssues: { nodes: secret === 'token-a'
-        ? [node('Low', { identifier: 'ENG-1', priority: 4, updatedAt: '2026-01-01T00:00:00.000Z', branchName: 'eng-1-low' })]
-        : [node('Urgent', { identifier: 'ENG-2', priority: 1, updatedAt: '2026-01-02T00:00:00.000Z' })] } },
-    }))
+  // so nothing is mapped for any connection here.
+  it('contributes no rows when a connection has no linked projects, rather than the viewer’s own issues', async () => {
+    // The fallback this replaces showed whatever was assigned to you, which answered a question nobody
+    // asked and whose rows belonged to no project in the workspace. The rail says so instead, through the
+    // source's authored `emptyState` (docs/third-party/linear.md § finding 1).
+    vi.mocked(linearFetch).mockImplementation(async () => graphQl({ issues: { nodes: [node('Urgent')] } }))
 
     const response = await app.fetch(new Request('http://acorn.test/api/linear/rail-items'), env())
 
     expect(response.status).toBe(200)
-    // Urgent first across BOTH workspaces: ordering is applied to the merged list, not per connection.
-    expect(await response.json()).toEqual({
-      items: [
-        expect.objectContaining({ id: 'linear-b:ENG-2', task: expect.objectContaining({ origin: 'linear', branch: 'eng-2' }) }),
-        expect.objectContaining({ id: 'linear-a:ENG-1', task: expect.objectContaining({ branch: 'eng-1-low' }) }),
-      ],
-    })
+    expect(await response.json()).toEqual({ items: [] })
+    // And it costs no provider call at all, which the fallback did once per connection on every visit.
+    expect(linearFetch).not.toHaveBeenCalled()
   })
 
   it('answers the rail with an empty list, never an error, when nothing is connected', async () => {
@@ -189,7 +189,9 @@ describe('Linear provider parity', () => {
     }), env())
 
     expect(response.status).toBe(200)
-    expect((await response.json()) as { issues: LinearIssueSummary[] }).toMatchObject({ issues: [{ title: 'Workspace A' }] })
+    // The host's ref-resolver shape, not a Linear-flavoured one: a bare array, `label` rather than
+    // `title`, and no `providerId` — the device stamps that from the plugin whose route answered.
+    expect((await response.json()) as PluginRefResolutionBody[]).toMatchObject([{ label: 'Workspace A' }])
     expect(linearFetch).not.toHaveBeenCalled()
   })
 
@@ -201,7 +203,7 @@ describe('Linear provider parity', () => {
     }), env())
 
     expect(response.status).toBe(200)
-    expect((await response.json()) as { issues: LinearIssueSummary[] }).toMatchObject({ issues: [{ title: 'Workspace A' }] })
+    expect((await response.json()) as PluginRefResolutionBody[]).toMatchObject([{ label: 'Workspace A' }])
     expect(vi.mocked(linearFetch).mock.calls.map(([secret]) => secret)).toEqual(['token-a'])
   })
 

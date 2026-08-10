@@ -14,23 +14,27 @@
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { githubProvider } from '@acorn/plugin-github/server/provider.ts'
-import { linear } from '@acorn/plugin-linear/server/routes/linear.ts'
+import { createLinearFetch } from '@acorn/plugin-linear/server/routes/linear.ts'
 import { linearProvider } from '@acorn/plugin-linear/server/provider.ts'
-import { rollbar } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
+import { createRollbarFetch } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
 import { rollbarProvider } from '@acorn/plugin-rollbar/server/provider.ts'
 
 // Idempotent: several suites in one vitest worker may import this, and the registries throw on a
 // duplicate id. Keyed on the registry's own state rather than a local flag so it stays correct if a
-// suite registers one provider itself.
+// suite registers one provider itself. Owners match what each plugin's init registers in production
+// (plugin id = provider id here), because the portable runtime's ownership assertions read them.
 for (const provider of [githubProvider, linearProvider, rollbarProvider]) {
   if (integrationProviderRegistry.get(provider.id)) continue
-  connectionProviderRegistry.register(provider)
-  integrationProviderRegistry.register(provider)
+  connectionProviderRegistry.register(provider, provider.id)
+  integrationProviderRegistry.register(provider, provider.id)
 }
-for (const [providerId, router] of [
-  ['linear', linear],
-  ['rollbar', rollbar],
+// Neither loaded plugin has a compiled router any more — their routes only run over the portable
+// fetch carrier, so the registry gets the same shape production registers and the mount table
+// adapts it.
+for (const route of [
+  { providerId: 'linear', prefix: '', fetch: createLinearFetch() },
+  { providerId: 'rollbar', prefix: '', fetch: createRollbarFetch() },
 ] as const) {
-  if (integrationProviderRegistry.routes().some((r) => r.providerId === providerId)) continue
-  integrationProviderRegistry.registerRoute({ providerId, prefix: '', router })
+  if (integrationProviderRegistry.routes().some((r) => r.providerId === route.providerId)) continue
+  integrationProviderRegistry.registerRoute(route)
 }

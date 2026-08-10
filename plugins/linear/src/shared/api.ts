@@ -4,11 +4,11 @@
 // namespace owns the shape of what crosses it. Moved verbatim out of @acorn/protocol/api.ts, and the
 // route strings are byte-identical for it.
 //
-// ONE query key is left, and it is not this plugin's. `linearIssuesKey` belongs to the TanStack query
-// github runs through `contract/issues.ts`, and its value is load-bearing: the persisted query cache has
-// no buster, so a changed key orphans a user's IndexedDB. The rest went with the client half — a frame
-// calls these routes over the bridge and keeps no query cache of its own, so a key with no client is a
-// value nothing can compare against.
+// NO query keys left. The last one, `linearIssuesKey`, belonged to github's batch query through
+// `contract/issues.ts`; both are gone, replaced by the host's `refResolvers` carrier, which owns the key
+// for every provider (client-core/registries/refResolvers.ts). A frame calls these routes over the
+// bridge and keeps no query cache of its own, so a key with no client is a value nothing can compare
+// against.
 
 import type { PluginRailItem } from '@acorn/protocol/api.ts'
 
@@ -52,8 +52,10 @@ export type LinearIssueDetail = LinearIssueSummary & {
   relations?: LinearRelation[]
 }
 export type LinearCommentRequest = { body: string; parentId?: string }
+// The request half only. What the batch route ANSWERS is the host's `PluginRefResolutionBody[]`
+// (@acorn/protocol/refResolvers.ts), because it is declared as this plugin's ref resolver and the
+// vocabulary belongs to whoever renders it.
 export type LinearIssuesRequest = { identifiers: string[] }
-export type LinearIssuesResponse = { issues: LinearIssueSummary[] }
 // A project LIST is no longer a Linear wire type. Core's workspace picker reads projects through the
 // provider's `projects` contribution and its own `IntegrationProject` shape, so the plugin no longer
 // owns a response type for them (docs/workspaces-and-tasks.md).
@@ -83,5 +85,3 @@ export const linearIssueRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
-
-export const linearIssuesKey = (identifiers: string[]) => ['linear-issues', ...[...identifiers].sort()] as const

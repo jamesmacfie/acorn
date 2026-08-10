@@ -84,6 +84,10 @@ export default function PluginFrame(props: PluginFrameProps) {
   const qc = useQueryClient()
   const [misbehaving, setMisbehaving] = createSignal<string | null>(null)
 
+  // The iframe element, for the broker's `frameHasFocus` gate on `openUrl`: a click or keypress
+  // inside the frame's document makes this element the shell document's activeElement.
+  let frameEl: HTMLIFrameElement | undefined
+
   // Rebuilt per frame rather than shared: every effect below closes over THIS frame's binding, which is
   // what pins its node and forbids the importer verbs on a pane.
   const services = (): FrameServices => ({
@@ -163,6 +167,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       // (apps/desktop/src/app/main/electron.ts, docs/electron.md § navigation policy).
       window.open(url, '_blank', 'noopener,noreferrer')
     },
+    frameHasFocus: () => frameEl !== undefined && document.activeElement === frameEl,
     importerDone: () => props.onImported?.(),
     importerClose: () => props.onClose?.(),
     webviewNavigate: (url) => props.webview?.navigate(url) ?? Promise.resolve(false),
@@ -292,7 +297,10 @@ export default function PluginFrame(props: PluginFrameProps) {
         style={props.controllerOnly
           ? { border: '0', width: '1px', height: '1px', position: 'absolute', opacity: '0', 'pointer-events': 'none' }
           : { border: '0', width: '100%', height: '100%', display: 'block' }}
-        ref={(frame) => frame.addEventListener('load', () => onLoad(frame), { once: true })}
+        ref={(frame) => {
+          frameEl = frame
+          frame.addEventListener('load', () => onLoad(frame), { once: true })
+        }}
       />
     </Show>
   )

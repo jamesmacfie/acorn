@@ -175,6 +175,37 @@ const chromeAction = z.discriminatedUnion('verb', [
 // itself into a busy loop against a remote node.
 const refresh = z.number().int().min(30).max(86_400).optional()
 
+// The verbs that need NOTHING from their click site. `createTask` depends on a selected rail row and
+// its host-owned promotion callback; `navigate` needs a routed project to substitute into the
+// surface's path and the shell's navigator to follow it. A command registry row has none of those in
+// scope, and neither does a footer badge — the badge's click handler runs with only the plugin and
+// the node. A contribution that parses and can only toast is worse for an author than one the
+// manifest refuses, so both surfaces take this union rather than the full `chromeAction`.
+const contextFreeAction = z.discriminatedUnion('verb', [
+  z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
+  z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
+  z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
+])
+
+// What an empty rail says, and where it can send someone.
+//
+// The rail's fixed "Nothing here yet." is true and useless, and its uselessness had a cost: linear
+// answered a workspace with no linked projects by showing the viewer's own assigned issues instead,
+// because a wrong list looked better than a blank one. That is a rail-contract gap owed by every
+// source, not a linear feature (docs/third-party/README.md § known issues).
+//
+// `contextFreeAction`, because an empty rail has no row in scope — the same argument a slot badge and
+// a command make. Message length bounded, exactly ONE action, no markup: this is the field that
+// invites a source to grow an onboarding flow, and the tier's rule is that growth stops before the
+// descriptor vocabulary becomes a UI framework.
+const emptyStateDescriptor = z.object({
+  message: z.string().min(1).max(160),
+  action: contextFreeAction.optional(),
+  // The action's label. Absent means the message renders alone, which is a legitimate answer — see
+  // linear, whose empty state points at a settings page no verb in this union can reach.
+  actionLabel: z.string().min(1).max(40).optional(),
+})
+
 const sourceDescriptor = z.object({
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(80),
@@ -187,6 +218,10 @@ const sourceDescriptor = z.object({
   // GET → { items: PluginRailItem[] }
   items: pluginRoute,
   onSelect: chromeAction.optional(),
+  // Shown when the route answered with no items. NOT when it failed — an unreachable node already has
+  // its own banner, and telling someone "nothing is assigned to you" because a fetch timed out is a
+  // lie the host would be telling on the plugin's behalf.
+  emptyState: emptyStateDescriptor.optional(),
   refresh,
 })
 
@@ -199,7 +234,7 @@ const slotDescriptor = z.object({
   icon: z.string().min(1).max(64).optional(),
   // GET → PluginSlotBadge | null, where null hides the badge.
   data: pluginRoute,
-  onClick: chromeAction.optional(),
+  onClick: contextFreeAction.optional(),
   refresh,
 })
 
@@ -211,25 +246,12 @@ const paletteDescriptor = z.object({
 
 const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'terminal', 'workspace'])
 
-// `createTask` depends on a selected rail row and its host-owned promotion callback. A command has
-// neither, so exposing that otherwise-valid chrome verb here would create a command that can only fail.
-//
-// `navigate` is absent for exactly the same reason, and it is worth spelling out because it is the newer
-// hole: the verb needs a routed project to substitute into the surface's path and the shell's navigator
-// to follow it, and a palette row runs from a command registry that has neither in scope. A command that
-// parses and can only toast is worse for an author than one the manifest refuses.
-const commandAction = z.discriminatedUnion('verb', [
-  z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
-  z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
-  z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
-])
-
 const commandDescriptor = z.object({
   id: z.string().min(1).max(64),
   title: z.string().min(1).max(120),
   category: commandCategory.default('action'),
   palette: z.boolean().default(true),
-  action: commandAction,
+  action: contextFreeAction,
 })
 
 const keybindingDescriptor = z.object({
@@ -345,6 +367,23 @@ const agentContextDescriptor = z.object({
   capture: pluginRoute,
 })
 
+// One batch-enrichment route, so a surface holding identifiers of THIS plugin's items can turn them
+// into something displayable without importing this plugin (docs/third-party/cross-plugin-refs.md).
+// The host POSTs `{ identifiers }` and parses the answer against @acorn/protocol/refResolvers.ts.
+//
+// `kind` names the content-link kind these identifiers come from — `linear.issue` — so a caller that
+// scanned text knows which resolver its refs belong to. It is a claim like every other id here; what
+// binds the answer to a provider is the plugin the route belongs to, which the host stamps.
+//
+// There is no GET twin and no single-identifier form. A surface that has one identifier asks for an
+// array of one, and the cache key is the identifier set either way.
+const refResolverDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  kind: z.string().min(1).max(64),
+  // POST { identifiers } → PluginRefResolutionBody[]
+  resolve: pluginRoute,
+})
+
 // `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` is
 // still a loose object even now that phase 4's keys are named: a manifest written for a newer acorn
 // should contribute less on an older one rather than fail to parse.
@@ -364,6 +403,9 @@ const contributions = z.looseObject({
   // Four, the same ceiling as attention and nodeStats. A composer list with more than a couple of
   // entries from one plugin is a picker inside a picker, not a richer integration.
   agentContexts: z.array(agentContextDescriptor).max(4).default([]),
+  // Four. A plugin with more than a handful of resolvable item kinds is describing a whole product
+  // surface, and the vocabulary a resolver answers in is deliberately one shape for all of them.
+  refResolvers: z.array(refResolverDescriptor).max(4).default([]),
 }).prefault({})
 
 export type PluginFrameSurface = z.infer<typeof frameSurface>
@@ -371,6 +413,7 @@ export type PluginChromeAction = z.infer<typeof chromeAction>
 export type PluginCommandDescriptor = z.infer<typeof commandDescriptor>
 export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
 export type PluginAgentContextDescriptor = z.infer<typeof agentContextDescriptor>
+export type PluginRefResolverDescriptor = z.infer<typeof refResolverDescriptor>
 export type PluginClientRouteDescriptor = z.infer<typeof clientRouteDescriptor>
 
 const manifestShape = z.object({
@@ -403,7 +446,7 @@ const manifestShape = z.object({
 // plugin may address its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read
 // core routes, or another plugin's, on its behalf.
 export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) => {
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, routes } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The RENDERER twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -485,6 +528,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   sources.forEach((entry, i) => {
     route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])
+    if (entry.emptyState?.action) action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
   })
   slots.forEach((entry, i) => {
     route(entry.data, ['contributions', 'slots', i, 'data'])
@@ -520,6 +564,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     route(entry.options, ['contributions', 'agentContexts', i, 'options'])
     route(entry.capture, ['contributions', 'agentContexts', i, 'capture'])
   })
+  refResolvers.forEach((entry, i) => route(entry.resolve, ['contributions', 'refResolvers', i, 'resolve']))
   // Every project-scoped surface needs two things this manifest alone can supply, and both are checked
   // here rather than left to a runtime that would have nothing to say about them.
   const routedSurfaces = new Set<string>()
@@ -592,7 +637,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...routes]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

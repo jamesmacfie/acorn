@@ -1,14 +1,12 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
 import { rollbarProvider } from '../server/provider'
-import { createRollbarFetch, rollbar } from '../server/routes/rollbar'
+import { createRollbarFetch } from '../server/routes/rollbar'
 
 export const rollbarPlugin = (): NodePlugin => ({
   name: 'rollbar',
   init: (ctx) => {
-    // A loaded plugin deliberately has no live-router seam: its bundled Hono cannot cross the
-    // process-boundary contract. Built-ins keep their concrete router so route inventory remains
-    // precise; the dogfood bundle takes the portable carrier and exercises the third-party path.
-    const route = typeof ctx.routes.register === 'function' ? rollbar : createRollbarFetch(ctx.core.projects)
-    ctx.providers.integration(rollbarProvider, route)
+    // Always the portable fetch carrier: rollbar ships loaded, a bundled Hono instance cannot cross
+    // the contract, and the compiled-tier branch that used to sit here went with the compiled mount.
+    ctx.providers.integration(rollbarProvider, createRollbarFetch(ctx.core.projects))
   },
 })

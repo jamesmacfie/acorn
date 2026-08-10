@@ -1,4 +1,5 @@
 import type { PluginChromeAction, PluginRailItem } from '@acorn/protocol/api.ts'
+import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
 import { openPane } from '../../registries/clientEvents'
@@ -85,9 +86,11 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       context.promote(context.item)
       return
     case 'openUrl':
-      // Manifest parsing already rejected anything but https. `window.open` is denied by main's
+      // Repeated on this side for the same reason `runNodeAction` re-checks its path: the URL came off
+      // a roster row, and a roster row is wire input from a node. `window.open` is denied by main's
       // setWindowOpenHandler, which hands the URL to `openExternal` — so this opens in the owner's
       // browser and never in-app (apps/desktop/src/app/main/electron.ts).
+      if (!isPluginOpenableUrl(action.url)) return toast(context.pluginId, 'refused a non-https URL')
       window.open(action.url, '_blank', 'noopener,noreferrer')
   }
 }

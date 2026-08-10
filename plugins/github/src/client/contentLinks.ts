@@ -1,18 +1,18 @@
-// GitHub's content-link recognisers, plus the bare-Linear-id text helpers the PR conversation uses.
+// GitHub's own content-link recognisers, and one click handler that adds github's project resolution
+// to the host's ladder.
 //
-// The registry, the target type and parseInAppTarget moved to
-// @acorn/client-core/registries/contentLinks.ts: link resolution is the shell's, and while it lived
-// here a third provider could not participate without editing github. Linear's URL recogniser went
-// with it, to plugins/linear.
-//
-// The `splitLinearIds` / `linkifyLinearIds` pair genuinely does stay. It is not link RESOLUTION — it
-// is github's PR body rendering, turning bare `CRA-404` text into something clickable, and it runs
-// against GitHub's innerHTML in github's own pane.
+// Everything else that used to be here has gone up into
+// @acorn/client-core/registries/contentLinks.ts, in two moves. The registry, the target type and
+// `parseInAppTarget` went first: link resolution is the shell's, and while it lived here a third
+// provider could not participate without editing github (Linear's URL recogniser went with it, into
+// plugins/linear's manifest). The `splitLinearIds` / `linkifyLinearIds` pair followed, and the argument
+// for keeping them was the one that turned out to be wrong — they are not "github's body rendering",
+// they are the only machinery in the app that makes a bare `CRA-404` clickable, and it worked for
+// exactly one provider because github was the one holding it.
 import {
   activeTaskId,
   type ContentLinkContribution,
-  openContentTarget,
-  openRefPanel,
+  handlePluginContentLinkClick,
   parseInAppTarget,
 } from '@acorn/plugin-api/client'
 
@@ -53,66 +53,15 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
   },
 ]
 
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-export function splitLinearIds(text: string, prefixes: string[]): { text: string; id?: string }[] {
-  const keys = [...new Set(prefixes)].filter(Boolean)
-  if (!keys.length) return [{ text }]
-  const re = new RegExp(`\\b(?:${keys.map(escapeRegExp).join('|')})-\\d+\\b`, 'g')
-  const out: { text: string; id?: string }[] = []
-  let last = 0
-  for (const m of text.matchAll(re)) {
-    const idx = m.index ?? 0
-    if (idx > last) out.push({ text: text.slice(last, idx) })
-    out.push({ text: m[0], id: m[0] })
-    last = idx + m[0].length
-  }
-  if (last < text.length) out.push({ text: text.slice(last) })
-  return out.length ? out : [{ text }]
-}
-
-// Walk text nodes under an innerHTML container and wrap bare Linear ids in clickable anchors
-// (data-linear-id), so a delegated content handler opens them. Skips text inside existing links and
-// code/pre. Only call on Solid-opaque innerHTML nodes (e.g. .markdown), never Solid-managed text.
-export function linkifyLinearIds(root: HTMLElement, prefixes: string[]): void {
-  const keys = [...new Set(prefixes)].filter(Boolean)
-  if (!keys.length) return
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  const hits: Text[] = []
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    const t = n as Text
-    if (!t.parentElement?.closest('a, code, pre')) hits.push(t)
-  }
-  for (const t of hits) {
-    const parts = splitLinearIds(t.data, keys)
-    if (parts.length === 1 && !parts[0].id) continue
-    const frag = document.createDocumentFragment()
-    for (const p of parts) {
-      if (!p.id) {
-        frag.append(p.text)
-        continue
-      }
-      const a = document.createElement('a')
-      a.className = 'linear-inline-link'
-      a.dataset.linearId = p.id
-      a.textContent = p.text
-      frag.append(a)
-    }
-    t.replaceWith(frag)
-  }
-}
-
-
 // A delegated click handler for a PR content container. What is left here is only what is github's:
+// owner/name → project resolution, which needs the project query this pane already holds.
 //
-//   1. the bare-id anchors `linkifyLinearIds` above minted out of github's own body HTML, which are not
-//      URLs and so no recogniser can claim them;
-//   2. owner/name → project resolution, which needs the project query this pane already holds.
-//
-// Everything general — which recogniser claims the href, and whether the matched item lands in a task pane
-// or the provider's reference panel — moved to client-core/registries/contentLinks.ts § openContentTarget.
-// It had to: this function decided, for the whole app, that a Linear issue opens a side panel, so no other
-// surface could do the same and no third provider could be opened this way at all.
+// Everything general — which recogniser claims the href, whether the matched item lands in a task pane
+// or the provider's reference panel, and the bare `CRA-404` anchors the host linkified into GitHub's
+// body HTML — is `handlePluginContentLinkClick`. The last of those was github's until the host learned
+// to mint the anchors itself (client-core/registries/contentLinks.ts § linkifyRefs); what it took with
+// it was the assumption that a bare id is a LINEAR id, which is why the branch here could never have
+// served a second provider.
 //
 // `prefer: 'refPanel'` is the request that made the move worth making. A reader half-way through a diff who
 // clicks a ticket wants to glance at it, not to have the pane under them swapped, and the panel stays over
@@ -123,28 +72,15 @@ export function makeContentLinkHandler(
   projectIdForGithub?: (owner: string, repo: string) => string | null | undefined,
 ) {
   return (e: MouseEvent) => {
+    // Handled, and `preventDefault` already called. A false covers both "not a link the host knows" and
+    // "recognised, but nowhere in-app to put it" — the two branches below are the only ones this plugin
+    // adds before the browser gets the click.
+    if (handlePluginContentLinkClick(e, { taskId: activeTaskId(), prefer: 'refPanel' })) return
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-    const anchor = (e.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null
-    if (!anchor) return
-    // A bare `CRA-404` this file wrapped itself. It carries no href, so there is no browser fallback to
-    // preserve and the click is ours whether or not Linear's panel is installed to receive it. Naming
-    // another plugin's provider is the CONSUMER side of ownership and is allowed — a panel may only be
-    // REGISTERED under its own provider — and github is already the one scanning for Linear's prefixes.
-    if (anchor.dataset.linearId) {
-      e.preventDefault()
-      openRefPanel({ providerId: 'linear', displayId: anchor.dataset.linearId })
-      return
-    }
-    const href = anchor.getAttribute('href')
+    const href = ((e.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null)?.getAttribute('href')
     if (!href) return
     const target = parseInAppTarget(href)
     if (!target) return
-    // The host's rungs first: the panel, then the declared task pane. `'external'` means it found neither,
-    // and the two branches below are the only ones this plugin adds before the browser gets the click.
-    if (openContentTarget(target, { taskId: activeTaskId(), prefer: 'refPanel' }) !== 'external') {
-      e.preventDefault()
-      return
-    }
     const str = (value: unknown): string => (typeof value === 'string' ? value : '')
     if (target.kind !== 'pr' && target.kind !== 'repo') return
     const projectId = projectIdForGithub?.(str(target.owner), str(target.repo))

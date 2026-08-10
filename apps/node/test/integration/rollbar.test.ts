@@ -15,7 +15,8 @@ import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/plugin-rollbar/server/syncPolicy.ts'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { integrations } from '@acorn/node-core/server/routes/integrations.ts'
-import { rollbar } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
+import { createRollbarFetch } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
+import { servePluginFetch } from '@acorn/node-core/server/plugin/fetchRoute.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import '../registerProviders'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
@@ -81,7 +82,10 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
       await next()
     })
     app.route('/api/integrations', integrations)
-    app.route('/api/rollbar', rollbar)
+    // Through the portable carrier, exactly as production mounts it — rollbar has no compiled router
+    // to hand `app.route` any more.
+    const fetch = createRollbarFetch()
+    app.all('/api/rollbar/*', (c) => servePluginFetch(c, { pluginId: 'rollbar', mount: '/api/rollbar', fetch }))
   })
 
   afterEach(async () => {

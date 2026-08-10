@@ -10,11 +10,9 @@ import type {
 import {
   type AppEnv,
   type CoreServices,
-  ownedConnections as hostOwnedConnections,
   type PluginFetchHandler,
   type PluginProviderResourceRequest,
   type PluginRequestContext,
-  providerResource as hostProviderResource,
   respondError,
   type RouteResult,
 } from '@acorn/plugin-api/node'
@@ -40,23 +38,23 @@ type PortableBindings = AppEnv['Bindings'] & {
   [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext
 }
 
-const portableContext = (c: Context<AppEnv>): PluginRequestContext | undefined =>
-  (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
-
-const rollbarConnections = (c: Context<AppEnv>, providerId: string) => {
-  const context = portableContext(c)
-  return context ? context.providers.connections(providerId) : hostOwnedConnections(c, providerId)
+// Rollbar ships loaded, so these routes run on ONE tier: the host gets `router.fetch`
+// (createRollbarFetch below) and the identity-bound runtime rides in through `c.env` behind this
+// symbol. A request arriving without the context is a wiring bug, and saying so beats answering it
+// from host handles this bundle should no longer touch.
+const requestContext = (c: Context<AppEnv>): PluginRequestContext => {
+  const context = (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
+  if (!context) throw new Error('rollbar routes only run over the portable carrier (createRollbarFetch)')
+  return context
 }
+
+const rollbarConnections = (c: Context<AppEnv>, providerId: string) =>
+  requestContext(c).providers.connections(providerId)
 
 const rollbarResource = <TInput, TOutput>(
   c: Context<AppEnv>,
   request: PluginProviderResourceRequest<TInput>,
-): Promise<RouteResult<TOutput>> => {
-  const context = portableContext(c)
-  return context
-    ? context.providers.resource<TInput, TOutput>(request)
-    : hostProviderResource<TInput, TOutput>(c, request)
-}
+): Promise<RouteResult<TOutput>> => requestContext(c).providers.resource<TInput, TOutput>(request)
 
 const connectionIdFrom = (c: { req: { query(name: string): string | undefined } }) => c.req.query('integration')
 
@@ -183,15 +181,10 @@ export const createRollbarRoutes = (projects?: RollbarProjectScope) => new Hono<
     return c.json(composeItemDetail(metadata.value, latestOccurrence) satisfies RollbarItemDetail)
   })
 
-export const rollbar = createRollbarRoutes()
-
-// The same Hono routes run in both tiers through this fetch-shaped carrier. Its request context
-// supplies the identity-bound provider runtime without exposing host database or secret-service
-// handles to the bundle; the exported router remains useful to direct route tests.
-export const rollbarFetch: PluginFetchHandler = (request, context) =>
-  rollbar.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
-
-export const createRollbarFetch = (projects: RollbarProjectScope): PluginFetchHandler => {
+// The Hono routes over the portable carrier — the only way in. Its request context supplies the
+// identity-bound provider runtime without exposing host database or secret-service handles to the
+// bundle. `projects` is optional for the suites that drive these routes without a project scope.
+export const createRollbarFetch = (projects?: RollbarProjectScope): PluginFetchHandler => {
   const routes = createRollbarRoutes(projects)
   return (request, context) => routes.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
 }

@@ -9,6 +9,12 @@
 // The result is `<dataRoot>/plugins/<id>/` holding a generated `acorn-plugin.json` plus one ESM
 // bundle per declared runtime. On the next boot the loader picks it up like any installed package.
 //
+// ## Where a plugin's declaration lives
+//
+// In the plugin's own package: `plugins/<id>/acorn-plugin.config.mjs`, imported here by id. The
+// declared surface — permissions, frames, sources, commands — is diffed and reviewed where the code
+// it describes lives, and this script stays a builder rather than a registry.
+//
 // ## Why Vite and not esbuild
 //
 // The phase doc said esbuild; there is none in this workspace, and apps/node already bundles itself
@@ -19,211 +25,38 @@
 // The default target is the development data root. `--package-root` is the generic staging seam used
 // by the desktop build: the same validated package shape is copied into application resources and
 // reconciled into the writable data root on boot.
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'vite'
 import solid from 'vite-plugin-solid'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(NODE_APP, '../..')
+const PLUGINS_DIR = join(ROOT, 'plugins')
+const CONFIG_FILE = 'acorn-plugin.config.mjs'
 
-// One row per plugin that can be built this way. `factory` is the exported function the node half
-// declares; the loader wants a default-exported NodePlugin, so the generated entry calls it.
-const PLUGINS = {
-  rollbar: {
-    name: 'Rollbar',
-    package: '@acorn/plugin-rollbar',
-    entry: '@acorn/plugin-rollbar/node/index.ts',
-    factory: 'rollbarPlugin',
-    client: {
-      entry: resolve(ROOT, 'plugins/rollbar/src/frame/index.tsx'),
-      // A frame owns its realm and bundle, so its Solid graph is intentionally independent from the
-      // shell's. The build seam stays framework-agnostic: transforms are opt-in per package, and a
-      // React/Vue/vanilla frame supplies its own Vite plugins (or none) here instead.
-      vitePlugins: [solid()],
-    },
-    permissions: {
-      api: ['core.tasks:read'],
-      events: [],
-      node: { core: ['projects:read'], capabilities: [], secrets: true, exec: false, net: ['api.rollbar.com'] },
-    },
-    contributions: {
-      frames: [{ target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'circle-dot', order: 100 }],
-      sources: [{
-        id: 'rollbar-items',
-        label: 'Rollbar',
-        glyph: 'circle-dot',
-        order: 30,
-        providerId: 'rollbar',
-        items: '/v2/p/rollbar/rail-items',
-        onSelect: { verb: 'openPane', pane: 'rollbar' },
-      }],
-      commands: [{
-        id: 'open',
-        title: 'Rollbar: open linked items',
-        category: 'pane',
-        palette: false,
-        action: { verb: 'openPane', pane: 'rollbar' },
-      }],
-      keybindings: [{ command: 'open', defaultChord: 'meta+shift+o', when: 'task' }],
-    },
-  },
-  // The first row to use every kind of contribution at once, and the first to have another plugin
-  // rendering one of its surfaces: plugins/github draws `linear-ref` beside a pull request through the
-  // ref-panel registry, without importing linear.
-  //
-  // `id: "linear"` is load-bearing and must never change. It binds `/v2/p/linear`, the provider id on
-  // every stored `integrations` row, the `providerId` on every `task_links` row, and the `linear` task
-  // origin. Renaming it orphans real user data.
-  //
-  // On the permissions, and where they differ from what the migration brief guessed:
-  //
-  //   secrets: false — the brief expected `true` "because the provider spends the owner's Linear token",
-  //     and it does, but never through `ctx.core.secrets`. Core resolves the `integrations` row inside
-  //     its own secret scope and lends the key to `withConnections` / a mirrored resource for the length
-  //     of the call. `true` here would be a grant with no call site, and a disclosure that overstates.
-  //   core: ['projects:read'] — only `byId` and `externalProjects`, to turn the rail's routed project
-  //     into the workspace's linked Linear projects. Not `projects:config` (no scripts), not
-  //     `projects:write`, no `tasks` facet: creating and linking a task stays in the host-owned
-  //     promotion flow, which is why the frame's `api` list has no task WRITE scope either.
-  //   api: ['core.tasks:read'] — the pane frame reads `/v2/core/tasks` to find which tickets this task
-  //     links. The ref-panel frame needs none of it; one list covers both surfaces, which is the
-  //     coarsest thing here and the reason it stays a one-item list.
-  'linear': {
-    name: 'Linear',
-    package: '@acorn/plugin-linear',
-    entry: '@acorn/plugin-linear/node/index.ts',
-    factory: 'linearPlugin',
-    client: {
-      entry: resolve(ROOT, 'plugins/linear/src/frame/index.tsx'),
-      vitePlugins: [solid()],
-    },
-    permissions: {
-      api: ['core.tasks:read'],
-      events: [],
-      node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: ['api.linear.app'] },
-    },
-    contributions: {
-      // THREE surfaces, one bundle: it decides what to draw from `bridge.context`. `providerId` on the
-      // reference panel must equal the plugin id or the client adapter refuses to register it.
-      //
-      // `linear-issue` is the surface the move to a loaded package lost, and getting it back is what
-      // `scope: 'project'` is for. Linear genuinely has two pane-shaped views and they differ in what
-      // they are ABOUT, not in how they look:
-      //
-      //   linear        the tickets THIS TASK links. A task pane, opened by meta+shift+L or the command,
-      //                 and the target a `linear.app` URL inside a note or an agent transcript resolves
-      //                 into — all of which need a task, and have one.
-      //   linear-issue  ONE ticket from the project's rail list, drawn beside it at `/p/:projectId`, with
-      //                 no task anywhere. This is where the old `SourceRouteContribution` pointed, and
-      //                 without it every rail row click outside a task was refused with "open a task
-      //                 first — this opens a pane, and a pane belongs to a task."
-      //
-      // Keeping BOTH is why nothing regresses. Had the task pane simply become project-scoped, the
-      // keybinding, the command and every content link in a note would have quietly stopped resolving.
-      frames: [
-        { target: 'pane', id: 'linear', label: 'Linear', glyph: 'square-check', order: 90 },
-        { target: 'pane', id: 'linear-issue', label: 'Linear issue', glyph: 'square-check', scope: 'project' },
-        { target: 'refPanel', id: 'linear-ref', label: 'Linear issue', providerId: 'linear' },
-      ],
-      // Keyed by identifier alone, while an issue is really (integrationId, identifier) — the same
-      // trade-off the compiled route made, with the same reasoning: two connected Linear workspaces whose
-      // teams share a prefix would collide here. A rail row click carries `<connection>:<identifier>` and
-      // so is unambiguous; only a hand-typed or copied URL is, and the upgrade is a connection id in the
-      // path, not worth the URL noise until someone has two.
-      //
-      // The prefix is the HOST's: `/p/:projectId/x/linear/` is minted from the plugin id, and a path
-      // outside it is a parse error rather than a plugin quietly claiming core's project navigation.
-      routes: [{
-        id: 'linear.issue-route',
-        path: '/p/:projectId/x/linear/issues/:identifier',
-        surface: 'linear-issue',
-        item: 'identifier',
-        order: 60,
-      }],
-      sources: [{
-        id: 'linear-issues',
-        label: 'Linear',
-        glyph: 'square-check',
-        order: 20,
-        providerId: 'linear',
-        items: '/v2/p/linear/rail-items',
-        // `navigate`, not `openPane`: the detail belongs to the project, so clicking a row changes the URL
-        // and the surface beside the list follows. It is also what mounts `linear-issue` at all.
-        onSelect: { verb: 'navigate', surface: 'linear-issue' },
-      }],
-      // Still `openPane: 'linear'`, the TASK pane, and deliberately not the project surface. A content link
-      // is clicked inside something — a PR conversation, a note, an agent transcript — and every one of
-      // those already has a task or its own better answer.
-      //
-      // It is no longer the only destination, and that is the interesting part. Naming a pane here says
-      // "an item can land in this pane"; the `linear-ref` panel above says "an item can also be shown on
-      // its own, over whatever the reader was looking at". WHICH of the two a click gets is the clicking
-      // surface's call, not this file's — a PR conversation asks for the panel so the reader keeps their
-      // place, a note takes the pane (client-core/registries/contentLinks.ts § ContentLinkPresentation).
-      // A plugin with items but no task pane would omit `openPane` entirely and get the panel alone.
-      //
-      // TWO entries for one URL shape, and that is the finding rather than a style choice. The pattern
-      // grammar is exact-arity by design — a bounded host/path form with no tail wildcard, so a manifest
-      // string cannot backtrack the renderer — and Linear's own "copy link" appends a title slug. One
-      // entry would silently recognise only the short form, which is the rarer of the two in practice.
-      contentLinks: [
-        { id: 'linear.issue', match: 'https://linear.app/{workspace}/issue/{identifier}', openPane: 'linear', item: 'identifier' },
-        { id: 'linear.issue-slug', match: 'https://linear.app/{workspace}/issue/{identifier}/{slug}', openPane: 'linear', item: 'identifier' },
-      ],
-      commands: [{
-        id: 'open',
-        title: 'Linear: open linked issues',
-        category: 'pane',
-        palette: false,
-        action: { verb: 'openPane', pane: 'linear' },
-      }],
-      keybindings: [{ command: 'open', defaultChord: 'meta+shift+l', when: 'task' }],
-    },
-  },
-  // The smallest thing this table can describe, and the two absences are the interesting part.
-  //
-  // No `client` key, because there is no frame — the plugin registers two connection providers and two
-  // model adapters and stops. Nothing of it executes on the device, so no client bundle is built, no
-  // hash is cached, and no trust prompt is ever raised; the integrations settings list is drawn by the
-  // host from the connection providers the node reports, exactly as it was when this was compiled in.
-  //
-  // `secrets: false`, because the adapter never fetches a credential. Core resolves the `integrations`
-  // row inside its own secret scope and hands `generateText` the key, so `ctx.core.secrets` would be a
-  // grant with no call site. The plugin touches no CoreServices facet at all, hence `core: []`.
-  //
-  // And no routes, so `contributions: {}` — a consumer owns its own route and calls
-  // `CoreServices.models.generateText`; see the header of plugins/model-providers/src/node/index.ts
-  // for why a generic model endpoint is deliberately absent.
-  'model-providers': {
-    name: 'Model Providers',
-    package: '@acorn/plugin-model-providers',
-    entry: '@acorn/plugin-model-providers/node/index.ts',
-    factory: 'modelProvidersPlugin',
-    permissions: {
-      api: [],
-      events: [],
-      // These two are where the SDKs go by default, and a stored connection cannot redirect them: the
-      // provider declares one `apiKey` field and normalizes to an empty `config`, so there is no
-      // user-supplied base URL. The PROCESS environment can still redirect both — `openai` reads
-      // OPENAI_BASE_URL and `@anthropic-ai/sdk` reads ANTHROPIC_BASE_URL — and since `net` is
-      // disclosure rather than enforcement, that is worth saying here rather than leaving a reader to
-      // conclude the list is exhaustive.
-      node: { core: [], capabilities: [], secrets: false, exec: false, net: ['api.openai.com', 'api.anthropic.com'] },
-    },
-    contributions: {},
-  },
+// A frame owns its realm and bundle, so its framework choice is independent of the shell's. The
+// config names a framework and this maps it to the Vite transforms the frame bundle needs; a plugin
+// whose frame needs none omits the key, and adding a framework is one line here.
+const FRAMEWORKS = {
+  solid: () => [solid()],
 }
+
+const buildable = () =>
+  readdirSync(PLUGINS_DIR).filter((dir) => existsSync(join(PLUGINS_DIR, dir, CONFIG_FILE)))
 
 const args = process.argv.slice(2)
 const id = args[0]
-const spec = PLUGINS[id]
-if (!spec) {
-  console.error(`Usage: build-plugin.mjs <${Object.keys(PLUGINS).join('|')}> [--package-root <directory>]`)
+const configPath = id ? join(PLUGINS_DIR, id, CONFIG_FILE) : null
+if (!configPath || !existsSync(configPath)) {
+  console.error(`Usage: build-plugin.mjs <${buildable().join('|')}> [--package-root <directory>]`)
   process.exit(1)
 }
+// The directory name IS the plugin id — it binds the `/v2/p/<id>` namespace, provider ids and task
+// origins, which is why the config file does not carry a second copy to disagree with.
+const spec = (await import(pathToFileURL(configPath).href)).default
 const packageRootIndex = args.indexOf('--package-root')
 const packageRoot = packageRootIndex === -1 ? null : args[packageRootIndex + 1]
 if (packageRootIndex !== -1 && !packageRoot) throw new Error('--package-root requires a directory')
@@ -271,13 +104,17 @@ try {
   })
 
   if (spec.client) {
+    const framework = spec.client.framework ? FRAMEWORKS[spec.client.framework] : null
+    if (spec.client.framework && !framework) {
+      throw new Error(`unknown client framework '${spec.client.framework}' — this builder knows: ${Object.keys(FRAMEWORKS).join(', ')}`)
+    }
     await build({
       // The node app's vite.config.ts intentionally externalizes every bare dependency for its SSR
       // artifact. A frame is one self-contained browser file, so it must not inherit that config.
       configFile: false,
       root: NODE_APP,
       logLevel: 'warn',
-      plugins: spec.client.vitePlugins ?? [],
+      plugins: framework ? framework() : [],
       build: {
         target: 'es2022',
         // The node bundle is built first in this process. Be explicit that this second build is a
@@ -288,7 +125,7 @@ try {
         emptyOutDir: false,
         reportCompressedSize: false,
         rollupOptions: {
-          input: spec.client.entry,
+          input: resolve(PLUGINS_DIR, id, spec.client.entry),
           output: {
             format: 'es',
             entryFileNames: 'client.js',
@@ -302,7 +139,7 @@ try {
   rmSync(entryDir, { recursive: true, force: true })
 }
 
-const { version } = JSON.parse(readFileSync(join(ROOT, 'plugins', id, 'package.json'), 'utf8'))
+const { version } = JSON.parse(readFileSync(join(PLUGINS_DIR, id, 'package.json'), 'utf8'))
 writeFileSync(
   join(outDir, 'acorn-plugin.json'),
   `${JSON.stringify({
@@ -317,7 +154,42 @@ writeFileSync(
   }, null, 2)}\n`,
 )
 
-// Neither plugin in the table owns a database, so nothing built here needs a manifest `migrations`
+// Mark a package built STRAIGHT INTO the data root as a dev build, so boot reconciliation treats it as
+// app-owned and a newer bundled version replaces it. Without this it is indistinguishable from an
+// owner-installed package — a directory with bytes nobody has on record — so it was marked `user` and
+// then protected from every subsequent app build, which has already cost an hour once and presented as a
+// feature that silently did not exist.
+//
+// Deliberately NOT written under `--package-root`: that output is the distribution path, and a marker
+// travelling into application resources would tell every user's node that its bundled plugins are
+// somebody's dev build. The name is duplicated in node-core/main/bundledPlugins.ts § DEV_BUILD_MARKER;
+// one string in two places beats making this script depend on a built package.
+if (!packageRoot) {
+  writeFileSync(join(outDir, '.acorn-dev-build'), `${new Date().toISOString()}\n`)
+
+  // And clear any `user` row this id already has. That row means "an owner installed this through the
+  // installer", and reconciliation checks it first — correctly, because an owner install must never be
+  // replaced by a bundled copy. But a package built by THIS script is not one, and any such row is a
+  // leftover from before the marker existed: without clearing it, a developer who was already trapped
+  // stays trapped no matter how many times they rebuild, which is the exact failure this is fixing.
+  //
+  // Read-modify-write of plain JSON rather than importing node-core's writer: this script is ESM run
+  // directly by node with no build step. Defensive — a missing or unreadable file means there is
+  // nothing to clear.
+  const statePath = join(dataRoot, 'plugins', 'bundled-state.json')
+  try {
+    const state = JSON.parse(readFileSync(statePath, 'utf8'))
+    if (state?.plugins?.[id]?.status === 'user') {
+      delete state.plugins[id]
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
+      console.log(`[build-plugin] cleared the stale "user" ownership row for ${id}`)
+    }
+  } catch {
+    // No state file yet, or one this script should not be rewriting. Either way, nothing to clear.
+  }
+}
+
+// No buildable plugin owns a database yet, so nothing built here needs a manifest `migrations`
 // entry. A loaded table-owning plugin stages its chain inside the package, declares that relative
 // directory, and opens its host-bound database through ctx.storage.
 console.log(`[build-plugin] ${id} -> ${outDir}`)

@@ -70,8 +70,14 @@ export type PluginProviderRuntime = {
   // Without this, a loaded provider's batch route has no local cache at all and calls the vendor on
   // every read — which is a latency and rate-limit regression, not a simplification.
   //
-  // Rows in, rows out. The owner and the provider's ownership of `providerId` are bound by the host, so
-  // this widens what a plugin can REACH by nothing: its own resource already writes these same rows.
+  // Rows in, rows out. The host checks the plugin owns `providerId` at the ask, and the store it
+  // returns is built FOR that provider (integrations/itemStore.ts) — every query carries it, so the
+  // check at the ask is the truth about every row the store can reach. A plugin's own resource
+  // already writes these same rows; this widens what it can reach by nothing.
+  //
+  // One live-object exception: this returns a store synchronously rather than plain data over an
+  // async call, so unlike the three methods above it needs a proxy before loaded plugins can move
+  // out of process.
   items(providerId: string): ExternalItemStore
 }
 

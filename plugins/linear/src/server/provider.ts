@@ -216,7 +216,7 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
       const data = encodeCached(linearCodec.withDetail(ref, linearSummaryOf(detail), detail, context.now), context.limits.maxCachedItemBytes)
       // `write` is an upsert keyed on (owner, connection, identifier) — the same conflict target the
       // raw statement declared, kept in one place now that two providers share the table.
-      await context.items.write({ connectionId: context.connection.id, provider: 'linear', identifier: detail.identifier, data, fetchedAt: context.now })
+      await context.items.write({ connectionId: context.connection.id, identifier: detail.identifier, data, fetchedAt: context.now })
       return { ok: true }
     } catch {
       return { ok: false, failure: { error: 'provider_unavailable', status: 502 } }

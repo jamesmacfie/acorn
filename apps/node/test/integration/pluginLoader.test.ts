@@ -1,12 +1,15 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
+import { DEV_BUILD_MARKER, reconcileBundledPlugins } from '@acorn/node-core/main/bundledPlugins.ts'
+import { markPluginUserManaged, readBundledPluginState } from '@acorn/node-core/main/bundledPluginState.ts'
 import { loadExternalPlugins } from '@acorn/node-core/main/pluginLoader.ts'
+import { pluginDir } from '@acorn/node-core/main/pluginInstaller.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
@@ -143,6 +146,42 @@ describe('loading rollbar from disk', () => {
     } finally {
       vi.unstubAllEnvs()
       warn.mockRestore()
+    }
+  })
+
+  it('lets a newer bundled package replace what build:plugin wrote, without touching a user install', () => {
+    // The script marked what it wrote (`.acorn-dev-build`), which is the whole fix: before it, this
+    // directory was indistinguishable from an owner install, got stamped `user`, and then outlived every
+    // rebuild of the app — a feature that reads as missing until someone deletes the data root.
+    const built = pluginDir(dataRoot, 'rollbar')
+    expect(existsSync(join(built, DEV_BUILD_MARKER))).toBe(true)
+
+    // Stand in for the app's own resources: a package of the same id, one version newer.
+    const resources = mkdtempSync(join(tmpdir(), 'acorn-dogfood-resources-'))
+    try {
+      const manifest = JSON.parse(readFileSync(join(built, 'acorn-plugin.json'), 'utf8')) as { version: string }
+      cpSync(built, join(resources, 'rollbar'), { recursive: true })
+      rmSync(join(resources, 'rollbar', DEV_BUILD_MARKER))
+      writeFileSync(
+        join(resources, 'rollbar', 'acorn-plugin.json'),
+        JSON.stringify({ ...manifest, version: `${manifest.version}-bundled` }),
+      )
+
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        expect(reconcileBundledPlugins(dataRoot, resources)).toMatchObject({ updated: ['rollbar'], preserved: [] })
+      } finally {
+        warn.mockRestore()
+      }
+      expect(readBundledPluginState(dataRoot, 'rollbar')).toMatchObject({ status: 'installed', version: `${manifest.version}-bundled` })
+
+      // And the protection that must not have moved: an owner install still wins outright.
+      markPluginUserManaged(dataRoot, 'rollbar')
+      writeFileSync(join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'), JSON.stringify({ ...manifest, version: '9.9.9' }))
+      expect(reconcileBundledPlugins(dataRoot, resources)).toMatchObject({ preserved: ['rollbar'], updated: [] })
+      expect(JSON.parse(readFileSync(join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'), 'utf8')).version).toBe('9.9.9')
+    } finally {
+      rmSync(resources, { recursive: true, force: true })
     }
   })
 })

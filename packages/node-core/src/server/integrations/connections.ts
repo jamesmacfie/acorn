@@ -280,12 +280,14 @@ export const withOwnedConnections = <T>(
 ): Promise<T[]> => forEachConnection(getDb(c.env), ownerId(c), providerId, c.env.SECRETS, visit)
 
 /**
- * The external-item read model for the calling principal (integrations/itemStore.ts). This is how a
- * provider's ROUTE reaches core's `issues` table; a provider's mirrored RESOURCE gets the same store on
- * `ProviderResourceContext.items` instead.
+ * The external-item read model for the calling principal, scoped to one provider
+ * (integrations/itemStore.ts). This is how a compiled provider's ROUTE reaches core's `issues`
+ * table; a provider's mirrored RESOURCE gets the same store on `ProviderResourceContext.items`
+ * instead. The compiled tier is trusted, so `providerId` is taken at its word here — the loaded
+ * tier's twin (`providers.items` on the request context) asserts ownership first.
  */
-export const ownedExternalItems = (c: Context<AppEnv>): ExternalItemStore =>
-  createExternalItemStore(getDb(c.env), ownerId(c))
+export const ownedExternalItems = (c: Context<AppEnv>, providerId: string): ExternalItemStore =>
+  createExternalItemStore(getDb(c.env), ownerId(c), providerId)
 
 export const credentialsFromBody = (body: unknown): ProviderCredentials => {
   if (!body || typeof body !== 'object') return {}

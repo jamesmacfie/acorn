@@ -32,6 +32,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   copy: vi.fn(),
   openPane: vi.fn(),
   openUrl: vi.fn(),
+  frameHasFocus: vi.fn(() => true),
   importerDone: vi.fn(),
   importerClose: vi.fn(),
   keydown: vi.fn(),
@@ -307,6 +308,29 @@ describe('ui verbs', () => {
     }
     expect(replyTo(h, 40)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(h.svc.openUrl).not.toHaveBeenCalled()
+  })
+
+  it('refuses openUrl while the frame is not focused', async () => {
+    // A navigation is a person's act. A click or keypress inside the frame's document focuses the
+    // iframe, so a frame whose document does NOT hold focus is code acting on its own — a background
+    // surface must not be able to move the reader.
+    const h = withBridge({}, services({ frameHasFocus: vi.fn(() => false) }))
+    h.send({ id: 50, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
+    await h.settled(2)
+    expect(replyTo(h, 50)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.openUrl).not.toHaveBeenCalled()
+  })
+
+  it('throttles a second openUrl inside the minimum gap', async () => {
+    // The focus check is a raised bar, not a wall — a visible frame's own script can pull focus to
+    // itself — so the throttle is what caps how fast a hostile frame can push the reader around.
+    const h = withBridge()
+    h.send({ id: 51, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
+    h.send({ id: 52, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/2' })
+    await h.settled(3)
+    expect(replyTo(h, 51)).toMatchObject({ ok: true })
+    expect(replyTo(h, 52)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.openUrl).toHaveBeenCalledTimes(1)
   })
 
   it('survives an effect that disposes the bridge, which is what a refPanel swap does', async () => {

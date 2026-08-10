@@ -98,6 +98,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     if (bundled.installed.length || bundled.updated.length) {
       console.log(`[plugins] bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
     }
+    // `preserved` used to be silent, which is how a package that had quietly stopped taking updates
+    // looked exactly like one that had never needed any. Saying so is the difference between "this
+    // feature does not exist" and "the copy you are running is your own".
+    if (bundled.preserved.length) {
+      console.log(`[plugins] bundled packages NOT updated (owner-installed on this node): ${bundled.preserved.join(', ')}`)
+    }
     for (const failure of bundled.failures) {
       console.error(`[plugins] bundled ${failure.id} was not reconciled: ${failure.reason}`)
     }

@@ -3,7 +3,8 @@ import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-que
 import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
-import { integrationsOptions, prefsOptions, projectsOptions, tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
+import { integrationsOptions, prefsOptions, projectsOptions, type Task, tasksKey, tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
+import { setTaskLookup } from '@acorn/client-core/tasks/taskLookup.ts'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
 import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/workspaces/fleetWorkspaces.ts'
@@ -79,6 +80,12 @@ export default function App() {
     const id = activeTaskId()
     if (id) setTerminalOpen(id, false)
   }
+
+  // The one place that holds both the QueryClient and the whole mounted app, which is what
+  // client-core's module-level task lookup needs (tasks/taskLookup.ts states why it cannot reach
+  // either itself). Installed before anything is clickable, so a content-link click can ask whether a
+  // pane is available on the task it names rather than claiming the event and rendering nothing.
+  setTaskLookup((taskId) => queryClient.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
 
   // Shell-owned commands are registered once; the single dispatcher below owns the only global
   // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.

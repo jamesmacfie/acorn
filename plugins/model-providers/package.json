@@ -11,13 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@anthropic-ai/sdk": "^0.113.0",
     "openai": "^6.48.0"
   },
   "devDependencies": {
+    "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"

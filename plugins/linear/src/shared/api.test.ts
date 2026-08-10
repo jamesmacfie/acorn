@@ -1,21 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import * as api from './api'
-import { linearIssuesKey, linearProjectIssuesRoute } from './api'
+import { linearProjectIssuesRoute } from './api'
 
-// Protocol's api.test.ts had no Linear cases, so these are new rather than moved. They pin the two
-// things tsc cannot see: a retyped route template compiles fine and 404s, and a changed query key
-// silently orphans a user's persisted IndexedDB cache, which has no buster.
+// Protocol's api.test.ts had no Linear cases, so these are new rather than moved. They pin what tsc
+// cannot see: a retyped route template compiles fine and 404s.
+//
+// The batch query key that used to be pinned here is gone with `contract/issues.ts` — the host owns one
+// key for every provider's resolver now, and client-core/registries/refResolvers.ts carries the
+// persisted-cache warning that came with it.
 describe('linear wire contract', () => {
   it('sorts the id set in the project-issues route so cache identity is order-independent', () => {
     expect(linearProjectIssuesRoute('conn-1', ['p2', 'p1']))
       .toBe('/v2/p/linear/project-issues?integration=conn-1&ids=p2%2Cp1')
-  })
-
-  // The one remaining key, and it is github's: `linearIssuesOptions` in contract/issues.ts runs the batch
-  // query on PR detail. Order-independent by construction, because the identifier set a PR body yields is
-  // not ordered — two scans of the same PR must not be two cache entries.
-  it('preserves the batch query key shape for cache compatibility', () => {
-    expect(linearIssuesKey(['ENG-2', 'ENG-1'])).toEqual(['linear-issues', 'ENG-1', 'ENG-2'])
   })
 
   // The same net protocol's api.test.ts keeps over its own builders, scoped to this plugin:

@@ -76,6 +76,11 @@ export type SourceContribution<Item = unknown> = {
   // with a pull number belongs at a PR URL is GitHub's, and it now lives in GitHub.
   taskPath?: (task: Task) => string | undefined
   promotion?: SourcePromotion<Item>
+  // There is deliberately NO `emptyState` here, unlike the descriptor twin (@acorn/protocol/api.ts §
+  // PluginSourceEmptyState). A descriptor source has no component of its own — the host draws its list
+  // and therefore owes it the empty case — whereas a first-party source IS a component and already
+  // renders whatever it wants when it has nothing. A field here would be one every first-party source
+  // carries and none reads, which is worse than its absence: it reads as a contract and is not one.
 }
 
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')

@@ -71,6 +71,11 @@ export type FrameServices = {
   // otherwise. Returns nothing on purpose — see the `openUrl` case below for why the frame is told
   // neither the outcome nor when it happened.
   openUrl(url: string): void
+  // Whether input focus is currently inside this frame's document — the host-side evidence that an
+  // `openUrl` came from a person interacting with the frame (a click or keypress gives the iframe
+  // focus) rather than from code running behind a surface the reader is not touching. Supplied by
+  // the component that owns the iframe element; the broker cannot see the DOM.
+  frameHasFocus(): boolean
   // Importer lifecycle. `done` is the host's post-import refresh; `close` is plain dismissal.
   importerDone(): void
   importerClose(): void
@@ -84,6 +89,13 @@ export type FrameServices = {
 const MAX_IN_FLIGHT = 100
 const MAX_PER_WINDOW = 1000
 const WINDOW_MS = 10_000
+
+// A navigation is a person's act, so one per second is generous — a real reader clicks one link and
+// then reads what opened. This is the cap on how fast a focused frame can push the reader around,
+// because the focus check alone is a raised bar rather than a wall: a visible frame's own script can
+// pull focus to itself. If that is ever abused the upgrade is real user-activation plumbing through
+// the sandbox, not a longer window here.
+const OPEN_URL_MIN_GAP_MS = 1000
 
 export type FrameBridge = { dispose(): void }
 
@@ -127,6 +139,7 @@ export function createFrameBridge(input: {
   const subscribed = new Set<string>()
   let windowStart = Date.now()
   let windowCount = 0
+  let lastOpenUrlAt = 0
   let alive = true
 
   const post = (message: PluginBridgeMessage): void => {
@@ -282,6 +295,18 @@ export function createFrameBridge(input: {
         if (typeof url !== 'string' || !isPluginOpenableUrl(url)) {
           return void post(denied(id, 'openUrl may only be given an https URL'))
         }
+        // A navigation must be a person's act. A click or keypress inside the frame's document gives
+        // the iframe focus, so honouring the verb only while the frame holds it means background code
+        // cannot move the reader — the SDK's `openLinkOnClick` satisfies this for free. See
+        // OPEN_URL_MIN_GAP_MS above for why the throttle backs the focus check up.
+        if (!services.frameHasFocus()) {
+          return void post(denied(id, 'openUrl works from a click or key handler — the frame must be focused'))
+        }
+        const now = Date.now()
+        if (now - lastOpenUrlAt < OPEN_URL_MIN_GAP_MS) {
+          return void post(denied(id, 'openUrl is limited to one navigation per second'))
+        }
+        lastOpenUrlAt = now
         // The reply goes out BEFORE the effect, which is the opposite of every other verb here. The
         // ladder can replace the reference panel this very frame is rendering inside — that is the whole
         // point of the refPanel presentation — and doing so disposes this bridge from inside the call, so

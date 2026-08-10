@@ -16,7 +16,7 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 // Compiled-client parity: the built-in panes with their shipped order and chords. Loaded frames are
 // asserted by their package/e2e coverage instead of being smuggled back into this static graph — which is
 // why `linear` (90, ⌘⇧L) is absent even though the pane and its chord still exist: both are manifest
-// data now, in apps/node/scripts/build-plugin.mjs, and the chord is still unique because no compiled pane
+// data now, in plugins/linear/acorn-plugin.config.mjs, and the chord is still unique because no compiled pane
 // may claim it.
 const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['pr', 10, 'meta+shift+r'],

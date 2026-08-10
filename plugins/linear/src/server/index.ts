@@ -55,22 +55,6 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
 // The rail's fallback set, for a workspace with no Linear projects linked to it.
 //
 // It exists because of a gap the loaded tier has, not because anyone asked for a second rail mode.
-// Choosing which Linear projects a workspace follows writes `workspace_external_projects`, which is
-// core's workspace state: `PUT /v2/core/workspaces/:id/external-projects` is permanently unmappable on
-// the frame bridge and `CoreServices.projects` has no write for it, so the picker the browse used to
-// carry has nowhere to live now. Without a fallback the rail would be empty forever on a fresh install.
-// "Your open Linear issues" is the honest default for "no projects chosen", and it disappears the moment
-// a mapping exists. docs/third-party/linear.md records this as the finding it is.
-export const ASSIGNED_ISSUES_QUERY = `query {
-  viewer {
-    assignedIssues(filter: { state: { type: { nin: ["completed", "canceled"] } } }, first: 100) {
-      nodes {
-        ${TRIAGE_FIELDS}
-      }
-    }
-  }
-}`
-export type ViewerAssignedIssues = { viewer: { assignedIssues: { nodes: LinearNode[] } } }
 
 // A single issue-history event. Linear records each change with from/to fields; one event may
 // carry several changes (state + assignee at once). Labels arrive as IDs — resolved to names via

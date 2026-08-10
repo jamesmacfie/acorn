@@ -49,6 +49,23 @@ describe('openRefPanel', () => {
     panel.dispose()
   })
 
+  it('refuses a panel whose plugin is stopped on the node being looked at', () => {
+    // Registered is not available. Without the `when` gate this returned true, the shell put the target
+    // in its one slot, and `RefPanelHost` re-resolved to nothing — a claimed click and an empty overlay.
+    // Degrading at render was never the same as declining, because declining is what lets
+    // `openContentTarget` try the pane rung or the real URL.
+    let running = false
+    const panel = refPanelRegistry.register({ id: 'board-ref', providerId: 'board', when: () => running, component: () => null })
+
+    expect(openRefPanel({ providerId: 'board', displayId: 'ENG-42' })).toBe(false)
+    expect(activeRefPanel()).toBeNull()
+
+    running = true
+    expect(openRefPanel({ providerId: 'board', displayId: 'ENG-42' })).toBe(true)
+
+    panel.dispose()
+  })
+
   it('replaces the open panel rather than stacking a second one', () => {
     const panel = refPanelRegistry.register({ id: 'board-ref', providerId: 'board', component: () => null })
     openRefPanel({ providerId: 'board', displayId: 'ENG-42' })

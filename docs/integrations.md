@@ -21,6 +21,15 @@ for resource execution and connection enumeration. The runtime verifies that the
 belongs to the calling plugin and keeps SQLite and the secret service behind host calls;
 `withConnections` lends each decrypted credential only for the duration of the provider callback.
 
+The runtime's fourth member, `items(providerId)`, hands a route the provider's slice of core's
+external-item cache — the same store a mirrored resource receives on `ProviderResourceContext.items`.
+It exists for the one read `resource()` cannot express: resolution that spans connections, where an
+identifier has not yet been attributed to a connection so there is no `connectionId` to key a resource
+call on. The ownership check runs at the ask, and the store it returns is built for that provider —
+every query it makes carries the provider, and a freshness-marker key outside the provider's own
+`provider:<id>:` namespace is refused — so a plugin can never read or write another provider's rows
+through it.
+
 Deleting a connection cascades its cached external items, freshness markers, project links, and task
 links. The provider mirror is disposable and is never treated as the upstream source of truth.
 

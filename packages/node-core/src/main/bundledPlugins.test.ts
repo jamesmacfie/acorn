@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { reconcileBundledPlugins } from './bundledPlugins'
-import { readBundledPluginState } from './bundledPluginState'
+import { DEV_BUILD_MARKER, reconcileBundledPlugins } from './bundledPlugins'
+import { markPluginUserManaged, readBundledPluginState } from './bundledPluginState'
 import { installPlugin, pluginDir, uninstallPlugin } from './pluginInstaller'
 import { PLUGIN_API_MAJOR } from './pluginManifest'
 import { pluginDbPath } from './pluginStorage'
@@ -110,5 +110,42 @@ describe('bundled plugin reconciliation', () => {
 
     expect(reconcileBundledPlugins(root, resources)).toMatchObject({ preserved: ['rollbar'] })
     expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('existing version')
+  })
+
+  it('replaces a developer’s own build:plugin output, and keeps doing so after the first time', () => {
+    // Byte-for-byte the case above — an unrecorded directory in the data root — except for the marker
+    // `build:plugin` leaves when it writes there. Without it the two are indistinguishable, so a dev
+    // build was marked `user` and then survived every app rebuild: a feature that reads as missing.
+    const devBuild = () => {
+      const dir = packageAt(join(root, 'plugins'), '1.0.0', 'dev version')
+      writeFileSync(join(dir, DEV_BUILD_MARKER), '2026-01-01T00:00:00.000Z\n')
+    }
+    packageAt(resources, '2.0.0', 'app version')
+    devBuild()
+
+    expect(reconcileBundledPlugins(root, resources)).toMatchObject({ updated: ['rollbar'], preserved: [] })
+    expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('app version')
+    expect(readBundledPluginState(root, 'rollbar')).toMatchObject({ status: 'installed', version: '2.0.0' })
+    // `place` replaced the directory, so the marker went with it — an ordinary bundled package again.
+    expect(existsSync(join(pluginDir(root, 'rollbar'), DEV_BUILD_MARKER))).toBe(false)
+
+    // The second dev build is the one a state-row-only fix would miss: there IS a row now, saying
+    // 'installed' with a fingerprint the rebuild invalidated, which is the same trap one step later.
+    devBuild()
+    packageAt(resources, '3.0.0', 'newer app version')
+    expect(reconcileBundledPlugins(root, resources)).toMatchObject({ updated: ['rollbar'], preserved: [] })
+    expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('newer app version')
+  })
+
+  it('leaves an owner-installed package alone even when it carries a dev marker', () => {
+    // The marker is evidence about how a directory got there, not an override of ownership. A `user`
+    // row is a decision someone made through the installer and still returns before any of this.
+    packageAt(resources, '2.0.0', 'app version')
+    const dir = packageAt(join(root, 'plugins'), '1.0.0', 'owner version')
+    writeFileSync(join(dir, DEV_BUILD_MARKER), 'x\n')
+    markPluginUserManaged(root, 'rollbar')
+
+    expect(reconcileBundledPlugins(root, resources)).toMatchObject({ preserved: ['rollbar'], updated: [] })
+    expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('owner version')
   })
 })

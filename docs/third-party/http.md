@@ -23,8 +23,9 @@ This brief predates the rollbar migration and the agent-context carrier.
 - **`rollbar.md` no longer exists.** It was cleared along with these four when `docs/third-party/`
   became the review record. The reference is now [README.md](./README.md) plus `plugins/rollbar/`.
 - **A plugin package holds no `acorn-plugin.json`.** The manifest is *generated* by
-  `apps/node/scripts/build-plugin.mjs` from its `PLUGINS` table, so the manifest sketch below is a
-  sketch of a row in that table, not of a file you add to `plugins/http/`.
+  `apps/node/scripts/build-plugin.mjs` from the plugin's own `acorn-plugin.config.mjs`, so the
+  manifest sketch below is a sketch of `plugins/http/acorn-plugin.config.mjs` —
+  `plugins/linear/acorn-plugin.config.mjs` is the widest example to copy.
 - **The route carrier has a reference implementation**: `plugins/rollbar/src/server/routes/rollbar.ts`.
   Keep the Hono router, hand `router.fetch` over, and carry the `PluginRequestContext` in through
   `c.env` behind a module-level symbol, so the same routes run in both tiers.

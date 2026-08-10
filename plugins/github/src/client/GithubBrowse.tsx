@@ -82,11 +82,15 @@ export default function GithubBrowse() {
       queryClient.setQueryData(filesKey(owner(), repo(), params.number), files)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner(), repo()) }),
-        // Linked Linear tickets (list enrichment + any open detail) — refetch their status too. Keyed by
-        // string, not by importing plugins/linear: these are client-core query keys, and a force-refresh of
-        // a PR should not make this plugin depend on whichever providers enrich it.
-        queryClient.invalidateQueries({ queryKey: ['linear-issues'] }),
-        queryClient.invalidateQueries({ queryKey: ['linear-issue'] }),
+        // Linked tickets (list enrichment + any open detail) — refetch their status too. Keyed by
+        // string, not by importing the plugin that supplies them: these are client-core query keys, and a
+        // force-refresh of a PR should not make this plugin depend on whichever providers enrich it.
+        //
+        // One prefix, the HOST's, covering every provider at once
+        // (client-core/registries/refResolvers.ts). The second line here used to be `['linear-issue']`,
+        // a detail key that stopped existing when Linear became a frame — a frame calls its routes over
+        // the bridge and keeps no query cache, so there was nothing left to invalidate.
+        queryClient.invalidateQueries({ queryKey: ['plugin-ref-resolutions'] }),
       ])
     } finally {
       setRefreshingPull(false)

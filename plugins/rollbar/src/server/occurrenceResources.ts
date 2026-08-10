@@ -62,7 +62,6 @@ async function writeResource(
   if (Buffer.byteLength(data, 'utf8') > context.limits.maxCachedItemBytes) return false
   await context.items.writeResource({
     connectionId: context.connection.id,
-    provider: 'rollbar',
     issueIdentifier,
     resource,
     identifier,

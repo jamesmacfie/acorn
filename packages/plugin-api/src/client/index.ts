@@ -77,16 +77,29 @@ export { registerCommands } from '@acorn/client-core/registries/commands.ts'
 export {
   contentLinkRegistry,
   handlePluginContentLinkClick,
+  learnRefPrefixes,
+  linkifyRefs,
   openContentTarget,
   openPluginContentTarget,
   parseInAppTarget,
+  REF_LINK_CLASS,
+  scanContentRefs,
+  splitRefTokens,
 } from '@acorn/client-core/registries/contentLinks.ts'
 export type {
   ContentLinkContribution,
   ContentLinkOutcome,
   ContentLinkPresentation,
+  ContentRef,
   InAppTarget,
+  RefTokenPart,
 } from '@acorn/client-core/registries/contentLinks.ts'
+// Batch enrichment for another plugin's items, addressed by provider. The registry value is exported
+// too, but only the host registers into it — a plugin consumes this, it does not contribute one from
+// client code (that is a manifest row).
+export { refResolutionsOptions, refResolverFor } from '@acorn/client-core/registries/refResolvers.ts'
+export type { RefResolverContribution } from '@acorn/client-core/registries/refResolvers.ts'
+export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 export { contextSectionContributions } from '@acorn/client-core/registries/contextSections.ts'
 export { agentContextContributions } from '@acorn/client-core/registries/agentContexts.ts'
 // prune candidate: agent-tool renderers are in-realm components drawn inside the transcript list,

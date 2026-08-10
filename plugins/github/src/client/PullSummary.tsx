@@ -1,15 +1,16 @@
 import { createMemo, For, Show } from 'solid-js'
 import type { Accessor } from 'solid-js'
 import { CopyButton, Icon, UserAvatar } from '@acorn/plugin-api/ui'
-import { formatRelativeTime } from '@acorn/plugin-api/client'
-import { splitLinearIds } from './contentLinks'
+import { formatRelativeTime, REF_LINK_CLASS, splitRefTokens } from '@acorn/plugin-api/client'
 import type { Pull, PullConflicts } from '../contract/api'
 
-function LinearText(props: { text: string; prefixes: string[]; onOpen: (id: string) => void }) {
-  const parts = createMemo(() => splitLinearIds(props.text, props.prefixes))
+// The Solid-rendered twin of the host's `linkifyRefs`: same split, same class, different mechanism,
+// because a PR title is text this component owns and a PR body is opaque innerHTML.
+function RefText(props: { text: string; prefixes: ReadonlyMap<string, string>; onOpen: (id: string) => void }) {
+  const parts = createMemo(() => splitRefTokens(props.text, props.prefixes))
   return (
     <For each={parts()}>
-      {(part) => part.id ? <a class="linear-inline-link" onClick={() => props.onOpen(part.id!)}>{part.text}</a> : <>{part.text}</>}
+      {(part) => part.ref ? <a class={REF_LINK_CLASS} onClick={() => props.onOpen(part.ref!.item)}>{part.text}</a> : <>{part.text}</>}
     </For>
   )
 }
@@ -21,7 +22,7 @@ export function PullSummary(props: {
   pull: Accessor<PullWithBody>
   bindNavigatorScroll: (element: HTMLDivElement) => void
   fileSummary: Accessor<{ count: number; additions: number; deletions: number }>
-  linearPrefixes: Accessor<string[]>
+  refPrefixes: Accessor<ReadonlyMap<string, string>>
   onOpenIssue: (id: string) => void
   mergeMethod: Accessor<string>
   setMergeMethod: (method: string) => void
@@ -43,7 +44,7 @@ export function PullSummary(props: {
     <>
       <div class="pr-detail-header" ref={props.bindNavigatorScroll}>
         <div class="pr-detail-title">
-          <span class="pr-num copyable">#{props.pull().number}<CopyButton text={() => String(props.pull().number)} title="Copy PR number" /></span>{' '}<LinearText text={props.pull().title} prefixes={props.linearPrefixes()} onOpen={props.onOpenIssue} />
+          <span class="pr-num copyable">#{props.pull().number}<CopyButton text={() => String(props.pull().number)} title="Copy PR number" /></span>{' '}<RefText text={props.pull().title} prefixes={props.refPrefixes()} onOpen={props.onOpenIssue} />
         </div>
         <div class="pr-detail-meta muted">
           <span class={`state-badge state-${props.pull().state}`}>{props.pull().draft ? 'draft' : props.pull().state}</span>

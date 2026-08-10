@@ -362,6 +362,14 @@ export type PluginChromeAction =
 // the check is spelled here: an architecture rule forbids this package from naming a plugin route at
 // all, and the two halves that do the confining are node-core/main/pluginManifest.ts and
 // client-core/plugins/chrome/data.ts.
+// What a rail source says when its route answered with nothing, in place of the host's fixed
+// "Nothing here yet." — one bounded message and at most one context-free action, because an empty rail
+// has no row in scope. See pluginManifest.ts for why it stops there.
+export type PluginSourceEmptyState = {
+  message: string
+  action?: PluginCommandAction
+  actionLabel?: string
+}
 export type PluginSourceDescriptor = {
   id: string
   label: string
@@ -370,6 +378,7 @@ export type PluginSourceDescriptor = {
   providerId?: string
   items: string
   onSelect?: PluginChromeAction
+  emptyState?: PluginSourceEmptyState
   refresh?: number
 }
 export type PluginSlotDescriptor = {
@@ -438,6 +447,14 @@ export type PluginAgentContextDescriptor = {
   options: string
   capture: string
 }
+// One batch-enrichment route: identifiers of this plugin's items in, display rows out, so another
+// plugin's surface can render a chip for them without importing this one. The response schema and the
+// argument for keeping its vocabulary tiny are in refResolvers.ts; `providerId` is stamped by the host.
+export type PluginRefResolverDescriptor = {
+  id: string
+  kind: string
+  resolve: string
+}
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
 // serves: the host is the one rendering these, so the shape is its contract and not the plugin's
@@ -495,6 +512,7 @@ export type PluginContributions = {
   nodeStats?: PluginNodeStatDescriptor[]
   contentLinks?: PluginContentLinkDescriptor[]
   agentContexts?: PluginAgentContextDescriptor[]
+  refResolvers?: PluginRefResolverDescriptor[]
   routes?: PluginClientRouteDescriptor[]
 } & Record<string, unknown>
 
