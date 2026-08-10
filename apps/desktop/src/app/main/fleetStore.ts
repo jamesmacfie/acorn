@@ -69,8 +69,24 @@ export class FleetStore {
 
   // Add or replace a node and its token. Called on every local-node start (the endpoint changes across
   // restarts now that the port is ephemeral) and once per successful pairing.
+  //
+  // A LOCAL node replaces any OTHER local row as well as its own, because the local node is a singleton
+  // (docs/architecture-overview.md § Fleet semantics: "Exactly one, and it cannot be unpaired") while its
+  // IDENTITY is not stable — replace the data root and the same machine comes back up under a new nodeId.
+  // Matching on nodeId alone appended a second `local: true` row instead, and nothing ever cleared it:
+  // `adoptLocalNode` upserts only the id it just started, nodeBrokerIpc's boot loop skips local rows on
+  // purpose (the local endpoint is unknown until the service binds a port), and NODE_FORGET refuses to
+  // remove a local node at all, so the owner could not even clear it by hand.
+  //
+  // The consequence was not cosmetic. The leftover row stayed LISTED with no broker connection behind it,
+  // and `homeNode()` takes the first local row — so the window homed onto a node whose every request
+  // answers `Unknown node <id>` from the broker, while the persisted per-node query cache kept the shell
+  // looking populated and `pluginEnabledOnNode` quietly went false for every plugin.
+  //
+  // The dropped row's credential is deliberately NOT forgotten: every local row shares LOCAL_TOKEN_SCOPE
+  // (see `scopeOf`), so it is the live node's token and the write below is what refreshes it.
   remember(node: FleetNode, token: string): FleetNode {
-    const nodes = this.list().filter((existing) => existing.nodeId !== node.nodeId)
+    const nodes = this.list().filter((existing) => existing.nodeId !== node.nodeId && !(node.local && existing.local))
     nodes.push(node)
     this.write(nodes)
     writeDeviceToken(this.userDataDir, scopeOf(node), token)
