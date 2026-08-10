@@ -108,3 +108,7 @@
 /* GitHub-not-connected empty state (PullList.tsx). GitHub is an integration now, so "no credential"
    is a configuration state with an action, not a load failure. */
 .pr-list-connect { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+
+/* +TASK failure (PullList.tsx). Same look as pull-detail.css's .action-error, restated here because the
+   list renders without the detail stylesheet loaded. */
+.pr-tabs ~ .action-error { margin: var(--space-2) var(--pane-pad); font-size: var(--fs-sm); color: var(--del-marker); }

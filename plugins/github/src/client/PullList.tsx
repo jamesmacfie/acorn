@@ -85,9 +85,21 @@ export default function PullList() {
   // Flow A (docs/workspaces-and-tasks.md): promote a PR into a task. origin github-pr, branch = headRef,
   // pullNumber. Linear ids are seeded from a warmed detail body if we have one (best-effort — the
   // Linear pane that consumes them is P4); otherwise none. Then activate + navigate to the PR.
+  // +TASK creates inline (no PromoteToTaskModal — a PR already carries its own title and branch), so this
+  // is the only place its failure can be reported. Without it a node-offline createTask threw into an
+  // uncaught rejection and the click looked like it did nothing at all.
+  const [taskError, setTaskError] = createSignal('')
   async function openAsTask(e: Event, pr: Pull) {
     e.preventDefault()
     e.stopPropagation()
+    setTaskError('')
+    try {
+      await promoteToTask(pr)
+    } catch (err) {
+      setTaskError(err instanceof Error ? err.message : 'Could not create a task for this PR.')
+    }
+  }
+  async function promoteToTask(pr: Pull) {
     const projectId = params.projectId
     if (!projectId || !owner() || !repo() || !pr.headRef) return
     // If a task for this PR already exists, focus it instead of creating a duplicate.
@@ -187,6 +199,7 @@ export default function PullList() {
         </button>
         <input class="pr-filter" placeholder="Filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
       </div>
+      <Show when={taskError()}><div class="action-error" role="alert">{taskError()}</div></Show>
       {/* Scroll element stays mounted from first render so the virtualizer always observes it —
           publish the ref after layout so the first observed rect has the flexed pane height. */}
       <div class="pr-list-scroll" ref={publishScrollEl}>

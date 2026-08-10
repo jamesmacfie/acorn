@@ -68,7 +68,18 @@ export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore, dep
   ipcMain.handle(NODE_FETCH, async (_event, nodeId: unknown, raw: unknown) => {
     if (typeof nodeId !== 'string') throw new Error('nodeFetch: nodeId must be a string')
     const request = nodeFetchRequestSchema.parse(raw)
-    return broker.fetch(nodeId, request)
+    try {
+      return await broker.fetch(nodeId, request)
+    } catch (error) {
+      // A request the renderer itself cancelled is not a handler failure, but rethrowing made Electron
+      // print "Error occurred in handler for 'acorn:node-fetch'" with a stack for every unmounted query —
+      // pages of noise that hid real faults. Answered with 499 (client closed request) instead: the
+      // caller's own AbortSignal has already fired, so whoever awaited this has stopped caring.
+      if ((error as { name?: unknown } | null)?.name === 'AbortError') {
+        return { status: 499, headers: {}, body: new Uint8Array() }
+      }
+      throw error
+    }
   })
 
   ipcMain.on(NODE_ABORT, (_event, requestId: unknown) => {
