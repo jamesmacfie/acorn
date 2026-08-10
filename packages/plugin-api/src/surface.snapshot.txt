@@ -93,6 +93,7 @@ client: persistDraft
 client: postJson
 client: prefsOptions
 client: projectImporterRegistry
+client: projectPath
 client: projectsKey
 client: projectsOptions
 client: pushManagedAgentNotice

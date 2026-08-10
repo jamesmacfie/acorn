@@ -34,6 +34,17 @@ Widths are clamped to pane minimums and normalized on load. Unknown IDs become p
 disabled plugin or a stale layout cannot crash the task view. Maximize/focus is session UI state and
 does not rewrite the durable row.
 
+## Addressing a pane
+
+A task's URL is `/t/:taskId` and stays that way — the layout is a row with focus and maximise state, and a
+URL that tried to own it would be wrong the moment the owner moved a pane. What is addressable is the thing
+`PaneIntent` already models: `/t/:taskId?pane=<paneId>&item=<id>` opens that pane on that item.
+
+The params are consumed once and stripped (`tasks/taskDeepLink.ts`), because the layout restores itself from
+its own persisted state and a lingering `?pane=` would keep asserting a view the owner has since left. An
+unknown pane id is rejected rather than dispatched, so a bad link cannot push a placeholder into the durable
+layout. Every pane gets this without contributing a route.
+
 ## Contributions
 
 Each pane contributes its ID, label, order, default chord, minimum width, component, and optional

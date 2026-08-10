@@ -33,6 +33,7 @@ import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@ac
 import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
+import { createTaskDeepLink } from '@acorn/client-core/tasks/taskDeepLink.ts'
 import { defaultSourceId, sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/registries/corePaths.ts'
 import { availableSources } from '@acorn/client-core/tabs/sources.ts'
@@ -209,6 +210,14 @@ export default function App() {
     navigate,
     collapsed,
     setCollapsed,
+  })
+
+  // `/t/:taskId?pane=…&item=…` — open a pane on a selected item, once, then strip the params
+  // (tasks/taskDeepLink.ts). The address a plugin pane could not previously be given.
+  createTaskDeepLink({
+    taskId: () => activeTaskId(),
+    search: () => location.query,
+    navigate,
   })
 
   // Active workspace is derived from the current project. The ACTIVE

@@ -38,6 +38,11 @@ export function parseInAppTarget(href: string): InAppTarget | null {
 // Declarative recognisers carry the pane and selected item in their host-created target. Existing
 // first-party targets do not, so this is additive and an unknown target still falls through to the
 // browser.
+//
+// No active task means no pane to open, and this returns false. That is not a dead end any more: the same
+// (pane, item) pair is addressable as `/t/:taskId?pane=…&item=…` (tasks/taskDeepLink.ts), so a caller
+// holding a task id can navigate instead of calling this, and a Source that contributed a route of its own
+// can send the owner to its browse surface instead.
 export function openPluginContentTarget(target: InAppTarget, taskId: string | null | undefined): boolean {
   if (!taskId || typeof target.pane !== 'string' || typeof target.item !== 'string') return false
   openPane(taskId, target.pane, { kind: 'plugin:select', item: target.item })
