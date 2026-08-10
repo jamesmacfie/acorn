@@ -31,6 +31,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   toast: vi.fn(),
   copy: vi.fn(),
   openPane: vi.fn(),
+  openUrl: vi.fn(),
   importerDone: vi.fn(),
   importerClose: vi.fn(),
   keydown: vi.fn(),
@@ -270,6 +271,57 @@ describe('ui verbs', () => {
     h.send({ id: 23, kind: 'ui', op: 'importer.done' })
     await h.settled(2)
     expect(h.svc.importerDone).toHaveBeenCalled()
+  })
+
+  it('hands an https URL to the host without telling the frame where it went', async () => {
+    const h = withBridge()
+    h.send({ id: 25, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
+    await h.settled(2)
+    expect(h.svc.openUrl).toHaveBeenCalledWith('https://github.com/runn/acorn/pull/1')
+    // `ok` with an empty body. Whether the host resolved it in-app or opened the browser is the host's
+    // business, and reporting it would tell a frame where the reader was sent.
+    expect(replyTo(h, 25)).toMatchObject({ ok: true, body: null })
+  })
+
+  it('refuses every scheme but https, before the host is asked', async () => {
+    // The frame is untrusted input on its way to the navigation layer. `file:` and `javascript:` are the
+    // arbitrary-launch and script-execution cases; `http:` is a downgrade a plugin does not get to pick
+    // for the owner; `app-plugin://` is another plugin's bundle origin, which is why a scheme allowlist
+    // rather than a denylist is the right shape here.
+    const refused = [
+      'file:///Applications/Calculator.app',
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'http://internal.example/',
+      'app-plugin://abc123/index.html',
+      '//evil.example.com/',
+      'not a url',
+      '',
+    ]
+    const h = withBridge()
+    refused.forEach((url, index) => h.send({ id: 30 + index, kind: 'ui', op: 'openUrl', url }))
+    h.send({ id: 40, kind: 'ui', op: 'openUrl' })
+    await h.settled(refused.length + 2)
+    for (let index = 0; index < refused.length; index++) {
+      expect(replyTo(h, 30 + index), refused[index]).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    }
+    expect(replyTo(h, 40)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.openUrl).not.toHaveBeenCalled()
+  })
+
+  it('survives an effect that disposes the bridge, which is what a refPanel swap does', async () => {
+    // Not gated by surface, unlike the importer verbs: every frame renders content and every frame's
+    // content can contain a link. The refPanel case is the interesting one because resolving the link
+    // can replace the panel this frame IS — so the host's handler tears the port down from inside the
+    // call, and the broker must not fall over or keep answering afterwards.
+    const svc = services()
+    const h = withBridge({ target: 'refPanel', taskId: undefined }, svc)
+    svc.openUrl = vi.fn(() => h.dispose())
+    h.send({ id: 26, kind: 'ui', op: 'openUrl', url: 'https://linear.app/acme/issue/ENG-42' })
+    h.send({ id: 27, kind: 'ui', op: 'copy', text: 'after the teardown' })
+    await h.settled(2)
+    expect(svc.openUrl).toHaveBeenCalledWith('https://linear.app/acme/issue/ENG-42')
+    expect(svc.copy).not.toHaveBeenCalled()
   })
 
   it('rejects a verb outside the closed set', async () => {

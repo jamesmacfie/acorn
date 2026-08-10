@@ -1,10 +1,10 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Row, Spinner } from '@acorn/plugin-api/ui'
-import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
+import { openLinkOnClick, type AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
 import { linearCommentsRoute, linearIssueRoute, type LinearIssueDetail } from '../shared/api'
 import { parseLinearRailItemId, type LinearRailTarget } from '../shared/rail'
-import { canonicalIdentifier, targetKey, taskLinearTargets } from './model'
+import { canonicalIdentifier, linearIdentifierFromHref, targetKey, taskLinearTargets } from './model'
 import { LinearIssueView } from './LinearIssueView'
 
 // One bundle, two manifest surfaces. What it renders is decided by `bridge.context`, which is the whole
@@ -77,6 +77,28 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
     setOverride(canonicalIdentifier(identifier))
     setActiveTab('overview')
     void fetchIssue(canonicalIdentifier(identifier), target()?.connectionId)
+  }
+
+  // Every link in rendered content, in the order the two answers are worth trying.
+  //
+  // A linear.app ticket link is kept LOCAL rather than handed to the host, and that is a real preference
+  // rather than a leftover. Going through `ui.openUrl` would work — the host's recogniser claims the URL
+  // and this frame is what it would resolve into — but the trip is lossy in both directions: from a ref
+  // panel it swaps the panel and remounts the frame, throwing away the tab and the scroll position and
+  // the back affordance; from the project surface there is no task, so the pane rung cannot fire and the
+  // reader gets an overlay on top of the surface they are already reading the ticket in. Re-pointing in
+  // place keeps `override`, which is what makes "← back" mean anything.
+  //
+  // Everything else goes over the port. The host resolves it in-app if some provider recognises it — a
+  // GitHub PR in a ticket description, another provider's item — and opens the owner's browser if not.
+  // Which of those happened is deliberately not reported back.
+  const onContentClick = (event: MouseEvent): void => {
+    const identifier = linearIdentifierFromHref((event.target as HTMLElement | null)?.closest('a')?.getAttribute('href'))
+    if (identifier) {
+      event.preventDefault()
+      return openRelated(identifier)
+    }
+    openLinkOnClick(props.bridge, event)
   }
 
   const refresh = async (): Promise<void> => {
@@ -190,6 +212,7 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
                   if (current) open(current)
                 }}
                 onOpenRelated={openRelated}
+                onContentClick={onContentClick}
                 onComment={(body, parentId) => void comment(body, parentId)}
                 onCopy={(text) => void copy(text)}
               />

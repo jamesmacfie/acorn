@@ -9,6 +9,8 @@
 //
 // Everything here is framework-free by construction. Inside its own frame a plugin bundles whatever it
 // likes; what it needs from us is this port and the appearance tokens that come down it.
-export { connect, AcornBridgeError } from '@acorn/client-core/plugins/frames/sdk.ts'
+// `openLinkOnClick` is here rather than on ./ui beside `renderMarkdown`, even though a frame calls the
+// two on the same line: it needs the bridge, and this is the entrypoint that has one.
+export { connect, AcornBridgeError, openLinkOnClick } from '@acorn/client-core/plugins/frames/sdk.ts'
 export type { AcornBridge, AcornBridgeApi } from '@acorn/client-core/plugins/frames/sdk.ts'
 export type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'

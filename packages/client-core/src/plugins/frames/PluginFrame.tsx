@@ -7,6 +7,7 @@ import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
 import { clientEvents, consumePaneIntent, openPane } from '../../registries/clientEvents'
 import { executeCommand } from '../../registries/commands'
+import { openContentTarget, parseInAppTarget } from '../../registries/contentLinks'
 import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../../registries/keybindings'
 import { saveJsonPref } from '../../settings/savePref'
 import { activeTaskId } from '../../tasks/tasks'
@@ -129,6 +130,38 @@ export default function PluginFrame(props: PluginFrameProps) {
       // A pane is opened in a task's layout, so a frame with no task has nothing to open into.
       const taskId = props.binding.taskId
       if (taskId) openPane(taskId, paneId)
+    },
+    // A link inside a frame's own rendered content. The frame handed over a URL and nothing else; where
+    // it goes is decided here, on the host's side of the port, with the same two-rung ladder every shell
+    // surface uses (registries/contentLinks.ts) and the same external fall-through the descriptor
+    // `openUrl` verb takes (chrome/actions.ts). There is no third path: a frame cannot navigate the shell
+    // to an address of its choosing, only offer a URL and let the host recognise it or not.
+    //
+    // Which rung is PREFERRED comes from the surface, which is why this lives here and not in the broker:
+    // this side knows what the frame is. A link clicked inside a reference panel wants to swap that
+    // panel's subject — the reader is looking sideways and asked to look sideways again, and pushing a
+    // pane behind an overlay they would then have to dismiss is not what they meant. Every other surface
+    // is a pane or a modal sitting in a task, where the pane is the richer destination and the one those
+    // surfaces have always used. Identical reasoning to registries/refPanelHost.tsx and github's PR
+    // conversation, and the frame is not consulted in either case.
+    openUrl: (url) => {
+      const target = parseInAppTarget(url)
+      // The BOUND task, never `activeTaskId()`, even though the shell's own content handlers use the
+      // ambient one. A frame the host did not give a task is not looking at one: a project-scoped surface
+      // and a ref panel both sit beside or over something that is not a task layout, while a task may well
+      // still be selected in the rail behind them. Reading it here would let a link clicked on a project
+      // page push a pane into a background task's PERSISTED layout, where the reader is not and will not
+      // see it. With no bound task the pane rung is simply unavailable, and the URL falls to the browser.
+      const presentation = {
+        taskId: props.binding.taskId,
+        ...(props.binding.target === 'refPanel' ? { prefer: 'refPanel' as const } : {}),
+      }
+      if (target && openContentTarget(target, presentation) !== 'external') return
+      // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
+      // the URL to `shell.openExternal` behind the scheme allowlist — so this opens in the owner's
+      // browser and never in-app, and there is no second policy to keep in step
+      // (apps/desktop/src/app/main/electron.ts, docs/electron.md § navigation policy).
+      window.open(url, '_blank', 'noopener,noreferrer')
     },
     importerDone: () => props.onImported?.(),
     importerClose: () => props.onClose?.(),

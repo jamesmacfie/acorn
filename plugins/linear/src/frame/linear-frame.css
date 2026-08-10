@@ -62,7 +62,9 @@ button { font: inherit; }
 .ln-links { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3, .375rem); }
 .ln-links li { display: flex; align-items: center; gap: var(--space-3, .375rem); min-width: 0; }
 .ln-attachment-kind { color: var(--text-muted); font-size: var(--fs-sm, .75rem); text-transform: uppercase; }
-.ln-attachment-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* An anchor now that the host has a verb for opening one, so it needs the accent `.markdown a` already
+   gives a link inside a description — the two are the same affordance in two containers. */
+.ln-attachment-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); cursor: pointer; }
 
 .ln-subissue-bar { height: .25rem; background: var(--bg-subtle, var(--bg-hover)); margin-bottom: var(--space-4, .5rem); }
 .ln-subissue-bar i { display: block; height: 100%; background: var(--accent); }

@@ -22,6 +22,7 @@ import type {
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
+import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { isNormalizedChord } from '@acorn/protocol/keybindings.ts'
 import { allowApi, isApiMethod, type ApiMethod } from './scopes'
@@ -66,6 +67,10 @@ export type FrameServices = {
   toast(title: string, detail?: string): void
   copy(text: string): void
   openPane(paneId: string): void
+  // Resolve an https URL somewhere: in-app if a content-link recogniser claims it, the owner's browser
+  // otherwise. Returns nothing on purpose — see the `openUrl` case below for why the frame is told
+  // neither the outcome nor when it happened.
+  openUrl(url: string): void
   // Importer lifecycle. `done` is the host's post-import refresh; `close` is plain dismissal.
   importerDone(): void
   importerClose(): void
@@ -267,6 +272,29 @@ export function createFrameBridge(input: {
         }
         services.openPane(paneId)
         return void post({ id, ok: true, status: 200, body: null })
+      }
+      case 'openUrl': {
+        const url = data.url
+        // The boundary. A URL from a frame is untrusted input on its way to the navigation layer, so the
+        // scheme is decided here against the same policy a manifest's `openUrl` descriptor is held to
+        // (@acorn/protocol/externalUrl.ts) — `file:`, `javascript:`, `data:` and the frame's own
+        // `app-plugin://` origin are all refused by that one clause, and none of them reaches the host.
+        if (typeof url !== 'string' || !isPluginOpenableUrl(url)) {
+          return void post(denied(id, 'openUrl may only be given an https URL'))
+        }
+        // The reply goes out BEFORE the effect, which is the opposite of every other verb here. The
+        // ladder can replace the reference panel this very frame is rendering inside — that is the whole
+        // point of the refPanel presentation — and doing so disposes this bridge from inside the call, so
+        // a reply posted afterwards is one `post` would silently drop. Whether an already-queued message
+        // survives the port closing is the runtime's business (Node's MessageChannel drops it, which is
+        // why the suite pins the teardown rather than the ordering) and by then the frame's document is
+        // going away too; posting first is simply the order with no failure mode of its own.
+        //
+        // `ok` means ACCEPTED and nothing more. Reporting whether the URL resolved in-app or opened the
+        // browser would tell a frame where the host sent the reader, which is not its business.
+        post({ id, ok: true, status: 200, body: null })
+        services.openUrl(url)
+        return
       }
       case 'importer.done':
       case 'importer.close': {

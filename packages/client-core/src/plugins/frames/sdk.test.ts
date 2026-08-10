@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
-import { AcornBridgeError, connect, _resetConnection, type AcornBridge } from './sdk'
+import { AcornBridgeError, connect, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
 
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node
 // (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it — something
@@ -267,6 +267,8 @@ describe('state and ui', () => {
     expect(sent.at(-1)).toMatchObject({ op: 'copy', text: 'abc' })
     await acorn.ui.openPane('board')
     expect(sent.at(-1)).toMatchObject({ op: 'openPane', paneId: 'board' })
+    await acorn.ui.openUrl('https://github.com/runn/acorn/pull/1')
+    expect(sent.at(-1)).toMatchObject({ op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
     await acorn.ui.done()
     expect(sent.at(-1)).toMatchObject({ op: 'importer.done' })
     await acorn.ui.close()
@@ -281,6 +283,73 @@ describe('state and ui', () => {
     )
     const acorn = await handshake()
     await expect(acorn.ui.done()).rejects.toBeInstanceOf(AcornBridgeError)
+  })
+})
+
+describe('openLinkOnClick', () => {
+  // A stand-in for the one thing the helper touches: `event.target.closest('a')`. There is no DOM here
+  // (client-core's suite is plain Node) and the helper needs none — it reads an href and calls a verb.
+  const clickOn = (href: string | null, over: Partial<MouseEvent> = {}): MouseEvent & { prevented: boolean } => {
+    const event = {
+      defaultPrevented: false,
+      button: 0,
+      prevented: false,
+      target: { closest: (selector: string) => (selector === 'a' && href !== null ? { getAttribute: () => href } : null) },
+      preventDefault() {
+        this.prevented = true
+      },
+      ...over,
+    }
+    return event as unknown as MouseEvent & { prevented: boolean }
+  }
+
+  // The helper is fire-and-forget by design — a click handler cannot await — so the port hop has to be
+  // let through before `sent` can be read.
+  const flushed = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  const connected = async (): Promise<AcornBridge> => {
+    host((message) => (message.kind === 'ui' ? { id: message.id, ok: true, status: 200, body: null } : undefined))
+    return handshake()
+  }
+
+  it('takes an https anchor and hands the href to the host', async () => {
+    const acorn = await connected()
+    const event = clickOn('https://github.com/runn/acorn/pull/20535')
+    expect(openLinkOnClick(acorn, event)).toBe(true)
+    expect(event.prevented).toBe(true)
+    await flushed()
+    expect(sent.at(-1)).toMatchObject({ kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/20535' })
+  })
+
+  it('takes a MODIFIED click too, unlike the shell handler it mirrors', async () => {
+    // In the shell a cmd-click is the reader asking for a browser tab, so the anchor keeps its default.
+    // Inside a frame there is no default to keep — the sandbox has no `allow-popups` — so bailing here
+    // would make cmd-click the one gesture that does nothing at all.
+    const acorn = await connected()
+    const event = clickOn('https://example.com/', { metaKey: true, shiftKey: true })
+    expect(openLinkOnClick(acorn, event)).toBe(true)
+    await flushed()
+    expect(sent.at(-1)).toMatchObject({ op: 'openUrl' })
+  })
+
+  it('leaves a non-https href alone, with its default intact', async () => {
+    const acorn = await connected()
+    const before = sent.length
+    // `mailto:` is the honest casualty: renderMarkdown allows it, the verb does not, and preventing the
+    // default would only replace an inert link with a denied bridge call.
+    for (const href of ['mailto:someone@example.com', 'http://internal.example/', 'javascript:alert(1)', '#anchor', null]) {
+      const event = clickOn(href)
+      expect(openLinkOnClick(acorn, event), String(href)).toBe(false)
+      expect(event.prevented, String(href)).toBe(false)
+    }
+    await flushed()
+    expect(sent.length).toBe(before)
+  })
+
+  it('ignores a click something else has already handled', async () => {
+    const acorn = await connected()
+    expect(openLinkOnClick(acorn, clickOn('https://example.com/', { defaultPrevented: true }))).toBe(false)
+    expect(openLinkOnClick(acorn, clickOn('https://example.com/', { button: 1 }))).toBe(false)
   })
 })
 
