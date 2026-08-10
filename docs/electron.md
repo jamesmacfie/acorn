@@ -141,7 +141,8 @@ pre-discovery reconciliation. Packaged client bundles are hashed and trusted fro
 directory, never from a node's claim. The desktop build must run the service and bundled-plugin builds
 first; staging detects missing artifacts, not stale ones.
 
-`better-sqlite3` and `node-pty` must be rebuilt for the ABI of the process that will load them. Plain
+`node-pty` must be rebuilt for the ABI of the process that will load it — SQLite is `node:sqlite`,
+which has no ABI to match. Plain
 Node development uses the Node ABI; the packaged app uses the Electron ABI. `electron-builder` then
 produces the macOS DMG/ZIP. The standalone Node is distributed separately as a tarball; it is not an
 npm package.

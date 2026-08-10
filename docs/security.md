@@ -334,7 +334,7 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 - **Migrations** run in the Node at boot against the plugin's own file only
   (`packages/node-core/src/main/pluginMigrations.ts`). SQL is data, not code, but verify the
   plugin database factory (`main/pluginStorage.ts`) keeps `load_extension` unavailable
-  (better-sqlite3 default) and never grants `ATTACH` reach into other files — an attached
+  (the default `main/sqlite.ts` pins) and never grants `ATTACH` reach into other files — an attached
   database is a cross-plugin read the boundary rules exist to prevent.
 - **Backups.** Backup snapshots scrub core credentials and device rows
   (docs/architecture-overview.md), but a plugin that stashes tokens in its own SQLite defeats

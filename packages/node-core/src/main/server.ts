@@ -8,6 +8,7 @@ import { CapabilityRegistry } from '../server/plugin/capabilities'
 import { openDataRoot, type DataRoot } from './dataRoot'
 import { resolveDatabasePath } from './serverPaths'
 import { configuredPort, devDataDir } from './serverConfig'
+import { advertisedHosts } from './advertise'
 import { ensureCert } from './tls'
 import { attachWsHub, disposeWsHub } from './wsHub'
 import { attachTunnel, disposeTunnel, type TunnelDeps } from './tunnel'
@@ -45,17 +46,26 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
 
   const { keyPem, certPem, fingerprint } = ensureCert(root.dir)
 
-  // Loopback Host guard (docs/electron.md §4g): we bind 127.0.0.1, but reject unexpected Host
-  // headers too so a DNS-rebinding page can't reach the local API as some other origin. Only the
-  // 127.0.0.1 form is allowed — the endpoint we report, and every doc, standardise on it.
+  // Host guard (docs/electron.md §4g): binding an interface is not the same as answering to any name
+  // on it, so a Host we did not expect is refused — that is what stops a DNS-rebinding page from
+  // reaching this API as some other origin. Loopback is always allowed; anything else is here because
+  // the operator advertised it (main/advertise.ts).
   //
-  // Assigned in the listening callback, not at build time: the port is ephemeral now, so there is no
-  // expected Host until the kernel has picked one. Empty means "not listening yet" and rejects
-  // everything, which is the safe direction for the sliver of time before the callback runs.
-  let allowedHost = ''
+  // ONE Set, shared by reference with the two upgrade handlers below and filled in place once the
+  // kernel has picked a port. It starts empty and therefore rejects everything, which is the safe
+  // direction for the sliver of time before the listening callback runs. Nobody may copy it: the
+  // tunnel was first attached with a spread of its deps, which snapshotted the old string field while
+  // it was still empty, and its Host guard then rejected every upgrade forever — a bare 403 with
+  // nothing logged, caught only by the two-node e2e.
+  const allowedHosts = new Set<string>()
+  const advertised = advertisedHosts(root)
+  // 0.0.0.0 rather than the advertised address itself: children of this node still reach it over
+  // loopback with full certificate validation (the cert's SAN is IP:127.0.0.1), so both audiences
+  // have to keep working. `endpoint` below stays loopback for the same reason.
+  const bindHost = advertised.length > 0 ? '0.0.0.0' : '127.0.0.1'
   const fetch = (request: Request, nodeEnv: HttpBindings | Http2Bindings) => {
     const host = request.headers.get('host')
-    if (!allowedHost || host !== allowedHost) return new Response('Forbidden host', { status: 403 })
+    if (!host || !allowedHosts.has(host)) return new Response('Forbidden host', { status: 403 })
     // serve() below creates a node:https server, whose bindings are still HttpBindings (https.Server
     // extends http.Server) — narrow it once here. Env is RuntimeBindings & Partial<HttpBindings>
     // (./bindings), so the merged object IS the env the routes see — no `as unknown as Env` double
@@ -79,7 +89,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
     // ship — the broker's https.Agent, `ws`, and Node children — so there is no legacy peer to
     // accommodate, and pinning the floor here means the transport cannot be downgraded.
     serverOptions: { key: keyPem, cert: certPem, minVersion: 'TLSv1.3' },
-    hostname: '127.0.0.1',
+    hostname: bindHost,
   })
 
   // The one authenticated WebSocket (/v2/events) shares this listener via its 'upgrade' event; the hub
@@ -87,19 +97,11 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
   // service so a revoked device's sockets close immediately. https.Server extends http.Server, so the
   // hub's node:http typing still describes it exactly.
   //
-  // `allowedHost` is read at upgrade time by the hub's authorize(), so it is filled in once the port is
-  // known — the same "mutable on purpose, read per call" shape service/runtime.ts uses for
-  // internalApiEnv.
-  // ONE object, shared by both upgrade handlers, and that is not a tidiness choice.
-  //
-  // `allowedHost` is filled in below once the kernel has picked a port, and both handlers read it at upgrade
-  // time — the "mutable on purpose, read per call" shape service/runtime.ts uses for internalApiEnv. The
-  // tunnel was first attached with `{ ...wsDeps, declaredPorts }`, which COPIED `allowedHost` while it was
-  // still the empty string, so its Host guard rejected every upgrade forever. It failed as a bare 403 with
-  // nothing logged on the node, and the two-node e2e is what caught it.
+  // The same `allowedHosts` Set the fetch guard above reads, by reference — see the note there for
+  // why it must not be copied.
   const upgradeDeps: TunnelDeps = {
     internalToken: runtime.INTERNAL_TOKEN,
-    allowedHost: '',
+    allowedHosts,
     devices: runtime.DEVICES,
     // Derived from what this node already resolves for the task, so the tunnel's allowlist is not a new
     // configuration surface (main/tunnelPorts.ts).
@@ -133,7 +135,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
         // endpoint — the client is told where we bound rather than assuming — so this is a retry.
         retried = true
         console.warn(`[server] port ${requested} is taken; binding an ephemeral port instead`)
-        server.listen(0, '127.0.0.1', onListening)
+        server.listen(0, bindHost, onListening)
         return
       }
       reject(error)
@@ -141,15 +143,20 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
     function onListening(): void {
       const address = server.address()
       if (!address || typeof address === 'string') return reject(new Error('acorn server bound no TCP port'))
-      allowedHost = `127.0.0.1:${address.port}`
-      upgradeDeps.allowedHost = allowedHost
+      // Filled in place, never reassigned: the upgrade handlers hold this same Set.
+      allowedHosts.add(`127.0.0.1:${address.port}`)
+      for (const host of advertised) allowedHosts.add(`${host}:${address.port}`)
       root.recordPort(address.port)
-      console.log(`acorn server on https://${allowedHost}`)
+      console.log(`acorn server on https://127.0.0.1:${address.port}`)
+      for (const host of advertised) console.log(`acorn server also answering to https://${host}:${address.port}`)
       server.off('error', onError) // listening — later runtime errors are not listen failures
-      resolveServer({ server, endpoint: { origin: `https://${allowedHost}`, port: address.port }, fingerprint, certPem })
+      // Loopback, even when advertising: this origin is handed to child processes, which validate the
+      // certificate fully against its IP:127.0.0.1 SAN. The address a remote client uses is the one the
+      // operator was shown, not this.
+      resolveServer({ server, endpoint: { origin: `https://127.0.0.1:${address.port}`, port: address.port }, fingerprint, certPem })
     }
     server.on('error', onError)
-    server.listen(requested, '127.0.0.1', onListening)
+    server.listen(requested, bindHost, onListening)
   })
 }
 

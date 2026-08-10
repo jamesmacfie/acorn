@@ -5,11 +5,11 @@
 //
 // ## Why a tarball and not an npm package
 //
-// `apps/node` is `private`, every `@acorn/*` dependency is `workspace:*`, and the two dependencies that
-// matter most — better-sqlite3 and node-pty — are NATIVE. An `npx`-able package would need prebuilt
+// `apps/node` is `private`, every `@acorn/*` dependency is `workspace:*`, and the dependency that
+// matters most — node-pty — is NATIVE. An `npx`-able package would need prebuilt
 // binaries for every (platform, arch, Node ABI) triple we are willing to support, which is a release
 // pipeline rather than a script. A tarball the operator unpacks and runs `npm install --omit=dev` in
-// compiles those two against THEIR Node, which is the same dance a developer already does here
+// compiles it against THEIR Node, which is the same dance a developer already does here
 // (`pnpm rebuild:node`) and needs no infrastructure at all.
 //
 // ## What goes in
@@ -44,7 +44,6 @@ const RUNTIME = [
   '@vscode/ripgrep',
   '@xterm/addon-serialize',
   '@xterm/headless',
-  'better-sqlite3',
   'drizzle-orm',
   'hono',
   'jose',
@@ -56,12 +55,10 @@ const RUNTIME = [
   'zod',
 ]
 
-// Loaded through `createRequire(...)` rather than a static import (main/sqliteLoader.ts explains why for
-// the first: a lazy load turns a native-ABI mismatch into an actionable error instead of a bare stack at
-// import time). The scanner below now matches both spellings of that, so this list is a BELT-AND-BRACES
-// check on the three that would break a boot — asserted by looking for the bare name as a quoted string,
+// Loaded through `createRequire(...)` rather than a static import. The scanner below matches both
+// spellings of that, so this list is a BELT-AND-BRACES check on the two that would break a boot — asserted by looking for the bare name as a quoted string,
 // which is weaker than the specifier scan and labelled as such rather than folded in silently.
-const DYNAMIC = ['better-sqlite3', '@xterm/headless', '@xterm/addon-serialize']
+const DYNAMIC = ['@xterm/headless', '@xterm/addon-serialize']
 
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
@@ -78,9 +75,9 @@ function importedPackages(files) {
     // wolf on the first run is one whose next real finding gets waved through.
     /(?<![.\w$])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
     /(?<![.\w$])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    // The dynamic forms, and they are NOT an edge case here: better-sqlite3, @xterm/headless and
-    // @xterm/addon-serialize are all loaded this way, because a lazy load turns a native-ABI mismatch
-    // into an actionable error instead of a bare stack at import time (main/sqliteLoader.ts). The first
+    // The dynamic forms, and they are NOT an edge case here: @xterm/headless and
+    // @xterm/addon-serialize are both loaded this way, because a lazy load turns a load failure
+    // into an actionable error instead of a bare stack at import time. The first
     // version of this scanner saw none of them — it declared the manifest complete, and the unpacked
     // tarball then died on `Cannot find module '@xterm/headless'` at boot. That is precisely the silent
     // failure this check exists for, so it now covers both spellings.
@@ -186,7 +183,15 @@ writeFileSync(
       type: 'module',
       // The entry an operator runs, and the one a launchd plist or systemd unit points at.
       main: 'dist/standalone.js',
-      scripts: { start: 'node dist/standalone.js' },
+      // --disable-warning: `node:sqlite` is still flagged experimental and prints a warning on every
+      // require. It is accurate about the API's status and useless to an operator who did not choose
+      // the storage engine, and it lands in the middle of the pairing banner. Scoped to this one
+      // warning class rather than --no-warnings, so a real deprecation still gets through.
+      scripts: { start: 'node --disable-warning=ExperimentalWarning dist/standalone.js' },
+      // The real floor is the node:sqlite surface main/sqlite.ts touches: enableForeignKeyConstraints
+      // landed in 22.18/24.4, backup() and setReturnArrays earlier. npm only warns on a mismatch, but
+      // a warning that names the requirement beats "unknown option" from deep inside boot.
+      engines: { node: '>=22.18 <23 || >=24.4' },
       dependencies,
     },
     null,
@@ -203,7 +208,7 @@ writeFileSync(
     'bundled node.',
     '',
     '```sh',
-    'npm install --omit=dev   # compiles better-sqlite3 and node-pty against THIS Node',
+    'npm install --omit=dev   # builds node-pty against THIS Node, if no prebuilt binary fits',
     'SESSION_ENC_KEY=$(openssl rand -hex 32) GITHUB_CLIENT_ID=<your oauth app> node dist/standalone.js',
     '```',
     '',

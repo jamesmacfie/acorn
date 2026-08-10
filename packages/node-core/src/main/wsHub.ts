@@ -113,7 +113,9 @@ export const wsHasClients = (): boolean => conns.size > 0
 
 export type WsAuthDeps = {
   internalToken: string
-  allowedHost: string
+  // Held by reference and filled in once the listener knows its port (main/server.ts). A copy taken at
+  // attach time is empty forever, which refuses every upgrade with no log line.
+  allowedHosts: ReadonlySet<string>
   // Resolves the device bearer at upgrade and tells the hub when a device is revoked.
   devices: DeviceService
   // How often the backstop sweep re-checks each connection's device. docs/api-reference.md § Pairing pins the
@@ -132,7 +134,7 @@ export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps)
 export type { Authorized as AuthorizedWsUpgrade }
 
 async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
-  if (req.headers.host !== deps.allowedHost) return null
+  if (!deps.allowedHosts.has(req.headers.host ?? '')) return null
   const bearer = req.headers.authorization
   if (bearer?.startsWith('Bearer ')) {
     // A bearer that fails does NOT fall through to the internal token: presenting a credential and
@@ -281,7 +283,9 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     // Only claim our path — other upgrades (if any) are left for their own handlers.
     let path: string
     try {
-      path = new URL(req.url ?? '', `http://${req.headers.host ?? deps.allowedHost}`).pathname
+      // Only a syntactic base for parsing the path out — a request with no Host is refused by
+      // authorize() below regardless, so the placeholder never decides anything.
+      path = new URL(req.url ?? '', `http://${req.headers.host ?? 'placeholder.invalid'}`).pathname
     } catch {
       socket.destroy()
       return

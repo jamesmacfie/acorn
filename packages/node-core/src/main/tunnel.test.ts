@@ -58,7 +58,7 @@ beforeEach(async () => {
   allowedHost = `127.0.0.1:${httpPort}`
   attachTunnel(http, {
     internalToken: INTERNAL_KEY,
-    allowedHost,
+    allowedHosts: new Set([allowedHost]),
     devices,
     declaredPorts: async () => {
       if (slowPorts) await new Promise((resolve) => setTimeout(resolve, slowPorts))

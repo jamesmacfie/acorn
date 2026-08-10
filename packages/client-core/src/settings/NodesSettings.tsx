@@ -2,7 +2,7 @@ import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { nodes, nodeStatus } from '../node/fleet'
 import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../node/fleetActions'
-import { fingerprintPhrase } from '../node/fingerprintWords'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
 
@@ -219,7 +219,7 @@ export default function NodesSettings() {
                   {/* Words first, hex second. Two 64-character hex strings differing in the middle look
                       identical to a person, which is exactly the substitution an attacker wants — so the
                       phrase is what the owner is asked to compare, and the hex stays for anyone who would
-                      rather paste and diff it exactly (node/fingerprintWords.ts). */}
+                      rather paste and diff it exactly (@acorn/protocol/fingerprintWords.ts). */}
                   <Show when={fingerprintPhrase(probed().fingerprint)}>
                     {(phrase) => <code class="node-fingerprint node-fingerprint-words">{phrase()}</code>}
                   </Show>

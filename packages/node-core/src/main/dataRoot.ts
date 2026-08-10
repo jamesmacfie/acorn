@@ -15,12 +15,19 @@ export type DataRoot = {
   // an ephemeral port when it is taken. Reflects recordPort within this process.
   readonly preferredPort: number | undefined
   recordPort(port: number): void
+  // The operator's answer to "which host should this node advertise?", or undefined if they have
+  // never been asked. '' means they were asked and said loopback only — distinct from undefined,
+  // which is what stops the prompt reappearing every boot (main/advertise.ts).
+  readonly advertiseHost: string | undefined
+  recordAdvertiseHost(host: string): void
   release(): void
 }
 
-// Atomic 0600 write: tmp + fsync + rename, so a crash mid-write cannot leave a truncated identity
-// file (the same shape activeIdentity.ts uses for the same reason).
-function writePrivateAtomic(path: string, body: string): void {
+// Atomic 0600 write: tmp + fsync + rename, so a crash mid-write cannot leave a truncated file (the
+// same shape activeIdentity.ts uses for the same reason). Exported because the session key is
+// written with exactly this posture for exactly this reason (main/sessionKey.ts) — a half-written
+// key is an unrecoverable loss of every stored credential.
+export function writePrivateAtomic(path: string, body: string): void {
   const temporary = `${path}.${process.pid}.tmp`
   const fd = openSync(temporary, 'w', 0o600)
   try {
@@ -152,6 +159,17 @@ export function openDataRoot(dir: string): DataRoot {
       recordPort(port) {
         if (port === identity.port || !Number.isInteger(port) || port < 1) return
         identity = { ...identity, port }
+        writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
+      },
+      get advertiseHost() {
+        return identity.advertiseHost
+      },
+      recordAdvertiseHost(host) {
+        // No early return on an unchanged value the way recordPort has: writing '' over a missing
+        // field IS the change that stops the first-boot prompt, and `'' === undefined` is false, so
+        // the guard below is enough.
+        if (host === identity.advertiseHost) return
+        identity = { ...identity, advertiseHost: host }
         writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
       },
       release,

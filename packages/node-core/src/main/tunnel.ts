@@ -114,7 +114,8 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
   sweep.unref?.()
 
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
-    const host = req.headers.host ?? deps.allowedHost
+    // Parsing only; authorizeWsUpgrade below is what checks the Host against the allowlist.
+    const host = req.headers.host ?? 'placeholder.invalid'
     const target = parseTarget(req.url, host)
     // Only claim our own path, leaving `/v2/events` (and anything later) to its own handler — the same
     // contract wsHub's handler observes.

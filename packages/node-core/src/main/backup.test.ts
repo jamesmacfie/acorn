@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createBackup, suggestBackupPath } from './backup'
 import { openDb } from './bindings'
 import { PLUGIN_DB_DIR } from './pluginStorage'
-import { loadDatabase } from './sqliteLoader'
+import { openSqlite } from './sqlite'
 import { schema } from '../server/db'
 
 // The backup, against a REAL data root and unpacked with the real `tar` (docs/data-layer.md § Backup).
@@ -67,9 +67,8 @@ beforeEach(async () => {
   // Two plugin databases, DISCOVERED rather than named: pluginStorage's header says the directory exists
   // so a backup can enumerate it without knowing the plugin list, and this is what tests that claim.
   mkdirSync(join(root, PLUGIN_DB_DIR), { recursive: true })
-  const Database = loadDatabase()
   for (const name of ['agents', 'notes']) {
-    const handle = new Database(join(root, PLUGIN_DB_DIR, `${name}.sqlite`))
+    const handle = openSqlite(join(root, PLUGIN_DB_DIR, `${name}.sqlite`))
     handle.exec('CREATE TABLE thing (id TEXT PRIMARY KEY)')
     handle.exec(`INSERT INTO thing VALUES ('${name}-row')`)
     handle.close()
@@ -99,12 +98,11 @@ describe('createBackup', () => {
     const dir = unpack(archive)
     try {
       expect(readdirSync(dir).sort()).toEqual(['agents.sqlite', 'core.sqlite', 'manifest.json', 'notes.sqlite'])
-      const Database = loadDatabase()
       // Openable and populated, not merely present: a zero-byte file would satisfy a listing.
-      const agents = new Database(join(dir, 'agents.sqlite'), { readonly: true })
+      const agents = openSqlite(join(dir, 'agents.sqlite'), { readonly: true })
       expect(agents.prepare('SELECT id FROM thing').all()).toEqual([{ id: 'agents-row' }])
       agents.close()
-      const core = new Database(join(dir, 'core.sqlite'), { readonly: true })
+      const core = openSqlite(join(dir, 'core.sqlite'), { readonly: true })
       expect(core.prepare('SELECT name FROM workspaces').all()).toEqual([{ name: 'Runn' }])
       core.close()
     } finally {
@@ -117,8 +115,7 @@ describe('createBackup', () => {
     await createBackup(root, archive)
     const dir = unpack(archive)
     try {
-      const Database = loadDatabase()
-      const core = new Database(join(dir, 'core.sqlite'), { readonly: true })
+      const core = openSqlite(join(dir, 'core.sqlite'), { readonly: true })
       // Blanked rather than deleted, so a restored node still shows that a Linear connection existed and
       // needs re-entering — which is the state docs/data-layer.md describes.
       expect(core.prepare('SELECT access_token, label FROM integrations').all()).toEqual([

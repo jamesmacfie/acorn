@@ -28,8 +28,12 @@ Electron main starts the built `apps/node` artifact with `process.execPath` and
 the service protocol. The local Node is supervised and restarted with bounded backoff; a standalone
 Node uses the same service graph without Electron-native capabilities.
 
-The Node binds `127.0.0.1` over HTTPS with TLS 1.3. The port is ephemeral unless `ACORN_PORT` is set
-or a remembered port in `node.json` is available. The Node serves no web assets. Electron's
+The Node binds `127.0.0.1` over HTTPS with TLS 1.3, and only loopback unless an operator has recorded
+an `advertiseHost` for it (`node.json`, or `ACORN_ADVERTISE_HOST`) — see
+[node-distribution.md](./node-distribution.md). A Host header outside that allowlist is refused with
+403 regardless. The endpoint the Node *reports* is always loopback, because the child processes it
+spawns validate its certificate against an `IP:127.0.0.1` SAN. The port is ephemeral unless
+`ACORN_PORT` is set or a remembered port in `node.json` is available. The Node serves no web assets. Electron's
 `app://acorn` protocol serves the renderer and falls back to its bundled `index.html` for client-side
 routes.
 
