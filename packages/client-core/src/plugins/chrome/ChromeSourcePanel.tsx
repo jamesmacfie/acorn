@@ -1,4 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PluginRailItem, PluginSourceDescriptor, Task } from '@acorn/protocol/api.ts'
@@ -12,6 +13,7 @@ import { chromeKey, chromeRevision, readRailItems, scopedSourceItemsPath } from 
 import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
 import { workspaceForProject } from '../../workspaces/activeWorkspace'
 import { PromoteToTaskModal } from '../../integrations/PromoteToTaskModal'
+import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '../../registries/projectSurfaces'
 import { activateTaskSignals, pathForTask } from '../../tasks/activate'
 
 // The ONE rail list every descriptor source renders through
@@ -72,7 +74,31 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
       nodeId,
       item,
       promote: setPromoteItem,
+      // Only the `navigate` verb reads these two, and this is the one caller that has them: a rail panel
+      // renders under the project route and holds the shell's navigator.
+      ...(params.projectId ? { projectId: params.projectId } : {}),
+      navigate,
     })
+  }
+
+  // The DETAIL half, for a source whose row click addresses a project-scoped surface rather than opening a
+  // task pane. Master/detail exactly as every other Source browse is (plugins/github GithubBrowse.tsx),
+  // which is the layout a compiled plugin's issue view used to get from a `SourceRouteContribution` and the
+  // one the descriptor tier had no way to ask for.
+  //
+  // `onSelect` is where the binding comes from, and no second manifest field is needed for it: `navigate`
+  // already names the surface, and the manifest refuses a project-scoped surface that no source navigates
+  // to — so if there is one, this is where it mounts.
+  const detail = () => {
+    const onSelect = props.descriptor.onSelect
+    return onSelect?.verb === 'navigate' ? projectSurfaceRegistry.get(onSelect.surface) : undefined
+  }
+  // The selection, read back out of the URL. There is no local signal shadowing it on purpose: a
+  // project-scoped surface has no task layout to keep a selection in, so the address IS the state — which
+  // is what makes the row click, a pasted deep link and the back button all the same thing.
+  const detailItem = () => {
+    const surface = detail()
+    return surface ? decodeProjectSurfaceItem(params[surface.item]) : undefined
   }
 
   const afterPromote = (task: Task): void => {
@@ -105,6 +131,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
             {(item) => (
               <Row
                 onActivate={props.descriptor.onSelect ? () => select(item) : undefined}
+                selected={item.id === detailItem()}
                 leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
                 meta={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
                 trailing={(
@@ -131,6 +158,21 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           </For>
         </Show>
       </section>
+      {/* Spans the remaining two grid columns: the frame draws its own header and layout, so splitting it
+          across mid and right would give it two boxes it cannot lay out across. `pane-right` is what drops
+          the trailing border and makes the section a flex column, so the iframe's `height: 100%` resolves
+          against the grid row instead of collapsing. */}
+      <Show when={detail()}>
+        {(surface) => (
+          <section class="pane pane-right" style={{ 'grid-column': '2 / -1' }}>
+            <Dynamic
+              component={surface().component}
+              projectId={params.projectId ?? ''}
+              item={detailItem()}
+            />
+          </section>
+        )}
+      </Show>
       <Show when={promoteItem()}>
         {(item) => (
           <PromoteToTaskModal

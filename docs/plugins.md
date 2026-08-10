@@ -171,7 +171,12 @@ decides what to render from that, and the plugin's JavaScript never touches a sh
 kinds of contribution come out of one manifest:
 
 - **Frames** — a pane, reference panel, settings page, or project importer that the plugin draws
-  itself. Each renders in an iframe on `app-plugin://<bundle-hash>`, a scheme Electron main serves
+  itself. A `pane` declares a `scope` of `task` (the default, and what a pane has always meant: a
+  rectangle in a task's layout) or `project`, in which case it is drawn beside its own rail Source's
+  list at `/p/:projectId` with no task involved. A project-scoped pane must declare a `routes` entry
+  addressing it and a source whose `onSelect` navigates to it — those are its address and its only
+  mount site, and a manifest missing either is rejected rather than shipping a surface that can never
+  appear. Each renders in an iframe on `app-plugin://<bundle-hash>`, a scheme Electron main serves
   from its content-addressed cache with `connect-src 'none'`: the frame has no network, no
   `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
   is checked against the manifest's declared scopes by an allowlist naming each path and method
@@ -188,7 +193,8 @@ kinds of contribution come out of one manifest:
   or message bridge. The plugin's sandboxed client frame remains the controller for only
   `navigate`, `back`, `forward`, and `reload`; it cannot read the page or type into it.
 - **Descriptors** — a rail source, task-footer badge, commands/keybindings, attention items, node stats,
-  restricted URL recognizers (`contentLinks`), and agent-context entries (`agentContexts`).
+  restricted URL recognizers (`contentLinks`), renderer routes (`routes`), and agent-context entries
+  (`agentContexts`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
   mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
@@ -197,8 +203,20 @@ kinds of contribution come out of one manifest:
   declare `createTask`; its row supplies the task seed and optional external link, while the host owns
   the modal, origin namespace, connection ownership check, create-before-link ordering, and
   partial-failure reporting. A `contentLinks` entry uses a
-  bounded `https://` host/path grammar, names a pane from the same manifest, and delivers one captured
-  path segment as a `plugin:select` intent. An `agentContexts` entry names two routes — `options`
+  bounded `https://` host/path grammar, names a **task-scoped** pane from the same manifest, and
+  delivers one captured path segment as a `plugin:select` intent into the active task; a target naming
+  anything that is not a registered task pane resolves to nothing rather than pushing an unrenderable
+  pane id into a task's persisted layout. A `routes` entry gives a project-scoped surface a URL. Its
+  `path` is confined at parse time to the prefix the host mints from the plugin id —
+  `/p/:projectId/x/<plugin-id>/` — so it cannot claim core's `/p/:projectId`, `/p/:projectId/new`, or
+  another plugin's path, and a collision is a manifest error rather than a race between two loads. It
+  names a project-scoped `surface` from the same manifest and one `item` parameter of its own path;
+  the host does the matching and supplies the value. A source's `onSelect: { "verb": "navigate",
+  "surface": … }` is what changes that URL from a clicked row — the URL is where a project-scoped
+  surface's selection lives, because unlike a task pane it has no layout state to keep one in. A
+  command may not carry `navigate`, for the same reason it may not carry `createTask`: a command
+  registry row has neither a routed project nor the shell's navigator in scope. An `agentContexts`
+  entry names two routes — `options`
   (GET) and `capture` (POST) — and puts a row in the agent composer's context picker. Its `capture`
   answer is the one descriptor response that ends up inside a model's prompt, so it is parsed against
   a schema rather than sniffed field by field, and the host binds what a plugin must not: `source`
@@ -272,6 +290,37 @@ The webview manifest shape is:
   "hosts": ["docs.example.com", "*.example.com"]
 }
 ```
+
+A project-scoped pane needs three entries that refer to each other, and all three are checked when the
+manifest is parsed:
+
+```json
+{
+  "contributions": {
+    "frames": [{ "target": "pane", "id": "linear-issue", "label": "Linear issue", "scope": "project" }],
+    "routes": [{
+      "id": "linear.issue-route",
+      "path": "/p/:projectId/x/linear/issues/:identifier",
+      "surface": "linear-issue",
+      "item": "identifier",
+      "order": 60
+    }],
+    "sources": [{
+      "id": "linear-issues",
+      "label": "Linear",
+      "order": 20,
+      "items": "/v2/p/linear/rail-items",
+      "onSelect": { "verb": "navigate", "surface": "linear-issue" }
+    }]
+  }
+}
+```
+
+What the frame receives is unchanged: `bridge.context.projectId` and, when the URL addresses one,
+`bridge.context.item`; every later selection arrives as a `select` message rather than a remount. A
+project-scoped surface never gets a `taskId`, which is how a frame that draws both scopes tells them
+apart without asking. The `x` segment is reserved by core for exactly this, and the prefix is derived
+from the plugin id alone — a manifest cannot name it.
 
 A frame surface may also declare the modified chords its own UI handles:
 

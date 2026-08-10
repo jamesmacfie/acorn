@@ -84,6 +84,20 @@ const frameSurface = z.object({
   // Which registry this lands in. The shell renders all four the same way; what differs is the
   // surrounding chrome it supplies.
   target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview']),
+  // TASK or PROJECT, and `pane` only. A pane has always meant "a rectangle in a task's layout", which is
+  // why that is the default: every manifest written before this field parses and behaves identically.
+  //
+  // `project` is the other scope the shell actually has. A rail Source's browse renders at
+  // `/p/:projectId` with no task anywhere near it, and a project-scoped pane is the DETAIL half of the
+  // one list every descriptor source draws through (client-core/plugins/chrome/ChromeSourcePanel.tsx) —
+  // the place a `SourceRouteContribution` used to put a compiled plugin's issue view. It is what lets a
+  // rail row click resolve outside a task instead of being refused.
+  //
+  // A property rather than a fifth `target`, because `target` says which registry a surface lands in and
+  // `scope` says which of two things a pane IS. As a target it would have had to be added to the `panes`
+  // set that `openPane`, `contentLinks` and the frame's own bridge allowlist each key on — four edits to
+  // carry one bit, in exchange for nothing a reader gains.
+  scope: z.enum(['task', 'project']).default('task'),
   // The contribution id. Not namespaced by us: it becomes a persisted layout key the moment a user
   // opens the pane, and prefixing it later would be a storage break (registries/plugin.ts).
   id: z.string().min(1).max(64),
@@ -139,6 +153,14 @@ const chromeAction = z.discriminatedUnion('verb', [
   // A pane the SAME manifest declares under `frames`, checked below. The clicked row's id rides along
   // as a pane intent (client-core/registries/clientEvents.ts).
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
+  // A project-scoped pane the SAME manifest declares, reached by NAVIGATING to the route the manifest
+  // declared for it (`routes` below). The selected row's id becomes the addressed item.
+  //
+  // Separate from `openPane` rather than a scope-aware widening of it, because the two do different
+  // things: `openPane` mutates a task's persisted layout, this changes the URL. Keeping them apart is
+  // also what keeps `openPane`'s "open a task first" refusal honest — it goes on firing for a pane that
+  // really does need a task, and can no longer fire for one that does not.
+  z.object({ verb: z.literal('navigate'), surface: z.string().min(1).max(64) }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
   // Host-owned promotion. The selected rail row carries the seed; the verb itself carries no plugin
   // callbacks and therefore survives the descriptor boundary.
@@ -190,6 +212,11 @@ const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'termina
 
 // `createTask` depends on a selected rail row and its host-owned promotion callback. A command has
 // neither, so exposing that otherwise-valid chrome verb here would create a command that can only fail.
+//
+// `navigate` is absent for exactly the same reason, and it is worth spelling out because it is the newer
+// hole: the verb needs a routed project to substitute into the surface's path and the shell's navigator
+// to follow it, and a palette row runs from a command registry that has neither in scope. A command that
+// parses and can only toast is worse for an author than one the manifest refuses.
 const commandAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
@@ -243,6 +270,36 @@ const contentLinkPattern = z.string().min(1).max(CONTENT_LINK_PATTERN_MAX_LENGTH
   }
 })
 
+// A RENDERER URL the host matches on this plugin's behalf, handing the matched value to the surface the
+// entry names. The manifest twin of `SourceContribution.routes` (client-core/registries/sources.ts).
+//
+// This had no manifest form until now, and the reason is recorded in client-core/plugins/chrome/
+// register.ts: a compiled plugin writes its own pattern, so github can declare `/p/:projectId/pulls`,
+// and a manifest allowed to do the same could claim `/p/:projectId`, `/settings`, or another plugin's
+// path — and would find out by silently taking over project navigation for the whole shell. Confinement
+// to a host-minted prefix is the answer, and it is the same answer `route()` gives for the node
+// namespace: one prefix per plugin id, checked below, so a collision is a parse error and never a race
+// between two loads.
+//
+// `item` is required. A route on this tier exists to ADDRESS something inside a surface — it does not
+// decide whether the surface appears, which is the rail's job — so a route with nothing to address has no
+// reason to exist. The HOST matches the URL and supplies the value; naming which capture carries it is
+// the same thing `contentLinks.item` already does over a pattern's captures, and it is the only part of
+// the match a manifest gets to name.
+const clientRouteDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  // Confined below, because the check needs `id`.
+  path: z.string().min(1).max(256),
+  // A `scope: 'project'` pane this same manifest declares — the precedent `contentLinks.openPane` and
+  // `chromeAction.openPane` already set.
+  surface: z.string().min(1).max(64),
+  // A `:param` of `path`, and never `projectId`: that one is core's, and the host has already bound it.
+  item: z.string().min(1).max(32),
+  // Registration order on the Router, so a static path can be declared ahead of a parameter path that
+  // would otherwise swallow it — the same job `SourceRouteContribution.order` does.
+  order: z.number().int().min(0).max(100_000).default(500),
+})
+
 const contentLinkDescriptor = z.object({
   id: z.string().min(1).max(64),
   match: contentLinkPattern,
@@ -288,6 +345,9 @@ const contributions = z.looseObject({
   attention: z.array(attentionDescriptor).max(4).default([]),
   nodeStats: z.array(nodeStatDescriptor).max(4).default([]),
   contentLinks: z.array(contentLinkDescriptor).max(16).default([]),
+  // Eight, matching `sources`: a route addresses something inside a project-scoped surface, and a plugin
+  // with more addressable surfaces than rail sources is describing an app rather than an integration.
+  routes: z.array(clientRouteDescriptor).max(8).default([]),
   // Four, the same ceiling as attention and nodeStats. A composer list with more than a couple of
   // entries from one plugin is a picker inside a picker, not a richer integration.
   agentContexts: z.array(agentContextDescriptor).max(4).default([]),
@@ -298,6 +358,7 @@ export type PluginChromeAction = z.infer<typeof chromeAction>
 export type PluginCommandDescriptor = z.infer<typeof commandDescriptor>
 export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
 export type PluginAgentContextDescriptor = z.infer<typeof agentContextDescriptor>
+export type PluginClientRouteDescriptor = z.infer<typeof clientRouteDescriptor>
 
 const manifestShape = z.object({
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
@@ -329,25 +390,46 @@ const manifestShape = z.object({
 // plugin may address its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read
 // core routes, or another plugin's, on its behalf.
 export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) => {
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, routes } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
-  const panes = new Set(manifest.contributions.frames.filter((frame) => frame.target === 'pane' || frame.target === 'webview').map((frame) => frame.id))
+  // The RENDERER twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
+  // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
+  // client-core/registries/corePaths.ts, and node-core does not depend on the client.
+  //
+  // `x` is a reserved segment, and reserving it is what makes collision a parse error instead of a race.
+  // It cannot collide with core's `/p/:projectId` or `/p/:projectId/new`, nor with a compiled plugin's
+  // own pattern (github's `/p/:projectId/pulls`); and because exactly one bundle wins per plugin id, two
+  // loaded plugins cannot land on the same prefix either.
+  const ownPath = `/p/:projectId/x/${manifest.id}/`
+  // A webview is a pane by another name and has no second scope, so it counts as a task pane.
+  const taskPanes = new Set(frames.filter((frame) => frame.target === 'webview' || (frame.target === 'pane' && frame.scope === 'task')).map((frame) => frame.id))
+  const projectPanes = new Set(frames.filter((frame) => frame.target === 'pane' && frame.scope === 'project').map((frame) => frame.id))
 
-  const route = (path: string, at: (string | number)[]): void => {
+  const confine = (path: string, prefix: string, at: (string | number)[]): void => {
     let confined = false
     try {
       const url = new URL(path, 'https://acorn.invalid')
-      confined = path.startsWith('/') && url.origin === 'https://acorn.invalid' && url.pathname.startsWith(own)
+      confined = path.startsWith('/') && url.origin === 'https://acorn.invalid' && url.pathname.startsWith(prefix)
     } catch {
       // Report the same confinement error for malformed and escaped paths.
     }
-    if (!confined) ctx.addIssue({ code: 'custom', path: at, message: `route must be inside ${own}` })
+    if (!confined) ctx.addIssue({ code: 'custom', path: at, message: `route must be inside ${prefix}` })
   }
+
+  const route = (path: string, at: (string | number)[]): void => confine(path, own, at)
 
   const action = (value: PluginChromeAction, at: (string | number)[]): void => {
     // A pane the manifest did not declare is a manifest error, not a runtime surprise — and it cannot
     // name another plugin's pane, because the host only ever registers panes this manifest declared.
-    if (value.verb === 'openPane' && !panes.has(value.pane)) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'pane'], message: `openPane names '${value.pane}', which this manifest does not declare as a pane` })
+    //
+    // TASK-scoped only, because that is what this verb does: it pushes a pane into a task's layout. A
+    // project-scoped surface has `navigate`, and the two sets are disjoint, so neither verb can reach a
+    // surface it would only fail on.
+    if (value.verb === 'openPane' && !taskPanes.has(value.pane)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'pane'], message: `openPane names '${value.pane}', which this manifest does not declare as a task-scoped pane` })
+    }
+    if (value.verb === 'navigate' && !projectPanes.has(value.surface)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `navigate names '${value.surface}', which this manifest does not declare as a project-scoped pane` })
     }
     if (value.verb === 'runNodeAction') route(value.path, [...at, 'path'])
     // `openUrl` reaches the real browser. Anything but https is either a downgrade or a scheme handler,
@@ -357,9 +439,13 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     }
   }
 
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts } = manifest.contributions
   frames.forEach((frame, i) => {
     const at = ['contributions', 'frames', i] as (string | number)[]
+    // Nothing but a pane has two scopes: a refPanel is opened by whoever renders the item, settings and
+    // importer are modals the host puts on screen, and a webview is a pane by another name.
+    if (frame.scope === 'project' && frame.target !== 'pane') {
+      ctx.addIssue({ code: 'custom', path: [...at, 'scope'], message: 'only a pane surface can be project-scoped' })
+    }
     if (frame.target !== 'webview') {
       if (frame.url !== undefined || frame.urlSource !== undefined || frame.hosts !== undefined) {
         ctx.addIssue({ code: 'custom', path: at, message: 'url, urlSource and hosts are only valid on a webview surface' })
@@ -419,12 +505,44 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     route(entry.options, ['contributions', 'agentContexts', i, 'options'])
     route(entry.capture, ['contributions', 'agentContexts', i, 'capture'])
   })
+  // Every project-scoped surface needs two things this manifest alone can supply, and both are checked
+  // here rather than left to a runtime that would have nothing to say about them.
+  const routedSurfaces = new Set<string>()
+  routes.forEach((entry, i) => {
+    const at = ['contributions', 'routes', i] as (string | number)[]
+    confine(entry.path, ownPath, [...at, 'path'])
+    if (!projectPanes.has(entry.surface)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `route names '${entry.surface}', which this manifest does not declare as a project-scoped pane` })
+    } else {
+      routedSurfaces.add(entry.surface)
+    }
+    const params = new Set(entry.path.split('/').flatMap((segment) => segment.startsWith(':') ? [segment.slice(1)] : []))
+    if (entry.item === 'projectId' || !params.has(entry.item)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'item'], message: `route item '${entry.item}' must be a :param of its path other than projectId` })
+    }
+  })
+  // A source's `navigate` is the only thing that mounts a project-scoped surface, and a `routes` entry is
+  // the only address it has. Declaring one without either is a surface that parses and can never appear,
+  // which is the failure mode this file spends the rest of its length avoiding.
+  const navigatedSurfaces = new Set(sources.flatMap((entry) => entry.onSelect?.verb === 'navigate' ? [entry.onSelect.surface] : []))
+  frames.forEach((frame, i) => {
+    if (frame.target !== 'pane' || frame.scope !== 'project') return
+    const at = ['contributions', 'frames', i] as (string | number)[]
+    if (!routedSurfaces.has(frame.id)) {
+      ctx.addIssue({ code: 'custom', path: at, message: `project-scoped pane '${frame.id}' needs a routes entry; it has no other address` })
+    }
+    if (!navigatedSurfaces.has(frame.id)) {
+      ctx.addIssue({ code: 'custom', path: at, message: `project-scoped pane '${frame.id}' needs a source whose onSelect navigates to it; it has nowhere else to mount` })
+    }
+  })
   contentLinks.forEach((entry, i) => {
-    if (!panes.has(entry.openPane)) {
+    // Task-scoped, because resolving one opens a pane in the active task's layout
+    // (client-core/registries/contentLinks.ts).
+    if (!taskPanes.has(entry.openPane)) {
       ctx.addIssue({
         code: 'custom',
         path: ['contributions', 'contentLinks', i, 'openPane'],
-        message: `content link names '${entry.openPane}', which this manifest does not declare as a pane`,
+        message: `content link names '${entry.openPane}', which this manifest does not declare as a task-scoped pane`,
       })
     }
     try {
@@ -444,7 +562,7 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...manifest.contributions.frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...routes]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

@@ -91,20 +91,30 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   const note = (seconds: number | undefined): void => void (seconds !== undefined && refreshes.push(seconds))
   const frames = contributions.frames ?? []
   const surfaceIds = new Set(frames.map((surface) => surface.id))
-  const panes = new Set(frames.filter((frame) => frame.target === 'pane' || frame.target === 'webview').map((frame) => frame.id))
+  // TASK-scoped panes only. Everything below that consumes this set puts a pane into a task's layout —
+  // `openPane` on a command, a content link's retained intent, an agent-context deep link's `?pane=` — so a
+  // project-scoped surface in here would be an offer that can only fail. It reaches the shell through
+  // plugins/frames/register.tsx and the project-surface registry instead.
+  const taskPanes = new Set(frames.filter((frame) => frame.target === 'webview' || (frame.target === 'pane' && frame.scope !== 'project')).map((frame) => frame.id))
 
   // `palette` is the one-release compatibility alias. Both forms become commands, and the palette's
   // existing command-registry pass renders only those whose `palette` flag is true.
   const commands: PluginCommandDescriptor[] = [
     ...(contributions.commands ?? []),
     ...(contributions.palette ?? []).flatMap((descriptor): PluginCommandDescriptor[] =>
-      descriptor.action.verb === 'createTask'
+      // The two verbs a command cannot carry, dropped rather than promoted. `createTask` needs a selected
+      // rail row and `navigate` needs a routed project plus a navigator, and a palette row has none of them.
+      descriptor.action.verb === 'createTask' || descriptor.action.verb === 'navigate'
         ? []
         : [{ ...descriptor, category: 'action', palette: true, action: descriptor.action }]),
   ].filter((descriptor) => {
-    if (descriptor.action.verb === 'openPane') return panes.has(descriptor.action.pane)
+    if (descriptor.action.verb === 'openPane') return taskPanes.has(descriptor.action.pane)
     if (descriptor.action.verb === 'runNodeAction') return ownsRoute(pluginId, descriptor.action.path)
-    return descriptor.action.url.startsWith('https://')
+    if (descriptor.action.verb === 'openUrl') return descriptor.action.url.startsWith('https://')
+    // A verb a command cannot carry: `createTask` needs a selected rail row, `navigate` needs a routed
+    // project and a navigator. The manifest refuses both here, and a roster row is wire input, so this
+    // refuses them again rather than reading a field the verb does not have.
+    return false
   })
   const commandById = new Map(commands.map((descriptor) => [descriptor.id, descriptor]))
   for (const descriptor of commands) {
@@ -145,7 +155,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   }
 
   for (const descriptor of contributions.contentLinks ?? []) {
-    if (!panes.has(descriptor.openPane)) {
+    if (!taskPanes.has(descriptor.openPane)) {
       console.warn(`[plugin-chrome] ${pluginId} content link '${descriptor.id}' names an undeclared pane '${descriptor.openPane}'.`)
       continue
     }
@@ -180,9 +190,13 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       // so an integration can use the row click for detail navigation and a separate host-drawn
       // +TASK affordance for promotion.
       promotion: descriptorPromotion(pluginId),
-      // No `routes`. `SourceRouteContribution`'s `project` and `create` kinds are core-owned URLs, so a
-      // descriptor source claiming them would take over project navigation for the whole shell; deep
-      // links for descriptor sources want a host-minted prefix and are a later, additive decision.
+      // Still no `routes` on the source contribution, and that is now a placement decision rather than a
+      // deferral. The reason a descriptor source could not have them was that `SourceRouteContribution`
+      // takes a bare pattern, so a manifest claiming one could claim core's `/p/:projectId` and take over
+      // project navigation for the whole shell. The host-minted prefix that fixes that arrived with
+      // `contributions.routes` — but a manifest route belongs to the SURFACE it addresses, not to a rail
+      // list, so it is registered next to that surface's component (registries/projectSurfaces.ts) and the
+      // shell picks up both from there.
     }))
   }
 
@@ -243,7 +257,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
         ? readAgentContextOptions(pluginId, descriptor.options, chromeNode(), scope)
         : [],
       capture: async (scope, optionIds) => pluginEnabledOnNode(chromeNode(), pluginId)
-        ? captureAgentContext(pluginId, descriptor.capture, chromeNode(), scope, optionIds, { source, panes })
+        ? captureAgentContext(pluginId, descriptor.capture, chromeNode(), scope, optionIds, { source, panes: taskPanes })
         : [],
     }))
   }

@@ -2,8 +2,10 @@ import { Portal } from 'solid-js/web'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { activeNodeId } from '../../node/activeNode'
+import { pluginProjectRoutePrefix } from '../../registries/corePaths'
 import { paneRegistry } from '../../registries/panes'
 import { projectImporterRegistry } from '../../registries/projectImporters'
+import { projectSurfaceRegistry } from '../../registries/projectSurfaces'
 import { refPanelRegistry } from '../../registries/refPanels'
 import type { Disposable } from '../../registries/registry'
 import { settingsRegistry } from '../../registries/settings'
@@ -63,8 +65,12 @@ const bindingFor = (pluginId: string, surface: PluginFrameSurface, row: NodePlug
   api: row.installed?.permissions.api ?? [],
   events: row.installed?.permissions.events ?? [],
   ...(surface.target === 'webview' ? { hosts: surface.hosts ?? [] } : {}),
-  // The plugin's own pane ids, which is the allowlist for the `openPane` verb.
-  panes: (row.installed?.contributions.frames ?? []).filter((entry) => entry.target === 'pane' || entry.target === 'webview').map((entry) => entry.id),
+  // The plugin's own TASK-scoped pane ids, which is the allowlist for the `openPane` verb. Project-scoped
+  // surfaces are excluded because the verb opens into a task's layout and there is nothing there for one
+  // of them to become — `services.openPane` below already refuses when the frame has no task.
+  panes: (row.installed?.contributions.frames ?? [])
+    .filter((entry) => entry.target === 'webview' || (entry.target === 'pane' && entry.scope !== 'project'))
+    .map((entry) => entry.id),
   // Roster rows are wire input. The node parsed these already, but the device re-applies the closed
   // claim policy before handing the declaration to a frame.
   claimsKeys: (surface.claimsKeys ?? []).filter(isPluginKeyClaim),
@@ -106,6 +112,38 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         },
       })
     case 'pane':
+      // Project scope lands in its own registry: the surface is drawn beside its plugin's rail list, with
+      // no task to hand it and no layout key to persist (registries/projectSurfaces.ts says why the two
+      // are not one registry). The manifest guarantees both a route and a source that navigates to it, so
+      // the address and the mount site exist before this runs — but the manifest reached this device as a
+      // ROSTER ROW, so the confinement is re-applied here for the same reason chrome/data.ts re-applies
+      // the node one: a node could have sent something its own parser would have rejected.
+      if (surface.scope === 'project') {
+        const route = (row.installed?.contributions.routes ?? []).find((entry) => entry.surface === surface.id)
+        if (!route) throw new Error(`project-scoped surface '${surface.id}' has no declared route`)
+        if (!route.path.startsWith(pluginProjectRoutePrefix(pluginId))) {
+          throw new Error(`route '${route.path}' is outside ${pluginProjectRoutePrefix(pluginId)}`)
+        }
+        if (!route.path.split('/').includes(`:${route.item}`)) {
+          throw new Error(`route '${route.path}' does not capture '${route.item}'`)
+        }
+        return projectSurfaceRegistry.register({
+          id: surface.id,
+          path: route.path,
+          item: route.item,
+          order: route.order,
+          // No `when` gate, unlike the task pane below. The only thing that renders this is the plugin's
+          // own descriptor rail panel, and the source registry already gates THAT on the plugin running on
+          // the node being looked at; a second copy of the same predicate here could only disagree with it.
+          component: (props) => (
+            <PluginFrame
+              binding={bindingFor(pluginId, surface, row, { projectId: props.projectId })}
+              hash={hash}
+              item={props.item}
+            />
+          ),
+        })
+      }
       return paneRegistry.register({
         id: surface.id,
         label: surface.label,

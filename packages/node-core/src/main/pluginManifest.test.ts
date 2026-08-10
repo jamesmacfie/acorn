@@ -103,6 +103,10 @@ describe('chrome descriptors', () => {
     expect(result.success && result.data.contributions.agentContexts).toEqual([])
     expect(result.success && result.data.contributions.commands).toEqual([])
     expect(result.success && result.data.contributions.keybindings).toEqual([])
+    expect(result.success && result.data.contributions.routes).toEqual([])
+    // And a pane written before `scope` existed is still a TASK pane, which is the compatibility promise
+    // the whole field rests on: rollbar's manifest has to keep behaving identically.
+    expect(result.success && result.data.contributions.frames[0]?.scope).toBe('task')
   })
 
   it('confines every route to the plugin’s own namespace', () => {
@@ -123,7 +127,7 @@ describe('chrome descriptors', () => {
 
   it('rejects an openPane naming a pane the manifest does not declare', () => {
     const bad = manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v2/p/board/items', onSelect: { verb: 'openPane', pane: 'diff' } }] })
-    expect(messages(bad)).toEqual([`openPane names 'diff', which this manifest does not declare as a pane`])
+    expect(messages(bad)).toEqual([`openPane names 'diff', which this manifest does not declare as a task-scoped pane`])
 
     const good = manifest({
       frames: [PANE],
@@ -221,7 +225,7 @@ describe('chrome descriptors', () => {
       contentLinks: [{
         id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'missing', item: 'key',
       }],
-    }))).toContain(`content link names 'missing', which this manifest does not declare as a pane`)
+    }))).toContain(`content link names 'missing', which this manifest does not declare as a task-scoped pane`)
 
     expect(messages(manifest({
       frames: [PANE],
@@ -229,6 +233,103 @@ describe('chrome descriptors', () => {
         id: 'board.card', match: 'https://board.example/cards/{key}', openPane: 'board', item: 'id',
       }],
     }))).toContain(`content link item 'id' is not captured by its match pattern`)
+  })
+})
+
+// A project-scoped pane plus the route that addresses it and the source that mounts it. Written out once
+// because every case below is a mutation of exactly one of the three.
+const PROJECT_PANE = { target: 'pane', id: 'board-card', label: 'Card', scope: 'project' }
+const PROJECT_ROUTE = { id: 'board.card-route', path: '/p/:projectId/x/board/cards/:key', surface: 'board-card', item: 'key' }
+const PROJECT_SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v2/p/board/rail-items', onSelect: { verb: 'navigate', surface: 'board-card' } }
+
+describe('project-scoped surfaces and their routes', () => {
+  it('carries a project-scoped pane addressed by a host-prefixed route', () => {
+    const result = manifest({ frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE] })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.frames[0]?.scope).toBe('project')
+    // `order` defaults like every other registration order does, so the client never sorts on undefined.
+    expect(result.success && result.data.contributions.routes[0]?.order).toBe(500)
+  })
+
+  it('confines a route to the prefix the host mints from the plugin id', () => {
+    // Core's own project URL is the whole hazard: a manifest that could claim it would take over project
+    // navigation for the entire shell.
+    const core = manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/cards/:key' }] })
+    expect(messages(core)).toContain('route must be inside /p/:projectId/x/board/')
+    // Another plugin's prefix looks legal, which is why it is checked rather than assumed.
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/github/cards/:key' }] })))
+      .toContain('route must be inside /p/:projectId/x/board/')
+    // A prefix match is not a namespace match, and dot segments are normalised before the check so an
+    // apparently owned path cannot escape afterwards.
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/board-other/cards/:key' }] })))
+      .toContain('route must be inside /p/:projectId/x/board/')
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/board/../../settings' }] })))
+      .toContain('route must be inside /p/:projectId/x/board/')
+    // Not a path at all, and a path leaving the origin, both report the same confinement failure.
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: 'cards/:key' }] })))
+      .toContain('route must be inside /p/:projectId/x/board/')
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '//evil.example/p/:projectId/x/board/cards/:key' }] })))
+      .toContain('route must be inside /p/:projectId/x/board/')
+  })
+
+  it('rejects a route naming a surface this manifest does not declare as project-scoped', () => {
+    expect(messages(manifest({ routes: [PROJECT_ROUTE] })))
+      .toContain(`route names 'board-card', which this manifest does not declare as a project-scoped pane`)
+    // A TASK pane is not addressable this way either: its selection lives in the task's layout, and the
+    // surface it would mount into does not exist outside one.
+    expect(messages(manifest({
+      frames: [PANE],
+      routes: [{ ...PROJECT_ROUTE, surface: 'board' }],
+    }))).toContain(`route names 'board', which this manifest does not declare as a project-scoped pane`)
+  })
+
+  it('requires the addressed item to be a parameter of the path, and never projectId', () => {
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, item: 'identifier' }] })))
+      .toContain(`route item 'identifier' must be a :param of its path other than projectId`)
+    // `projectId` IS a parameter of every such path, and it is the host's — bound before a plugin sees it.
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, item: 'projectId' }] })))
+      .toContain(`route item 'projectId' must be a :param of its path other than projectId`)
+  })
+
+  it('refuses a project-scoped surface with no address and no mount site', () => {
+    expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE] })))
+      .toContain(`project-scoped pane 'board-card' needs a routes entry; it has no other address`)
+    expect(messages(manifest({ frames: [PROJECT_PANE], routes: [PROJECT_ROUTE] })))
+      .toContain(`project-scoped pane 'board-card' needs a source whose onSelect navigates to it; it has nowhere else to mount`)
+  })
+
+  it('keeps openPane and navigate on disjoint sets of surfaces', () => {
+    // The refusal the whole change is about: `openPane` on a project-scoped surface would toast "open a
+    // task first" forever, so the manifest says no instead of the runtime saying nothing useful.
+    expect(messages(manifest({
+      frames: [PROJECT_PANE],
+      routes: [PROJECT_ROUTE],
+      sources: [{ ...PROJECT_SOURCE, onSelect: { verb: 'openPane', pane: 'board-card' } }],
+    }))).toContain(`openPane names 'board-card', which this manifest does not declare as a task-scoped pane`)
+    // And the other way: navigating to a task pane has no URL to go to.
+    expect(messages(manifest({
+      frames: [PANE],
+      sources: [{ ...PROJECT_SOURCE, onSelect: { verb: 'navigate', surface: 'board' } }],
+    }))).toContain(`navigate names 'board', which this manifest does not declare as a project-scoped pane`)
+  })
+
+  it('refuses navigate from a command, which has no project and no navigator', () => {
+    expect(manifest({
+      frames: [PROJECT_PANE],
+      routes: [PROJECT_ROUTE],
+      sources: [PROJECT_SOURCE],
+      commands: [{ id: 'board.open', title: 'Board: open card', action: { verb: 'navigate', surface: 'board-card' } }],
+    }).success).toBe(false)
+  })
+
+  it('allows only a pane to be project-scoped, and folds routes into the duplicate-id sweep', () => {
+    expect(messages(manifest({ frames: [{ target: 'settings', id: 'board-settings', label: 'Board', scope: 'project' }] })))
+      .toContain('only a pane surface can be project-scoped')
+    expect(messages(manifest({
+      frames: [PROJECT_PANE],
+      sources: [PROJECT_SOURCE],
+      routes: [{ ...PROJECT_ROUTE, id: 'board' }],
+    }))).toContain(`duplicate contribution id 'board'`)
   })
 })
 

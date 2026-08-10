@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, Show } from 'solid-js'
+import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
@@ -42,6 +42,12 @@ export type PluginFrameProps = {
   hash: string
   // Reference-panel surfaces only: which external item the panel was opened for.
   refId?: string
+  // Project-scoped pane surfaces only: which item the URL addresses. A task-scoped pane gets the same
+  // thing as a retained pane intent, because its selection lives in the task's layout state; a
+  // project-scoped one has no such store, so the URL is the selection and it arrives as a prop the host
+  // updates. Both feed the same two channels — whatever is set when the frame connects rides in
+  // `context`, and every change after that is a `select` message rather than a remount.
+  item?: string
   // Importer surfaces only. The host owns the modal chrome and the post-import refresh; the frame only
   // says when it is done.
   onImported?: () => void
@@ -156,8 +162,9 @@ export default function PluginFrame(props: PluginFrameProps) {
   }
 
   const context = (): PluginFrameContext => {
-    // Once: consuming an intent removes it, so a second read would report no selection.
-    const item = selected()
+    // Once: consuming an intent removes it, so a second read would report no selection. A routed item
+    // wins, because for a project-scoped surface it IS the current selection rather than a one-shot.
+    const item = props.item ?? selected()
     return {
       surface: props.binding.surface,
       target: props.binding.target,
@@ -170,6 +177,20 @@ export default function PluginFrame(props: PluginFrameProps) {
       claimsKeys: [...props.binding.claimsKeys],
     }
   }
+
+  // The port this frame is connected on, or null before it loads and after it is torn down. Held out here
+  // rather than inside `onLoad` so the effect below can have a normal reactive lifetime: `onLoad` runs from
+  // an iframe load event, which is outside the component's reactive owner.
+  let port: MessagePort | null = null
+
+  // Every routed selection after the one the frame connected with. `defer` skips the initial value
+  // deliberately — that one already crossed in `context`, and posting it again would tell the frame to
+  // reload the ticket it is in the middle of loading. A change that lands BEFORE the frame connects needs
+  // nothing either, because `context()` is built at load time and reads whatever is current then.
+  createEffect(on(() => props.item, (next, previous) => {
+    if (!port || !next || next === previous) return
+    postSelect(port, next)
+  }, { defer: true }))
 
   // The handshake. One channel per frame load: the host keeps port1 and transfers port2 in, so nothing
   // after this rides window.postMessage and there is no origin check to get wrong.
@@ -192,6 +213,7 @@ export default function PluginFrame(props: PluginFrameProps) {
     // land in the hash-addressed document we built this frame for.
     target.postMessage({ acornBridge: PLUGIN_BRIDGE_VERSION }, pluginFrameOrigin(props.hash), [channel.port2])
 
+    port = channel.port1
     const push = () => postAppearance(channel.port1, { ...currentAxes(), tokens: currentTokens() })
     push()
     const unwatch = watchAppearance(push)
@@ -208,6 +230,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       postBridgeEvent(channel.port1, eventChannel, payload)
     })
     onCleanup(() => {
+      port = null
       unwebview?.()
       unselect()
       unwatch()

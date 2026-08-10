@@ -48,6 +48,22 @@ its own persisted state and a lingering `?pane=` would keep asserting a view the
 unknown pane id is rejected rather than dispatched, so a bad link cannot push a placeholder into the durable
 layout. Every pane gets this without contributing a route.
 
+## Pane scope
+
+Everything above is a **task-scoped** pane, which is what a pane means unless something says otherwise.
+A loaded plugin may also declare a **project-scoped** pane (`"scope": "project"` in its manifest). That
+is a different thing wearing the same rectangle: it is drawn beside its own rail Source's list at
+`/p/:projectId`, it has no task, and it never enters a task layout — so none of the layout model,
+`?pane=`/`?item=` addressing, or `paneRegistry` above applies to it. It lives in its own registry
+(`client-core/registries/projectSurfaces.ts`) precisely so those consumers do not have to branch on a
+scope they cannot act on.
+
+Because it has no layout state to keep a selection in, its selection lives in the URL — one route per
+surface, confined to the host-minted `/p/:projectId/x/<plugin-id>/` prefix — which makes a clicked rail
+row, a pasted link, and the back button the same mechanism. The task-scoped verb (`openPane`) and the
+project-scoped one (`navigate`) name disjoint sets of surfaces, checked when the manifest is parsed, so
+neither can reach a surface it could only fail on. See `docs/plugins.md`.
+
 ## Contributions
 
 Each pane contributes its ID, label, order, default chord, minimum width, component, and optional

@@ -19,6 +19,21 @@ export const TASK_ROUTE = '/t/:taskId'
 // it to decide whether the current location is worth remembering.
 export const PROJECT_PATH_PREFIX = '/p/'
 
+// The one segment core reserves for a LOADED plugin's project-scoped URLs, and the per-plugin prefix
+// minted from it. This is the declaration that `x` is taken: core will not add a `/p/:projectId/x` of its
+// own, so a manifest confined to `/p/:projectId/x/<pluginId>/` cannot collide with core's paths, and two
+// plugins cannot collide with each other because exactly one bundle wins per plugin id.
+//
+// Compiled plugins are deliberately NOT confined — github writes `/p/:projectId/pulls` directly through
+// `SourceContribution.routes`, because it is part of the binary and its patterns are reviewed with the
+// rest of it. A manifest is not, which is the whole difference and the reason this prefix exists.
+//
+// node-core/main/pluginManifest.ts re-spells the same string to check it at parse time; it cannot import
+// this, because the client is downstream of the node. The two are one edit apart on purpose.
+export const PLUGIN_ROUTE_SEGMENT = 'x'
+export const pluginProjectRoutePrefix = (pluginId: string): string =>
+  `${PROJECT_ROUTE}/${PLUGIN_ROUTE_SEGMENT}/${pluginId}/`
+
 export const projectPath = (projectId: string): string => `/p/${encodeURIComponent(projectId)}`
 export const createTaskPath = (projectId: string): string => `${projectPath(projectId)}/new`
 export const taskPath = (taskId: string): string => `/t/${encodeURIComponent(taskId)}`
