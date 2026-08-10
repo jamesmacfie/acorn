@@ -231,13 +231,21 @@ export default function PluginTrustDialog() {
               </Show>
 
               {/* The vocabulary, once. `Declared` is the honest half and says so here rather than in a
-                  heading nobody reads twice (docs/security.md § Node-half plugin security). */}
+                  heading nobody reads twice (docs/security.md § Node-half plugin security).
+
+                  The second sentence on that line is canonical and must not be softened or dropped:
+                  it is the whole truth about the list above, and the one thing standing between an
+                  owner and a plugin that reads ~/.ssh. It is drawn at full contrast for the same
+                  reason — the strongest statement in this dialog must not also be its faintest. */}
               <p class="muted plugin-trust-legend">
                 <Show when={has('enforced')}>
                   <span><strong>Enforced</strong> — acorn checks these; its interface runs in a sandbox and anything not listed is refused.</span>
                 </Show>
                 <Show when={has('declared')}>
-                  <span><strong>Declared</strong> — the plugin’s own description of what its server code touches; acorn can’t check it.</span>
+                  <span>
+                    <strong>Declared</strong> — the plugin’s own description of what it touches; acorn can’t check it.{' '}
+                    <span class="plugin-trust-plain">This plugin’s server code runs with the same access as acorn itself.</span>
+                  </span>
                 </Show>
                 <Show when={has('web')}>
                   <span><strong>Web pages</strong> — these load from the internet with their own cookies and logins. The plugin cannot read them or type into them.</span>

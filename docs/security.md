@@ -135,14 +135,12 @@ anything the Node process can do.** Everything that shapes or displays its `perm
 is least privilege for cooperative code and honest disclosure for users — not a security boundary.
 Every surface that renders those permissions must label them *declared*, never *enforced*, and must
 keep them in a group of their own — a strong claim must not lend credibility to a weaker one sitting
-beside it. In the trust prompt the label is the group's name and the legend is the canonical
-disclosure: "Declared — the plugin's own description of what its server code touches; acorn can't
-check it."
-
-That legend says the list is unverified. It no longer says the code is unconstrained: the previous
-footer line ("This plugin's server code runs with the same access as acorn itself") was dropped when
-the prompt was redesigned for legibility, which is a deliberate softening of the disclosure and the
-one to revisit first if bundles the owner did not write ever become installable.
+beside it. In the trust prompt the label is the group's name and the legend defines it, carrying two
+statements: that the list is unverified ("the plugin's own description of what it touches; acorn
+can't check it") and the canonical wording for what that means — "This plugin's server code runs
+with the same access as acorn itself." The second must not be softened or dropped; it is drawn at
+full contrast rather than as fine print, and `e2e/twoNode.spec.ts` asserts it so its removal cannot
+pass as a copy tidy-up.
 
 ### Threat model
 
