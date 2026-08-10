@@ -1,7 +1,8 @@
-import { QueryClient } from '@tanstack/solid-query'
+import { QueryClient, QueryObserver } from '@tanstack/solid-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { persistedStateRegistry } from '../persistence/persistedState'
+import { mergePrefs } from '../persistence/devicePrefs'
 
 const mocks = vi.hoisted(() => ({
   writeJson: vi.fn(),
@@ -79,6 +80,31 @@ describe('savePref', () => {
       expect(client.getQueryData(prefsKey)).toEqual({ theme: 'dark' })
       expect(mocks.writeJson).not.toHaveBeenCalled()
       expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([['acorn-pref:theme', 'dark']])
+    })
+  })
+
+  it('has the DEVICE value in localStorage before the cache notifies', async () => {
+    // Readers see prefs through `prefsOptions.select` = mergePrefs(raw, readDevicePrefs()), where device
+    // wins. So the cache write must land AFTER localStorage or select recomputes against the old device
+    // value and discards the new one — which is how a theme or style change used to appear to do nothing
+    // until an unrelated pref write re-ran select seconds later.
+    await withLocalStorage(async () => {
+      const client = new QueryClient()
+      client.setQueryData(prefsKey, { style: 'terminal' })
+      // Seed the device tier, which is the whole point: with localStorage empty the stale read the bug
+      // depends on contributes nothing and the assertion below passes either way.
+      localStorage.setItem('acorn-pref:style', 'terminal')
+      // The shape every reader actually observes: prefsOptions' select over the raw cache.
+      const observer = new QueryObserver<Record<string, string>, Error, Record<string, string>>(client, {
+        queryKey: prefsKey, enabled: false, select: mergePrefs,
+      })
+      const unsubscribe = observer.subscribe(() => {})
+      try {
+        await savePref(client, 'style', 'cozy')
+        expect(observer.getCurrentResult().data?.style).toBe('cozy')
+      } finally {
+        unsubscribe()
+      }
     })
   })
 
