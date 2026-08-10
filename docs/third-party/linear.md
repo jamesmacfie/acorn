@@ -14,6 +14,29 @@ noticed. The brief this file replaces said "Blockers: none". That was wrong — 
 
 ### 1. A workspace's linked Linear projects have no writer left — capability lost
 
+**Closed.** The host owns the picker now: Settings → the workspace's page → *Linked provider projects*
+(`client-core/settings/WorkspaceExternalProjects.tsx`), over a provider-agnostic seam. A provider
+declares a `projects` source on its connection contribution and core serves it at
+`GET /v2/core/integrations/:id/projects`, inside the secret scope and the request budget, per
+connection. Linear's old `/v2/p/linear/projects` fetch moved onto that source and the route is gone;
+Rollbar declared one too, from the connection row rather than the network, which closed the same silent
+unscoping on its rail. `supportsProjects` on the public descriptor is derived from the source in both
+the projection and the registry's descriptor check, so a provider cannot advertise projects it lacks.
+
+The mirrored-resource route was evaluated first and rejected on inspection, which was the more useful
+finding of the two: `MirroredResourceContribution` is not a generic cached provider read, it is the
+external-item mirror. Its context hands the provider `ExternalItemStore` and nothing else, `Cached<T>`'s
+`fetchedAt` can only come from an item row or a sync marker, and `serveThenRevalidate` re-reads the store
+after a refresh — a refresh that writes nothing is a `sync_empty` 502. A project list could only travel
+that path by being written into `issues`, the table behind task links, agent context sections,
+cross-connection identifier resolution and the storage-footprint count. The caching it would have
+inherited is also caching this data does not want: the deleted picker reached *past* its own cache by
+hand, because an empty state must be a claim about the provider now.
+
+The fallback in finding 1's mitigation was kept — see the paragraph at the end of this section.
+
+The original finding follows.
+
 The browse carried a picker: *choose which Linear projects this workspace follows*, saved with
 `PUT /v2/core/workspaces/:id/external-projects`. It was the **only** writer of
 `workspace_external_projects` in the app. It cannot come back on this tier:
@@ -32,6 +55,19 @@ That is a mitigation, not a fix. The real answer is a host-owned surface for pro
 project mappings — the data is core's, the route is core's, and a picker belongs next to
 `WorkspaceProjectAssignments` rather than inside whichever plugin happens to own the provider. That
 is a deliberate host decision and was left undecided rather than smuggled in behind a migration.
+
+**The fallback stayed, now on purpose.** With a real picker in place the honest-looking alternative is
+an empty rail carrying a "link some projects" affordance — and a descriptor rail cannot draw one.
+`ChromeSourcePanel` renders every source's empty state as a fixed "Nothing here yet.", with no way for a
+contribution to say what is missing or where to go. Dropping the fallback would trade "shows your own
+open issues, unlabelled" for "shows nothing, unexplained", which is worse. Making it the right trade
+means giving `PluginSourceDescriptor` an authored empty state: a decision about the rail contract, owed
+by every source rather than by Linear, and left for whoever takes that on.
+
+The picker landed beside the workspace's identity and project settings rather than beside
+`WorkspaceProjectAssignments` as this note guessed. The `workspace` settings group has exactly one page
+and it already answers "what is in this workspace"; which external projects it follows is the same
+question at the same scope, and the workspace is already in that page's context.
 
 ### 2. The content-link grammar is exact-arity, so Linear needs two entries for one URL
 
@@ -212,5 +248,8 @@ seeds a task.
 - **A `linear.app` URL pasted into a note.** The recognisers parse (unit-covered through
   `linearIdentifierFromHref`, and the manifest's patterns compile through the host's own grammar at parse
   time), but the click path from a note body to the pane has not been driven.
-- **The project-mapping surface** from finding 1.
+- **A manual pass over the project-mapping surface** from finding 1. The seam, the bounding and both
+  providers' sources are unit-covered, but the picker is a component and vitest here cannot render one:
+  ticking a real Linear project and watching the row land, the failing-connection row, and both
+  appearance axes over it have not been driven.
 - **A decision on `ui.openUrl`** from finding 5.

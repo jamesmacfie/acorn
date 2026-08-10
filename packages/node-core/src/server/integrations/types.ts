@@ -129,6 +129,38 @@ export type MirroredResourceContribution<TInput = unknown, TOutput = unknown> = 
   refresh(context: ProviderResourceRefreshContext, input: TInput): Promise<RefreshResult>
 }
 
+// One selectable project inside a connection, as the provider reports it. Both fields are provider
+// CLAIMS, not authority: `id` becomes a `workspace_external_projects.external_id` row, so the host
+// bounds and re-checks the whole list before it is ever offered for selection (projectSource.ts).
+export type ProviderProject = { id: string; label: string }
+
+export type ProviderProjectContext = { connection: StoredConnection; secret: string }
+
+/**
+ * How the host enumerates a connection's projects for its OWN workspace-mapping picker
+ * (routes/integrations.ts → client-core/settings/WorkspaceExternalProjects.tsx). The mapping in
+ * `workspace_external_projects` is core's data on a core route, so the picker has to be able to ask
+ * every provider the same question without knowing which provider it is asking — and it cannot
+ * hard-code `GET /v2/p/linear/projects` per provider to do it.
+ *
+ * Optional, and its absence is the honest degradation rather than an error: a provider with no
+ * project source simply never appears in the picker, because there is nothing for the user to choose.
+ *
+ * Deliberately NOT a MirroredResourceContribution with a reserved id. That contract mirrors external
+ * ITEMS: its context hands the provider `ExternalItemStore` and nothing else, `Cached<T>`'s fetchedAt
+ * can only come from an item row or a sync marker, and serveThenRevalidate re-reads the store after a
+ * refresh (a refresh that writes nothing is a `sync_empty` 502). So a project list could only ride it
+ * by being written into `issues` — the table that backs task links, agent context sections,
+ * cross-connection identifier resolution and the storage-footprint count. A project is not a ticket,
+ * and a picker wants a live read anyway, which is why the deleted one force-refetched past its cache.
+ *
+ * `list` is called with the credential already unsealed and inside the provider's request budget; it
+ * should just do the fetch, exactly as `MirroredResourceContribution.refresh` does.
+ */
+export type ProviderProjectSource = {
+  list(context: ProviderProjectContext): Promise<ProviderProject[]>
+}
+
 // A provider-owned HTTP router. `prefix` is relative to the provider's own plugin namespace
 // (`/v2/p/<providerId>`), so it is empty for a provider that owns its whole namespace — the
 // namespace segment comes from the declared providerId, never from the prefix string.
@@ -145,6 +177,12 @@ export type ConnectionProviderContribution = {
   connection: ConnectionContract
   capabilities: ProviderCapabilities
   budgets: ProviderRequestBudgets
+  // On the CONNECTION contribution rather than the integration one: what the host needs is "can this
+  // connection be scoped to a set of the provider's projects", and that is a property of the
+  // connection, not of whether the provider also mirrors items. Being optional here means a model
+  // provider — which has no projects — is excluded by having declared nothing, with no flag to keep
+  // in sync.
+  projects?: ProviderProjectSource
   models?: ModelCatalogEntry[]
   defaultModelId?: string
   toPublic(): PublicIntegrationProvider

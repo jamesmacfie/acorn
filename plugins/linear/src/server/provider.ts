@@ -12,16 +12,18 @@ import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import {
   COMMENT_CREATE,
   ISSUE_DETAIL_QUERY,
+  PROJECTS_QUERY,
   VIEWER_QUERY,
   issuesFilter,
   type LinearNode,
+  type LinearProjectNode,
   type LinearRelatedNode,
   type Viewer,
   linearData,
   linearError,
   linearFetch,
 } from './'
-import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, publicProvider } from '@acorn/plugin-api/node'
+import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderProjectSource, publicProvider } from '@acorn/plugin-api/node'
 
 type LinearValidated = { viewer: Viewer; secret: string }
 type LinearCached = CachedExternalItem<LinearIssueSummary, LinearIssueDetail>
@@ -222,6 +224,24 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
   },
 }
 
+// The projects a Linear workspace offers, for the HOST's workspace-mapping picker. This is the fetch
+// that used to sit behind `GET /v2/p/linear/projects`, moved onto the provider contribution so core
+// can ask it without knowing it is asking Linear — that route had no caller left, because the browse
+// pane that called it is a host-drawn rail now.
+//
+// No error handling beyond "no projects": the host runs this inside the secret scope and the request
+// budget and turns a throw into a per-connection failure the picker can retry, so swallowing a 401
+// here would only hide it. Same division as `linearIssuesResource.refresh` above.
+const linearProjectSource: ProviderProjectSource = {
+  async list({ secret }) {
+    const response = await linearFetch(secret, PROJECTS_QUERY, {})
+    const error = linearError(response)
+    if (error) throw new ProviderOperationError(error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', error.status)
+    const { projects } = await linearData<{ projects: { nodes: LinearProjectNode[] } }>(response)
+    return projects.nodes.map((node) => ({ id: node.id, label: node.name }))
+  },
+}
+
 export const linearProvider = publicProvider({
   id: 'linear',
   label: 'Linear',
@@ -287,6 +307,7 @@ export const linearProvider = publicProvider({
     userFeed: true,
   },
   resources: [linearIssuesResource],
+  projects: linearProjectSource,
   codec: linearCodec,
   taskContext: {
     summarize(ref, item, state) {

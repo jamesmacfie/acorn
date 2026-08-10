@@ -1,5 +1,37 @@
-import { describe, expect, it } from 'vitest'
-import { linearNodeToDetail, linearSummaryOf } from './provider'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { linearNodeToDetail, linearProvider, linearSummaryOf } from './provider'
+import { ProviderOperationError, type StoredConnection } from '@acorn/plugin-api/node'
+
+// The host runs the project source, so these drive it the way the host does: the credential already
+// unsealed, one call, and a throw where the host expects to map a per-connection failure.
+describe('linear project source', () => {
+  const connection = { id: 'connection-1', label: 'Linear · Acme' } as StoredConnection
+  const list = () => linearProvider.projects!.list({ connection, secret: 'lin_api_test' })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  const respond = (body: unknown, status = 200) =>
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))))
+
+  it('projects Linear projects onto the host shape', async () => {
+    respond({ data: { projects: { nodes: [{ id: 'proj-1', name: 'Platform' }, { id: 'proj-2', name: 'Mobile' }] } } })
+    await expect(list()).resolves.toEqual([
+      { id: 'proj-1', label: 'Platform' },
+      { id: 'proj-2', label: 'Mobile' },
+    ])
+  })
+
+  it('throws a typed provider error so the host can report it against this connection', async () => {
+    respond({}, 401)
+    await expect(list()).rejects.toThrow(ProviderOperationError)
+    respond({}, 500)
+    await expect(list()).rejects.toMatchObject({ code: 'provider_unavailable' })
+  })
+
+  it('is advertised on the public descriptor', () => {
+    expect(linearProvider.toPublic().supportsProjects).toBe(true)
+  })
+})
 
 describe('linear provider normalization', () => {
   it('normalizes detail fields, activity, labels, and related issues', () => {

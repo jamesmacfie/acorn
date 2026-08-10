@@ -118,6 +118,9 @@ export type {
   CachedItemCodec,
   CodecResult,
   MirroredResourceContribution,
+  ProviderProject,
+  ProviderProjectContext,
+  ProviderProjectSource,
   ProviderResourceContext,
   ProviderResourceRefreshContext,
 } from '@acorn/node-core/server/integrations/types.ts'

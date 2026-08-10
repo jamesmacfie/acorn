@@ -57,6 +57,22 @@ Provider projects from Linear and Rollbar are separate external references in
 `workspace_external_projects`, keyed by the exact integration connection. They do not become local
 projects and do not change project identity.
 
+The mapping is edited in Settings → the workspace's page → **Linked provider projects**, and that
+surface is the host's for every provider rather than any one plugin's. The reason is ownership: the
+table is core's, the route is core's (`PUT /v2/core/workspaces/:id/external-projects`, which replaces
+the whole set for the workspace), and a plugin cannot write it at all — every workspace mutation is
+permanently unmappable on the frame bridge, and `CoreServices.projects` exposes a provider-scoped read
+with no write. When the only writer lived inside the Linear plugin's browse pane, deleting that pane
+made the mapping unwritable and left every integration silently unscoped.
+
+Which providers appear is decided by the providers, not by the picker: a provider declares a `projects`
+source on its contribution, and one that declares none is absent rather than present and empty
+([integrations.md](./integrations.md)). Selection is edited one project at a time against the current
+set, so a provider whose list fails to load — or one that is simply not on screen — keeps its rows.
+
+A rail scoped to nothing mapped is unscoped, not empty: with no rows for its connections an integration
+shows what it can reach on its own (Linear, the viewer's assigned issues; Rollbar, every connection).
+
 ## Task
 
 A task contains:

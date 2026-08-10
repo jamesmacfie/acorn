@@ -134,6 +134,11 @@ export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omi
 // A workspace's linked provider projects (docs/workspaces-and-tasks.md) — (integrationId, externalId) pairs.
 export type WorkspaceExternalProject = { integrationId: string; externalId: string }
 export type WorkspaceExternalProjectsResponse = { projects: WorkspaceExternalProject[] }
+// The projects ONE connection offers, for core's workspace picker. `id` is what a chosen row's
+// `externalId` becomes; `label` is display-only and already bounded by the node
+// (integrations/projectSource.ts) — the provider that produced it is not the authority on either.
+export type IntegrationProject = { id: string; label: string }
+export type IntegrationProjectsResponse = { projects: IntegrationProject[] }
 // A Lucide icon name (see core/client/ui/Icon.tsx). Shape-checked only, deliberately: the
 // 1756-name map is client-side, and importing it into a route would breach the client↔node boundary
 // that core/boundaries.test.ts enforces. An unrecognised name degrades to Icon's render-as-is
@@ -558,6 +563,7 @@ export const taskLinksRoute = (id: string) => `/v2/core/tasks/${id}/links`
 export const integrationsRoute = '/v2/core/integrations'
 export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
 export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`
+export const integrationProjectsRoute = (id: string) => `/v2/core/integrations/${id}/projects`
 
 export const prefsKey = ['prefs'] as const
 // The suffixes identify the current response shapes and prevent unrelated query data from sharing keys.

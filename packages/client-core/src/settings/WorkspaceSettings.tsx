@@ -8,10 +8,14 @@ import { resolveWorkspaceColor, WORKSPACE_COLORS } from '@acorn/protocol/workspa
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
 import { ProjectConfig } from './WorkspaceProjectSettings'
+import WorkspaceExternalProjects from './WorkspaceExternalProjects'
 
 // Settings → per-workspace page: workspace IDENTITY (name / icon / colour) + membership + delete.
 // Build/run/db/preview config is REPO-level (repo-level-settings): a workspace groups repos, but
 // setup/dev/db/preview describe one project, so those editors live in ProjectConfig, one per project.
+//
+// It also owns the workspace's LINKED PROVIDER PROJECTS (WorkspaceExternalProjects), which is core's
+// surface for every integration rather than any one plugin's — see the header there.
 export default function WorkspaceSettings(props: { workspace: Workspace; onDeleted: () => void }) {
   const qc = useQueryClient()
   const projects = createQuery(() => projectsOptions(true))
@@ -146,6 +150,8 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           <span class="muted settings-hint">The Default workspace can't be renamed.</span>
         </Show>
       </label>
+
+      <WorkspaceExternalProjects workspace={props.workspace} />
 
       <Show when={taskBridge() && (projects.data ?? []).some((project) => project.workspaceId === props.workspace.id)}>
         <div class="settings-field">

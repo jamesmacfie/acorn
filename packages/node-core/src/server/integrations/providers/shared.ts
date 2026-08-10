@@ -47,6 +47,9 @@ export const publicConnectionProvider = <TValidated>(
         ...(connection.maxConnections === undefined ? {} : { maxConnections: connection.maxConnections }),
       },
       capabilities: provider.capabilities,
+      // Projected from the presence of the contribution, never declared twice: a provider cannot
+      // advertise projects it has no source for, and cannot forget to advertise ones it has.
+      ...(provider.projects === undefined ? {} : { supportsProjects: true }),
       ...(provider.models === undefined ? {} : { models: provider.models }),
       ...(provider.defaultModelId === undefined ? {} : { defaultModelId: provider.defaultModelId }),
     }),
