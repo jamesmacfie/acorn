@@ -17,6 +17,11 @@ import { LinearIssueView } from './LinearIssueView'
 //   pane       `context.item` when a rail row opened it, `context.taskId` otherwise — in which case the
 //              tickets are whatever this task links, read once from core.
 //
+// Both pane surfaces — the task one and the project-scoped one — come through the same branch, and they do
+// not need telling apart beyond what `context` already says. The project surface arrives with an `item` and
+// no `taskId`, so it takes the same path a rail selection into a task pane takes; the difference is only
+// that its selection comes from the URL, which is the HOST's problem and never reaches here.
+//
 // A selection into an ALREADY-mounted pane arrives as `onSelect` rather than a new context, because
 // remounting per click would throw away everything drawn so far.
 
@@ -120,8 +125,11 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
         const selected = parseLinearRailItemId(context.item)
         return open(selected ?? { identifier: context.item })
       }
+      // No task and no item: the project-scoped surface, sitting beside the rail list with nothing
+      // addressed yet. `taskId` is what tells the two pane surfaces apart, because the host gives one to a
+      // task pane and never to a project-scoped one — the frame does not get to ask which it is.
       if (!context.taskId) {
-        return setPage({ kind: 'empty', message: 'Open a task, or pick an issue from the Linear rail.' })
+        return setPage({ kind: 'empty', message: 'Pick an issue from the list.' })
       }
       try {
         const tasks = await props.bridge.api.get<Task[]>('/v2/core/tasks')
