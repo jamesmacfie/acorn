@@ -22,15 +22,18 @@ import { activeTaskId } from '../tasks/tasks'
 export function RefPanelHost() {
   return (
     <Show when={activeRefPanel()} keyed>
-      {(ref) => (
+      {(target) => (
         // Resolved at RENDER time, not when the ref was set. `openRefPanel` already refused a provider with
         // no panel, but a plugin can be disabled or a node switched between then and now, and rendering
         // nothing is the right degradation for a detail overlay (registries/refPanels.ts).
-        <Show when={refPanelFor(ref.providerId)}>
+        <Show when={refPanelFor(target.providerId)}>
           {(panel) => (
+            // `target=`, never `ref=`. Solid compiles a component's `ref` attribute into a setter method,
+            // so this exact line previously handed every panel a function in place of its subject —
+            // registries/refPanels.ts § RefPanelProps has the full account.
             <Dynamic
               component={panel().component}
-              ref={ref}
+              target={target}
               onClose={closeRefPanel}
               // A link inside a panel's own content. `prefer: 'refPanel'` so a ticket linking a sibling
               // ticket SWAPS this panel rather than pushing a pane behind it — the reader asked to look

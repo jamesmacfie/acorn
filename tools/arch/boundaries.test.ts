@@ -695,6 +695,43 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([...SCHEMA_BASELINE].sort())
   })
 
+  it('a contribution props type never names a member `ref`', () => {
+    // `ref` is a RESERVED JSX attribute, and the reservation is invisible in both directions.
+    //
+    // Solid's compiler rewrites `ref={value}` on a COMPONENT into a `ref(r$)` method that assigns `r$`
+    // back into `value`, because on an element that is how a DOM node is captured. So a contribution
+    // whose props declare `ref` as DATA receives a function instead: the panel reads
+    // `props.ref.displayId` as `undefined`, and neither the compiler nor the registry can tell. That
+    // shipped — a Linear reference panel opened with a blank title over an empty frame while every
+    // guard on the way in held — and TypeScript is no help, because Solid declares `ref` on
+    // `IntrinsicAttributes`, which exempts it from the excess-property check that catches every other
+    // misspelled prop on the same JSX call.
+    //
+    // A CALLBACK `ref` is the legitimate form (a primitive forwarding a DOM node to its caller), so
+    // that is what the rule allows rather than banning the name outright.
+    //
+    // Scoped to registries/, which is where the props types that cross a `Dynamic`/registry call site
+    // are declared. Elsewhere in the repo `ref: ExternalRef` is an ordinary field on wire and server
+    // types that never becomes a JSX attribute, and a repo-wide ban would be a rule about the word
+    // rather than about the hazard.
+    const dir = join(ROOT, 'packages/client-core/src/registries')
+    const files = walk(dir).filter((f) => !isTestCode(f))
+    const offenders: string[] = []
+    for (const file of files) {
+      for (const [index, line] of readFileSync(file, 'utf8').split('\n').entries()) {
+        // An indented `ref:` / `ref?:` member declaration. A same-named function parameter never starts
+        // its line, and neither does an inline union member.
+        const declared = /^\s+ref\??:\s*(.+?)[,;]?\s*$/.exec(line)
+        // `(el) => void` and `((el) => void) | undefined` are both fine; a type is not.
+        if (declared && !/^\(+[^)]*\)\s*=>/.test(declared[1])) offenders.push(`${rel(file)}:${index + 1}`)
+      }
+    }
+    // Anti-vacuity: the registries are where the contribution contracts live, and there are many.
+    expect(files.length).toBeGreaterThan(15)
+    expect(files.some((f) => /Props/.test(readFileSync(f, 'utf8')))).toBe(true)
+    expect(offenders).toEqual([])
+  })
+
   it('no plugin imports another outside contract/', () => {
     const seen = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && e.target.pkg!.kind === 'plugin')

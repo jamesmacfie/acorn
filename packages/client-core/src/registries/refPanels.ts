@@ -14,8 +14,17 @@ import { onScopeEvicted } from './scopeEviction'
 // intent — passes it through unchanged.
 export type RefPanelTarget = Pick<ExternalRef, 'providerId' | 'displayId'> & Partial<Omit<ExternalRef, 'providerId' | 'displayId'>>
 
+// NOT named `ref`, and that is load-bearing rather than a style preference. `ref` is a RESERVED JSX
+// attribute: Solid's compiler sees `ref={value}` on a component and emits a `ref(r$)` METHOD that
+// assigns `r$` back into whatever was passed, because on an element that is how you capture the DOM
+// node. So a props member called `ref` can never carry data across a JSX call site — the panel receives
+// a function where it expected a target, `props.ref.displayId` reads `undefined`, and nothing anywhere
+// errors. That is exactly what shipped: the host header drew a blank title and the frame was handed no
+// `refId`, so linear's panel opened onto its "pick an issue" empty state while every guard on the way
+// in (`openRefPanel`, `openRefPanelTarget`) held perfectly. The only correct `ref` prop is a callback,
+// and tools/arch/boundaries.test.ts now holds that line for this whole directory.
 export type RefPanelProps = {
-  ref: RefPanelTarget
+  target: RefPanelTarget
   onClose: () => void
   // Clicks inside rendered provider markdown (a ticket body linking another ticket, or a GitHub PR). The
   // HOST owns where a link goes — github routes PR links into the SPA — so the handler is passed down
@@ -23,8 +32,8 @@ export type RefPanelProps = {
   onContentClick: (event: MouseEvent) => void
   // When a task links several items, the panel shows a chip strip to switch between them. Omitted by
   // single-ref hosts like PR detail.
-  refs?: RefPanelTarget[]
-  onSelectRef?: (ref: RefPanelTarget) => void
+  targets?: RefPanelTarget[]
+  onSelectTarget?: (target: RefPanelTarget) => void
 }
 
 export type RefPanelContribution = {
