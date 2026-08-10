@@ -165,10 +165,11 @@ cooperative code and makes the trust prompt truthful for the honest majority —
 boundary, because that code can ignore the context entirely.
 
 Every surface that renders those permissions says *declared*, not *enforced*, and the trust prompt
-carries one sentence that must not be softened: "This plugin's server code runs with the same
-access as acorn itself." The UI half genuinely is contained, and keeping the two lists visually
-separate is deliberate — a strong claim must not lend credibility to a weaker one sitting next to
-it.
+defines the word in its legend: "Declared — the plugin's own description of what its server code
+touches; acorn can't check it." The UI half genuinely is contained, and keeping the two lists
+visually separate is deliberate — a strong claim must not lend credibility to a weaker one sitting
+next to it. `security.md` § Node-half plugin security records what that legend stopped saying when
+the prompt was redesigned, and why that is the first thing to revisit.
 
 The route to a real boundary is written down in `security.md` § Node-half plugin security: move
 loaded plugins out of process, under the platform's own permission model, with the context becoming

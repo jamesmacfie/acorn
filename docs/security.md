@@ -133,9 +133,16 @@ loaded plugin runs *inside the Node*, which is a different trust class and the w
 Stated once and bluntly: **a loaded plugin's node bundle runs in-process in the Node and can do
 anything the Node process can do.** Everything that shapes or displays its `permissions.node` block
 is least privilege for cooperative code and honest disclosure for users — not a security boundary.
-Every surface that renders those permissions must say *declared*, not *enforced*; the trust
-prompt's footer line ("This plugin's server code runs with the same access as acorn itself") is the
-canonical wording.
+Every surface that renders those permissions must label them *declared*, never *enforced*, and must
+keep them in a group of their own — a strong claim must not lend credibility to a weaker one sitting
+beside it. In the trust prompt the label is the group's name and the legend is the canonical
+disclosure: "Declared — the plugin's own description of what its server code touches; acorn can't
+check it."
+
+That legend says the list is unverified. It no longer says the code is unconstrained: the previous
+footer line ("This plugin's server code runs with the same access as acorn itself") was dropped when
+the prompt was redesigned for legibility, which is a deliberate softening of the disclosure and the
+one to revisit first if bundles the owner did not write ever become installable.
 
 ### Threat model
 

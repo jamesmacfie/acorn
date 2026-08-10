@@ -261,11 +261,11 @@ test('installs, trusts, updates and uninstalls a plugin from Settings', async ()
   // ── Trust, from the install flow rather than at the next boot ──────────────────────────────────
   const installDialog = page.locator('.plugin-trust-dialog')
   await expect(installDialog).toBeVisible({ timeout: 60_000 })
-  await expect(installDialog.locator('.plugin-trust-permissions').last()).toHaveText(
+  await expect(installDialog.locator('.plugin-trust-permissions[data-tier="enforced"]')).toHaveText(
     '1 request this version of acorn does not recognise (ignored)',
   )
   await expect(installDialog).not.toContainText('core.quantum:read')
-  expect(await acceptTrust(page)).toBe('Run a plugin from this node?')
+  expect(await acceptTrust(page)).toBe('Plugin trust')
 
   // ── Restart, and the plugin is live ───────────────────────────────────────────────────────────
   await openPluginsSettings(page)
@@ -293,8 +293,13 @@ test('installs, trusts, updates and uninstalls a plugin from Settings', async ()
   // makes the added permission visible instead of arriving inside a version bump.
   const dialog = page.locator('.plugin-trust-dialog')
   await expect(dialog).toBeVisible({ timeout: 60_000 })
-  await expect(dialog.locator('.overlay-title')).toHaveText('A plugin has been updated')
-  await expect(dialog.locator('.plugin-trust-permissions li.added')).toHaveText('Run commands on the node')
+  await expect(dialog.locator('.overlay-title')).toHaveText('Plugin update')
+  // The update leads with the diff, and each new line carries the tier that owns it — the added
+  // permission here is a node one, which is declared rather than enforced.
+  const newLine = dialog.locator('.plugin-trust-permissions[data-tier="new"] li.added')
+  await expect(newLine).toHaveCount(1)
+  await expect(newLine).toContainText('Run commands on the node')
+  await expect(newLine).toContainText('Declared')
   await dialog.getByRole('button', { name: 'Trust the update' }).click()
   await expect(dialog).toHaveCount(0)
 
