@@ -46,6 +46,7 @@ apps/node/        Node composition roots, standalone entry, plugin activation, a
 packages/protocol Wire contracts and route/query builders
 packages/node-core Node server, auth, storage, core services, MCP, and shared registries
 packages/client-core Renderer runtime, fleet state, persistence, registries, settings, and UI kit
+packages/plugin-api The only host import surface for loaded plugins (node/client/ui entrypoints)
 plugins/*         First-party feature packages with client/server/main/shared code as needed
 tools/arch/        Import-boundary and package-graph tests
 ```
@@ -53,6 +54,11 @@ tools/arch/        Import-boundary and package-graph tests
 Every first-party package is consumed as TypeScript source through its exports map. Cross-package
 imports include the real `.ts` extension. `apps/desktop` embeds the built Node artifact; it never
 imports Node source.
+
+First-party plugins ship in two tiers. Most are compiled into the composition roots. A growing set
+(Rollbar, Linear, model-providers, HTTP, database) ships as loaded packages: bundled with the app,
+installed like third-party plugins, importing the host only through `@acorn/plugin-api`. The record
+of those migrations is [docs/third-party/README.md](./docs/third-party/README.md).
 
 ## Development
 
@@ -74,10 +80,12 @@ pnpm --filter @acorn/desktop dist          # build and package the macOS app
 pnpm pack:node                             # build the standalone Node tarball
 ```
 
-The Node needs an exactly 64-character hexadecimal `SESSION_ENC_KEY` in development. The optional
-GitHub plugin reads `GITHUB_CLIENT_ID` when GitHub connection/import features are enabled; it does not
-use a client secret. Native modules are ABI-specific: use `pnpm rebuild:node` for
-plain Node commands and `pnpm run rebuild` for Electron, as documented in
+`SESSION_ENC_KEY` (64 hexadecimal characters) is optional in development — the desktop supplies one
+from safeStorage, and a standalone Node generates its own; setting it in `.env` pins a stable key
+across throwaway data roots. The GitHub plugin reads `GITHUB_CLIENT_ID` when GitHub connection/import
+features are enabled; it does not use a client secret. `node-pty` is the only native module (SQLite
+is the runtime's own `node:sqlite`): use `pnpm rebuild:node` for plain Node commands and
+`pnpm run rebuild` for Electron, as documented in
 [local-development.md](./docs/local-development.md).
 
 ## Documentation
@@ -88,9 +96,12 @@ Start with [architecture-overview.md](./docs/architecture-overview.md), then use
 - [frontend.md](./docs/frontend.md) and [state.md](./docs/state.md) — renderer composition and state ownership.
 - [authentication.md](./docs/authentication.md) and [security.md](./docs/security.md) — device auth and boundaries.
 - [api-reference.md](./docs/api-reference.md) and [data-layer.md](./docs/data-layer.md) — Node API and storage.
-- [plugins.md](./docs/plugins.md) and [agent-tools.md](./docs/agent-tools.md) — extension seams and tool projection.
+- [plugins.md](./docs/plugins.md), [first-party-plugins.md](./docs/first-party-plugins.md), and
+  [extensibility.md](./docs/extensibility.md) — the two plugin tiers, and why they're shaped that way.
+- [agent-tools.md](./docs/agent-tools.md) — agent tool contributions and MCP projection.
 - [local-development.md](./docs/local-development.md), [testing.md](./docs/testing.md), and
   [node-distribution.md](./docs/node-distribution.md) — build, test, and distribution workflows.
 
-The completed project-model migration record is [docs/legacy/projects/README.md](./docs/legacy/projects/README.md).
-Current runtime contracts live in the parent `docs/` tree and the code.
+Design and migration material lives under [docs/third-party/](./docs/third-party/README.md) (the
+loaded-plugin record), `docs/future/`, and `docs/smolforge/`. Current runtime contracts live in the
+topic docs above and the code.
