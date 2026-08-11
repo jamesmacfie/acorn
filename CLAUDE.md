@@ -2,8 +2,8 @@
 
 Use [CLAUDE.md](./CLAUDE.md) as the repository-wide engineering guide. The current architecture and
 runtime contracts are in [docs/architecture-overview.md](./docs/architecture-overview.md) and the
-topic docs beneath `docs/`. The material under `docs/legacy/vNext/` is a completed implementation record,
-kept for historical reference.
+topic docs beneath `docs/`. Design and migration material lives under `docs/third-party/` (the
+loaded-plugin record and remaining work), `docs/future/`, and `docs/smolforge/`.
 
 Before changing code, identify the owning runtime and trace data from its source through the Node API,
 protocol, broker, client cache, and UI consumer. Preserve the Node/Electron and plugin boundaries,
