@@ -1,0 +1,350 @@
+/* The Database pane's FRAME half — the region below the host's SQL editor and its drag handle
+   (docs/future/monaco.md § document-over-frame, concretely).
+
+   Tokens only, and they are the host's: the SDK pushes the shell's resolved theme + style tokens onto
+   this document's `:root` on connect and on every appearance change, so `var(--accent)` here is the same
+   value it is in the shell. That is what makes a frame stylesheet look like first-party CSS instead of
+   an approximation of it.
+
+   Inlined into the bundle by src/frame/index.tsx, because a plugin origin serves one file. */
+
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+body { font: var(--font-ui, inherit); }
+
+/* Was `.db-pane`, a whole pane. It is the bottom region of one now, and the two rules it needs are the
+   same: fill the rectangle, and let the children scroll rather than the frame. */
+.db-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.db-empty { padding: var(--space-6); }
+
+.db-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.db-status {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-transform: none;
+}
+.db-status.ok { color: var(--add-marker); }
+.db-status.err { color: var(--del-marker); }
+.db-head .db-icon-btn { margin-left: auto; }
+
+.db-icon-btn {
+  background: transparent;
+  border: var(--control-border);
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-4);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.db-icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.db-icon-btn:disabled { opacity: 0.5; cursor: default; }
+
+.db-error {
+  padding: 6px var(--pane-pad);
+  font-size: var(--fs-sm);
+  color: var(--del-marker);
+  background: var(--del-bg);
+  border-bottom: var(--chrome-divider);
+  white-space: pre-wrap;
+}
+
+.db-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* Sidebar — searchable table list */
+.db-sidebar {
+  width: clamp(180px, 22%, 280px);
+  border-right: var(--chrome-divider);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.db-filter {
+  margin: var(--space-4);
+  flex: none;
+}
+.db-table-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.db-table-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0 var(--space-6);
+  height: var(--row-h);
+  line-height: var(--row-h);
+  border: none;
+  border-left: var(--marker-w) solid transparent;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.db-table-row:hover { background: var(--bg-hover); }
+.db-table-row.active {
+  background: var(--bg-selected);
+  border-left-color: var(--accent);
+}
+
+/* Main — the button bar over the results grid. The editor and the splitter that used to be here are the
+   host's, in the region above this frame, and `.db-editor` / `.db-editor-host` / `.db-split` are gone
+   with them. */
+.db-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The bar keeps its class name and its layout; only its position changed, from above the splitter to
+   below it. `border-bottom` rather than `border-top` now, because what it is separating itself from is
+   the grid underneath rather than an editor above. */
+.db-editor-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  justify-content: flex-end;
+  padding: 5px var(--space-5);
+  border-bottom: var(--chrome-divider);
+}
+.db-hint { font-size: var(--fs-sm); }
+.db-run-btn {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-6);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.db-run-btn:disabled { opacity: 0.5; cursor: default; }
+.db-del-btn {
+  background: transparent;
+  color: var(--del-marker);
+  border: var(--control-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-6);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.db-del-btn:hover:not(:disabled) { background: var(--del-bg); }
+
+.db-result {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.db-result-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: var(--chrome-divider);
+}
+.db-footer {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.db-result-bar .db-icon-btn { margin-left: auto; }
+
+/* Virtualized result grid */
+.dbgrid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.dbgrid { position: relative; }
+.dbgrid-head {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--z-base) + 1);
+  display: grid;
+  height: var(--row-h);
+  background: var(--bg-subtle);
+  border-bottom: var(--chrome-divider);
+}
+.dbgrid-hcell {
+  padding: 0 var(--space-4);
+  line-height: var(--row-h);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: var(--chrome-divider);
+}
+.dbgrid-body { position: relative; }
+.dbgrid-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: var(--divider);
+}
+.dbgrid-row:hover { background: var(--bg-hover); }
+.dbgrid-row.active { background: var(--bg-selected); }
+.dbgrid-cell {
+  padding: 0 var(--space-4);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: var(--chrome-divider);
+}
+.dbgrid-cell.is-null { color: var(--text-faint); font-style: italic; }
+
+/* Row detail / editor panel */
+.db-detail {
+  width: clamp(280px, 32%, 420px);
+  border-left: var(--chrome-divider);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+.db-detail-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+  font-size: var(--fs-sm);
+  text-transform: var(--label-transform);
+  color: var(--text-muted);
+}
+.db-detail-head .db-icon-btn { margin-left: auto; }
+.db-detail-fields {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px var(--pane-pad);
+}
+.db-field { display: block; margin-bottom: var(--space-5); }
+.db-field-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.db-pk {
+  font-style: normal;
+  font-size: var(--fs-2xs);
+  color: var(--accent);
+  border: var(--control-bw) solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0 3px;
+}
+.db-field-type { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); }
+.db-field-input {
+  width: 100%;
+  resize: vertical;
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: var(--space-2) var(--space-3);
+}
+.db-field-input:disabled { color: var(--text-faint); }
+.db-null-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.db-detail-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-4);
+  padding: 8px var(--pane-pad);
+  border-top: var(--chrome-divider);
+}
+
+/* AI SQL generation modal (docs/pg.md): overlay base + a right-aligned action row. */
+.db-generate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: 8px var(--pane-pad);
+  border-top: var(--chrome-divider);
+}
+
+/* Example-query multi-select: chips for the picked queries + the Picker button that adds more. */
+.db-examples { display: flex; flex-direction: column; gap: var(--space-2); }
+.db-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.db-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  font-size: var(--fs-sm);
+  border: var(--control-bw) solid var(--badge-border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+}
+.db-chip-x {
+  background: none;
+  border: none;
+  padding: 0 var(--space-1);
+  font: inherit;
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.db-chip-x:hover { color: var(--del-marker); }
+.db-chip-add {
+  background: none;
+  border: var(--control-bw) dashed var(--border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-5);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.db-chip-add:hover { color: var(--text); }
+
+/* Save-query modal: a read-only look at what's about to be stored. */
+.db-sql-preview {
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: var(--surface-border);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+}

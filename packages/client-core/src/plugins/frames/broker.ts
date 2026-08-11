@@ -18,9 +18,10 @@ import type {
   PluginBridgeMessage,
   PluginBridgeReply,
   PluginBridgeSelect,
+  PluginBridgeSurfaceAction,
   PluginFrameContext,
 } from '@acorn/protocol/pluginBridge.ts'
-import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
+import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
@@ -32,7 +33,7 @@ export type FrameBinding = {
   pluginId: string
   // The contribution id this frame renders, and which registry it landed in.
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay'
   nodeId: string
   taskId?: string
   projectId?: string
@@ -82,6 +83,19 @@ export type FrameServices = {
   webviewNavigate?(url: string): Promise<boolean>
   webviewCommand?(action: 'back' | 'forward' | 'reload'): Promise<boolean>
   keydown(chord: string): void
+  // The document a composed pane's host region is drawing, supplied ONLY when this frame shares its
+  // rectangle with one. Its absence is the whole permission check for the `document` verb — there is no
+  // scope to declare, because the grant is structural: a frame either has a document beside it or it
+  // does not, and which one is a fact about the manifest the host already read.
+  //
+  // Shaped inline rather than imported from editor/documentModel, for the reason at the top of this
+  // file: the broker is the choke point that must stay testable in plain Node, and that module reaches a
+  // registry at import time.
+  document?: {
+    read(): string
+    write(text: string): void
+    flush(): Promise<void>
+  }
 }
 
 // A broken plugin must not be able to busy-loop the shell. These are generous for anything honest: a
@@ -325,7 +339,14 @@ export function createFrameBridge(input: {
       case 'importer.close': {
         // The surface decides, not the message. An importer frame decides when it is done; it never
         // decides how the shell reacts, and a pane cannot claim to be an importer at all.
-        if (binding.target !== 'importer') {
+        //
+        // `close` — the SDK's `ui.close()` — is the one an OVERLAY also gets, because dismissing itself
+        // is the whole gesture of a picker: pick a thing, then get out of the way. `done` stays importer-
+        // only, since what it means is "run the host's post-import refresh", which an overlay has no
+        // business asking for. The wire spelling stays `importer.*` so every shipped frame SDK keeps
+        // working; what an author calls is `acorn.ui.close()`.
+        const dismissible = binding.target === 'importer' || (op === 'importer.close' && binding.target === 'overlay')
+        if (!dismissible) {
           return void post(denied(id, `${op} is only valid from an importer surface`))
         }
         if (op === 'importer.done') services.importerDone()
@@ -334,6 +355,50 @@ export function createFrameBridge(input: {
       }
       default:
         return void post(failed(id, 'bad_request', `unknown ui op ${String(op)}`))
+    }
+  }
+
+  // The composed pane's shared document (docs/future/monaco.md § Communication between regions). Three
+  // operations, and the interesting thing about them is what is NOT here: no cursor, no selection, no
+  // decorations, no "open this other document". Each of those is either the host's state or an
+  // LSP-shaped route, and the growth rule sends new asks to the second rather than to this list.
+  const handleDocument = async (id: number, data: Record<string, unknown>): Promise<void> => {
+    const doc = services.document
+    if (!doc) {
+      post(denied(id, 'document operations need a pane whose layout declares a document region'))
+      return
+    }
+    const op = data.op
+    try {
+      switch (op) {
+        case 'read':
+          post({ id, ok: true, status: 200, body: { text: doc.read() } })
+          return
+        case 'write': {
+          const text = data.text
+          if (typeof text !== 'string') {
+            post(failed(id, 'bad_request', 'a document write needs text'))
+            return
+          }
+          // The same ceiling the read path enforces, applied in the other direction: a frame must not be
+          // able to push a document into the editor that the editor would then refuse to load back.
+          if (utf8Bytes(text) > MAX_DOCUMENT_BYTES) {
+            post(failed(id, 'bad_request', `documents are capped at ${MAX_DOCUMENT_BYTES} bytes`))
+            return
+          }
+          doc.write(text)
+          post({ id, ok: true, status: 200, body: null })
+          return
+        }
+        case 'flush':
+          await doc.flush()
+          post({ id, ok: true, status: 200, body: null })
+          return
+        default:
+          post(failed(id, 'bad_request', `unknown document op ${String(op)}`))
+      }
+    } catch (error) {
+      post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -396,6 +461,9 @@ export function createFrameBridge(input: {
       case 'ui':
         handleUi(shape.id, data)
         return
+      case 'document':
+        void handleDocument(shape.id, data)
+        return
       case 'webview':
         void handleWebview(shape.id, data)
         return
@@ -440,4 +508,11 @@ export const postSelect = (port: MessagePort, item: string): void => {
 /** Push a host-owned event such as webview navigation into its controller frame. */
 export const postBridgeEvent = (port: MessagePort, channel: string, payload: unknown): void => {
   port.postMessage({ kind: 'event', channel, payload } satisfies PluginBridgeEvent)
+}
+
+/** Deliver a surface-scoped command the host resolved on this frame's behalf, because the chord landed
+ * in the host's half of a composed pane. The CALLER owes the flush-before-action guarantee — it is the
+ * side that holds the document. */
+export const postSurfaceAction = (port: MessagePort, command: string): void => {
+  port.postMessage({ kind: 'surfaceAction', command } satisfies PluginBridgeSurfaceAction)
 }

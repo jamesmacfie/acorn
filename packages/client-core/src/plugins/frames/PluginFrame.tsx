@@ -13,7 +13,7 @@ import { saveJsonPref } from '../../settings/savePref'
 import { activeTaskId } from '../../tasks/tasks'
 import { watchAppearance } from '../../ui/appearance'
 import { FRAME_TOKENS } from '../../ui/tokenAxes'
-import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, type FrameBinding, type FrameServices } from './broker'
+import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, postSurfaceAction, type FrameBinding, type FrameServices } from './broker'
 import { isSubscribable } from './channels'
 
 export { SUBSCRIBABLE_CHANNELS } from './channels'
@@ -56,6 +56,10 @@ export type PluginFrameProps = {
   // A webview's visible pixels are host-owned. Its sandboxed client bundle remains mounted offscreen
   // solely as the typed controller that can issue the four allowed verbs.
   controllerOnly?: boolean
+  // Composed panes only (`document-over-frame`): the sibling host editor's document, as an accessor
+  // because the editor may not exist yet when this frame mounts. Read per bridge call rather than
+  // captured, so a frame that connected first still reaches the document once it appears.
+  document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
   webview?: {
     navigate(url: string): Promise<boolean>
     command(action: 'back' | 'forward' | 'reload'): Promise<boolean>
@@ -170,6 +174,19 @@ export default function PluginFrame(props: PluginFrameProps) {
     frameHasFocus: () => frameEl !== undefined && document.activeElement === frameEl,
     importerDone: () => props.onImported?.(),
     importerClose: () => props.onClose?.(),
+    // Present only for a composed pane, and its absence IS the permission check the broker applies —
+    // there is no scope to declare, because the grant is structural. The indirection through the
+    // accessor is what makes the two regions' mount order a non-issue: the frame can connect before the
+    // editor has loaded its document, and its first `document.read()` still lands on the real thing.
+    ...(props.document
+      ? {
+        document: {
+          read: () => props.document?.()?.read() ?? '',
+          write: (text: string) => props.document?.()?.write(text),
+          flush: async () => void (await props.document?.()?.flush()),
+        },
+      }
+      : {}),
     webviewNavigate: (url) => props.webview?.navigate(url) ?? Promise.resolve(false),
     webviewCommand: (action) => props.webview?.command(action) ?? Promise.resolve(false),
     keydown: (chord) => {
@@ -264,12 +281,20 @@ export default function PluginFrame(props: PluginFrameProps) {
       consumePaneIntent(event.taskId, event.paneId)
       postSelect(channel.port1, event.intent.item)
     })
+    // Surface-scoped commands the host resolved for this frame — the chord was pressed in the sibling
+    // editor, or the row was picked in the palette. Addressed by plugin AND surface, because a task can
+    // have two composed panes open and each one's chord belongs to its own frame.
+    const unaction = clientEvents.on('plugin:surface-action', (event) => {
+      if (event.pluginId !== props.binding.pluginId || event.surface !== props.binding.surface) return
+      postSurfaceAction(channel.port1, event.command)
+    })
     const unwebview = props.webview?.subscribe((eventChannel, payload) => {
       postBridgeEvent(channel.port1, eventChannel, payload)
     })
     onCleanup(() => {
       port = null
       unwebview?.()
+      unaction()
       unselect()
       unwatch()
       bridge.dispose()

@@ -37,7 +37,7 @@ export type PluginBridgeHello = { acornBridge: typeof PLUGIN_BRIDGE_VERSION }
 export type PluginFrameContext = {
   // The contribution id this frame is rendering, as declared in the manifest.
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay'
   nodeId: string
   taskId?: string
   projectId?: string
@@ -96,6 +96,26 @@ export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'importer.done' }
   | { id: number; kind: 'ui'; op: 'importer.close' }
 
+// The document a composed pane shares with its frame (docs/future/monaco.md § Communication between
+// regions). Valid only from a frame whose pane declares a `document-over-frame` layout; every other
+// surface is denied, because there is no document on the other side of the port to touch.
+//
+// Three operations, each with a proven consumer in the pane that forced this contract: `read` is the
+// Run button needing the current SQL, `write` is the saved-query picker loading one into the editor,
+// and `flush` is "make sure my write route has the latest before I act on it". Nothing about the
+// EDITOR crosses — no cursor, no selection, no decorations — because those are the host's and the
+// growth rule sends anything richer to an LSP-shaped route instead.
+export type PluginBridgeDocumentRequest =
+  | { id: number; kind: 'document'; op: 'read' }
+  | { id: number; kind: 'document'; op: 'write'; text: string }
+  | { id: number; kind: 'document'; op: 'flush' }
+
+/** The ceiling on a document in either direction — what the host will load into an editor, and what a
+ * frame may write back into one. Here rather than beside the editor because both ends of the port have
+ * to agree on it, and refused whole rather than truncated: half a document in an editor that will
+ * happily save it back is data loss wearing the shape of a rendering limit. */
+export const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
+
 // A webview controller can address only the surface whose binding owns its port. There is no surface,
 // plugin or node identifier in the request for plugin code to forge.
 export type PluginBridgeWebviewRequest =
@@ -112,6 +132,7 @@ export type PluginBridgeRequest =
   | PluginBridgeSubscribeRequest
   | PluginBridgeStateRequest
   | PluginBridgeUiRequest
+  | PluginBridgeDocumentRequest
   | PluginBridgeWebviewRequest
   | PluginBridgeCancelRequest
   | PluginBridgeKeydown
@@ -146,12 +167,22 @@ export type PluginBridgeReady = { kind: 'ready'; context: PluginFrameContext }
 // click would throw away everything the plugin had drawn.
 export type PluginBridgeSelect = { kind: 'select'; item: string }
 
+// A surface-scoped command the host resolved on this frame's behalf — the chord landed in the host's
+// half of a composed pane (its editor), where a frame could never have seen it. `command` is the id the
+// manifest declared, and the frame handles it exactly as it would its own button click.
+//
+// The host guarantees the pane's document has been FLUSHED to the plugin's write route before this is
+// posted. Without that guarantee every plugin independently rediscovers "it ran the previous version of
+// my query", which is the class of bug this whole contract exists to make unwriteable.
+export type PluginBridgeSurfaceAction = { kind: 'surfaceAction'; command: string }
+
 export type PluginBridgeMessage =
   | PluginBridgeReply
   | PluginBridgeEvent
   | PluginBridgeAppearance
   | PluginBridgeReady
   | PluginBridgeSelect
+  | PluginBridgeSurfaceAction
 
 // The code the bridge denies with. A domain code rather than `forbidden`, because a plugin author
 // seeing this needs to know it is their manifest that is short, not their credentials.

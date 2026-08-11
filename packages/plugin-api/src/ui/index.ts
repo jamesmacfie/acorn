@@ -30,6 +30,19 @@ export { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
 // qualifies on this barrel's own terms — no imports, no DOM, text in and markup out.
 export { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
 
+// A density token as a number. On this barrel for the same reason `renderMarkdown` is: no imports, no
+// state, and a virtualized list cannot get its row height from CSS at all — @tanstack/solid-virtual
+// needs a number and writes the result back as an inline style that beats any stylesheet rule. A frame
+// gets the same tokens the shell does (they are pushed onto `:root` by the SDK), so a plugin's grid can
+// honour a style pack's density instead of hardcoding 30 and lying about it.
+export { cssPx, rowHeightSm } from '@acorn/client-core/ui/metrics.ts'
+
+// Controlled connection + model dropdowns over `availableModelConnections`. On this barrel because it
+// is presentation only — a protocol type in, two `<select>`s out — and because a plugin whose own route
+// calls `core.models.generateText` has to be able to offer the picker from a frame. It remains on
+// ./ui/host too, for the compiled panes that already import it from there.
+export { default as ModelConnectionPicker, defaultModelIdFor } from '@acorn/client-core/modelProviders/ModelConnectionPicker.tsx'
+
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
 export { DiffLine, FileHead, NonCodeRow, SplitCell } from '@acorn/client-core/ui/diff/DiffRows.tsx'

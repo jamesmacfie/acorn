@@ -1,42 +1,21 @@
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import * as monaco from 'monaco-editor'
-import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, isAppDark, onClosePaneWithin, type PaneIntent, registerCommands, sendReferenceToAgent, type Task, token, watchAppearance } from '@acorn/plugin-api/client'
+import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWithin, type PaneIntent, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
+import { Tabs } from '@acorn/plugin-api/ui'
+import { MONACO_THEME, monacoLanguageForPath, watchMonacoTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi } from './editorClient'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { editorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
+import SearchPanel from './search/SearchPanel'
 import './editor.css'
 
-const EXT_LANG: Record<string, string> = {
-  ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript',
-  json: 'json', css: 'css', scss: 'scss', less: 'less', html: 'html', xml: 'xml',
-  md: 'markdown', py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', c: 'c', cpp: 'cpp',
-  sh: 'shell', bash: 'shell', yml: 'yaml', yaml: 'yaml', sql: 'sql', toml: 'ini', ini: 'ini',
-}
-const langFor = (name: string): string => EXT_LANG[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'plaintext'
-
-// Monaco (like xterm) ignores CSS custom properties, so it gets an explicit theme: base vs/vs-dark
-// supplies the syntax colours, chrome colours come from the live app tokens (tokens-layout.css) —
-// the same recipe terminal/theme.ts uses. Re-defining 'app' on theme change updates in place; the
-// name is global, so every editor instance follows.
-function applyMonacoTheme() {
-  monaco.editor.defineTheme('app', {
-    base: isAppDark() ? 'vs-dark' : 'vs',
-    inherit: true,
-    rules: [],
-    colors: {
-      'editor.background': token('--bg'),
-      'editor.foreground': token('--text'),
-      'editorCursor.foreground': token('--text'),
-      'editorLineNumber.foreground': token('--text-faint'),
-      'editorLineNumber.activeForeground': token('--text-muted'),
-      'editor.lineHighlightBackground': token('--bg-hover'),
-      'editor.selectionBackground': token('--bg-selected'),
-    },
-  })
-  monaco.editor.setTheme('app')
-}
+// The extension→language map and the Monaco theme both moved to the host
+// (@acorn/protocol/languageIds.ts + client-core/editor/), because this file and DatabasePane.tsx were
+// each carrying a copy and the theme NAME is a Monaco global — two panes writing the same global and
+// agreeing by luck. Same reason the host now owns the whole document surface a loaded plugin gets
+// (docs/future/monaco.md).
 
 // The Monaco editor pane (docs/panes.md): a lazy file tree on the left, a file TAB BAR + one reused
 // Monaco instance on the right. Single-click opens an ephemeral (italic) preview tab; editing or
@@ -49,6 +28,7 @@ export default function EditorPane(props: { task: Task }) {
   const [saveErr, setSaveErr] = createSignal('')
   const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number; column?: number } | null>(null)
   const [treeReveal, setTreeReveal] = createSignal<FileTreeRevealRequest | null>(null)
+  const [side, setSide] = createSignal<'files' | 'search'>('files')
   let treeRevealRevision = 0
 
   let host: HTMLDivElement | undefined
@@ -74,7 +54,9 @@ export default function EditorPane(props: { task: Task }) {
 
   const revealActiveFile = () => {
     const path = active()
-    if (path) setTreeReveal({ path, revision: ++treeRevealRevision })
+    if (!path) return
+    setSide('files') // the tree is one of two things the sidebar shows; revealing into a hidden one is a no-op
+    setTreeReveal({ path, revision: ++treeRevealRevision })
   }
 
   onMount(() => {
@@ -124,16 +106,15 @@ export default function EditorPane(props: { task: Task }) {
       if (disposed) return
       setRoot(r) // renders the host div synchronously when truthy
       if (!r || !host) return
-      applyMonacoTheme()
+      stopTheme = watchMonacoTheme()
       editor = monaco.editor.create(host, {
         automaticLayout: true,
-        theme: 'app',
+        theme: MONACO_THEME,
         readOnly: true, // until a file is opened
         minimap: { enabled: false },
       })
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save()) // explicit flush; autosave still runs
       editor.onDidBlurEditorText(() => scheduleSave.flush())
-      stopTheme = watchAppearance(applyMonacoTheme)
       window.addEventListener('focus', onFocus)
       const restore = active()
       if (restore) void show(restore)
@@ -146,7 +127,7 @@ export default function EditorPane(props: { task: Task }) {
     if (model) return model
     const content = (await api?.read(taskId, relPath).catch(() => '')) ?? ''
     if (disposed) return null
-    model = monaco.editor.createModel(content, langFor(relPath))
+    model = monaco.editor.createModel(content, monacoLanguageForPath(relPath))
     savedVersion.set(relPath, model.getAlternativeVersionId())
     model.onDidChangeContent(() => {
       // Dirty derives from the version id vs the last saved one — undo back to saved clears it.
@@ -189,7 +170,13 @@ export default function EditorPane(props: { task: Task }) {
   }
 
   const applyPaneIntent = (intent: PaneIntent | undefined) => {
-    if (!intent || intent.kind !== 'editor:reveal') return
+    if (!intent) return
+    // ⌘⇧F and the "Find in files…" palette row, which used to open a pane of their own.
+    if (intent.kind === 'editor:search') {
+      setSide('search')
+      return
+    }
+    if (intent.kind !== 'editor:reveal') return
     setPendingReveal({ path: intent.path, line: intent.line, column: intent.column })
     // Reveal implies open: cross-pane senders (find-in-files, stack frames) go through the core
     // intent bus alone and can't call editorOpen themselves. No-op when the tab is already current.
@@ -265,16 +252,33 @@ export default function EditorPane(props: { task: Task }) {
       <Show when={root() !== undefined} fallback={<div class="editor-empty muted">Loading…</div>}>
         <Show when={root()} fallback={<div class="editor-empty muted">Open a terminal first to map this repo's checkout.</div>}>
           <div class="editor-layout">
-            <div class="editor-tree">
-              <FileTree
-                taskId={taskId}
-                onOpen={(p) => openPath(p, true)}
-                openPath={active()}
-                reveal={treeReveal()}
-                onRevealed={(revision) => {
-                  setTreeReveal((request) => request?.revision === revision ? null : request)
-                }}
+            <div class="editor-side">
+              <Tabs
+                tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
+                active={side()}
+                onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
+                idPrefix="editor-side"
+                ariaLabel="Editor sidebar"
               />
+              {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results. */}
+              <div
+                id="editor-side-panel-files"
+                role="tabpanel"
+                aria-labelledby="editor-side-tab-files"
+                class="editor-tree"
+                style={{ display: side() === 'files' ? undefined : 'none' }}
+              >
+                <FileTree
+                  taskId={taskId}
+                  onOpen={(p) => openPath(p, true)}
+                  openPath={active()}
+                  reveal={treeReveal()}
+                  onRevealed={(revision) => {
+                    setTreeReveal((request) => request?.revision === revision ? null : request)
+                  }}
+                />
+              </div>
+              <SearchPanel taskId={taskId} active={side() === 'search'} />
             </div>
             <div class="editor-main">
               <div class="editor-tabs">

@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // ── What a plugin's ref-resolver route may answer ──────────────────────────────────────────────────
 //
-// The enrichment half of a cross-plugin reference (docs/third-party/cross-plugin-refs.md). A surface
+// The enrichment half of a cross-plugin reference (docs/third-party/README.md § cross-plugin references). A surface
 // holding identifiers of ANOTHER plugin's items — github's PR conversation citing `ENG-42` — asks the
 // host, and the host POSTs `{ identifiers }` to the route the owning plugin declared in its manifest
 // (`contributions.refResolvers`, node-core/main/pluginManifest.ts). It replaced a direct import of

@@ -10,8 +10,9 @@ vi.mock('../../apiClient', () => ({
 const { runChromeAction } = await import('./actions')
 const { paneRegistry } = await import('../../registries/panes')
 const { projectSurfaceRegistry } = await import('../../registries/projectSurfaces')
-const { consumePaneIntent, evictPendingIntents } = await import('../../registries/clientEvents')
+const { clientEvents, consumePaneIntent, evictPendingIntents } = await import('../../registries/clientEvents')
 const { setActiveTaskId } = await import('../../tasks/tasks')
+const { closePluginOverlay, pluginOverlayOpen } = await import('../frames/overlays')
 
 // The two verbs that decide WHERE a rail row's detail appears, which is the one thing the descriptor tier
 // could not previously express. They are disjoint by manifest rule, and this pins the runtime half of that:
@@ -37,6 +38,45 @@ describe('openPane', () => {
   it('still refuses when there is no task, because a task pane has nowhere else to go', () => {
     runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item })
     expect(consumePaneIntent('', 'board')).toBeUndefined()
+  })
+})
+
+describe('openOverlay', () => {
+  it('opens with no task, unlike openPane, and only one is up at a time', () => {
+    // The verb that needs nothing from its click site: an overlay covers the window rather than taking a
+    // row in a task's layout, which is what makes it usable from a chord pressed anywhere.
+    runChromeAction({ verb: 'openOverlay', overlay: 'files' }, { pluginId: 'editor', nodeId: 'node-a' })
+    expect(pluginOverlayOpen('editor', 'files')).toBe(true)
+
+    runChromeAction({ verb: 'openOverlay', overlay: 'cards' }, { pluginId: 'board', nodeId: 'node-a' })
+    expect(pluginOverlayOpen('editor', 'files')).toBe(false)
+    expect(pluginOverlayOpen('board', 'cards')).toBe(true)
+
+    closePluginOverlay()
+    expect(pluginOverlayOpen('board', 'cards')).toBe(false)
+  })
+})
+
+describe('surfaceAction', () => {
+  // The one verb whose effect lands INSIDE a plugin. Fire-and-forget by design: a pane nobody has open
+  // has no frame listening, which is the honest outcome for a command meaning "do this in the thing I
+  // am looking at". It is deliberately NOT retained the way a pane intent is.
+  it('emits the command id to the named surface, addressed by plugin', async () => {
+    const heard: unknown[] = []
+    const off = clientEvents.on('plugin:surface-action', (event) => void heard.push(event))
+    runChromeAction({ verb: 'surfaceAction', surface: 'database' }, { pluginId: 'database', nodeId: 'node-a', commandId: 'execute' })
+    off()
+    expect(heard).toEqual([{ pluginId: 'database', surface: 'database', command: 'execute' }])
+  })
+
+  it('refuses without a command id, because what it delivers IS the command id', async () => {
+    // A footer badge's click has no command in scope. Rather than invent a second name for the thing
+    // being delivered, the verb declines there — visibly, so an author is told.
+    const heard: unknown[] = []
+    const off = clientEvents.on('plugin:surface-action', (event) => void heard.push(event))
+    runChromeAction({ verb: 'surfaceAction', surface: 'database' }, { pluginId: 'database', nodeId: 'node-a' })
+    off()
+    expect(heard).toEqual([])
   })
 })
 

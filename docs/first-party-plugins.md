@@ -47,8 +47,8 @@ Three of `RefPanelProps` do not survive the boundary, and the third was found by
 today: a frame handles clicks inside its own document, and every host is a single-ref host — the shell's
 panel host is single-slot by design, so `refs`/`onSelectRef` currently have no caller at all. If a
 multi-ref host ever appears, a *frame* panel will not be able to serve it and that is a real gap, not a
-detail to work around. `onClose` does not cross either — the bridge's close verb is gated to importer
-surfaces — and a frame cannot `Portal` out of its iframe to draw a drawer in the first place. So the
+detail to work around. `onClose` does not cross either — the bridge's close verb is gated to importer and
+overlay surfaces — and a frame cannot `Portal` out of its iframe to draw a drawer in the first place. So the
 manifest adapter draws the overlay and the dismiss control itself, using the same classes a first-party
 panel would, and the shell's host adds no second wrapper. A frame ref panel supplies the body; the host
 supplies the box.
@@ -135,11 +135,22 @@ written before the loader existed.
 
 | Plugin | What it uses | Portable? |
 | --- | --- | --- |
-| **http** | Its own SQLite file, a pane, a rail source, a settings page, an `agentContexts` entry. Uses `core.secrets`. | **Yes.** Its one remaining wrinkle is `activate: purgeStoredHttpDrafts()`, and a loaded plugin's client half has no lifecycle hook — the purge needs a new home alongside the drafts |
-| **database** | Its own SQLite file, a pane, an `agentContexts` entry, publishes `DATABASE`. Runs `bash -lc` on a repo-configured script through `core.proc`. | Yes — `DATABASE` turns out to have no consumer outside the plugin. It also depends on `monaco-editor`, so it shares editor's unanswered bundle-size question |
-| **editor** | Monaco pane, find-in-files over ripgrep, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. | Yes — neither capability has an outside consumer. Two concrete gaps first: the manifest's slot descriptor accepts `footer` only, `persistedState` has no form at all, and whether an unminified Monaco bundle fits the 8 MiB client-bundle cap is unmeasured |
+| **editor** | Monaco pane with find-in-files (ripgrep) folded into its sidebar, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. | **One blocker left, and it is a build rather than a question.** Neither capability has an outside consumer; the `overlay` slot has a manifest form (`target: "overlay"` + the `openOverlay` verb) and `persistedState` has a decided answer (bridge `state.*`, no manifest form — see [docs/plugins.md](./plugins.md)). The document surface that unblocked database now exists; what editor still needs from it is its own template (`frame-beside-document`, or host-drawn tabs) and the open-document verb ⌘P needs ([docs/third-party/editor.md](./third-party/editor.md)) |
 
-**model-providers** used to head this table and has moved: it is a loaded package now, in neither
+**http** used to head this table and has moved. It was the first table-owning plugin to go, which is why
+it was chosen: it is the only candidate that exercises the whole storage path, and the part nothing had
+tested — a migration arriving through an installer update against a populated database — now has a test.
+Read [docs/third-party/README.md](./third-party/README.md) for what it cost and what it found —
+including two bugs that had nothing to do with the tier; the per-finding detail is in `git log`.
+
+**database** followed it, and it is the more interesting of the two. It was the entry that read "no, on
+the client half" here, because the pane embeds Monaco and Monaco does not fit a frame. The answer was
+not to widen the sandbox: the host now owns one editor and lends it through a declarative contract, so
+the pane still has a real editor while the plugin ships 156 KB and no Monaco at all
+([docs/third-party/README.md](./third-party/README.md) § database has moved). Its `DATABASE` capability turned out to be
+an indirection with nothing on the other side of it and was deleted rather than ported.
+
+**model-providers** also used to be on this table and has moved: it is a loaded package now, in neither
 composition list. It was the easiest possible second move and worth saying why — no client half, so
 no bundle to trust and no prompt to answer; no routes, so nothing to convert to the fetch carrier;
 no tables, no capabilities, and no `secrets` grant, because core resolves the stored credential and
@@ -152,7 +163,7 @@ genuinely lost rather than reshaped. Its answer to "portable? yes, fully" turned
 right. The pane, the ref panel, the recognisers, the rail rows and host-owned promotion all crossed;
 the browse's **workspace project picker** did not, because choosing which Linear projects a workspace
 follows writes core's workspace state, and that write is unmappable on the frame bridge and absent
-from `CoreServices`. [third-party/linear.md](./third-party/linear.md) is the full record.
+from `CoreServices`. [third-party/README.md](./third-party/README.md) carries the summary.
 
 Its **project-scoped issue view** was the other loss, and that one is closed. Every frame target the
 manifest had was task-scoped or modal, so the issue detail Linear used to render at `/p/:projectId`
@@ -235,10 +246,10 @@ export const rollbarPlugin = (): NodePlugin => ({
 Everything real — codecs, sync policy, routes, frame and descriptor projection — lives in the
 plugin. Copy this loaded shape for an external item source.
 
-**http** — the fullest example of a self-contained feature plugin: its own SQLite file and
-migration chain, a pane, a rail source, a settings page, use-scoped secrets, and an `agentContexts`
-entry that a manifest can now carry. Nothing in it is out of a loaded plugin's reach; the one thing
-that needs rehoming on the way across is the draft purge it runs from `activate`.
+**http** — the fullest example of a self-contained feature plugin, and a LOADED one now: its own SQLite
+file and migration chain staged inside its package, three frame surfaces in one bundle, a descriptor rail
+source, use-scoped secrets, and an `agentContexts` entry served by two of its own routes. Read it for the
+storage seam in particular; it is the only plugin that uses `ctx.storage`.
 
 **linear** — the second integration, and the one to read once rollbar makes sense; also a loaded
 package now rather than a first-party one, so read it for the same reason and expect the same shape.
@@ -252,9 +263,6 @@ became `openRefPanel({ providerId, displayId })` and github stopped rendering th
 remaining github→linear coupling is one string, in one place, for a reason that is genuinely github's:
 `linkifyLinearIds` scans PR body HTML for Linear's key prefixes, so those bare-id anchors are github's
 own and carry no URL for a recogniser to claim.
-
-**database** — the same shape as http, slightly smaller, and it publishes a capability. Useful to
-read alongside http to see where "self-contained" ends and "something else depends on me" begins.
 
 Worth reading, though not portable: **changes**, for what a plugin looks like when exactly one
 contribution — its agent-tool renderer — is the thing keeping it first-party.

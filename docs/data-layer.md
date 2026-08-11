@@ -54,9 +54,9 @@ These plugins own SQLite files and migrations:
 | --- | --- |
 | `plugins/agents.sqlite` | managed sessions, turns, event ledger, requests, attachments, artifacts, webhooks, FTS |
 | `plugins/changes.sqlite` | review notes and plugin-local change state |
-| `plugins/database.sqlite` | project-scoped saved SQL queries |
+| `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a LOADED plugin — same binding as `http.sqlite` below) |
 | `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
-| `plugins/http.sqlite` | project-scoped requests/variables, encrypted request fields |
+| `plugins/http.sqlite` | project-scoped requests/variables, encrypted request fields (a LOADED plugin — this file is bound from its manifest id, and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/notes.sqlite` | task/workspace/global notes and revisions |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
@@ -111,7 +111,9 @@ resource ID without colliding.
 
 Edit the schema in its owning package, run `pnpm db:generate`, and verify every chain with
 `pnpm db:check`. Launching a Node also applies pending migrations. The desktop build stages core and
-plugin migration directories beside the bundled Node artifact.
+plugin migration directories beside the bundled Node artifact — except for a LOADED plugin, whose chain
+is staged inside its own package by `apps/node/scripts/build-plugin.mjs` and read from there, because the
+package is the only copy the loader will look at. http is the one plugin on that path.
 
 Every chain starts from a single baseline migration that creates the current schema. The pre-project
 `(owner, name)` model and its one-way data migrations were squashed away with it, so a database
@@ -119,7 +121,10 @@ written before that baseline cannot be upgraded — start from a fresh data root
 
 Native SQLite access is centralized. Loaded plugins receive their own manifest-bound migrated handle
 through `ctx.storage.open()`; built-ins use the corresponding compile-time factories. Both use
-`CoreServices` for core-owned operations.
+`CoreServices` for core-owned operations. What happens when a loaded plugin's chain GROWS between
+versions — the update applies at the next boot, against a database that already has rows — is covered by
+`apps/node/test/integration/httpLoaded.test.ts`, along with a broken chain failing contained and
+uninstall-without-purge keeping the file.
 
 ## Backup and import
 

@@ -1,5 +1,6 @@
 import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore, type LanguageInput } from 'shiki/core'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
+import { languageIdForPath, type LanguageId } from '@acorn/protocol/languageIds.ts'
 
 // Fine-grained Shiki: only the langs/themes below get bundled (the bundled `shiki` entry pulls a
 // chunk for every grammar). Dual github-light/dark so colours follow the app theme via CSS vars.
@@ -23,16 +24,23 @@ const LANGS: Record<string, () => Promise<unknown>> = {
   sql: () => import('shiki/langs/sql.mjs'),
 }
 
-const EXT_LANG: Record<string, keyof typeof LANGS> = {
-  ts: 'typescript', tsx: 'tsx', mts: 'typescript', cts: 'typescript',
-  js: 'javascript', jsx: 'jsx', mjs: 'javascript', cjs: 'javascript',
-  json: 'json', css: 'css', html: 'html', md: 'markdown',
-  py: 'python', go: 'go', rs: 'rust', java: 'java',
-  c: 'c', h: 'c', cpp: 'cpp', cc: 'cpp', hpp: 'cpp',
-  sh: 'shellscript', bash: 'shellscript', yml: 'yaml', yaml: 'yaml', sql: 'sql',
+// Canonical language id -> shiki grammar, the twin of client-core/editor/language.ts. The vocabulary
+// itself is @acorn/protocol/languageIds.ts, and this map is where "shiki does not bundle that one"
+// gets said: an id with no grammar loaded here falls to `text` rather than throwing inside
+// codeToTokens. That is why the map is total over LanguageId instead of falling through — a new
+// entry in the vocabulary fails `tsc` here until someone decides whether to pull its grammar in.
+const SHIKI: Record<LanguageId, keyof typeof LANGS | 'text'> = {
+  typescript: 'typescript', typescriptreact: 'tsx',
+  javascript: 'javascript', javascriptreact: 'jsx',
+  json: 'json', css: 'css', html: 'html', markdown: 'markdown',
+  python: 'python', go: 'go', rust: 'rust', java: 'java',
+  c: 'c', cpp: 'cpp',
+  shellscript: 'shellscript', yaml: 'yaml', sql: 'sql',
+  // No grammar bundled: plain text, which is what these already rendered as.
+  plaintext: 'text', scss: 'text', less: 'text', xml: 'text', ruby: 'text', ini: 'text', toml: 'text',
 }
 
-export const langFor = (path: string) => EXT_LANG[path.split('.').pop()?.toLowerCase() ?? ''] ?? 'text'
+export const langFor = (path: string) => SHIKI[languageIdForPath(path)]
 
 let instance: Promise<HighlighterCore> | null = null
 export const getHighlighter = () =>

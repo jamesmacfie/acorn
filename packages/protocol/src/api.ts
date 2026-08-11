@@ -313,8 +313,30 @@ export type NodePluginPermissions = {
 // (docs/plugins.md; the Zod schema is node-core/main/pluginManifest.ts).
 // Hand-written here for the same reason NodePluginPermissions is: the node parses the manifest, and
 // this is the projection the device registers contributions from.
+// A document the HOST draws an editor for, with the plugin supplying only its content
+// (docs/future/monaco.md). `languageId` is one of ./languageIds.ts — typed as a plain string here
+// because this is the wire projection and a roster row is bytes a node sent, so the device re-checks
+// it rather than believing the type. Absent `write` means read-only.
+// `completions` is the first LSP-shaped capability: the host POSTs a position into the plugin's own
+// route and maps what comes back onto editor items. The host never learns the language.
+export type PluginDocumentCompletions = { route: string; triggerCharacters?: string[] }
+export type PluginDocumentRegion = {
+  languageId: string
+  read: string
+  write?: string
+  completions?: PluginDocumentCompletions
+}
+// Which arrangement of regions the host draws for a pane. Region-addressed from the first release, which
+// is what lets a second template arrive without changing what an already-published declaration means.
+//
+// `document` is degenerate — the whole pane is the document, and nothing is left for a frame.
+// `document-over-frame` splits the rectangle: the host's editor on top, the plugin's own frame below, and
+// a host-owned drag handle between them. The frame region is why the second template needs a client
+// bundle and a trust decision where the first needs neither.
+export type PluginPaneLayout = { template: 'document' | 'document-over-frame'; document: PluginDocumentRegion }
+
 export type PluginFrameSurface = {
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay'
   // `pane` only, and OPTIONAL on the wire rather than defaulted: an older node's roster row does not
   // carry it, and absent has to mean `task` — the scope a pane has always had. A project-scoped pane is
   // the detail half of its plugin's rail Source browse, not a rectangle in a task's layout, and it lands
@@ -334,6 +356,8 @@ export type PluginFrameSurface = {
   url?: string
   urlSource?: string
   hosts?: string[]
+  // `pane` only. Absent is a plain frame filling the pane, which is every manifest written so far.
+  layout?: PluginPaneLayout
   claimsKeys?: string[]
 }
 export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
@@ -356,6 +380,15 @@ export type PluginChromeAction =
   | { verb: 'runNodeAction'; path: string }
   | { verb: 'createTask' }
   | { verb: 'openUrl'; url: string }
+  // An `overlay` surface the same manifest declares: a full-screen picker the host places. It needs
+  // nothing from its click site, so unlike `createTask` and `navigate` it survives into
+  // `PluginCommandAction` — which is where it will actually be used, since a picker is opened by a chord.
+  | { verb: 'openOverlay'; overlay: string }
+  // Deliver this command to the frame region of one of the plugin's own composed panes. The only verb
+  // whose effect lands INSIDE a plugin rather than on the shell: the host flushes that pane's document
+  // first and then posts the command id over the frame's bridge, and the frame handles it exactly as it
+  // would its own button click. A pane nobody has open has no frame, so the verb is a no-op.
+  | { verb: 'surfaceAction'; surface: string }
 
 // Every `path`/`items`/`data` below is confined to the plugin's OWN route namespace when the node
 // parses the manifest, and confined again on the device before it is fetched. Neither the prefix nor

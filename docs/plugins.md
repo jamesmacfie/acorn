@@ -166,14 +166,17 @@ build would stay trapped through any number of rebuilds.
 Packaged client bytes are trusted only after Electron main reads and hashes its own application
 resource; a node cannot acquire that trust by labelling a roster row as bundled.
 
-Three first-party packages ship this way and none is also present in the compiled composition.
+Four first-party packages ship this way and none is also present in the compiled composition.
 Rollbar was the first production caller of the route, descriptor and frame seams. `model-providers` is
 one end of the range: node-only, no client bundle, no routes, no storage, `contributions: {}` — it
 registers two connection providers and two model adapters and stops, which is proof the loaded tier
-costs a small plugin nothing. Linear is the other end, and the widest manifest here: a pane frame plus
+costs a small plugin nothing. Linear is the widest manifest here: a pane frame plus
 a `refPanel` frame that ANOTHER plugin renders, a descriptor rail source with host-owned promotion,
-declarative `contentLinks`, a command and a keybinding. Read it for the two surfaces rollbar does not
-exercise, and read `docs/third-party/linear.md` for what they cost. The loader still supports a package id shadowing a built-in during
+declarative `contentLinks`, a command and a keybinding. HTTP is the other end from model-providers —
+the only one that owns TABLES, so it is the only production caller of `ctx.storage` and of a
+manifest-declared migration chain, and it also serves an `agentContexts` descriptor from its own
+routes. Read it for the storage seam, read linear for the two surfaces rollbar does not
+exercise, and read `docs/third-party/README.md` for what all of these moves cost. The loader still supports a package id shadowing a built-in during
 a staged migration; when that happens it drops the compiled copy from the graph and logs which
 directory won.
 
@@ -184,7 +187,8 @@ manifest and the hash of its client bundle in the roster (`GET /v2/core/plugins`
 decides what to render from that, and the plugin's JavaScript never touches a shell registry. Two
 kinds of contribution come out of one manifest:
 
-- **Frames** — a pane, reference panel, settings page, or project importer that the plugin draws
+- **Frames** — a pane, reference panel, settings page, project importer, or full-screen overlay picker
+  that the plugin draws
   itself. A `pane` declares a `scope` of `task` (the default, and what a pane has always meant: a
   rectangle in a task's layout) or `project`, in which case it is drawn beside its own rail Source's
   list at `/p/:projectId` with no task involved. A project-scoped pane must declare a `routes` entry
@@ -195,9 +199,10 @@ kinds of contribution come out of one manifest:
   `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
   is checked against the manifest's declared scopes by an allowlist naming each path and method
   (`packages/client-core/src/plugins/frames/`, `scopes.ts` is the choke point). The host pins which
-  Node the frame talks to; the frame cannot name one. A `refPanel` frame is the one surface whose
-  surrounding chrome the host draws rather than the plugin: an iframe cannot `Portal` out of the box
-  its consumer placed it in, and the bridge's close verb is importer-only, so the manifest adapter
+  Node the frame talks to; the frame cannot name one. A `refPanel` frame is one of the two surfaces whose
+  surrounding chrome the host draws rather than the plugin (`overlay` is the other): an iframe cannot
+  `Portal` out of the box its consumer placed it in, and the bridge's close verb does not reach a
+  reference panel — it is granted to importers and overlays only — so the manifest adapter
   supplies the drawer and its dismiss control while the frame supplies the body. It is also the one
   surface no plugin *mounts*: the shell holds which ref is open and draws it in one place
   (`client-core/registries/refPanels.ts` + `refPanelHost.tsx`), so any surface that renders content can
@@ -208,6 +213,19 @@ kinds of contribution come out of one manifest:
   reserved JSX attribute that Solid compiles into a DOM setter, so a props member of that name silently
   arrives as a function instead of data. `tools/arch/boundaries.test.ts` holds the line, because
   TypeScript cannot — Solid declares `ref` on `IntrinsicAttributes`.
+
+  The bridge's `api` surface is five verbs — `get`, `post`, `put`, `patch`, `del` — matching
+  `PluginBridgeApiRequest.method` exactly. That last part is the rule rather than a coincidence: a method
+  missing from the SDK facade is a method no plugin can reach, however permissive the scope table
+  underneath, and `put` was missing for exactly that reason until http (whose own updates take a
+  full-replacement body) could not call its own routes from its own frame.
+
+  Two browser affordances a frame does NOT have, both worth knowing before writing one. `window.confirm`
+  and `alert` are suppressed: the iframe is sandboxed `allow-scripts allow-same-origin` and deliberately
+  not `allow-modals`, so `confirm()` returns false and a guarded action silently does nothing. And
+  `navigator.clipboard` refuses to write, because the frame's document is not the focused one from the
+  shell's point of view — `bridge.ui.copy` exists for that, and a confirmation is the frame's own UI to
+  draw (two clicks, an inline undo, whatever fits) rather than a host verb.
 
   A link inside a frame's own rendered content reaches the shell through `bridge.ui.openUrl(url)`,
   because the anchor itself cannot go anywhere: the iframe has no `allow-popups` and Electron pins every
@@ -225,6 +243,125 @@ kinds of contribution come out of one manifest:
   `openLinkOnClick(bridge, event)` is the delegated anchor handler on top of it, so a frame does not
   hand-roll the plumbing; unlike the shell's equivalent it takes modified clicks too, because in a frame
   there is no browser default for cmd-click to preserve.
+- **Document surfaces** — a pane whose editor the **host** draws, with the plugin supplying only the
+  document. A `pane` surface may declare a `layout` block. Two templates exist: `document`, where the
+  whole pane is one text document, and `document-over-frame`, where that document sits above the
+  plugin's own frame with a host-owned drag handle between them.
+
+  ```json
+  {
+    "contributions": {
+      "frames": [{
+        "target": "pane", "id": "scratch", "label": "Scratch", "glyph": "file-text",
+        "layout": {
+          "template": "document",
+          "document": {
+            "languageId": "sql",
+            "read": "/v2/p/board/tasks/:taskId/scratch",
+            "write": "/v2/p/board/tasks/:taskId/scratch"
+          }
+        }
+      }]
+    }
+  }
+  ```
+
+  That is the entire job: `read` answers `GET → { text }`, `write` receives `PUT { text }`, and the
+  host does the rest — the editor instance, its theme, its workers, the dirty model, the autosave
+  debounce, ⌘S, the flush before unmount, and the scroll/cursor position across remounts (keyed by
+  node, scope and document, and evicted when a task or workspace is). Omitting `write` is a real mode
+  rather than a degenerate one: the surface is read-only, which is what a rendered template or a
+  generated migration wants. `languageId` comes from a published vocabulary
+  (`@acorn/protocol/languageIds.ts`, LSP's spellings) so an unknown one is a parse error rather than a
+  document that silently renders as plain text; the host maps it onto whichever engine draws it. Only
+  `:taskId` and `:projectId` are substituted into a route — those are the two values the host holds —
+  and both routes are confined to the plugin's own namespace at parse time and again on the device.
+
+  **This exists because the sandbox provably cannot serve it.** A Monaco frame measures 7.93 MiB
+  against the 8.00 MiB client-bundle cap with a stub UI, and its language-service workers cannot be
+  delivered at all: a plugin origin serves one file and the frame CSP has no `worker-src`. The
+  alternative — multi-file plugin origins plus `worker-src` — would be a standing grant to every
+  installed plugin, forever, to serve two first-party panes. A host-owned surface widens nothing, and
+  costs no plugin a duplicated 7.9 MiB. The bar for any future host-drawn region is that one:
+  **common is not the bar; impossible is.** Master/detail is common — every frame already draws its
+  own with ordinary CSS — and the host rendering a plugin's list *from data* would mean designing and
+  eternally versioning a widget toolkit in the wire format. The answer to that stays no.
+
+  Because a document surface runs no plugin code on the device, it is gated like a **descriptor**
+  rather than like a frame: no bytes execute, so there is nothing for a bytes-hash trust prompt to be
+  about, and a plugin that ships only document surfaces needs no client bundle at all. The ceiling is
+  the honest one — a declarative contract gives a plugin the editor's *features*, not its *API*. No
+  decorations, no inline widgets, no arbitrary providers. Capabilities grow only as LSP-shaped
+  request/response routes (completions first, when a consumer needs them), never as "run my code
+  inside the editor".
+
+  `layout` is region-addressed rather than whole-pane-addressed, and that was decided before there were
+  templates to address: a whole-pane declaration would have meant something different once a second
+  template arrived, and changing that later would change what already-published manifests mean.
+  `frame-beside-document` is the next entry and lands with its consumer, the editor plugin. The design
+  record is `docs/future/monaco.md`.
+
+  ### `document-over-frame`
+
+  ```
+  ┌──────────────────────────────────┐
+  │ host document surface (sql)      │  host: the editor, theme, workers, dirty state, ⌘S, view state
+  ├──────────────────────────────────┤  host: the drag handle
+  │ [picker] [Save] [Generate] [Run] │  the plugin's frame starts here
+  │ results grid                     │
+  └──────────────────────────────────┘
+  ```
+
+  The host composes this, and the plugin could not: the frame CSP has `frame-src 'none'`, so a plugin
+  can never embed host content inside its own layout. That restriction binds the plugin and not the
+  host, which is the whole shape of the design — the host places its editor and the plugin's iframe as
+  siblings in its own DOM.
+
+  A composed pane runs plugin code in half its rectangle, so unlike the degenerate template it needs an
+  accepted bytes hash and a client bundle exactly like any other frame. It is not a cheaper way to run
+  untrusted code.
+
+  What is deliberately *not* a region: the button bar. `plugins/database`'s bar holds a searchable
+  saved-query picker with per-row delete chips, a Generate button visible only when a model connection
+  exists, and an Execute button disabled on connection status. A host-drawn "action bar" descriptor
+  sounds cheap until it needs all three. The bar is common, not impossible, so it is the plugin's — the
+  first row of its own frame region. Modals are the one honest compromise: a frame confined to the
+  bottom region can only overlay the bottom region, and the escape hatch if that grates is the
+  `overlay` frame target rather than a widened template.
+
+  **Two regions, no shared realm.** The editor is in the shell and the frame is a sandboxed iframe, so
+  everything between them goes through the host, in two directions:
+
+  - **Frame → host: `bridge.document`.** `read()` is the current text including keystrokes the autosave
+    has not written yet; `write(text)` goes through the model, so it joins the undo stack and schedules
+    the same autosave typing would; `flush()` writes anything pending to the plugin's own write route.
+    Three methods, each with a proven consumer. There is deliberately nothing about the EDITOR — no
+    cursor, no selection, no decorations — because those are host state or LSP-shaped routes. The verb
+    is gated structurally rather than by a declared scope: a frame either has a document beside it or it
+    does not, and which one is a fact about the manifest the host already read.
+  - **Host → frame: surface actions.** A chord like `⌘Enter` is pressed with focus inside the host's
+    editor, where the frame has no keyboard at all. A `commands` entry declares
+    `{ "verb": "surfaceAction", "surface": "<pane id>" }` and a `keybindings` entry with
+    `when: "surface"` binds the chord. The host resolves it, **flushes the document**, then posts the
+    command id over the frame's bridge, where `acorn.onSurfaceAction` receives it. The flush is a
+    contract guarantee, not an implementation detail: without it every plugin independently rediscovers
+    "it ran the previous version of my query". A frame handles the command exactly as it would its own
+    button click, and is not told which gesture produced it.
+
+  ### Language smarts
+
+  A document region may declare `completions: { route, triggerCharacters }`. The host POSTs
+  `{ text, position }` (1-based line and column) and renders the `{ label, kind, insertText, detail }`
+  items that come back. **The host never learns the language**: context detection is the plugin's, on
+  its node half, where the schema knowledge already lives — which is exactly what lets a SQL console, a
+  GraphQL console and a YAML config plugin share one host provider with no host change.
+
+  The growth rule this sets as precedent: **capabilities grow as LSP-shaped request/response routes —
+  position and text in, standard items out — never as "run my code inside the editor".** Hover and
+  diagnostics can follow the same shape when a real consumer needs them. Custom widgets, decorations
+  and inline UI cannot, and the test for any proposed addition is "is this an LSP method". The wire
+  shapes are `@acorn/protocol/documentSurface.ts`; the kinds are LSP's names rather than its magic
+  numbers, because this wire is read by plugin authors and not by an LSP client.
 - **Webviews** — a host-drawn pane backed by an Electron-main `WebContentsView`. A surface declares
   exactly one literal `url` or plugin-owned `urlSource` plus a non-empty `hosts` allowlist. HTTPS is
   required except for `localhost`, `127.0.0.1`, and `::1`; the renderer broker validates requested
@@ -274,7 +411,13 @@ kinds of contribution come out of one manifest:
   `onClick` takes the same narrowed verb set as a command — `openPane`, `runNodeAction`, `openUrl` —
   for the same reason: its click carries no selected row and no routed project, so a verb that needs
   either would parse and then only ever fail. Only a source's `onSelect` gets the full set, because a
-  rail row is the one click site with a row, a project, and the promotion callback in scope. An `agentContexts`
+  rail row is the one click site with a row, a project, and the promotion callback in scope.
+  `surfaceAction` is the one verb whose effect lands *inside* a plugin rather than on the shell: it
+  delivers the command's own id to the frame region of one of that plugin's `document-over-frame` panes
+  (§ Document surfaces above), and it may only name a pane the same manifest declares with such a
+  layout — a plain frame pane has no document to flush and no host chord to have resolved it. It is
+  useful only on a command, because what it delivers *is* the command id, and a footer badge has no
+  command in scope. An `agentContexts`
   entry names two routes — `options`
   (GET) and `capture` (POST) — and puts a row in the agent composer's context picker. Its `capture`
   answer is the one descriptor response that ends up inside a model's prompt, so it is parsed against
@@ -440,6 +583,34 @@ switcher entry, but a project-scoped surface is drawn beside its own rail list, 
 the plugin's labels — so do not expect them on screen. The `x` segment is reserved by core for exactly this, and the prefix is derived
 from the plugin id alone — a manifest cannot name it.
 
+An `overlay` surface is a full-screen picker — the shape the editor's ⌘P file palette has as a compiled
+contribution. The host draws the backdrop, the box, the title and the dismiss affordance; the frame draws
+only its contents, because an iframe cannot position itself against anything outside its own rectangle
+(the same argument that makes `refPanel` a frame target). It has no click site of its own, so the one
+thing that opens it is the `openOverlay` verb, and a manifest declaring an overlay nothing opens is a
+parse error rather than a surface nobody can reach:
+
+```json
+{
+  "contributions": {
+    "frames": [{ "target": "overlay", "id": "files", "label": "Go to file" }],
+    "commands": [{
+      "id": "open-files",
+      "title": "Go to file",
+      "action": { "verb": "openOverlay", "overlay": "files" }
+    }],
+    "keybindings": [{ "command": "open-files", "defaultChord": "meta+p", "when": "task" }]
+  }
+}
+```
+
+One overlay is on screen at a time — opening a second replaces the first, because two would leave the
+reader unable to tell which one Escape dismissed. Escape and the close button are the host's; the frame
+dismisses itself with `acorn.ui.close()` once its picker has picked, which is the one importer verb an
+overlay also gets (`done`, the host's post-import refresh, stays importer-only). The overlay is bound to
+the task that was active when it opened, so `bridge.context.taskId` is there for a picker whose job is
+to put something into one.
+
 A frame surface may also declare the modified chords its own UI handles:
 
 ```json
@@ -482,6 +653,17 @@ sources, settings pages, shell/task slots, context sections, provider reference 
 agent contexts, agent-tool renderers, pollers, persisted-state slices, Node statistics, and attention
 items. An activation pass handles subscriptions or local storage initialization after all descriptors
 exist.
+
+**`persistedState` has no manifest form, and will not get one.** A slice is not a value — it is a
+`{ codec, empty, unknownIds, maxBytes, legacy, binding: { values, hydrate } }` record the host drives
+through its own restore phases, reading and writing SHELL SIGNALS at boot before any frame exists, and
+clearing them on scope eviction. None of that survives a port: a descriptor cannot hand over a codec, and
+a frame is not mounted at the moment the phase it would belong to runs. A loaded plugin's answer is the
+frame's `state.get`/`state.set` verbs into its own `plugin:<id>:*` namespace, which are the same prefs
+the Node half's `prefs` facet reads — durable, per-node, capped at 1 MiB, and shared between a plugin's
+two halves. What it costs is the orchestration: the frame reads its own state when it mounts instead of
+being hydrated before first paint, and it clears its own keys instead of the host doing it on eviction.
+That is a real difference and the reason the editor's open-file tabs cannot simply move as they are.
 
 A source may also contribute routes. Two rules keep that seam honest. A route ADDRESSES an item inside a
 surface — it must never gate whether the surface renders, because the rail selects a source by signal and
@@ -527,6 +709,14 @@ A loaded plugin that owns tables declares a package-relative `migrations` direct
 `acorn-plugin.json` and calls `ctx.storage.open()`. The loader confines and validates that chain,
 while the host binds the SQLite filename to the manifest id. No declaration means no storage; there
 is no fallback search outside the package.
+
+HTTP is the only plugin on that path, and it is what makes the rest of this paragraph real rather than
+designed: `build-plugin.mjs` stages the declared directory into the package it builds — a chain that
+travels with the code, since Drizzle reads the journal and the `.sql` files off disk at migrate time —
+and `apps/node/test/integration/httpLoaded.test.ts` covers a schema change arriving through an
+installer update against a populated database, a broken chain failing contained, and
+uninstall-without-purge keeping the file. Because the filename is bound from the manifest id, that id
+is the one thing in a table-owning package that can never change: renaming it orphans real rows.
 
 There are no cross-file foreign keys, `ATTACH` queries, or transactions spanning plugin databases.
 Cross-plugin workflows use durable operation state and explicit IDs/capabilities.

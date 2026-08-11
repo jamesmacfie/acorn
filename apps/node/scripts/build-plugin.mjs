@@ -25,7 +25,7 @@
 // The default target is the development data root. `--package-root` is the generic staging seam used
 // by the desktop build: the same validated package shape is copied into application resources and
 // reconciled into the writable data root on boot.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -139,6 +139,23 @@ try {
   rmSync(entryDir, { recursive: true, force: true })
 }
 
+// A table-owning plugin's DDL chain travels INSIDE the package, because that is the only copy the
+// loader will look at: `ctx.storage.open()` migrates from the manifest-declared directory, confined to
+// the installed package (node-core/main/pluginLoader.ts). Copied rather than bundled — Drizzle reads
+// `meta/_journal.json` and the `.sql` files off disk at migrate time, so there is nothing for Vite to
+// inline.
+//
+// The declaration is the plugin's (`migrations: './migrations'` in its config); this only checks that
+// what it names exists and stages it. A config that declares one and ships nothing is a package that
+// fails on first open, which is a worse place to find out than here.
+if (spec.migrations) {
+  const source = resolve(PLUGINS_DIR, id, spec.migrations)
+  if (!existsSync(join(source, 'meta/_journal.json'))) {
+    throw new Error(`${id} declares migrations at '${spec.migrations}' but there is no Drizzle chain there`)
+  }
+  cpSync(source, join(outDir, 'migrations'), { recursive: true })
+}
+
 const { version } = JSON.parse(readFileSync(join(PLUGINS_DIR, id, 'package.json'), 'utf8'))
 writeFileSync(
   join(outDir, 'acorn-plugin.json'),
@@ -149,6 +166,9 @@ writeFileSync(
     apiVersion: apiMajor,
     node: './dist/node.js',
     ...(spec.client ? { client: './dist/client.js' } : {}),
+    // Always './migrations' in the built package regardless of where the source chain lives, so the
+    // manifest path the loader confines is one the builder placed.
+    ...(spec.migrations ? { migrations: './migrations' } : {}),
     permissions: spec.permissions,
     contributions: spec.contributions,
   }, null, 2)}\n`,
@@ -189,8 +209,5 @@ if (!packageRoot) {
   }
 }
 
-// No buildable plugin owns a database yet, so nothing built here needs a manifest `migrations`
-// entry. A loaded table-owning plugin stages its chain inside the package, declares that relative
-// directory, and opens its host-bound database through ctx.storage.
 console.log(`[build-plugin] ${id} -> ${outDir}`)
 if (!packageRoot) console.log('[build-plugin] restart the node to load it')

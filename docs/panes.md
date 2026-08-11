@@ -12,19 +12,28 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `changes` | 20 | worktree diff and review notes |
 | `notes` | 30 | task/workspace/global notes |
 | `context` | 40 | context selection and sync |
-| `editor` | 50 | worktree editor |
-| `search` | 60 | worktree search |
-| `database` | 70 | PostgreSQL browser/editor |
+| `editor` | 50 | worktree editor, with find-in-files as a sidebar panel |
+| `database` | 70 | loaded database pane; a host-drawn SQL editor over the plugin's own result grid |
 | `docker` | 75 | task container surface |
-| `http` | 76 | API request client |
+| `http` | 76 | loaded HTTP frame; API request client for this task |
 | `preview` | 80 | browser preview |
 | `linear` | 90 | loaded Linear frame; linked issue, selected descriptor row, or content-link target |
 | `rollbar` | 100 | loaded Rollbar frame; linked item or selected descriptor row |
 
 Compiled provider panes appear when their linked provider is connected and the task has relevant data.
-The two loaded ones — `linear` and `rollbar` — are frame surfaces declared in a manifest, which has no
-form for either condition: they are offered whenever the plugin is running on the node the window is
-talking to, and a task with nothing linked gets the frame's own empty state.
+The four loaded ones — `database`, `http`, `linear` and `rollbar` — are frame surfaces declared in a
+manifest, which has no form for either condition: they are offered whenever the plugin is running on the
+node the window is talking to, and a task with nothing linked gets the frame's own empty state.
+
+`database` is the one COMPOSED pane: its manifest declares a `document-over-frame` layout, so the host
+draws the SQL editor and the drag handle and the plugin's frame draws everything below them. To the
+layout model it is still one pane with one id, which is the point — the reader has one rectangle, and
+the split inside it is not something a task layout knows about (`docs/plugins.md` § Document surfaces).
+
+Two of those plugins also declare a PROJECT-scoped pane, which is not in this table because it is not
+part of a task's layout: `http-project` and `linear-issue` are drawn beside their plugin's rail list at
+`/p/:projectId`, addressed by a manifest route under `/p/:projectId/x/<plugin-id>/`. They exist because a
+rail row click often has no task, and `openPane` needs one.
 
 ## Layout model
 
@@ -90,12 +99,20 @@ palette rows, commands/keybindings, agent-tool renderers, and persisted state th
 Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.
 
-Find-in-files is a separate pane backed by a ripgrep subprocess, not an editor feature, and that is
-not a stopgap: Monaco is an editor component with no filesystem or process access, so it provides
-find-within-a-file and nothing wider. Every editor that offers project-wide search — including the
-one Monaco was extracted from — implements it exactly this way. Folding the results UI into the
-editor pane would be a reasonable product change; replacing the subprocess with an editor feature
-is not available.
+Find-in-files is backed by a ripgrep subprocess, not an editor feature, and that is not a stopgap:
+Monaco is an editor component with no filesystem or process access, so it provides find-within-a-file
+and nothing wider. Every editor that offers project-wide search — including the one Monaco was
+extracted from — implements it exactly this way. Replacing the subprocess with an editor feature is
+not available.
+
+What did change is where the results are shown. Find-in-files was its own rail pane and is now a panel
+in the editor pane's sidebar, beside the file tree, the way VS Code's sidebar works: a result click
+already opened a file in the editor, so as two panes it was a cross-pane hop for one mental model
+("find something in this project, open it"). The route, the ripgrep runner and the byte-offset
+conversion are untouched. `⌘⇧F` and the "Find in files…" palette row now open the editor pane with the
+search panel focused, through a retained `editor:search` pane intent — that entry point had to survive
+the fold, because otherwise searching would start with "open the editor first". Tree and search stay
+mounted together, so flipping between them keeps a query, its results and the tree's open folders.
 
 ## Data and actions
 

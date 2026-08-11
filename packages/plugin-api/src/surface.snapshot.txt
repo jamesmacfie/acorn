@@ -328,6 +328,11 @@ ui/diff: rowIdentityKeys
 ui/diff: splitBandIdentityKeys
 ui/diff: synth
 ui/diff: toBands
+ui/editor: MONACO_THEME
+ui/editor: applyMonacoTheme
+ui/editor: monacoLanguageFor
+ui/editor: monacoLanguageForPath
+ui/editor: watchMonacoTheme
 ui/host: Acorn
 ui/host: Concern
 ui/host: ModelConnectionPicker
@@ -353,6 +358,7 @@ ui: Input
 ui: LineComposerController
 ui: MentionTextarea
 ui: Modal
+ui: ModelConnectionPicker
 ui: NonCodeRow
 ui: Picker
 ui: Row
@@ -365,4 +371,7 @@ ui: Tabs
 ui: Textarea
 ui: ThreadCollapseController
 ui: UserAvatar
+ui: cssPx
+ui: defaultModelIdFor
 ui: renderMarkdown
+ui: rowHeightSm

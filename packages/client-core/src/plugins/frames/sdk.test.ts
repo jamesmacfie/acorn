@@ -245,6 +245,40 @@ describe('events', () => {
   })
 })
 
+describe('the shared document and surface actions', () => {
+  it('round-trips the document the host is drawing beside this frame', async () => {
+    host((message) => {
+      if (message.kind !== 'document') return undefined
+      if (message.op === 'read') return { id: message.id, ok: true, status: 200, body: { text: 'SELECT 1;' } }
+      return { id: message.id, ok: true, status: 200, body: null }
+    })
+    const acorn = await handshake()
+    expect(await acorn.document.read()).toBe('SELECT 1;')
+    await acorn.document.write('SELECT 2;')
+    await acorn.document.flush()
+    expect(sent.filter((message) => message.kind === 'document').map((message) => message.op)).toEqual(['read', 'write', 'flush'])
+    expect(sent.find((message) => message.op === 'write')?.text).toBe('SELECT 2;')
+  })
+
+  // The chord landed in the host's editor, where this frame has no keyboard at all. What arrives is the
+  // command id and nothing else — the frame is not told which gesture produced it, deliberately, so it
+  // handles a chord and a palette row through one path.
+  it('fans a surface action out to its listeners and stops on unsubscribe', async () => {
+    host(() => undefined)
+    const acorn = await handshake()
+    const ran = vi.fn()
+    const off = acorn.onSurfaceAction(ran)
+    push({ kind: 'surfaceAction', command: 'execute' })
+    await new Promise((r) => setTimeout(r, 5))
+    expect(ran).toHaveBeenCalledWith('execute')
+
+    off()
+    push({ kind: 'surfaceAction', command: 'execute' })
+    await new Promise((r) => setTimeout(r, 5))
+    expect(ran).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('state and ui', () => {
   it('round-trips state through the host', async () => {
     host((message) => {

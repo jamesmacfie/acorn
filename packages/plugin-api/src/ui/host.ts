@@ -5,6 +5,9 @@ export { registerKeybindings } from '@acorn/client-core/registries/keybindings.t
 export { registerWillHandler } from '@acorn/client-core/registries/willPhase.tsx'
 export type { Concern } from '@acorn/client-core/registries/willPhase.tsx'
 export { PromoteToTaskModal } from '@acorn/client-core/integrations/PromoteToTaskModal.tsx'
+// Also on ./ui, because it qualifies there and a sandboxed frame needs it — it is two controlled
+// `<select>`s over a protocol type, with no shell state anywhere in it. It stays exported here as well
+// so the compiled panes that already import it are untouched.
 export { default as ModelConnectionPicker, defaultModelIdFor } from '@acorn/client-core/modelProviders/ModelConnectionPicker.tsx'
 export { default as WorkspaceProjectAssignments } from '@acorn/client-core/workspaces/WorkspaceProjectAssignments.tsx'
 // Prune candidate: GitHub still mounts the whole shell while its source migration is completed.

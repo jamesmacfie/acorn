@@ -11,18 +11,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
-    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/protocol": "workspace:*",
-    "@solidjs/router": "^0.16.1",
-    "@tanstack/solid-query": "^5.101.0",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "solid-js": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3",

@@ -86,14 +86,16 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 // package now: its routes reach the mount table through the loader's fetch carrier, which this suite
 // does not assemble. `apps/node/test/integration/pluginLoader.test.ts` is where a loaded plugin's routes
 // are exercised, and `linear.test.ts` drives linear's own router directly.
+//
+// `/v2/p/http/projects/:projectId/requests` left this table for the same reason: http ships loaded too, so
+// nothing in the compiled graph mounts it. `httpLoaded.test.ts` drives it through the carrier the host
+// actually uses, against a package built from this source.
 const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
   ['GET', '/v2/p/changes/tasks/:id/review-notes'],
   ['GET', '/v2/p/changes/tasks/:id/local/changes'],
   ['POST', '/v2/p/editor/tasks/:id/search'],
   ['GET', '/v2/p/editor/tasks/:id/editor/root'],
-  ['POST', '/v2/p/database/tasks/:id/database/connect'],
   ['GET', '/v2/p/docker/info'],
-  ['GET', '/v2/p/http/projects/:projectId/requests'],
   ['GET', '/v2/p/agents/usage'],
   ['GET', '/v2/p/agents/sessions'],
   ['GET', '/v2/p/workflows/tasks/:id/workflows'], // registered by the plugin's own init

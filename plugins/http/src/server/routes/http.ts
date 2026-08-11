@@ -6,14 +6,45 @@
 // live in <data-root>/plugins/http.sqlite now, and c.env deliberately does not carry per-plugin handles
 // (docs/data-layer.md § Plugin DBs). The SecretService comes from CoreServices for the same reason — this
 // router no longer needs `c.env` at all, which is the point.
-import { Hono } from 'hono'
+//
+// http ships LOADED, so these routes run on one tier: the host gets `router.fetch` (createHttpFetch at
+// the bottom) and the identity-bound runtime rides in through `c.env` behind a module-level symbol, the
+// same carrier rollbar and linear use. That is also why the identity below comes off the request context
+// rather than out of `owner(c)`/`c.get('principal')`: a loaded bundle is not inside the host's Hono
+// stack, so those middleware-set values are simply not there.
+import { Hono, type Context } from 'hono'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
-import { type AppEnv, ownerId, type PluginDatabase, respondError, type SecretService } from '@acorn/plugin-api/node'
+import {
+  type AppEnv,
+  type PluginDatabase,
+  type PluginFetchHandler,
+  type PluginRequestContext,
+  respondError,
+  type SecretService,
+} from '@acorn/plugin-api/node'
+import type { PluginRailItems } from '@acorn/protocol/api.ts'
 import { httpRequests, httpVariables } from '../../node/schema'
 import { bodyModes, httpMethods, variableKinds, type AuthConfig, type BodyMode, type HttpRequest, type HttpVariable, type KeyValue } from '../../shared/model'
 import { SendError, send, type SendCoreServices } from '../send'
 import { HttpStorageError, openHttpValue, protectHttpValue } from '../storage'
+import { MAX_CONTEXT_REQUESTS, requestOption, requestSnapshot } from '../agentContext'
+
+const PORTABLE_REQUEST_CONTEXT = Symbol('http-plugin-request-context')
+
+type PortableBindings = AppEnv['Bindings'] & {
+  [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext
+}
+
+// A request arriving without the context is a wiring bug, and saying so beats answering it from host
+// handles this bundle should no longer touch.
+const requestContext = (c: Context<AppEnv>): PluginRequestContext => {
+  const context = (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
+  if (!context) throw new Error('http routes only run over the portable carrier (createHttpFetch)')
+  return context
+}
+
+const owner = (c: Context<AppEnv>): string => requestContext(c).userId
 
 const keyValue = z.object({ name: z.string(), value: z.string(), enabled: z.boolean() })
 
@@ -114,6 +145,48 @@ const taskBelongsToProject = async (taskId: string, projectId: string, core: Sen
 const inProject = (userId: string, projectId: string) => and(eq(httpRequests.userId, userId), eq(httpRequests.projectId, projectId))
 const variablesInProject = (userId: string, projectId: string) => and(eq(httpVariables.userId, userId), eq(httpVariables.projectId, projectId))
 
+// The composer's POST body. `taskId` is the scope the host minted; `workspaceId` may ride along and is
+// ignored here, because a saved request belongs to a project and the task already names one.
+const contextCaptureBody = z.object({
+  taskId: z.string().min(1),
+  optionIds: z.array(z.string().min(1)).max(MAX_CONTEXT_REQUESTS).optional(),
+})
+
+// This project's saved tree — the rows with no task, which is what the rail lists.
+const projectRequests = async (db: PluginDatabase, userId: string, projectId: string) =>
+  db
+    .select()
+    .from(httpRequests)
+    .where(and(inProject(userId, projectId), isNull(httpRequests.taskId)))
+    .orderBy(asc(httpRequests.folder), asc(httpRequests.name))
+    .limit(MAX_CONTEXT_REQUESTS)
+
+// A task's own ad-hoc requests, opened. Returns null when the task is gone, and a THUNK rather than the
+// rows because the two callers differ in whether they need the plaintext at all — and opening ciphertext
+// is the expensive, credential-touching half.
+const taskRequests = async (
+  c: Context<AppEnv>,
+  db: PluginDatabase,
+  core: SendCoreServices,
+  fromBody?: string,
+): Promise<(() => Promise<HttpRequest[]>) | null> => {
+  const taskId = fromBody ?? c.req.query('taskId')
+  if (!taskId) return null
+  const task = await core.tasks.load(taskId)
+  if (!task?.projectId) return null
+  const projectId = task.projectId
+  const userId = owner(c)
+  return async () => {
+    const rows = await db
+      .select()
+      .from(httpRequests)
+      .where(and(inProject(userId, projectId), eq(httpRequests.taskId, taskId)))
+      .orderBy(asc(httpRequests.folder), asc(httpRequests.name))
+      .limit(MAX_CONTEXT_REQUESTS)
+    return Promise.all(rows.map((row) => toRequest(row, core.secrets, projectId)))
+  }
+}
+
 const protectedRequestFields = async (d: z.infer<typeof requestBody>, secrets: SecretService) => {
   const [url, headers, body, auth, vars] = await Promise.all([
     protectHttpValue(d.url, secrets),
@@ -133,8 +206,65 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
     // decryption oracle.
     .use('*', async (c, next) => {
       // 'device' is the owner principal allowed to drive this pane. An internal token must never reach it.
-      if (c.get('principal')?.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
+      if (requestContext(c).principal.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
       await next()
+    })
+
+    // ── Host-drawn chrome (the manifest's `sources` and `agentContexts` descriptors) ──────────────
+    //
+    // These three answer to the HOST rather than to this plugin's own frame: the rail draws the rows,
+    // and the agent composer draws the picker. Which is why they are here at all — a descriptor's data
+    // has to come from a route, because the node is always running and a frame is not.
+
+    // The rail's list of this project's saved requests. `?project=` is minted by the host from the
+    // shell's routed project (client-core/plugins/chrome/data.ts § scopedSourceItemsPath); with no
+    // project routed there is nothing to list, and the descriptor's empty state says where to go.
+    //
+    // No `task` block on a row, and that absence is the contribution: it is what tells the host there is
+    // nothing to promote here, so no `+TASK` affordance is drawn. A saved request is not an external item
+    // — the compiled source carried a permanent promotion stub to say the same thing in more code.
+    .get('/rail-items', async (c) => {
+      const projectId = c.req.query('project')
+      if (!projectId) return c.json({ items: [] } satisfies PluginRailItems)
+      const project = await core.projects.byId(projectId)
+      if (!project) return c.json({ items: [] } satisfies PluginRailItems)
+      const rows = await projectRequests(db, owner(c), project.id)
+      return c.json({
+        items: rows.map((row) => ({
+          id: row.id,
+          title: row.name,
+          badge: row.method,
+          icon: 'send',
+          ...(row.folder ? { subtitle: row.folder } : {}),
+        })),
+      } satisfies PluginRailItems)
+    })
+
+    // The agent composer's option list and capture, for the task the composer named. Both resolve the
+    // project from the TASK rather than taking one from the caller: the composer's scope is a task, and a
+    // project parameter here would be a second thing to check ownership of.
+    //
+    // The set is this task's ad-hoc requests, which is exactly what the renderer contribution listed
+    // before the move — deliberately unchanged, so a difference in what an agent receives cannot be
+    // blamed on the tier. It is also thinner than it looks — a task with no ad-hoc requests offers
+    // nothing; widening it to the project tree is a product decision, not a port.
+    .get('/context-options', async (c) => {
+      const scoped = await taskRequests(c, db, core)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      return c.json((await scoped()).map(requestOption))
+    })
+
+    .post('/context-capture', async (c) => {
+      const body = await c.req.json().catch(() => null)
+      const optionIds = contextCaptureBody.safeParse(body)
+      if (!optionIds.success) return respondError(c, 400, 'bad_request', optionIds.error.issues.map((i) => i.message))
+      const scoped = await taskRequests(c, db, core, optionIds.data.taskId)
+      if (!scoped) return respondError(c, 404, 'not_found')
+      const requests = await scoped()
+      const chosen = optionIds.data.optionIds
+        ? requests.filter((request) => optionIds.data.optionIds?.includes(request.id))
+        : requests
+      return c.json(chosen.map(requestSnapshot))
     })
 
     // Saved requests for the project. `?taskId=` returns that task's ad-hoc requests instead of the
@@ -143,7 +273,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const scoped = await projectScope(c, core)
       if (!scoped) return respondError(c, 404, 'not_found')
       const { project } = scoped
-      const userId = ownerId(c)
+      const userId = owner(c)
       const taskId = c.req.query('taskId')
       if (taskId === '') return respondError(c, 400, 'bad_request', ['taskId must not be empty'])
       if (taskId && !(await taskBelongsToProject(taskId, project.id, core))) return respondError(c, 400, 'bad_request', [taskScopeError(taskId)])
@@ -166,7 +296,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const protectedFields = await protectedRequestFields(d, secrets)
       const row = {
         id: crypto.randomUUID(),
-        userId: ownerId(c),
+        userId: owner(c),
         projectId: project.id,
         folder: d.folder,
         taskId: d.taskId,
@@ -194,7 +324,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       const d = parsed.data
       if (d.taskId && !(await taskBelongsToProject(d.taskId, project.id, core))) return respondError(c, 400, 'bad_request', [taskScopeError(d.taskId)])
-      const userId = ownerId(c)
+      const userId = owner(c)
       const protectedFields = await protectedRequestFields(d, secrets)
       // Scope the update to this project so an id from another project can't be smuggled in.
       const updated = await db
@@ -223,7 +353,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const scoped = await projectScope(c, core)
       if (!scoped) return respondError(c, 404, 'not_found')
       const { project } = scoped
-      const userId = ownerId(c)
+      const userId = owner(c)
       const deleted = await db
         .delete(httpRequests)
         .where(and(inProject(userId, project.id), eq(httpRequests.id, c.req.param('id'))))
@@ -238,7 +368,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const scoped = await projectScope(c, core)
       if (!scoped) return respondError(c, 404, 'not_found')
       const { project } = scoped
-      const userId = ownerId(c)
+      const userId = owner(c)
       const rows = await db
         .select()
         .from(httpVariables)
@@ -254,7 +384,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       const d = parsed.data
-      const userId = ownerId(c)
+      const userId = owner(c)
       const value = await protectHttpValue(d.value, secrets)
       const row = {
         id: crypto.randomUUID(),
@@ -283,7 +413,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const parsed = variableBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       const d = parsed.data
-      const userId = ownerId(c)
+      const userId = owner(c)
       const id = c.req.param('id')
       const existing = await db
         .select()
@@ -307,7 +437,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const scoped = await projectScope(c, core)
       if (!scoped) return respondError(c, 404, 'not_found')
       const { project } = scoped
-      const userId = ownerId(c)
+      const userId = owner(c)
       const deleted = await db
         .delete(httpVariables)
         .where(and(variablesInProject(userId, project.id), eq(httpVariables.id, c.req.param('id'))))
@@ -326,7 +456,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
       const parsed = sendBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       try {
-        return c.json(await send(db, core, ownerId(c), project.id, parsed.data))
+        return c.json(await send(db, core, owner(c), project.id, parsed.data))
       } catch (err) {
         // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
         // request to display, so they stay a 422. Network attempts return a typed SendFailure above.
@@ -335,4 +465,13 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
         throw err
       }
     })
+}
+
+// The Hono routes over the portable carrier — the only way in. Its request context supplies the caller's
+// identity without this bundle reaching for the host's middleware state, and the bundle keeps its OWN
+// Hono (build-plugin.mjs inlines every non-builtin dependency), which is why a router instance can never
+// cross the contract and `router.fetch` does.
+export const createHttpFetch = (db: PluginDatabase, core: SendCoreServices): PluginFetchHandler => {
+  const routes = httpRoutes(db, core)
+  return (request, context) => routes.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
 }

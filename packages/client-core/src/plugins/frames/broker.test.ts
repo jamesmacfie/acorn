@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectConfigRoute, projectRunTargetsRoute, projectsRoute, tasksRoute } from '@acorn/protocol/api.ts'
 import type { PluginBridgeMessage } from '@acorn/protocol/pluginBridge.ts'
-import { PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
+import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
 import { createFrameBridge, type FrameBinding, type FrameServices } from './broker'
 
@@ -274,6 +274,18 @@ describe('ui verbs', () => {
     expect(h.svc.importerDone).toHaveBeenCalled()
   })
 
+  it('lets an overlay dismiss itself but not run the host’s import refresh', async () => {
+    // A picker's whole gesture is "pick, then get out of the way", so `close` is the one of the pair an
+    // overlay gets. `done` means "the host re-reads its projects", which an overlay never imported into.
+    const h = withBridge({ target: 'overlay' })
+    h.send({ id: 26, kind: 'ui', op: 'importer.close' })
+    h.send({ id: 27, kind: 'ui', op: 'importer.done' })
+    await h.settled(3)
+    expect(h.svc.importerClose).toHaveBeenCalled()
+    expect(h.svc.importerDone).not.toHaveBeenCalled()
+    expect(replyTo(h, 27)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+  })
+
   it('hands an https URL to the host without telling the frame where it went', async () => {
     const h = withBridge()
     h.send({ id: 25, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
@@ -382,6 +394,61 @@ describe('webview verbs', () => {
     await h.settled(2)
     expect(replyTo(h, 32)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(svc.webviewCommand).not.toHaveBeenCalled()
+  })
+})
+
+describe('the shared document', () => {
+  // A composed pane's frame reaching the editor beside it. The permission check is STRUCTURAL rather
+  // than a declared scope — a frame either has a document beside it or it does not, and which one is a
+  // fact about the manifest the host already read — so the absence of `services.document` is the whole
+  // gate, and that is what these pin.
+  const doc = (over: Partial<NonNullable<FrameServices['document']>> = {}) => ({
+    read: vi.fn(() => 'SELECT 1;'),
+    write: vi.fn(),
+    flush: vi.fn(async () => {}),
+    ...over,
+  })
+
+  it('reads, writes and flushes for a frame the host gave a document to', async () => {
+    const document = doc()
+    const h = withBridge({}, services({ document }))
+    h.send({ id: 40, kind: 'document', op: 'read' })
+    await h.settled(2)
+    expect(replyTo(h, 40)).toMatchObject({ ok: true, body: { text: 'SELECT 1;' } })
+
+    h.send({ id: 41, kind: 'document', op: 'write', text: 'SELECT 2;' })
+    await h.settled(3)
+    expect(replyTo(h, 41)).toMatchObject({ ok: true })
+    expect(document.write).toHaveBeenCalledWith('SELECT 2;')
+
+    h.send({ id: 42, kind: 'document', op: 'flush' })
+    await h.settled(4)
+    expect(replyTo(h, 42)).toMatchObject({ ok: true })
+    expect(document.flush).toHaveBeenCalled()
+  })
+
+  it('denies every operation to a frame with no document beside it', async () => {
+    const h = withBridge()
+    h.send({ id: 43, kind: 'document', op: 'read' })
+    await h.settled(2)
+    expect(replyTo(h, 43)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+  })
+
+  it('holds a write to the same ceiling the read path enforces', async () => {
+    const document = doc()
+    const h = withBridge({}, services({ document }))
+    h.send({ id: 44, kind: 'document', op: 'write', text: 'x'.repeat(MAX_DOCUMENT_BYTES + 1) })
+    await h.settled(2)
+    expect(replyTo(h, 44)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
+    expect(document.write).not.toHaveBeenCalled()
+  })
+
+  it('reports a failing flush rather than dropping it, so a frame can say the save did not land', async () => {
+    const document = doc({ flush: vi.fn(async () => { throw new Error('write route 500') }) })
+    const h = withBridge({}, services({ document }))
+    h.send({ id: 45, kind: 'document', op: 'flush' })
+    await h.settled(2)
+    expect(replyTo(h, 45)).toMatchObject({ ok: false, error: { code: 'internal', message: 'write route 500' } })
   })
 })
 

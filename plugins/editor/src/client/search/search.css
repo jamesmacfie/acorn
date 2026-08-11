@@ -1,14 +1,19 @@
-.search-pane {
+/* The find-in-files panel, one column of the editor pane's sidebar. */
+.search-panel {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+/* Stacked, not a row: the sidebar is 240px, and an input sharing that with three toggle buttons
+   leaves about a hundred pixels to type a query into. */
 .search-bar {
   flex: none;
   display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--pane-pad);
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
   border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
 }
@@ -26,6 +31,7 @@
 .search-toggles {
   flex: none;
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 .search-toggle {
@@ -49,7 +55,7 @@
 }
 .search-status {
   flex: none;
-  padding: 4px var(--pane-pad);
+  padding: 4px var(--space-4);
   font-size: var(--fs-sm);
   border-bottom: var(--chrome-divider);
 }
@@ -70,7 +76,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  padding: 4px var(--pane-pad);
+  padding: 4px var(--space-4);
   position: sticky;
   top: 0;
   background: var(--bg-subtle);
@@ -94,7 +100,7 @@
   gap: var(--space-5);
   width: 100%;
   text-align: left;
-  padding: 2px var(--pane-pad) 2px 20px;
+  padding: 2px var(--space-4) 2px var(--space-6);
   color: var(--text-muted);
   background: transparent;
   border: 0;

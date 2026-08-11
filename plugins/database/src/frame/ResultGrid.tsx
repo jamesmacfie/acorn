@@ -1,0 +1,85 @@
+import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
+import { createVirtualizer } from '@tanstack/solid-virtual'
+import { rowHeightSm } from '@acorn/plugin-api/ui'
+import type { DbCell } from '../shared/database'
+
+const COL_W = 200
+
+export default function ResultGrid(props: {
+  columns: string[]
+  rows: DbCell[][]
+  activeRow?: number | null
+  onRowClick?: (index: number) => void
+  // The frame's appearance subscription, passed in rather than imported. `watchAppearance` reads the
+  // shell's own signal and there is no shell here; the same event reaches a frame as a bridge push, and
+  // the SDK has already written the tokens onto `:root` by the time it fires — so re-reading the token
+  // below is the correct thing to do from it.
+  onAppearance: (listener: () => void) => () => void
+}) {
+  const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
+  // Row height comes from --row-h-sm so a style pack's density actually reaches the grid; the
+  // virtualizer writes it back as an inline height, which would beat any CSS rule.
+  const [rowH, setRowH] = createSignal(rowHeightSm())
+  onCleanup(props.onAppearance(() => {
+    setRowH(rowHeightSm())
+    virt.measure()
+  }))
+  const virt = createVirtualizer({
+    get count() {
+      return props.rows.length
+    },
+    getScrollElement: () => scrollEl() ?? null,
+    estimateSize: () => rowH(),
+    overscan: 16,
+  })
+  let frame = 0
+  onCleanup(() => cancelAnimationFrame(frame))
+  const publish = (el: HTMLDivElement) => {
+    frame = requestAnimationFrame(() => {
+      setScrollEl(el)
+      virt.measure()
+    })
+  }
+  // Re-measure and scroll back to the top when the result set is swapped out.
+  createEffect(on(() => [props.columns, props.rows] as const, () => {
+    const el = scrollEl()
+    if (el) el.scrollTop = 0
+    frame = requestAnimationFrame(() => virt.measure())
+  }, { defer: true }))
+
+  const template = () => `repeat(${props.columns.length}, ${COL_W}px)`
+  const width = () => `${props.columns.length * COL_W}px`
+
+  return (
+    <div class="dbgrid-scroll" ref={publish}>
+      <div class="dbgrid" style={{ width: width() }}>
+        <div class="dbgrid-head" style={{ 'grid-template-columns': template() }}>
+          <For each={props.columns}>{(c) => <div class="dbgrid-hcell" title={c}>{c}</div>}</For>
+        </div>
+        <div class="dbgrid-body" style={{ height: `${virt.getTotalSize()}px` }}>
+          <For each={virt.getVirtualItems()}>
+            {(vi) => {
+              const row = () => props.rows[vi.index]
+              return (
+                <div
+                  class="dbgrid-row"
+                  classList={{ active: props.activeRow === vi.index }}
+                  style={{ transform: `translateY(${vi.start}px)`, height: `${rowH()}px`, 'grid-template-columns': template() }}
+                  onClick={() => props.onRowClick?.(vi.index)}
+                >
+                  <For each={row()}>
+                    {(v) => (
+                      <div class="dbgrid-cell" classList={{ 'is-null': v === null }} title={v ?? 'NULL'}>
+                        {v === null ? 'NULL' : v}
+                      </div>
+                    )}
+                  </For>
+                </div>
+              )
+            }}
+          </For>
+        </div>
+      </div>
+    </div>
+  )
+}

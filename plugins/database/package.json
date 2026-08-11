@@ -15,11 +15,9 @@
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/protocol": "workspace:*",
-    "@tanstack/solid-query": "^5.101.0",
     "@tanstack/solid-virtual": "^3.13.29",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "monaco-editor": "^0.55.1",
     "pg": "^8.22.0",
     "solid-js": "catalog:",
     "zod": "catalog:"

@@ -64,12 +64,16 @@ const registered = new Map<string, Disposable[]>()
 // whichever node the window is talking to.
 const chromeNode = (): string => activeNodeId() ?? ''
 
+// The surface ids a manifest declared, as the DEVICE read them, split by what each verb may name.
+export type DeclaredSurfaces = { panes: ReadonlySet<string>; overlays: ReadonlySet<string> }
+
 // Can this action actually do anything from a click site with no row and no routed project? The node
 // checked all three when it parsed the manifest; a roster row is wire input, so the device checks them
 // again. Shared by commands, palette rows and a source's empty-state button, which take the same
 // narrowed verb set for the same reason (node-core/main/pluginManifest.ts § contextFreeAction).
-const contextFreeActionUsable = (pluginId: string, taskPanes: ReadonlySet<string>, action: PluginChromeAction): boolean => {
-  if (action.verb === 'openPane') return taskPanes.has(action.pane)
+const contextFreeActionUsable = (pluginId: string, surfaces: DeclaredSurfaces, action: PluginChromeAction): boolean => {
+  if (action.verb === 'openPane') return surfaces.panes.has(action.pane)
+  if (action.verb === 'openOverlay') return surfaces.overlays.has(action.overlay)
   if (action.verb === 'runNodeAction') return ownsRoute(pluginId, action.path)
   if (action.verb === 'openUrl') return isPluginOpenableUrl(action.url)
   // `createTask` needs a selected rail row, `navigate` needs a routed project and a navigator. Refused
@@ -82,12 +86,12 @@ const contextFreeActionUsable = (pluginId: string, taskPanes: ReadonlySet<string
  * button that can only toast is exactly the failure worth pinning. */
 export const usableEmptyState = (
   pluginId: string,
-  taskPanes: ReadonlySet<string>,
+  surfaces: DeclaredSurfaces,
   empty: PluginSourceEmptyState | undefined,
 ): PluginSourceEmptyState | undefined =>
   // The message survives on its own: it is the part the rail was missing, and losing a sentence over a
   // button would be the worse trade.
-  empty?.action && !contextFreeActionUsable(pluginId, taskPanes, empty.action) ? { message: empty.message } : empty
+  empty?.action && !contextFreeActionUsable(pluginId, surfaces, empty.action) ? { message: empty.message } : empty
 
 // Every plugin whose chrome this device may draw, one row per plugin id. The manifest travels with the
 // roster row and one version wins per id, so the first node offering it is as good as any.
@@ -124,6 +128,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   // project-scoped surface in here would be an offer that can only fail. It reaches the shell through
   // plugins/frames/register.tsx and the project-surface registry instead.
   const taskPanes = new Set(frames.filter((frame) => frame.target === 'webview' || (frame.target === 'pane' && frame.scope !== 'project')).map((frame) => frame.id))
+  // The other set a context-free verb may name. An overlay is not a pane — it belongs to no task layout
+  // — so it is kept apart rather than folded into the set above, where `openPane` would then accept it.
+  const surfaces: DeclaredSurfaces = {
+    panes: taskPanes,
+    overlays: new Set(frames.filter((frame) => frame.target === 'overlay').map((frame) => frame.id)),
+  }
 
   // `palette` is the one-release compatibility alias. Both forms become commands, and the palette's
   // existing command-registry pass renders only those whose `palette` flag is true.
@@ -135,7 +145,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       descriptor.action.verb === 'createTask' || descriptor.action.verb === 'navigate'
         ? []
         : [{ ...descriptor, category: 'action', palette: true, action: descriptor.action }]),
-  ].filter((descriptor) => contextFreeActionUsable(pluginId, taskPanes, descriptor.action))
+  ].filter((descriptor) => contextFreeActionUsable(pluginId, surfaces, descriptor.action))
   const commandById = new Map(commands.map((descriptor) => [descriptor.id, descriptor]))
   for (const descriptor of commands) {
     add('command', descriptor.id, () => commandRegistry.register({
@@ -144,7 +154,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       category: descriptor.category,
       palette: descriptor.palette,
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
-      run: () => runChromeAction(descriptor.action, { pluginId, nodeId: chromeNode() }),
+      run: () => runChromeAction(descriptor.action, { pluginId, nodeId: chromeNode(), commandId: descriptor.id }),
     }))
   }
 
@@ -208,7 +218,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     note(rawSource.refresh)
     // The empty state's action is re-checked on the device for the same reason a command's is: it came
     // off a roster row.
-    const emptyState = usableEmptyState(pluginId, taskPanes, rawSource.emptyState)
+    const emptyState = usableEmptyState(pluginId, surfaces, rawSource.emptyState)
     const descriptor = emptyState === rawSource.emptyState ? rawSource : { ...rawSource, emptyState }
     add('source', descriptor.id, () => sourceRegistry.register({
       id: descriptor.id,

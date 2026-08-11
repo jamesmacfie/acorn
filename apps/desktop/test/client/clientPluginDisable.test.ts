@@ -64,9 +64,9 @@ const snapshot = (): Snapshot =>
 // right, so this doubles as the parity assertion for the compiled graph. Loaded packages are covered
 // through their manifest adapters and do not belong in this static ownership ledger.
 const FULL: Snapshot = {
-  panes: ['agents', 'changes', 'context', 'database', 'docker', 'editor', 'search', 'pr', 'http', 'notes', 'preview'],
-  sources: ['agents', 'docker', 'github', 'http'],
-  settingsPages: ['agent-pricing', 'docker', 'http', 'terminal', 'workflows'],
+  panes: ['agents', 'changes', 'context', 'docker', 'editor', 'pr', 'notes', 'preview'],
+  sources: ['agents', 'docker', 'github'],
+  settingsPages: ['agent-pricing', 'docker', 'terminal', 'workflows'],
   slots: ['overlay/palette.files', 'overlay/palette.pull-files', 'overlay/onboarding.first-run', 'topbar.right/terminal.topbar-toggle', 'drawer/terminal.drawer'],
   taskSlots: ['task.footer/docker-footer-badge', 'tabrail.task-row/docker-rail-badge'],
   contextSections: ['memory.section'],
@@ -75,7 +75,7 @@ const FULL: Snapshot = {
   // client-core/plugins/frames/register.tsx. A compiled panel reappearing here is a real change.
   refPanels: [],
   paletteRows: ['terminal.run', 'workflows.defs'],
-  agentContexts: ['acorn-task-context', 'acorn-database', 'acorn-docker', 'acorn-http', 'acorn-terminals'],
+  agentContexts: ['acorn-task-context', 'acorn-docker', 'acorn-terminals'],
   agentToolRenderers: ['changes.agent-file-tool'],
   pollers: ['docker.task-containers', 'workflows.triggers'],
   persistedState: ['context.section-selection', 'docker.prefs', 'editor.open-files', 'github.pr-filters'],
@@ -89,7 +89,6 @@ const FULL: Snapshot = {
 const OWNED: Record<string, Partial<Snapshot>> = {
   changes: { panes: ['changes'], agentToolRenderers: ['changes.agent-file-tool'] },
   context: { panes: ['context'], agentContexts: ['acorn-task-context'], persistedState: ['context.section-selection'] },
-  database: { panes: ['database'], agentContexts: ['acorn-database'] },
   docker: {
     panes: ['docker'],
     sources: ['docker'],
@@ -99,8 +98,7 @@ const OWNED: Record<string, Partial<Snapshot>> = {
     pollers: ['docker.task-containers'],
     persistedState: ['docker.prefs'],
   },
-  editor: { panes: ['editor', 'search'], slots: ['overlay/palette.files'], persistedState: ['editor.open-files'] },
-  http: { panes: ['http'], sources: ['http'], settingsPages: ['http'], agentContexts: ['acorn-http'] },
+  editor: { panes: ['editor'], slots: ['overlay/palette.files'], persistedState: ['editor.open-files'] },
   onboarding: { slots: ['overlay/onboarding.first-run'] },
   preview: { panes: ['preview'] },
   github: {
@@ -140,9 +138,10 @@ describe('disabling a client plugin', () => {
   afterEach(() => void activate())
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
-    expect(NAMES.length).toBeGreaterThanOrEqual(14)
+    // Down one per plugin that ships loaded instead of compiled — linear, then http, then database.
+    expect(NAMES.length).toBeGreaterThanOrEqual(12)
     expect([...REQUIRED].sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
-    expect(OPTIONAL.length).toBeGreaterThanOrEqual(9)
+    expect(OPTIONAL.length).toBeGreaterThanOrEqual(8)
     // Every optional plugin is in the ledger, and every ledger entry claims something. A plugin
     // contributing nothing would make its own case below pass vacuously — this fails instead.
     expect(Object.keys(OWNED).sort()).toEqual([...OPTIONAL].sort())
