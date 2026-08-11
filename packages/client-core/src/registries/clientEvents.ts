@@ -6,6 +6,11 @@ import { onScopeEvicted } from './scopeEviction'
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
   | { kind: 'editor:reveal'; path: string; line: number; column?: number }
+  // Show the editor pane's find-in-files panel and focus its box. Find-in-files stopped being its own
+  // pane (docs/panes.md), so the palette row and ⌘⇧F that used to open that pane now open this one with
+  // an intent — and it has to be an intent for the same reason `editor:reveal` is: the pane may not be
+  // mounted yet, and the request has to survive until it is.
+  | { kind: 'editor:search' }
   | { kind: 'integration:show-ref'; ref: ExternalRef }
   | { kind: 'context:reveal'; sectionId: string; itemId?: string } // → pane 'context'
   // A row a plugin's declarative rail source was selected on, carried to that plugin's own pane
@@ -23,6 +28,12 @@ export type ClientEventMap = {
   // UiSlotContext's `openSettings` — so the request is an event rather than a prop threaded through
   // every pane that might ever need one.
   'presentation:open-settings': { tab: string }
+  // A surface-scoped plugin command, on its way to the frame region of a composed pane
+  // (docs/future/monaco.md § Communication between regions). NOT retained like a pane intent, and the
+  // difference is the point: an intent describes a destination the reader is being taken to, so it waits
+  // for the pane to exist, whereas this is a verb fired at a frame that is already on screen. Replaying
+  // "run the query" into a pane that opens ten minutes later would be a surprise, not a fix.
+  'plugin:surface-action': { pluginId: string; surface: string; command: string }
   'runtime:task-archived': { taskId: string }
   'runtime:workspace-removed': { workspaceId: string }
   // A node left the fleet (unpaired or revoked). Emitted by the renderer AFTER main confirms the

@@ -94,10 +94,8 @@ const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'in
 // out of every case below byte-identical — which is a real assertion here, and was not one before.
 const OWNED: Record<string, Partial<Snapshot>> = {
   changes: { routes: ['changes/tasks', 'changes/tasks'], tools: ['git_log', 'local_changes', 'local_diff'], databases: ['changes.sqlite'] },
-  database: { routes: ['database/tasks'], databases: ['database.sqlite'] },
   docker: { routes: ['docker'] },
   editor: { routes: ['editor/tasks', 'editor/tasks'] },
-  http: { routes: ['http'], databases: ['http.sqlite'] },
   preview: { tools: ['browser_click', 'browser_console', 'browser_fill', 'browser_navigate', 'browser_screenshot', 'browser_snapshot'] },
   workflows: { routes: ['workflows'], databases: ['workflows.sqlite'] },
   github: { routes: [...Array.from({ length: 12 }, () => 'github/repos'), 'github/pins', 'github', 'github'], sections: ['pr'], databases: ['github.sqlite'], connectionProviders: ['github'], integrationProviders: ['github'] },
@@ -131,9 +129,9 @@ describe('disabling a node plugin', () => {
   beforeEach(() => {
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
     dataRoots = []
-    // A REAL migrated core database, not a stub. plugins/http's `ready()` asks core whether this node knows
-    // exactly one owner identity, which is a query — so a stubbed CoreServices fails the boot rather than
-    // testing it, and that failure would look exactly like the coupling this suite is hunting.
+    // A REAL migrated core database, not a stub. At least one plugin's init queries core during the boot
+    // this suite performs, so a stubbed CoreServices fails the boot rather than testing it — and that
+    // failure would look exactly like the coupling this suite is hunting.
     coreDb = makeTestDb()
   })
 
@@ -194,8 +192,10 @@ describe('disabling a node plugin', () => {
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     // Every case below asserts "the others are still there", which an empty list satisfies trivially.
-    expect(all.length).toBeGreaterThanOrEqual(12)
-    expect(optional.length).toBeGreaterThanOrEqual(7)
+    // These floors track the COMPILED list, so they come down by one each time a plugin ships loaded
+    // instead — rollbar, then linear, then model-providers, then http, now database.
+    expect(all.length).toBeGreaterThanOrEqual(10)
+    expect(optional.length).toBeGreaterThanOrEqual(6)
     expect(required.sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     // The ledger covers exactly the plugins that get cycled — a plugin added to the list without an entry
     // fails here rather than quietly getting a case that asserts nothing.
@@ -214,7 +214,9 @@ describe('disabling a node plugin', () => {
     expect(skipped).toEqual([])
     expect(enabled).toEqual(all.map((p) => p.name))
     expect(snapshot.sections).toEqual(['pr', 'issues', 'notes', 'memory'])
-    expect(snapshot.databases.length).toBeGreaterThanOrEqual(8)
+    // Six, not eight: http.sqlite and database.sqlite are opened by their loaded packages now,
+    // through ctx.storage, so this boot never sees either.
+    expect(snapshot.databases.length).toBeGreaterThanOrEqual(6)
     expect(snapshot.routes.length).toBeGreaterThanOrEqual(15)
     // The connection and integration registries still have real content — github's — so the ledger's
     // provider expectations are not satisfiable by an empty registry. The other two keys are empty and
@@ -288,9 +290,12 @@ describe('disabling a node plugin', () => {
   it('reports a roster covering every offered plugin, including the skipped ones', async () => {
     // `enabled` + `skipped` is not the list Settings → Plugins needs: it says nothing about which names
     // are `required` and therefore not togglable, and a disabled plugin still has to appear as a row.
-    const { roster } = await start(['docker', 'http'])
+    // Two OPTIONAL plugins, in roster order. It was `['docker', 'http']` until http moved out of the
+    // compiled graph, and `['database', 'docker']` until database followed it — the same substitution
+    // linear's migration forced, for the same reason, three times now.
+    const { roster } = await start(['changes', 'docker'])
     expect(roster.map((entry) => entry.name)).toEqual(all.map((p) => p.name))
     expect(roster.filter((entry) => entry.required).map((entry) => entry.name).sort()).toEqual(required.sort())
-    expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['docker', 'http'])
+    expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['changes', 'docker'])
   })
 })

@@ -22,3 +22,17 @@ export const dbSavedQueries = sqliteTable(
   },
   (t) => [uniqueIndex('db_saved_queries_project_name_idx').on(t.projectId, t.name)],
 )
+
+// The task's query editor, as a document (docs/future/monaco.md). It exists because the pane's editor
+// is now the HOST's: a document surface is defined by a route that reads it and a route that writes it,
+// so the text has to live somewhere the plugin can serve it from, and that is here.
+//
+// The visible change is that it PERSISTS. The compiled pane created Monaco with `value: ''` every time,
+// so a half-written query died with the pane — which nobody ever chose, it was just what an unbacked
+// editor does. TASK-scoped rather than project-scoped, unlike the saved queries above: a scratch buffer
+// is what you are doing right now, and what you meant to keep has a Save button.
+export const dbScratch = sqliteTable('db_scratch', {
+  taskId: text('task_id').primaryKey(), // → CoreServices.tasks.load (plain ID, not a foreign key)
+  sql: text('sql').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})

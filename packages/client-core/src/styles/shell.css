@@ -90,6 +90,29 @@
 .pane-left { display: flex; flex-direction: column; overflow: hidden; }
 .pr-list-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 0; }
 
+/* Host-owned document surface: the editor a loaded plugin DECLARES instead of bundling
+   (docs/future/monaco.md). Core CSS rather than a plugin stylesheet on purpose — the plugin ships no
+   code for this pane, so it has nowhere to put a rule. Same flex-column shape as .pane-right: Monaco
+   is absolutely positioned inside its host and needs a definite box to fill. */
+.document-surface { display: flex; flex-direction: column; overflow: hidden; }
+.document-surface-host { flex: 1; min-height: 0; }
+.document-surface-error { flex: none; padding: var(--space-2) var(--space-3); }
+
+/* The `document-over-frame` template: host editor, host drag handle, the plugin's frame below. All
+   three rules are the HOST's for the same reason the surface above is — the splitter is the boundary
+   between two realms, so neither side could style it alone. The document region takes an inline pixel
+   height from the drag; the frame region takes whatever is left. */
+.document-over-frame { display: flex; flex-direction: column; overflow: hidden; }
+.document-over-frame-document { flex: none; min-height: 0; display: flex; flex-direction: column; }
+.document-over-frame-frame { flex: 1; min-height: 0; }
+.document-over-frame-split {
+  flex: none;
+  height: 6px;
+  cursor: ns-resize;
+  background: var(--border);
+}
+.document-over-frame-split:hover { background: var(--border-strong); }
+
 .section-header {
   position: sticky;
   top: 0;

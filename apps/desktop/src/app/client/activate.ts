@@ -4,6 +4,7 @@ import { pluginFailureAttention } from '@acorn/client-core/node/pluginFailures.t
 import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
 import { noticeKindContributions } from '@acorn/client-core/notifications/kindContributions.ts'
 import { directPreferenceSlices } from '@acorn/client-core/persistence/preferenceSlices.ts'
+import { purgeRetiredLocalStorage } from '@acorn/client-core/persistence/legacyStorage.ts'
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
 import { coreStateSlices } from '@acorn/client-core/persistence/stateSlices.ts'
 import { noticeKindRegistry } from '@acorn/client-core/registries/notices.ts'
@@ -32,6 +33,11 @@ pollerRegistry.register(taskStatusPollerContribution)
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)
 activateScopedStateEviction()
+// Bytes an older release left in localStorage, some of them credential-bearing. Before anything renders,
+// and in the SHELL rather than in the plugin that wrote them — a loaded plugin's frame has its own
+// storage area and could not reach these (persistence/legacyStorage.ts).
+const swept = purgeRetiredLocalStorage()
+if (swept.length) console.log(`[client:boot] removed ${swept.length} retired local key(s)`)
 
 // The first activation runs with nothing disabled, and that is not a placeholder any more: the list
 // belongs to a NODE, and at module-evaluation time no node has answered yet. `applyNodePlugins` below is

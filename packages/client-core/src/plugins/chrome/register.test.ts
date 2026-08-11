@@ -113,16 +113,21 @@ describe('syncChromeContributions', () => {
     const message = 'No boards linked yet.'
     const authored = (action: PluginSourceEmptyState['action']): PluginSourceEmptyState =>
       ({ message, action, actionLabel: 'Link one' })
-    const panes = new Set(['board'])
+    const panes = { panes: new Set(['board']), overlays: new Set(['board-picker']) }
 
     // Another plugin's route, a pane this manifest never declared, and a verb that needs a row.
     expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v2/p/other/go' }))).toEqual({ message })
     expect(usableEmptyState('board', panes, authored({ verb: 'openPane', pane: 'ghost' }))).toEqual({ message })
     expect(usableEmptyState('board', panes, authored({ verb: 'openUrl', url: 'http://example.com' }))).toEqual({ message })
     expect(usableEmptyState('board', panes, authored({ verb: 'createTask' } as never))).toEqual({ message })
+    // An overlay is its own set: `openPane` cannot name one, and `openOverlay` cannot name a pane.
+    expect(usableEmptyState('board', panes, authored({ verb: 'openOverlay', overlay: 'board' }))).toEqual({ message })
+    expect(usableEmptyState('board', panes, authored({ verb: 'openPane', pane: 'board-picker' }))).toEqual({ message })
 
     const usable = authored({ verb: 'runNodeAction', path: '/v2/p/board/link' })
     expect(usableEmptyState('board', panes, usable)).toBe(usable)
+    const picker = authored({ verb: 'openOverlay', overlay: 'board-picker' })
+    expect(usableEmptyState('board', panes, picker)).toBe(picker)
     expect(usableEmptyState('board', panes, { message })).toEqual({ message })
     expect(usableEmptyState('board', panes, undefined)).toBeUndefined()
   })

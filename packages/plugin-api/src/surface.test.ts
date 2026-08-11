@@ -22,6 +22,7 @@ const ENTRYPOINTS = {
   client: 'client/index.ts',
   ui: 'ui/index.ts',
   'ui/diff': 'ui/diff.ts',
+  'ui/editor': 'ui/editor.ts',
   'ui/host': 'ui/host.ts',
   'ui/sdk': 'ui/sdk.ts',
 }

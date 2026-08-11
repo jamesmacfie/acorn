@@ -1,42 +1,72 @@
+// Routes for the Database pane, mounted at /v2/p/database by this plugin's init (node/index.ts):
+// per-task Postgres browse + edit, the project's saved queries, the task's scratch DOCUMENT, and
+// table/column completions.
+//
+// database ships LOADED, so these routes run on one tier: the host gets `router.fetch`
+// (createDatabaseFetch at the bottom) and the identity-bound runtime rides in through `c.env` behind a
+// module-level symbol, the same carrier rollbar, linear and http use. The identity therefore comes off
+// the request context rather than out of `ownerId(c)`/`c.get('principal')`: a loaded bundle is not
+// inside the host's Hono stack, so those middleware-set values are simply not there.
+//
+// The route CAPABILITY this file used to declare is gone, and it is worth saying why rather than
+// leaving a reader to wonder where `DATABASE` went. It was `routeCapability<DatabaseBridge>` provided at
+// init and resolved per request through `viaBridge` — an indirection whose whole job was to cross the
+// old main/renderer process boundary. The pane has been loopback HTTP for a while and this plugin has
+// had no such boundary since; the bridge is now a plain closure argument, which is also what makes a
+// fake injectable without a global registry. Nothing outside `plugins/database/` ever consumed it.
+//
+// SQL-injection posture is unchanged and is main/database.ts's: values are always parameterized,
+// identifiers are validated against the live introspected schema, and arbitrary SQL from the editor
+// runs verbatim because it is the reader's own database and writes are the point.
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { z } from 'zod'
+import {
+  type AppEnv,
+  type CoreServices,
+  type PluginDatabase,
+  type PluginFetchHandler,
+  type PluginRequestContext,
+  ProviderOperationError,
+  respondError,
+} from '@acorn/plugin-api/node'
+import { MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
+import type { PluginCompletionResponse, PluginDocumentBody } from '@acorn/protocol/documentSurface.ts'
 import { GENERATE_MAX_PROMPT_CHARS } from '../../shared/database'
-import type { DbCell, DbColumnsResult, DbConnectResult, DbGenerateResult, DbPk, DbQueryResult, DbRowsResult, DbSavedQuery, DbSchemaResult, DbTablesResult, DbWriteResult } from '../../shared/database'
-import { type AppEnv, canUseProviderCredential, type CoreServices, ownerId, type PluginDatabase, ProviderOperationError, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
-import { dbSavedQueries } from '../../node/schema'
+import type { DbGenerateResult, DbSavedQuery } from '../../shared/database'
+import { dbSavedQueries, dbScratch } from '../../node/schema'
+import type { DatabaseBridge } from '../../main/database'
 import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '../generateSql'
+import { completeSql } from '../completions'
+import { MAX_CONTEXT_QUERIES, savedQueryOption, savedQuerySnapshot } from '../agentContext'
 
-// Database pane (docs/pg.md): per-task Postgres browse + edit. Was the `db:*` IPC channels
-//; now task-scoped HTTP behind the DatabaseBridge (main/database.ts). The
-// connection URL is resolved server-side per connect and never persisted; identifiers in generated
-// SQL are validated against the live schema; every value is parameterized. Needs a reachable pg —
-// 503 when the bridge isn't wired (dev:node with no DB).
-//
-// A FACTORY over the plugin's own database, not a module-scope router reading getDb(c.env): saved
-// queries live in <data-root>/plugins/database.sqlite now, and c.env deliberately does not carry
-// per-plugin handles (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no
-// request can reach an unmigrated database.
+const PORTABLE_REQUEST_CONTEXT = Symbol('database-plugin-request-context')
 
-export type DatabaseBridge = {
-  connect(taskId: string): Promise<DbConnectResult>
-  disconnect(taskId: string): Promise<{ ok: true }>
-  tables(taskId: string): Promise<DbTablesResult>
-  columns(taskId: string, schema: string, name: string): Promise<DbColumnsResult>
-  rows(taskId: string, schema: string, name: string, offset?: number): Promise<DbRowsResult>
-  query(taskId: string, sql: string): Promise<DbQueryResult>
-  update(taskId: string, schema: string, name: string, column: string, value: DbCell, pk: DbPk): Promise<DbWriteResult>
-  insert(taskId: string, schema: string, name: string, values: Record<string, DbCell>): Promise<DbWriteResult>
-  remove(taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult>
-  schema(taskId: string): Promise<DbSchemaResult>
+type PortableBindings = AppEnv['Bindings'] & {
+  [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext
 }
 
-export const DATABASE = routeCapability<DatabaseBridge>('database.route')
-/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
-export const setDatabaseBridge = (bridge: DatabaseBridge | null): void => setRouteTestCapability(DATABASE, bridge)
+// A request arriving without the context is a wiring bug, and saying so beats answering it from host
+// handles this bundle should no longer touch.
+const requestContext = (c: Context<AppEnv>): PluginRequestContext => {
+  const context = (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
+  if (!context) throw new Error('database routes only run over the portable carrier (createDatabaseFetch)')
+  return context
+}
 
-// Everything that reaches SQL is validated (the privileged-boundary contract). DbCell is string | null on the wire.
+const owner = (c: Context<AppEnv>): string => requestContext(c).userId
+
+// AI generation spends the owner's provider key, billed to the owner, so a task-scoped agent credential
+// must not reach it. The host's `canUseProviderCredential` reads `c.get('principal')`, which a loaded
+// bundle does not have — same rule, read off the request context instead.
+const isInteractiveOwner = (c: Context<AppEnv>): boolean => {
+  const { principal } = requestContext(c)
+  return principal.kind === 'device' || principal.scope === 'service'
+}
+
+// Everything that reaches SQL is validated (the privileged-boundary contract). DbCell is string | null
+// on the wire.
 const cell = z.union([z.string(), z.null()])
 const queryBody = z.object({ sql: z.string().min(1) })
 const updateBody = z.object({ schema: z.string(), name: z.string(), column: z.string(), value: cell, pk: z.record(z.string(), cell) })
@@ -53,27 +83,44 @@ const savedQueryBody = z.object({
   notes: z.string().max(2000),
   sql: z.string().trim().min(1).max(20_000),
 })
+// The document surface's write body. The host defines this shape, and the cap matches the one it
+// enforces on the way in and the bridge enforces on the way back.
+const scratchBody = z.object({ text: z.string().max(2 * 1024 * 1024) })
+const completionsBody = z.object({
+  text: z.string().max(2 * 1024 * 1024),
+  position: z.object({ line: z.number().int().min(1), column: z.number().int().min(1) }),
+})
+const contextCaptureBody = z.object({ taskId: z.string().min(1), optionIds: z.array(z.string()).optional() })
 
-const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
+const id = (c: { req: { param(k: string): string } }) => c.req.param('taskId')
 
 type SavedRow = typeof dbSavedQueries.$inferSelect
 const rowToQuery = (r: SavedRow): DbSavedQuery => ({ id: r.id, name: r.name, notes: r.notes, sql: r.sql, updatedAt: r.updatedAt })
 
-type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models' | 'projects'>
+export type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models' | 'projects'>
 
-export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) => {
+export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge) => {
   // Saved queries are project-scoped but addressed through the task, like everything else in this
-  // pane — the renderer has the task and core resolves its project without a cross-file join.
+  // pane — the frame holds the task and core resolves its project without a cross-file join.
   const taskOf = (taskId: string) => core.tasks.load(taskId)
   const projectOf = async (t: { projectId: string }) => core.projects.byId(t.projectId)
   const projectScope = (projectId: string) => eq(dbSavedQueries.projectId, projectId)
 
-  // The saved queries a generate call asked to include as examples, scoped to the task's project so an id
-  // from another project can't be smuggled into the prompt.
+  const savedFor = async (taskId: string, limit?: number): Promise<DbSavedQuery[] | null> => {
+    const t = await taskOf(taskId)
+    if (!t) return null
+    const project = t.projectId ? await projectOf(t) : null
+    if (!project) return []
+    const rows = await db.select().from(dbSavedQueries).where(projectScope(project.id)).orderBy(dbSavedQueries.name)
+    return (limit ? rows.slice(0, limit) : rows).map(rowToQuery)
+  }
+
+  // The saved queries a generate call asked to include as examples, scoped to the task's project so an
+  // id from another project cannot be smuggled into the prompt.
   const loadExamples = async (taskId: string, ids: readonly string[]): Promise<DbSavedQuery[]> => {
     if (!ids.length) return []
     const t = await taskOf(taskId)
-    const project = t ? await projectOf(t) : null
+    const project = t?.projectId ? await projectOf(t) : null
     if (!project) return []
     const rows = await db
       .select()
@@ -84,60 +131,100 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
   }
 
   return new Hono<AppEnv>()
-    .post('/:id/database/connect', (c) => viaBridge(c, DATABASE, (b) => b.connect(id(c))))
-    .post('/:id/database/disconnect', (c) => viaBridge(c, DATABASE, (b) => b.disconnect(id(c))))
-    .get('/:id/database/tables', (c) => viaBridge(c, DATABASE, (b) => b.tables(id(c))))
-    .get('/:id/database/columns', (c) => {
+    .post('/tasks/:taskId/connect', async (c) => c.json(await bridge.connect(id(c))))
+    .post('/tasks/:taskId/disconnect', async (c) => c.json(await bridge.disconnect(id(c))))
+    .get('/tasks/:taskId/tables', async (c) => c.json(await bridge.tables(id(c))))
+    .get('/tasks/:taskId/columns', async (c) => {
       const schema = c.req.query('schema')
       const name = c.req.query('name')
       if (!schema || !name) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, DATABASE, (b) => b.columns(id(c), schema, name))
+      return c.json(await bridge.columns(id(c), schema, name))
     })
-    .get('/:id/database/rows', (c) => {
+    .get('/tasks/:taskId/rows', async (c) => {
       const schema = c.req.query('schema')
       const name = c.req.query('name')
       if (!schema || !name) return respondError(c, 400, 'bad_request')
       const offsetRaw = c.req.query('offset')
       const offset = offsetRaw ? Number(offsetRaw) : undefined
-      return viaBridge(c, DATABASE, (b) => b.rows(id(c), schema, name, offset))
+      return c.json(await bridge.rows(id(c), schema, name, offset))
     })
-    .post('/:id/database/query', async (c) => {
+    .post('/tasks/:taskId/query', async (c) => {
       const p = queryBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, DATABASE, (b) => b.query(id(c), p.data.sql))
+      return c.json(await bridge.query(id(c), p.data.sql))
     })
-    .post('/:id/database/update', async (c) => {
+    .post('/tasks/:taskId/update', async (c) => {
       const p = updateBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, DATABASE, (b) => b.update(id(c), p.data.schema, p.data.name, p.data.column, p.data.value, p.data.pk))
+      return c.json(await bridge.update(id(c), p.data.schema, p.data.name, p.data.column, p.data.value, p.data.pk))
     })
-    .post('/:id/database/insert', async (c) => {
+    .post('/tasks/:taskId/insert', async (c) => {
       const p = insertBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, DATABASE, (b) => b.insert(id(c), p.data.schema, p.data.name, p.data.values))
+      return c.json(await bridge.insert(id(c), p.data.schema, p.data.name, p.data.values))
     })
-    .post('/:id/database/delete', async (c) => {
+    .post('/tasks/:taskId/delete', async (c) => {
       const p = deleteBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      return viaBridge(c, DATABASE, (b) => b.remove(id(c), p.data.schema, p.data.name, p.data.pk))
+      return c.json(await bridge.remove(id(c), p.data.schema, p.data.name, p.data.pk))
     })
-    // --- saved queries (project-scoped, this plugin's own table — no bridge) ---
-    .get('/:id/database/queries', async (c) => {
-      const t = await taskOf(id(c))
-      if (!t) return respondError(c, 404, 'not_found')
-      const project = await projectOf(t)
-      if (!project) return c.json([])
-      const rows = await db.select().from(dbSavedQueries).where(projectScope(project.id)).orderBy(dbSavedQueries.name)
-      return c.json(rows.map(rowToQuery))
+
+    // ── The document surface (docs/future/monaco.md) ───────────────────────────────────────────────
+    //
+    // Two routes and a language id is the ENTIRE declaration behind the query editor now. The host owns
+    // the editor, its theme, its workers, the dirty model, the autosave debounce, ⌘S, the flush before
+    // unmount and the scroll position; this plugin owns a column of text.
+    //
+    // It persists, which the compiled pane's editor did not — an unbacked Monaco started empty every
+    // time. Task-scoped, because a scratch buffer is what you are doing now and what you meant to keep
+    // has a Save button (node/schema.ts § dbScratch).
+    .get('/tasks/:taskId/scratch', async (c) => {
+      const taskId = id(c)
+      if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
+      const [row] = await db.select().from(dbScratch).where(eq(dbScratch.taskId, taskId)).limit(1)
+      return c.json({ text: row?.sql ?? '' } satisfies PluginDocumentBody)
     })
-    .post('/:id/database/queries', async (c) => {
+    .put('/tasks/:taskId/scratch', async (c) => {
+      const p = scratchBody.safeParse(await c.req.json().catch(() => null))
+      if (!p.success) return respondError(c, 400, 'bad_request')
+      const taskId = id(c)
+      // The taskId is a plain ID into core's tables, so core validates it. Checked on the WRITE as well
+      // as the read: an autosave for an archived task should not quietly create a row nothing will
+      // ever read again.
+      if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
+      const now = Date.now()
+      await db
+        .insert(dbScratch)
+        .values({ taskId, sql: p.data.text, updatedAt: now })
+        .onConflictDoUpdate({ target: dbScratch.taskId, set: { sql: p.data.text, updatedAt: now } })
+      return c.json({ ok: true })
+    })
+
+    // Table/column completions — the first LSP-shaped capability. The host POSTs a position and maps
+    // what comes back onto its editor; every judgement about SQL is in ../completions.ts, on this side.
+    .post('/tasks/:taskId/completions', async (c) => {
+      const p = completionsBody.safeParse(await c.req.json().catch(() => null))
+      if (!p.success) return respondError(c, 400, 'bad_request')
+      const catalog = await bridge.catalog(id(c))
+      // Not connected is not an error here. A reader typing in the editor before the pane has reached
+      // the database wants an empty popup, not a red line.
+      if ('error' in catalog) return c.json({ items: [] } satisfies PluginCompletionResponse)
+      const items = completeSql(p.data.text, p.data.position, catalog.tables)
+      return c.json({ items: items.slice(0, MAX_COMPLETION_ITEMS) } satisfies PluginCompletionResponse)
+    })
+
+    // --- saved queries (project-scoped, this plugin's own table — no database connection needed) ---
+    .get('/tasks/:taskId/queries', async (c) => {
+      const saved = await savedFor(id(c))
+      if (!saved) return respondError(c, 404, 'not_found')
+      return c.json(saved)
+    })
+    .post('/tasks/:taskId/queries', async (c) => {
       const p = savedQueryBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      // The taskId is a plain ID into core's tables, so core validates it — this was a join in this
-      // file, and cannot be one across two SQLite files.
       const t = await taskOf(id(c))
       if (!t) return respondError(c, 404, 'not_found')
-      const project = await projectOf(t)
+      const project = t.projectId ? await projectOf(t) : null
       if (!project) return respondError(c, 400, 'project_not_found')
       const now = Date.now()
       const row: typeof dbSavedQueries.$inferInsert = {
@@ -159,32 +246,39 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
         .returning()
       return c.json(rowToQuery(saved))
     })
-    .delete('/:id/database/queries/:queryId', async (c) => {
+    .delete('/tasks/:taskId/queries/:queryId', async (c) => {
       const t = await taskOf(id(c))
       if (!t) return respondError(c, 404, 'not_found')
-      const project = await projectOf(t)
+      const project = t.projectId ? await projectOf(t) : null
       if (!project) return c.json({ ok: true })
       await db.delete(dbSavedQueries).where(and(eq(dbSavedQueries.id, c.req.param('queryId')), projectScope(project.id)))
       return c.json({ ok: true })
     })
-    // Generate a PostgreSQL query from a natural-language description via a connected model provider
-    // (docs/pg.md). The plugin owns the route + prompt; the core runtime owns provider access. The
-    // prompt carries the schema, the repo's schema notes, and any saved queries picked as examples.
-    .post('/:id/database/generate', async (c) => {
+
+    // Which model connections this owner could generate with. The frame cannot ask core directly —
+    // `/v2/core/integrations` has no bridge scope, and minting one would hand every installed plugin the
+    // whole connection roster to serve one dropdown. This answers ids and labels; the key stays on the
+    // node and is resolved inside `models.generateText`.
+    .get('/tasks/:taskId/model-connections', async (c) => {
+      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
+      const connections = await core.models.available(owner(c))
+      return c.json({ connections })
+    })
+
+    // Generate a PostgreSQL query from a natural-language description through a connected model
+    // provider. The plugin owns the route and the prompt; core owns provider access. The prompt carries
+    // the schema, the repo's schema notes, and any saved queries picked as examples.
+    .post('/tasks/:taskId/generate', async (c) => {
       const p = generateBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
-      const bridge = routeCapabilityFor(c, DATABASE)
-      if (!bridge) return respondError(c, 503, 'bridge-unavailable')
-      // AI SQL generation spends the owner's OpenAI/Anthropic key, billed to the owner. A task-scoped
-      // agent credential must not reach it (server/middleware/requireUser.ts § canUseProviderCredential).
-      if (!canUseProviderCredential(c)) return respondError(c, 403, 'interactive_user_required')
+      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
       const schemaRes = await bridge.schema(id(c))
       if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
-      // Unknown/foreign ids just don't resolve — a stale pick shouldn't fail the whole generate.
+      // Unknown/foreign ids just do not resolve — a stale pick should not fail the whole generate.
       const examples = await loadExamples(id(c), p.data.queryIds ?? [])
       try {
         const result = await core.models.generateText({
-          userId: ownerId(c),
+          userId: owner(c),
           connectionId: p.data.connectionId,
           input: {
             system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples }),
@@ -199,4 +293,28 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices) 
         return respondError(c, 502, 'provider_unavailable')
       }
     })
+
+    // --- the agent composer's "Saved database queries" entry (../agentContext.ts) ---
+    .get('/context-options', async (c) => {
+      const taskId = c.req.query('taskId')
+      if (!taskId) return respondError(c, 404, 'not_found')
+      const saved = await savedFor(taskId, MAX_CONTEXT_QUERIES)
+      if (!saved) return respondError(c, 404, 'not_found')
+      return c.json(saved.map(savedQueryOption))
+    })
+    .post('/context-capture', async (c) => {
+      const p = contextCaptureBody.safeParse(await c.req.json().catch(() => null))
+      if (!p.success) return respondError(c, 400, 'bad_request', p.error.issues.map((i) => i.message))
+      const saved = await savedFor(p.data.taskId, MAX_CONTEXT_QUERIES)
+      if (!saved) return respondError(c, 404, 'not_found')
+      const chosen = p.data.optionIds ? saved.filter((query) => p.data.optionIds?.includes(query.id)) : saved
+      return c.json(chosen.map(savedQuerySnapshot))
+    })
+}
+
+/** The portable carrier. A Hono instance cannot cross a process boundary and a (Request) → Response
+ * function can, so this is what `ctx.routes.fetch` is handed. */
+export const createDatabaseFetch = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge): PluginFetchHandler => {
+  const routes = databaseRoutes(db, core, bridge)
+  return (request, context) => routes.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
 }

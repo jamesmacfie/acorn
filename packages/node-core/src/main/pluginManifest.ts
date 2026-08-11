@@ -29,6 +29,7 @@ import {
   isPluginShortcutChord,
   isReservedPluginKeyClaim,
 } from '@acorn/protocol/keybindings.ts'
+import { LANGUAGE_IDS } from '@acorn/protocol/languageIds.ts'
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The constant itself
 // moved to @acorn/protocol when the client gained a stake in it: the node uses it to decide what to
@@ -81,10 +82,84 @@ const webviewHost = z.string().min(1).max(WEBVIEW_HOST_MAX_LENGTH).superRefine((
   }
 })
 
+// A path the host will GET or POST on this plugin's behalf. Bounded here, confined in the
+// manifest-level refinement (which is where `id` is visible). Declared above the frame block because
+// a document region names two of them.
+const pluginRoute = z.string().min(1).max(256)
+
+// ── Host-owned document surfaces (docs/future/monaco.md) ──────────────────────────────────────────
+//
+// The one class of surface the sandbox provably cannot serve. A Monaco frame measures 7.93 MiB
+// against an 8.00 MiB cap with a stub UI, and its language-service workers cannot be delivered at all:
+// a plugin origin serves one file and the frame CSP has no `worker-src`. The alternative to this block
+// was multi-file plugin origins plus `worker-src` — a permanent widening of the sandbox for every
+// installed plugin, forever, to serve two first-party panes.
+//
+// So the host owns the editor and the plugin supplies the DOCUMENT: an identity, a route that reads
+// it, optionally a route that writes it, and a language id from the vocabulary above. The plugin ships
+// no editor code and therefore cannot get theming, save semantics, dirty state or view state wrong,
+// because it never owns them.
+//
+// The bar for a host-owned region, and it is deliberately high: a region is host-owned only when the
+// sandbox CANNOT serve its content. Common is not the bar; impossible is. Master/detail is common —
+// every frame already draws its own with ordinary CSS — and the answer to "make that a region too"
+// stays no, because the host rendering a plugin's list from data means designing and eternally
+// versioning a widget toolkit in the wire format.
+const documentRegion = z.object({
+  // From the published vocabulary, so an unknown id is a parse error rather than a document that
+  // silently renders as plain text. LSP's spellings (@acorn/protocol/languageIds.ts).
+  languageId: z.enum(LANGUAGE_IDS).default('plaintext'),
+  // GET -> { text }. `:taskId` and `:projectId` are substituted by the host from the pane's own scope;
+  // no other parameter is, because no other one is the host's to know.
+  read: pluginRoute,
+  // PUT { text }. ABSENT MEANS READ-ONLY, which is a real mode rather than a degenerate one — a
+  // generated migration or a rendered template in a proper highlighted viewer wants exactly this.
+  write: pluginRoute.optional(),
+  // The first language capability, and the precedent for how the rest grow: LSP-SHAPED
+  // REQUEST/RESPONSE ROUTES — position and text in, standard items out — never "run my code inside the
+  // editor". The host POSTs `{ text, position }` and maps a small subset of LSP's CompletionItem back
+  // onto its editor; it never learns the language. Context detection ("after FROM → tables, after
+  // `alias.` → that table's columns") is the PLUGIN's, on its node half, where the schema knowledge
+  // already lives — which is what lets a GraphQL console or a YAML config plugin reuse this with zero
+  // host changes. Hover and diagnostics can follow the same shape when a consumer needs them; custom
+  // widgets, decorations and inline UI cannot, and the test for any proposal is "is this an LSP method".
+  completions: z.object({
+    route: pluginRoute,
+    // What re-opens the popup mid-word, beyond the editor's own identifier rule. Small and bounded:
+    // this is a list of punctuation, not a grammar.
+    triggerCharacters: z.array(z.string().min(1).max(2)).max(8).default([]),
+  }).optional(),
+})
+
+// Which arrangement of regions the host draws for this pane, and what goes in each.
+//
+// REGION-ADDRESSED FROM DAY ONE even though only the degenerate template exists, and that is the single
+// one-way door in the design. Shipped whole-pane-addressed, a declaration means "this PANE is a document
+// surface"; under templates it means "this REGION of a template is one". Bolting regions on later would
+// change what every already-published declaration means, underneath third-party plugins we no longer
+// control. Carrying the region-capable shape now costs a nested object and keeps the door open.
+//
+// `document-over-frame` arrived with its consumer, which is the database pane: a document above the
+// plugin's own frame with a host-owned splitter between them. `frame-beside-document` (the editor
+// pane's) is the next entry and lands with ITS consumer rather than ahead of it. Orientation is encoded
+// in the NAME on purpose: an `orientation` field would imply the other values exist, which is the first
+// knob of a layout language. The generative rule, so future entries stay in the family:
+// `<host surface>` optionally arranged `<over|beside>` `frame`.
+const paneLayout = z.object({
+  template: z.enum(['document', 'document-over-frame']),
+  document: documentRegion,
+})
+
 const frameSurface = z.object({
-  // Which registry this lands in. The shell renders all four the same way; what differs is the
+  // Which registry this lands in. The shell renders them all the same way; what differs is the
   // surrounding chrome it supplies.
-  target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview']),
+  //
+  // `overlay` is the full-screen picker slot — the one the editor's ⌘P file palette occupies as a
+  // compiled contribution, and the last component slot with no manifest form. It is a rectangle the
+  // HOST places (backdrop, box, close affordance), which is the same argument that makes `refPanel` a
+  // frame target: the frame draws its contents, not its own position. It has no click site of its own,
+  // so the only way to open one is the `openOverlay` verb below.
+  target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview', 'overlay']),
   // TASK or PROJECT, and `pane` only. A pane has always meant "a rectangle in a task's layout", which is
   // why that is the default: every manifest written before this field parses and behaves identically.
   //
@@ -119,6 +194,10 @@ const frameSurface = z.object({
   url: z.string().min(1).max(2_048).optional(),
   urlSource: z.string().min(1).max(256).optional(),
   hosts: z.array(webviewHost).min(1).max(WEBVIEW_HOST_MAX_COUNT).optional(),
+  // `pane` only. Absent is the shape every manifest written so far has: a plain frame filling the
+  // pane, exactly what http declares today. Present, it says the HOST draws some or all of this
+  // rectangle from the regions below.
+  layout: paneLayout.optional(),
   // Chords the frame may keep instead of forwarding to the shell. Runtime code may narrow this
   // list, never widen it; declaring the upper bound makes the capture visible before code runs.
   claimsKeys: z.array(z.string().min(1).max(64).superRefine((value, ctx) => {
@@ -140,9 +219,6 @@ const frameSurface = z.object({
 //
 // Everything below is therefore either static data or a path into the plugin's own namespace. The
 // confinement check itself lives in the manifest-level refinement, because it needs `id`.
-
-// A path the host will GET or POST on this plugin's behalf. Bounded here, confined below.
-const pluginRoute = z.string().min(1).max(256)
 
 // The closed verb set the host executes on a descriptor's behalf. Closed on purpose: it is the
 // flexibility dial, every plugin composes the same few verbs, and adding one later is additive.
@@ -168,6 +244,20 @@ const chromeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('createTask') }),
   // https only, and opened in the real browser — never in-app (docs/electron.md § navigation policy).
   z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
+  // An `overlay` surface the SAME manifest declares, checked below. This verb is in both unions rather
+  // than only the narrow one: an overlay covers the window and belongs to no task's layout, so it needs
+  // nothing from its click site — no row, no routed project, no task. The click site it will actually be
+  // used from is a command with a keybinding, which is what ⌘P is.
+  z.object({ verb: z.literal('openOverlay'), overlay: z.string().min(1).max(64) }),
+  // A composed pane the SAME manifest declares, checked below. The only verb whose effect lands inside a
+  // plugin rather than on the shell, and it exists because of a chord the plugin cannot receive: in a
+  // `document-over-frame` pane ⌘Enter is pressed in the HOST's editor, where the frame has no keyboard at
+  // all. The host resolves it against the surface-scoped keybinding, flushes the document, and posts the
+  // command id over that frame's bridge.
+  //
+  // Naming the surface rather than deriving it from the keybinding keeps the command usable on its own —
+  // from the palette, from a footer badge — instead of being a thing only a chord can reach.
+  z.object({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
 ])
 
 // Seconds. A fallback for data that changes with no node-side trigger; the primary freshness path is
@@ -185,6 +275,8 @@ const contextFreeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
   z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
+  z.object({ verb: z.literal('openOverlay'), overlay: z.string().min(1).max(64) }),
+  z.object({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
 ])
 
 // What an empty rail says, and where it can send someone.
@@ -368,7 +460,7 @@ const agentContextDescriptor = z.object({
 })
 
 // One batch-enrichment route, so a surface holding identifiers of THIS plugin's items can turn them
-// into something displayable without importing this plugin (docs/third-party/cross-plugin-refs.md).
+// into something displayable without importing this plugin (docs/third-party/README.md § cross-plugin references).
 // The host POSTs `{ identifiers }` and parses the answer against @acorn/protocol/refResolvers.ts.
 //
 // `kind` names the content-link kind these identifiers come from — `linear.issue` — so a caller that
@@ -409,6 +501,8 @@ const contributions = z.looseObject({
 }).prefault({})
 
 export type PluginFrameSurface = z.infer<typeof frameSurface>
+export type PluginPaneLayout = z.infer<typeof paneLayout>
+export type PluginDocumentRegion = z.infer<typeof documentRegion>
 export type PluginChromeAction = z.infer<typeof chromeAction>
 export type PluginCommandDescriptor = z.infer<typeof commandDescriptor>
 export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
@@ -460,6 +554,13 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   // A webview is a pane by another name and has no second scope, so it counts as a task pane.
   const taskPanes = new Set(frames.filter((frame) => frame.target === 'webview' || (frame.target === 'pane' && frame.scope === 'task')).map((frame) => frame.id))
   const projectPanes = new Set(frames.filter((frame) => frame.target === 'pane' && frame.scope === 'project').map((frame) => frame.id))
+  const overlays = new Set(frames.filter((frame) => frame.target === 'overlay').map((frame) => frame.id))
+  // Panes with BOTH a host region and a frame region, which is the only place a surface action has to
+  // land. The degenerate `document` template is excluded on purpose: it draws no frame, so a command
+  // targeting it would parse and then post into nothing.
+  const composedPanes = new Set(
+    frames.filter((frame) => frame.target === 'pane' && frame.layout?.template === 'document-over-frame').map((frame) => frame.id),
+  )
 
   const confine = (path: string, prefix: string, at: (string | number)[]): void => {
     let confined = false
@@ -474,6 +575,11 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
 
   const route = (path: string, at: (string | number)[]): void => confine(path, own, at)
 
+  // Filled by `action` below, and read after every descriptor pass has run: an overlay has no click site
+  // of its own, so a declared one that nothing opens is the same "parses and can never appear" failure
+  // the project-scoped pane checks at the bottom of this function refuse.
+  const openedOverlays = new Set<string>()
+
   const action = (value: PluginChromeAction, at: (string | number)[]): void => {
     // A pane the manifest did not declare is a manifest error, not a runtime surprise — and it cannot
     // name another plugin's pane, because the host only ever registers panes this manifest declared.
@@ -486,6 +592,19 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     }
     if (value.verb === 'navigate' && !projectPanes.has(value.surface)) {
       ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `navigate names '${value.surface}', which this manifest does not declare as a project-scoped pane` })
+    }
+    if (value.verb === 'openOverlay') {
+      if (overlays.has(value.overlay)) openedOverlays.add(value.overlay)
+      else ctx.addIssue({ code: 'custom', path: [...at, 'overlay'], message: `openOverlay names '${value.overlay}', which this manifest does not declare as an overlay surface` })
+    }
+    // The frame region is what receives it, so the degenerate template is not a candidate — and neither
+    // is a plain frame pane, which has no document to flush and no host chord to have resolved this.
+    if (value.verb === 'surfaceAction' && !composedPanes.has(value.surface)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'surface'],
+        message: `surfaceAction names '${value.surface}', which this manifest does not declare as a document-over-frame pane`,
+      })
     }
     if (value.verb === 'runNodeAction') route(value.path, [...at, 'path'])
     // `openUrl` reaches the real browser. Anything but https is either a downgrade or a scheme handler,
@@ -503,6 +622,31 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
     // importer are modals the host puts on screen, and a webview is a pane by another name.
     if (frame.scope === 'project' && frame.target !== 'pane') {
       ctx.addIssue({ code: 'custom', path: [...at, 'scope'], message: 'only a pane surface can be project-scoped' })
+    }
+    if (frame.layout) {
+      // A template splits a PANE rectangle. A settings page, an importer, a reference panel and an
+      // overlay are all chrome the host already draws around a frame, and a webview's pixels are not
+      // the renderer's at all — none of them has a rectangle to split.
+      if (frame.target !== 'pane') {
+        ctx.addIssue({ code: 'custom', path: [...at, 'layout'], message: 'layout is only valid on a pane surface' })
+      }
+      route(frame.layout.document.read, [...at, 'layout', 'document', 'read'])
+      if (frame.layout.document.write) route(frame.layout.document.write, [...at, 'layout', 'document', 'write'])
+      if (frame.layout.document.completions) {
+        route(frame.layout.document.completions.route, [...at, 'layout', 'document', 'completions', 'route'])
+      }
+      // The degenerate template has no frame region, so this plugin's bundle draws nothing in this
+      // pane — there is no iframe to hold a chord and forward the rest. Declaring claims here would
+      // parse and then capture nothing, which is the failure this file spends its length refusing.
+      // The check is on the template rather than on `layout`, because `document-over-frame` DOES have
+      // a frame and its claims will be real.
+      if (frame.layout.template === 'document' && frame.claimsKeys.length) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'claimsKeys'],
+          message: "the 'document' template draws no frame, so there is nothing here to claim keys",
+        })
+      }
     }
     if (frame.target !== 'webview') {
       if (frame.url !== undefined || frame.urlSource !== undefined || frame.hosts !== undefined) {
@@ -586,6 +730,13 @@ export const pluginManifestSchema = manifestShape.superRefine((manifest, ctx) =>
   // which is the failure mode this file spends the rest of its length avoiding.
   const navigatedSurfaces = new Set(sources.flatMap((entry) => entry.onSelect?.verb === 'navigate' ? [entry.onSelect.surface] : []))
   frames.forEach((frame, i) => {
+    if (frame.target === 'overlay' && !openedOverlays.has(frame.id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'frames', i],
+        message: `overlay '${frame.id}' needs an action that opens it; a command with a keybinding is the usual one`,
+      })
+    }
     if (frame.target !== 'pane' || frame.scope !== 'project') return
     const at = ['contributions', 'frames', i] as (string | number)[]
     if (!routedSurfaces.has(frame.id)) {

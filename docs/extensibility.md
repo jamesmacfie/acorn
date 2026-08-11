@@ -40,9 +40,9 @@ until it can do everything the first can.
 
 **The line is: can the contribution be expressed as data plus asynchronous messages?**
 
-If yes, it can be sandboxed. Panes, reference panels, settings pages, importers, rail sources,
-badges, palette rows, attention items, node stats, content links, commands, keybindings, webviews
-— all of these turned out to be expressible that way, several of them only after someone looked
+If yes, it can be sandboxed. Panes, reference panels, settings pages, importers, overlay pickers, rail
+sources, badges, palette rows, attention items, node stats, content links, commands, keybindings,
+webviews — all of these turned out to be expressible that way, several of them only after someone looked
 properly.
 
 If no, it needs the shared realm and stays first-party. That is a short list: owning a WebSocket
@@ -242,15 +242,21 @@ Roughly in order of how much they matter:
 
 1. **Node-half containment.** The one honest weakness. Everything else is defence in depth around
    a server half that is disclosed rather than contained.
-2. **The remaining migration candidates** — http, database, editor. Each proves something
-   different: http is the only one that would exercise plugin-owned storage and a migration
-   shipped through an update; editor is the hardest and most valuable, because it demands
-   keybindings, latency and real cross-pane traffic. linear has moved, and it is the one that found a
-   capability the tier cannot carry rather than merely reshape (docs/third-party/linear.md).
-3. **The carriers that are still missing.** `agentContexts` — the composer's attach-to-context
-   picker, and the last thing blocking http and database — now has one: two routes the host fetches
-   on the plugin's behalf, which is what its already-async-data-shaped contract needed. What is left
-   is `persistedState` and a component slot outside the task footer, both of which editor wants.
+2. **The editor plugin's move, the last one.** The migration candidates are done being candidates.
+   http moved first with tables; database followed over the **document surface** — the host owns one
+   editor and lends it through a vendor-neutral contract (`docs/plugins.md § Document surfaces`,
+   design record `future/monaco.md`). That surface exists because a Monaco frame measurably cannot be
+   served: 7.93 MiB against an 8.00 MiB cap with a stub UI, and its language-service workers denied
+   outright by the one-file origin and a CSP with no `worker-src`
+   (docs/third-party/editor.md § Monaco in a frame) — the first surface class the sandbox demonstrably
+   does not serve, answered by widening nothing. What remains is editor itself: its own template shape
+   and the open-document verb ⌘P needs (docs/third-party/editor.md).
+   linear, earlier, was the one that found a capability the tier cannot carry rather than merely
+   reshape (docs/third-party/README.md § What is still owed).
+3. **The carriers that were missing have answers.** `agentContexts` has a form and real callers;
+   `overlay` is a frame target opened by the `openOverlay` verb (unexercised end to end until a plugin
+   declares one); `persistedState` deliberately gets no manifest form — the frame's
+   `state.get`/`state.set` is the tier's store, with the cost named in `docs/plugins.md`.
 4. **Ecosystem, if and when it is wanted** — discovery, a scaffold, an authoring guide, a written
    compatibility policy. Deliberately last: none of it is worth building before a plugin someone
    outside this repo actually wants to ship.
@@ -267,3 +273,6 @@ Roughly in order of how much they matter:
 - `third-party/` — the review record from the first migration out of the binary.
 - `future/remote.md` — web, mobile, and remote access.
 - `future/terminal.md` — a terminal client and how plugin UI would render there.
+- `future/monaco.md` — a host-owned document surface: the concrete instance of terminal.md's
+  "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
+  that remains.

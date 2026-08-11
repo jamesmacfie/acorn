@@ -1,0 +1,384 @@
+/* API panel — the rail Source and the task pane share every rule here (docs/ui-design.md).
+   Feature-owned; shared tokens only. Borders are picked by role: --chrome-divider between regions,
+   --divider between rows, --control-border on inputs. */
+
+/* `flex: 1` because a task slot is a flex row and this is its only child: with the default `auto`
+   basis the grid sizes to its own content and leaves half the slot empty. Harmless in the rail
+   Source, where the parent isn't a flex container. */
+.http-panel {
+  display: grid;
+  grid-template-columns: clamp(200px, 22vw, 300px) minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── sidebar ─────────────────────────────────────────────────────────────────────────────── */
+
+.http-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: var(--chrome-divider);
+  overflow: hidden;
+}
+
+.http-tree { flex: 1; overflow-y: auto; min-height: 0; }
+
+.http-tree-group { padding-bottom: var(--space-3); }
+
+.http-tree-folder {
+  display: block;
+  padding: var(--space-4) var(--pane-pad) var(--space-1);
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+}
+
+.http-tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-2);
+  border-left: var(--marker-w) solid transparent;
+}
+.http-tree-row:hover { background: var(--bg-hover); }
+.http-tree-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+
+.http-tree-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.http-tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Actions stay hidden until the row is hovered or holds focus, so the list reads as names. */
+.http-tree-actions { display: flex; gap: 2px; opacity: 0; }
+.http-tree-row:hover .http-tree-actions,
+.http-tree-row:focus-within .http-tree-actions { opacity: 1; }
+
+.http-vars-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--pane-pad);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-top: var(--chrome-divider);
+  cursor: pointer;
+}
+.http-vars-link:hover { background: var(--bg-hover); color: var(--text); }
+.http-vars-link.active { color: var(--accent); }
+
+/* ── method chips ────────────────────────────────────────────────────────────────────────── */
+
+.http-method-chip {
+  flex-shrink: 0;
+  min-width: 3.4em;
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--label-tracking);
+  color: var(--text-muted);
+}
+.http-method-chip[data-method='get'] { color: var(--state-ok); }
+.http-method-chip[data-method='post'] { color: var(--accent); }
+.http-method-chip[data-method='put'],
+.http-method-chip[data-method='patch'] { color: var(--state-warn); }
+.http-method-chip[data-method='delete'] { color: var(--state-bad); }
+
+/* ── main column ─────────────────────────────────────────────────────────────────────────── */
+
+.http-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.http-urlbar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4) var(--pane-pad);
+  border-bottom: var(--divider);
+}
+.http-urlbar .http-method { flex: 0 0 auto; }
+.http-urlbar .http-url { flex: 1; min-width: 0; font-family: var(--font-mono, monospace); }
+
+.http-metabar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+  background: var(--bg-subtle);
+}
+.http-metabar-spacer { flex: 1; }
+.http-dirty { color: var(--accent); font-size: var(--fs-xs); }
+
+/* The request's name is a button that opens the save dialog — the only place it can be edited. */
+.http-name-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.http-name-btn:hover { background: var(--bg-hover); }
+.http-name-folder { color: var(--text-faint); }
+.http-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.http-name-tag {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+}
+
+/* ── request tabs ────────────────────────────────────────────────────────────────────────── */
+
+.http-request-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 45%;
+  overflow: hidden;
+}
+
+/* The body/auth mode selector rides in the tab strip's right slot rather than inside the panel,
+   so the current mode stays visible from any tab. */
+.http-tabstrip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-right: var(--pane-pad);
+  border-bottom: var(--divider);
+}
+.http-tabstrip .ui-tabs { flex: 1; min-width: 0; border-bottom: 0; }
+.http-tabstrip-right { flex: 0 0 auto; }
+
+.http-tabpanel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3) var(--pane-pad);
+}
+
+.http-body-editor {
+  width: 100%;
+  min-height: 12em;
+  height: 100%;
+  resize: vertical;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-sm);
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+.http-hint {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.http-hint code {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-2xs);
+  padding: 0 3px;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.http-empty {
+  margin: var(--space-3) var(--pane-pad);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+/* ── key/value grids ─────────────────────────────────────────────────────────────────────── */
+
+.http-grid { display: flex; flex-direction: column; gap: 2px; }
+
+.http-grid-head,
+.http-grid-row {
+  display: grid;
+  grid-template-columns: auto minmax(6em, 1fr) minmax(8em, 2fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.http-grid-head {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  padding-bottom: var(--space-1);
+}
+
+/* The trailing blank row is a typing affordance, not data — mute it until it has content. */
+.http-grid-row.is-blank { opacity: 0.6; }
+.http-grid-row.is-blank:focus-within { opacity: 1; }
+
+/* The variables grid carries an extra `kind` column and a per-row hint line. */
+.http-vars-grid .http-grid-head,
+.http-vars-grid .http-grid-row {
+  grid-template-columns: auto minmax(6em, 1fr) 7em minmax(8em, 2fr) auto;
+}
+.http-grid-actions { display: flex; gap: var(--space-1); align-items: center; }
+.http-grid-hint {
+  grid-column: 2 / -1;
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+}
+
+.http-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.http-field > span { flex: 0 0 7em; font-size: var(--fs-xs); color: var(--text-muted); }
+
+.http-auth { max-width: 42em; }
+
+/* ── response ────────────────────────────────────────────────────────────────────────────── */
+
+.http-response {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 55%;
+  border-top: var(--chrome-divider);
+  overflow: hidden;
+}
+
+.http-response-empty {
+  padding: var(--space-5) var(--pane-pad);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+.http-response-error {
+  color: var(--state-bad);
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+}
+.http-failure-message {
+  margin: 0 0 var(--space-4);
+  color: var(--state-bad);
+  font-size: var(--fs-sm);
+}
+
+.http-response-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--pane-pad);
+  border-bottom: var(--divider);
+}
+.http-response-meta {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.http-response-spacer { flex: 1; }
+
+.http-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.http-response-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3) var(--pane-pad);
+}
+
+.http-pre {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.http-kv-list {
+  display: grid;
+  grid-template-columns: minmax(8em, auto) minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.http-kv-list dt { color: var(--text-muted); font-family: var(--font-mono, monospace); }
+.http-kv-list dd { margin: 0; overflow-wrap: anywhere; }
+
+.http-timeline { list-style: none; margin: 0; padding: 0; }
+
+.http-timeline-row {
+  display: grid;
+  grid-template-columns: 9em minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: 1px 0;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+}
+.http-timeline-label { color: var(--text-faint); }
+.http-timeline-detail { overflow-wrap: anywhere; white-space: pre-wrap; }
+.http-timeline-row[data-label='request'] .http-timeline-detail,
+.http-timeline-row[data-label='response'] .http-timeline-detail { color: var(--accent); }
+.http-timeline-row[data-label='error'] .http-timeline-detail,
+.http-timeline-row[data-label='error-detail'] .http-timeline-detail { color: var(--state-bad); }
+
+/* ── variables view ──────────────────────────────────────────────────────────────────────── */
+
+/* Fills the main column rather than sizing to its rows — `.http-main` is a flex column, so without
+   `flex: 1` the grid ends where its content does and the scroller never engages. */
+.http-variables {
+  flex: 1;
+  padding: var(--space-5) var(--pane-pad);
+  overflow-y: auto;
+  min-height: 0;
+}
+.http-variables-head h3 { margin: 0 0 var(--space-2); font-size: var(--fs-sm); }
+.http-variables-head { margin-bottom: var(--space-5); max-width: 60em; }
+
+.http-choose-repo { padding: var(--space-8) var(--pane-pad); max-width: 40em; }
+.http-choose-repo h2 { margin: 0 0 var(--space-2); font-size: var(--fs-sm); }
+
+/* Settings hosts the same variables component with no pane chrome around it. */
+.settings-page .http-variables { padding: 0; flex: none; }
+
+/* `.settings-hint` is a shell class and the shell's settings.css is NOT one of the modules a frame's
+   host stylesheet carries (apps/desktop/src/app/main/pluginFrameStyles.ts is presentation primitives
+   only). One declaration here beats widening that list for one line of text — and a frame that reaches
+   for a host class it cannot see renders unstyled rather than failing, which is the quiet kind. */
+.settings-page .settings-hint { font-size: var(--fs-sm); color: var(--text-muted); }

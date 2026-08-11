@@ -2,7 +2,7 @@ import { MAX_REF_RESOLVE_IDENTIFIERS, type PluginRefResolution } from '@acorn/pr
 import { Registry } from './registry'
 
 // Turning identifiers of one plugin's items into something another plugin's surface can draw
-// (docs/third-party/cross-plugin-refs.md § piece 2). The recognition half is ./contentLinks.ts; this is
+// (docs/third-party/README.md § cross-plugin references). The recognition half is ./contentLinks.ts; this is
 // what happens after a ref has been found.
 //
 // The entry holds a CLOSURE rather than a route, exactly as `AgentContextContribution` does, and for

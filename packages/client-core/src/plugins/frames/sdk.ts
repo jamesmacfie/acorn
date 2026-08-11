@@ -39,9 +39,14 @@ export class AcornBridgeError extends Error {
   }
 }
 
+// Five verbs, matching `PluginBridgeApiRequest.method` exactly. `put` was missing until a frame needed
+// one: the protocol and the broker both carried PUT from the start, and only this facade did not, so a
+// plugin whose own routes take a full-replacement body had no way to call them. A method absent here is
+// a method no plugin can reach, however permissive the table underneath.
 export type AcornBridgeApi = {
   get<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
   post<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
+  put<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
   patch<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T>
   del<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
 }
@@ -77,8 +82,27 @@ export type AcornBridge = {
     openUrl(url: string): Promise<void>
     /** Importer surfaces only: finish, letting the host close the modal and refresh. */
     done(): Promise<void>
-    /** Importer surfaces only: dismiss without having imported anything. */
+    /** Dismiss the surface: an importer modal without having imported anything, or an overlay once its
+     * picker has picked. Refused from any other surface — a pane does not get to close itself. */
     close(): Promise<void>
+  }
+  /**
+   * The document this frame shares its pane with, when its manifest declared a `document-over-frame`
+   * layout. The host draws that editor — its theme, its workers, its dirty state, its ⌘S — and these
+   * three methods are the entire seam between it and the plugin's own half of the rectangle.
+   *
+   * Denied from any other surface, structurally: a frame that has no document beside it has nothing
+   * these could address.
+   */
+  document: {
+    /** The editor's current text, including edits not yet written to the plugin's own route. */
+    read(): Promise<string>
+    /** Replace it. Goes through the model, so it joins the undo stack and schedules the host's autosave
+     * exactly as typing would. */
+    write(text: string): Promise<void>
+    /** Write anything pending to the plugin's declared write route and wait for it. Rarely needed by
+     * hand: the host already flushes before it delivers a surface action. */
+    flush(): Promise<void>
   }
   webview: {
     navigate(url: string): Promise<void>
@@ -99,6 +123,15 @@ export type AcornBridge = {
   /** A row was selected on this plugin's declarative rail source while this pane was already open. The
    * selection that OPENED the pane is `context.item` instead — this fires only for the ones after it. */
   onSelect(listener: (item: string) => void): () => void
+  /**
+   * One of this surface's declared commands fired — from its chord pressed inside the host's editor,
+   * from the palette, or from anywhere else the host runs a command. `command` is the id the manifest
+   * declared.
+   *
+   * Handle it exactly as you would the equivalent button click; the trigger is not your business. The
+   * host has already flushed the shared document, so reading it back through your own route is safe.
+   */
+  onSurfaceAction(listener: (command: string) => void): () => void
 }
 
 type Pending = { resolve(value: unknown): void; reject(error: unknown): void }
@@ -156,6 +189,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     const listeners = new Map<string, Set<(payload: unknown) => void>>()
     const appearanceListeners = new Set<(appearance: { theme: string; style: string }) => void>()
     const selectListeners = new Set<(item: string) => void>()
+    const actionListeners = new Set<(command: string) => void>()
     const subscribing = new Map<string, Promise<unknown>>()
     let seq = 0
     let context: PluginFrameContext | null = null
@@ -212,6 +246,9 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         case 'select':
           for (const listener of selectListeners) listener(message.item)
           return
+        case 'surfaceAction':
+          for (const listener of actionListeners) listener(message.command)
+          return
       }
     }
     port.start?.()
@@ -265,6 +302,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       api: {
         get: (path, options) => call('GET', path, undefined, options),
         post: (path, body, options) => call('POST', path, body, options),
+        put: (path, body, options) => call('PUT', path, body, options),
         patch: (path, body, options) => call('PATCH', path, body, options),
         del: (path, options) => call('DELETE', path, undefined, options),
       },
@@ -282,6 +320,11 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         openUrl: async (url) => void (await request({ kind: 'ui', op: 'openUrl', url })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),
         close: async () => void (await request({ kind: 'ui', op: 'importer.close' })),
+      },
+      document: {
+        read: async () => (await request<{ text?: string }>({ kind: 'document', op: 'read' }))?.text ?? '',
+        write: async (text) => void (await request({ kind: 'document', op: 'write', text })),
+        flush: async () => void (await request({ kind: 'document', op: 'flush' })),
       },
       webview: {
         navigate: async (url) => void (await request({ kind: 'webview', op: 'navigate', url })),
@@ -312,6 +355,10 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       onSelect(listener) {
         selectListeners.add(listener)
         return () => void selectListeners.delete(listener)
+      },
+      onSurfaceAction(listener) {
+        actionListeners.add(listener)
+        return () => void actionListeners.delete(listener)
       },
     }
   })

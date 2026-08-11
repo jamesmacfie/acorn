@@ -1,18 +1,32 @@
+import { lazy, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { activeNodeId } from '../../node/activeNode'
+import { commandRegistry } from '../../registries/commands'
 import { pluginProjectRoutePrefix } from '../../registries/corePaths'
+import { keybindingRegistry } from '../../registries/keybindings'
 import { paneRegistry } from '../../registries/panes'
 import { projectImporterRegistry } from '../../registries/projectImporters'
 import { projectSurfaceRegistry } from '../../registries/projectSurfaces'
 import { refPanelRegistry } from '../../registries/refPanels'
 import type { Disposable } from '../../registries/registry'
 import { settingsRegistry } from '../../registries/settings'
-import { activeBundles, bundleAccepted, installedByNode, pluginEnabledOnNode } from '../distribution'
+import { uiSlotRegistry } from '../../registries/slots'
+import { activeTaskId } from '../../tasks/tasks'
+import {
+  activeBundles,
+  bundleAccepted,
+  installedByNode,
+  pluginEnabledOnNode,
+  pluginInstalledAtOnNode,
+  loadedPluginStateOnNode,
+} from '../distribution'
 import PluginFrame from './PluginFrame'
 import PluginWebview from './PluginWebview'
 import type { FrameBinding } from './broker'
+import { documentRegionFor, isHostOwnedSurface } from './documentSurfaces'
+import { closePluginOverlay, pluginOverlayOpen } from './overlays'
 
 // Turning accepted manifests into shell contributions (docs/plugins.md
 // § Frame contribution kind).
@@ -39,6 +53,15 @@ import type { FrameBinding } from './broker'
 //              cannot register a shell contribution at all — only a manifest can.
 
 const registered = new Map<string, Disposable[]>()
+
+// Lazy, like every Monaco-bearing pane in this repo, and here it is required rather than tidy: this
+// file is evaluated on every shell boot, and a static import would put Monaco's tree in the boot
+// graph for a pane most sessions never open — including in the client-graph test suites, where
+// `monaco-editor` reads `window.location` at module scope and there is no real window.
+const DocumentSurface = lazy(() => import('../../editor/DocumentSurface'))
+// The composed template. Its own lazy boundary rather than a branch inside the one above, so a shell
+// that only ever opens a whole-pane document never pulls the frame half in either.
+const DocumentOverFrame = lazy(() => import('./DocumentOverFrame'))
 
 // `activeNodeId()` is the frame's node, and there is no other candidate: a task belongs to whichever node
 // the window is talking to (Task has no nodeId of its own), and a rail-scoped surface is looking at that
@@ -79,12 +102,18 @@ const bindingFor = (pluginId: string, surface: PluginFrameSurface, row: NodePlug
 
 // Registered per plugin, and torn down as a unit: a re-run replaces a plugin's whole contribution set
 // rather than reconciling it, the way the client plugin host does (registries/plugin.ts).
-function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow): Disposable[] {
+function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, trusted: boolean): Disposable[] {
   const disposables: Disposable[] = []
   for (const surface of row.installed?.contributions.frames ?? []) {
     // A surface a future mobile shell would have to render unusably in a phone viewport. Costless to
     // honour now, and the reason the field exists (docs/future/remote.md).
     if (!surface.formFactor.includes('desktop')) continue
+    // A host-owned document surface runs no plugin code on this device — the host draws the editor
+    // and the plugin's contribution is two routes on a node. So it is gated like a DESCRIPTOR rather
+    // than like a frame (chrome/register.ts draws the same line): no bytes execute, so there is
+    // nothing for a bytes-hash prompt to be about, and a plugin that ships only document surfaces
+    // needs no client bundle at all.
+    if (!trusted && !isHostOwnedSurface(surface)) continue
     try {
       disposables.push(registerSurface(pluginId, hash, row, surface))
     } catch (error) {
@@ -112,6 +141,54 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         },
       })
     case 'pane':
+      // A host-owned document surface: no iframe, no plugin code in this pane at all
+      // (docs/future/monaco.md). The host draws the editor and the plugin supplies the document
+      // through two of its own routes, which is why this branch comes before everything else the
+      // `pane` case does — there is no bundle to mount and no bridge to open.
+      //
+      // The routes were confined to `/v2/p/<id>/` when the node parsed the manifest and are confined
+      // AGAIN here, for the reason chrome/data.ts states: the manifest reached this device as a roster
+      // row, and a node could have sent something its own parser would have rejected.
+      {
+        // Throws — and is therefore skipped and logged by registerSurfaces — when a roster row carried
+        // a route the node's own parser would have refused.
+        const region = documentRegionFor(pluginId, surface)
+        if (region) {
+          const composed = surface.layout?.template === 'document-over-frame'
+          return paneRegistry.register({
+            id: surface.id,
+            label: surface.label,
+            glyph: surface.glyph,
+            order: surface.order,
+            when: () => pluginEnabledOnNode(frameNode(), pluginId),
+            component: (props) => {
+              const scope = { taskId: props.task.id, projectId: props.task.projectId ?? undefined }
+              // `document-over-frame` has a frame region, so half this rectangle is the plugin's own
+              // bundle in an iframe — which is why `isHostOwnedSurface` above excluded it from the
+              // trust bypass and why there is a `hash` to hand over here at all.
+              return composed
+                ? (
+                  <DocumentOverFrame
+                    pluginId={pluginId}
+                    binding={bindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId })}
+                    hash={hash}
+                    region={region}
+                    scope={scope}
+                  />
+                )
+                : (
+                  <DocumentSurface
+                    pluginId={pluginId}
+                    surfaceId={surface.id}
+                    nodeId={frameNode()}
+                    region={region}
+                    scope={scope}
+                  />
+                )
+            },
+          })
+        }
+      }
       // Project scope lands in its own registry: the surface is drawn beside its plugin's rail list, with
       // no task to hand it and no layout key to persist (registries/projectSurfaces.ts says why the two
       // are not one registry). The manifest guarantees both a route and a source that navigates to it, so
@@ -208,6 +285,78 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         ),
       })
     }
+    case 'overlay': {
+      // The full-screen picker slot — what the editor's ⌘P file palette occupies as a compiled
+      // contribution, and the last component slot that had no manifest form. Same division of labour as
+      // the reference panel above: the HOST draws the backdrop, the box and the dismiss affordance,
+      // because an iframe cannot position itself against anything outside its own rectangle.
+      //
+      // Nothing here decides when it appears. An overlay has no click site of its own — the only thing
+      // that opens one is the `openOverlay` verb (plugins/chrome/actions.ts), and the manifest refuses an
+      // overlay that no action opens, so a picker without its chord is a parse error rather than a
+      // surface nobody can reach.
+      const open = (): boolean => pluginOverlayOpen(pluginId, surface.id)
+      const closeId = `plugin.${pluginId}.overlay-close.${surface.id}`
+      const disposables = [
+        commandRegistry.register({
+          id: closeId,
+          title: `Close ${surface.label}`,
+          category: 'action',
+          // Kept out of the palette: it is only ever available while an overlay covers the palette.
+          palette: false,
+          when: open,
+          run: closePluginOverlay,
+        }),
+        // Escape, through the keybinding registry rather than a window listener on the host component,
+        // because once an overlay is up the focus is normally INSIDE the iframe — those keydowns never
+        // reach the shell's window, they cross the bridge and are resolved against this registry
+        // (PluginFrame's `keydown` service). `typing-exempt` is the one scope both paths agree on.
+        keybindingRegistry.register({
+          id: closeId,
+          command: closeId,
+          description: `Close ${surface.label}`,
+          category: row.name,
+          defaultChord: 'escape',
+          when: 'typing-exempt',
+          active: open,
+          plugin: {
+            id: pluginId,
+            name: row.name,
+            installedAt: () => pluginInstalledAtOnNode(frameNode(), pluginId),
+            state: () => loadedPluginStateOnNode(frameNode(), pluginId),
+          },
+        }),
+        uiSlotRegistry.register({
+          id: surface.id,
+          slot: 'overlay',
+          order: surface.order,
+          when: () => pluginEnabledOnNode(frameNode(), pluginId),
+          component: () => (
+            <Show when={open()}>
+              <div class="overlay-backdrop" onClick={closePluginOverlay}>
+                <div class="overlay plugin-overlay" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+                  <header class="overlay-title plugin-overlay-head">
+                    <span>{surface.label}</span>
+                    <button type="button" class="plugin-overlay-close" onClick={closePluginOverlay} aria-label="Close">✕</button>
+                  </header>
+                  <div class="plugin-overlay-body">
+                    {/* The active task, because a picker's job is usually to put something into one —
+                        and it is read HERE, when the overlay mounts, so it is the task that was on
+                        screen when the reader asked for it. */}
+                    <PluginFrame
+                      binding={bindingFor(pluginId, surface, row, activeTaskId() ? { taskId: activeTaskId()! } : {})}
+                      hash={hash}
+                      onClose={closePluginOverlay}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Show>
+          ),
+        }),
+      ]
+      return { dispose: () => [...disposables].reverse().forEach((disposable) => disposable.dispose()) }
+    }
     case 'settings':
       return settingsRegistry.register({
         id: surface.id,
@@ -245,25 +394,30 @@ export function syncFrameContributions(): void {
   for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
   registered.clear()
 
-  for (const [pluginId, bundle] of bundles) {
-    // Trust binds to bytes: a hash this device has not accepted contributes nothing, whether it was
-    // rejected or simply never asked about yet.
-    if (!bundleAccepted(pluginId, bundle.hash)) continue
-    const row = rowFor(pluginId)
-    if (!row?.installed) continue
-    registered.set(pluginId, registerSurfaces(pluginId, bundle.hash, row))
+  // Driven by the ROSTER rather than by the bundle map, because not every surface needs a bundle any
+  // more. A document surface is host-drawn and executes nothing here, so the loop has to be able to
+  // reach a plugin that has no client half at all.
+  for (const [pluginId, row] of eligible()) {
+    const bundle = bundles.get(pluginId)
+    // Trust binds to bytes: a hash this device has not accepted runs nothing, whether it was rejected
+    // or simply never asked about yet. What that withholds is the code-bearing surfaces only.
+    const trusted = !!bundle && bundleAccepted(pluginId, bundle.hash)
+    const disposables = registerSurfaces(pluginId, bundle?.hash ?? '', row, trusted)
+    if (disposables.length) registered.set(pluginId, disposables)
   }
 }
 
-// Any node's row for this plugin. The manifest is the same wherever it came from — one bundle won
-// resolution, and its contributions travel with it — so the first node offering this exact bundle is as
-// good as any.
-const rowFor = (pluginId: string): NodePluginRow | undefined => {
-  for (const rows of installedByNode().values()) {
-    const row = rows.find((candidate) => candidate.name === pluginId)
-    if (row?.installed) return row
+/** One row per plugin id, the same way chrome/register.ts picks one: the manifest travels with the
+ * roster row and one bundle wins per id, so the first node offering it is as good as any. */
+function eligible(): Map<string, NodePluginRow> {
+  const rows = new Map<string, NodePluginRow>()
+  for (const roster of installedByNode().values()) {
+    for (const row of roster) {
+      if (!row.installed || rows.has(row.name)) continue
+      rows.set(row.name, row)
+    }
   }
-  return undefined
+  return rows
 }
 
 /** Test seam, mirroring _resetPluginDistribution: the registry is module-level, so a suite that asserts

@@ -31,6 +31,36 @@ describe('permission identifier shape', () => {
   })
 })
 
+describe('overlay surfaces', () => {
+  const overlay = { target: 'overlay', id: 'files', label: 'Go to file' }
+  const opener = (action: unknown) => ({ id: 'open-files', title: 'Go to file', action })
+
+  it('accepts an overlay opened by a command', () => {
+    const result = manifest({ frames: [overlay], commands: [opener({ verb: 'openOverlay', overlay: 'files' })] })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.frames[0]?.target).toBe('overlay')
+  })
+
+  it('refuses an overlay nothing opens, and an openOverlay naming something else', () => {
+    // The same rule a project-scoped pane is held to: a surface that parses and can never appear is
+    // worse than a parse error, because it looks installed.
+    expect(messages(manifest({ frames: [overlay] })))
+      .toContain(`overlay 'files' needs an action that opens it; a command with a keybinding is the usual one`)
+    expect(messages(manifest({ frames: [PANE], commands: [opener({ verb: 'openOverlay', overlay: 'board' })] })))
+      .toContain(`openOverlay names 'board', which this manifest does not declare as an overlay surface`)
+  })
+
+  it('keeps an overlay out of the pane sets', () => {
+    // `openPane` puts a rectangle in a task's layout; an overlay has no layout to be put in.
+    expect(messages(manifest({
+      frames: [overlay],
+      commands: [opener({ verb: 'openOverlay', overlay: 'files' }), { id: 'x', title: 'X', action: { verb: 'openPane', pane: 'files' } }],
+    }))).toContain(`openPane names 'files', which this manifest does not declare as a task-scoped pane`)
+    expect(messages(manifest({ frames: [{ ...overlay, scope: 'project' }], commands: [opener({ verb: 'openOverlay', overlay: 'files' })] })))
+      .toContain('only a pane surface can be project-scoped')
+  })
+})
+
 describe('webview surfaces', () => {
   it('accepts literal and plugin-route URL sources', () => {
     expect(manifest({
@@ -66,6 +96,98 @@ describe('webview surfaces', () => {
     expect(manifest({
       frames: [{ target: 'webview', id: 'remote', label: 'Remote', url: 'http://docs.example.com', hosts: ['docs.example.com'] }],
     }).success).toBe(false)
+  })
+})
+
+describe('document surfaces', () => {
+  // The host draws the editor and the plugin supplies the document, because a Monaco frame cannot be
+  // served at all (docs/future/monaco.md). What is worth pinning is the same class of rule as every
+  // other cross-field check here: a plugin may not name a route outside its own namespace, and a
+  // surface that parses and can never do anything is refused rather than shipped.
+  const layout = (document: Record<string, unknown>) => ({ ...PANE, layout: { template: 'document', document } })
+
+  it('accepts a read/write document and defaults the language', () => {
+    const result = manifest({ frames: [layout({ read: '/v2/p/board/doc', write: '/v2/p/board/doc' })] })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.frames[0]?.layout?.document.languageId).toBe('plaintext')
+  })
+
+  it('treats a missing write route as read-only rather than as an error', () => {
+    const result = manifest({ frames: [layout({ read: '/v2/p/board/doc', languageId: 'sql' })] })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.frames[0]?.layout?.document.write).toBeUndefined()
+  })
+
+  it('confines both routes to the plugin, so the host cannot be made to read core on its behalf', () => {
+    expect(messages(manifest({ frames: [layout({ read: '/v2/core/tasks' })] }))).toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ frames: [layout({ read: '/v2/p/board/doc', write: '/v2/p/other/doc' })] })))
+      .toContain('route must be inside /v2/p/board/')
+  })
+
+  it('takes only a published language id', () => {
+    expect(manifest({ frames: [layout({ read: '/v2/p/board/doc', languageId: 'brainfuck' })] }).success).toBe(false)
+  })
+
+  it('refuses a layout on a surface with no pane rectangle to split', () => {
+    expect(messages(manifest({
+      frames: [{ target: 'settings', id: 'board', label: 'Board', layout: { template: 'document', document: { read: '/v2/p/board/doc' } } }],
+    }))).toContain('layout is only valid on a pane surface')
+  })
+
+  it('refuses key claims on the degenerate template, which draws no frame to claim them', () => {
+    expect(messages(manifest({ frames: [{ ...layout({ read: '/v2/p/board/doc' }), claimsKeys: ['meta+j'] }] })))
+      .toContain("the 'document' template draws no frame, so there is nothing here to claim keys")
+  })
+
+  // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them.
+  // The template that arrived with its consumer (the database pane), which is what shipping the region
+  // addressing on day one was for.
+  const composed = (document: Record<string, unknown>) => ({ ...PANE, layout: { template: 'document-over-frame', document } })
+
+  it('accepts the composed template, and allows the key claims the degenerate one refuses', () => {
+    const result = manifest({ frames: [{ ...composed({ read: '/v2/p/board/doc', languageId: 'sql' }), claimsKeys: ['meta+j'] }] })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.frames[0]?.layout?.template).toBe('document-over-frame')
+  })
+
+  it('confines the completions route like any other, and defaults its trigger characters', () => {
+    const ok = manifest({ frames: [layout({ read: '/v2/p/board/doc', completions: { route: '/v2/p/board/complete' } })] })
+    expect(ok.success).toBe(true)
+    expect(ok.success && ok.data.contributions.frames[0]?.layout?.document.completions?.triggerCharacters).toEqual([])
+    expect(messages(manifest({ frames: [layout({ read: '/v2/p/board/doc', completions: { route: '/v2/p/other/complete' } })] })))
+      .toContain('route must be inside /v2/p/board/')
+  })
+})
+
+describe('surface actions', () => {
+  // A command delivered into the frame region of a composed pane, because its chord is pressed in the
+  // HOST's editor where the frame has no keyboard. The rule worth pinning is the one every other verb
+  // has: it may only name a surface this same manifest declares, and only one that can receive it.
+  const composedPane = {
+    target: 'pane',
+    id: 'query',
+    label: 'Query',
+    layout: { template: 'document-over-frame', document: { read: '/v2/p/board/doc', write: '/v2/p/board/doc' } },
+  }
+  const execute = (surface: string) => ({ id: 'execute', title: 'Run', action: { verb: 'surfaceAction', surface } })
+
+  it('accepts a command aimed at a composed pane this manifest declares', () => {
+    expect(manifest({ frames: [composedPane], commands: [execute('query')] }).success).toBe(true)
+  })
+
+  it('refuses a surface with no frame region to receive it', () => {
+    // A plain frame pane has no document to flush and no host chord to have resolved the command…
+    expect(messages(manifest({ frames: [PANE], commands: [execute('board')] })))
+      .toContain("surfaceAction names 'board', which this manifest does not declare as a document-over-frame pane")
+    // …and the degenerate template draws no frame at all, so there is nothing on the other side.
+    const wholePane = { ...PANE, layout: { template: 'document', document: { read: '/v2/p/board/doc' } } }
+    expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] })))
+      .toContain("surfaceAction names 'board', which this manifest does not declare as a document-over-frame pane")
+  })
+
+  it('refuses another plugin\'s surface, which is to say any it did not declare', () => {
+    expect(messages(manifest({ frames: [composedPane], commands: [execute('someone-elses')] })))
+      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a document-over-frame pane")
   })
 })
 

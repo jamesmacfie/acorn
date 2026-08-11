@@ -15,8 +15,26 @@ import { promisify } from 'node:util'
 import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
 import { type CoreServices, loadRepoConfig } from '@acorn/plugin-api/node'
-import type { DatabaseBridge } from '../server/routes/database'
-import type { DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
+import type { DbCatalogResult, DbCatalogTable, DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
+
+// The Postgres surface this plugin's routes call. Declared here, beside the implementation, rather than
+// in the route file that consumes it: the indirection it used to travel through — a route CAPABILITY
+// provided at init and resolved per request — existed to cross the old main/renderer process boundary,
+// and this plugin has not had one since it became loopback HTTP. A test that wants a fake passes one to
+// the route factory.
+export type DatabaseBridge = {
+  connect(taskId: string): Promise<DbConnectResult>
+  disconnect(taskId: string): Promise<{ ok: true }>
+  tables(taskId: string): Promise<DbTablesResult>
+  columns(taskId: string, schema: string, name: string): Promise<DbColumnsResult>
+  rows(taskId: string, schema: string, name: string, offset?: number): Promise<DbRowsResult>
+  query(taskId: string, sql: string): Promise<DbQueryResult>
+  update(taskId: string, schema: string, name: string, column: string, value: DbCell, pk: DbPk): Promise<DbWriteResult>
+  insert(taskId: string, schema: string, name: string, values: Record<string, DbCell>): Promise<DbWriteResult>
+  remove(taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult>
+  schema(taskId: string): Promise<DbSchemaResult>
+  catalog(taskId: string): Promise<DbCatalogResult>
+}
 
 const { Pool } = pg
 const exec = promisify(execFile)
@@ -107,6 +125,18 @@ async function readEnvUrl(envPath: string): Promise<string | null> {
 
 const getPool = (taskId: string): InstanceType<typeof Pool> | null => pools.get(taskId)?.pool ?? null
 
+// The introspected catalog behind table/column completions, cached per task. Monaco asks its provider
+// once per completion SESSION and filters client-side as the reader types, so this is one lookup per
+// trigger rather than per keystroke — but a full introspection per trigger would still be a visible
+// stall on a remote node, and it is the same answer every time.
+//
+// Invalidated on connect/disconnect and after any statement that was not a plain read or write, which
+// is the cheap approximation of "DDL ran through this pane". Stale columns in a popup is a small bug,
+// but it is a visible one, and someone running a migration in the editor above the grid is exactly the
+// person who would hit it.
+const catalogs = new Map<string, DbCatalogTable[]>()
+const DML_COMMANDS = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
+
 // Introspect the non-system tables in the current database.
 async function listTables(pool: InstanceType<typeof Pool>): Promise<{ schema: string; name: string }[]> {
   const res = await pool.query<{ table_schema: string; table_name: string }>(
@@ -175,6 +205,7 @@ export async function endDbPools(): Promise<void> {
     await pool.end().catch(() => {})
     pools.delete(taskId)
   }
+  catalogs.clear()
 }
 
 export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
@@ -190,6 +221,7 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
         const res = await pool.query<{ database: string }>('SELECT current_database() AS database')
         const database = res.rows[0]?.database ?? ''
         pools.set(taskId, { pool, url, database })
+        catalogs.delete(taskId) // a reconnect may be pointing at a different database entirely
         return { ok: true, database }
       } catch (e) {
         return { ok: false, error: errText(e) }
@@ -247,7 +279,12 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
         const ms = Number(process.hrtime.bigint() - started) / 1e6
         // A multi-statement string yields an array; report the last result set (psql-like).
         const last = Array.isArray(res) ? res[res.length - 1] : res
-        return { ...toResultSet(last as QueryResult<QueryResultRow>), ms: Math.round(ms) }
+        const set = toResultSet(last as QueryResult<QueryResultRow>)
+        // Anything that was not a plain read or write may have changed the shape of the database, and
+        // the completion popup is the thing that would go on claiming otherwise. A multi-statement
+        // string is judged on its last command, which is the same simplification the row report makes.
+        if (!DML_COMMANDS.has(set.command.toUpperCase())) catalogs.delete(taskId)
+        return { ...set, ms: Math.round(ms) }
       } catch (e) {
         return { error: errText(e) }
       }
@@ -343,7 +380,28 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
       }
     },
 
+    // Structured tables + columns for the completion provider. Cached (see `catalogs` above) because
+    // the same answer is wanted on every trigger and introspection is two queries per table.
+    catalog: async (taskId): Promise<DbCatalogResult> => {
+      const cached = catalogs.get(taskId)
+      if (cached) return { tables: cached }
+      const pool = getPool(taskId)
+      if (!pool) return { error: 'Not connected.' }
+      try {
+        const tables = await listTables(pool)
+        const withCols = await Promise.all(tables.map(async (table) => ({
+          ...table,
+          columns: (await tableColumns(pool, table.schema, table.name)).map((c) => ({ name: c.name, dataType: c.dataType })),
+        })))
+        catalogs.set(taskId, withCols)
+        return { tables: withCols }
+      } catch (e) {
+        return { error: errText(e) }
+      }
+    },
+
     disconnect: async (taskId): Promise<{ ok: true }> => {
+      catalogs.delete(taskId)
       const entry = pools.get(taskId)
       if (entry) {
         pools.delete(taskId)

@@ -11,7 +11,7 @@ const output = resolve(DESKTOP, 'out/bundled-plugins')
 // The distribution roster. Adding another bundled plugin is one row here; package construction,
 // desktop resources, boot reconciliation, update ownership, uninstall tombstones and client trust
 // are all generic over the resulting directories.
-const BUNDLED_PLUGINS = ['linear', 'model-providers', 'rollbar']
+const BUNDLED_PLUGINS = ['database', 'http', 'linear', 'model-providers', 'rollbar']
 
 rmSync(output, { recursive: true, force: true })
 for (const id of BUNDLED_PLUGINS) {

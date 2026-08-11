@@ -1,16 +1,17 @@
-import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
-import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
+import type { Principal } from '@acorn/node-core/server/middleware/auth.ts'
+import type { PluginRequestContext } from '@acorn/plugin-api/node'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { AgentContextOption } from '@acorn/protocol/agentContext.ts'
+import type { PluginRailItems } from '@acorn/protocol/api.ts'
 import type { HttpRequest, HttpVariable } from '../../shared/model'
 import { httpRequests, httpVariables } from '../../node/schema'
 import { migrationsDir } from '../../node/migrations'
-import { httpRoutes } from './http'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import { createHttpFetch } from './http'
 
 const ENC_KEY = '0'.repeat(64)
 const requestBody = {
@@ -29,9 +30,9 @@ const requestBody = {
 const principal = (login: string, kind: Principal['kind'] = 'device'): Principal => ({ kind, userId: login })
 
 describe('HTTP credential isolation', () => {
-  // The router is a factory over this plugin's own database now, so the test hands it one instead of
-  // putting core's handle on `c.env`. The empty Env below is deliberate: it proves the router reads
-  // nothing from the bindings any more.
+  // The router is a factory over this plugin's own database, so the test hands it one instead of putting
+  // core's handle on `c.env`. Nothing about `c.env` is used any more except the one symbol the carrier
+  // puts there, which is what `call` below supplies.
   let pluginDb: TestPluginDb
   let coreDb: TestDb
 
@@ -69,18 +70,25 @@ describe('HTTP credential isolation', () => {
     coreDb.cleanup()
   })
 
+  // Straight through the portable carrier, which is the only door these routes have now: no host Hono
+  // stack, no middleware-set principal, and the identity arriving as the request context the host binds.
   const call = (caller: Principal, path: string, init?: RequestInit) => {
-    const app = new Hono<AppEnv>()
-    app.use('/api/*', async (c, next) => {
-      c.set('principal', caller)
-      await next()
-    })
-    app.route('/api/http', httpRoutes(pluginDb.db, createCoreServices({ secrets: new SecretService(ENC_KEY), db: coreDb.db, activeIdentity: memoryIdentityStore() })))
-    return app.fetch(new Request(`http://acorn.test${path}`, init), {} as Env)
+    const core = createCoreServices({ secrets: new SecretService(ENC_KEY), db: coreDb.db, activeIdentity: memoryIdentityStore() })
+    const context: PluginRequestContext = {
+      userId: caller.userId,
+      principal: caller,
+      providers: {
+        connections: () => { throw new Error('http has no provider') },
+        resource: () => { throw new Error('http has no provider') },
+        withConnections: () => { throw new Error('http has no provider') },
+        items: () => { throw new Error('http has no provider') },
+      },
+    }
+    return createHttpFetch(pluginDb.db, core)(new Request(`http://acorn.test${path}`, init), context)
   }
 
   it('encrypts saved request payloads and returns them only to their owner', async () => {
-    const created = await call(principal('alice'), '/api/http/projects/project-web/requests', {
+    const created = await call(principal('alice'), '/projects/project-web/requests', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(requestBody),
@@ -95,15 +103,15 @@ describe('HTTP credential isolation', () => {
       expect(raw).not.toContain(secret)
     }
 
-    const alice = (await (await call(principal('alice'), '/api/http/projects/project-web/requests')).json()) as HttpRequest[]
+    const alice = (await (await call(principal('alice'), '/projects/project-web/requests')).json()) as HttpRequest[]
     expect(alice).toHaveLength(1)
     expect(alice[0]).toMatchObject(requestBody)
-    expect(await (await call(principal('bob'), '/api/http/projects/project-web/requests')).json()).toEqual([])
+    expect(await (await call(principal('bob'), '/projects/project-web/requests')).json()).toEqual([])
   })
 
   it('encrypts every variable kind, masks secrets, and scopes names per user', async () => {
     const create = (login: string, kind: 'value' | 'secret' | 'command', value: string) =>
-      call(principal(login), '/api/http/projects/project-web/vars', {
+      call(principal(login), '/projects/project-web/vars', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name: 'TOKEN', kind, value, enabled: true }),
@@ -121,13 +129,13 @@ describe('HTTP credential isolation', () => {
     expect(JSON.stringify(stored)).not.toContain('bob-value')
     expect(stored.every((row) => row.encrypted)).toBe(true)
 
-    const bobRows = (await (await call(principal('bob'), '/api/http/projects/project-web/vars')).json()) as HttpVariable[]
+    const bobRows = (await (await call(principal('bob'), '/projects/project-web/vars')).json()) as HttpVariable[]
     expect(bobRows).toMatchObject([{ name: 'TOKEN', kind: 'value', value: 'bob-value' }])
   })
 
   it('rejects request task IDs that are missing or owned by another project', async () => {
     const mismatched = { ...requestBody, taskId: 'task-api' }
-    const create = await call(principal('alice'), '/api/http/projects/project-web/requests', {
+    const create = await call(principal('alice'), '/projects/project-web/requests', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(mismatched),
@@ -135,7 +143,7 @@ describe('HTTP credential isolation', () => {
     expect(create.status).toBe(400)
     expect(await create.json()).toMatchObject({ error: { code: 'bad_request' } })
 
-    const valid = await call(principal('alice'), '/api/http/projects/project-web/requests', {
+    const valid = await call(principal('alice'), '/projects/project-web/requests', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ...requestBody, taskId: 'task-web' }),
@@ -143,7 +151,7 @@ describe('HTTP credential isolation', () => {
     expect(valid.status).toBe(201)
     const saved = (await valid.json()) as HttpRequest
 
-    const update = await call(principal('alice'), `/api/http/projects/project-web/requests/${saved.id}`, {
+    const update = await call(principal('alice'), `/projects/project-web/requests/${saved.id}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(mismatched),
@@ -151,14 +159,75 @@ describe('HTTP credential isolation', () => {
     expect(update.status).toBe(400)
     expect(await update.json()).toMatchObject({ error: { code: 'bad_request' } })
 
-    const read = await call(principal('alice'), '/api/http/projects/project-web/requests?taskId=task-api')
+    const read = await call(principal('alice'), '/projects/project-web/requests?taskId=task-api')
     expect(read.status).toBe(400)
     expect(await read.json()).toMatchObject({ error: { code: 'bad_request' } })
   })
 
   it('rejects the machine internal principal before it can read or send credentials', async () => {
-    const response = await call(principal('alice', 'internal'), '/api/http/projects/project-web/requests')
+    const response = await call(principal('alice', 'internal'), '/projects/project-web/requests')
     expect(response.status).toBe(403)
     expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
+  })
+
+  // ── The descriptor routes the move added: what the HOST reads, not what the frame reads ───────────
+
+  const save = (login: string, body: Record<string, unknown>) =>
+    call(principal(login), '/projects/project-web/requests', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...requestBody, ...body }),
+    })
+
+  it('lists the routed project’s saved requests as rail rows, and nobody else’s', async () => {
+    await save('alice', { name: 'Filed', folder: 'auth' })
+    await save('alice', { name: 'Ad hoc', taskId: 'task-web' })
+    await save('bob', { name: 'Bob’s' })
+
+    const rows = (await (await call(principal('alice'), '/rail-items?project=project-web')).json()) as PluginRailItems
+    // The project tree only: a task's ad-hoc request is not a project row, and another owner's never was.
+    expect(rows.items).toEqual([{ id: expect.any(String), title: 'Filed', badge: 'POST', icon: 'send', subtitle: 'auth' }])
+    // No `task` block, which is what tells the host there is nothing here to promote.
+    expect(rows.items[0]).not.toHaveProperty('task')
+  })
+
+  it('answers an empty rail rather than everything when no project is routed', async () => {
+    await save('alice', { name: 'Filed' })
+    expect(await (await call(principal('alice'), '/rail-items')).json()).toEqual({ items: [] })
+    expect(await (await call(principal('alice'), '/rail-items?project=nope')).json()).toEqual({ items: [] })
+  })
+
+  it('offers a task’s own requests to the agent composer and captures them redacted', async () => {
+    const adhoc = (await (await save('alice', { name: 'Login', taskId: 'task-web' })).json()) as HttpRequest
+    await save('alice', { name: 'Filed in the project' })
+
+    const options = (await (await call(principal('alice'), '/context-options?taskId=task-web')).json()) as AgentContextOption[]
+    // The option's URL is redacted too — the fixture's `?token=query-secret` is exactly the case for it.
+    expect(options).toEqual([{ id: adhoc.id, label: 'Login', description: 'POST https://api.example.test/items?token=•••' }])
+
+    const captured = await call(principal('alice'), '/context-capture', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ taskId: 'task-web', optionIds: [adhoc.id] }),
+    })
+    expect(captured.status).toBe(200)
+    // The assertion the whole node-side move rests on: the rows this route read had their ciphertext
+    // opened, and the snapshot still carries no credential.
+    const body = JSON.stringify(await captured.json())
+    expect(body).toContain('Login')
+    for (const secret of ['query-secret', 'header-secret', 'body-secret', 'auth-secret', 'override-secret']) {
+      expect(body).not.toContain(secret)
+    }
+  })
+
+  it('needs a task the caller can name for either context route', async () => {
+    expect((await call(principal('alice'), '/context-options')).status).toBe(404)
+    expect((await call(principal('alice'), '/context-options?taskId=nope')).status).toBe(404)
+    const bad = await call(principal('alice'), '/context-capture', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    expect(bad.status).toBe(400)
   })
 })

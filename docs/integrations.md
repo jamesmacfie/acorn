@@ -80,7 +80,7 @@ The rail lists the issues of the projects the workspace has linked; with no link
 back to the viewer's own open issues. That fallback started as a mitigation for having no writer and is
 now a deliberate choice: a descriptor rail's empty state is a fixed "Nothing here yet." that no
 contribution can author, so removing the fallback would show nothing and explain nothing
-([third-party/linear.md](./third-party/linear.md)).
+(see the linear-migration summary in [third-party/README.md](./third-party/README.md)).
 
 ## Rollbar
 

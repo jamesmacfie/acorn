@@ -4,11 +4,9 @@
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { agentsPlugin, type AgentsPluginDeps } from '@acorn/plugin-agents/node/index.ts'
 import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
-import { databasePlugin } from '@acorn/plugin-database/node/index.ts'
 import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
 import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
 import { githubPlugin } from '@acorn/plugin-github/node/index.ts'
-import { httpPlugin } from '@acorn/plugin-http/node/index.ts'
 import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin, type PreviewPluginDeps } from '@acorn/plugin-preview/node/index.ts'
@@ -36,11 +34,9 @@ export type NodePluginDeps = {
 export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[] => [
   agentsPlugin(dataDir, deps.agents),
   changesPlugin(dataDir),
-  databasePlugin(dataDir),
   dockerPlugin(),
   editorPlugin(),
   githubPlugin(dataDir),
-  httpPlugin(dataDir),
   memoryPlugin(dataDir),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(deps.preview),

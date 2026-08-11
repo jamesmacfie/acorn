@@ -2,9 +2,10 @@ import type { PluginChromeAction, PluginRailItem } from '@acorn/protocol/api.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
-import { openPane } from '../../registries/clientEvents'
+import { clientEvents, openPane } from '../../registries/clientEvents'
 import { projectSurfacePath } from '../../registries/projectSurfaces'
 import { activeTaskId } from '../../tasks/tasks'
+import { openPluginOverlay } from '../frames/overlays'
 import { ownsRoute } from './data'
 
 // The closed verb set the host executes on a descriptor's behalf
@@ -28,6 +29,9 @@ export type ChromeActionContext = {
   // runs with neither in scope, the same argument that already keeps `createTask` off the command list.
   projectId?: string
   navigate?: (path: string) => void
+  // The id of the command being run, for `surfaceAction` — which delivers that id to the plugin's own
+  // frame. Supplied only by the command caller, which is the only click site that has one.
+  commandId?: string
 }
 
 const toast = (pluginId: string, title: string, detail?: string): void =>
@@ -84,6 +88,30 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
         return toast(context.pluginId, 'could not create a task', 'This action needs a selected source row.')
       }
       context.promote(context.item)
+      return
+    case 'openOverlay':
+      // No task check, unlike `openPane`: an overlay is a rectangle over the whole window, not a row in a
+      // task's layout, which is why it is the one verb that works from anywhere. Whether the SURFACE is
+      // one this plugin declared was checked when the manifest was read and again on the device before
+      // registration, so nothing but a declared overlay can be named here.
+      openPluginOverlay(context.pluginId, action.overlay)
+      return
+    case 'surfaceAction':
+      // The one verb whose effect lands INSIDE a plugin. No task check and no mount check: the event is
+      // fire-and-forget, and a pane nobody has open simply has no frame listening — which is the honest
+      // outcome, because the command means "do this in the thing I am looking at". Deliberately not
+      // retained the way a pane intent is (registries/clientEvents.ts says why).
+      //
+      // The surface named here was checked against this manifest's own composed panes when the node
+      // parsed it; the frame that receives it re-checks that the event is addressed to ITS plugin and ITS
+      // surface, because that is the side holding the port.
+      //
+      // What the frame receives is the COMMAND's own id, so there is one id rather than two that can
+      // drift. That is also why this verb is only useful on a command: a footer badge's click has no
+      // command in scope, and rather than invent a second name for the thing being delivered, the
+      // verb refuses there.
+      if (!context.commandId) return toast(context.pluginId, 'surfaceAction needs a command', 'This verb delivers a command id, so it only works from a command.')
+      clientEvents.emit('plugin:surface-action', { pluginId: context.pluginId, surface: action.surface, command: context.commandId })
       return
     case 'openUrl':
       // Repeated on this side for the same reason `runNodeAction` re-checks its path: the URL came off

@@ -15,9 +15,9 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 
 // Compiled-client parity: the built-in panes with their shipped order and chords. Loaded frames are
 // asserted by their package/e2e coverage instead of being smuggled back into this static graph — which is
-// why `linear` (90, ⌘⇧L) is absent even though the pane and its chord still exist: both are manifest
-// data now, in plugins/linear/acorn-plugin.config.mjs, and the chord is still unique because no compiled pane
-// may claim it.
+// why `linear` (90, ⌘⇧L) and `http` (76, ⌘⇧H) are absent even though those panes and their chords still
+// exist: both are manifest data now, in each plugin's own acorn-plugin.config.mjs, and the chords are still
+// unique because no compiled pane may claim them.
 const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['pr', 10, 'meta+shift+r'],
   ['agents', 15, 'meta+shift+a'],
@@ -25,21 +25,25 @@ const PANES: Array<[id: string, order: number, chord: string | undefined]> = [
   ['notes', 30, 'meta+shift+d'],
   ['context', 40, 'meta+shift+x'],
   ['editor', 50, 'meta+shift+e'],
-  ['search', 60, 'meta+shift+f'],
-  ['database', 70, 'meta+shift+j'],
+  // No `search` pane at 60 any more: find-in-files is a panel in the editor pane's sidebar
+  // (docs/panes.md), and ⌘⇧F is now an editor COMMAND that opens this pane on that panel — so the chord
+  // survives without a pane to hang it on, and this table is the wrong place to look for it.
+  // No `database` pane at 70 either, and for a different reason than search's: it left the compiled
+  // graph entirely. It is a loaded package whose pane is a `document-over-frame` layout — the host draws
+  // the SQL editor, the plugin's frame draws the grid — so it reaches the registry through the manifest
+  // adapter in client-core/plugins/frames/register.tsx. ⌘⏎ went with it, as a surface-scoped keybinding.
   ['docker', 75, undefined],
-  ['http', 76, 'meta+shift+h'],
   ['preview', 80, 'meta+shift+b'],
 ]
 
 // Core Home is the stable default; Fleet is additive and gated on a second node. Provider browse sources
-// remain optional contributions.
+// remain optional contributions. `http` (50) left with the same move its pane did — its rail source is a
+// manifest descriptor now, so the host draws the rows.
 const SOURCES: Array<[id: string, order: number]> = [
   ['home', 0],
   ['fleet', 1],
   ['github', 10],
   ['docker', 40],
-  ['http', 50],
   ['agents', 60],
 ]
 
