@@ -28,7 +28,10 @@ ambiguous (`composition.md § Write-back`). Shipping read-only first is not a cu
 avoids designing a per-field mutation contract and its trust story under time pressure. The
 mapping config's persisted shape reserves room (per-(source, column) records that can grow a
 `writeValue`). Revisit when the read-only surface has real usage and the mutation contract can be
-designed against observed boards.
+designed against observed boards. Distinct from this: verb-shaped mutations via `runNodeAction`
+are *not* refused and work in v1; their missing confirmation semantics are a reserved additive
+seam on the action descriptor — see `data-contract.md § Reserved seam: destructive and confirmed
+actions`.
 
 ## No cross-collection joins
 
