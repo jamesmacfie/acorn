@@ -17,6 +17,8 @@ export function DiffCanvas(props: {
   virt: DiffVirtualizer
   splitVirt: DiffVirtualizer
   stickyHead: () => JSX.Element
+  // The scroller must be handed back: the virtualizer only produces rows once it has this element.
+  publishScrollEl: (element: HTMLDivElement, mode: ViewMode) => void
   onScroll: (element: HTMLDivElement) => void
   scheduleElementMeasure: (target: 'unified' | 'split', element: HTMLElement) => void
   shouldMeasureRow: (row: Row) => boolean
@@ -49,7 +51,7 @@ export function DiffCanvas(props: {
 
   return (
     <Show when={props.viewMode() === 'split'} fallback={
-      <div class="diff" onScroll={(e) => props.onScroll(e.currentTarget)}>
+      <div class="diff" ref={(el) => props.publishScrollEl(el, 'unified')} onScroll={(e) => props.onScroll(e.currentTarget)}>
         {props.stickyHead()}
         <div class="diff-rows" style={{ height: `${props.virt.getTotalSize()}px` }}>
           <For each={virtualRows()}>
@@ -115,7 +117,7 @@ export function DiffCanvas(props: {
         </div>
       </div>
     }>
-      <div class="diff diff-split" onScroll={(e) => props.onScroll(e.currentTarget)}>
+      <div class="diff diff-split" ref={(el) => props.publishScrollEl(el, 'split')} onScroll={(e) => props.onScroll(e.currentTarget)}>
         {props.stickyHead()}
         <div class="diff-split-rows" style={{ height: `${props.splitVirt.getTotalSize()}px` }}>
           <For each={virtualBands()}>
