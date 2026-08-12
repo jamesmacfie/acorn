@@ -96,7 +96,21 @@ plugin needs something the vocabulary can't express, the answer is a frame pane,
   mixed board renders source badges and routes row actions on the host's stamp, so a plugin cannot
   impersonate another's rows.
 - **Row actions come from the closed verb set** (`PluginChromeAction`), so a click can do exactly
-  what a command can do, nothing more.
+  what a command can do, nothing more. Note that `runNodeAction` already makes verb-shaped
+  mutations expressible in v1 ("pick up review", "restart server") — what v1 does not give an
+  action is confirmation, optimistic UI, or failure surfacing; it fires, and the panel refetches.
+
+**Reserved seam: destructive and confirmed actions.** An action that destroys something ("delete
+worktree") must not ship without arm-to-confirm, and v1 therefore ships no destructive actions at
+all. The extension is an optional `risk` (or `confirm`) key on the action descriptor — an
+additive optional field on a versioned Zod schema, so adding it later breaks nothing — with the
+**host** rendering the confirmation from the declared tier; a plugin never renders its own. The
+precedent already exists in the tree: agent tools declare a risk tier
+(`AgentToolContribution`, `packages/node-core/src/server/agentTools/registry.ts`) that the host
+projects into permission UI. This is recorded so a reviewer knows the v1 omission is deliberate,
+and so the growth path is this key on the descriptor — not a new verb, and not plugin-drawn
+confirmation UI. (Optimistic updates and failure surfacing are host machinery over the same
+contract and need no wire change at all — see the invariant in `README.md`.)
 
 ## Self-describing responses, and run-once-and-pin
 
