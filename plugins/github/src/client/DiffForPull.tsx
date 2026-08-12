@@ -437,6 +437,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
         virt={virt}
         splitVirt={splitVirt}
         stickyHead={stickyHead}
+        publishScrollEl={(element, mode) => scrollRestoration.publish(element, mode)}
         onScroll={(element) => scrollRestoration.onScroll(element)}
         scheduleElementMeasure={scheduleElementMeasure}
         shouldMeasureRow={shouldMeasureRow}
