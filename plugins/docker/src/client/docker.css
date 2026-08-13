@@ -1,11 +1,6 @@
 /* Docker Source browse + container detail (docs/ui-design.md). Feature-owned; shared tokens only.
    Flat 1px separators, compact mono metadata — matches the rollbar/linear browse genre. */
 
-.panes.docker-browse-panes {
-  grid-template-columns: clamp(320px, 30vw, 460px) minmax(0, 1fr);
-}
-.app.left-collapsed .panes.docker-browse-panes { grid-template-columns: minmax(0, 1fr); }
-
 .docker-browse { display: flex; flex-direction: column; overflow: hidden; }
 
 .docker-filters { padding: 6px var(--pane-pad); }

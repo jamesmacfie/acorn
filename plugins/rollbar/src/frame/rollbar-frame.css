@@ -25,8 +25,11 @@ button { font: inherit; }
 /* DescriptionList's `facts` layout came from this grid. What is left is the ruled-tile look. */
 .rb-stats { gap: 0; border-top: var(--control-bw, .0625rem) solid var(--border); }
 .rb-fact { padding: var(--space-5, .625rem) var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
-.rb-occurrence-workbench { min-height: 26.25rem; display: grid; grid-template-columns: minmax(13.75rem, 32%) minmax(0, 1fr); border: var(--control-bw, .0625rem) solid var(--border); }
-.rb-occurrence-list { overflow-y: auto; border-right: var(--control-bw, .0625rem) solid var(--border); }
+/* ListDetail owns the split, the column width and the divider — including the border ROLE, which this
+   rule had wrong the same way the outer layout did: --control-bw is the width a pack may zero. What is
+   left is the box drawn around the pair, and the height that keeps a short list from collapsing it. */
+.rb-occurrence-workbench { min-height: 26.25rem; border: var(--surface-border); }
+.rb-occurrence-list { overflow-y: auto; }
 .rb-occurrence-row.ui-row { align-items: flex-start; border-bottom: var(--control-bw, .0625rem) solid var(--border); border-radius: var(--radius-0, 0); }
 .rb-occurrence-summary { min-width: 0; display: grid; gap: var(--space-2, .25rem); }
 .rb-occurrence-title, .rb-occurrence-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -41,8 +44,10 @@ button { font: inherit; }
 .rb-code { overflow-x: auto; margin: var(--space-3, .375rem) 0 0; padding: var(--space-3, .4375rem); background: var(--bg-subtle, var(--bg-hover)); color: var(--text-muted); font-family: var(--font-mono, monospace); font-size: var(--fs-sm, .75rem); }
 
 @media (max-width: 45rem) {
-  .rb-occurrence-workbench { grid-template-columns: 1fr; grid-template-rows: minmax(10rem, 35vh) minmax(15rem, 1fr); }
-  .rb-occurrence-list { border-right: 0; border-bottom: var(--control-bw, .0625rem) solid var(--border); }
+  /* Written against both classes so it beats ListDetail's own `[data-list]` rule on specificity
+     rather than on stylesheet order. */
+  .rb-occurrence-workbench.ui-listdetail[data-list] { grid-template-columns: 1fr; grid-template-rows: minmax(10rem, 35vh) minmax(15rem, 1fr); }
+  .rb-occurrence-workbench .ui-listdetail-list { border-right: 0; border-bottom: var(--chrome-divider); }
   .rb-item-head { padding-inline: var(--space-6, .75rem); }
   .rb-chips, .rb-content > .ui-tabs, .rb-panel { padding-inline: var(--space-6, .75rem); }
 }

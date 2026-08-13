@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, DescriptionList, EmptyState, Row, Tabs } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, DescriptionList, EmptyState, ListDetail, Row, Tabs } from '@acorn/plugin-api/ui'
 import { For, Show } from 'solid-js'
 import type {
   RollbarItemMetadata,
@@ -91,8 +91,13 @@ export function RollbarItemView(props: {
           when={props.state.occurrences.length}
           fallback={<EmptyState>No occurrence sample is available.</EmptyState>}
         >
-          <div class="rb-occurrence-workbench">
-            <div class="rb-occurrence-list">
+          <ListDetail
+            class="rb-occurrence-workbench"
+            listLabel="Occurrences"
+            listClass="rb-occurrence-list"
+            detailClass="rb-occurrence-detail"
+            scrollDetail
+            list={
               <For each={props.state.occurrences}>{(entry) => (
                 <Row
                   class="rb-occurrence-row"
@@ -108,9 +113,10 @@ export function RollbarItemView(props: {
                   </span>
                 </Row>
               )}</For>
-            </div>
+            }
+          >
             <OccurrenceDetail state={props.occurrence} onCopy={props.onCopy} />
-          </div>
+          </ListDetail>
         </Show>
       </Tabs.Panel>
     </>
@@ -121,8 +127,9 @@ function OccurrenceDetail(props: {
   state: OccurrenceState
   onCopy(detail: RollbarOccurrenceDetail): void
 }) {
+  // Contents, not a box: ListDetail draws the detail column and `detailClass` carries this padding.
   return (
-    <div class="rb-occurrence-detail">
+    <>
       <Show when={props.state.kind === 'empty'}>
         <EmptyState>Choose an occurrence to inspect its stack.</EmptyState>
       </Show>
@@ -137,7 +144,7 @@ function OccurrenceDetail(props: {
       <Show when={props.state.kind === 'ready' ? props.state.detail : undefined}>
         {(detail) => <OccurrenceContent detail={detail()} onCopy={props.onCopy} />}
       </Show>
-    </div>
+    </>
   )
 }
 
