@@ -17,17 +17,8 @@
   border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
 }
-.search-input {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius-control);
-  padding: var(--space-2) var(--space-4);
-}
+/* Input kind="filter" owns the control; this keeps the panel's own padding. */
+.search-input { padding: var(--space-2) var(--space-4); }
 .search-toggles {
   flex: none;
   display: flex;
@@ -121,8 +112,4 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.search-mark {
-  background: var(--bg-selected);
-  color: var(--text);
-  border-radius: var(--radius-marker);
-}
+/* `.ui-find-mark` owns the highlight (see FindBar). */

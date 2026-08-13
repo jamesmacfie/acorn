@@ -1,6 +1,6 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
-import { Button, Modal } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, Modal } from '@acorn/plugin-api/ui'
 
 export default function AgentContextPickerModal(props: {
   contribution: AgentContextContribution
@@ -48,7 +48,7 @@ export default function AgentContextPickerModal(props: {
         <Show when={!options.loading} fallback={<p class="muted">Loading available context…</p>}>
           <Show
             when={!options.error}
-            fallback={<p class="action-error" role="alert">Unable to load available context.</p>}
+            fallback={<Alert>Unable to load available context.</Alert>}
           >
             <div class="agent-context-option-list">
               <For
@@ -56,17 +56,17 @@ export default function AgentContextPickerModal(props: {
                 fallback={<p class="muted agent-context-option-empty">Nothing is currently available from this source.</p>}
               >
                 {(option) => (
-                  <label class="agent-context-option">
-                    <input
-                      type="checkbox"
-                      checked={selected().has(option.id)}
-                      onChange={() => toggle(option.id)}
-                    />
-                    <span>
-                      <strong>{option.label}</strong>
-                      <Show when={option.description}><small>{option.description}</small></Show>
-                    </span>
-                  </label>
+                  <Checkbox
+                    class="agent-context-option"
+                    checked={selected().has(option.id)}
+                    onChange={() => toggle(option.id)}
+                    label={
+                      <>
+                        <strong>{option.label}</strong>
+                        <Show when={option.description}><small>{option.description}</small></Show>
+                      </>
+                    }
+                  />
                 )}
               </For>
             </div>

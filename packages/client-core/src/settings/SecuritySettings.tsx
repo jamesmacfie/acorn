@@ -3,7 +3,7 @@ import type { AuditEntry, NodeSecurityPosture } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../node/activeNode'
 import { nodes } from '../node/fleet'
 import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPath } from '../node/nodeSecurity'
-import { Button, Input, Select } from '../ui/primitives'
+import { Alert, Button, Input, Select } from '../ui/primitives'
 import './settings.css'
 
 // Settings → Security (docs/security.md § Audit: "Owner-readable in Settings"; § On-disk: "the app
@@ -142,13 +142,11 @@ export default function SecuritySettings() {
         {(current) => (
           <>
             <Show when={current().diskEncrypted === false}>
-              <div class="settings-notice" role="alert">
-                <span>
-                  <strong>{node()?.label ?? 'This node'}</strong> does not have full-disk encryption turned
-                  on. Acorn encrypts credentials and backup archives only — worktrees, caches, scrollback
-                  and agent transcripts rely on the operating system.
-                </span>
-              </div>
+              <Alert tone="warn" variant="banner">
+                <strong>{node()?.label ?? 'This node'}</strong> does not have full-disk encryption turned
+                on. Acorn encrypts credentials and backup archives only — worktrees, caches, scrollback
+                and agent transcripts rely on the operating system.
+              </Alert>
             </Show>
             <p class="muted">
               Disk encryption:{' '}
@@ -189,7 +187,7 @@ export default function SecuritySettings() {
         revocation, credential changes, repo-config trust and plugin changes. Kept for 90 days.
       </p>
 
-      <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
       <Show when={firstPage.loading && !rows().length}><p class="muted">Reading the audit trail…</p></Show>
       {/* An empty trail is a real state on a fresh node, and saying so beats rendering nothing — which
           reads as a page that failed to load. */}

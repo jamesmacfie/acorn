@@ -15,9 +15,40 @@
 // WorkspacePicker, tokenAxes, focus.ts. No plugin imports them, and page-level components on a
 // contract are how a design system stops being able to change.
 
-export { Badge, Button, Field, Input, Row, SectionHeader, Select, Spinner, Textarea } from '@acorn/client-core/ui/primitives.tsx'
+export {
+  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
+  Field, Input, Kbd, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner, SplitHandle,
+  StatusDot, Table, Textarea, ToggleButton, Toolbar, TreeRow,
+} from '@acorn/client-core/ui/primitives.tsx'
 export { default as Icon } from '@acorn/client-core/ui/Icon.tsx'
 export { default as Picker } from '@acorn/client-core/ui/Picker.tsx'
+export { default as Popover } from '@acorn/client-core/ui/Popover.tsx'
+export { Menu } from '@acorn/client-core/ui/Menu.tsx'
+export { CollapsibleSection } from '@acorn/client-core/ui/CollapsibleSection.tsx'
+export { Composer } from '@acorn/client-core/ui/Composer.tsx'
+export { DocumentTabs } from '@acorn/client-core/ui/DocumentTabs.tsx'
+export type { DocTabDef } from '@acorn/client-core/ui/DocumentTabs.tsx'
+export { Drawer } from '@acorn/client-core/ui/Drawer.tsx'
+export { FindBar } from '@acorn/client-core/ui/FindBar.tsx'
+export { KeyValueEditor } from '@acorn/client-core/ui/KeyValueEditor.tsx'
+export type { KVRow } from '@acorn/client-core/ui/KeyValueEditor.tsx'
+// Drag-resize as a hook, because the three consumers model size differently — two panes against
+// each other, one absolute height, one fraction — and only a delta suits all three.
+export { createSplitDrag } from '@acorn/client-core/ui/split.ts'
+export type { SplitDrag } from '@acorn/client-core/ui/split.ts'
+// The delegated tooltip protocol, as a typed helper. Attributes are the API — a wrapper component
+// would add an element around every trigger, which is exactly what the protocol avoids.
+export { tip } from '@acorn/client-core/ui/tips.tsx'
+// Frame-side tooltip listener: a sandboxed frame has its own document, so the shell's singleton
+// cannot see it. Pure DOM, no shell imports.
+export { mountFrameTips } from '@acorn/client-core/ui/tips.tsx'
+// Behaviour that isn't a component ships as a hook — the dismissable.ts precedent. Arm-to-confirm
+// because a sandboxed frame's window.confirm silently returns false; anchoring because five
+// separate call sites re-solved portalling and outside-click, each covering less of it.
+export { createArmedConfirm } from '@acorn/client-core/ui/confirm.ts'
+export type { ArmedConfirm } from '@acorn/client-core/ui/confirm.ts'
+export { createAnchoredPopover } from '@acorn/client-core/ui/anchor.ts'
+export type { AnchoredPopover, Placement } from '@acorn/client-core/ui/anchor.ts'
 export { default as CopyButton } from '@acorn/client-core/ui/CopyButton.tsx'
 export { default as MentionTextarea } from '@acorn/client-core/ui/MentionTextarea.tsx'
 export { Modal } from '@acorn/client-core/ui/Modal.tsx'

@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { Badge, CopyButton, type TabDef, Tabs } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Checkbox, CopyButton, DescriptionList, EmptyState, Tabs, type TabDef } from '@acorn/plugin-api/ui'
 import type { SendFailure, SendResult, SendSuccess, TimelineEntry } from '../shared/model'
 import { decodeBody } from './httpClient'
 
@@ -45,7 +45,7 @@ function Timeline(props: { entries: TimelineEntry[] }) {
   )
 }
 
-function SuccessResponse(props: { result: SendSuccess }) {
+function SuccessResponse(props: { result: SendSuccess; onCopy: (text: string) => void }) {
   const [tab, setTab] = createSignal<ResponseTab>('body')
   const [raw, setRaw] = createSignal(false)
 
@@ -79,9 +79,9 @@ function SuccessResponse(props: { result: SendSuccess }) {
         <span class="http-response-spacer" />
         <Show when={tab() === 'body'}>
           <label class="http-toggle">
-            <input type="checkbox" checked={raw()} onChange={(e) => setRaw(e.currentTarget.checked)} /> Raw
+            <Checkbox label="Raw" checked={raw()} onChange={(e) => setRaw(e.currentTarget.checked)} />
           </label>
-          <CopyButton text={bodyText} title="Copy body" />
+          <CopyButton text={bodyText} onCopy={props.onCopy} title="Copy body" />
         </Show>
       </div>
 
@@ -89,22 +89,17 @@ function SuccessResponse(props: { result: SendSuccess }) {
 
       <div class="http-response-body" id={`http-response-panel-${tab()}`} role="tabpanel">
         <Show when={tab() === 'body'}>
-          <Show when={bodyText()} fallback={<p class="http-empty">Empty response body.</p>}>
+          <Show when={bodyText()} fallback={<EmptyState size="sm">Empty response body.</EmptyState>}>
             <pre class="http-pre">{bodyText()}</pre>
           </Show>
         </Show>
 
         <Show when={tab() === 'headers'}>
-          <dl class="http-kv-list">
+          <DescriptionList class="http-kv-list" size="sm">
             <For each={props.result.headers}>
-              {([name, value]) => (
-                <>
-                  <dt>{name}</dt>
-                  <dd>{value}</dd>
-                </>
-              )}
+              {([name, value]) => <DescriptionList.Item label={name}>{value}</DescriptionList.Item>}
             </For>
-          </dl>
+          </DescriptionList>
         </Show>
 
         <Show when={tab() === 'timeline'}>
@@ -135,23 +130,16 @@ function FailedResponse(props: { result: SendFailure }) {
 
       <div class="http-response-body" id={`http-response-failure-panel-${tab()}`} role="tabpanel">
         <Show when={tab() === 'error'}>
-          <p class="http-failure-message" role="alert">{props.result.error}</p>
-          <dl class="http-kv-list">
-            <dt>URL</dt>
-            <dd>{props.result.url}</dd>
+          <Alert class="http-failure-message">{props.result.error}</Alert>
+          <DescriptionList class="http-kv-list" size="sm">
+            <DescriptionList.Item label="URL">{props.result.url}</DescriptionList.Item>
             <Show when={props.result.code}>
-              {(code) => (
-                <>
-                  <dt>Code</dt>
-                  <dd>{code()}</dd>
-                </>
-              )}
+              {(code) => <DescriptionList.Item label="Code">{code()}</DescriptionList.Item>}
             </Show>
             <Show when={props.result.detail && props.result.detail !== props.result.error}>
-              <dt>Detail</dt>
-              <dd>{props.result.detail}</dd>
+              <DescriptionList.Item label="Detail">{props.result.detail}</DescriptionList.Item>
             </Show>
-          </dl>
+          </DescriptionList>
         </Show>
 
         <Show when={tab() === 'timeline'}>
@@ -162,7 +150,14 @@ function FailedResponse(props: { result: SendFailure }) {
   )
 }
 
-export default function ResponseView(props: { result: SendResult | null; error: string | null; sending: boolean }) {
+export default function ResponseView(props: {
+  result: SendResult | null
+  error: string | null
+  sending: boolean
+  /** The bridge's copy. A frame's document is not focused from the shell's point of view when the
+   *  click lands, so the Clipboard API refuses — the host copies on the frame's behalf. */
+  onCopy: (text: string) => void
+}) {
   const success = createMemo((): SendSuccess | null => {
     const result = props.result
     return result?.ok ? result : null
@@ -177,15 +172,16 @@ export default function ResponseView(props: { result: SendResult | null; error: 
       <Show
         when={props.result}
         fallback={
-          <div class="http-response-empty">
-            <Show when={props.error} fallback={<span>{props.sending ? 'Sending…' : 'No response yet — press Send.'}</span>}>
-              <span class="http-response-error" role="alert">{props.error}</span>
-            </Show>
-          </div>
+          <Show
+            when={props.error}
+            fallback={<EmptyState busy={props.sending}>{props.sending ? 'Sending…' : 'No response yet — press Send.'}</EmptyState>}
+          >
+            <Alert variant="banner">{props.error}</Alert>
+          </Show>
         }
       >
         <Show when={success()} fallback={<Show when={failure()}>{(result) => <FailedResponse result={result()} />}</Show>}>
-          {(result) => <SuccessResponse result={result()} />}
+          {(result) => <SuccessResponse result={result()} onCopy={props.onCopy} />}
         </Show>
       </Show>
     </section>

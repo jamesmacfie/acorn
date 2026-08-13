@@ -1,17 +1,14 @@
 .agent-pricing-settings { gap: var(--space-7); }
 .agent-pricing-heading { margin: 0 0 var(--space-4); }
-.agent-pricing-table-wrap {
-  max-width: 100%;
-  overflow-x: auto;
+/* Table owns the h-scroll wrapper, the min-width floor and the cell/header styling. This keeps the
+   settings page's boxed frame around it. */
+/* The boxed frame goes on the scroll wrapper, which Table renders — hence `:has()`, since the call
+   site's class lands on the <table> itself. */
+.ui-table-scroll:has(> .agent-pricing-table) {
   border: var(--surface-border);
   border-radius: var(--radius-surface);
 }
-.agent-pricing-table {
-  width: 100%;
-  min-width: 620px;
-  border-collapse: collapse;
-  font-size: var(--fs-xs);
-}
+.agent-pricing-table { font-size: var(--fs-xs); }
 .agent-pricing-table th,
 .agent-pricing-table td {
   padding: var(--space-3);

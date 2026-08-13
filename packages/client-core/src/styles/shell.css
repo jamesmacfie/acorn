@@ -105,13 +105,8 @@
 .document-over-frame { display: flex; flex-direction: column; overflow: hidden; }
 .document-over-frame-document { flex: none; min-height: 0; display: flex; flex-direction: column; }
 .document-over-frame-frame { flex: 1; min-height: 0; }
-.document-over-frame-split {
-  flex: none;
-  height: 6px;
-  cursor: ns-resize;
-  background: var(--border);
-}
-.document-over-frame-split:hover { background: var(--border-strong); }
+/* SplitHandle owns the grip (ui/split.ts + primitives.css). */
+.document-over-frame-split { margin: 0; }
 
 .section-header {
   position: sticky;

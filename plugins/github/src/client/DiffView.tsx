@@ -4,6 +4,7 @@ import { createQuery } from '@tanstack/solid-query'
 import { projectsOptions, type Task } from '@acorn/plugin-api/client'
 import { routeKey as makeRouteKey } from './fileNavigation'
 import { DiffForPull, type PullRoute } from './DiffForPull'
+import { EmptyState } from '@acorn/plugin-api/ui'
 
 export default function DiffView(props: { task?: Task } = {}) {
   const params = props.task ? null : useParams()
@@ -23,7 +24,7 @@ export default function DiffView(props: { task?: Task } = {}) {
   })
 
   return (
-    <Show when={route()} keyed fallback={<p class="placeholder">Select a PR.</p>}>
+    <Show when={route()} keyed fallback={<EmptyState align="start">Select a PR.</EmptyState>}>
       {(r) => <DiffForPull route={r} router={!props.task} taskId={props.task?.id} />}
     </Show>
   )

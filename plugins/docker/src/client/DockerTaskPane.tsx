@@ -5,9 +5,10 @@ import type { Task } from '@acorn/protocol/api.ts'
 import type { DockerContainerSummary } from '../shared/model'
 import { fetchTaskContainers } from './dockerClient'
 import { wsOnDockerChanged } from './wsChannel'
-import { dockerSelection, rememberDockerSelection } from './dockerViewState'
+import { containerTone, dockerSelection, rememberDockerSelection } from './dockerViewState'
 import ContainerDetail from './ContainerDetail'
 import './docker.css'
+import { Chip, EmptyState, StatusDot } from '@acorn/plugin-api/ui'
 
 export default function DockerTaskPane(props: { task: Task }) {
   const [selected, setSelected] = createSignal<string | null>(dockerSelection(props.task.id) ?? null)
@@ -33,14 +34,19 @@ export default function DockerTaskPane(props: { task: Task }) {
 
   return (
     <section class="pane docker-task-pane">
-      <Show when={(linked() ?? []).length} fallback={<div class="pane-empty"><p class="placeholder">{linked.loading ? 'Loading…' : 'No containers linked to this task.'}</p></div>}>
+      <Show when={(linked() ?? []).length} fallback={<div class="pane-empty"><EmptyState align="start" busy={linked.loading}>{linked.loading ? 'Loading…' : 'No containers linked to this task.'}</EmptyState></div>}>
         <div class="docker-chips">
           <For each={linked()}>
             {(c) => (
-              <button type="button" class="docker-chip" classList={{ active: selected() === c.id }} title={c.name} onClick={() => setSelected(c.id)}>
-                <span class="docker-dot" data-state={c.state} />
+              <Chip
+                class="docker-chip"
+                classList={{ active: selected() === c.id }}
+                title={c.name}
+                leading={<StatusDot tone={containerTone(c.state)} />}
+                onActivate={() => void setSelected(c.id)}
+              >
                 {chipLabel(c)}
-              </button>
+              </Chip>
             )}
           </For>
         </div>

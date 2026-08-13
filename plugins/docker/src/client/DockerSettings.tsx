@@ -7,6 +7,7 @@ import type { DockerInfo } from '../shared/model'
 import { fetchDockerInfo } from './dockerClient'
 import { readDockerPrefs, saveDockerPrefs, type DockerPrefs } from './dockerPrefs'
 import './docker.css'
+import { Checkbox } from '@acorn/plugin-api/ui'
 
 const infoText = (info: DockerInfo): string =>
   info.available
@@ -27,18 +28,18 @@ export default function DockerSettings() {
         <Show when={info()} fallback={'Checking the daemon…'}>{(i) => infoText(i())}</Show>
       </p>
 
-      <label class="settings-field">
-        <span class="settings-label">
-          <input type="checkbox" checked={current().confirmDestructive} onChange={() => toggle('confirmDestructive')} />
-          {' '}Ask twice before destructive actions (remove, prune, compose down)
-        </span>
-      </label>
-      <label class="settings-field">
-        <span class="settings-label">
-          <input type="checkbox" checked={current().showStopped} onChange={() => toggle('showStopped')} />
-          {' '}Show stopped containers in the Docker source
-        </span>
-      </label>
+      <Checkbox
+        class="settings-field"
+        label="Ask twice before destructive actions (remove, prune, compose down)"
+        checked={current().confirmDestructive}
+        onChange={() => toggle('confirmDestructive')}
+      />
+      <Checkbox
+        class="settings-field"
+        label="Show stopped containers in the Docker source"
+        checked={current().showStopped}
+        onChange={() => toggle('showStopped')}
+      />
 
       <p class="muted">
         Task↔container linking is automatic for compose stacks started in a task worktree. Repos can

@@ -87,11 +87,4 @@
 /* .ui-modal-actions has no top padding, so the separator that anchors the buttons needs one. */
 .plugin-trust-actions { border-top: var(--chrome-divider); padding-top: var(--pane-pad); }
 .plugin-trust-escape { margin: 0 auto 0 0; max-width: 26ch; font-size: var(--fs-xs); color: var(--text-muted); }
-.plugin-trust-escape kbd {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: 0 var(--space-2);
-  background: var(--bg-subtle);
-}
+/* Kbd owns the cap. */

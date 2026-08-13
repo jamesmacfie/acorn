@@ -4,7 +4,7 @@ import { prefsKey } from '@acorn/protocol/api.ts'
 import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
 import { sendRaw } from '../../apiClient'
-import { pushNotice } from '../../notifications/notifications'
+import { toast } from '../../notifications/toast'
 import { clientEvents, consumePaneIntent, openPane } from '../../registries/clientEvents'
 import { executeCommand } from '../../registries/commands'
 import { openContentTarget, parseInAppTarget } from '../../registries/contentLinks'
@@ -125,14 +125,10 @@ export default function PluginFrame(props: PluginFrameProps) {
       }
     },
     stateSet: async (key, value) => void (await saveJsonPref(qc, key, value)),
-    toast: (title, detail) =>
-      void pushNotice({
-        taskId: props.binding.taskId ?? '',
-        kind: 'plugin',
-        title,
-        at: Date.now(),
-        ...(detail === undefined ? {} : { detail }),
-      }),
+    // Into the shared transient stack, not the notification inbox. `bridge.ui.toast('Copied to the
+    // clipboard')` used to leave a permanent bell entry — the frames and the shell now share one
+    // stack and one look, which is what the API always claimed.
+    toast: (title, detail) => toast(detail ? `${title} — ${detail}` : title),
     copy: (text) => void navigator.clipboard.writeText(text),
     openPane: (paneId) => {
       // A pane is opened in a task's layout, so a frame with no task has nothing to open into.

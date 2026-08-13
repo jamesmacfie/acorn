@@ -4,7 +4,7 @@ import { agentSessionsFor, fileStatusMeta, formatFileReference, getHighlighter, 
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { reviewNotesRoute, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
-import { CopyButton, DiffLine, type LineComposerController, NonCodeRow } from '@acorn/plugin-api/ui'
+import { Alert, CopyButton, createArmedConfirm, DiffLine, NonCodeRow, type LineComposerController } from '@acorn/plugin-api/ui'
 import { buildDiffRows, type CodeRow, highlighterTokenize, isCodeRow, plainTokenize, type Row } from '@acorn/plugin-api/ui/diff'
 import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
@@ -20,7 +20,9 @@ export default function ChangesPane(props: { task: Task }) {
   const project = () => projects.data?.find((candidate) => candidate.id === props.task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
-  const [discardArmed, setDiscardArmed] = createSignal('')
+  // Arm-to-confirm for the two discard actions. The prompt used to be written into the error
+  // banner, which claimed a failure that had not happened.
+  const discardArmed = createArmedConfirm()
 
   const [changes, { refetch }] = createResource(
     () => props.task.id,
@@ -114,24 +116,13 @@ export default function ChangesPane(props: { task: Task }) {
   }
   async function discard(path: string, untracked: boolean) {
     if (!api) return
-    const key = `file:${path}`
-    if (discardArmed() !== key) {
-      setDiscardArmed(key)
-      setActionError(`Click discard again to permanently discard changes to ${path}.`)
-      return
-    }
-    setDiscardArmed('')
+    if (!discardArmed.request(`file:${path}`)) return
     await gitAction(() => localGitApi.discard(props.task.id, path, untracked))
   }
   // Bulk toolbar actions (docs/panes.md): whole working tree at once. Discard-all is destructive → confirm.
   async function discardAll() {
     if (!api) return
-    if (discardArmed() !== 'all') {
-      setDiscardArmed('all')
-      setActionError('Click discard all again to permanently discard all changes, including untracked files.')
-      return
-    }
-    setDiscardArmed('')
+    if (!discardArmed.request('all')) return
     await gitAction(() => localGitApi.discardAll(props.task.id))
   }
   async function commit() {
@@ -196,7 +187,7 @@ export default function ChangesPane(props: { task: Task }) {
           <span class="changes-toolbar">
             <button type="button" class="changes-to-agent" disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => api && void gitAction(() => localGitApi.stageAll(props.task.id))}>++</button>
             <button type="button" class="changes-to-agent" disabled={!groups().staged.length} data-tip="Unstage all" data-tip-sub="git reset" onClick={() => api && void gitAction(() => localGitApi.unstageAll(props.task.id))}>−−</button>
-            <button type="button" class="changes-to-agent" data-tip="Discard all" data-tip-sub="Reset tracked + remove untracked — cannot be undone" onClick={() => void discardAll()}>↺</button>
+            <button type="button" class="changes-to-agent" data-armed={discardArmed.armed() === 'all' ? '' : undefined} data-tip={discardArmed.armed() === 'all' ? 'Click again to discard all' : 'Discard all'} data-tip-sub="Reset tracked + remove untracked — cannot be undone" onClick={() => void discardAll()}>{discardArmed.armed() === 'all' ? '?' : '↺'}</button>
           </span>
         </Show>
         <button type="button" class="changes-send" disabled={pushing()} data-tip="Push to origin" data-tip-sub="git push -u origin HEAD" onClick={() => void push()}>
@@ -213,7 +204,7 @@ export default function ChangesPane(props: { task: Task }) {
         <Show when={sendMsg()}>
           <span class="muted">{sendMsg()}</span>
         </Show>
-        <Show when={actionError()}><span class="action-error" role="alert">{actionError()}</span></Show>
+        <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
       </div>
       <div class="changes-body">
         <div class="changes-list">
@@ -245,7 +236,7 @@ export default function ChangesPane(props: { task: Task }) {
                           fallback={
                             <>
                               <button type="button" class="changes-to-agent" data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</button>
-                              <button type="button" class="changes-to-agent" data-tip="Discard changes" data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>↺</button>
+                              <button type="button" class="changes-to-agent" data-armed={discardArmed.armed() === `file:${c.path}` ? '' : undefined} data-tip={discardArmed.armed() === `file:${c.path}` ? 'Click again to discard' : 'Discard changes'} data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>{discardArmed.armed() === `file:${c.path}` ? '?' : '↺'}</button>
                             </>
                           }
                         >

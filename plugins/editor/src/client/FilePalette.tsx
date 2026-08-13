@@ -1,12 +1,12 @@
-import { createMemo, createResource, For, Show } from 'solid-js'
+import { createMemo, createResource, Show } from 'solid-js'
 import { editorApi } from './editorClient'
 import { editorOpen } from './editorState'
 import { activeTaskId, createOverlayPalette, dispatchActiveLayout, fuzzyScore } from '@acorn/plugin-api/client'
-import '@acorn/client-core/palette/palette.css'
+import { PaletteSurface } from '@acorn/plugin-api/ui/host'
 
 // ⌘P quick-open: fuzzy-jump to a file in the active task's worktree. Monaco has no built-in file
 // finder (that's a VS Code workbench feature, not the editor core), so this reuses OUR command-
-// palette shell (palette.css + fuzzyScore + createOverlayPalette) over `git ls-files`. Selecting a
+// palette shell (PaletteSurface + fuzzyScore + createOverlayPalette) over `git ls-files`. Selecting a
 // file opens an ephemeral tab via shared editorState and reveals the editor pane — EditorPane's
 // active() effect swaps it in.
 const MAX_ROWS = 100 // Keep palette rendering bounded for repositories with thousands of files.
@@ -52,43 +52,24 @@ export default function FilePalette() {
   }
 
   return (
-    <Show when={palette.open()}>
-      <div class="overlay-backdrop" onClick={palette.close}>
-        <div class="overlay palette" role="dialog" aria-modal="true" onKeyDown={palette.onKeyDown} onMouseDown={palette.onDialogMouseDown} onClick={(e) => e.stopPropagation()}>
-          <input
-            ref={palette.setInputRef}
-            class="palette-input"
-            placeholder="Go to file…"
-            value={palette.query()}
-            onInput={(e) => palette.setQuery(e.currentTarget.value)}
-          />
-          <ul class="palette-list">
-            <For each={matches()} fallback={<li class="palette-empty muted">No files.</li>}>
-              {(path, i) => {
-                const slash = path.lastIndexOf('/')
-                const name = slash >= 0 ? path.slice(slash + 1) : path
-                const dir = slash >= 0 ? path.slice(0, slash) : ''
-                return (
-                  <li>
-                    <button
-                      type="button"
-                      class="palette-row"
-                      classList={{ selected: i() === palette.sel() }}
-                      onMouseEnter={() => palette.setSel(i())}
-                      onClick={() => pick(path)}
-                    >
-                      <span class="palette-label">{name}</span>
-                      <Show when={dir}>
-                        <span class="palette-hint muted">{dir}</span>
-                      </Show>
-                    </button>
-                  </li>
-                )
-              }}
-            </For>
-          </ul>
-        </div>
-      </div>
-    </Show>
+    <PaletteSurface
+      palette={palette}
+      items={matches()}
+      ariaLabel="Go to file"
+      placeholder="Go to file…"
+      emptyText="No files."
+      onPick={(path) => pick(path)}
+      row={(path) => {
+        const slash = path.lastIndexOf('/')
+        return (
+          <>
+            <span class="palette-label">{slash >= 0 ? path.slice(slash + 1) : path}</span>
+            <Show when={slash >= 0}>
+              <span class="palette-hint muted">{path.slice(0, slash)}</span>
+            </Show>
+          </>
+        )
+      }}
+    />
   )
 }

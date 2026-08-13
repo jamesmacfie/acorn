@@ -73,21 +73,8 @@
 @media (max-width: 560px) {
   .wizard-cards { grid-template-columns: 1fr; }
 }
-.wizard-card {
-  font: inherit;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--pad-surface);
-  color: var(--text);
-  background: var(--card-bg);
-  border: var(--surface-border);
-  border-radius: var(--radius-surface);
-  cursor: pointer;
-}
-.wizard-card:hover:not(:disabled) { background: var(--bg-hover); }
-.wizard-card:disabled { opacity: 0.5; cursor: default; }
+/* Card owns the surface and its interactive states. What is left is the wizard card's inner stack. */
+.wizard-card { display: flex; flex-direction: column; gap: var(--space-2); }
 .wizard-card-title { font-weight: var(--fw-semibold); }
 .wizard-card-desc { color: var(--text-muted); font-size: var(--fs-sm); }
 .wizard-card-tag {
@@ -176,23 +163,11 @@
 .wizard-field { max-width: 380px; width: 100%; }
 
 /* Done: chord → what it does. */
-.wizard-keys {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-3) var(--space-6);
-  margin: 0;
-}
-.wizard-keys dt { justify-self: start; }
-.wizard-keys dd { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); align-self: center; }
-.wizard-keys kbd {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: 1px var(--space-3);
-}
+/* DescriptionList owns the grid, Kbd owns the cap. Each row is its own Item, so the columns are
+   per-row rather than aligned across rows — which is fine here: the caps are all one or two glyphs. */
+.wizard-keys { gap: var(--space-3); }
+.wizard-keys .ui-dl-item { grid-template-columns: max-content 1fr; gap: var(--space-6); align-items: center; }
+.wizard-keys .ui-dl-value { color: var(--text-muted); }
 
 .wizard-foot {
   flex: none;

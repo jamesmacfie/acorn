@@ -2,7 +2,8 @@ import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { AgentProviderUsage } from '../shared/usage'
 import { agentUsageStore } from './usageStore'
 import { formatUpdated, providerUsageRows } from './usageModel'
-import { Button, Icon } from '@acorn/plugin-api/ui'
+import { Button, DescriptionList, Icon, StatusDot } from '@acorn/plugin-api/ui'
+import { usageTone } from './stateTone'
 import './agent-usage.css'
 
 const providerLabel = (provider: AgentProviderUsage): string => (provider.provider === 'claude' ? 'Claude' : 'Codex')
@@ -40,7 +41,7 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
         {(provider) => (
           <div class="agent-usage-provider" data-provider={provider.provider}>
             <div class="agent-usage-provider-head">
-              <span class="agent-usage-health" data-health={provider.health} aria-hidden="true" />
+              <StatusDot tone={usageTone(provider.health)} />
               <strong>{providerLabel(provider)}</strong>
               <Show when={provider.plan}><span class="agent-usage-plan">{provider.plan}</span></Show>
               <span class="agent-usage-updated muted">
@@ -55,16 +56,11 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
             <Show when={provider.error}>
               {(error) => <div class="agent-usage-error" role="status">{error().message}</div>}
             </Show>
-            <dl class="agent-usage-values">
+            <DescriptionList class="agent-usage-values" size="sm">
               <For each={providerUsageRows(provider)}>
-                {(row) => (
-                  <div class="agent-usage-value">
-                    <dt>{row.label}</dt>
-                    <dd>{row.value}</dd>
-                  </div>
-                )}
+                {(row) => <DescriptionList.Item class="agent-usage-value" label={row.label}>{row.value}</DescriptionList.Item>}
               </For>
-            </dl>
+            </DescriptionList>
           </div>
         )}
       </For>

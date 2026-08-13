@@ -1,10 +1,12 @@
-import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount } from './notifications'
 import { createAttentionInbox } from './attentionInbox'
 import { activeNodeId, setActiveNode } from '../node/activeNode'
 import { nodes } from '../node/fleet'
 import { noticeKindContribution } from '../registries/notices'
 import Icon from '../ui/Icon'
+import { Alert } from '../ui/primitives'
+import Popover from '../ui/Popover'
 import './notifications.css'
 import { openRepoConfigTrust } from '../configTrust/configTrust'
 
@@ -28,38 +30,40 @@ const relTime = (at: number): string => {
 // dismissed from here (dismiss it and the next fetch brings it back, correctly); a notice is an event that
 // already happened and is client-local.
 export default function NotificationBell(props: { onSelectTask: (taskId: string) => void }) {
-  const [open, setOpen] = createSignal(false)
   const inbox = createAttentionInbox()
   const multiNode = () => nodes().length > 1
-  let rootRef: HTMLDivElement | undefined
 
-  const onDocPointer = (e: PointerEvent) => {
-    if (open() && !rootRef?.contains(e.target as Node)) setOpen(false)
-  }
-  onMount(() => document.addEventListener('pointerdown', onDocPointer))
-  onCleanup(() => document.removeEventListener('pointerdown', onDocPointer))
-
+  // Popover for the chrome only — the portal, the anchoring, outside-click and the Escape this never
+  // had. The CONTENT stays as it is: an inbox with two sections and dismissable rows is not a list of
+  // menu items, so it is deliberately not a Menu.
   return (
-    <div class="notify-bell" ref={rootRef}>
-      <button type="button" class="theme-toggle" title="Notifications" aria-expanded={open()} onClick={() => setOpen(!open())}>
-        ◔
-        {/* One pill for both sections. An attention item always counts — it is unresolved by definition —
-            so it is added rather than max()'d with the unread notices. */}
-        <Show when={unreadCount() + inbox().rows.length}>
-          {(count) => <span class="notify-count">{count()}</span>}
-        </Show>
-      </button>
-      <Show when={open()}>
-        <div class="notify-popover">
+    <Popover
+      class="notify-popover"
+      role="dialog"
+      ariaLabel="Notifications"
+      placement="bottom-end"
+      trigger={({ open, toggle }) => (
+        <button type="button" class="theme-toggle" title="Notifications" aria-expanded={open()} onClick={toggle}>
+          ◔
+          {/* One pill for both sections. An attention item always counts — it is unresolved by definition —
+              so it is added rather than max()'d with the unread notices. */}
+          <Show when={unreadCount() + inbox().rows.length}>
+            {(count) => <span class="notify-count">{count()}</span>}
+          </Show>
+        </button>
+      )}
+    >
+      {({ close }) => (
+        <>
           <Show when={inbox().rows.length || inbox().unavailable.length}>
             <div class="notify-head">
               <span>Needs you</span>
             </div>
             {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
             <Show when={inbox().unavailable.length}>
-              <div class="notify-banner" role="status">
-                <For each={inbox().unavailable}>{(entry) => <span>{entry.label} unavailable</span>}</For>
-              </div>
+              <For each={inbox().unavailable}>
+                {(entry) => <Alert tone="warn" variant="banner" class="notify-banner">{entry.label} unavailable</Alert>}
+              </For>
             </Show>
             <ul class="notify-list">
               <For each={inbox().rows}>
@@ -69,7 +73,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       type="button"
                       class="notify-row unread"
                       onClick={() => {
-                        setOpen(false)
+                        close()
                         // The node FIRST, then the task: navigation resolves against the active node, so
                         // selecting a task on another node before switching would look up an id that is
                         // not there (and might collide with a local one).
@@ -107,7 +111,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                     classList={{ unread: !n.read }}
                     onClick={() => {
                       markRead(n.id)
-                      setOpen(false)
+                      close()
                       props.onSelectTask(n.taskId)
                       if (n.action === 'review-config') openRepoConfigTrust(n.taskId)
                       openNoticeTarget(n)
@@ -124,8 +128,8 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
               )}
             </For>
           </ul>
-        </div>
-      </Show>
-    </div>
+        </>
+      )}
+    </Popover>
   )
 }

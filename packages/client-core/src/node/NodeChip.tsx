@@ -1,7 +1,20 @@
 import { Show } from 'solid-js'
 import { nodeState, nodeStatus } from './fleet'
 import { formatLastSeen, freshnessOf, FRESHNESS_LABELS, type FreshnessQuery } from './freshness'
+import { StatusDot } from '../ui/primitives'
 import './nodes.css'
+
+// The chip's six-value freshness vocabulary, in StatusDot's terms. NodeChip was the one *designed*
+// status indicator in the codebase, so it keeps its chip shape and its vocabulary; only the dot
+// itself is now the shared primitive.
+const FRESHNESS_TONE = {
+  live: 'ok',
+  refreshing: 'accent',
+  stale: 'warn',
+  offline: 'muted',
+  disabled: 'muted',
+  error: 'bad',
+} as const
 
 export default function NodeChip(props: { nodeId: string; label?: string; query?: FreshnessQuery; compact?: boolean }) {
   const status = () => nodeStatus(props.nodeId)
@@ -21,9 +34,10 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
       class="node-chip"
       classList={{ compact: props.compact }}
       data-freshness={mismatch() ? 'error' : freshness()}
-      title={`${props.label ?? props.nodeId}: ${nodeState(props.nodeId)}${detail() ? ` · ${detail()}` : ''}`}
+      data-tip={`${props.label ?? props.nodeId}: ${nodeState(props.nodeId)}`}
+      data-tip-sub={detail() || undefined}
     >
-      <span class="node-chip-dot" aria-hidden="true" />
+      <StatusDot class="node-chip-dot" tone={FRESHNESS_TONE[mismatch() ? 'error' : freshness()]} />
       <Show when={props.label}>{(label) => <span class="node-chip-label">{label()}</span>}</Show>
       <span class="node-chip-state">{mismatch() ? 'Identity changed' : FRESHNESS_LABELS[freshness()]}</span>
       <Show when={detail() && !mismatch()}>

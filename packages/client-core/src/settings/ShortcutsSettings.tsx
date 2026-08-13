@@ -19,6 +19,7 @@ import {
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
+import { Alert } from '../ui/primitives'
 
 type ShortcutGroup = {
   key: string
@@ -113,7 +114,7 @@ export default function ShortcutsSettings() {
   return (
     <>
       <p class="muted">Click a chord, then press its replacement. Conflicts never steal an existing binding.</p>
-      <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
       <For each={groups()}>
         {(group) => (
           <section class="shortcut-group" classList={{ 'shortcut-group-disabled': group.disabled }}>
@@ -124,6 +125,8 @@ export default function ShortcutsSettings() {
               </Show>
             </div>
             <Show when={group.disabled}><p class="shortcut-plugin-state muted">Plugin disabled — shortcuts remain editable and will apply when it is enabled.</p></Show>
+            {/* Stays a plain <dl>: `.help-list` aligns its two columns ACROSS rows, which
+                DescriptionList.Item cannot express — each Item is its own grid. */}
             <dl class="help-list">
               <For each={group.bindings}>
                 {(binding) => (
@@ -141,7 +144,9 @@ export default function ShortcutsSettings() {
                     </dt>
                     <dd class="help-desc">
                       {binding.description}
-                      <Show when={binding.conflict}><span class="action-error"> · conflicts with {binding.conflict}</span></Show>
+                      {/* Sits mid-sentence inside the description, so it keeps inline flow — the one
+                          `.action-error` site that was not a standalone message. */}
+                      <Show when={binding.conflict}><Alert class="shortcut-conflict-note"> · conflicts with {binding.conflict}</Alert></Show>
                       <button type="button" class="shortcut-reset" aria-label={`Unbind ${binding.description}`} onClick={() => void saveOverride(binding, null)}>×</button>
                       <button type="button" class="shortcut-reset" onClick={() => void resetBindings([binding])}>Reset</button>
                     </dd>

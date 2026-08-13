@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { Badge, Button, renderMarkdown, Spinner, Tabs, Textarea } from '@acorn/plugin-api/ui'
+import { Badge, Button, Chip, DescriptionList, renderMarkdown, Spinner, Tabs, Textarea } from '@acorn/plugin-api/ui'
 import type { LinearComment, LinearIssueDetail, LinearRelatedIssue } from '../shared/api'
 import { priorityMeta } from '../shared/triage'
 import { formatDate, relativeTime } from './model'
@@ -66,7 +66,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       <span class="ln-related-id">{related.identifier}</span>
       <span class="ln-related-title">{related.title}</span>
       <Show when={related.state}>
-        {(state) => <span class="ln-state" style={{ '--state-color': state().color }}>{state().name}</span>}
+        {(state) => <Chip color={state().color}>{state().name}</Chip>}
       </Show>
     </button>
   )
@@ -134,13 +134,13 @@ export function LinearIssueView(props: LinearIssueViewProps) {
 
       <div class="ln-chips">
         <Show when={issue().state}>
-          {(state) => <span class="ln-state" style={{ '--state-color': state().color }}>{state().name}</span>}
+          {(state) => <Chip color={state().color}>{state().name}</Chip>}
         </Show>
         <Show when={priorityMeta(issue().priority, issue().priorityLabel).level !== 'none'}>
           <Badge tone="warn" size="xs">{priorityMeta(issue().priority, issue().priorityLabel).label}</Badge>
         </Show>
         <For each={issue().labels ?? []}>
-          {(label) => <span class="ln-label-chip" style={{ '--label-color': label.color }}>{label.name}</span>}
+          {(label) => <Chip color={label.color}>{label.name}</Chip>}
         </For>
       </div>
 
@@ -157,26 +157,26 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       />
 
       <section id="linear-panel-overview" class="ln-panel" role="tabpanel" aria-labelledby="linear-tab-overview" hidden={props.activeTab !== 'overview'}>
-        <dl class="ln-facts">
-          <Show when={issue().assignee}>{(name) => <div><dt>Assignee</dt><dd>{name()}</dd></div>}</Show>
-          <Show when={issue().creator}>{(name) => <div><dt>Opened by</dt><dd>{name()} {relativeTime(issue().createdAt)}</dd></div>}</Show>
-          <Show when={issue().estimate != null}><div><dt>Estimate</dt><dd>{issue().estimate} pts</dd></div></Show>
-          <Show when={issue().cycle}>{(cycle) => <div><dt>Cycle</dt><dd>C{cycle().number}{cycle().endsAt ? ` → ${formatDate(cycle().endsAt)}` : ''}</dd></div>}</Show>
-          <Show when={issue().dueDate}>{(due) => <div><dt>Due</dt><dd>{formatDate(due())}</dd></div>}</Show>
-          <Show when={issue().team}>{(team) => <div><dt>Team</dt><dd>{team().name}</dd></div>}</Show>
-          <Show when={issue().project}>{(project) => <div><dt>Project</dt><dd>{project().name}</dd></div>}</Show>
+        {/* This grid IS where DescriptionList's `facts` layout came from. */}
+        <DescriptionList class="ln-facts" layout="facts">
+          <Show when={issue().assignee}>{(name) => <DescriptionList.Item label="Assignee">{name()}</DescriptionList.Item>}</Show>
+          <Show when={issue().creator}>{(name) => <DescriptionList.Item label="Opened by">{name()} {relativeTime(issue().createdAt)}</DescriptionList.Item>}</Show>
+          <Show when={issue().estimate != null}><DescriptionList.Item label="Estimate">{issue().estimate} pts</DescriptionList.Item></Show>
+          <Show when={issue().cycle}>{(cycle) => <DescriptionList.Item label="Cycle">C{cycle().number}{cycle().endsAt ? ` → ${formatDate(cycle().endsAt)}` : ''}</DescriptionList.Item>}</Show>
+          <Show when={issue().dueDate}>{(due) => <DescriptionList.Item label="Due">{formatDate(due())}</DescriptionList.Item>}</Show>
+          <Show when={issue().team}>{(team) => <DescriptionList.Item label="Team">{team().name}</DescriptionList.Item>}</Show>
+          <Show when={issue().project}>{(project) => <DescriptionList.Item label="Project">{project().name}</DescriptionList.Item>}</Show>
           <Show when={issue().branchName}>
             {(branch) => (
-              <div>
-                <dt>Branch</dt>
-                <dd class="ln-branch">
+              <DescriptionList.Item label="Branch" class="ln-branch-item">
+                <span class="ln-branch">
                   <code>{branch()}</code>
                   <Button size="sm" variant="bare" onClick={() => props.onCopy(branch())}>Copy</Button>
-                </dd>
-              </div>
+                </span>
+              </DescriptionList.Item>
             )}
           </Show>
-        </dl>
+        </DescriptionList>
 
         <Show when={issue().description} fallback={<p class="ln-muted">No description.</p>}>
           {(description) => <div class="markdown" innerHTML={renderMarkdown(description())} onClick={props.onContentClick} />}

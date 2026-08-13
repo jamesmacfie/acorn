@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { Modal } from '@acorn/plugin-api/ui'
+import { Alert, CodeBlock, Input, Modal, Textarea } from '@acorn/plugin-api/ui'
 import type { DbSavedQuery } from '../shared/database'
 import { saveQuery } from './databaseClient'
 
@@ -44,10 +44,14 @@ export default function SaveQueryModal(props: {
     }
   }
 
+  // Modal owns the deferred focus; a bare `autofocus` is unreliable inside a Solid modal.
+  let nameInput: HTMLInputElement | undefined
+
   return (
     <Modal
       title="Save query"
       class="db-generate"
+      autoFocus={() => nameInput}
       onClose={props.onClose}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return false
@@ -56,19 +60,16 @@ export default function SaveQueryModal(props: {
       }}
     >
       <Modal.Body class="db-generate-body">
-        <input
-          class="ui-input"
+        <Input
           type="text"
           maxlength="80"
           placeholder="Name — e.g. recent paid orders"
-          // Not bare `autofocus`: it is unreliable inside a Solid modal, and a microtask-deferred focus
-          // is the spelling that works.
-          ref={(el) => queueMicrotask(() => el.focus())}
+          ref={(el) => { nameInput = el }}
           value={name()}
           onInput={(e) => setName(e.currentTarget.value)}
         />
-        <textarea
-          class="settings-script"
+        <Textarea
+          mono
           rows="3"
           maxlength="2000"
           spellcheck={false}
@@ -76,9 +77,9 @@ export default function SaveQueryModal(props: {
           value={notes()}
           onInput={(e) => setNotes(e.currentTarget.value)}
         />
-        <pre class="db-sql-preview">{props.sql}</pre>
+        <CodeBlock class="db-sql-preview" size="xs" maxHeight="block" wrap>{props.sql}</CodeBlock>
         <Show when={error()}>
-          <div class="db-error">{error()}</div>
+          <Alert>{error()}</Alert>
         </Show>
       </Modal.Body>
       <div class="db-generate-actions">

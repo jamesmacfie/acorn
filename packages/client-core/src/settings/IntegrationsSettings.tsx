@@ -12,6 +12,7 @@ import {
 } from '../integrations/integrationClient'
 import { createDeviceFlow } from '../integrations/deviceFlow'
 import { integrationsKey, integrationsOptions } from '../queries'
+import { Alert } from '../ui/primitives'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   return (
@@ -216,7 +217,7 @@ export default function IntegrationsSettings() {
               )}
             </Show>
           </Show>
-          <Show when={error() || deviceFlow.error()}>{(message) => <div class="action-error">{message()}</div>}</Show>
+          <Show when={error() || deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
         </div>
       </div>
     </div>

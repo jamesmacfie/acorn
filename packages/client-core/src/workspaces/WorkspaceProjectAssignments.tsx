@@ -6,7 +6,7 @@ import { projectsKey, projectsOptions, tasksKey, tasksOptions, workspacesKey, wo
 import { createProject, createWorkspace, deleteProject, deleteWorkspace, patchProject, renameWorkspace } from './mutations'
 import { taskBridge } from '../tasks/taskBridge'
 import { projectImporterRegistry } from '../registries/projectImporters'
-import { Button, Input, Select } from '../ui/primitives'
+import { Alert, Button, Input, Select } from '../ui/primitives'
 import Icon from '../ui/Icon'
 import GithubMark from '../ui/GithubMark'
 import { Modal } from '../ui/Modal'
@@ -61,6 +61,7 @@ export default function WorkspaceProjectAssignments() {
     return (projects.data ?? []).filter((project) => !known.has(project.workspaceId))
   })
   const taskCount = (projectId: string) => (tasks.data ?? []).filter((task) => task.projectId === projectId).length
+  const projectsIn = (workspaceId: string) => (projects.data ?? []).filter((project) => project.workspaceId === workspaceId).length
 
   const guard = async (work: () => Promise<unknown>, whenItFails: string) => {
     setBusy(true)
@@ -124,13 +125,10 @@ export default function WorkspaceProjectAssignments() {
     setMovingToNew(null)
   }
 
-  const removeWorkspace = (workspace: Workspace, count: number) => {
-    const message = count
-      ? `Delete "${workspace.name}"? Its ${count} project${count === 1 ? '' : 's'} move to Default. No folder is touched.`
-      : `Delete "${workspace.name}"?`
-    if (!confirm(message)) return
-    void guard(() => deleteWorkspace(workspace.id), 'Could not delete workspace.')
-  }
+  // Was `confirm()`, which Electron renders unstyled — the same slip TabRail.tsx documents avoiding.
+  // Modal rather than arm-to-confirm because the blast radius is real: every project in the workspace
+  // moves. Sibling of DeleteProjectModal below, which already established the shape.
+  const [confirmDeleteWorkspace, setConfirmDeleteWorkspace] = createSignal<Workspace | null>(null)
 
   return (
     <>
@@ -139,7 +137,7 @@ export default function WorkspaceProjectAssignments() {
         map or clone repository projects. Git and GitHub badges describe detected facets; plain folders
         are valid too.
       </p>
-      <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
 
       <div class="onboarding-listhead">
         <span class="muted">Projects</span>
@@ -186,7 +184,7 @@ export default function WorkspaceProjectAssignments() {
                 <span />
                 {/* The default workspace is where deleted workspaces' projects land, so it cannot go. */}
                 <Show when={!group.workspace.isDefault} fallback={<span />}>
-                  <Button class="ws-group-delete" variant="bare" tone="danger" size="sm" disabled={busy()} onClick={() => removeWorkspace(group.workspace, group.projects.length)}>Delete</Button>
+                  <Button class="ws-group-delete" variant="bare" tone="danger" size="sm" disabled={busy()} onClick={() => setConfirmDeleteWorkspace(group.workspace)}>Delete</Button>
                 </Show>
               </header>
               {/* No empty-state row: the header already reads "no projects", and a second sentence
@@ -247,6 +245,37 @@ export default function WorkspaceProjectAssignments() {
           <Button type="submit" disabled={busy() || !newWorkspace()?.trim()}>Add</Button>
           <Button variant="bare" onClick={() => setNewWorkspace(null)}>Cancel</Button>
         </form>
+      </Show>
+
+      <Show when={confirmDeleteWorkspace()}>
+        {(workspace) => (
+          <Modal onClose={() => setConfirmDeleteWorkspace(null)} title="Delete workspace" size="sm" role="alertdialog">
+            <Modal.Body>
+              <p>Delete <strong>{workspace().name}</strong>?</p>
+              <Show when={projectsIn(workspace().id)}>
+                {(count) => (
+                  <p class="muted">
+                    Its {count()} project{count() === 1 ? '' : 's'} move to Default. No folder is touched.
+                  </p>
+                )}
+              </Show>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button variant="bare" onClick={() => setConfirmDeleteWorkspace(null)}>Cancel</Button>
+              <Button
+                variant="solid"
+                tone="danger"
+                busy={busy()}
+                onClick={async () => {
+                  await guard(() => deleteWorkspace(workspace().id), 'Could not delete workspace.')
+                  setConfirmDeleteWorkspace(null)
+                }}
+              >
+                Delete workspace
+              </Button>
+            </Modal.Actions>
+          </Modal>
+        )}
       </Show>
 
       <Show when={confirmDelete()}>

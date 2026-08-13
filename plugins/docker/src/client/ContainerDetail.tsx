@@ -1,7 +1,7 @@
 // Shared container detail panel (docs/ui-design.md): Info + live Logs + live Stats tabs, used by
 // the browse right pane and the task pane — one component, two hosts (the RollbarItemPanel split).
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
-import { requestTerminalFocusIntent, writeJson } from '@acorn/plugin-api/client'
+import { requestTerminalFocusIntent, toast, writeJson } from '@acorn/plugin-api/client'
 import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/routes.ts'
 import { wsDockerAttach } from './wsChannel'
 import type { DockerStatsSample } from '../shared/wsFrames'
@@ -9,8 +9,9 @@ import type { DockerContainerAction, DockerPort } from '../shared/model'
 import { containerAction, fetchContainerDetail, removeContainer } from './dockerClient'
 import { refreshDocker } from './dockerStore'
 import { dockerLogBuffer, type DockerLogBuffer } from './dockerLogStore'
-import { dockerDetailState, rememberDockerDetailState, type DockerDetailTab as Tab } from './dockerViewState'
+import { containerTone, dockerDetailState, rememberDockerDetailState, type DockerDetailTab as Tab } from './dockerViewState'
 import DockerExecTerminal from './DockerExecTerminal'
+import { Alert, Button, Checkbox, Chip, createArmedConfirm, DescriptionList, EmptyState, FindBar, Meter, StatusDot } from '@acorn/plugin-api/ui'
 
 // Try bash, fall back to sh — works across alpine/debian-ish images.
 const execCommand = (ref: string): string => `docker exec -it ${ref} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`
@@ -23,8 +24,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   const [tab, setTab] = createSignal<Tab>(initialView?.tab ?? 'info')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const [confirmRm, setConfirmRm] = createSignal(false)
-  const [copied, setCopied] = createSignal('')
+  const armed = createArmedConfirm()
   const [showEnv, setShowEnv] = createSignal(false)
 
   const [detail, { refetch }] = createResource(() => props.target, fetchContainerDetail)
@@ -140,11 +140,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   }
 
   async function remove() {
-    if (!confirmRm()) {
-      setConfirmRm(true)
-      setTimeout(() => setConfirmRm(false), 3000)
-      return
-    }
+    if (!armed.request('remove')) return
     setBusy(true)
     setError('')
     try {
@@ -155,7 +151,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
       setError(e instanceof Error ? e.message : 'remove failed')
     } finally {
       setBusy(false)
-      setConfirmRm(false)
+      armed.disarm()
     }
   }
 
@@ -163,8 +159,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
     if (!p.hostPort) return
     const url = `http://localhost:${p.hostPort}`
     void navigator.clipboard.writeText(url)
-    setCopied(url)
-    setTimeout(() => setCopied(''), 1500)
+    toast(`Copied ${url}`)
   }
 
   // Exec into the container. With a task in scope, open it as a session in the task's terminal
@@ -173,8 +168,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   async function openExec(name: string) {
     if (!props.taskId) {
       void navigator.clipboard.writeText(execCommand(name))
-      setCopied('exec command')
-      setTimeout(() => setCopied(''), 1500)
+      toast('Copied exec command')
       return
     }
     setError('')
@@ -194,11 +188,11 @@ export default function ContainerDetail(props: { target: string; taskId?: string
 
   return (
     <div class="docker-detail">
-      <Show when={detail()} fallback={<p class="placeholder">{detail.error ? 'Container not found.' : 'Loading…'}</p>}>
+      <Show when={detail()} fallback={<EmptyState align="start" busy={!detail.error}>{detail.error ? 'Container not found.' : 'Loading…'}</EmptyState>}>
         {(d) => (
           <>
             <header class="docker-detail-header">
-              <span class="docker-dot" data-state={d().state} />
+              <StatusDot tone={containerTone(d().state)} />
               <span class="docker-detail-name" title={d().name}>{d().name}</span>
               <span class="docker-detail-actions">
                 <Show when={!running()}>
@@ -217,16 +211,15 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                   </button>
                 </Show>
                 <button type="button" class="ui-btn docker-danger" disabled={busy()} onClick={() => void remove()}>
-                  {confirmRm() ? 'Sure?' : 'Remove'}
+                  {armed.armed() ? 'Sure?' : 'Remove'}
                 </button>
                 {props.actions}
               </span>
             </header>
             <div class="docker-detail-sub muted">
               {d().image} · {d().status}{d().health ? ` · ${d().health}` : ''}
-              <Show when={copied()}><span role="status"> · copied {copied()}</span></Show>
             </div>
-            <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+            <Show when={error()}><Alert>{error()}</Alert></Show>
 
             <nav class="docker-tabs">
               <button type="button" classList={{ active: tab() === 'info' }} onClick={() => switchTab('info')}>Info</button>
@@ -238,94 +231,93 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             </nav>
 
             <Show when={tab() === 'info'}>
-              <dl class="docker-info">
-                <dt>ID</dt><dd class="mono">{d().id}</dd>
-                <dt>Command</dt><dd class="mono" title={d().command}>{d().command}</dd>
-                <dt>State</dt><dd>{d().state}{d().exitCode !== null && d().state === 'exited' ? ` (exit ${d().exitCode})` : ''}</dd>
-                <Show when={d().startedAt}><dt>Started</dt><dd>{new Date(d().startedAt!).toLocaleString()}</dd></Show>
-                <Show when={d().restartCount > 0}><dt>Restarts</dt><dd>{d().restartCount}</dd></Show>
+              <DescriptionList class="docker-info" size="sm">
+                <DescriptionList.Item label="ID" mono>{d().id}</DescriptionList.Item>
+                <DescriptionList.Item label="Command" mono>{d().command}</DescriptionList.Item>
+                <DescriptionList.Item label="State">{d().state}{d().exitCode !== null && d().state === 'exited' ? ` (exit ${d().exitCode})` : ''}</DescriptionList.Item>
+                <Show when={d().startedAt}><DescriptionList.Item label="Started">{new Date(d().startedAt!).toLocaleString()}</DescriptionList.Item></Show>
+                <Show when={d().restartCount > 0}><DescriptionList.Item label="Restarts">{d().restartCount}</DescriptionList.Item></Show>
                 <Show when={d().composeProject}>
-                  <dt>Compose</dt><dd class="mono">{d().composeProject}{d().composeService ? ` / ${d().composeService}` : ''}</dd>
+                  <DescriptionList.Item label="Compose" mono>{d().composeProject}{d().composeService ? ` / ${d().composeService}` : ''}</DescriptionList.Item>
                 </Show>
-                <Show when={d().composeWorkingDir}><dt>Working dir</dt><dd class="mono" title={d().composeWorkingDir!}>{d().composeWorkingDir}</dd></Show>
+                <Show when={d().composeWorkingDir}><DescriptionList.Item label="Working dir" mono>{d().composeWorkingDir}</DescriptionList.Item></Show>
                 <Show when={d().ports.length}>
-                  <dt>Ports</dt>
-                  <dd class="docker-ports">
-                    <For each={d().ports}>
-                      {(p) => (
-                        <button
-                          type="button"
-                          class="docker-port-chip"
-                          disabled={!p.hostPort}
-                          title={p.hostPort ? `Copy http://localhost:${p.hostPort}` : 'Not published'}
-                          onClick={() => copyPort(p)}
-                        >
-                          {portLabel(p)}
-                        </button>
-                      )}
-                    </For>
-                    <Show when={copied()}><span class="muted" role="status">copied {copied()}</span></Show>
-                  </dd>
+                  <DescriptionList.Item label="Ports">
+                    <span class="docker-ports">
+                      <For each={d().ports}>
+                        {(p) => (
+                          <Chip
+                            class="docker-port-chip"
+                            title={p.hostPort ? `Copy http://localhost:${p.hostPort}` : 'Not published'}
+                            {...(p.hostPort ? { onActivate: () => copyPort(p) } : {})}
+                          >
+                            {portLabel(p)}
+                          </Chip>
+                        )}
+                      </For>
+                    </span>
+                  </DescriptionList.Item>
                 </Show>
                 <Show when={d().mounts.length}>
-                  <dt>Mounts</dt>
-                  <dd>
+                  <DescriptionList.Item label="Mounts">
                     <ul class="docker-mounts">
                       <For each={d().mounts}>
                         {(m) => <li class="mono" title={`${m.source} → ${m.destination}`}>{m.type}: {m.destination}{m.rw ? '' : ' (ro)'}</li>}
                       </For>
                     </ul>
-                  </dd>
+                  </DescriptionList.Item>
                 </Show>
-                <Show when={d().networks.length}><dt>Networks</dt><dd class="mono">{d().networks.join(', ')}</dd></Show>
+                <Show when={d().networks.length}><DescriptionList.Item label="Networks" mono>{d().networks.join(', ')}</DescriptionList.Item></Show>
                 <Show when={d().env.length}>
-                  <dt>Env</dt>
-                  <dd>
-                    <Show when={showEnv()} fallback={<button type="button" class="ui-btn" onClick={() => setShowEnv(true)}>Show {d().env.length} variables</button>}>
+                  <DescriptionList.Item label="Env">
+                    <Show when={showEnv()} fallback={<Button onClick={() => setShowEnv(true)}>Show {d().env.length} variables</Button>}>
                       <ul class="docker-env mono"><For each={d().env}>{(line) => <li>{line}</li>}</For></ul>
                     </Show>
-                  </dd>
+                  </DescriptionList.Item>
                 </Show>
-              </dl>
+              </DescriptionList>
             </Show>
 
             <Show when={tab() === 'logs'}>
-              <div class="docker-logs-bar">
-                <label class="docker-follow">
-                  <input
-                    type="checkbox"
-                    checked={follow()}
-                    onChange={(e) => {
-                      setFollow(e.currentTarget.checked)
-                      rememberView()
-                    }}
-                  /> Follow
-                </label>
-                <input
-                  class="docker-search docker-logs-search"
-                  type="search"
-                  placeholder="Find in logs"
-                  value={logQuery()}
-                  onInput={(e) => {
-                    setLogQuery(e.currentTarget.value)
-                    setMatchIdx(0)
-                    rememberView()
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') navMatch(e.shiftKey ? -1 : 1)
-                    else if (e.key === 'Escape') setLogQuery('')
-                  }}
-                />
-                <Show when={logQuery()}>
-                  <span class="muted docker-match-count" role="status">
-                    {logMatches().length ? `${currentMatch() + 1}/${logMatches().length}` : 'no matches'}
-                  </span>
-                  <button type="button" class="ui-btn" title="Previous match (Shift+Enter)" disabled={!logMatches().length} onClick={() => navMatch(-1)}>↑</button>
-                  <button type="button" class="ui-btn" title="Next match (Enter)" disabled={!logMatches().length} onClick={() => navMatch(1)}>↓</button>
-                </Show>
-                <button type="button" class="ui-btn" title="Clear the current log view (the stream keeps appending)" onClick={() => logBuf()?.clear()}>Clear</button>
-                <span class="muted">{logEnded() ? 'stream ended' : 'live'}</span>
-              </div>
+              {/* The three surfaces that had a find strip disagreed on the keyboard contract;
+                  FindBar owns it (⏎ next, ⇧⏎ prev, Esc close) and the count is announced. */}
+              <FindBar
+                class="docker-logs-bar"
+                placeholder="Find in logs"
+                query={logQuery()}
+                onQuery={(query) => {
+                  setLogQuery(query)
+                  setMatchIdx(0)
+                  rememberView()
+                }}
+                count={logQuery() ? { current: currentMatch() + 1, total: logMatches().length } : undefined}
+                onNext={() => navMatch(1)}
+                onPrev={() => navMatch(-1)}
+                onClose={() => setLogQuery('')}
+                status={logEnded() ? 'stream ended' : 'live'}
+                toggles={
+                  <>
+                    <Checkbox
+                      class="docker-follow"
+                      label="Follow"
+                      checked={follow()}
+                      onChange={(e) => {
+                        setFollow(e.currentTarget.checked)
+                        rememberView()
+                      }}
+                    />
+                    <Button
+                      variant="bare"
+                      size="sm"
+                      data-tip="Clear the current log view"
+                      data-tip-sub="The stream keeps appending"
+                      onClick={() => logBuf()?.clear()}
+                    >
+                      Clear
+                    </Button>
+                  </>
+                }
+              />
               <pre
                 class="docker-logs mono"
                 ref={logEl}
@@ -340,7 +332,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 <Show when={logSegments()} fallback={logText() || 'Waiting for log output…'}>
                   {(parts) => (
                     <For each={parts()}>
-                      {(p) => (p.match === undefined ? p.text : <mark classList={{ current: p.match === currentMatch() }}>{p.text}</mark>)}
+                      {(p) => (p.match === undefined ? p.text : <mark class="ui-find-mark" {...(p.match === currentMatch() ? { 'data-current': '' } : {})}>{p.text}</mark>)}
                     </For>
                   )}
                 </Show>
@@ -352,17 +344,19 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             </Show>
 
             <Show when={tab() === 'stats'}>
-              <Show when={stats()} fallback={<p class="placeholder">{statsEnded() ? 'Stats stream ended (container stopped?).' : running() ? 'Sampling…' : 'Container is not running.'}</p>}>
+              <Show when={stats()} fallback={<EmptyState align="start" busy={!statsEnded() && running()}>{statsEnded() ? 'Stats stream ended (container stopped?).' : running() ? 'Sampling…' : 'Container is not running.'}</EmptyState>}>
                 {(s) => (
-                  <dl class="docker-info docker-stats">
-                    <dt>CPU</dt>
-                    <dd><meter class="docker-meter" min="0" max="100" value={Math.min(s().cpuPercent, 100)} /> {s().cpuPercent.toFixed(1)}%</dd>
-                    <dt>Memory</dt>
-                    <dd><meter class="docker-meter" min="0" max="100" value={Math.min(s().memPercent, 100)} /> {s().memUsage} ({s().memPercent.toFixed(1)}%)</dd>
-                    <dt>Network I/O</dt><dd class="mono">{s().netIO}</dd>
-                    <dt>Block I/O</dt><dd class="mono">{s().blockIO}</dd>
-                    <dt>PIDs</dt><dd>{s().pids}</dd>
-                  </dl>
+                  <DescriptionList class="docker-info docker-stats" size="sm">
+                    <DescriptionList.Item label="CPU">
+                      <Meter class="docker-meter" tone="auto" label="CPU" value={s().cpuPercent / 100} /> {s().cpuPercent.toFixed(1)}%
+                    </DescriptionList.Item>
+                    <DescriptionList.Item label="Memory">
+                      <Meter class="docker-meter" tone="auto" label="Memory" value={s().memPercent / 100} /> {s().memUsage} ({s().memPercent.toFixed(1)}%)
+                    </DescriptionList.Item>
+                    <DescriptionList.Item label="Network I/O" mono>{s().netIO}</DescriptionList.Item>
+                    <DescriptionList.Item label="Block I/O" mono>{s().blockIO}</DescriptionList.Item>
+                    <DescriptionList.Item label="PIDs">{s().pids}</DescriptionList.Item>
+                  </DescriptionList>
                 )}
               </Show>
             </Show>

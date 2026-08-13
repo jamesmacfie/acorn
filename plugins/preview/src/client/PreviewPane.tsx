@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents } from '@acorn/plugin-api/client'
+import { EmptyState, Spinner } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -98,16 +99,17 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
   return (
     <section class="pane workspace-preview" style={{ 'grid-column': '1 / 3' }}>
       <Show when={preview} fallback={
-        <div class="workspace-empty-inner">
-          <p class="muted">The browser preview needs the desktop app.</p>
-          <p class="muted">Server-backed panes (PR review, workspaces, tasks) work in browser mode, but the preview surface is a desktop-only capability.</p>
-        </div>
+        <EmptyState title="The browser preview needs the desktop app">
+          Server-backed panes (PR review, workspaces, tasks) work in browser mode, but the preview
+          surface is a desktop-only capability.
+        </EmptyState>
       }>
         <Show when={props.url} fallback={
-          <div class="workspace-empty-inner">
-            <p class="muted">No preview URL yet.</p>
-            <p class="muted">Declare a run target with a <code>url</code> (in <code>.acorn/config.toml</code> or the workspace's run targets) and start it from the pane switcher's ▶ button, or set a preview URL in Settings → workspace.</p>
-          </div>
+          <EmptyState title="No preview URL yet">
+            Declare a run target with a <code>url</code> (in <code>.acorn/config.toml</code> or the
+            workspace's run targets) and start it from the pane switcher's ▶ button, or set a preview
+            URL in Settings → workspace.
+          </EmptyState>
         }>
           <div class="preview-chrome">
             <button type="button" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => preview?.command(props.taskId, 'back')}>‹</button>
@@ -123,7 +125,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
               onKeyDown={(e) => e.key === 'Enter' && go()}
             />
             <button type="button" class="preview-nav-btn" title="Toggle preview DevTools" aria-label="Toggle preview DevTools" onClick={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</button>
-            <Show when={loading()}><span class="preview-spinner spin">◐</span></Show>
+            <Show when={loading()}><Spinner label="Loading page" /></Show>
           </div>
         </Show>
       </Show>

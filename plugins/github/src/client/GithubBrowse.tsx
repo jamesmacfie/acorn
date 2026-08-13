@@ -26,6 +26,7 @@ import { projectsOptions, readJson } from '@acorn/plugin-api/client'
 import { Acorn } from '@acorn/plugin-api/ui/host'
 import PullList from './PullList'
 import { githubCreateRoute } from './routes'
+import { Button, EmptyState, SectionHeader } from '@acorn/plugin-api/ui'
 
 // Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and the
 // create-PR form do not compete with the first interactive paint. PullList is the startup path and is
@@ -103,22 +104,26 @@ export default function GithubBrowse() {
       fallback={
         <main class="panes panes-empty">
           <Show when={emptyMessage()} fallback={<Acorn />}>
-            {(message) => <p class="placeholder">{message()}</p>}
+            {(message) => <EmptyState align="start">{message()}</EmptyState>}
           </Show>
         </main>
       }
     >
       <main class="panes">
         <section class="pane pane-left">
-          <div class="section-header">
+          <SectionHeader
+            actions={
+              <>
+                <Button class="new-pr-btn" data-tip="New pull request" onClick={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}>
+                  + New PR
+                </Button>
+                {/* Was a literal '...' with no accessible name for the busy state. */}
+                <Button variant="bare" iconOnly data-tip="Refresh reviews" aria-label="Refresh reviews" busy={refreshingPulls()} onClick={refreshAllPulls}>↻</Button>
+              </>
+            }
+          >
             Reviews
-            <button type="button" class="new-pr-btn" title="New pull request" onClick={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}>
-              + New PR
-            </button>
-            <button type="button" class="section-refresh" title="Refresh reviews" aria-label="Refresh reviews" disabled={refreshingPulls()} onClick={refreshAllPulls}>
-              {refreshingPulls() ? '...' : '↻'}
-            </button>
-          </div>
+          </SectionHeader>
           <PullList />
         </section>
         <Show
@@ -133,16 +138,17 @@ export default function GithubBrowse() {
               }
             >
               <section class="pane pane-mid">
-                <div class="section-header">Navigator</div>
+                <SectionHeader>Navigator</SectionHeader>
                 <PullDetail />
               </section>
               <section class="pane pane-right">
-                <div class="section-header">
+                <SectionHeader
+                  actions={
+                    <Button variant="bare" iconOnly title="Refresh diff" aria-label="Refresh diff" busy={refreshingPull()} onClick={refreshCurrentPull}>↻</Button>
+                  }
+                >
                   Diff
-                  <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh diff" aria-label="Refresh diff" disabled={refreshingPull()} onClick={refreshCurrentPull}>
-                    {refreshingPull() ? '...' : '↻'}
-                  </button>
-                </div>
+                </SectionHeader>
                 <DiffView />
               </section>
             </Show>

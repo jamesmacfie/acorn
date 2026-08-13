@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Row, Spinner } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, Row } from '@acorn/plugin-api/ui'
 import { openLinkOnClick, type AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
 import { linearCommentsRoute, linearIssueRoute, type LinearIssueDetail } from '../shared/api'
@@ -227,16 +227,11 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
 function PageStatus(props: { state: Page }) {
   return props.state.kind === 'error'
     ? (
-      <div class="ln-error" role="alert">
-        <strong>{props.state.title}</strong>
-        <span>{props.state.detail}</span>
-      </div>
+      <Alert variant="banner" title={props.state.title}>{props.state.detail}</Alert>
     )
     : (
-      <div class="ln-placeholder">
-        <Show when={props.state.kind === 'loading'} fallback={<span>{props.state.kind === 'empty' ? props.state.message : ''}</span>}>
-          <Spinner label="Loading Linear" />
-        </Show>
-      </div>
+      <EmptyState busy={props.state.kind === 'loading'}>
+        {props.state.kind === 'loading' ? 'Loading Linear…' : props.state.kind === 'empty' ? props.state.message : ''}
+      </EmptyState>
     )
 }

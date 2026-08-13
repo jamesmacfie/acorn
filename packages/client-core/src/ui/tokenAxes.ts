@@ -72,7 +72,7 @@ export const STYLE_TOKENS = [
 export const INVARIANT_TOKENS = [
   '--z-base', '--z-sticky', '--z-resizer', '--z-float', '--z-rail', '--z-panel',
   '--z-popover', '--z-drawer', '--z-drawer-menu', '--z-overlay', '--z-modal',
-  '--z-picker', '--z-tooltip',
+  '--z-picker', '--z-toast', '--z-tooltip',
   '--brand-github', '--brand-linear', '--brand-rollbar', '--brand-fg',
   '--tabular',
 ] as const
@@ -106,4 +106,8 @@ export const Z_ORDER_INVARIANTS: readonly (readonly [above: string, below: strin
   ['--z-picker', '--z-modal'],
   ['--z-modal', '--z-overlay'],
   ['--z-drawer-menu', '--z-drawer'],
+  // A toast is how the app says "that worked". Occluded by the modal the action was taken in, it
+  // says nothing at all.
+  ['--z-toast', '--z-modal'],
+  ['--z-tooltip', '--z-toast'],
 ]

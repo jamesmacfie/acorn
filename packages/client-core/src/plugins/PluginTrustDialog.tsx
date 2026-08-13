@@ -16,6 +16,7 @@ import { syncChromeContributions } from './chrome/register'
 import { syncFrameContributions } from './frames/register'
 import { recordPluginTrust } from './host'
 import './plugin-trust.css'
+import { Alert, Kbd } from '../ui/primitives'
 
 // The consent surface for running code a node handed this device
 // (docs/plugins.md).
@@ -195,7 +196,7 @@ export default function PluginTrustDialog() {
                 </Show>
               </p>
 
-              <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+              <Show when={error()}><Alert>{error()}</Alert></Show>
 
               <Show when={addedLines().length}>
                 <section class="plugin-trust-group" data-tier="new">
@@ -254,7 +255,7 @@ export default function PluginTrustDialog() {
             </div>
             <div class="ui-modal-actions plugin-trust-actions">
               <p class="plugin-trust-escape">
-                Not sure? Press <kbd>Esc</kbd> — {previousVersion() ? `${previousVersion()} keeps running and ` : ''}acorn asks again next launch.
+                Not sure? Press <Kbd size="xs">Esc</Kbd> — {previousVersion() ? `${previousVersion()} keeps running and ` : ''}acorn asks again next launch.
               </p>
               <button type="button" class="ui-btn" data-variant="ghost" disabled={saving()} onClick={() => void decide('rejected')}>
                 {previousVersion() ? `Keep ${previousVersion()}` : 'Don’t run it'}

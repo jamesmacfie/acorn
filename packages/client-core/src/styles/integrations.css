@@ -258,12 +258,3 @@
   text-decoration: underline;
 }
 
-/* Status badge pill in the list row, tinted by the Linear state colour. */
-.integration-row-state {
-  flex-shrink: 0;
-  font-size: var(--fs-xs);
-  padding: 1px 7px;
-  border-radius: var(--radius-pill-fixed);
-  color: var(--state-color, var(--text-muted));
-  border: var(--control-bw) solid var(--state-color, var(--border));
-}

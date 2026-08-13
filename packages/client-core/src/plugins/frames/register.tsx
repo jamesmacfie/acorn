@@ -27,6 +27,7 @@ import PluginWebview from './PluginWebview'
 import type { FrameBinding } from './broker'
 import { documentRegionFor, isHostOwnedSurface } from './documentSurfaces'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
+import { Button, Toolbar } from '../../ui/primitives'
 
 // Turning accepted manifests into shell contributions (docs/plugins.md
 // § Frame contribution kind).
@@ -264,15 +265,8 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
                     — which is precisely what it would have done: the empty title was the visible half of
                     the reserved-`ref`-prop defect, and the reason it was found at all. */}
                 <span class="integrations-panel-title">{props.target.displayId}</span>
-                <button
-                  type="button"
-                  class="integrations-panel-close"
-                  style={{ 'margin-left': 'auto' }}
-                  onClick={props.onClose}
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
+                <Toolbar.Spacer />
+                <Button variant="bare" class="integrations-panel-close" onClick={props.onClose} aria-label="Close">✕</Button>
               </header>
               <PluginFrame
                 binding={bindingFor(pluginId, surface, row)}

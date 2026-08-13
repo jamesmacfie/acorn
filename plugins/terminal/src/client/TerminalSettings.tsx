@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { PrefKeys, prefsOptions, savePref, termFontSize } from '@acorn/plugin-api/client'
 import { resolveTerminalFontSize, TERMINAL_FONT_SIZE_OPTIONS } from './preferences'
+import { Checkbox } from '@acorn/plugin-api/ui'
 
 // Settings → Terminal: the rail-default profile — what the terminal button auto-launches when the
 // drawer opens empty (TerminalPanel reads `term_rail_default`).
@@ -39,16 +40,12 @@ export default function TerminalSettings() {
           ))}
         </select>
       </label>
-      <label class="settings-field">
-        <span class="settings-label">
-          <input
-            type="checkbox"
-            checked={injectContext()}
-            onChange={(e) => void savePref(qc, PrefKeys.startupContextInjection, e.currentTarget.checked ? 'true' : 'false')}
-          />
-          {' '}Send task context (PR, linked issues, notes) to new agent sessions at startup
-        </span>
-      </label>
+      <Checkbox
+        class="settings-field"
+        label="Send task context (PR, linked issues, notes) to new agent sessions at startup"
+        checked={injectContext()}
+        onChange={(e) => void savePref(qc, PrefKeys.startupContextInjection, e.currentTarget.checked ? 'true' : 'false')}
+      />
     </>
   )
 }

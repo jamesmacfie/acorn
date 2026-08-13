@@ -2,11 +2,10 @@
 // and as a task pane (that task's ad-hoc requests on top of the project tree). Everything below is shared
 // between them — the only difference is `taskId`.
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
-import { Button, Icon, Input, SectionHeader, Select } from '@acorn/plugin-api/ui'
+import { Button, createArmedConfirm, EmptyState, Icon, Input, SectionHeader, Select, StatusDot, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { fromCurl, httpMethods, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
-import { createArmedDelete } from './confirmDelete'
 import { draftsDiffer, emptyDraft, toDraft, toSendInput, type Draft } from './draft'
 import RequestTabs from './RequestTabs'
 import ResponseView from './ResponseView'
@@ -63,7 +62,7 @@ export default function HttpPanel(props: {
     void adhocActions.refetch()
   }
 
-  const armedDelete = createArmedDelete()
+  const armedDelete = createArmedConfirm()
 
   const current = createMemo<HttpRequest | null>(() => {
     const sel = selection()
@@ -202,8 +201,8 @@ export default function HttpPanel(props: {
           <Show when={props.taskId}>
             <div class="http-tree-group">
               <span class="http-tree-folder">This task</span>
-              <Show when={(adhoc() ?? []).length} fallback={<p class="http-empty">Nothing yet — new requests you make here stay with this task until you file them.</p>}>
-                <For each={adhoc()}>{(row) => <TreeRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
+              <Show when={(adhoc() ?? []).length} fallback={<EmptyState align="start" size="sm">Nothing yet — new requests you make here stay with this task until you file them.</EmptyState>}>
+                <For each={adhoc()}>{(row) => <RequestRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
               </Show>
             </div>
           </Show>
@@ -212,13 +211,13 @@ export default function HttpPanel(props: {
             {(group) => (
               <div class="http-tree-group">
                 <span class="http-tree-folder">{group.folder || 'Ungrouped'}</span>
-                <For each={group.requests}>{(row) => <TreeRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
+                <For each={group.requests}>{(row) => <RequestRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
               </div>
             )}
           </For>
 
           <Show when={saved.state === 'ready' && !(saved() ?? []).length && !props.taskId}>
-            <p class="http-empty">No saved requests for this project yet.</p>
+            <EmptyState align="start" size="sm">No saved requests for this project yet.</EmptyState>
           </Show>
         </nav>
 
@@ -232,7 +231,7 @@ export default function HttpPanel(props: {
           when={selection().kind !== 'variables'}
           fallback={<HttpVariables projectId={props.projectId} projectName={props.projectName} />}
         >
-          <div class="http-urlbar">
+          <Toolbar class="http-urlbar" ariaLabel="Request">
             <Select
               class="http-method"
               width="narrow"
@@ -258,9 +257,9 @@ export default function HttpPanel(props: {
             <Button variant="solid" tone="accent" busy={sending()} onClick={() => void fire()}>
               Send
             </Button>
-          </div>
+          </Toolbar>
 
-          <div class="http-metabar">
+          <Toolbar class="http-metabar" size="sm" ariaLabel="Request meta">
             {/* The name is a label, not a field: it opens the save dialog, which is also the rename
                 and the move-into-the-repo path. */}
             <button type="button" class="http-name-btn" title="Rename, move or file this request" onClick={openSave}>
@@ -272,11 +271,9 @@ export default function HttpPanel(props: {
                 <span class="http-name-tag">task</span>
               </Show>
             </button>
-            <span class="http-metabar-spacer" />
+            <Toolbar.Spacer />
             <Show when={dirty()}>
-              <span class="http-dirty" title="Unsaved changes">
-                ●
-              </span>
+              <StatusDot tone="accent" label="Unsaved changes" />
             </Show>
             <Button size="sm" variant="ghost" onClick={() => void copyAsCurl()}>
               Copy as curl
@@ -284,10 +281,10 @@ export default function HttpPanel(props: {
             <Button size="sm" busy={saving()} onClick={onSaveClick}>
               {current() ? 'Save' : 'Save…'}
             </Button>
-          </div>
+          </Toolbar>
 
           <RequestTabs draft={draft()} patch={patch} />
-          <ResponseView result={result()} error={error()} sending={sending()} />
+          <ResponseView result={result()} error={error()} sending={sending()} onCopy={(text) => void props.bridge.ui.copy(text)} />
         </Show>
       </div>
 
@@ -316,34 +313,44 @@ export default function HttpPanel(props: {
   )
 }
 
-function TreeRow(props: { row: HttpRequest; active: boolean; armed: boolean; onOpen: (row: HttpRequest) => void; onCopy: (row: HttpRequest) => void; onDelete: (row: HttpRequest) => void }) {
+// Named RequestRow, not TreeRow: the shared TreeRow owns that name now, and this is the adapter that
+// gives it this plugin's leading method chip and its two row actions.
+function RequestRow(props: { row: HttpRequest; active: boolean; armed: boolean; onOpen: (row: HttpRequest) => void; onCopy: (row: HttpRequest) => void; onDelete: (row: HttpRequest) => void }) {
   return (
-    <div class="http-tree-row" classList={{ active: props.active, 'delete-armed': props.armed }}>
-      <button type="button" class="http-tree-open" onClick={() => props.onOpen(props.row)}>
+    <TreeRow
+      class="http-tree-row"
+      depth={1}
+      reveal
+      selected={props.active}
+      onActivate={() => props.onOpen(props.row)}
+      leading={
         <span class="http-method-chip" data-method={methodTone(props.row.method)}>
           {props.row.method}
         </span>
-        <span class="http-tree-name">{props.row.name}</span>
-      </button>
-      <span class="http-tree-actions">
-        <Button variant="bare" size="sm" iconOnly title="Duplicate as a new request" aria-label="Duplicate" onClick={() => props.onCopy(props.row)}>
-          <Icon name="copy" />
-        </Button>
-        {/* Two clicks, not a dialog — see confirmDelete.ts. The label changes so the second click is not a
-            surprise, and it is the affordance rather than a tooltip because a tooltip is not an answer to
-            "did that do anything". */}
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly={!props.armed}
-          tone={props.armed ? 'danger' : undefined}
-          title={props.armed ? `Click again to delete "${props.row.name}"` : 'Delete'}
-          aria-label={props.armed ? 'Confirm delete' : 'Delete'}
-          onClick={() => props.onDelete(props.row)}
-        >
-          <Show when={props.armed} fallback={<Icon name="trash-2" />}>Delete?</Show>
-        </Button>
-      </span>
-    </div>
+      }
+      trailing={
+        <>
+          <Button variant="bare" size="sm" iconOnly data-tip="Duplicate as a new request" aria-label="Duplicate" onClick={() => props.onCopy(props.row)}>
+            <Icon name="copy" />
+          </Button>
+          {/* Two clicks, not a dialog — a sandboxed frame's window.confirm silently returns false.
+              The label changes so the second click is not a surprise, and it is the affordance rather
+              than a tooltip because a tooltip is not an answer to "did that do anything". */}
+          <Button
+            variant="bare"
+            size="sm"
+            iconOnly={!props.armed}
+            tone={props.armed ? 'danger' : undefined}
+            title={props.armed ? `Click again to delete "${props.row.name}"` : 'Delete'}
+            aria-label={props.armed ? 'Confirm delete' : 'Delete'}
+            onClick={() => props.onDelete(props.row)}
+          >
+            <Show when={props.armed} fallback={<Icon name="trash-2" />}>Delete?</Show>
+          </Button>
+        </>
+      }
+    >
+      {props.row.name}
+    </TreeRow>
   )
 }

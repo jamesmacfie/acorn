@@ -22,6 +22,10 @@ export function Modal(props: {
   /** Extra keys handled before dismissal (e.g. ⌘↵ to submit). Return true if handled. */
   onKeyDown?: (event: KeyboardEvent) => boolean | void
   labelledBy?: string
+  /** Focused once, after mount. A bare `autofocus` attribute is unreliable in a Solid modal — the
+   *  element is created before it is in the document — so this is a `queueMicrotask` focus, which two
+   *  call sites were duplicating with identical comments. */
+  autoFocus?: () => HTMLElement | undefined
   class?: string
   children: JSX.Element
 }) {
@@ -31,6 +35,8 @@ export function Modal(props: {
     container: () => dialog,
     on: props.dismissOn,
   })
+
+  if (props.autoFocus) queueMicrotask(() => props.autoFocus?.()?.focus())
 
   return (
     <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>

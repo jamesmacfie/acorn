@@ -4,6 +4,8 @@ import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from '.
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
 import './notes.css'
+import { Alert, createArmedConfirm, EmptyState, Input, Toolbar } from '@acorn/plugin-api/ui'
+import { toast } from '@acorn/plugin-api/client'
 
 // The Notes pane (docs/agent-tools.md): where you write context. Lands in this task's
 // scratchpad (a *virtual* note until the first keystroke creates the file); a library column
@@ -27,9 +29,9 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
   const [preview, setPreview] = createSignal(false)
   const [filter, setFilter] = createSignal('')
   const [saving, setSaving] = createSignal(false)
-  const [savedOnce, setSavedOnce] = createSignal(false)
   const [actionError, setActionError] = createSignal('')
-  const [deleteArmed, setDeleteArmed] = createSignal('')
+  // The armed button is the prompt; this used to be written into the error banner.
+  const deleteArmed = createArmedConfirm()
   const [landedTask, setLandedTask] = createSignal('')
   let titleInputRef: HTMLInputElement | undefined
   let scratchCreate: Promise<void> | null = null
@@ -124,7 +126,6 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     setSelected({ scope: 'task', slug: SCRATCHPAD_SLUG, virtual: true })
     setNoteTitle('Scratchpad')
     setBody('')
-    setSavedOnce(false)
   }
 
   // First keystroke in a virtual scratchpad creates the file (single-flight). Adopt an existing
@@ -163,7 +164,6 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     setBody(res.body)
     setNoteTitle(res.title)
     setSaving(false)
-    setSavedOnce(false)
     rememberNotesSelection(props.task.id, { scope, slug })
   }
 
@@ -176,7 +176,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     setSaving(false)
     if ('error' in res) return setActionError(res.error)
     setActionError('')
-    setSavedOnce(true)
+    toast('Note saved', { tone: 'success' })
   }
 
   async function saveTitle() {
@@ -215,13 +215,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
   async function remove(scope: NoteScope, slug: string) {
     const location = locationFor(scope)
     if (!api || !location) return
-    const key = `${scope}:${slug}`
-    if (deleteArmed() !== key) {
-      setDeleteArmed(key)
-      setActionError(`Click delete again to remove “${slug}”.`)
-      return
-    }
-    setDeleteArmed('')
+    if (!deleteArmed.request(`${scope}:${slug}`)) return
     setActionError('')
     if (isActive(scope, slug)) {
       scheduleSave.cancel()
@@ -234,7 +228,6 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
 
   function onBodyInput(value: string) {
     setBody(value)
-    setSavedOnce(false)
     if (selected()?.virtual) void ensureScratchpad().then(() => scheduleSave())
     else scheduleSave()
   }
@@ -256,7 +249,13 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
         <span class="notes-row-title">{rowProps.note.title}</span>
         <Show when={authorBadge(rowProps.note.author)}><span class="notes-row-author">{authorBadge(rowProps.note.author)}</span></Show>
       </button>
-      <button type="button" class="notes-row-delete" title="Delete note" onClick={() => void remove(rowProps.scope, rowProps.note.slug)}>✕</button>
+      <button
+        type="button"
+        class="notes-row-delete"
+        data-armed={deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? '' : undefined}
+        title={deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
+        onClick={() => void remove(rowProps.scope, rowProps.note.slug)}
+      >{deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? '?' : '✕'}</button>
     </div>
   )
 
@@ -271,11 +270,11 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     <section class="pane notes-pane">
       <div class="section-header notes-header">
         <span>Notes — {props.workspace?.name ?? 'workspace'}</span>
-        <input class="notes-filter" type="text" placeholder="filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
+        <Input class="notes-filter" kind="filter" type="text" placeholder="filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
         <button type="button" class="notes-collapse" title={collapsed() ? 'Show library' : 'Hide library'} onClick={() => setLibraryCollapsed(props.task.id, !collapsed())}>{collapsed() ? '▶' : '◀'}</button>
       </div>
-      <Show when={actionError()}><div class="action-error" role="alert">{actionError()}</div></Show>
-      <Show when={api} fallback={<div class="editor-empty muted">Notes need the desktop app.</div>}>
+      <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
+      <Show when={api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
         <div class="notes-body" classList={{ 'library-collapsed': collapsed() }}>
           <div class="notes-list">
             <GroupHeader label="Task" count={taskOther().length + 1} scope="task" />
@@ -298,10 +297,10 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
           </div>
 
           <div class="notes-main">
-            <Show when={selected()} fallback={<div class="editor-empty muted">Select or create a note.</div>}>
+            <Show when={selected()} fallback={<EmptyState>Select or create a note.</EmptyState>}>
               {(sel) => (
                 <>
-                  <div class="notes-toolbar">
+                  <Toolbar class="notes-toolbar" size="sm" ariaLabel="Note actions">
                     <input
                       ref={titleInputRef}
                       class="notes-title-input"
@@ -324,8 +323,9 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                       onClick={() => void toggleIncluded(sel().scope, sel().slug, !selectedIncluded())}
                     />
                     <button type="button" class="editor-save" onClick={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</button>
-                    <span class="notes-save-state muted">{saving() ? 'saving…' : savedOnce() ? 'saved ·' : ''}</span>
-                  </div>
+                    {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
+                    <span class="notes-save-state muted">{saving() ? 'saving…' : ''}</span>
+                  </Toolbar>
                   <Show when={!preview()} fallback={
                     <div
                       class="notes-preview linear-md"

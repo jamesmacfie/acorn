@@ -1,9 +1,10 @@
-import { createEffect, createMemo, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
 import { createOverlayPalette, fuzzyScore, projectsOptions, registerCommands } from '@acorn/plugin-api/client'
 import type { PullFile } from '../contract/api'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
+import { PaletteSurface } from '@acorn/plugin-api/ui/host'
 import { createQuery } from '@tanstack/solid-query'
 import { githubCreateRoute } from './routes'
 
@@ -95,41 +96,23 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   }
 
   return (
-    <Show when={finder.open()}>
-      <div class="overlay-backdrop" onClick={finder.close}>
-        <div class="overlay" role="dialog" aria-modal="true" onKeyDown={finder.onKeyDown} onMouseDown={finder.onDialogMouseDown} onClick={(e) => e.stopPropagation()}>
-          <input
-            ref={finder.setInputRef}
-            class="finder-input"
-            placeholder="Find file…"
-            value={finder.query()}
-            onInput={(e) => finder.setQuery(e.currentTarget.value)}
-          />
-          <Show
-            when={results().length}
-            fallback={<p class="finder-empty">{allFiles().length ? 'No matching files.' : 'No changed files.'}</p>}
-          >
-            <ul class="finder-list">
-              <For each={results()}>
-                {(file, i) => {
-                  const parts = splitPath(file.path)
-                  return (
-                    <li
-                      class="finder-row"
-                      classList={{ active: i() === finder.sel() }}
-                      onMouseMove={() => finder.setSel(i())}
-                      onClick={() => selectFile(file.path)}
-                    >
-                      <span class="finder-dir">{parts.dir}</span>
-                      <span class="finder-name">{parts.name}</span>
-                    </li>
-                  )
-                }}
-              </For>
-            </ul>
-          </Show>
-        </div>
-      </div>
-    </Show>
+    <PaletteSurface
+      palette={finder}
+      items={results()}
+      ariaLabel="Find file"
+      placeholder="Find file…"
+      emptyText={allFiles().length ? 'No matching files.' : 'No changed files.'}
+      onPick={(file) => selectFile(file.path)}
+      row={(file) => {
+        const parts = splitPath(file.path)
+        return (
+          <>
+            {/* Directory first and dimmed, filename emphasised — the finder's own emphasis, kept. */}
+            <span class="palette-hint muted">{parts.dir}</span>
+            <span class="palette-label">{parts.name}</span>
+          </>
+        )
+      }}
+    />
   )
 }

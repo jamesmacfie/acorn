@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { readJson } from '@acorn/plugin-api/client'
 import { editorFilesRoute } from '@acorn/plugin-editor/contract/api.ts'
-import { Button, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, Textarea } from '@acorn/plugin-api/ui'
 import {
   activeFileMention,
   completeFileMention,
@@ -131,7 +131,7 @@ export default function AgentMentionTextarea(props: {
           <Show when={!files.loading} fallback={<p class="muted">Loading files…</p>}>
             <Show
               when={!files.error}
-              fallback={<p class="action-error" role="alert">Unable to load worktree files.</p>}
+              fallback={<Alert>Unable to load worktree files.</Alert>}
             >
               <For
                 each={suggestions()}

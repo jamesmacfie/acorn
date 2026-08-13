@@ -9,9 +9,8 @@
 //             request references it. Its output is never stored. The same mechanism the Database
 //             pane uses for its connection URL.
 import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
-import { Button, Icon, Input, Select } from '@acorn/plugin-api/ui'
+import { Button, Checkbox, createArmedConfirm, Icon, Input, Select } from '@acorn/plugin-api/ui'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
-import { createArmedDelete } from './confirmDelete'
 import { createVariable, deleteVariable, listVariables, updateVariable } from './httpClient'
 
 const KIND_HINT: Record<VariableKind, string> = {
@@ -46,7 +45,7 @@ export default function HttpVariables(props: { projectId: string; projectName: s
     if (saved) setRows(saved.map(toRow))
   })
 
-  const armedDelete = createArmedDelete()
+  const armedDelete = createArmedConfirm()
 
   const editRow = (index: number, patch: Partial<Row>) => setRows((current) => current.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   const dropRow = (index: number) => setRows((current) => current.filter((_, i) => i !== index))
@@ -106,7 +105,7 @@ export default function HttpVariables(props: { projectId: string; projectName: s
         <Index each={rows()}>
           {(row, index) => (
             <div class="http-grid-row" role="row">
-              <input type="checkbox" checked={row().enabled} aria-label="Enabled" onChange={(e) => editRow(index, { enabled: e.currentTarget.checked })} />
+              <Checkbox checked={row().enabled} aria-label="Enabled" onChange={(e) => editRow(index, { enabled: e.currentTarget.checked })} />
               <Input size="sm" value={row().name} placeholder="BASE_URL" onInput={(e) => editRow(index, { name: e.currentTarget.value })} />
               <Select size="sm" value={row().kind} aria-label="Kind" onChange={(e) => editRow(index, { kind: e.currentTarget.value as VariableKind, value: '' })}>
                 <For each={variableKinds}>{(k) => <option value={k}>{k}</option>}</For>

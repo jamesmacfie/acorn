@@ -15,8 +15,6 @@ button { font: inherit; }
 .rb-target.ui-row { padding-inline: var(--space-4, .5rem); color: var(--text-muted); }
 .rb-target.ui-row[data-selected] { color: var(--text); }
 .rb-content { min-width: 0; min-height: 0; overflow: auto; }
-.rb-placeholder { display: flex; min-height: 10rem; align-items: center; justify-content: center; gap: var(--space-3, .375rem); padding: var(--space-8, 1.5rem); color: var(--text-muted); text-align: center; }
-.rb-error { margin: var(--space-7, 1rem); padding: var(--space-6, .75rem); display: grid; gap: var(--space-2, .25rem); border: var(--control-bw, .0625rem) solid var(--danger, var(--del-marker)); color: var(--danger, var(--del-marker)); }
 .rb-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-7, 1rem); padding: var(--space-7, 1rem) var(--space-8, 1.25rem) var(--space-5, .625rem); }
 .rb-heading { min-width: 0; }
 .rb-heading h1 { margin: var(--space-2, .25rem) 0 0; font-size: var(--fs-xl, 1.125rem); overflow-wrap: anywhere; }
@@ -25,10 +23,9 @@ button { font: inherit; }
 .rb-content > .ui-tabs { padding-inline: var(--space-8, 1.25rem); }
 .rb-panel { padding: var(--space-7, 1rem) var(--space-8, 1.25rem) var(--space-9, 1.5rem); }
 .rb-panel[hidden] { display: none; }
-.rb-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr)); border-top: var(--control-bw, .0625rem) solid var(--border); }
-.rb-fact { min-width: 0; display: grid; gap: var(--space-2, .25rem); padding: var(--space-5, .625rem) var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
-.rb-fact-label { color: var(--text-muted); font-size: var(--fs-sm, .75rem); }
-.rb-fact-value { font-family: var(--font-mono, monospace); overflow-wrap: anywhere; }
+/* DescriptionList's `facts` layout came from this grid. What is left is the ruled-tile look. */
+.rb-stats { gap: 0; border-top: var(--control-bw, .0625rem) solid var(--border); }
+.rb-fact { padding: var(--space-5, .625rem) var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
 .rb-occurrence-workbench { min-height: 26.25rem; display: grid; grid-template-columns: minmax(13.75rem, 32%) minmax(0, 1fr); border: var(--control-bw, .0625rem) solid var(--border); }
 .rb-occurrence-list { overflow-y: auto; border-right: var(--control-bw, .0625rem) solid var(--border); }
 .rb-occurrence-row.ui-row { align-items: flex-start; border-bottom: var(--control-bw, .0625rem) solid var(--border); border-radius: var(--radius-0, 0); }

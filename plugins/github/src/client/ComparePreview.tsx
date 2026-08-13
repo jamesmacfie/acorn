@@ -3,7 +3,7 @@ import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { compareOptions } from './queries'
 import { getHighlighter, projectsOptions } from '@acorn/plugin-api/client'
-import { DiffLine, NonCodeRow } from '@acorn/plugin-api/ui'
+import { DiffLine, EmptyState, NonCodeRow } from '@acorn/plugin-api/ui'
 import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, highlighterTokenize, isCodeRow, type ParsedFile, plainTokenize, type Row, type TokenizeLine } from '@acorn/plugin-api/ui/diff'
 
 // Right (Diff) pane in create mode: read-only base..head preview. Reuses the diff engine
@@ -62,11 +62,11 @@ export default function ComparePreview() {
   const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), undefined))
 
   return (
-    <Show when={comparable()} fallback={<p class="placeholder">Pick a branch to compare.</p>}>
-      <Show when={!compare.isLoading} fallback={<p class="placeholder">Loading…</p>}>
+    <Show when={comparable()} fallback={<EmptyState align="start">Pick a branch to compare.</EmptyState>}>
+      <Show when={!compare.isLoading} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
         <Show
           when={(compare.data?.aheadBy ?? 0) > 0}
-          fallback={<p class="placeholder">Nothing to compare — branches are identical.</p>}
+          fallback={<EmptyState align="start">Nothing to compare — branches are identical.</EmptyState>}
         >
           <div class="diff compare-diff">
             <div class="diff-rows">

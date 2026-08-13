@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, For, on, Show } from 'solid-js'
 import { debounce } from '@acorn/plugin-api/client'
-import { CopyButton } from '@acorn/plugin-api/ui'
+import { CopyButton, Input, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import './search.css'
@@ -65,9 +65,10 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
       style={{ display: props.active ? undefined : 'none' }}
     >
       <div class="search-bar">
-        <input
+        <Input
           ref={input}
           class="search-input"
+          kind="filter"
           placeholder="Search in files…"
           value={query()}
           spellcheck={false}
@@ -75,11 +76,13 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
           autocorrect="off"
           onInput={(e) => onInput(e.currentTarget.value)}
         />
-        <div class="search-toggles">
-          <button type="button" class="search-toggle" classList={{ active: caseSensitive() }} title="Match case" aria-pressed={caseSensitive()} onClick={() => setCaseSensitive((v) => !v)}>Aa</button>
-          <button type="button" class="search-toggle" classList={{ active: wholeWord() }} title="Whole word" aria-pressed={wholeWord()} onClick={() => setWholeWord((v) => !v)}>\b</button>
-          <button type="button" class="search-toggle" classList={{ active: regex() }} title="Use regular expression" aria-pressed={regex()} onClick={() => setRegex((v) => !v)}>.*</button>
-        </div>
+        <Toolbar.Group class="search-toggles">
+          {/* Three independent booleans, so three ToggleButtons — not a radiogroup, which would make
+              them mutually exclusive. */}
+          <ToggleButton variant="bare" size="sm" class="search-toggle" title="Match case" pressed={caseSensitive()} onPressedChange={setCaseSensitive}>Aa</ToggleButton>
+          <ToggleButton variant="bare" size="sm" class="search-toggle" title="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>
+          <ToggleButton variant="bare" size="sm" class="search-toggle" title="Use regular expression" pressed={regex()} onPressedChange={setRegex}>.*</ToggleButton>
+        </Toolbar.Group>
       </div>
 
       <div class="search-status muted">
@@ -137,7 +140,7 @@ function HitPreview(props: { hit: SearchHit }) {
   return (
     <>
       {parts().before}
-      <mark class="search-mark">{parts().match}</mark>
+      <mark class="ui-find-mark">{parts().match}</mark>
       {parts().after}
     </>
   )

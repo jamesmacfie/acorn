@@ -1,5 +1,4 @@
 /* Notification bell + popover (docs/terminal-and-agents.md). Popovers are the only elevated surface. */
-.notify-bell { position: relative; }
 .notify-count {
   position: absolute;
   top: 0;
@@ -15,16 +14,9 @@
   border-radius: var(--radius-pill-fixed);
   pointer-events: none;
 }
-.notify-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: var(--z-popover);
-  width: 340px;
-  background: var(--bg);
-  border: var(--control-border);
-  box-shadow: var(--shadow-2);
-}
+/* Popover owns the surface (portal, position, elevation, dismissal). This is only the inbox's width
+   and the fact that its own rows supply all the padding. */
+.notify-popover { width: 340px; padding: 0; }
 .notify-head {
   display: flex;
   align-items: center;
@@ -82,11 +74,8 @@
 
 /* The attention inbox's banner and node badge (notifications/attentionInbox.ts). The rows themselves
    reuse .notify-row: an attention item and a notice differ in lifecycle, not in shape. */
-.notify-banner {
-  padding: var(--space-2) var(--space-3);
-  color: var(--warn);
-  font-size: var(--fs-xs);
-}
+/* Alert owns the box; this is only the popover's tighter inset. */
+.notify-banner { margin-top: 0; padding: var(--space-2) var(--space-3); font-size: var(--fs-xs); }
 .notify-node {
   font-size: var(--fs-xs);
   white-space: nowrap;

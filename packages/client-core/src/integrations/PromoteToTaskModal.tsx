@@ -7,6 +7,7 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../registries/sources'
 import { Tabs } from '../ui/Tabs'
 import { createDismissable } from '../ui/dismissable'
+import { Alert } from '../ui/primitives'
 
 // Shared "+TASK" flow for the integration browses (docs/workspaces-and-tasks.md). Promoting an
 // external item (a Rollbar error, a Linear ticket) either CREATES a new task or ATTACHES the item to
@@ -119,7 +120,7 @@ export function PromoteToTaskModal(props: {
         </Show>
         <div class="overlay-body">
           <p class="muted">{props.itemTitle}</p>
-          <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+          <Show when={error()}><Alert>{error()}</Alert></Show>
 
           <Show when={mode() === 'new'}>
             <form id="promote-panel-new" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitNew}>

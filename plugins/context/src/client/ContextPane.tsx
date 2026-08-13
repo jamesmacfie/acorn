@@ -1,8 +1,8 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { agentSessionsFor, bytesOf, clientEvents, consumePaneIntent, contextSectionContributions, formatSize, openPane, type PaneIntent, readJson, type Task, taskBridge } from '@acorn/plugin-api/client'
+import { agentSessionsFor, bytesOf, clientEvents, consumePaneIntent, contextSectionContributions, formatSize, openPane, type PaneIntent, readJson, type Task, taskBridge, toast } from '@acorn/plugin-api/client'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
-import { Picker } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, CodeBlock, Meter, Picker, Toolbar } from '@acorn/plugin-api/ui'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { recordSync, rememberTarget, syncStatus, targetSessionFor, type SyncStatus } from './syncState'
 import { selectionFor, setSectionSelection } from './selectionState'
@@ -121,7 +121,9 @@ export default function ContextPane(props: { task: Task }) {
     if (!block.trim()) return setMsg('Nothing selected.')
     const res = await api.sendToAgent(t.id, block, 'after-ready')
     if (res.ok) recordSync(t.id, props.task.id, sections)
-    setMsg(res.ok ? (res.queued ? 'Queued — delivers when the agent is idle.' : 'Sent.') : (res.reason ?? 'Send failed.'))
+    // Success is transient feedback; a failure needs to stay next to the button that failed.
+    if (res.ok) return toast(res.queued ? 'Queued — delivers when the agent is idle.' : 'Sent.', { tone: 'success' })
+    setMsg(res.reason ?? 'Send failed.')
   }
 
   return (
@@ -129,7 +131,7 @@ export default function ContextPane(props: { task: Task }) {
       <div class="section-header context-tray-head">
         <span>context</span>
         <span class="muted">{traySummary(ctx() ? { ...ctx()!, sections: visibleSections() } : undefined)}</span>
-        <Show when={msg()}><span class="muted context-tray-msg">{msg()}</span></Show>
+        <Show when={msg()}><Alert class="context-tray-msg">{msg()}</Alert></Show>
       </div>
       <Show when={ctx()}>
         <div class="context-tray-body">
@@ -144,14 +146,16 @@ export default function ContextPane(props: { task: Task }) {
                 return (
                   <div class="context-tray-section" data-context-row={section.id}>
                     <div class="context-tray-row">
-                      <input type="checkbox" checked={effective()[section.id] ?? false} onChange={() => toggleSection(section.id)} />
+                      <Checkbox aria-label={section.label} checked={effective()[section.id] ?? false} onChange={() => toggleSection(section.id)} />
                       <span class="context-tray-kind">{section.label}</span>
                       <Show when={pendingFor(section.id)}><span class="muted">· {pendingFor(section.id)} pending</span></Show>
                       <Show when={section.omitted}><span class="muted">+{section.omitted} omitted</span></Show>
                       <span class="context-size">{formatSize(size())}</span>
                     </div>
                     <Show when={cap()}>
-                      <div class="context-bar"><div class="context-bar-fill" classList={{ warn: ratio() >= 0.8 }} style={{ width: `${ratio() * 100}%` }} /></div>
+                      {/* The 80% warn threshold this site invented is now Meter's `auto` tone,
+                          and the bar finally has an accessible name. */}
+                      <Meter class="context-bar" tone="auto" label={`${section.label} budget`} value={ratio()} />
                     </Show>
                     <Show when={section.absent}><div class="context-tray-detail muted">⚠ {section.absent!.detail}</div></Show>
                     <For each={section.items}>
@@ -209,11 +213,11 @@ export default function ContextPane(props: { task: Task }) {
                 <span class="muted context-size">{formatSize(bytesOf(assembled()?.block ?? ''))}</span>
               </button>
               <Show when={previewOpen()}>
-                <pre class="context-preview-block">{assembled()?.block}</pre>
+                <CodeBlock class="context-preview-block" size="xs" maxHeight="block" wrap>{assembled()?.block}</CodeBlock>
               </Show>
             </div>
 
-            <div class="context-sync-row">
+            <Toolbar class="context-sync-row" ariaLabel="Context sync">
               <Picker<TerminalSession>
                 label={sessionLabel(target())}
                 placeholder="Filter sessions…"
@@ -228,9 +232,10 @@ export default function ContextPane(props: { task: Task }) {
                   {pillText(status()!)}
                 </span>
               </Show>
-              <button type="button" class="ui-btn context-sync-btn" onClick={() => void syncContext()}>Sync context</button>
-              <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" onClick={() => void refreshContext()}>↻</button>
-            </div>
+              <Button class="context-sync-btn" onClick={() => void syncContext()}>Sync context</Button>
+              <Toolbar.Spacer />
+              <Button variant="bare" iconOnly title="Refresh" aria-label="Refresh" onClick={() => void refreshContext()}>↻</Button>
+            </Toolbar>
           </div>
       </Show>
     </section>

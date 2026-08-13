@@ -4,7 +4,7 @@ import { prefsOptions } from '../queries'
 import { savePref } from './savePref'
 import { THEMES } from './themes'
 import { STYLES } from './uiStyles'
-import { Field, Select } from '../ui/primitives'
+import { Checkbox, Field, Select } from '../ui/primitives'
 import { PrefKeys } from '../persistence/prefKeys'
 
 // Settings → Appearance. Two orthogonal axes (docs/ui-design.md): STYLE owns shape, typography,
@@ -36,14 +36,12 @@ export default function AppearanceSettings() {
         </Select>
       </Field>
 
-      <label class="settings-field settings-field-row">
-        <input
-          type="checkbox"
-          checked={followSystem()}
-          onChange={(e) => void savePref(qc, PrefKeys.themeFollowSystem, e.currentTarget.checked ? 'true' : 'false')}
-        />
-        <span class="settings-label">Follow system light/dark setting</span>
-      </label>
+      <Checkbox
+        class="settings-field settings-field-row"
+        label="Follow system light/dark setting"
+        checked={followSystem()}
+        onChange={(e) => void savePref(qc, PrefKeys.themeFollowSystem, e.currentTarget.checked ? 'true' : 'false')}
+      />
       <Show
         when={followSystem()}
         fallback={

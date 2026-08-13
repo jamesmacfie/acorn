@@ -191,3 +191,635 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
   gap: var(--space-4);
   padding: 0 var(--pane-pad) var(--pane-pad);
 }
+
+/* ── Alert ──────────────────────────────────────────────────────────────────────────────────
+   Owns what `.action-error` used to: that class was reached for by 32 files, 17 of them in
+   client-core, and DEFINED in the GitHub plugin's stylesheet. Disabling that plugin unstyled every
+   error message in the shell, and shared libraries may not import plugin CSS, so core could not fix
+   it without taking ownership. This is that ownership.
+
+   The inline variant is `.action-error` value-for-value, so a migrated call site that keeps its old
+   class renders identically. */
+.ui-alert { font-size: var(--fs-sm); }
+.ui-alert-title { display: block; font-weight: var(--fw-semibold); }
+.ui-alert-actions { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); }
+
+/* Deliberately NOT flex: `.action-error` set only margin/size/colour, so it inherited whatever
+   display its element had — some sites were block divs, some inline spans mid-sentence. Making the
+   inline variant a flex container would reflow all of them. Only the banner needs a box. */
+.ui-alert[data-variant='inline'] { margin-top: var(--space-3); }
+.ui-alert[data-variant='banner'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+.ui-alert[data-variant='banner'] .ui-alert-body { flex: 1; min-width: 0; }
+.ui-alert[data-tone='danger'] { color: var(--danger); }
+.ui-alert[data-tone='warn'] { color: var(--state-warn); }
+.ui-alert[data-tone='success'] { color: var(--success); }
+.ui-alert[data-tone='info'] { color: var(--text-muted); }
+.ui-alert[data-variant='banner'][data-tone='danger'] { border-color: var(--danger); }
+
+/* ── EmptyState ─────────────────────────────────────────────────────────────────────────────
+   ~35 sites in ten class vocabularies, three of them borrowing another plugin's stylesheet. The
+   geometry is the whole contribution: every current site is a bare muted <p> with no agreed
+   centring, which is why panes, sidebars and wizards each fought a different override. */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--pane-pad);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+.ui-empty[data-align='start'] { align-items: flex-start; justify-content: flex-start; text-align: left; }
+.ui-empty[data-size='md'] { min-height: var(--space-11); flex: 1; }
+.ui-empty[data-size='sm'] { padding: var(--space-4); gap: var(--space-2); }
+.ui-empty-icon { color: var(--text-faint); display: inline-flex; }
+.ui-empty-title { margin: 0; color: var(--text); font-weight: var(--fw-medium); }
+.ui-empty-text { margin: 0; max-width: 42ch; }
+.ui-empty[data-align='start'] .ui-empty-text { max-width: none; }
+.ui-empty-action { display: inline-flex; gap: var(--space-3); margin-top: var(--space-2); }
+
+/* ── StatusDot ──────────────────────────────────────────────────────────────────────────────
+   Ten independent implementations with two competing colour vocabularies: docker's dots used
+   --state-ok/warn/bad while agents' identical dots used --add-marker/--warn/--del-marker. The
+   status trio wins — they read as status, and they are already derived theme tokens, so no theme
+   block needs restating to adopt them.
+
+   8px is the majority size (.check-dot, .checks-dot, .docker-dot); terminal's 7px and notes' 10px
+   converge onto sm/md. */
+.ui-dot {
+  flex: none;
+  display: inline-block;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-circle);
+  background: var(--text-faint);
+  vertical-align: middle;
+}
+.ui-dot[data-size='md'] { width: var(--space-5); height: var(--space-5); }
+.ui-dot[data-tone='ok'] { background: var(--state-ok); }
+.ui-dot[data-tone='warn'] { background: var(--state-warn); }
+.ui-dot[data-tone='bad'] { background: var(--state-bad); }
+.ui-dot[data-tone='accent'] { background: var(--accent); }
+.ui-dot[data-tone='muted'] { background: var(--text-faint); }
+/* "Some failed, some still running" — half bad, half warn. */
+.ui-dot[data-tone='mixed'] { background: linear-gradient(90deg, var(--state-bad) 0 50%, var(--state-warn) 50% 100%); }
+/* Terminal hand-rolled this keyframe and skipped the reduced-motion guard that core's .spin has. */
+.ui-dot[data-pulse] { animation: ui-dot-pulse 1s var(--ease-in-out) infinite; }
+@keyframes ui-dot-pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .ui-dot[data-pulse] { animation: none; } }
+
+/* ── Checkbox ───────────────────────────────────────────────────────────────────────────────
+   Every checkbox in the app was a raw input, making it the one control class no style pack could
+   reach. Styling the NATIVE input keeps the keyboard and screen-reader behaviour that rebuilding
+   out of divs throws away; `accent-color` is most of the look. */
+.ui-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+.ui-check[data-nested] { padding-left: var(--space-9); }
+.ui-check-label { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.ui-check-hint { color: var(--text-muted); font-size: var(--fs-xs); }
+.ui-check-box {
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: inherit;
+}
+.ui-check-box:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
+.ui-check:has(.ui-check-box:disabled) { opacity: 0.5; cursor: default; }
+.ui-check[data-size='md'] .ui-check-box { width: var(--icon-size); height: var(--icon-size); }
+
+/* The switch is presentation on the same input and the same events. `appearance: none` applies
+   ONLY here so the plain checkbox keeps its native mark. */
+.ui-check[data-switch] .ui-check-box {
+  appearance: none;
+  width: var(--space-9);
+  height: var(--space-6);
+  border: var(--control-border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  position: relative;
+  transition: background var(--dur-short) var(--ease-out);
+}
+.ui-check[data-switch] .ui-check-box::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: var(--space-1);
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-circle);
+  background: var(--text-muted);
+  transform: translateY(-50%);
+  transition: left var(--dur-short) var(--ease-out), background var(--dur-short) var(--ease-out);
+}
+.ui-check[data-switch] .ui-check-box:checked { background: var(--accent); border-color: var(--accent); }
+.ui-check[data-switch] .ui-check-box:checked::after { left: calc(100% - var(--space-5)); background: var(--accent-fg); }
+
+/* ── ConfirmButton ──────────────────────────────────────────────────────────────────────────
+   No new box — the armed state is Button's danger tone plus this ring, so the button reads as
+   "one more click and it happens" without a banner claiming an error occurred. */
+.ui-btn[data-armed] { box-shadow: var(--ring); }
+
+/* ── Popover ────────────────────────────────────────────────────────────────────────────────
+   The floating surface for ui/anchor.ts. `--z-picker` because a portalled popover is a sibling of
+   any modal backdrop rather than a descendant, so the picker rung is the one that clears a modal
+   it was opened from. */
+.ui-popover-anchor { display: contents; }
+.ui-popover {
+  z-index: var(--z-picker);
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  background: var(--popover-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--elev-popover);
+}
+
+/* ── Kbd ────────────────────────────────────────────────────────────────────────────────────
+   The union of three separate keycap rules (.rail-tip-key, .help-key, .plugin-trust-escape kbd).
+   Fixed height with a centred glyph, kept from rail-tips.css: a cap must not grow the line-height
+   of the row it sits in. */
+.ui-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: var(--space-9);
+  height: var(--control-h-sm);
+  padding: 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+.ui-kbd[data-size='xs'] { min-width: var(--space-8); height: var(--space-8); font-size: var(--fs-2xs); padding: 0 var(--space-2); }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────────────────────────
+   The strip that was authored fifteen times. This is a pure layout primitive with almost no
+   behaviour and the highest style leverage in the set: a density pack now compresses every bar in
+   the app through one rule instead of having no reach at all. */
+.ui-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
+  font-size: var(--fs-sm);
+  background: var(--bg-subtle);
+  border-bottom: var(--chrome-divider);
+}
+.ui-toolbar[data-size='sm'] { min-height: var(--control-h-sm); gap: var(--space-3); padding: 0 var(--space-4); }
+/* Form and modal footers: no strip, items to the end. Subsumes .ui-modal-actions' role. */
+.ui-toolbar[data-variant='actions'] {
+  justify-content: flex-end;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border-bottom: 0;
+  gap: var(--space-4);
+}
+.ui-toolbar-spacer { flex: 1; }
+.ui-toolbar-group { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* ── Chip ───────────────────────────────────────────────────────────────────────────────────
+   Badge's interactive sibling, sharing its tone tokens so the two read as one family. Static label
+   → Badge; interactive or data-coloured → Chip. */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  max-width: 100%;
+  font: inherit;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  padding: var(--pad-chip);
+  color: var(--text-muted);
+  background: var(--chip-bg);
+  border: var(--control-bw) solid var(--badge-border);
+  border-radius: var(--radius-chip);
+  white-space: nowrap;
+}
+.ui-chip[data-size='xs'] { font-size: var(--fs-2xs); padding: 0 var(--space-3); }
+.ui-chip[data-dashed] { border-style: dashed; background: transparent; }
+.ui-chip[data-tone='accent'] { color: var(--accent); border-color: var(--accent); }
+.ui-chip[data-tone='add'] { color: var(--add-marker); border-color: var(--add-marker); }
+.ui-chip[data-tone='del'] { color: var(--del-marker); border-color: var(--del-marker); }
+.ui-chip[data-tone='warn'] { color: var(--warn); border-color: var(--warn); }
+.ui-chip-label { overflow: hidden; text-overflow: ellipsis; }
+.ui-chip-leading { flex: none; display: inline-flex; align-items: center; }
+
+/* Clickable form. `button.ui-chip` — the component switches element on interactivity. */
+button.ui-chip { cursor: pointer; }
+button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--text); }
+.ui-chip:focus-visible,
+.ui-chip-remove:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
+
+/* A provider colour arrives as --chip-color from the call site; the dot carries it so the label
+   stays readable against any hue. Both linear and github drew exactly this by hand. */
+.ui-chip[data-colored] { border-color: var(--chip-color); color: var(--text); }
+.ui-chip[data-colored]::before {
+  content: '';
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-circle);
+  background: var(--chip-color);
+}
+
+.ui-chip-remove {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.ui-chip-remove:hover { color: var(--danger); }
+/* Hover-reveal, matching the row idiom. Focus-within keeps it keyboard-reachable — the five
+   hand-rolled versions of this were :hover only, so the × was unreachable without a mouse. */
+.ui-chip[data-reveal] .ui-chip-remove { opacity: 0; }
+.ui-chip[data-reveal]:hover .ui-chip-remove,
+.ui-chip[data-reveal]:focus-within .ui-chip-remove { opacity: 1; }
+
+/* ── DescriptionList ────────────────────────────────────────────────────────────────────────
+   Two layouts covered all nine hand-rolled label/value grids. `facts` minmax is lifted from the
+   rollbar and linear frames, which had the two best implementations. */
+.ui-dl { display: grid; gap: var(--space-3) var(--space-5); margin: 0; font-size: var(--fs-sm); }
+.ui-dl[data-size='sm'] { font-size: var(--fs-xs); gap: var(--space-2) var(--space-4); }
+.ui-dl[data-layout='columns'] .ui-dl-item { display: grid; grid-template-columns: max-content 1fr; gap: inherit; }
+.ui-dl[data-layout='facts'] { grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr)); }
+.ui-dl[data-layout='facts'] .ui-dl-item { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.ui-dl-label { color: var(--text-muted); }
+.ui-dl[data-layout='facts'] .ui-dl-label { font-size: var(--fs-2xs); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); }
+.ui-dl-value { margin: 0; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.ui-dl-value[data-mono] { font-family: var(--font-mono); font-size: var(--fs-xs); }
+
+/* ── SegmentedControl / ToggleButton ────────────────────────────────────────────────────────
+   The collapsed-border look from agent-center, promoted to the base. A pack rounds the ends via
+   --radius-control. */
+.ui-segments {
+  flex: none;
+  display: inline-flex;
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.ui-segment {
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-xs);
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-4);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-right: var(--divider);
+  cursor: pointer;
+}
+.ui-segments[data-size='md'] .ui-segment { font-size: var(--fs-sm); min-height: var(--control-h); padding: 0 var(--space-5); }
+.ui-segment:last-child { border-right: 0; }
+.ui-segment:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
+.ui-segment[aria-checked='true'] { color: var(--text); background: var(--bg-selected); }
+.ui-segment:disabled { opacity: 0.5; cursor: default; }
+.ui-segment:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
+
+/* Pressed must read differently from hover in every pack, or a toggle's state is invisible the
+   moment the pointer is over it. */
+.ui-btn[data-pressed] { color: var(--text); background: var(--bg-selected); border-color: var(--accent); }
+
+/* ── Menu ───────────────────────────────────────────────────────────────────────────────────
+   Sits on .ui-popover, which owns the surface. This is the item vocabulary only. */
+.ui-menu { min-width: var(--space-11); }
+.ui-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: var(--row-h-sm);
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.ui-menu-item:hover:not(:disabled) { background: var(--bg-hover); }
+.ui-menu-item:disabled { opacity: 0.45; cursor: default; }
+.ui-menu-item[data-tone='danger'] { color: var(--danger); }
+.ui-menu-item:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
+.ui-menu-leading { flex: none; display: inline-flex; align-items: center; }
+.ui-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ui-menu-trailing { flex: none; color: var(--text-faint); font-size: var(--fs-2xs); }
+.ui-menu-label-row {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-menu-separator { margin: var(--space-1) 0; border-top: var(--chrome-divider); }
+
+/* ── CollapsibleSection ─────────────────────────────────────────────────────────────────────
+   The summary carries the shared .section-header class, so one pack selector styles both a fold's
+   closed state and a real section header — which is what all eight hand-written folds imitated. */
+.ui-fold-summary { display: flex; align-items: center; gap: var(--space-3); cursor: pointer; list-style: none; }
+/* Both spellings: WebKit needs the pseudo-element, everything else honours list-style. */
+.ui-fold-summary::-webkit-details-marker { display: none; }
+.ui-fold-marker {
+  flex: none;
+  width: 0;
+  height: 0;
+  /* A triangle from borders, so its size follows the marker width token rather than a font. */
+  border-top: var(--marker-w) solid transparent;
+  border-bottom: var(--marker-w) solid transparent;
+  border-left: var(--marker-w) solid currentColor;
+  transition: transform var(--dur-short) var(--ease-out);
+}
+.ui-fold[open] > .ui-fold-summary .ui-fold-marker { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .ui-fold-marker { transition: none; } }
+
+/* ── Input variants ─────────────────────────────────────────────────────────────────────────
+   `bare` is `.palette-input` verbatim, so the palettes migrate with no visual change. `filter` is
+   the boxed list-narrowing input that had seven separate rules, three of them byte-identical. */
+.ui-input[data-kind='bare'] {
+  padding: var(--space-5) var(--space-6);
+  font-size: var(--fs);
+  border: 0;
+  border-bottom: var(--chrome-divider);
+  border-radius: var(--radius-0);
+  outline: none;
+}
+.ui-input[data-kind='filter'] { font-size: var(--fs-sm); min-height: var(--control-h-sm); }
+.ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; }
+
+/* ── Card ───────────────────────────────────────────────────────────────────────────────────
+   Ten bespoke card rules. The stripe uses the same --stripe-w marker the diff and comment cards
+   already use, so a pack that zeroes stripe width (the Terminal borders philosophy) degrades
+   consistently instead of leaving one surface with an orphan edge. */
+.ui-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--card-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  padding: var(--pad-surface);
+}
+.ui-card[data-pad='sm'] { padding: var(--space-4); }
+.ui-card[data-interactive] { cursor: pointer; }
+.ui-card[data-interactive]:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
+.ui-card[data-interactive]:disabled { opacity: 0.5; cursor: default; }
+.ui-card[data-interactive]:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
+.ui-card[data-selected] { background: var(--bg-selected); border-color: var(--accent); }
+.ui-card[data-stripe] { border-left-width: var(--stripe-w); }
+.ui-card[data-stripe='accent'] { border-left-color: var(--accent); }
+.ui-card[data-stripe='warn'] { border-left-color: var(--warn); }
+.ui-card[data-stripe='danger'] { border-left-color: var(--danger); }
+
+/* ── Meter ──────────────────────────────────────────────────────────────────────────────────
+   Div-based rather than a native <meter>, because a native one is the only control in the app a
+   style pack cannot touch at all. The fill width comes from a numeric custom property, so the pack
+   can change the fill's shape without the component knowing. */
+.ui-meter {
+  flex: none;
+  display: block;
+  width: 100%;
+  height: var(--space-4);
+  overflow: hidden;
+  background: var(--surface-sunken);
+  border: var(--control-border);
+  border-radius: var(--radius-pill);
+}
+.ui-meter[data-size='md'] { height: var(--space-6); }
+.ui-meter-fill {
+  display: block;
+  height: 100%;
+  width: calc(var(--meter-value, 0) * 100%);
+  background: var(--accent);
+  transition: width var(--dur-short) var(--ease-out);
+}
+.ui-meter[data-tone='warn'] .ui-meter-fill { background: var(--state-warn); }
+.ui-meter[data-tone='danger'] .ui-meter-fill { background: var(--state-bad); }
+@media (prefers-reduced-motion: reduce) { .ui-meter-fill { transition: none; } }
+
+/* ── CodeBlock ──────────────────────────────────────────────────────────────────────────────
+   Nine mono-block rules. `.copyable` on the wrapper is the existing shared convention from
+   copy.css, which is already a frame-served role sheet. */
+.ui-code-wrap { position: relative; min-width: 0; }
+.ui-code {
+  margin: 0;
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: var(--control-border);
+  border-radius: var(--radius-surface);
+  overflow: auto;
+  white-space: pre;
+}
+.ui-code[data-size='xs'] { font-size: var(--fs-xs); }
+.ui-code[data-wrap] { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Capped with its own scroll, for a preview that must not push the page down. */
+.ui-code[data-max='block'] { max-height: 240px; }
+.ui-code-copy { position: absolute; top: var(--space-2); right: var(--space-2); }
+
+/* ── Table ──────────────────────────────────────────────────────────────────────────────────
+   Thin: real <table> semantics plus tokens. The scroll wrapper is part of the component because
+   both hand-rolled sites had to write it and one of them forgot, which is how a wide table ends up
+   scrolling the whole pane sideways. */
+.ui-table-scroll { min-width: 0; }
+.ui-table-scroll[data-scroll] { overflow-x: auto; }
+.ui-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.ui-table th,
+.ui-table td { padding: var(--pad-cell); text-align: left; border-bottom: var(--divider); }
+.ui-table th {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  white-space: nowrap;
+}
+.ui-table[data-size='sm'] th,
+.ui-table[data-size='sm'] td { padding: var(--space-2) var(--space-4); }
+.ui-table[data-sticky] thead th { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--bg-subtle); }
+
+/* ── TreeRow ────────────────────────────────────────────────────────────────────────────────
+   Depth indentation generalises Row's single `nested` boolean and replaces the editor's nested-<ul>
+   padding. The twist is drawn from the marker token, not a glyph literal, so it scales with the
+   pack rather than with a font. */
+.ui-row[data-depth='1'] { padding-left: var(--space-6); }
+.ui-row[data-depth='2'] { padding-left: var(--space-9); }
+.ui-row[data-depth='3'] { padding-left: var(--space-11); }
+.ui-row[data-depth='4'] { padding-left: calc(var(--space-11) + var(--space-6)); }
+.ui-row-twist {
+  flex: none;
+  width: 0;
+  height: 0;
+  margin-right: var(--space-2);
+  border-top: var(--marker-w) solid transparent;
+  border-bottom: var(--marker-w) solid transparent;
+  border-left: var(--marker-w) solid var(--text-faint);
+  cursor: pointer;
+  transition: transform var(--dur-short) var(--ease-out);
+}
+.ui-row-twist[aria-expanded='true'] { transform: rotate(90deg); }
+/* A leaf still reserves the twist's width, or its label misaligns with its siblings'. */
+.ui-row-twist[data-empty] { border-left-color: transparent; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .ui-row-twist { transition: none; } }
+
+/* Hover-revealed trailing actions. Implemented once here; five stylesheets had their own, all of
+   them :hover-only and therefore unreachable by keyboard. */
+.ui-row[data-reveal] .ui-row-trailing { opacity: 0; }
+.ui-row[data-reveal]:hover .ui-row-trailing,
+.ui-row[data-reveal]:focus-within .ui-row-trailing { opacity: 1; }
+
+/* ── SplitHandle ────────────────────────────────────────────────────────────────────────────
+   Lifted from `.pane-divider`: a wide hit area around a hairline. The negative margin keeps the
+   handle from consuming layout space it does not visually occupy. */
+.ui-split-handle {
+  position: relative;
+  z-index: var(--z-resizer);
+  flex: none;
+  touch-action: none;
+  outline: none;
+}
+.ui-split-handle[data-axis='x'] { flex-basis: 5px; margin: 0 -2px; cursor: col-resize; }
+.ui-split-handle[data-axis='y'] { flex-basis: 5px; margin: -2px 0; cursor: row-resize; }
+.ui-split-handle::after { content: ''; position: absolute; background: var(--border); }
+.ui-split-handle[data-axis='x']::after { inset: 0 2px; }
+.ui-split-handle[data-axis='y']::after { inset: 2px 0; }
+.ui-split-handle:hover::after,
+.ui-split-handle:focus-visible::after { background: var(--accent); }
+
+/* ── FindBar ────────────────────────────────────────────────────────────────────────────────
+   Toolbar geometry plus the search semantics. */
+.ui-findbar-search { flex: 1; min-width: 0; display: flex; }
+.ui-findbar-count { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); white-space: nowrap; }
+.ui-findbar-status { flex: none; font-size: var(--fs-xs); white-space: nowrap; }
+/* One highlight vocabulary, replacing three. Callers put these on their own <mark> elements. */
+.ui-find-mark { background: var(--find-hit-bg); color: inherit; border-radius: var(--radius-marker); }
+.ui-find-mark[data-current] { background: var(--find-current-bg); }
+
+/* ── KeyValueEditor ─────────────────────────────────────────────────────────────────────────
+   The editable rows grid, given a home. Column count is driven by the caller's extra columns so the
+   head and the rows cannot drift apart. */
+.ui-kvgrid { display: flex; flex-direction: column; min-width: 0; }
+.ui-kvgrid-head,
+.ui-kvgrid-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.4fr) repeat(var(--kv-extra-cols, 0), auto) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-4);
+}
+.ui-kvgrid-head {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+}
+/* The trailing blank row is present but recessive, so it reads as "somewhere to type" rather than
+   as a row that exists. */
+.ui-kvgrid-row[data-blank] { opacity: 0.6; }
+.ui-kvgrid-row[data-blank]:focus-within { opacity: 1; }
+.ui-kvgrid-hint { margin: 0 0 var(--space-2) var(--space-4); color: var(--text-muted); font-size: var(--fs-2xs); }
+
+/* ── Composer ───────────────────────────────────────────────────────────────────────────────
+   Textarea + actions + error, with the ⌘↵ chord owned by the component. */
+.ui-composer { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.ui-composer-input { width: 100%; resize: vertical; }
+.ui-composer-hint { font-size: var(--fs-2xs); }
+
+/* ── DocumentTabs ───────────────────────────────────────────────────────────────────────────
+   The closable tab strip. Overflow scrolls rather than squishing, which is the terminal strip's
+   behaviour and the right one: a squished tab shows no filename at all. */
+.ui-doctabs { flex: none; display: flex; align-items: stretch; min-width: 0; border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
+.ui-doctabs-strip { flex: 1; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; }
+.ui-doctabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); }
+.ui-doctab {
+  flex: none;
+  display: flex;
+  align-items: center;
+  max-width: 220px;
+  border-right: var(--chrome-divider);
+}
+.ui-doctab[data-active] { background: var(--bg); }
+.ui-doctab[data-ephemeral] .ui-doctab-text { font-style: italic; }
+.ui-doctab-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0 var(--space-2) 0 var(--space-4);
+  min-height: var(--pane-head-h);
+  cursor: pointer;
+}
+.ui-doctab[data-active] .ui-doctab-label { color: var(--text); }
+.ui-doctab-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-doctab-close { flex: none; padding: 0 var(--space-3); opacity: 0; }
+/* Keyboard-reachable, unlike the mouse-only ✕ this replaces. */
+.ui-doctab:hover .ui-doctab-close,
+.ui-doctab:focus-within .ui-doctab-close,
+.ui-doctab[data-active] .ui-doctab-close { opacity: 1; }
+
+/* ── Button/Row/Tabs extensions ─────────────────────────────────────────────────────────────
+   `xs` is the chrome-badge size: a glyph affordance inside a topbar strip, which ChromeBadge was
+   already asking for with an invalid `data-size` before the size existed. */
+.ui-btn[data-size='xs'] { padding: 0 var(--space-2); font-size: var(--fs-2xs); }
+/* An <a class="ui-btn"> has to shed the UA's link decoration and pick up the button's box. */
+a.ui-btn { display: inline-block; text-decoration: none; }
+a.ui-btn:hover { text-decoration: none; }
+/* An <a class="ui-row"> likewise. */
+a.ui-row { text-decoration: none; cursor: pointer; }
+a.ui-row:hover { background: var(--bg-hover); }
+/* The multi-line row. rollbar overrode `.ui-row`'s centring three times to get this. */
+.ui-row[data-variant='stacked'] { align-items: flex-start; padding-block: var(--space-3); }
+.ui-row[data-variant='stacked'] .ui-row-body { white-space: normal; overflow: visible; }

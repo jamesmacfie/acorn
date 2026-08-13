@@ -1,62 +1,30 @@
 // The request half of the API panel: Params / Body / Headers / Auth / Vars.
 // The mode selectors for Body and Auth sit in the tab strip's right slot rather than inside their
 // panels — Bruno's arrangement, and it keeps the current mode visible from any tab.
-import { createMemo, createSignal, For, Index, Show } from 'solid-js'
-import { Button, Icon, Input, Select, type TabDef, Tabs, Textarea } from '@acorn/plugin-api/ui'
+import { createMemo, createSignal, For, Show } from 'solid-js'
+import { Input, KeyValueEditor, Select, type TabDef, Tabs, Textarea } from '@acorn/plugin-api/ui'
 import { authModes, bodyModes, joinUrl, parseFormBody, splitUrl, type AuthConfig, type BodyMode, type KeyValue } from '../shared/model'
 import type { Draft } from './draft'
 
 type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'vars'
 
-const blankRow = (): KeyValue => ({ name: '', value: '', enabled: true })
-
 /**
- * An editable name/value grid with a trailing blank row that materialises as you type.
+ * The shared editor, adapted to this plugin's `KeyValue` shape (`name` where KVRow says `key`).
  *
- * `<Index>` not `<For>`: `<For>` keys rows by object reference, so replacing a row on every
- * keystroke tears down its input and drops focus. `<Index>` keys by position.
+ * The grid itself moved to client-core's KeyValueEditor, which was lifted from THIS implementation —
+ * including the trailing blank row and the `<Index>`-not-`<For>` rule that keeps an input from losing
+ * focus on every keystroke.
  */
 function KeyValueTable(props: { rows: KeyValue[]; onChange: (rows: KeyValue[]) => void; nameLabel?: string; valueLabel?: string }) {
-  // The grid always shows one more row than exists, so there is somewhere to type.
-  const padded = createMemo(() => [...props.rows, blankRow()])
-
-  const write = (index: number, patch: Partial<KeyValue>) => {
-    const next = [...props.rows]
-    if (index === props.rows.length) next.push({ ...blankRow(), ...patch })
-    else next[index] = { ...next[index], ...patch }
-    // Drop rows the user has emptied out entirely, except the one being typed in.
-    props.onChange(next.filter((r, i) => r.name || r.value || i === index))
-  }
-
   return (
-    <div class="http-grid" role="table">
-      <div class="http-grid-head" role="row">
-        <span />
-        <span>{props.nameLabel ?? 'Name'}</span>
-        <span>{props.valueLabel ?? 'Value'}</span>
-        <span />
-      </div>
-      <Index each={padded()}>
-        {(row, index) => (
-          <div class="http-grid-row" role="row" classList={{ 'is-blank': index === props.rows.length }}>
-            <input
-              type="checkbox"
-              checked={row().enabled}
-              disabled={index === props.rows.length}
-              aria-label="Enabled"
-              onChange={(e) => write(index, { enabled: e.currentTarget.checked })}
-            />
-            <Input size="sm" value={row().name} placeholder={props.nameLabel ?? 'Name'} onInput={(e) => write(index, { name: e.currentTarget.value })} />
-            <Input size="sm" value={row().value} placeholder={props.valueLabel ?? 'Value'} onInput={(e) => write(index, { value: e.currentTarget.value })} />
-            <Show when={index < props.rows.length} fallback={<span />}>
-              <Button variant="bare" size="sm" iconOnly aria-label="Remove row" onClick={() => props.onChange(props.rows.filter((_, i) => i !== index))}>
-                <Icon name="x" />
-              </Button>
-            </Show>
-          </div>
-        )}
-      </Index>
-    </div>
+    <KeyValueEditor
+      class="http-grid"
+      ariaLabel={`${props.nameLabel ?? 'Name'} / ${props.valueLabel ?? 'Value'}`}
+      keyPlaceholder={props.nameLabel ?? 'Name'}
+      valuePlaceholder={props.valueLabel ?? 'Value'}
+      rows={props.rows.map((row) => ({ key: row.name, value: row.value, enabled: row.enabled }))}
+      onChange={(rows) => props.onChange(rows.map((row) => ({ name: row.key, value: row.value, enabled: row.enabled ?? true })))}
+    />
   )
 }
 
@@ -182,23 +150,33 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
 
   return (
     <section class="http-request-tabs">
-      <div class="http-tabstrip">
-        <Tabs tabs={tabs()} active={tab()} onChange={(id) => setTab(id as RequestTab)} idPrefix="http-request" ariaLabel="Request" />
-        <div class="http-tabstrip-right">
-          <Show when={tab() === 'body'}>
-            <Select size="sm" width="narrow" value={props.draft.bodyMode} aria-label="Body type" onChange={(e) => props.patch({ bodyMode: e.currentTarget.value as BodyMode })}>
-              <For each={bodyModes}>{(m) => <option value={m}>{m === 'form' ? 'form-urlencoded' : m}</option>}</For>
-            </Select>
-          </Show>
-          <Show when={tab() === 'auth'}>
-            <Select size="sm" width="narrow" value={props.draft.auth.mode} aria-label="Auth type" onChange={(e) => props.patch({ auth: emptyAuth(e.currentTarget.value as AuthConfig['mode']) })}>
-              <For each={authModes}>{(m) => <option value={m}>{m === 'apikey' ? 'API key' : m}</option>}</For>
-            </Select>
-          </Show>
-        </div>
-      </div>
+      {/* The mode selectors sit in the strip's trailing slot rather than inside their panels —
+          Bruno's arrangement, and it keeps the current mode visible from any tab. Was a sibling div
+          plus a `.ui-tabs` override to make room for it. */}
+      <Tabs
+        class="http-tabstrip"
+        tabs={tabs()}
+        active={tab()}
+        onChange={(id) => setTab(id as RequestTab)}
+        idPrefix="http-request"
+        ariaLabel="Request"
+        actions={
+          <>
+            <Show when={tab() === 'body'}>
+              <Select size="sm" width="narrow" value={props.draft.bodyMode} aria-label="Body type" onChange={(e) => props.patch({ bodyMode: e.currentTarget.value as BodyMode })}>
+                <For each={bodyModes}>{(m) => <option value={m}>{m === 'form' ? 'form-urlencoded' : m}</option>}</For>
+              </Select>
+            </Show>
+            <Show when={tab() === 'auth'}>
+              <Select size="sm" width="narrow" value={props.draft.auth.mode} aria-label="Auth type" onChange={(e) => props.patch({ auth: emptyAuth(e.currentTarget.value as AuthConfig['mode']) })}>
+                <For each={authModes}>{(m) => <option value={m}>{m === 'apikey' ? 'API key' : m}</option>}</For>
+              </Select>
+            </Show>
+          </>
+        }
+      />
 
-      <div class="http-tabpanel" id={`http-request-panel-${tab()}`} role="tabpanel">
+      <Tabs.Panel class="http-tabpanel" idPrefix="http-request" id={tab()} active={tab()}>
         <Show when={tab() === 'params'}>
           <p class="http-hint">Query parameters are part of the URL — editing either side keeps the other in step.</p>
           <KeyValueTable rows={params()} onChange={setParams} nameLabel="Parameter" />
@@ -233,7 +211,7 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
         <Show when={tab() === 'vars'}>
           <VarsTable vars={props.draft.vars} onChange={(vars) => props.patch({ vars })} />
         </Show>
-      </div>
+      </Tabs.Panel>
     </section>
   )
 }

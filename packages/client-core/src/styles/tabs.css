@@ -38,3 +38,7 @@
 @media (prefers-reduced-motion: reduce) {
   .ui-tab { transition: none; }
 }
+
+/* Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to bolt these on. */
+.ui-tabs-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+.ui-tab-panel[hidden] { display: none; }

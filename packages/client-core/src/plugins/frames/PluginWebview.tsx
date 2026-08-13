@@ -4,6 +4,7 @@ import { acornGlobal } from '../../capabilities'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { displayHost, pluginWebviewKey, resolvePluginWebviewUrl } from './webviewModel'
+import { Alert, EmptyState, Spinner } from '../../ui/primitives'
 
 export type PluginWebviewProps = {
   pluginId: string
@@ -126,16 +127,17 @@ export default function PluginWebview(props: PluginWebviewProps) {
         <button type="button" class="preview-nav-btn" title="Forward" disabled={!canForward()} onClick={() => void native?.command(key(), 'forward')}>›</button>
         <button type="button" class="preview-nav-btn" title="Reload" onClick={() => void native?.command(key(), 'reload')}>↻</button>
         <span class="plugin-webview-hostname" title={url() || home() || ''}>{displayHost(url() || home() || '') || 'No page loaded'}</span>
-        <Show when={blocked()}><span class="plugin-webview-blocked" role="status">Blocked navigation to {blocked()}</span></Show>
-        <Show when={loading()}><span class="preview-spinner spin">◐</span></Show>
+        <Show when={blocked()}><Alert tone="warn" class="plugin-webview-blocked">Blocked navigation to {blocked()}</Alert></Show>
+        {/* Was a literal ◐ glyph with no accessible name. */}
+        <Show when={loading()}><Spinner label="Loading page" /></Show>
       </div>
       <Show when={native} fallback={
-        <div class="workspace-empty-inner"><p class="muted">Plugin web pages need the desktop app.</p></div>
+        <EmptyState>Plugin web pages need the desktop app.</EmptyState>
       }>
         <Show when={!home.loading && home()} fallback={
-          <div class="workspace-empty-inner">
-            <p class="muted">{home.error ? 'The plugin could not resolve its page URL.' : 'No web page is available yet.'}</p>
-          </div>
+          <EmptyState>
+            {home.error ? 'The plugin could not resolve its page URL.' : 'No web page is available yet.'}
+          </EmptyState>
         }><></></Show>
       </Show>
       <div class="workspace-preview-host" ref={host} />

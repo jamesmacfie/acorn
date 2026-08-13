@@ -1,4 +1,5 @@
-import { For, Show } from 'solid-js'
+import { For, Show, type JSX } from 'solid-js'
+import { cx } from './cx'
 
 export type TabDef = { id: string; label: string; count?: number }
 
@@ -12,6 +13,9 @@ export function Tabs(props: {
   onChange: (id: string) => void
   idPrefix: string
   ariaLabel: string
+  /** Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to get this. */
+  actions?: JSX.Element
+  class?: string
 }) {
   function onKeyDown(event: KeyboardEvent) {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
@@ -24,7 +28,7 @@ export function Tabs(props: {
   }
 
   return (
-    <div class="ui-tabs" role="tablist" aria-label={props.ariaLabel} onKeyDown={onKeyDown}>
+    <div class={cx('ui-tabs', props.class)} role="tablist" aria-label={props.ariaLabel} onKeyDown={onKeyDown}>
       <For each={props.tabs}>{(t) => (
         <button
           id={`${props.idPrefix}-tab-${t.id}`}
@@ -41,6 +45,22 @@ export function Tabs(props: {
           <Show when={t.count != null}><span class="ui-tab-count">{t.count}</span></Show>
         </button>
       )}</For>
+      <Show when={props.actions}><span class="ui-tabs-actions">{props.actions}</span></Show>
     </div>
   )
 }
+
+/** The panel half. Six attributes that have to agree with the strip's ids, hand-written twice in the
+ *  rollbar frame before this existed. `hidden` rather than unmounting, so a panel keeps its scroll
+ *  position and its in-flight state across a tab switch. */
+Tabs.Panel = (props: { idPrefix: string; id: string; active: string; class?: string; children: JSX.Element }) => (
+  <section
+    id={`${props.idPrefix}-panel-${props.id}`}
+    class={cx('ui-tab-panel', props.class)}
+    role="tabpanel"
+    aria-labelledby={`${props.idPrefix}-tab-${props.id}`}
+    hidden={props.active !== props.id}
+  >
+    {props.children}
+  </section>
+)

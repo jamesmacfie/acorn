@@ -1,6 +1,7 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
-import type { Task } from '@acorn/plugin-api/client'
+import { toast, type Task } from '@acorn/plugin-api/client'
 import { memoryApi, type MemoryType } from './memoryClient'
+import { Alert, Textarea } from '@acorn/plugin-api/ui'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
@@ -46,12 +47,14 @@ export default function MemorySection(props: {
   const [memType, setMemType] = createSignal<MemoryType>('convention')
   const [memScope, setMemScope] = createSignal<'project' | 'private'>('project')
   const [memBody, setMemBody] = createSignal('')
-  const [memMsg, setMemMsg] = createSignal('')
+  // Only failures live here now: success and failure used to share one muted grey span, so a failed
+  // save read exactly like a successful one. The success is a toast; a failure needs to persist.
+  const [memMsg, setMemMsg] = createSignal<string | null>(null)
 
   async function addMemory() {
     const m = memoryApi()
     if (!m) return
-    setMemMsg('')
+    setMemMsg(null)
     const res = await m.add({
       taskId: props.task.id,
       scope: memScope(),
@@ -61,7 +64,7 @@ export default function MemorySection(props: {
       body: memBody(),
     })
     if ('error' in res) return setMemMsg(res.error)
-    setMemMsg(`Saved → ${res.path}`)
+    toast(`Saved → ${res.path}`, { tone: 'success' })
     setMemName('')
     setMemDesc('')
     setMemBody('')
@@ -70,7 +73,7 @@ export default function MemorySection(props: {
 
   return (
     <>
-      <Show when={proposalError()}><div class="action-error" role="alert">{proposalError()}</div></Show>
+      <Show when={proposalError()}><Alert>{proposalError()}</Alert></Show>
       <Show when={(proposals() ?? []).length}>
         <div class="context-tray-proposals">
           <span class="muted">Memory proposals (auto-generated — review before they land):</span>
@@ -104,7 +107,7 @@ export default function MemorySection(props: {
       <Show when={memoryApi()}>
         <div class="context-tray-actions">
           <button type="button" class="ui-btn" onClick={() => setMemFormOpen(!memFormOpen())}>+ memory</button>
-          <Show when={memMsg()}><span class="muted">{memMsg()}</span></Show>
+          <Show when={memMsg()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
         </div>
       </Show>
       <Show when={memFormOpen()}>
@@ -126,7 +129,7 @@ export default function MemorySection(props: {
             </select>
           </div>
           <input class="ui-input" type="text" placeholder="one-line description" value={memDesc()} onInput={(e) => setMemDesc(e.currentTarget.value)} />
-          <textarea class="settings-script" rows="3" placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(e) => setMemBody(e.currentTarget.value)} />
+          <Textarea mono rows="3" placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(e) => setMemBody(e.currentTarget.value)} />
           <div class="context-tray-actions">
             <button type="submit" class="ui-btn" disabled={!memName().trim() || !memDesc().trim()}>Save memory</button>
           </div>

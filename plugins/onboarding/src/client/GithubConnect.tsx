@@ -2,7 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { createDeviceFlow, integrationsOptions, type Project, projectImporterRegistry } from '@acorn/plugin-api/client'
-import { Button, CopyButton } from '@acorn/plugin-api/ui'
+import { Alert, Button, CopyButton } from '@acorn/plugin-api/ui'
 
 // The GitHub branch of the wizard: the device grant, then whatever GitHub registered as a project
 // importer. Neither half is written here — the grant is core's shared createDeviceFlow (the same one
@@ -49,13 +49,13 @@ export default function GithubConnect(props: {
                   </div>
                   {/* A real link, not a fetch: main's setWindowOpenHandler routes it through
                       isAllowedExternalUrl → shell.openExternal, so it opens in the owner's browser. */}
-                  <a class="ui-btn" href={started().verificationUri} target="_blank" rel="noopener noreferrer">Open GitHub</a>
+                  <Button href={started().verificationUri} target="_blank" rel="noopener noreferrer">Open GitHub</Button>
                   <p class="wizard-waiting">Waiting for approval…</p>
                   <button type="button" class="wizard-link" onClick={flow.cancel}>Cancel</button>
                 </div>
               )}
             </Show>
-            <Show when={flow.error()}><div class="action-error" role="alert">{flow.error()}</div></Show>
+            <Show when={flow.error()}><Alert>{flow.error()}</Alert></Show>
             <p class="wizard-hint">
               If you close this or deny the request, nothing breaks — you land in the app and can retry
               from Settings → Integrations.

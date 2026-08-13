@@ -12,7 +12,7 @@ describe('railStatusItems', () => {
   it('surfaces each active marker with a glyph or dot and a meaning', () => {
     const items = railStatusItems({ checks: 'failure', working: 2, unread: true, status: status({ dirty: true, dirtyCount: 3 }) })
     expect(items.map((i) => i.key)).toEqual(['checks', 'working', 'needs', 'dirty'])
-    expect(items.every((i) => i.label && (i.glyph || i.dotCls))).toBe(true)
+    expect(items.every((i) => i.label && (i.glyph || i.dotTone))).toBe(true)
     expect(items.find((i) => i.key === 'working')?.label).toBe('2 agents working')
     expect(items.find((i) => i.key === 'dirty')?.label).toBe('Uncommitted changes (3)')
   })

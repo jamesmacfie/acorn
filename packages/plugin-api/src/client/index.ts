@@ -106,6 +106,7 @@ export { agentContextContributions } from '@acorn/client-core/registries/agentCo
 // so they cannot cross a sandbox boundary. First-party only, permanently (docs/third-party § Two tiers).
 export { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
 export type { AgentToolRendererContribution, AgentToolRendererProps } from '@acorn/client-core/registries/agentToolRenderers.ts'
+export { agentToolTone } from '@acorn/client-core/registries/agentToolRenderers.ts'
 export { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 // ── Tasks, sessions, layout ───────────────────────────────────────────────────────────────────
@@ -172,6 +173,10 @@ export {
   workspaceExternalProjectsForProvider,
 } from '@acorn/client-core/integrations/workspaceProjects.ts'
 export { pushManagedAgentNotice, registerNoticeTargetHandler } from '@acorn/client-core/notifications/notifications.ts'
+// Transient feedback. Notices persist in the bell; a toast says "that worked" and gets out of the way.
+// Three plugins had invented text-channel toasts before this existed.
+export { toast } from '@acorn/client-core/notifications/toast.ts'
+export type { ToastTone } from '@acorn/client-core/notifications/toast.ts'
 export { fuzzyScore } from '@acorn/client-core/palette/model.ts'
 export type { PaletteItem } from '@acorn/client-core/palette/model.ts'
 export { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
@@ -181,7 +186,7 @@ export { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
 // see the note at the top. Tokens, metrics and the status/display vocabulary the shell renders by.
 export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-core/ui/appearance.ts'
 export { rowHeight, rowHeightSm, termFontSize } from '@acorn/client-core/ui/metrics.ts'
-export { checksState, FAILED_STATUSES, fileStatusMeta, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
+export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
 export { createDismissable } from '@acorn/client-core/ui/dismissable.ts'
 export { cx } from '@acorn/client-core/ui/cx.ts'
 

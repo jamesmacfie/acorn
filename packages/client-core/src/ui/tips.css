@@ -31,16 +31,8 @@
      otherwise run straight out of the bubble. */
   overflow-wrap: anywhere;
 }
-.rail-tip-key {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: 0 5px;
-}
+/* Kbd owns the cap; the tip only asks for its muted tone. */
+.rail-tip-key { color: var(--text-muted); }
 .rail-tip-sub {
   font-size: var(--fs-xs);
   color: var(--text-muted);
@@ -74,7 +66,6 @@
 .rail-tip-legend-ico.tone-accent { color: var(--accent); }
 .rail-tip-legend-ico.tone-warn { color: var(--warn); }
 .rail-tip-legend-ico.tone-del { color: var(--del-marker); }
-.rail-tip-legend-ico .checks-dot { margin-left: 0; } /* the rail dot self-offsets; centre it here */
 
 @keyframes rail-tip-in {
   from { opacity: 0; }

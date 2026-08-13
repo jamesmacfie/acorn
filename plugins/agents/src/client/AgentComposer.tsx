@@ -3,7 +3,7 @@ import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession }
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { managedAgentApi } from './managedClient'
 import { agentContextContributions } from '@acorn/plugin-api/client'
-import { Button, Field, Icon, Picker, Select } from '@acorn/plugin-api/ui'
+import { Alert, Button, Chip, Field, Picker, Popover, Select } from '@acorn/plugin-api/ui'
 import { hydrateManagedDraft, managedDraft, setManagedDraft } from './managedDrafts'
 import { sameAgentConfigOptions } from './agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
@@ -347,42 +347,28 @@ export default function AgentComposer(props: {
         />
         <For each={attachments()}>
           {(attachment) => (
-            <span class="agent-attachment-chip">
-              <span>{attachment.mediaType.startsWith('image/') ? '▧' : '▤'}</span>
-              <span title={attachment.filename}>{attachment.filename}</span>
+            <Chip
+              class="agent-attachment-chip"
+              title={attachment.filename}
+              leading={<span>{attachment.mediaType.startsWith('image/') ? '▧' : '▤'}</span>}
+              onRemove={() => removeAttachment(attachment)}
+            >
+              {attachment.filename}
               <small>{Math.max(1, Math.round(attachment.byteSize / 1024))} KiB</small>
-              <Button
-                variant="bare"
-                size="sm"
-                iconOnly
-                class="agent-chip-remove"
-                title={`Remove ${attachment.filename}`}
-                aria-label={`Remove ${attachment.filename}`}
-                onClick={() => removeAttachment(attachment)}
-              >
-                <Icon name="x" />
-              </Button>
-            </span>
+            </Chip>
           )}
         </For>
         <For each={contexts()}>
           {(context) => (
-            <span class="agent-context-chip" title={context.provenance}>
-              <span>◇</span>
-              <span>{context.label}</span>
+            <Chip
+              class="agent-context-chip"
+              title={context.provenance}
+              leading={<span>◇</span>}
+              onRemove={() => removeContext(context)}
+            >
+              {context.label}
               <small>~{(context.estimatedTokens ?? Math.ceil((context.byteSize ?? context.content.length) / 4)).toLocaleString()} tok</small>
-              <Button
-                variant="bare"
-                size="sm"
-                iconOnly
-                class="agent-chip-remove"
-                title={`Remove ${context.label}`}
-                aria-label={`Remove ${context.label}`}
-                onClick={() => removeContext(context)}
-              >
-                <Icon name="x" />
-              </Button>
-            </span>
+            </Chip>
           )}
         </For>
         <Show when={contexts().find((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)}>
@@ -452,12 +438,28 @@ export default function AgentComposer(props: {
             placement="top"
           />
           <Show when={contexts().length}>
-            <details class="agent-context-preview">
-              <summary classList={{ 'agent-context-over-budget': contextBudget().overLimit }}>
-                Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens · {(contextBudget().bytes / 1024).toFixed(1)} KiB
-              </summary>
+            {/* Was a <details> with an absolutely-positioned <pre>, which the composer's own
+                overflow clipped. Popover portals it and adds Escape + outside-click. */}
+            <Popover
+              class="agent-context-preview-surface"
+              placement="top-start"
+              ariaLabel="Sent context preview"
+              role="dialog"
+              trigger={({ toggle, open }) => (
+                <Button
+                  variant="bare"
+                  size="sm"
+                  class="agent-context-preview"
+                  classList={{ 'agent-context-over-budget': contextBudget().overLimit }}
+                  aria-expanded={open()}
+                  onClick={toggle}
+                >
+                  Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens · {(contextBudget().bytes / 1024).toFixed(1)} KiB
+                </Button>
+              )}
+            >
               <pre>{contexts().map((context) => `## ${context.label}\n${context.content}`).join('\n\n')}</pre>
-            </details>
+            </Popover>
           </Show>
           <span class="muted agent-send-hint">Shift+Enter for newline</span>
           <Button
@@ -473,7 +475,7 @@ export default function AgentComposer(props: {
           </Button>
         </div>
       </div>
-      {error() ? <div class="action-error agent-composer-error" role="alert">{error()}</div> : null}
+      {error() ? <Alert class="agent-composer-error">{error()}</Alert> : null}
       <Show when={contextPicker()}>
         {(contribution) => (
           <AgentContextPickerModal

@@ -14,33 +14,18 @@
   min-width: 0;
 }
 .branch-flow { gap: 5px; }
+/* Chip owns the box, the tones and the interactivity. What is left is what differs. */
 .branch-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
   color: var(--text);
   background: var(--bg-selected);
-  border: var(--control-border);
   border-radius: var(--radius);
-  padding: 1px var(--space-3);
-  font: inherit;
   font-size: var(--fs-sm);
 }
-.branch-chip:hover { border-color: var(--text-muted); }
-.branch-chip-label {
-  max-width: 140px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.branch-chip-copy {
-  flex-shrink: 0;
-  opacity: 0;
-  color: var(--text-muted);
-  transition: opacity 0.1s;
-}
-.branch-chip:hover .branch-chip-copy { opacity: 1; }
+.branch-chip .ui-chip-label { max-width: 140px; white-space: nowrap; }
+/* The copy glyph rides Chip's data-reveal, so it fades in with the same gesture the × uses. */
+.branch-chip-copy { flex-shrink: 0; opacity: 0; color: var(--text-muted); transition: opacity var(--dur-instant) var(--ease-out); }
+.branch-chip[data-reveal]:hover .branch-chip-copy,
+.branch-chip[data-reveal]:focus-within .branch-chip-copy { opacity: 1; }
 .branch-arrow { color: var(--text-muted); }
 .state-badge {
   text-transform: capitalize;
@@ -54,21 +39,11 @@
 .state-closed { color: var(--del-marker); }
 
 /* Navigator collapsible sections. */
+/* CollapsibleSection draws the fold and its summary carries the shared `.section-header` class, so a
+   style pack now reaches these eight sections through the same selector as every other header. What
+   is left is the navigator's own strip height and its divider. */
 .nav-section { border-bottom: var(--chrome-divider); padding: 0; }
-.nav-section > summary {
-  display: flex;
-  align-items: center;
-  min-height: 36px;
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  padding: 0 var(--pane-pad);
-  user-select: none;
-}
-.nav-section > summary::-webkit-details-marker { color: var(--text-faint); }
+.nav-section > summary { min-height: 36px; user-select: none; }
 .nav-section > * + * { margin-top: 0; }
 .nav-section > :not(summary, .file-list, .check-list, .label-list, .conversation-items) { margin: 10px var(--pane-pad); }
 .nav-section > .file-list,
@@ -100,15 +75,6 @@
   font-size: var(--fs-sm);
 }
 .check-name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.check-dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-circle); background: var(--text-faint); }
-.check-success { background: var(--add-marker); }
-.check-failure, .check-error { background: var(--del-marker); }
-.check-pending, .check-in_progress, .check-queued { background: var(--warn); }
-.checks-dot { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-circle); margin-left: var(--space-3); vertical-align: middle; }
-.checks-dot-success { background: var(--add-marker); }
-.checks-dot-failure { background: var(--del-marker); }
-.checks-dot-pending { background: var(--warn); }
-.checks-dot-mixed { background: linear-gradient(90deg, var(--del-marker) 0 50%, var(--warn) 50% 100%); }
 .check-rerun,
 .pr-actions button,
 .composer button,
@@ -137,7 +103,6 @@
 .pr-actions button:disabled,
 .composer button:disabled,
 .diff-composer-actions button:disabled { opacity: 0.5; cursor: default; }
-.action-error { margin-top: var(--space-3); font-size: var(--fs-sm); color: var(--del-marker); }
 
 /* Create-PR form (mid pane in create mode). Reuses .repo-select / .pr-filter / .composer-input /
    .pr-actions; this just lays them out and stretches the title + body full width. */
@@ -157,7 +122,6 @@
 .create-pr-title { width: 100%; font-size: var(--fs); }
 .create-pr-body { min-height: 160px; }
 .create-pr-draft { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer; }
-.create-pr-draft input { accent-color: var(--accent); cursor: pointer; }
 .create-pr-status { font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* "+ New PR" entry button in the left-pane Reviews header. */
@@ -176,7 +140,9 @@
 }
 .new-pr-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
 
-.composer { display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
+/* Composer owns the box and the ⌘↵ chord; `.composer-input` stays because the create-PR form still
+   uses it for its body field, which is a plain MentionTextarea rather than a Composer. */
+.composer { margin-top: var(--space-3); }
 .composer-input {
   width: 100%;
   min-height: 64px;
@@ -189,6 +155,7 @@
   padding: var(--space-3) var(--space-4);
   resize: vertical;
 }
+.ui-composer .ui-composer-input { min-height: 64px; }
 .composer-input::placeholder, .diff-reply-input::placeholder, .repo-picker-filter::placeholder, .finder-input::placeholder { color: var(--text-muted); }
 
 .label-list {
@@ -506,7 +473,8 @@
 .file-row:hover { background: var(--bg-hover); }
 .file-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
 .file-row.viewed .file-path { text-decoration: line-through; color: var(--text-muted); }
-.file-viewed { flex: none; cursor: pointer; accent-color: var(--accent); }
+/* Checkbox owns the control's look; the row grid decides it must not stretch. */
+.file-viewed { flex: none; }
 .file-open {
   flex: 1;
   display: flex;
@@ -536,3 +504,8 @@
 .file-stat { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .file-stat.add { color: var(--add-marker); }
 .file-stat.del { color: var(--del-marker); }
+
+/* Armed for a second click (createArmedConfirm). github had no confirmation on these at all; the
+   changed label is the prompt and the tone is what marks it destructive. */
+.label-row-remove[data-armed] { opacity: 1; color: var(--danger); border-color: var(--danger); }
+.pr-actions button[data-armed] { color: var(--danger); border-color: var(--danger); }

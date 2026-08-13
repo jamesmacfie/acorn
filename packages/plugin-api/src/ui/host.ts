@@ -12,3 +12,6 @@ export { default as ModelConnectionPicker, defaultModelIdFor } from '@acorn/clie
 export { default as WorkspaceProjectAssignments } from '@acorn/client-core/workspaces/WorkspaceProjectAssignments.tsx'
 // Prune candidate: GitHub still mounts the whole shell while its source migration is completed.
 export { default as Acorn } from '@acorn/client-core/Acorn.tsx'
+// The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a
+// sandboxed frame cannot open one.
+export { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'

@@ -31,6 +31,8 @@ import Icon from '../ui/Icon'
 import IconPicker from '../ui/IconPicker'
 import './tabrail.css'
 import { taskOriginAppearance } from '../tasks/origin'
+import { Alert, StatusDot } from '../ui/primitives'
+import { Menu } from '../ui/Menu'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
 
@@ -322,59 +324,70 @@ export default function TabRail() {
               <Show when={isPinned(railOrder(), w.id)}>
                 <span class="tabrail-pin" title="Pinned to top"><Icon name="pin" /></span>
               </Show>
-              <button
-                type="button"
-                class="tabrail-tab tabrail-task"
-                classList={{ active: !selectedSource() && w.id === activeTaskId() }}
-                style={accent() ? { 'border-left-color': accent() } : undefined}
-                data-tip={w.title}
-                data-tip-sub={[
-                  w.branch ?? 'project folder',
-                  taskOriginAppearance(w.origin).tooltip,
-                ].filter(Boolean).join(' · ')}
-                data-tip-legend={statusItems().length ? JSON.stringify(statusItems().map((s) => ({ g: s.glyph, d: s.dotCls, t: s.tone, l: s.label }))) : undefined}
-                aria-label={w.title}
-                onClick={() => onRowClick(w)}
+              {/* Gains Escape, outside-click and menu roles, none of which this had. The rail
+                  keeps owning WHICH menu is open — ⌘1-9 navigation closes it, and that decision
+                  cannot live inside one menu instance. */}
+              <Menu
+                class="tabrail-menu"
+                ariaLabel={`Actions for ${w.title}`}
+                placement="right-start"
+                open={() => menuId() === w.id}
+                onOpenChange={(open) => setMenuId(open ? w.id : null)}
+                trigger={() => (
+                  <button
+                    type="button"
+                    class="tabrail-tab tabrail-task"
+                    classList={{ active: !selectedSource() && w.id === activeTaskId() }}
+                    style={accent() ? { 'border-left-color': accent() } : undefined}
+                    data-tip={w.title}
+                    data-tip-sub={[
+                      w.branch ?? 'project folder',
+                      taskOriginAppearance(w.origin).tooltip,
+                    ].filter(Boolean).join(' · ')}
+                    data-tip-legend={statusItems().length ? JSON.stringify(statusItems().map((s) => ({ g: s.glyph, d: s.dotTone, t: s.tone, l: s.label }))) : undefined}
+                    aria-label={w.title}
+                    aria-haspopup="menu"
+                    aria-expanded={menuId() === w.id}
+                    onClick={() => onRowClick(w)}
+                  >
+                    {/* The task's own icon wins, then the workspace's, then the origin default. */}
+                    <Icon
+                      name={w.icon ?? wsGlyph() ?? originIcon(w.origin)}
+                      title={taskOriginAppearance(w.origin).tooltip}
+                    />
+                  </button>
+                )}
               >
-                {/* The task's own icon wins, then the workspace's, then the origin default. */}
-                <Icon
-                  name={w.icon ?? wsGlyph() ?? originIcon(w.origin)}
-                  title={taskOriginAppearance(w.origin).tooltip}
-                />
-              </button>
+                {(menu) => (
+                  <>
+                    <Menu.Label>{w.title}</Menu.Label>
+                    <Menu.Label>{w.branch ?? 'Project folder'}</Menu.Label>
+                    <Menu.Separator />
+                    <Menu.Item
+                      context={menu}
+                      onSelect={() => void saveOrder(isPinned(railOrder(), w.id) ? unpinTask(railOrder(), w.id) : pinTask(railOrder(), w.id))}
+                    >
+                      {isPinned(railOrder(), w.id) ? 'Unpin' : 'Pin to top'}
+                    </Menu.Item>
+                    <Menu.Item context={menu} onSelect={() => openRename(w)}>Rename</Menu.Item>
+                    <Menu.Item context={menu} tone="danger" onSelect={() => openArchive(w)}>Archive</Menu.Item>
+                  </>
+                )}
+              </Menu>
               {/* Live status markers (docs/workspaces-and-tasks.md): CI dot, agent-working spinner,
                   needs-you notice, dirty/repair — from railStatus.ts, mirrored in the hover tooltip. */}
               <For each={statusItems()}>
                 {(s) => (
                   <span class={s.overlayCls} title={s.label}>
-                    {/* The CI marker has no glyph — it's the self-coloured dot on overlayCls. */}
-                    <Show when={s.glyph}>{(g) => <Icon name={g()} />}</Show>
+                    {/* The CI marker has no glyph — it is a StatusDot, whose colour used to come
+                        from a class defined in the GitHub plugin's stylesheet. */}
+                    <Show when={s.glyph} fallback={<Show when={s.dotTone}>{(tone) => <StatusDot tone={tone()} />}</Show>}>
+                      {(g) => <Icon name={g()} />}
+                    </Show>
                   </span>
                 )}
               </For>
               <TaskSlotHost slot="tabrail.task-row" taskId={w.id} />
-              <Show when={menuId() === w.id}>
-                <div class="tabrail-menu">
-                  <div class="tabrail-menu-title">{w.title}</div>
-                  <div class="tabrail-menu-title">{w.branch ?? 'Project folder'}</div>
-                  <button
-                    type="button"
-                    class="tabrail-close"
-                    onClick={() => {
-                      setMenuId(null)
-                      void saveOrder(isPinned(railOrder(), w.id) ? unpinTask(railOrder(), w.id) : pinTask(railOrder(), w.id))
-                    }}
-                  >
-                    {isPinned(railOrder(), w.id) ? 'Unpin' : 'Pin to top'}
-                  </button>
-                  <button type="button" class="tabrail-close" onClick={() => openRename(w)}>
-                    Rename
-                  </button>
-                  <button type="button" class="tabrail-close" onClick={() => openArchive(w)}>
-                    Archive
-                  </button>
-                </div>
-              </Show>
             </div>
             )
           }}
@@ -383,7 +396,8 @@ export default function TabRail() {
       <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
         +
       </button>
-      <Show when={archiveErr()}><div class="tabrail-action-error action-error" role="alert">{archiveErr()}</div></Show>
+      {/* `.tabrail-action-error` was never defined in any stylesheet — dropped with the migration. */}
+      <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (
           <div class="overlay-backdrop" onClick={draftDismiss.onBackdropClick}>
@@ -399,7 +413,7 @@ export default function TabRail() {
                   </select>
                 </Show>
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
-                  <Show when={draftErr()}><div class="action-error" role="alert">{draftErr()}</div></Show>
+                  <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
                   <div style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
                     <IconPicker value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
                     <input
