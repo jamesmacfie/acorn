@@ -1,5 +1,5 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Row, Toolbar } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import {
@@ -221,15 +221,14 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             <div class="db-table-list">
               <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
                 {(t) => (
-                  <button
-                    type="button"
-                    class="db-table-row"
-                    classList={{ active: selected()?.schema === t.schema && selected()?.name === t.name }}
-                    onClick={() => void openTable(t)}
+                  <Row
+                    density="compact"
+                    selected={selected()?.schema === t.schema && selected()?.name === t.name}
+                    onActivate={() => void openTable(t)}
                     title={`${t.schema}.${t.name}`}
                   >
                     {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
-                  </button>
+                  </Row>
                 )}
               </For>
             </div>

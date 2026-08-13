@@ -69,29 +69,9 @@ body { font: var(--font-ui, inherit); }
   min-height: 0;
   overflow: auto;
 }
-.db-table-row {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 0 var(--space-6);
-  height: var(--row-h);
-  line-height: var(--row-h);
-  border: none;
-  border-left: var(--marker-w) solid transparent;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-.db-table-row:hover { background: var(--bg-hover); }
-.db-table-row.active {
-  background: var(--bg-selected);
-  border-left-color: var(--accent);
-}
+/* The table list is `Row` at compact density now. `.db-table-row` was that primitive spelled out —
+   the box, the left marker, the hover and the selected tint — a full row taller than every other
+   browse list in the app for no reason anyone recorded. */
 
 /* Main — the button bar over the results grid. The editor and the splitter that used to be here are the
    host's, in the region above this frame, and `.db-editor` / `.db-editor-host` / `.db-split` are gone

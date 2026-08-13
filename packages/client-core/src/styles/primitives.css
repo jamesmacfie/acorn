@@ -689,10 +689,14 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    Depth indentation generalises Row's single `nested` boolean and replaces the editor's nested-<ul>
    padding. The twist is drawn from the marker token, not a glyph literal, so it scales with the
    pack rather than with a font. */
-.ui-row[data-depth='1'] { padding-left: var(--space-6); }
-.ui-row[data-depth='2'] { padding-left: var(--space-9); }
-.ui-row[data-depth='3'] { padding-left: var(--space-11); }
-.ui-row[data-depth='4'] { padding-left: calc(var(--space-11) + var(--space-6)); }
+/* The ladder starts ABOVE the undepthed row's own `padding: 0 var(--pane-pad)`, or depth 1 outdents:
+   --space-6 is 12px against a 14px --pane-pad, so the first level of nesting used to sit two pixels
+   LEFT of its parent. The editor's file tree and the API panel's request tree both wore that. Each
+   step is one --space-6 (12px), which is what levels 2→3 already were. */
+.ui-row[data-depth='1'] { padding-left: var(--space-9); }
+.ui-row[data-depth='2'] { padding-left: var(--space-11); }
+.ui-row[data-depth='3'] { padding-left: calc(var(--space-11) + var(--space-6)); }
+.ui-row[data-depth='4'] { padding-left: calc(var(--space-11) + var(--space-9)); }
 .ui-row-twist {
   flex: none;
   width: 0;
@@ -714,6 +718,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-row[data-reveal] .ui-row-trailing { opacity: 0; }
 .ui-row[data-reveal]:hover .ui-row-trailing,
 .ui-row[data-reveal]:focus-within .ui-row-trailing { opacity: 1; }
+/* The selected row keeps its actions. Selection is not focus — you can select a container and move
+   the pointer away — and the row you have chosen is the one you are about to act on. Docker's
+   bespoke rule had this; hover-only would have made its start/stop buttons vanish on the row you
+   just clicked. */
+.ui-row[data-reveal][data-selected] .ui-row-trailing { opacity: 1; }
 
 /* ── SplitHandle ────────────────────────────────────────────────────────────────────────────
    Lifted from `.pane-divider`: a wide hit area around a hairline. The negative margin keeps the
