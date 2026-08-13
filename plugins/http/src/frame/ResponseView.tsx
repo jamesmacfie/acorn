@@ -32,7 +32,7 @@ function formatBody(text: string, contentType: string): string {
 
 function Timeline(props: { entries: TimelineEntry[] }) {
   return (
-    <ul class="http-timeline">
+    <ul class="list-reset">
       <For each={props.entries}>
         {(entry) => (
           <li class="http-timeline-row" data-label={entry.label}>

@@ -16,11 +16,6 @@
   flex-direction: column;
 }
 /* Fixed-height column: the body scrolls so the footer (back / skip) is always reachable. */
-.wizard-stage {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
 .wizard-body {
   display: flex;
   flex-direction: column;

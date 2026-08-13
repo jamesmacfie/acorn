@@ -64,7 +64,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
     <button type="button" class="ln-related-row" classList={{ 'ln-done': done }} onClick={() => props.onOpenRelated(related.identifier)}>
       <Show when={done !== undefined}><span class="ln-related-check">{done ? '✓' : '○'}</span></Show>
       <span class="ln-related-id">{related.identifier}</span>
-      <span class="ln-related-title">{related.title}</span>
+      <span class="truncate">{related.title}</span>
       <Show when={related.state}>
         {(state) => <Chip color={state().color}>{state().name}</Chip>}
       </Show>

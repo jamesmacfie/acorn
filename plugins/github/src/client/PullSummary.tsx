@@ -108,7 +108,7 @@ export function PullSummary(props: {
           count={props.conflicts()?.available ? props.conflicts()!.files.length : undefined}
         >
           <Show when={props.conflicts()?.available} fallback={<p class="muted" style={{ padding: '4px var(--pane-pad)' }}>{props.conflictsLoading() ? 'Checking for conflicting files…' : 'This PR has merge conflicts. Map this repo to a local checkout to list the conflicting files.'}</p>}>
-            <ul class="file-list">
+            <ul class="file-list list-reset">
               <For each={props.conflicts()!.files} fallback={<li class="placeholder">Conflicts reported, but no specific files were detected.</li>}>
                 {(path) => <li class="file-row"><button type="button" class="file-open" onClick={() => props.selectFile(path)}><span class="file-status file-status-warn" title="Conflicting">!</span><span class="file-path">{path}</span></button></li>}
               </For>

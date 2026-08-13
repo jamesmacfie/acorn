@@ -118,7 +118,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
                     onDblClick={() => openHit(file.path, hit)}
                   >
                     <span class="search-hit-line muted">{hit.line}</span>
-                    <span class="search-hit-preview"><HitPreview hit={hit} /></span>
+                    <span class="truncate"><HitPreview hit={hit} /></span>
                   </button>
                 )}
               </For>

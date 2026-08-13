@@ -90,7 +90,7 @@ export default function ChecksPanel(props: { owner: string; repo: string; runId:
         <div class="checks-panel-body">
           <Show when={!jobs.isLoading} fallback={<p class="muted">Loading steps…</p>}>
             <Show when={steps().length} fallback={<p class="muted">{jobs.isError ? 'Failed to load steps.' : 'No steps.'}</p>}>
-              <ul class="step-list">
+              <ul class="list-reset">
                 <For each={steps()}>
                   {(s) => {
                     const status = () => (s.conclusion ?? s.status ?? '').toLowerCase()
@@ -98,7 +98,7 @@ export default function ChecksPanel(props: { owner: string; repo: string; runId:
                       <li class="step-row">
                         <button type="button" class="step-head" onClick={() => toggle(s.number)}>
                           <StatusDot tone={checkStatusTone(status())} />
-                          <span class="step-name">{s.name}</span>
+                          <span class="truncate">{s.name}</span>
                         </button>
                         <Show when={open().has(s.number)}>
                           <Show when={!log.isLoading} fallback={<EmptyState size="sm" busy>Loading log…</EmptyState>}>

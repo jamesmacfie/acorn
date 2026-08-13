@@ -172,7 +172,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     // full-screen takeover, and Escape or a stray backdrop click must not silently skip setup.
     <div class="wizard-backdrop">
       <div class="wizard" role="dialog" aria-modal="true" aria-label="Set up acorn">
-        <div class="wizard-stage">
+        <div class="scroll">
           <Show when={step() === 'welcome'}>
             <div class="wizard-body">
               <Acorn />
