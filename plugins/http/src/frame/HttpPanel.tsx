@@ -2,7 +2,7 @@
 // and as a task pane (that task's ad-hoc requests on top of the project tree). Everything below is shared
 // between them — the only difference is `taskId`.
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
-import { Button, createArmedConfirm, EmptyState, Icon, Input, SectionHeader, Select, StatusDot, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
+import { Button, createArmedConfirm, EmptyState, Icon, Input, ListDetail, SectionHeader, Select, StatusDot, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { fromCurl, httpMethods, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
@@ -191,102 +191,104 @@ export default function HttpPanel(props: {
   const groups = createMemo(() => groupByFolder(saved() ?? []))
 
   return (
-    <div class="http-panel">
-      <aside class="http-sidebar">
-        <SectionHeader level="pane" actions={<Button size="sm" variant="ghost" onClick={() => startNew()}>+ Request</Button>}>
-          {props.projectName}
-        </SectionHeader>
+    <ListDetail
+      listLabel="Requests"
+      detailClass="http-main"
+      list={
+        <>
+          <SectionHeader level="pane" actions={<Button size="sm" variant="ghost" onClick={() => startNew()}>+ Request</Button>}>
+            {props.projectName}
+          </SectionHeader>
 
-        <nav class="http-tree">
-          <Show when={props.taskId}>
-            <div class="http-tree-group">
-              <span class="http-tree-folder">This task</span>
-              <Show when={(adhoc() ?? []).length} fallback={<EmptyState align="start" size="sm">Nothing yet — new requests you make here stay with this task until you file them.</EmptyState>}>
-                <For each={adhoc()}>{(row) => <RequestRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
-              </Show>
-            </div>
-          </Show>
-
-          <For each={groups()}>
-            {(group) => (
+          <nav class="http-tree">
+            <Show when={props.taskId}>
               <div class="http-tree-group">
-                <span class="http-tree-folder">{group.folder || 'Ungrouped'}</span>
-                <For each={group.requests}>{(row) => <RequestRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
+                <span class="http-tree-folder">This task</span>
+                <Show when={(adhoc() ?? []).length} fallback={<EmptyState align="start" size="sm">Nothing yet — new requests you make here stay with this task until you file them.</EmptyState>}>
+                  <For each={adhoc()}>{(row) => <RequestRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
+                </Show>
               </div>
-            )}
-          </For>
-
-          <Show when={saved.state === 'ready' && !(saved() ?? []).length && !props.taskId}>
-            <EmptyState align="start" size="sm">No saved requests for this project yet.</EmptyState>
-          </Show>
-        </nav>
-
-        <button type="button" class="http-vars-link" classList={{ active: selection().kind === 'variables' }} onClick={() => setSelection({ kind: 'variables' })}>
-          <Icon name="braces" /> Variables
-        </button>
-      </aside>
-
-      <div class="http-main">
-        <Show
-          when={selection().kind !== 'variables'}
-          fallback={<HttpVariables projectId={props.projectId} projectName={props.projectName} />}
-        >
-          <Toolbar class="http-urlbar" ariaLabel="Request">
-            <Select
-              class="http-method"
-              width="narrow"
-              value={draft().method}
-              aria-label="Method"
-              data-method={methodTone(draft().method)}
-              onChange={(e) => patch({ method: e.currentTarget.value })}
-            >
-              <For each={httpMethods}>{(m) => <option value={m}>{m}</option>}</For>
-            </Select>
-            <Input
-              class="http-url"
-              value={draft().url}
-              placeholder="{{BASE_URL}}/users  ·  or paste a curl command"
-              spellcheck={false}
-              aria-label="URL"
-              onInput={(e) => patch({ url: e.currentTarget.value })}
-              onPaste={onUrlPaste}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void fire()
-              }}
-            />
-            <Button variant="solid" tone="accent" busy={sending()} onClick={() => void fire()}>
-              Send
-            </Button>
-          </Toolbar>
-
-          <Toolbar class="http-metabar" size="sm" ariaLabel="Request meta">
-            {/* The name is a label, not a field: it opens the save dialog, which is also the rename
-                and the move-into-the-repo path. */}
-            <button type="button" class="http-name-btn" title="Rename, move or file this request" onClick={openSave}>
-              <Show when={draft().folder}>
-                <span class="http-name-folder">{draft().folder}/</span>
-              </Show>
-              <span class="http-name-text">{draft().name || 'Untitled request'}</span>
-              <Show when={draft().taskId}>
-                <span class="http-name-tag">task</span>
-              </Show>
-            </button>
-            <Toolbar.Spacer />
-            <Show when={dirty()}>
-              <StatusDot tone="accent" label="Unsaved changes" />
             </Show>
-            <Button size="sm" variant="ghost" onClick={() => void copyAsCurl()}>
-              Copy as curl
-            </Button>
-            <Button size="sm" busy={saving()} onClick={onSaveClick}>
-              {current() ? 'Save' : 'Save…'}
-            </Button>
-          </Toolbar>
 
-          <RequestTabs draft={draft()} patch={patch} />
-          <ResponseView result={result()} error={error()} sending={sending()} onCopy={(text) => void props.bridge.ui.copy(text)} />
-        </Show>
-      </div>
+            <For each={groups()}>
+              {(group) => (
+                <div class="http-tree-group">
+                  <span class="http-tree-folder">{group.folder || 'Ungrouped'}</span>
+                  <For each={group.requests}>{(row) => <RequestRow row={row} active={current()?.id === row.id} armed={armedDelete.armed() === row.id} onOpen={open} onCopy={startNew} onDelete={remove} />}</For>
+                </div>
+              )}
+            </For>
+
+            <Show when={saved.state === 'ready' && !(saved() ?? []).length && !props.taskId}>
+              <EmptyState align="start" size="sm">No saved requests for this project yet.</EmptyState>
+            </Show>
+          </nav>
+
+          <button type="button" class="http-vars-link" classList={{ active: selection().kind === 'variables' }} onClick={() => setSelection({ kind: 'variables' })}>
+            <Icon name="braces" /> Variables
+          </button>
+        </>
+      }
+    >
+      <Show
+        when={selection().kind !== 'variables'}
+        fallback={<HttpVariables projectId={props.projectId} projectName={props.projectName} />}
+      >
+        <Toolbar class="http-urlbar" ariaLabel="Request">
+          <Select
+            class="http-method"
+            width="narrow"
+            value={draft().method}
+            aria-label="Method"
+            data-method={methodTone(draft().method)}
+            onChange={(e) => patch({ method: e.currentTarget.value })}
+          >
+            <For each={httpMethods}>{(m) => <option value={m}>{m}</option>}</For>
+          </Select>
+          <Input
+            class="http-url"
+            value={draft().url}
+            placeholder="{{BASE_URL}}/users  ·  or paste a curl command"
+            spellcheck={false}
+            aria-label="URL"
+            onInput={(e) => patch({ url: e.currentTarget.value })}
+            onPaste={onUrlPaste}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void fire()
+            }}
+          />
+          <Button variant="solid" tone="accent" busy={sending()} onClick={() => void fire()}>
+            Send
+          </Button>
+        </Toolbar>
+
+        <Toolbar class="http-metabar" size="sm" ariaLabel="Request meta">
+          {/* The name is a label, not a field: it opens the save dialog, which is also the rename
+              and the move-into-the-repo path. */}
+          <button type="button" class="http-name-btn" title="Rename, move or file this request" onClick={openSave}>
+            <Show when={draft().folder}>
+              <span class="http-name-folder">{draft().folder}/</span>
+            </Show>
+            <span class="http-name-text">{draft().name || 'Untitled request'}</span>
+            <Show when={draft().taskId}>
+              <span class="http-name-tag">task</span>
+            </Show>
+          </button>
+          <Toolbar.Spacer />
+          <Show when={dirty()}>
+            <StatusDot tone="accent" label="Unsaved changes" />
+          </Show>
+          <Button size="sm" variant="ghost" onClick={() => void copyAsCurl()}>
+            Copy as curl
+          </Button>
+          <Button size="sm" busy={saving()} onClick={onSaveClick}>
+            {current() ? 'Save' : 'Save…'}
+          </Button>
+        </Toolbar>
+
+        <RequestTabs draft={draft()} patch={patch} />
+        <ResponseView result={result()} error={error()} sending={sending()} onCopy={(text) => void props.bridge.ui.copy(text)} />
+      </Show>
 
       <Show when={saveOpen()}>
         <SaveRequestModal
@@ -309,7 +311,7 @@ export default function HttpPanel(props: {
           }}
         />
       </Show>
-    </div>
+    </ListDetail>
   )
 }
 

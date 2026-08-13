@@ -126,12 +126,19 @@ describe('primitive adoption', () => {
     expect(text, 'raw class="ui-input"').not.toMatch(/class="ui-input"/)
   })
 
-  // Every primitive must keep appending props.class — that passthrough is what makes migration
-  // incremental (a converted call site can carry its old bespoke class and look identical).
-  it('primitives append props.class rather than replacing it', () => {
+  // Every primitive must keep appending the caller's class — that passthrough is what makes
+  // migration incremental (a converted call site can carry its old bespoke class and look
+  // identical).
+  //
+  // Matched as `.*Class` rather than the literal `.class` because a primitive that renders more than
+  // one element needs more than one class prop: ListDetail draws a container and two columns, so its
+  // passthroughs are `class`, `listClass` and `detailClass`. The receiver varies too — a primitive
+  // that splitProps() reads `own.class`. The invariant is that every cx() takes a caller-supplied
+  // class, not that they are all spelled the same.
+  it('primitives append the caller class rather than replacing it', () => {
     const text = readFileSync(join(SRC, 'packages/client-core/src/ui/primitives.tsx'), 'utf8')
     const classAttrs = [...text.matchAll(/class=\{cx\(([^)]*)\)\}/g)].map((m) => m[1])
     expect(classAttrs.length).toBeGreaterThan(0)
-    for (const attr of classAttrs) expect(attr).toContain('.class')
+    for (const attr of classAttrs) expect(attr).toMatch(/\.\w*[Cc]lass\b/)
   })
 })

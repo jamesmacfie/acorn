@@ -45,6 +45,7 @@ export const STYLE_TOKENS = [
   // density
   '--row-h', '--row-h-sm', '--row-h-virt', '--control-h', '--control-h-sm',
   '--topbar-h', '--pane-head-h', '--tabrail-w', '--task-footer-h',
+  '--listdetail-w', '--listdetail-w-narrow',
   '--icon-size', '--icon-box', '--avatar-sm', '--avatar-md', '--diff-line-h', '--term-fs',
   // typography
   '--font-mono', '--font-ui', '--font-glyph', '--font-display',

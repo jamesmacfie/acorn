@@ -1,4 +1,5 @@
 import { createEffect, createSignal, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { createArmedConfirm } from './confirm'
 import type { SplitDrag } from './split'
 import { cx } from './cx'
@@ -930,4 +931,60 @@ export function TreeRow(props: {
    Three surfaces hand-rolled this and none had keyboard support, so a split was mouse-only. */
 export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag; class?: string }) {
   return <div {...props.drag.handleProps} class={cx('ui-split-handle', props.class)} data-axis={props.axis} />
+}
+
+/* ── ListDetail ──────────────────────────────────────────────────────────────────────────────
+   List on the left, detail on the right. Four panes each invented one — two grids (rollbar,
+   linear), a flex row (database) and a third grid (http) — with four column widths and two
+   different border ROLES, which is why they read as slightly-different versions of the same pane
+   rather than the same pane. The widths collapse to two genres: a compact switcher rail and a
+   browse list.
+
+   NOT for a Source that claims the whole shell — docker's browse is `.panes` + `.pane`, the inset
+   card genre with a gap between columns, and that layout belongs to the shell (styles/shell.css).
+   The test is whether the two columns are one surface split by a divider or two separate surfaces.
+
+   `list` omitted renders a single full-width column, because rollbar and linear both drop the
+   switcher when a task links exactly one item, and a two-column grid holding one child is not that.
+
+   Scrolling is the caller's to declare: `scrollDetail` makes the detail column one scroller (a
+   document view), and its absence means the children own their own (a toolbar over a grid). Every
+   consumer had this, and nobody had it the same way, but neither answer is wrong. */
+export function ListDetail(props: {
+  list?: JSX.Element
+  /** aria-label for the list column. It is a landmark; name it. */
+  listLabel?: string
+  /** `narrow` is the compact identifier switcher; `default` is the browse list. */
+  listWidth?: 'narrow' | 'default'
+  /** Detail column scrolls as one region. Otherwise its children own their scrolling. */
+  scrollDetail?: boolean
+  /** `main` when this split IS the document — a plugin frame, where nothing else claims the
+   *  landmark. A pane inside the shell leaves it a div, because the shell owns the page's `main`. */
+  detailAs?: 'div' | 'main'
+  class?: string
+  listClass?: string
+  detailClass?: string
+  children: JSX.Element
+}) {
+  return (
+    <div
+      class={cx('ui-listdetail', props.class)}
+      data-list={props.list === undefined ? undefined : (props.listWidth ?? 'default')}
+    >
+      {/* <aside> rather than a div: the list is a complementary landmark, and naming it is the only
+          way a screen reader can tell two same-shaped columns apart. */}
+      <Show when={props.list !== undefined}>
+        <aside class={cx('ui-listdetail-list', props.listClass)} aria-label={props.listLabel}>
+          {props.list}
+        </aside>
+      </Show>
+      <Dynamic
+        component={props.detailAs ?? 'div'}
+        class={cx('ui-listdetail-detail', props.detailClass)}
+        data-scroll={props.scrollDetail ? '' : undefined}
+      >
+        {props.children}
+      </Dynamic>
+    </div>
+  )
 }

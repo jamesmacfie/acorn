@@ -17,8 +17,8 @@
 
 export {
   Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
-  Field, Input, Kbd, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner, SplitHandle,
-  StatusDot, Table, Textarea, ToggleButton, Toolbar, TreeRow,
+  Field, Input, Kbd, ListDetail, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner,
+  SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar, TreeRow,
 } from '@acorn/client-core/ui/primitives.tsx'
 export { default as Icon } from '@acorn/client-core/ui/Icon.tsx'
 export { default as Picker } from '@acorn/client-core/ui/Picker.tsx'

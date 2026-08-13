@@ -57,20 +57,9 @@ body { font: var(--font-ui, inherit); }
   white-space: pre-wrap;
 }
 
-.db-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
+/* ListDetail owns the split, the column width, the divider and both columns' flex/overflow, which is
+   all `.db-body` / `.db-sidebar` / `.db-main` ever declared — so all three classes are gone with it. */
 
-/* Sidebar — searchable table list */
-.db-sidebar {
-  width: clamp(180px, 22%, 280px);
-  border-right: var(--chrome-divider);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
 .db-filter {
   margin: var(--space-4);
   flex: none;
@@ -106,13 +95,7 @@ body { font: var(--font-ui, inherit); }
 
 /* Main — the button bar over the results grid. The editor and the splitter that used to be here are the
    host's, in the region above this frame, and `.db-editor` / `.db-editor-host` / `.db-split` are gone
-   with them. */
-.db-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
+   with them. The column itself is ListDetail's. */
 /* The bar keeps its class name and its layout; only its position changed, from above the splitter to
    below it. `border-bottom` rather than `border-top` now, because what it is separating itself from is
    the grid underneath rather than an editor above. */

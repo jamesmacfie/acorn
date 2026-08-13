@@ -43,7 +43,7 @@ Six entrypoints:
 | --- | --- |
 | `@acorn/plugin-api/node` | `NodePlugin` and the context types, the route toolkit (`AppEnv`, `requireUser` and friends, `respondError`, the bridge), per-plugin SQLite and migrations, the `CoreServices` type, capability ids, provider and integration contracts |
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, and the design system's plain functions (`cx`, `token`, metrics) |
-| `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives, `Icon`, `Picker`, `Modal`, `Tabs`, and the diff rows |
+| `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives (including the `ListDetail` two-column pane layout), `Icon`, `Picker`, `Modal`, `Tabs`, and the diff rows |
 | `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass |
 | `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims |

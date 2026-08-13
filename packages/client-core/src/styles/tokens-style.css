@@ -95,6 +95,11 @@
   --pane-head-h: 48px;
   --tabrail-w: 52px;
   --task-footer-h: 27px;
+  /* ListDetail's two column genres. The browse list tracks the pane so a wide window gets a wider
+     list; the switcher rail holds identifiers and never needs to. Four panes had four values here
+     before the primitive existed. */
+  --listdetail-w: clamp(200px, 22vw, 300px);
+  --listdetail-w-narrow: 150px;
   --icon-size: 14px;
   --icon-box: 18px;
   --avatar-sm: 18px;
