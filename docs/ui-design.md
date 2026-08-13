@@ -41,6 +41,24 @@ avoid raw buttons, selects, textareas, and retired shared classes. New component
 primitives from the start, and the retired-class check must remain clean while older surfaces are
 migrated.
 
+## Two-column panes
+
+A pane that puts a list beside a detail uses the `ListDetail` primitive, not a hand-rolled grid. It
+owns the split, the two column widths (`narrow` for an identifier switcher, the default for a browse
+list), the `--chrome-divider` between them, and each column's flex/overflow behaviour. The Rollbar,
+Linear, API, and Database panes are its consumers; before it existed they had four different column
+widths, three different mechanisms, and two different border roles, which is why they read as
+variations on a pane rather than the same pane.
+
+It is deliberately not the layout for a Source that claims the whole shell. Docker's browse is
+`.panes` + `.pane` from `styles/shell.css` — two separate inset surfaces with a gap, not one surface
+split by a divider — and that layout stays the shell's.
+
+`ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
+than a media query, and `container-type` would make the element a containing block for
+`position: fixed` descendants, which silently mispositions any `Modal` rendered inside it. A pane
+that wants to stack declares it on its own class.
+
 ## Interaction rules
 
 - Command palette opens with `⌘K` and uses contributed actions and rows.

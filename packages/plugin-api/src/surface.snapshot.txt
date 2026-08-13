@@ -381,6 +381,7 @@ ui: KVRow
 ui: Kbd
 ui: KeyValueEditor
 ui: LineComposerController
+ui: ListDetail
 ui: MentionTextarea
 ui: Menu
 ui: Meter

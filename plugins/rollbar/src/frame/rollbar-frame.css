@@ -10,11 +10,10 @@ button { font: inherit; }
 .rb-header { min-height: 2.375rem; display: flex; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
 .rb-brand-mark { color: var(--brand-rollbar, var(--accent)); }
 .rb-brand { letter-spacing: .01em; }
-.rb-layout { min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); }
-.rb-targets { width: 9.375rem; overflow-y: auto; border-right: var(--control-bw, .0625rem) solid var(--border); padding: var(--space-3, .375rem); }
+/* ListDetail owns the split, the column width and the divider. What is left is this frame's padding. */
+.rb-targets { overflow-y: auto; padding: var(--space-3, .375rem); }
 .rb-target.ui-row { padding-inline: var(--space-4, .5rem); color: var(--text-muted); }
 .rb-target.ui-row[data-selected] { color: var(--text); }
-.rb-content { min-width: 0; min-height: 0; overflow: auto; }
 .rb-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-7, 1rem); padding: var(--space-7, 1rem) var(--space-8, 1.25rem) var(--space-5, .625rem); }
 .rb-heading { min-width: 0; }
 .rb-heading h1 { margin: var(--space-2, .25rem) 0 0; font-size: var(--fs-xl, 1.125rem); overflow-wrap: anywhere; }

@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, EmptyState, Row } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, ListDetail, Row } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
 import {
@@ -122,9 +122,15 @@ export function RollbarFrameApp(props: { bridge: AcornBridge }) {
         <span class="rb-brand-mark glyph">◉</span>
         <strong class="rb-brand">Rollbar</strong>
       </header>
-      <div class="rb-layout">
-        <Show when={linkedTargets().length > 1}>
-          <aside class="rb-targets" aria-label="Linked Rollbar items">
+      <ListDetail
+        listWidth="narrow"
+        listLabel="Linked Rollbar items"
+        listClass="rb-targets"
+        detailClass="rb-content"
+        detailAs="main"
+        scrollDetail
+        list={linkedTargets().length > 1
+          ? (
             <For each={linkedTargets()}>{(target) => (
               <Row
                 class="rb-target"
@@ -135,24 +141,23 @@ export function RollbarFrameApp(props: { bridge: AcornBridge }) {
                 #{target.identifier}
               </Row>
             )}</For>
-          </aside>
+          )
+          : undefined}
+      >
+        <Show when={view()} fallback={<PageStatus state={page()} />}>
+          {(state) => (
+            <RollbarItemView
+              state={state()}
+              activeTab={activeTab()}
+              occurrence={occurrence()}
+              onTab={setActiveTab}
+              onRefresh={() => void load(state().target, true)}
+              onOccurrence={(id) => void loadOccurrence(id)}
+              onCopy={(detail) => void copyOccurrence(detail)}
+            />
+          )}
         </Show>
-        <main class="rb-content">
-          <Show when={view()} fallback={<PageStatus state={page()} />}>
-            {(state) => (
-              <RollbarItemView
-                state={state()}
-                activeTab={activeTab()}
-                occurrence={occurrence()}
-                onTab={setActiveTab}
-                onRefresh={() => void load(state().target, true)}
-                onOccurrence={(id) => void loadOccurrence(id)}
-                onCopy={(detail) => void copyOccurrence(detail)}
-              />
-            )}
-          </Show>
-        </main>
-      </div>
+      </ListDetail>
     </div>
   )
 }

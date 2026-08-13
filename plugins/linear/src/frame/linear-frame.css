@@ -15,11 +15,11 @@ button { font: inherit; }
 .ln-brandbar { min-height: 2.375rem; display: flex; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
 .ln-brand-mark { color: var(--brand-linear, var(--accent)); }
 .ln-brand { letter-spacing: .01em; }
-.ln-layout { min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); }
-.ln-targets { width: 8.5rem; overflow-y: auto; border-right: var(--control-bw, .0625rem) solid var(--border); padding: var(--space-3, .375rem); }
+/* ListDetail owns the split, the column width and the divider. What is left is this frame's padding,
+   and the narrow-width rule at the foot of the file. */
+.ln-targets { overflow-y: auto; padding: var(--space-3, .375rem); }
 .ln-target.ui-row { padding-inline: var(--space-4, .5rem); color: var(--text-muted); font-family: var(--font-mono, monospace); }
 .ln-target.ui-row[data-selected] { color: var(--text); }
-.ln-content { min-width: 0; min-height: 0; overflow: auto; }
 
 .ln-muted { color: var(--text-muted); font-size: var(--fs-sm, .75rem); }
 
@@ -90,8 +90,11 @@ button { font: inherit; }
 .markdown blockquote { margin: var(--space-4, .5rem) 0; padding-left: var(--space-5, .625rem); border-left: var(--control-bw, .0625rem) solid var(--border); color: var(--text-muted); }
 
 @media (max-width: 45rem) {
-  .ln-layout { grid-template-columns: minmax(0, 1fr); }
-  .ln-targets { display: none; }
+  /* Drop the ticket switcher rather than squeeze it — it is a convenience for a task linking several
+     tickets, and the frame's viewport is the pane. Written against both classes so it beats
+     ListDetail's own `[data-list]` rule on specificity rather than on stylesheet order. */
+  .ln-layout.ui-listdetail[data-list] { grid-template-columns: minmax(0, 1fr); }
+  .ln-layout .ui-listdetail-list { display: none; }
   .ln-head { padding-inline: var(--space-6, .75rem); }
   .ln-chips, .ln-content > .ui-tabs, .ln-panel { padding-inline: var(--space-6, .75rem); }
 }

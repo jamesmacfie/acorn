@@ -1,5 +1,5 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Checkbox, createArmedConfirm, EmptyState, Input, Picker, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Toolbar } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import {
@@ -213,82 +213,83 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         <Alert class="db-error">{error()}</Alert>
       </Show>
 
-      <div class="db-body">
-        <aside class="db-sidebar">
-          <Input class="db-filter" kind="filter" placeholder="Filter tables…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
-          <div class="db-table-list">
-            <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
-              {(t) => (
-                <button
-                  type="button"
-                  class="db-table-row"
-                  classList={{ active: selected()?.schema === t.schema && selected()?.name === t.name }}
-                  onClick={() => void openTable(t)}
-                  title={`${t.schema}.${t.name}`}
-                >
-                  {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
-                </button>
-              )}
-            </For>
-          </div>
-        </aside>
+      <ListDetail
+        listLabel="Tables"
+        list={
+          <>
+            <Input class="db-filter" kind="filter" placeholder="Filter tables…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
+            <div class="db-table-list">
+              <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
+                {(t) => (
+                  <button
+                    type="button"
+                    class="db-table-row"
+                    classList={{ active: selected()?.schema === t.schema && selected()?.name === t.name }}
+                    onClick={() => void openTable(t)}
+                    title={`${t.schema}.${t.name}`}
+                  >
+                    {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
+                  </button>
+                )}
+              </For>
+            </div>
+          </>
+        }
+      >
+        {/* The bar moved from above the splitter to below it, and that is the only visible change the
+            move makes to this pane. It stays the PLUGIN's because it is a searchable picker with
+            per-row delete chips and a conditionally-visible button — common, not impossible, which is
+            the bar a host-drawn region has to clear (docs/plugins.md § Document surfaces). */}
+        <Toolbar class="db-editor-bar" variant="actions" ariaLabel="Query actions">
+          <span class="muted db-hint">⌘↵ to run</span>
+          <Picker<DbSavedQuery>
+            label={loadedName() || 'Queries'}
+            placeholder="Filter saved queries…"
+            emptyText="No saved queries yet."
+            buttonClass="db-run-btn"
+            results={matchSaved}
+            // Notes are searchable, so show their first line to explain why a row matched.
+            rowLabel={savedQueryLabel}
+            isActive={(q) => q.name === loadedName()}
+            leading={(q) => (
+              <button type="button" class="db-chip-x" title="Delete query" onClick={() => void deleteSaved(q)}>✕</button>
+            )}
+            onSelect={loadSaved}
+          />
+          {/* The editor's content is on the other side of a port, so this cannot be
+              disabled-when-empty without polling it — an empty document just makes the click a
+              no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
+          <button
+            type="button"
+            class="db-run-btn"
+            onClick={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
+          >
+            Save
+          </button>
+          <Show when={connections().length}>
+            <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</button>
+          </Show>
+          <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => void execute()}>Execute</button>
+        </Toolbar>
 
-        <div class="db-main">
-          {/* The bar moved from above the splitter to below it, and that is the only visible change the
-              move makes to this pane. It stays the PLUGIN's because it is a searchable picker with
-              per-row delete chips and a conditionally-visible button — common, not impossible, which is
-              the bar a host-drawn region has to clear (docs/plugins.md § Document surfaces). */}
-          <Toolbar class="db-editor-bar" variant="actions" ariaLabel="Query actions">
-            <span class="muted db-hint">⌘↵ to run</span>
-            <Picker<DbSavedQuery>
-              label={loadedName() || 'Queries'}
-              placeholder="Filter saved queries…"
-              emptyText="No saved queries yet."
-              buttonClass="db-run-btn"
-              results={matchSaved}
-              // Notes are searchable, so show their first line to explain why a row matched.
-              rowLabel={savedQueryLabel}
-              isActive={(q) => q.name === loadedName()}
-              leading={(q) => (
-                <button type="button" class="db-chip-x" title="Delete query" onClick={() => void deleteSaved(q)}>✕</button>
-              )}
-              onSelect={loadSaved}
-            />
-            {/* The editor's content is on the other side of a port, so this cannot be
-                disabled-when-empty without polling it — an empty document just makes the click a
-                no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
-            <button
-              type="button"
-              class="db-run-btn"
-              onClick={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
-            >
-              Save
-            </button>
-            <Show when={connections().length}>
-              <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</button>
+        <div class="db-result">
+          <Toolbar class="db-result-bar" size="sm" ariaLabel="Result actions">
+            <span class="db-footer">{footer()}</span>
+            <Show when={resultTable() && columns().some((c) => c.isPk)}>
+              <button type="button" class="db-icon-btn" title="Insert row" disabled={busy()} onClick={() => setInserting(true)}>+ Row</button>
             </Show>
-            <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => void execute()}>Execute</button>
           </Toolbar>
-
-          <div class="db-result">
-            <Toolbar class="db-result-bar" size="sm" ariaLabel="Result actions">
-              <span class="db-footer">{footer()}</span>
-              <Show when={resultTable() && columns().some((c) => c.isPk)}>
-                <button type="button" class="db-icon-btn" title="Insert row" disabled={busy()} onClick={() => setInserting(true)}>+ Row</button>
-              </Show>
-            </Toolbar>
-            <Show when={result()} fallback={<EmptyState align="start">Select a table or run a query.</EmptyState>}>
-              {(r) => (
-                <ResultGrid
-                  columns={r().columns}
-                  rows={r().rows}
-                  activeRow={activeRow()}
-                  onRowClick={(i) => batch(() => { setInserting(false); setActiveRow(i) })}
-                  onAppearance={(listener) => props.bridge.onAppearance(() => listener())}
-                />
-              )}
-            </Show>
-          </div>
+          <Show when={result()} fallback={<EmptyState align="start">Select a table or run a query.</EmptyState>}>
+            {(r) => (
+              <ResultGrid
+                columns={r().columns}
+                rows={r().rows}
+                activeRow={activeRow()}
+                onRowClick={(i) => batch(() => { setInserting(false); setActiveRow(i) })}
+                onAppearance={(listener) => props.bridge.onAppearance(() => listener())}
+              />
+            )}
+          </Show>
         </div>
 
         <Show when={inserting() && resultTable()}>
@@ -386,7 +387,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             onSaved={(q) => { setLoadedName(q.name); void refetchSaved() }}
           />
         </Show>
-      </div>
+      </ListDetail>
     </section>
   )
 }

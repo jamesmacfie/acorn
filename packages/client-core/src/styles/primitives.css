@@ -733,6 +733,48 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-split-handle:hover::after,
 .ui-split-handle:focus-visible::after { background: var(--accent); }
 
+/* ── ListDetail ─────────────────────────────────────────────────────────────────────────────
+   One surface split by a divider, so the border role is --chrome-divider (region against region).
+   Two of the four panes this replaces used --control-bw, the role a pack is free to zero, which
+   would have left them with no divider at all.
+
+   No `data-list` means no list column, and the grid is a single track — see the component.
+
+   `flex: 1` rather than `height: 100%`: a grid or flex parent stretches this for free, but http's
+   task slot is a flex ROW whose only child this is, and on the default `auto` basis the grid sizes
+   to its own content and leaves half the slot empty. A height would be wrong in the other direction
+   — database's parent is a flex column with two siblings above. */
+.ui-listdetail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.ui-listdetail[data-list] { grid-template-columns: var(--listdetail-w) minmax(0, 1fr); }
+.ui-listdetail[data-list='narrow'] { grid-template-columns: var(--listdetail-w-narrow) minmax(0, 1fr); }
+/* A flex column so a caller can stack a header, a scrolling list and a footer link in it — the
+   arrangement http's sidebar already had and the other three grew towards. */
+.ui-listdetail-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: var(--chrome-divider);
+}
+.ui-listdetail-detail { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ui-listdetail-detail[data-scroll] { display: block; overflow: auto; }
+
+/* No narrow-width behaviour here, deliberately. Stacking the columns wants a CONTAINER query — a
+   media query is right only by coincidence, because today every consumer is a plugin frame whose
+   viewport IS the pane, and wrong the moment a host-rendered pane uses this. But `container-type`
+   implies `contain: layout`, which makes this element the containing block for `position: fixed`
+   descendants, and Modal's backdrop is fixed and rendered inline rather than portalled. A plugin
+   that puts a modal inside a ListDetail would get a silently mispositioned overlay.
+   A consumer that wants to stack can say so on its own class (linear does). */
+
 /* ── FindBar ────────────────────────────────────────────────────────────────────────────────
    Toolbar geometry plus the search semantics. */
 .ui-findbar-search { flex: 1; min-width: 0; display: flex; }

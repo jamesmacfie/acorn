@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, EmptyState, Row } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, ListDetail, Row } from '@acorn/plugin-api/ui'
 import { openLinkOnClick, type AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
 import { linearCommentsRoute, linearIssueRoute, type LinearIssueDetail } from '../shared/api'
@@ -175,12 +175,20 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
         <span class="ln-brand-mark">◷</span>
         <strong class="ln-brand">Linear</strong>
       </header>
-      <div class="ln-layout">
-        {/* The ticket switcher for a task linking several. It is the app shell's concern rather than the
-            view's, and the ref-panel contract's own multi-ref chip strip does not cross the port — no
-            single-ref host needs it, and this is where a multi-ticket TASK gets one anyway. */}
-        <Show when={linked().length > 1}>
-          <aside class="ln-targets" aria-label="Linked Linear issues">
+      {/* The ticket switcher for a task linking several is ListDetail's list column. It is the app
+          shell's concern rather than the view's, and the ref-panel contract's own multi-ref chip strip
+          does not cross the port — no single-ref host needs it, and this is where a multi-ticket TASK
+          gets one anyway. */}
+      <ListDetail
+        class="ln-layout"
+        listWidth="narrow"
+        listLabel="Linked Linear issues"
+        listClass="ln-targets"
+        detailClass="ln-content"
+        detailAs="main"
+        scrollDetail
+        list={linked().length > 1
+          ? (
             <For each={linked()}>
               {(entry) => (
                 <Row
@@ -193,33 +201,32 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
                 </Row>
               )}
             </For>
-          </aside>
+          )
+          : undefined}
+      >
+        <Show when={issue()} fallback={<PageStatus state={page()} />}>
+          {(detail) => (
+            <LinearIssueView
+              issue={detail()}
+              activeTab={activeTab()}
+              refreshing={refreshing()}
+              posting={posting()}
+              postError={postError()}
+              overridden={!!override()}
+              onTab={setActiveTab}
+              onRefresh={() => void refresh()}
+              onBack={() => {
+                const current = target()
+                if (current) open(current)
+              }}
+              onOpenRelated={openRelated}
+              onContentClick={onContentClick}
+              onComment={(body, parentId) => void comment(body, parentId)}
+              onCopy={(text) => void copy(text)}
+            />
+          )}
         </Show>
-        <main class="ln-content">
-          <Show when={issue()} fallback={<PageStatus state={page()} />}>
-            {(detail) => (
-              <LinearIssueView
-                issue={detail()}
-                activeTab={activeTab()}
-                refreshing={refreshing()}
-                posting={posting()}
-                postError={postError()}
-                overridden={!!override()}
-                onTab={setActiveTab}
-                onRefresh={() => void refresh()}
-                onBack={() => {
-                  const current = target()
-                  if (current) open(current)
-                }}
-                onOpenRelated={openRelated}
-                onContentClick={onContentClick}
-                onComment={(body, parentId) => void comment(body, parentId)}
-                onCopy={(text) => void copy(text)}
-              />
-            )}
-          </Show>
-        </main>
-      </div>
+      </ListDetail>
     </div>
   )
 }

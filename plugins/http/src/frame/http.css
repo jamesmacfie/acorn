@@ -2,28 +2,11 @@
    Feature-owned; shared tokens only. Borders are picked by role: --chrome-divider between regions,
    --divider between rows, --control-border on inputs. */
 
-/* `flex: 1` because a task slot is a flex row and this is its only child: with the default `auto`
-   basis the grid sizes to its own content and leaves half the slot empty. Harmless in the rail
-   Source, where the parent isn't a flex container. */
-.http-panel {
-  display: grid;
-  grid-template-columns: clamp(200px, 22vw, 300px) minmax(0, 1fr);
-  min-height: 0;
-  min-width: 0;
-  height: 100%;
-  flex: 1;
-  overflow: hidden;
-}
+/* ListDetail owns the split, the column width, the divider and the `flex: 1` that fills a task slot.
+   `.http-panel` and `.http-sidebar` had all of that and nothing else, so they are gone; `.http-main`
+   survives only as the hook other rules in this file hang off. */
 
 /* ── sidebar ─────────────────────────────────────────────────────────────────────────────── */
-
-.http-sidebar {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: var(--chrome-divider);
-  overflow: hidden;
-}
 
 .http-tree { flex: 1; overflow-y: auto; min-height: 0; }
 
@@ -77,13 +60,8 @@
 
 /* ── main column ─────────────────────────────────────────────────────────────────────────── */
 
-.http-main {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-}
+/* `.http-main` is ListDetail's detail column: the flex-column-that-hides-overflow this rule used to
+   declare IS the primitive's default, so the class survives only as a name for the rules below. */
 
 /* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
 .http-urlbar { padding: var(--space-4) var(--pane-pad); background: none; }
