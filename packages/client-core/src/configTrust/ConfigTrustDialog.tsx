@@ -5,6 +5,7 @@ import { repoConfigTrustRoute, type RepoConfigTrustReview } from '@acorn/protoco
 import { closeRepoConfigTrust, configTrustRequest } from './configTrust'
 import { createDismissable } from '../ui/dismissable'
 import './config-trust.css'
+import { Alert } from '../ui/primitives'
 
 export default function ConfigTrustDialog() {
   const [review, setReview] = createSignal<RepoConfigTrustReview | null>(null)
@@ -67,7 +68,7 @@ export default function ConfigTrustDialog() {
               <strong>This project</strong> contains committed configuration that can run commands on this machine.
               Trust only text you have reviewed.
             </p>
-            <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+            <Show when={error()}><Alert>{error()}</Alert></Show>
             <Show when={review()?.current} fallback={<p class="muted">Loading configuration…</p>}>
               <Show
                 when={review()?.previous}

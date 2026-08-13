@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import type { Accessor } from 'solid-js'
-import { CopyButton, Icon, UserAvatar } from '@acorn/plugin-api/ui'
+import { Alert, Chip, CollapsibleSection, CopyButton, createArmedConfirm, Icon, UserAvatar } from '@acorn/plugin-api/ui'
 import { formatRelativeTime, REF_LINK_CLASS, splitRefTokens } from '@acorn/plugin-api/client'
 import type { Pull, PullConflicts } from '../contract/api'
 
@@ -37,9 +37,10 @@ export function PullSummary(props: {
   conflicting: boolean
   conflicts: Accessor<PullConflicts | undefined>
   conflictsLoading: Accessor<boolean>
-  conflictsRef: (element: HTMLDetailsElement) => void
   selectFile: (path: string) => void
 }) {
+  // Reopen exists, so closing is reversible — arm-to-confirm rather than a dialog.
+  const closeArmed = createArmedConfirm()
   return (
     <>
       <div class="pr-detail-header" ref={props.bindNavigatorScroll}>
@@ -49,16 +50,26 @@ export function PullSummary(props: {
         <div class="pr-detail-meta muted">
           <span class={`state-badge state-${props.pull().state}`}>{props.pull().draft ? 'draft' : props.pull().state}</span>
           <Show when={props.pull().author}>
-            {(author) => <span class="identity-chip"><UserAvatar login={author()} /><span>{author()}</span></span>}
+            {(author) => <Chip class="identity-chip" leading={<UserAvatar login={author()} />}>{author()}</Chip>}
           </Show>
           <span class="branch-flow">
-            <button class="branch-chip" title={props.pull().baseRef ?? 'base'} onClick={() => navigator.clipboard.writeText(props.pull().baseRef ?? '')}>
-              <span class="branch-chip-label">{props.pull().baseRef ?? 'base'}</span><Icon name="copy" class="branch-chip-copy" size={12} />
-            </button>
+            <Chip
+              class="branch-chip"
+              reveal
+              title={props.pull().baseRef ?? 'base'}
+              onActivate={() => void navigator.clipboard.writeText(props.pull().baseRef ?? '')}
+            >
+              {props.pull().baseRef ?? 'base'}<Icon name="copy" class="branch-chip-copy" size={12} />
+            </Chip>
             <span class="branch-arrow">←</span>
-            <button class="branch-chip" title={props.pull().headRef ?? 'head'} onClick={() => navigator.clipboard.writeText(props.pull().headRef ?? '')}>
-              <span class="branch-chip-label">{props.pull().headRef ?? 'head'}</span><Icon name="copy" class="branch-chip-copy" size={12} />
-            </button>
+            <Chip
+              class="branch-chip"
+              reveal
+              title={props.pull().headRef ?? 'head'}
+              onActivate={() => void navigator.clipboard.writeText(props.pull().headRef ?? '')}
+            >
+              {props.pull().headRef ?? 'head'}<Icon name="copy" class="branch-chip-copy" size={12} />
+            </Chip>
           </span>
           <span>{props.fileSummary().count} files · <span class="file-stat add">+{props.fileSummary().additions}</span> / <span class="file-stat del">−{props.fileSummary().deletions}</span></span>
           <Show when={formatRelativeTime(props.pull().updatedAt)}>{(age) => <span>{age()}</span>}</Show>
@@ -75,17 +86,27 @@ export function PullSummary(props: {
             <Show when={!props.pull().autoMergeEnabled && props.pull().mergeStateStatus !== 'BLOCKED'}>
               <button type="button" onClick={() => props.run(props.merge.run())} disabled={props.merge.pending || props.pull().mergeable === 'CONFLICTING'} title={props.pull().mergeable === 'CONFLICTING' ? 'Resolve merge conflicts before merging' : undefined}>Merge</button>
             </Show>
-            <button type="button" onClick={() => props.run(props.close.run())} disabled={props.close.pending}>Close</button>
+            <button
+              type="button"
+              data-armed={closeArmed.armed() ? '' : undefined}
+              onClick={() => { if (closeArmed.request('close')) props.run(props.close.run()) }}
+              disabled={props.close.pending}
+            >{closeArmed.armed() ? 'Close?' : 'Close'}</button>
             <button type="button" onClick={() => props.run(props.draft.run(!props.pull().draft))} disabled={props.draft.pending}>{props.pull().draft ? 'Ready for review' : 'Convert to draft'}</button>
           </div>
         </Show>
         <Show when={props.pull().state === 'closed'}><div class="pr-actions"><button type="button" onClick={() => props.run(props.reopen.run())} disabled={props.reopen.pending}>Reopen</button></div></Show>
-        <Show when={props.actionError()}><div class="action-error">{props.actionError()}</div></Show>
+        <Show when={props.actionError()}><Alert>{props.actionError()}</Alert></Show>
       </div>
 
       <Show when={props.conflicting}>
-        <details class="nav-section" open ref={props.conflictsRef}>
-          <summary>Merge conflicts <Show when={props.conflicts()?.available && props.conflicts()!.files.length}><span class="muted"> ({props.conflicts()!.files.length})</span></Show></summary>
+        <CollapsibleSection
+          class="nav-section"
+          persistKey="conflicts"
+          open
+          label="Merge conflicts"
+          count={props.conflicts()?.available ? props.conflicts()!.files.length : undefined}
+        >
           <Show when={props.conflicts()?.available} fallback={<p class="muted" style={{ padding: '4px var(--pane-pad)' }}>{props.conflictsLoading() ? 'Checking for conflicting files…' : 'This PR has merge conflicts. Map this repo to a local checkout to list the conflicting files.'}</p>}>
             <ul class="file-list">
               <For each={props.conflicts()!.files} fallback={<li class="placeholder">Conflicts reported, but no specific files were detected.</li>}>
@@ -93,7 +114,7 @@ export function PullSummary(props: {
               </For>
             </ul>
           </Show>
-        </details>
+        </CollapsibleSection>
       </Show>
     </>
   )

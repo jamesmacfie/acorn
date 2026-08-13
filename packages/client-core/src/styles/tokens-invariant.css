@@ -11,6 +11,8 @@
                                 multi-select) is portalled to <body>, so it is a SIBLING of the
                                 backdrop rather than a descendant. Without this it renders behind.
        --z-drawer-menu > --z-drawer   The terminal drawer's own menu.
+       --z-toast > --z-modal    A toast confirming an action taken inside a modal has to be visible
+                                from inside that modal, or the action reads as having done nothing.
 
      --z-tooltip is deliberately far above everything: RailTips is a single delegated portal that
      must never be occluded, and it has no interactive children to trap focus against. */
@@ -26,6 +28,7 @@
   --z-overlay: 70;
   --z-modal: 100;
   --z-picker: 110;
+  --z-toast: 120;
   --z-tooltip: 1000;
 
   /* ── Brand marks ───────────────────────────────────────────────────────────────────────────

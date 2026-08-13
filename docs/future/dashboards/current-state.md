@@ -103,13 +103,18 @@ type gaining required fields needs a query-key bump.
 
 ## Shared components: what a dashboard needs vs what exists
 
-The shared layer (`packages/client-core/src/ui`, exported via `@acorn/plugin-api/ui`) has nine
-primitives plus `Modal`/`Tabs`/`Picker`/`Icon` and the diff toolkit. The pieces a dashboard grid
-needs — **`card`, `table`, `empty-state`, `status-dot`, `meter`, `skeleton`** — are all
-proposed-but-unbuilt in `docs/future/components/`, and `.home-*` is on that survey's
-undefined-classes list. Dashboards are the natural forcing function to build them, under the house
-rules recorded there (pure presentation, `.ui-*` classes, tokens only, `cx()` class append,
-frame CSS distribution via `pluginFrameStyles.ts`).
+The shared layer (`packages/client-core/src/ui`, exported via `@acorn/plugin-api/ui`) is large now:
+the original nine primitives plus `Modal`/`Tabs`/`Picker`/`Icon`/`Menu`/`Popover` and roughly thirty
+more components from the 2026-08 design-system migration. The pieces a dashboard grid needs —
+**`Card`, `Table`, `EmptyState`, `StatusDot`, `Meter`** — all shipped; build on them rather than
+around them. `skeleton` is the one that was never built (`EmptyState busy` covers whole-pane loading).
+`.home-*` remains an undefined-class family.
+
+The house rules those components are held to are enforced, not documented: pure presentation
+(`tools/arch/boundaries.test.ts`), `.ui-*` classes with `data-*` variants and tokens only
+(`styles/cssHygiene.test.ts`, `ui/tokenAxes.ts`), `cx()` class append and a ratcheted migration
+ledger (`ui/adoption.test.ts`), and frame CSS distribution via
+`apps/desktop/src/app/main/pluginFrameStyles.ts`.
 
 ## Hard gates any implementation hits
 
@@ -130,8 +135,8 @@ frame CSS distribution via `pluginFrameStyles.ts`).
 - Whether the external-item store shape or `MirroredResourceContribution` moved
   (`server/integrations/`) — the "collection route is a projection" claim depends on them.
 - Whether Home is still a source and `FleetHome` still exists as the card precedent.
-- Whether any of `card`/`table`/`empty-state`/`status-dot`/`meter`/`skeleton` shipped from
-  `docs/future/components/` (build on them, don't duplicate).
+- All of `Card`/`Table`/`EmptyState`/`StatusDot`/`Meter` shipped; only `skeleton` did not. Build on
+  them, don't duplicate.
 - Whether the closed verb set gained verbs (each new verb widens what a panel row action can do).
 - Whether `docs/future/user-extensions/extension-points.md`'s cooperative extension points landed
   (plugin-hosted placements in `placements.md` share their constraint-vocabulary design).

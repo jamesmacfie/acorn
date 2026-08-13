@@ -6,7 +6,7 @@ import type { PluginRailItem, PluginSourceDescriptor, PluginSourceEmptyState, Ta
 import { activeNodeId } from '../../node/activeNode'
 import { createFleetQuery } from '../../node/fanout'
 import { FRESHNESS_LABELS } from '../../node/freshness'
-import { Badge, Row, SectionHeader } from '../../ui/primitives'
+import { Alert, Badge, Button, EmptyState, Row, SectionHeader } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import { runChromeAction } from './actions'
 import { chromeKey, chromeRevision, readRailItems, scopedSourceItemsPath } from './data'
@@ -34,20 +34,26 @@ export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourc
 // One action, no markup, no per-facet variants. The action is optional and NOT a gap to be filled later
 // by widening the verb set: linear's own empty state points at a settings page, which no context-free
 // verb can reach, and shipping the message alone is the honest answer to that.
-function EmptyState(props: { pluginId: string; nodeId: string; empty?: PluginSourceEmptyState }) {
+// Named SourceEmpty, not EmptyState: it is the descriptor→primitive adapter, and the primitive owns
+// the name. It contributes the plugin's message and its one action; the geometry comes from shared CSS.
+function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSourceEmptyState }) {
   return (
-    <Show when={props.empty} fallback={<p class="placeholder">Nothing here yet.</p>}>
+    <Show when={props.empty} fallback={<EmptyState align="start">Nothing here yet.</EmptyState>}>
       {(empty) => (
-        <div class="placeholder">
-          <p>{empty().message}</p>
-          <Show when={empty().action}>
-            {(action) => (
-              <button type="button" onClick={() => runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
-                {empty().actionLabel ?? 'Open'}
-              </button>
-            )}
-          </Show>
-        </div>
+        <EmptyState
+          align="start"
+          action={
+            <Show when={empty().action}>
+              {(action) => (
+                <Button onClick={() => runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
+                  {empty().actionLabel ?? 'Open'}
+                </Button>
+              )}
+            </Show>
+          }
+        >
+          {empty().message}
+        </EmptyState>
       )}
     </Show>
   )
@@ -147,18 +153,18 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
 
         {/* A node that did not answer and had nothing cached is a banner, never a failed pane. */}
         <Show when={unavailable()}>
-          {(entry) => <div class="action-error" role="alert">{entry().label} unavailable — {entry().reason}</div>}
+          {(entry) => <Alert>{entry().label} unavailable — {entry().reason}</Alert>}
         </Show>
 
         <Show
           when={row()}
-          fallback={<p class="placeholder">{unavailable() ? 'No cached items.' : 'Loading…'}</p>}
+          fallback={<EmptyState align="start" busy={!unavailable()}>{unavailable() ? 'No cached items.' : 'Loading…'}</EmptyState>}
         >
           {/* The authored empty state, or the fixed string for a source that declares none. It renders
               only under `row()` — i.e. the plugin's own route ANSWERED, with nothing — because an
               unreachable node is the banner above and "nothing is assigned to you" would be a claim the
               host has no business making on a failed fetch. */}
-          <For each={items()} fallback={<EmptyState pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}>
+          <For each={items()} fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}>
             {(item) => (
               <Row
                 onActivate={props.descriptor.onSelect ? () => select(item) : undefined}

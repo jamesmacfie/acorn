@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For, Show } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { agentToolsCatalogRoute, type AgentToolCatalogEntry, type ToolRisk } from '@acorn/protocol/api.ts'
 import { readJson } from '../apiClient'
@@ -6,6 +6,7 @@ import { prefsOptions } from '../queries'
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 import { toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
+import { Checkbox } from '../ui/primitives'
 
 // Settings → Agent tools (docs/agent-tools.md): the permission surface over the agent-tool
 // registry. Tools are grouped by risk tier (read → write → execute); a tier toggle and per-tool
@@ -69,32 +70,31 @@ export default function AgentToolsSettings() {
               when={tier.risk !== 'read'}
               fallback={<div class="settings-field-row"><span class="settings-label">{tier.label} tools · tier always available</span></div>}
             >
-              <label class="settings-field-row">
-                <input
-                  ref={(element) => createEffect(() => { element.indeterminate = tierState(tier.risk) === 'mixed' })}
-                  type="checkbox"
-                  checked={tierState(tier.risk) !== 'off'}
-                  onChange={(e) => void setTier(tier.risk, e.currentTarget.checked)}
-                />
-                <span class="settings-label">{tier.label} tools</span>
-              </label>
+              <Checkbox
+                class="settings-field-row"
+                label={`${tier.label} tools`}
+                indeterminate={tierState(tier.risk) === 'mixed'}
+                checked={tierState(tier.risk) !== 'off'}
+                onChange={(e) => void setTier(tier.risk, e.currentTarget.checked)}
+              />
             </Show>
             <p class="muted" style={{ 'margin-top': '0' }}>
               {tier.blurb}
             </p>
             <For each={toolsFor(tier.risk)}>
               {(t) => (
-                <label class="settings-field-row" style={{ 'padding-left': '1.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={toolOn(t)}
-                    onChange={(e) => void setTool(t.name, e.currentTarget.checked)}
-                  />
-                  <span class="settings-label">
-                    <code>{t.name}</code> — {t.description}
-                    <Show when={t.availability}><span class="muted"> {t.availability}</span></Show>
-                  </span>
-                </label>
+                <Checkbox
+                  class="settings-field-row"
+                  nested
+                  checked={toolOn(t)}
+                  onChange={(e) => void setTool(t.name, e.currentTarget.checked)}
+                  label={
+                    <>
+                      <code>{t.name}</code> — {t.description}
+                      <Show when={t.availability}><span class="muted"> {t.availability}</span></Show>
+                    </>
+                  }
+                />
               )}
             </For>
           </div>

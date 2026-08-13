@@ -24,6 +24,7 @@ import {
 } from './documentModel'
 import { monacoLanguageFor } from './language'
 import { MONACO_THEME, watchMonacoTheme } from './theme'
+import { Alert } from '../ui/primitives'
 
 // A host-owned document surface: the host draws the editor, the plugin supplies the document
 // (docs/future/monaco.md).
@@ -303,7 +304,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
 
   return (
     <section class="pane document-surface">
-      <Show when={error()}><div class="document-surface-error action-error">{error()}</div></Show>
+      <Show when={error()}><Alert class="document-surface-error">{error()}</Alert></Show>
       <Show when={ready()}><div class="document-surface-host" ref={host} /></Show>
     </section>
   )

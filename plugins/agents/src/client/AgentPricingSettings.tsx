@@ -14,6 +14,7 @@ import {
   type AgentPricingDraft,
 } from './pricingDraft'
 import { agentUsageStore } from './usageStore'
+import { Table } from '@acorn/plugin-api/ui'
 import './agent-pricing.css'
 
 const PRICE_FIELDS: Array<{ id: AgentPriceField; label: string }> = [
@@ -185,8 +186,7 @@ export default function AgentPricingSettings() {
           <>
             <section>
               <h3 class="settings-section-label agent-pricing-heading">Built-in Claude prices</h3>
-              <div class="agent-pricing-table-wrap">
-                <table class="agent-pricing-table">
+              <Table class="agent-pricing-table" size="sm" minWidth={620}>
                   <thead>
                     <tr>
                       <th>Model</th>
@@ -240,8 +240,7 @@ export default function AgentPricingSettings() {
                       }}
                     </For>
                   </tbody>
-                </table>
-              </div>
+              </Table>
             </section>
 
             <section>
@@ -264,8 +263,7 @@ export default function AgentPricingSettings() {
                 when={current().customModels.length}
                 fallback={<p class="muted agent-pricing-empty">No exact model prices.</p>}
               >
-                <div class="agent-pricing-table-wrap">
-                  <table class="agent-pricing-table">
+                <Table class="agent-pricing-table" size="sm" minWidth={620}>
                     <thead>
                       <tr>
                         <th>Exact model id</th>
@@ -321,8 +319,7 @@ export default function AgentPricingSettings() {
                         )}
                       </For>
                     </tbody>
-                  </table>
-                </div>
+                </Table>
               </Show>
             </section>
           </>

@@ -107,9 +107,10 @@ Dragging a card between board columns means mutating the underlying field. v1 is
 
 ## Verify before building
 
-- Whether any of the shared components a panel renders with shipped
-  (`docs/future/components/`: `card`, `table`, `empty-state`, `status-dot`, `meter`, `skeleton`)
-  — build views on them, and let dashboards be their forcing function, not a bypass.
+- The shared components a panel renders with: `Card`, `Table`, `EmptyState`, `StatusDot` and `Meter`
+  all shipped and are on `@acorn/plugin-api/ui`. Build views on them rather than around them. Only
+  `skeleton` was never built — a row-shaped loading shimmer; `EmptyState busy` covers whole-pane
+  loading, which was most of the need.
 - Whether `dataviz`-style chart infrastructure exists yet anywhere in the tree before designing
   the chart view (deliberately "later" here).
 - The pane-layout inert-survival mechanism (`tasks/layout.ts`, `persistedState.ts`) — the

@@ -15,6 +15,8 @@ import Icon from '../ui/Icon'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'
 import { formatChord } from './paneShortcuts'
+import { EmptyState } from '../ui/primitives'
+import { createSplitDrag } from '../ui/split'
 
 export default function TaskPaneHost(props: {
   task: Task
@@ -55,56 +57,38 @@ export default function TaskPaneHost(props: {
   const weightFor = (pane: PaneId) => layout().weights?.[pane] ?? 1
   const minWidthFor = (pane: PaneContribution) => pane.minWidth ?? 240
 
-  const resize = (
-    event: PointerEvent,
-    pane: PaneContribution,
-    adjacent: PaneContribution,
-    paneElement: HTMLElement,
-    adjacentElement: HTMLElement,
-  ) => {
-    event.preventDefault()
-    event.currentTarget instanceof HTMLElement && event.currentTarget.setPointerCapture(event.pointerId)
-    const startX = event.clientX
-    const paneWidth = paneElement.getBoundingClientRect().width
-    const adjacentWidth = adjacentElement.getBoundingClientRect().width
-    let frame = 0
-    const apply = (clientX: number) => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => dispatch({
-        type: 'resize', pane: pane.id, adjacent: adjacent.id, deltaPx: clientX - startX,
-        paneWidth, adjacentWidth,
-        paneMinWidth: minWidthFor(pane), adjacentMinWidth: minWidthFor(adjacent),
-      }))
-    }
-    const move = (pointer: PointerEvent) => apply(pointer.clientX)
-    const up = () => {
-      cancelAnimationFrame(frame)
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
+  const slotRefs = new Map<PaneId, HTMLDivElement>()
 
-  const resizeFromKeyboard = (
-    event: KeyboardEvent,
-    pane: PaneContribution,
-    adjacent: PaneContribution,
-    paneElement: HTMLElement,
-    adjacentElement: HTMLElement,
-  ) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-    event.preventDefault()
-    dispatch({
-      type: 'resize', pane: pane.id, adjacent: adjacent.id,
-      deltaPx: event.key === 'ArrowRight' ? 16 : -16,
-      paneWidth: paneElement.getBoundingClientRect().width,
-      adjacentWidth: adjacentElement.getBoundingClientRect().width,
-      paneMinWidth: minWidthFor(pane), adjacentMinWidth: minWidthFor(adjacent),
+  // Pointer capture, rAF coalescing, selection suppression and the arrow/Home/End keys come from
+  // createSplitDrag; the weight model stays here. Widths are snapshotted at pointer-down because the
+  // reducer works from the sizes the drag STARTED at — re-measuring mid-drag compounds the delta.
+  const paneDrag = (pane: PaneContribution, adjacent: () => PaneContribution | undefined) => {
+    let paneWidth = 0
+    let adjacentWidth = 0
+    const measure = () => {
+      const next = adjacent()
+      paneWidth = (next && slotRefs.get(pane.id)?.getBoundingClientRect().width) ?? 0
+      adjacentWidth = (next && slotRefs.get(next.id)?.getBoundingClientRect().width) ?? 0
+    }
+    return createSplitDrag({
+      axis: 'x',
+      label: `Resize ${pane.label} and ${adjacent()?.label ?? 'next pane'}`,
+      onStart: measure,
+      onDelta: (deltaPx) => {
+        const next = adjacent()
+        // A keyboard nudge never fired onStart, so it has no snapshot of its own.
+        if (!next) return
+        if (!paneWidth) measure()
+        if (!paneWidth) return
+        dispatch({
+          type: 'resize', pane: pane.id, adjacent: next.id, deltaPx,
+          paneWidth, adjacentWidth,
+          paneMinWidth: minWidthFor(pane), adjacentMinWidth: minWidthFor(next),
+        })
+      },
+      onReset: () => dispatch({ type: 'equalize' }),
     })
   }
-
-  const slotRefs = new Map<PaneId, HTMLDivElement>()
 
   return (
     <>
@@ -113,10 +97,10 @@ export default function TaskPaneHost(props: {
           each={visiblePanes()}
           fallback={
             <section class="pane pane-empty workspace-empty contribution-unavailable">
-              <div class="workspace-empty-inner">
-                <p class="muted">This layout has no panes available in the current environment.</p>
-                <p class="muted">Choose an available pane from the switcher.</p>
-              </div>
+              <EmptyState title="No panes available here">
+                This layout's panes are all unavailable in the current environment. Choose another
+                from the pane switcher.
+              </EmptyState>
             </section>
           }
         >
@@ -145,7 +129,7 @@ export default function TaskPaneHost(props: {
                     type="button"
                     class="pane-pin-btn"
                     classList={{ active: isPinned(pane.id) }}
-                    title={isPinned(pane.id) ? 'Unpin pane' : 'Pin pane'}
+                    data-tip={isPinned(pane.id) ? 'Unpin pane' : 'Pin pane'}
                     aria-label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Pin ${pane.label}`}
                     aria-pressed={isPinned(pane.id)}
                     onClick={() => dispatch({ type: 'pin', pane: pane.id })}
@@ -156,7 +140,7 @@ export default function TaskPaneHost(props: {
                     <button
                       type="button"
                       class="pane-close-btn"
-                      title={isPinned(pane.id) ? 'Unpin pane before closing' : 'Close pane'}
+                      data-tip={isPinned(pane.id) ? 'Unpin pane before closing' : 'Close pane'}
                       aria-label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Close ${pane.label}`}
                       onClick={() => dispatch({ type: 'close', pane: pane.id })}
                     >✕</button>
@@ -171,24 +155,9 @@ export default function TaskPaneHost(props: {
                   const adjacent = () => visiblePanes()[index() + 1]
                   return (
                     <div
-                      class="pane-divider"
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-label={`Resize ${pane.label} and ${adjacent()?.label ?? 'next pane'}`}
-                      tabindex="0"
-                      onDblClick={() => dispatch({ type: 'equalize' })}
-                      onPointerDown={(event) => {
-                        const next = adjacent()
-                        const beforeEl = slotRefs.get(pane.id)
-                        const afterEl = next && slotRefs.get(next.id)
-                        if (next && beforeEl && afterEl) resize(event, pane, next, beforeEl, afterEl)
-                      }}
-                      onKeyDown={(event) => {
-                        const next = adjacent()
-                        const beforeEl = slotRefs.get(pane.id)
-                        const afterEl = next && slotRefs.get(next.id)
-                        if (next && beforeEl && afterEl) resizeFromKeyboard(event, pane, next, beforeEl, afterEl)
-                      }}
+                      {...paneDrag(pane, adjacent).handleProps}
+                      class="pane-divider ui-split-handle"
+                      data-axis="x"
                     />
                   )
                 })()}

@@ -73,46 +73,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.step-log {
-  margin: 0 0 var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  max-height: 50vh;
-  overflow: auto;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--surface-border);
-  border-radius: var(--radius);
-}
-/* Copy button: absolute top-right of the log block, revealed on hover. */
-.step-log-wrap {
-  position: relative;
-}
-.step-log-copy {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: flex;
-  padding: var(--space-2);
-  color: var(--text-muted);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-.step-log-wrap:hover .step-log-copy { opacity: 1; }
-.step-log-copy:hover { color: var(--text); }
+/* CodeBlock owns the box and the copy affordance. What is left is this panel's taller cap, its
+   bottom margin and the ANSI line metrics. */
+.step-log-wrap { margin: 0 0 var(--space-4); }
+.step-log-wrap .ui-code { max-height: 50vh; line-height: 1.45; }
 .log-line {
   min-height: 1.45em;
 }
 /* ANSI dual-theme: --syntax-fg picks the light or dark side of Shiki's dual output (mirrors diff). */
-.step-log span { color: var(--syntax-fg); }
+.step-log-wrap .ui-code span { color: var(--syntax-fg); }
 /* Clickable check name in the PR detail checks list. */
 .check-name-link {
   font: inherit;

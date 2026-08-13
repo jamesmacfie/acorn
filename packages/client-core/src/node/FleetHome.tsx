@@ -10,6 +10,7 @@ import { reconnectNode } from './fleetActions'
 import { formatLastSeen } from './freshness'
 import NodeChip from './NodeChip'
 import './nodes.css'
+import { Alert } from '../ui/primitives'
 
 // Fleet home (docs/ui-design.md § New surfaces): the landing view once more than one node is paired — a
 // card per node with connection state, counts, last-refresh and the two actions that matter from here.
@@ -64,11 +65,9 @@ export default function FleetHome() {
 
       {/* Partial results are a banner, never a failed page (docs/architecture-overview.md § Fleet). */}
       <Show when={unavailable().length}>
-        <div class="fleet-banner" role="status">
-          <For each={unavailable()}>
-            {(entry) => <span>{entry.label} unavailable — {entry.reason}</span>}
-          </For>
-        </div>
+        <For each={unavailable()}>
+          {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable — {entry.reason}</Alert>}
+        </For>
       </Show>
 
       <ul class="fleet-cards">

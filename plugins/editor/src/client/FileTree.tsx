@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, onMount, Show } from 'solid-js'
+import { TreeRow } from '@acorn/plugin-api/ui'
 import { editorApi, type EditorEntry } from './editorClient'
 import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { directoryContainsFile, type FileTreeRevealRequest } from './fileTreeReveal'
@@ -10,15 +11,20 @@ export default function FileTree(props: {
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
 }) {
+  // The tree CONTAINER semantics live here, which is what TreeRow's contract asks for — a row cannot
+  // know its tree. There were none of these before.
   return (
-    <Tree
-      taskId={props.taskId}
-      relPath=""
-      onOpen={props.onOpen}
-      openPath={props.openPath}
-      reveal={props.reveal}
-      onRevealed={props.onRevealed}
-    />
+    <div role="tree" aria-label="Worktree files">
+      <Tree
+        taskId={props.taskId}
+        relPath=""
+        depth={0}
+        onOpen={props.onOpen}
+        openPath={props.openPath}
+        reveal={props.reveal}
+        onRevealed={props.onRevealed}
+      />
+    </div>
   )
 }
 
@@ -26,6 +32,7 @@ export default function FileTree(props: {
 function Tree(props: {
   taskId: string
   relPath: string
+  depth: number
   onOpen: (path: string) => void
   openPath: string | null
   reveal: FileTreeRevealRequest | null
@@ -39,12 +46,13 @@ function Tree(props: {
     })()
   })
   return (
-    <ul class="tree">
+    <ul class="tree" role="group">
       <For each={entries()}>
         {(entry) => (
           <TreeNode
             taskId={props.taskId}
             parent={props.relPath}
+            depth={props.depth}
             entry={entry}
             onOpen={props.onOpen}
             openPath={props.openPath}
@@ -60,13 +68,16 @@ function Tree(props: {
 function TreeNode(props: {
   taskId: string
   parent: string
+  depth: number
   entry: EditorEntry
   onOpen: (path: string) => void
   openPath: string | null
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
 }) {
-  let fileButton: HTMLButtonElement | undefined
+  // The <li>, not the row: TreeRow has no `ref` prop on purpose — a props member named `ref` becomes
+  // a DOM setter in Solid, silently.
+  let fileRow: HTMLLIElement | undefined
   const path = () => (props.parent ? `${props.parent}/${props.entry.name}` : props.entry.name)
   const open = () => editorTreeDirectoryOpen(props.taskId, path())
   const setOpen = (value: boolean) => setEditorTreeDirectoryOpen(props.taskId, path(), value)
@@ -79,31 +90,50 @@ function TreeNode(props: {
       setOpen(true)
     } else if (!props.entry.dir && nodePath === request.path) {
       queueMicrotask(() => {
-        fileButton?.scrollIntoView({ block: 'nearest' })
+        fileRow?.scrollIntoView({ block: 'nearest' })
         props.onRevealed(request.revision)
       })
     }
   })
 
   return (
-    <li>
+    // `aria-level` is 1-based; depth is 0-based, hence the +1.
+    <li
+      ref={(element) => { fileRow = element }}
+      role="treeitem"
+      aria-level={props.depth + 1}
+      aria-expanded={props.entry.dir ? open() : undefined}
+    >
       <Show
         when={props.entry.dir}
         fallback={
-          <button ref={fileButton} type="button" class="tree-file" classList={{ active: props.openPath === path() }} onClick={() => props.onOpen(path())}>
-            <span class="tree-twist" />
+          <TreeRow
+            class="tree-file"
+            depth={props.depth}
+            selected={props.openPath === path()}
+            onActivate={() => props.onOpen(path())}
+          >
             {props.entry.name}
-          </button>
+          </TreeRow>
         }
       >
-        <button type="button" class="tree-dir" onClick={() => setOpen(!open())}>
-          <span class="tree-twist">{open() ? '▾' : '▸'}</span>
+        {/* The twist was a ▾/▸ glyph literal; TreeRow draws it from the marker token, so it scales
+            with the style pack rather than with a font. */}
+        <TreeRow
+          class="tree-dir"
+          depth={props.depth}
+          expandable
+          expanded={open()}
+          onToggle={() => setOpen(!open())}
+          onActivate={() => setOpen(!open())}
+        >
           {props.entry.name}
-        </button>
+        </TreeRow>
         <Show when={open()}>
           <Tree
             taskId={props.taskId}
             relPath={path()}
+            depth={props.depth + 1}
             onOpen={props.onOpen}
             openPath={props.openPath}
             reveal={props.reveal}

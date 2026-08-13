@@ -38,38 +38,10 @@
   letter-spacing: var(--label-tracking);
 }
 
-.http-tree-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding-right: var(--space-2);
-  border-left: var(--marker-w) solid transparent;
-}
-.http-tree-row:hover { background: var(--bg-hover); }
-.http-tree-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
-
-.http-tree-open {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-2) var(--space-4);
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: none;
-  border: 0;
-  text-align: left;
-  cursor: pointer;
-}
-
-.http-tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* Actions stay hidden until the row is hovered or holds focus, so the list reads as names. */
-.http-tree-actions { display: flex; gap: 2px; opacity: 0; }
-.http-tree-row:hover .http-tree-actions,
-.http-tree-row:focus-within .http-tree-actions { opacity: 1; }
+/* TreeRow owns the row, the depth indent, the selected marker and the hover-revealed trailing
+   actions (which it also makes keyboard-reachable via :focus-within). This keeps the tree's tighter
+   row height. */
+.http-tree-row.ui-row { min-height: auto; padding: var(--space-2) var(--space-4); }
 
 .http-vars-link {
   display: flex;
@@ -113,26 +85,12 @@
   overflow: hidden;
 }
 
-.http-urlbar {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-4) var(--pane-pad);
-  border-bottom: var(--divider);
-}
+/* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
+.http-urlbar { padding: var(--space-4) var(--pane-pad); background: none; }
 .http-urlbar .http-method { flex: 0 0 auto; }
 .http-urlbar .http-url { flex: 1; min-width: 0; font-family: var(--font-mono, monospace); }
 
-.http-metabar {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-2) var(--pane-pad);
-  border-bottom: var(--chrome-divider);
-  background: var(--bg-subtle);
-}
-.http-metabar-spacer { flex: 1; }
-.http-dirty { color: var(--accent); font-size: var(--fs-xs); }
+.http-metabar { padding: var(--space-2) var(--pane-pad); }
 
 /* The request's name is a button that opens the save dialog — the only place it can be edited. */
 .http-name-btn {
@@ -178,8 +136,7 @@
   padding-right: var(--pane-pad);
   border-bottom: var(--divider);
 }
-.http-tabstrip .ui-tabs { flex: 1; min-width: 0; border-bottom: 0; }
-.http-tabstrip-right { flex: 0 0 auto; }
+/* Tabs' `actions` slot holds the mode selectors now, so the strip needs no override to make room. */
 
 .http-tabpanel {
   flex: 1;
@@ -213,15 +170,19 @@
   background: var(--bg-subtle);
 }
 
-.http-empty {
-  margin: var(--space-3) var(--pane-pad);
-  font-size: var(--fs-xs);
-  color: var(--text-faint);
-}
-
 /* ── key/value grids ─────────────────────────────────────────────────────────────────────── */
 
-.http-grid { display: flex; flex-direction: column; gap: 2px; }
+/* KeyValueEditor owns the params/headers/form grid, including the blank-row affordance. What is left
+   here is this frame's own column widths, plus the whole `.http-vars-grid` — the variables editor
+   keeps its bespoke markup because its rows carry a KIND, a stored-secret flag and per-kind hints,
+   which the shared editor's KVRow cannot express without becoming generic over the row type. One
+   consumer does not justify that. */
+.http-grid { gap: 2px; }
+.http-grid .ui-kvgrid-head,
+.http-grid .ui-kvgrid-row {
+  grid-template-columns: auto minmax(6em, 1fr) minmax(8em, 2fr) auto;
+  padding: 0;
+}
 
 .http-grid-head,
 .http-grid-row {
@@ -277,22 +238,7 @@
   overflow: hidden;
 }
 
-.http-response-empty {
-  padding: var(--space-5) var(--pane-pad);
-  font-size: var(--fs-sm);
-  color: var(--text-faint);
-}
-
-.http-response-error {
-  color: var(--state-bad);
-  font-size: var(--fs-sm);
-  white-space: pre-wrap;
-}
-.http-failure-message {
-  margin: 0 0 var(--space-4);
-  color: var(--state-bad);
-  font-size: var(--fs-sm);
-}
+.http-failure-message { margin: 0 0 var(--space-4); }
 
 .http-response-strip {
   display: flex;
@@ -331,15 +277,10 @@
   overflow-wrap: anywhere;
 }
 
-.http-kv-list {
-  display: grid;
-  grid-template-columns: minmax(8em, auto) minmax(0, 1fr);
-  gap: var(--space-1) var(--space-4);
-  margin: 0;
-  font-size: var(--fs-sm);
-}
-.http-kv-list dt { color: var(--text-muted); font-family: var(--font-mono, monospace); }
-.http-kv-list dd { margin: 0; overflow-wrap: anywhere; }
+/* DescriptionList owns the grid and the label styling. These keep the header list's own column
+   floor and its mono label font. */
+.http-kv-list .ui-dl-item { grid-template-columns: minmax(8em, auto) minmax(0, 1fr); }
+.http-kv-list .ui-dl-label { font-family: var(--font-mono, monospace); }
 
 .http-timeline { list-style: none; margin: 0; padding: 0; }
 

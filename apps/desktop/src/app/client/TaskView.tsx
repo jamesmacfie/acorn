@@ -18,6 +18,7 @@ import { formatChord } from '@acorn/client-core/tasks/paneShortcuts.ts'
 import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 import TaskPaneHost from '@acorn/client-core/tasks/TaskPaneHost.tsx'
 import { confirmWillEvent } from '@acorn/client-core/registries/willPhase.tsx'
+import { Alert, Button } from '@acorn/client-core/ui/primitives.tsx'
 import { TaskSlotHost } from '@acorn/client-core/registries/uiSlots.tsx'
 import { completeTaskArchive } from '@acorn/client-core/tasks/archiveLifecycle.ts'
 import { defaultSourceId } from '@acorn/client-core/registries/sources.ts'
@@ -229,12 +230,17 @@ export default function TaskView(props: {
         <TaskPaneHost task={props.task} extraButtons={extraButtons()} onCloseTask={openClose} closing={archiving()} shortcutFor={shortcutFor} />
 
         <Show when={runError() || closeError()}>
-          <div class="task-run-error action-error" role="alert">
+          <Alert
+            class="task-run-error"
+            variant="banner"
+            actions={
+              <Show when={teardownFailed()}>
+                <Button class="close-confirm" onClick={() => void confirmClose(true)}>Archive anyway (skip teardown)</Button>
+              </Show>
+            }
+          >
             <span style={{ 'white-space': 'pre-wrap' }}>{runError() || closeError()}</span>
-            <Show when={teardownFailed()}>
-              <button type="button" class="ui-btn close-confirm" onClick={() => void confirmClose(true)}>Archive anyway (skip teardown)</button>
-            </Show>
-          </div>
+          </Alert>
         </Show>
       </main>
       <footer class="workspace-footer">

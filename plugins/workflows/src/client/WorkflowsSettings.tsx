@@ -1,6 +1,7 @@
 import { createResource, For, Show } from 'solid-js'
 import { activeTaskId, capabilities } from '@acorn/plugin-api/client'
 import { workflowApi } from '../contract/workflowClient'
+import { Alert } from '@acorn/plugin-api/ui'
 
 // Settings → Workflows (docs/workflows.md): a read-only inspector over the committed/user workflow
 // definitions the active task's worktree would load (`.acorn/workflows/*.toml` + ~/.acorn), plus
@@ -49,7 +50,7 @@ export default function WorkflowsSettings() {
       <Show when={errors().length}>
         <div class="settings-field">
           <span class="settings-label">Problems</span>
-          <For each={errors()}>{(e) => <span class="muted">⚠ {e.source}: {e.message}</span>}</For>
+          <For each={errors()}>{(e) => <Alert tone="warn">{e.source}: {e.message}</Alert>}</For>
         </div>
       </Show>
 

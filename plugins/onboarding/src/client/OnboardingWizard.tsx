@@ -13,7 +13,7 @@ import {
   workspacesOptions,
 } from '@acorn/plugin-api/client'
 import { Acorn } from '@acorn/plugin-api/ui/host'
-import { Badge, Button, Input, Select } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, Card, DescriptionList, Input, Kbd, Select } from '@acorn/plugin-api/ui'
 import { saveOnboardingCompletion } from './onboardingCompletion'
 import './wizard.css'
 
@@ -193,21 +193,21 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                 up as they're detected.
               </p>
               <div class="wizard-cards">
-                <button type="button" class="wizard-card" disabled={!bridge || busy()} onClick={() => void openFolder()}>
+                <Card class="wizard-card" interactive disabled={!bridge || busy()} onActivate={() => void openFolder()}>
                   <span class="wizard-card-title">Open a folder</span>
                   <span class="wizard-card-desc">Point acorn at any folder. Plain folders work fine.</span>
                   <span class="wizard-card-tag">recommended</span>
-                </button>
-                <button type="button" class="wizard-card" onClick={() => go('github')}>
+                </Card>
+                <Card class="wizard-card" interactive onActivate={() => go('github')}>
                   <span class="wizard-card-title">Connect GitHub</span>
                   <span class="wizard-card-desc">Import repositories — clone them, or map ones you already have locally.</span>
                   <span class="wizard-card-tag">optional · anytime in settings</span>
-                </button>
+                </Card>
               </div>
               <Show when={!bridge}>
                 <p class="wizard-hint">Choosing a folder needs the desktop app.</p>
               </Show>
-              <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+              <Show when={error()}><Alert>{error()}</Alert></Show>
               <p class="wizard-hint">
                 Not sure? Open a folder. You can connect GitHub later and acorn will match it up
                 automatically.
@@ -323,7 +323,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                   )}
                 </Index>
               </Show>
-              <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+              <Show when={error()}><Alert>{error()}</Alert></Show>
               <Button variant="solid" tone="accent" busy={busy()} onClick={() => void saveNames()}>Continue</Button>
             </div>
           </Show>
@@ -332,11 +332,11 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
             <div class="wizard-body">
               <h2>You're set.</h2>
               <p class="wizard-lede">Start a task whenever you're ready. A few keys worth knowing:</p>
-              <dl class="wizard-keys">
+              <DescriptionList class="wizard-keys" size="sm">
                 <For each={SHORTCUTS}>
-                  {([chord, label]) => (<><dt><kbd>{chord}</kbd></dt><dd>{label}</dd></>)}
+                  {([chord, label]) => <DescriptionList.Item label={<Kbd>{chord}</Kbd>}>{label}</DescriptionList.Item>}
                 </For>
-              </dl>
+              </DescriptionList>
               <Button variant="solid" tone="accent" busy={busy()} onClick={() => void finish()}>Open acorn</Button>
             </div>
           </Show>

@@ -1,9 +1,11 @@
-import { createSignal, onCleanup } from 'solid-js'
+import { createSignal } from 'solid-js'
 import type { PluginDocumentRegion } from '@acorn/protocol/api.ts'
 import DocumentSurface from '../../editor/DocumentSurface'
 import type { DocumentHandle, DocumentScope } from '../../editor/documentModel'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
+import { SplitHandle } from '../../ui/primitives'
+import { createSplitDrag } from '../../ui/split'
 
 // The `document-over-frame` template: a host-owned editor above the plugin's own frame, with a
 // host-owned drag handle between them (docs/future/monaco.md § document-over-frame, concretely).
@@ -54,22 +56,19 @@ export default function DocumentOverFrame(props: DocumentOverFrameProps) {
   // the accessor per call, so a frame that got there first still finds the document when it arrives.
   const [handle, setHandle] = createSignal<DocumentHandle | null>(null)
 
-  const onSplitDown = (event: PointerEvent) => {
-    event.preventDefault()
-    const startY = event.clientY
-    const startHeight = height()
-    const onMove = (move: PointerEvent) =>
-      setHeight(Math.min(Math.max(startHeight + (move.clientY - startY), MIN_DOCUMENT_HEIGHT), window.innerHeight * MAX_DOCUMENT_FRACTION))
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    // A pointer capture that outlives the pane would keep moving a splitter that is no longer on
-    // screen. The compiled pane this replaces had exactly that hole.
-    onCleanup(onUp)
-  }
+  // Snapshotted at pointer-down; null between drags so a keyboard nudge measures from the current
+  // height rather than the last drag's start.
+  let dragStartHeight: number | null = null
+  // The hook owns the drag, the pointer-capture teardown this used to write by hand, and the
+  // arrow/Home/End keys this splitter did not have at all.
+  const drag = createSplitDrag({
+    axis: 'y',
+    label: 'Resize editor',
+    onStart: () => { dragStartHeight = height() },
+    onDelta: (deltaPx) =>
+      setHeight(Math.min(Math.max((dragStartHeight ?? height()) + deltaPx, MIN_DOCUMENT_HEIGHT), window.innerHeight * MAX_DOCUMENT_FRACTION)),
+    onCommit: () => { dragStartHeight = null },
+  })
 
   return (
     <section class="pane document-over-frame">
@@ -85,13 +84,7 @@ export default function DocumentOverFrame(props: DocumentOverFrameProps) {
           onHandle={(next) => setHandle(() => next)}
         />
       </div>
-      <div
-        class="document-over-frame-split"
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Resize editor"
-        onPointerDown={onSplitDown}
-      />
+      <SplitHandle axis="y" drag={drag} class="document-over-frame-split" />
       <div class="document-over-frame-frame">
         <PluginFrame binding={props.binding} hash={props.hash} document={handle} />
       </div>

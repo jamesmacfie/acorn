@@ -56,9 +56,6 @@
 }
 .agent-center-provider > span:nth-child(2) { min-width: 0; display: flex; flex: 1; flex-direction: column; }
 .agent-center-provider small { color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-center-provider-dot { width: 7px; height: 7px; border-radius: var(--radius-circle); background: var(--text-faint); }
-.agent-center-provider[data-health='ok'] .agent-center-provider-dot { background: var(--add-marker); }
-.agent-center-provider[data-health='error'] .agent-center-provider-dot { background: var(--warn); }
 
 .agent-center-filters {
   max-width: 1240px;
@@ -134,15 +131,6 @@
   font: 600 var(--fs-sm) var(--font-mono);
 }
 .agent-center-state { display: flex !important; flex-direction: row !important; align-items: center; gap: var(--space-3); }
-.agent-center-state > span:first-child { width: 7px; height: 7px; flex: none; border-radius: var(--radius-circle); background: var(--text-faint); }
-.agent-center-state > span[data-state='ready'] { background: var(--add-marker); }
-.agent-center-state > span[data-state='working'],
-.agent-center-state > span[data-state='connecting'],
-.agent-center-state > span[data-state='reconnecting'] { background: var(--accent); }
-.agent-center-state > span[data-state='waiting'] { background: var(--warn); }
-.agent-center-state > span[data-state='failed'] { background: var(--del-marker); }
-.agent-center-empty { padding: 12vh var(--space-6); color: var(--text-muted); text-align: center; }
-.agent-center-empty span { color: var(--accent); font-size: calc(var(--fs-xl) * 1.56); }
 
 @media (max-width: 860px) {
   .agent-center-head { align-items: flex-start; flex-direction: column; }
@@ -155,13 +143,5 @@
 }
 
 /* Fleet scope's partial-result banner (AgentCenter.tsx). */
-.agent-center-banner {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3);
-  border: var(--control-border);
-  border-radius: var(--radius-control);
-  color: var(--warn);
-  font-size: var(--fs-sm);
-}
+/* Alert owns the box; this keeps the centre column's max width. */
+.agent-center-banner { max-width: 1240px; margin: 0 auto var(--space-5); }

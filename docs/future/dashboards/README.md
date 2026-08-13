@@ -73,9 +73,9 @@ frame pane, not a wider wire format. The refusals this design keeps are in `refu
    (run-once-and-pin ships whenever the database collection lands), plugin-hosted placements and
    rail side panels, write-back. (`data-contract.md`, `placements.md`, `refused.md`)
 
-Phase 2 is also the forcing function for the unbuilt shared components a dashboard needs
-(`card`, `table`, `empty-state`, `status-dot`, `meter`, `skeleton` — all proposed in
-`docs/future/components/`): real consumers, not speculative ones.
+The shared components a dashboard needs already exist: `Card`, `Table`, `EmptyState`, `StatusDot`
+and `Meter` are on `@acorn/plugin-api/ui`. Only `skeleton` was never built, and `EmptyState busy`
+covers most of what it was for.
 
 ## The files
 

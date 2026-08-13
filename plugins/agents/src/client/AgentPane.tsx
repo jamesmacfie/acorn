@@ -16,7 +16,8 @@ import AgentTaskSidebar from './AgentTaskSidebar'
 import AgentUsageIndicator from './AgentUsageIndicator'
 import QueuedAgentTurns from './QueuedAgentTurns'
 import { latestAutomaticTaskContext } from './automaticTaskContext'
-import { Button, Icon, Picker } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, EmptyState, Field, Icon, Input, Menu, Modal, Picker, StatusDot } from '@acorn/plugin-api/ui'
+import { runtimeTone } from './stateTone'
 import './managed-agents.css'
 
 const capability = (provider: AgentProviderDescriptor | undefined, name: string): boolean =>
@@ -142,11 +143,24 @@ export default function AgentPane(props: { task: Task }) {
     }, false)
   }
 
-  async function rename() {
+  // Prompt-for-text is not arm-to-confirm, and neither is a permanent delete: window.prompt and
+  // window.confirm are unstyled in Electron and suppressed outright in a sandboxed frame, so both
+  // become dialogs. `dialog` carries which one is open.
+  const [dialog, setDialog] = createSignal<'rename' | 'delete' | null>(null)
+  const [renameText, setRenameText] = createSignal('')
+
+  function openRename() {
     const session = selected()
     if (!session) return
-    const title = window.prompt('Session title', session.title)?.trim()
-    if (!title || title === session.title) return
+    setRenameText(session.title)
+    setDialog('rename')
+  }
+
+  async function rename() {
+    const session = selected()
+    const title = renameText().trim()
+    setDialog(null)
+    if (!session || !title || title === session.title) return
     await action(async () => {
       managedAgentStore.upsertSession(await managedAgentApi.patch(session.id, { title }))
     })
@@ -154,7 +168,8 @@ export default function AgentPane(props: { task: Task }) {
 
   async function remove() {
     const session = selected()
-    if (!session || !window.confirm(`Permanently delete local history for “${session.title}”?`)) return
+    setDialog(null)
+    if (!session) return
     const next = taskSessions().find((candidate) => candidate.id !== session.id)
     await action(async () => {
       const result = await managedAgentApi.remove(session.id)
@@ -281,11 +296,11 @@ export default function AgentPane(props: { task: Task }) {
             run: () => void verifyImportedResume(),
           }]
         : []),
-      { id: 'rename', label: 'Rename session', run: () => void rename() },
+      { id: 'rename', label: 'Rename session', run: () => openRename() },
       { id: 'export-markdown', label: 'Export Markdown', run: () => void exportHistory('markdown') },
       { id: 'export-json', label: 'Export lossless JSON', run: () => void exportHistory('json') },
       { id: 'archive', label: 'Archive session', run: () => void archive() },
-      { id: 'delete', label: 'Delete permanently…', run: () => void remove() },
+      { id: 'delete', label: 'Delete permanently…', run: () => setDialog('delete') },
     ]
   })
 
@@ -301,8 +316,8 @@ export default function AgentPane(props: { task: Task }) {
         <Show when={selected()}>
           {(session) => (
             <>
-              <span class="managed-agent-state" data-state={session().runtimeState}>
-                <span />{session().runtimeState}
+              <span class="managed-agent-state">
+                <StatusDot tone={runtimeTone(session().runtimeState)} />{session().runtimeState}
               </span>
               <Button
                 disabled={!['working', 'waiting', 'cancelling'].includes(session().runtimeState)}
@@ -310,20 +325,41 @@ export default function AgentPane(props: { task: Task }) {
               >
                 Stop
               </Button>
-              <Picker<SessionAction>
-                label={<Icon name="ellipsis" />}
+              {/* Was a Picker — a filter input over five or six actions, which is the wrong
+                  affordance: nobody types to find "Rename session". A Menu is the shape. */}
+              <Menu
+                class="managed-agent-action-menu"
                 ariaLabel="Session actions"
-                placeholder="Filter session actions…"
-                emptyText="No session actions available."
-                results={(query) => sessionActions().filter((item) =>
-                  item.label.toLowerCase().includes(query.trim().toLowerCase()))}
-                rowLabel={(item) => item.label}
-                rowDescription={(item) => item.description}
-                isActive={() => false}
-                isDisabled={(item) => !!item.disabled}
-                onSelect={(item) => item.run()}
-                buttonClass="repo-picker-button managed-agent-picker-button managed-agent-action-picker"
-              />
+                placement="bottom-end"
+                trigger={({ toggle, open }) => (
+                  <Button
+                    class="managed-agent-action-picker"
+                    iconOnly
+                    aria-label="Session actions"
+                    aria-haspopup="menu"
+                    aria-expanded={open()}
+                    onClick={toggle}
+                  >
+                    <Icon name="ellipsis" />
+                  </Button>
+                )}
+              >
+                {(menu) => (
+                  <For each={sessionActions()}>
+                    {(item) => (
+                      <Menu.Item
+                        context={menu}
+                        disabled={!!item.disabled}
+                        title={item.description}
+                        tone={item.id === 'delete' ? 'danger' : 'neutral'}
+                        onSelect={() => item.run()}
+                      >
+                        {item.label}
+                      </Menu.Item>
+                    )}
+                  </For>
+                )}
+              </Menu>
             </>
           )}
         </Show>
@@ -365,29 +401,31 @@ export default function AgentPane(props: { task: Task }) {
           onError={setError}
         />
         <div class="managed-agent-conversation">
-          <Show when={error()}><div class="action-error managed-agent-error" role="alert">{error()}</div></Show>
+          <Show when={error()}><Alert class="managed-agent-error">{error()}</Alert></Show>
           <Show
             when={selected()}
             fallback={
-              <div class="managed-agent-onboarding">
-                <span class="agent-empty-mark">✦</span>
-                <h2>Start a managed coding session</h2>
+              <EmptyState
+                class="managed-agent-onboarding"
+                icon={<span class="agent-empty-mark">✦</span>}
+                title="Start a managed coding session"
+              >
                 <div class="managed-agent-provider-cards">
                   <For each={providers() ?? []}>
                     {(providerDescriptor) => (
-                      <Button
-                        variant="ghost"
+                      <Card
                         class="managed-agent-provider-card"
+                        interactive
                         disabled={!providerDescriptor.installed || creating()}
-                        onClick={() => void createSession(providerDescriptor)}
+                        onActivate={() => void createSession(providerDescriptor)}
                       >
                         <strong>{providerDescriptor.label}</strong>
                         <span>{providerDescriptor.installed ? 'Start managed session' : providerDescriptor.diagnostics[0] ?? 'Unavailable'}</span>
-                      </Button>
+                      </Card>
                     )}
                   </For>
                 </div>
-              </div>
+              </EmptyState>
             }
           >
             {(session) => (
@@ -422,6 +460,37 @@ export default function AgentPane(props: { task: Task }) {
           </Show>
         </div>
       </div>
+
+      <Show when={dialog() === 'rename'}>
+        <Modal onClose={() => setDialog(null)} title="Rename session" size="sm">
+          <Modal.Body>
+            <Field label="Title">
+              <Input
+                value={renameText()}
+                ref={(el) => queueMicrotask(() => el.focus())}
+                onInput={(event) => setRenameText(event.currentTarget.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter') void rename() }}
+              />
+            </Field>
+          </Modal.Body>
+          <Modal.Actions>
+            <Button variant="bare" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="solid" onClick={() => void rename()}>Rename</Button>
+          </Modal.Actions>
+        </Modal>
+      </Show>
+
+      <Show when={dialog() === 'delete'}>
+        <Modal onClose={() => setDialog(null)} title="Delete session history" size="sm" role="alertdialog">
+          <Modal.Body>
+            <p>Permanently delete local history for “{selected()?.title}”? This cannot be undone.</p>
+          </Modal.Body>
+          <Modal.Actions>
+            <Button variant="bare" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="solid" tone="danger" onClick={() => void remove()}>Delete permanently</Button>
+          </Modal.Actions>
+        </Modal>
+      </Show>
     </section>
   )
 }

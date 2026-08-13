@@ -279,9 +279,11 @@ describe('architecture boundaries', () => {
     // A plugin's first-party imports are therefore: the facade, the wire types, another plugin's
     // contract/, and its own files. Nothing else in packages/.
     const ALLOWED_CSS = new Set([
-      // A stylesheet is not re-exportable — `export … from` carries bindings, and these files have
-      // none. Both are core-owned CSS for a core-owned component the plugin renders.
-      '@acorn/client-core/palette/palette.css',
+      // A stylesheet is not re-exportable — `export … from` carries bindings, and this file has
+      // none. Core-owned CSS for a core-owned component the plugin renders.
+      //
+      // `palette/palette.css` used to be here too, for the editor plugin's file finder. PaletteSurface
+      // owns that stylesheet now, so the plugin imports a component instead of reaching for CSS.
       '@acorn/client-core/workspaces/onboarding.css',
     ])
     const offenders = crossPackage

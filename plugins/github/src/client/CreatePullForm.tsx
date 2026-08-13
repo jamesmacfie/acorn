@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { branchesOptions, compareOptions, mentionsOptions } from './queries'
 import { projectsOptions } from '@acorn/plugin-api/client'
 import { pullsKey, type Branch } from '../contract/api'
-import { MentionTextarea, Picker } from '@acorn/plugin-api/ui'
+import { Alert, Checkbox, EmptyState, Input, MentionTextarea, Picker } from '@acorn/plugin-api/ui'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import { githubBrowsePath } from './routes'
@@ -104,7 +104,7 @@ export default function CreatePullForm() {
   }
 
   return (
-    <Show when={repoKnown()} fallback={<p class="placeholder">Loading…</p>}>
+    <Show when={repoKnown()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
       <div class="create-pr">
         <div class="create-pr-branches">
           <Picker<Branch>
@@ -128,8 +128,9 @@ export default function CreatePullForm() {
           />
         </div>
 
-        <input
-          class="pr-filter create-pr-title"
+        {/* Was `.pr-filter` — the PR title is not a filter, so it is a plain Input. */}
+        <Input
+          class="create-pr-title"
           placeholder="Title"
           value={title()}
           onInput={(e) => {
@@ -147,7 +148,7 @@ export default function CreatePullForm() {
         />
 
         <label class="create-pr-draft">
-          <input type="checkbox" checked={draft()} onChange={(e) => setDraft(e.currentTarget.checked)} />
+          <Checkbox checked={draft()} onChange={(e) => setDraft(e.currentTarget.checked)} />
           Create as draft
         </label>
 
@@ -166,7 +167,7 @@ export default function CreatePullForm() {
         </Show>
 
         <Show when={error()}>
-          <div class="action-error">{error()}</div>
+          <Alert>{error()}</Alert>
         </Show>
       </div>
     </Show>

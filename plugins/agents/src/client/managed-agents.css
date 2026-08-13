@@ -34,18 +34,6 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
-.managed-agent-state > span {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-circle);
-  background: var(--text-faint);
-}
-.managed-agent-state[data-state='ready'] > span { background: var(--add-marker); }
-.managed-agent-state[data-state='working'] > span,
-.managed-agent-state[data-state='connecting'] > span,
-.managed-agent-state[data-state='reconnecting'] > span { background: var(--accent); }
-.managed-agent-state[data-state='waiting'] > span { background: var(--warn); }
-.managed-agent-state[data-state='failed'] > span { background: var(--del-marker); }
 
 .managed-agent-picker-button {
   height: var(--control-h-sm);
@@ -58,14 +46,9 @@
 
 .managed-agent-error { flex: none; padding: var(--space-3) var(--space-5); }
 .managed-agent-loading { margin: auto; color: var(--text-muted); }
-.managed-agent-onboarding {
-  max-width: 640px;
-  margin: auto;
-  padding: var(--space-8);
-  text-align: center;
-}
-.managed-agent-onboarding h2 { margin: var(--space-4) 0 var(--space-3); font-size: var(--fs-xl); }
-.managed-agent-onboarding p { color: var(--text-muted); }
+/* EmptyState owns the centring and the muted body; this keeps the onboarding pane's own width. */
+.managed-agent-onboarding { max-width: 640px; padding: var(--space-8); }
+.managed-agent-onboarding .ui-empty-title { font-size: var(--fs-xl); }
 .agent-empty-mark { color: var(--accent); font-size: calc(var(--fs-xl) * 1.67); }
 .managed-agent-provider-cards {
   display: grid;
@@ -73,16 +56,13 @@
   gap: var(--space-5);
   margin-top: var(--space-7);
 }
-.managed-agent-provider-card.ui-btn {
+/* Card owns the surface and its interactive states; this is the provider card's inner stack. */
+.managed-agent-provider-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-6);
-  color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--control-border);
 }
-.managed-agent-provider-card.ui-btn:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
 .managed-agent-provider-cards span { color: var(--text-muted); font-size: var(--fs-sm); }
 
 .agent-transcript-wrap {
@@ -143,13 +123,6 @@
   left: 0;
   width: 100%;
 }
-.agent-conversation-empty {
-  max-width: 440px;
-  margin: 15vh auto 0;
-  padding: var(--space-6);
-  text-align: center;
-}
-.agent-conversation-empty p { margin: var(--space-3) 0; }
 .agent-event { max-width: 880px; margin: 0 auto; padding: var(--space-3) var(--space-7); }
 .agent-event:empty { display: none; }
 .agent-message { position: relative; padding: var(--space-3) 0; }
@@ -232,10 +205,6 @@
 .agent-tool > summary { cursor: pointer; color: var(--text-muted); }
 .agent-reasoning > summary span { margin-left: var(--space-2); color: var(--text-faint); font-size: var(--fs-2xs); font-weight: 400; }
 .agent-tool > summary { display: flex; align-items: center; gap: var(--space-3); }
-.agent-tool-state { width: 7px; height: 7px; border-radius: var(--radius-circle); background: var(--text-faint); }
-.agent-tool-state[data-state='running'] { background: var(--accent); }
-.agent-tool-state[data-state='completed'] { background: var(--add-marker); }
-.agent-tool-state[data-state='failed'] { background: var(--del-marker); }
 .agent-path-link {
   margin: var(--space-2) var(--space-2) 0 0;
   color: var(--accent);
@@ -291,36 +260,20 @@
   box-shadow: var(--elev-card);
 }
 .agent-file-input { display: none; }
+/* Chip owns the box, the tones and the × affordance. These keep the composer's own wrapping inset,
+   its label truncation, and the accent tint that distinguishes a context chip from an attachment. */
 .agent-attachment-chip,
 .agent-context-chip {
   max-width: calc(100% - var(--space-6));
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
   margin: var(--space-3) 0 0 var(--space-3);
-  padding: var(--space-2) var(--space-3);
   color: var(--text);
   background: var(--bg-subtle);
   border: var(--control-border);
-  font-size: var(--fs-xs);
 }
-.agent-attachment-chip > span:nth-child(2),
-.agent-context-chip > span:nth-child(2) {
-  min-width: 0;
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.agent-attachment-chip .ui-chip-label,
+.agent-context-chip .ui-chip-label { max-width: 240px; white-space: nowrap; }
 .agent-attachment-chip small,
 .agent-context-chip small { color: var(--text-faint); }
-.agent-chip-remove.ui-btn {
-  width: 20px;
-  height: 20px;
-  min-height: 0;
-  padding: 2px;
-}
-.agent-chip-remove.ui-btn:hover:not(:disabled) { color: var(--text); }
 .agent-context-chip { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 .agent-automatic-context-note {
   margin: var(--space-2) var(--space-4) 0;
@@ -396,22 +349,20 @@
   font-size: var(--fs-xs);
 }
 .agent-insert-picker-button { width: var(--control-h-sm); padding-inline: var(--space-2); }
-.agent-context-preview { position: relative; color: var(--text-muted); font-size: var(--fs-2xs); }
-.agent-context-preview > summary { cursor: pointer; }
-.agent-context-preview > summary.agent-context-over-budget { color: var(--danger); }
-.agent-context-preview pre {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  z-index: var(--z-popover);
-  width: min(600px, 80vw);
+/* The trigger is a bare Button; Popover owns the surface it opens. */
+.agent-context-preview {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  padding: 0;
+}
+.agent-context-preview.agent-context-over-budget { color: var(--danger); }
+.agent-context-preview-surface { width: min(600px, 80vw); }
+.agent-context-preview-surface pre {
+  margin: 0;
   max-height: 360px;
   overflow: auto;
   padding: var(--space-4);
   color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  box-shadow: var(--shadow-popover);
   white-space: pre-wrap;
   font: var(--fs-xs) var(--font-mono);
 }

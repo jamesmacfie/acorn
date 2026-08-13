@@ -6,7 +6,7 @@ import { clientEvents, getHighlighter, PrefKeys, prefsOptions, readDraft, regist
 import { fetchFilePatches, fileBlobOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
 import { filePatchKey, pullKey, type PullFile, type Thread } from '../contract/api'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
-import { FileHead, type LineComposerController, type ThreadCollapseController } from '@acorn/plugin-api/ui'
+import { EmptyState, FileHead, type LineComposerController, type ThreadCollapseController } from '@acorn/plugin-api/ui'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGap, gapId, type GapRow, highlighterTokenize, isCodeRow, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, type TokenizeLine, type ViewMode } from '@acorn/plugin-api/ui/diff'
 import { createDiffScrollRestoration } from './reviewScrollRestoration'
@@ -427,7 +427,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   return (
     <Show
       when={files.data?.length}
-      fallback={<p class="placeholder">{files.isLoading ? 'Loading…' : 'No files.'}</p>}
+      fallback={<EmptyState align="start" busy={files.isLoading}>{files.isLoading ? 'Loading…' : 'No files.'}</EmptyState>}
     >
       <DiffToolbar find={find} viewMode={viewMode} setViewMode={setViewMode} />
       <DiffCanvas

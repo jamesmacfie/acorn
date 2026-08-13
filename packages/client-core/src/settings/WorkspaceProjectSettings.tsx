@@ -6,6 +6,7 @@ import { integrationsOptions } from '../queries'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch } from '@acorn/protocol/api.ts'
 import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
+import { Alert, Checkbox } from '../ui/primitives'
 
 // All project-level config for one folder project, collapsed behind a native <details> so a workspace
 // with several projects isn't an overwhelming wall of fields. Reads/writes the project row through
@@ -291,7 +292,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           <RepoRunTargets projectId={props.projectId} />
         </div>
 
-        <Show when={err()}><span class="action-error">{err()}</span></Show>
+        <Show when={err()}><Alert>{err()}</Alert></Show>
       </Show>
     </details>
   )
@@ -325,8 +326,8 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
       <Index each={rules()}>
         {(rule) => (
           <div class="integration-key-row">
-            <input
-              type="checkbox"
+            <Checkbox
+              aria-label="Enabled"
               title="Enabled"
               checked={rule().enabled}
               onChange={(e) => { update(rule().id, (r) => ({ ...r, enabled: e.currentTarget.checked })); debSave(); debSave.flush() }}
@@ -410,7 +411,7 @@ function RepoRunTargets(props: { projectId: string }) {
         onInput={(e) => { setText(e.currentTarget.value); debSave() }}
         onBlur={() => debSave.flush()}
       />
-      <Show when={err()}><span class="action-error">{err()}</span></Show>
+      <Show when={err()}><Alert>{err()}</Alert></Show>
     </Show>
   )
 }

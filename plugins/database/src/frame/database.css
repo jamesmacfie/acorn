@@ -48,10 +48,10 @@ body { font: var(--font-ui, inherit); }
 .db-icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .db-icon-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* Alert owns the tone and size; this is the full-bleed banner strip above the grid. */
 .db-error {
+  margin-top: 0;
   padding: 6px var(--pane-pad);
-  font-size: var(--fs-sm);
-  color: var(--del-marker);
   background: var(--del-bg);
   border-bottom: var(--chrome-divider);
   white-space: pre-wrap;
@@ -116,12 +116,9 @@ body { font: var(--font-ui, inherit); }
 /* The bar keeps its class name and its layout; only its position changed, from above the splitter to
    below it. `border-bottom` rather than `border-top` now, because what it is separating itself from is
    the grid underneath rather than an editor above. */
+/* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
 .db-editor-bar {
-  flex: none;
-  display: flex;
-  align-items: center;
   gap: var(--space-5);
-  justify-content: flex-end;
   padding: 5px var(--space-5);
   border-bottom: var(--chrome-divider);
 }
@@ -155,14 +152,7 @@ body { font: var(--font-ui, inherit); }
   display: flex;
   flex-direction: column;
 }
-.db-result-bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-2) var(--space-5);
-  border-bottom: var(--chrome-divider);
-}
+.db-result-bar { gap: var(--space-5); padding: var(--space-2) var(--space-5); background: none; }
 .db-footer {
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -303,30 +293,13 @@ body { font: var(--font-ui, inherit); }
 /* Example-query multi-select: chips for the picked queries + the Picker button that adds more. */
 .db-examples { display: flex; flex-direction: column; gap: var(--space-2); }
 .db-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-.db-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
-  font-size: var(--fs-sm);
-  border: var(--control-bw) solid var(--badge-border);
-  border-radius: var(--radius-pill);
-  background: var(--bg-subtle);
-}
-.db-chip-x {
-  background: none;
-  border: none;
-  padding: 0 var(--space-1);
-  font: inherit;
-  font-size: var(--fs-2xs);
-  color: var(--text-faint);
-  cursor: pointer;
-}
-.db-chip-x:hover { color: var(--del-marker); }
+/* Chip owns the box and the × affordance; these keep the pill radius and text size this modal uses.
+   The add-chip is Picker's trigger, so it gets Chip's dashed look through the same class rather than
+   its own copy of the recipe — which is what `Badge dashed` was originally built for. */
+.db-chip, .db-chip-add { border-radius: var(--radius-pill); font-size: var(--fs-sm); }
 .db-chip-add {
   background: none;
   border: var(--control-bw) dashed var(--border);
-  border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-5);
   font: inherit;
   font-size: var(--fs-sm);
@@ -336,15 +309,8 @@ body { font: var(--font-ui, inherit); }
 .db-chip-add:hover { color: var(--text); }
 
 /* Save-query modal: a read-only look at what's about to be stored. */
-.db-sql-preview {
-  margin: 0;
-  max-height: 120px;
-  overflow: auto;
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  border: var(--surface-border);
-  border-radius: var(--radius);
-  white-space: pre-wrap;
-}
+/* CodeBlock owns the box; this modal wants a shorter cap and a muted tone. */
+.db-sql-preview .ui-code { max-height: 120px; color: var(--text-muted); }
+
+/* Armed for a second click (createArmedConfirm) — the button IS the prompt. */
+.db-del-btn[data-armed] { color: var(--danger); border-color: var(--danger); }

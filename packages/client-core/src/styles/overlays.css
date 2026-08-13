@@ -60,7 +60,6 @@
 .will-concerns li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-4); align-items: baseline; }
 .will-concerns li[data-severity='danger'] { color: var(--del-marker); }
 .will-concern-option { grid-column: 2 / -1; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
-.will-concern-option input { accent-color: var(--accent); cursor: pointer; }
 
 
 /* Help: two-column key → description grid. */
@@ -72,6 +71,8 @@
   padding: var(--pane-pad);
   overflow-y: auto;
 }
+/* `.help-key` is the chord CAPTURE input in the shortcuts editor as well as a static cap in the
+   overlay, so it keeps its own rule — Kbd renders a <kbd>, and an <input> cannot be one. */
 .help-key {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
@@ -85,32 +86,8 @@
 .help-desc { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); align-self: center; }
 
 /* File finder: input header + scrollable result list. */
-.finder-input {
-  font: inherit;
-  font-size: var(--fs);
-  color: var(--text);
-  background: var(--bg);
-  border: 0;
-  border-bottom: var(--chrome-divider);
-  padding: 10px var(--pane-pad);
-  outline: none;
-}
-.finder-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--pane-pad); margin: 0; }
-.finder-list { list-style: none; margin: 0; padding: var(--space-2) 0; overflow-y: auto; }
-.finder-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-  padding: 4px var(--pane-pad);
-  border-left: var(--tab-active-w) solid transparent;
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  cursor: pointer;
-}
-.finder-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
-.finder-dir { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
-.finder-name { color: var(--text); flex-shrink: 0; }
+/* The `.finder-*` family lived here: a near-duplicate of `.palette-*` for github's file finder.
+   PaletteSurface renders both now. */
 
 /* @mention autocomplete popup (MentionTextarea.tsx): fixed below the textarea. */
 .mention-popup {
@@ -141,3 +118,90 @@
 .mention-item:hover,
 .mention-item-sel { background: var(--bg-subtle); }
 .mention-at { color: var(--accent); font-weight: 600; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────────────────────────
+   Bottom-right stack, offset by the terminal drawer's published height so a toast never hides
+   behind it (--term-drawer-h is set on documentElement by the terminal plugin; the fallback covers
+   every surface where that plugin is not mounted). */
+.ui-toast-host {
+  position: fixed;
+  right: var(--space-8);
+  bottom: calc(var(--term-drawer-h, 0px) + var(--space-8));
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+  /* The stack must not swallow clicks on the app behind it; each toast re-enables its own. */
+  pointer-events: none;
+}
+.ui-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: min(420px, 80vw);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--popover-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--elev-popover);
+  animation: ui-toast-in var(--dur-short) var(--ease-out);
+}
+@keyframes ui-toast-in { from { opacity: 0; transform: translateY(var(--space-4)); } }
+@media (prefers-reduced-motion: reduce) { .ui-toast { animation: none; } }
+.ui-toast[data-tone='success'] { border-color: var(--success); }
+.ui-toast[data-tone='danger'] { border-color: var(--danger); }
+.ui-toast-message { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ui-toast-close {
+  flex: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.ui-toast-close:hover { color: var(--text); }
+
+/* ── Drawer ─────────────────────────────────────────────────────────────────────────────────
+   Modal's sibling: same backdrop, same dismissal hook, edge-anchored geometry. */
+.ui-drawer {
+  position: fixed;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  border: var(--surface-border);
+  box-shadow: var(--elev-modal);
+  animation: ui-drawer-in var(--dur-med) var(--ease-out);
+}
+.ui-drawer[data-side='right'] { inset: 0 0 0 auto; width: min(420px, 92vw); }
+.ui-drawer[data-side='left'] { inset: 0 auto 0 0; width: min(420px, 92vw); }
+.ui-drawer[data-side='bottom'] { inset: auto 0 0 0; height: min(60vh, 520px); }
+.ui-drawer[data-side='right'][data-size='sm'],
+.ui-drawer[data-side='left'][data-size='sm'] { width: min(320px, 92vw); }
+.ui-drawer[data-side='right'][data-size='lg'],
+.ui-drawer[data-side='left'][data-size='lg'] { width: min(640px, 96vw); }
+.ui-drawer[data-side='bottom'][data-size='sm'] { height: min(40vh, 360px); }
+.ui-drawer[data-side='bottom'][data-size='lg'] { height: min(80vh, 720px); }
+@keyframes ui-drawer-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ui-drawer { animation: none; } }
+.ui-drawer-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
+  border-bottom: var(--chrome-divider);
+  background: var(--bg-subtle);
+}
+.ui-drawer-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The palette's hints line (PaletteSurface footer). */
+.palette-foot { padding: var(--space-3) var(--space-6); font-size: var(--fs-2xs); border-top: var(--chrome-divider); }

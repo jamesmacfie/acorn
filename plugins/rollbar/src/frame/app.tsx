@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Row, Spinner } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, Row } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
 import {
@@ -157,18 +157,11 @@ export function RollbarFrameApp(props: { bridge: AcornBridge }) {
   )
 }
 
+// Kept as the PageState→primitive mapping, but it no longer draws anything: `.rb-placeholder` and
+// `.rb-error` were this frame's private spellings of two shared components, and primitives.css is
+// already served to plugin frames, so the frame now looks like the shell without re-declaring a rule.
 function PageStatus(props: { state: PageState }) {
   return props.state.kind === 'error'
-    ? (
-      <div class="rb-error" role="alert">
-        <strong>{props.state.title}</strong>
-        <span>{props.state.detail}</span>
-      </div>
-    )
-    : (
-      <div class="rb-placeholder">
-        <Show when={props.state.kind === 'loading'}><Spinner label="Loading Rollbar" /></Show>
-        <span>{props.state.message}</span>
-      </div>
-    )
+    ? <Alert variant="banner" title={props.state.title}>{props.state.detail}</Alert>
+    : <EmptyState busy={props.state.kind === 'loading'}>{props.state.message}</EmptyState>
 }

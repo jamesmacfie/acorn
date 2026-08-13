@@ -5,6 +5,7 @@ import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, r
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
+import { Alert } from '../ui/primitives'
 
 // Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
 //
@@ -225,10 +226,10 @@ export default function NodesSettings() {
                   </Show>
                   <code class="node-fingerprint node-fingerprint-hex">{probed().fingerprint}</code>
                   <Show when={!probed().compatible}>
-                    <p class="action-error">
+                    <Alert>
                       This node speaks protocol v{probed().protocolVersion}; this client speaks a different major version.
                       Update one of them before pairing.
-                    </p>
+                    </Alert>
                   </Show>
                   <div class="node-step-actions">
                     <button
@@ -282,7 +283,7 @@ export default function NodesSettings() {
           </Match>
         </Switch>
 
-        <Show when={error()}><div class="action-error">{error()}</div></Show>
+        <Show when={error()}><Alert>{error()}</Alert></Show>
       </Show>
     </div>
   )

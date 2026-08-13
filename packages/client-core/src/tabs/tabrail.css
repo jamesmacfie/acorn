@@ -104,45 +104,9 @@
 .tabrail-add:hover { background: var(--bg-hover); color: var(--text); }
 
 /* Glyph picker / close popover, anchored just right of its tab. */
-.tabrail-menu {
-  position: absolute;
-  top: 0;
-  left: 100%;
-  z-index: var(--z-rail);
-  margin-left: var(--space-3);
-  padding: var(--space-3);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius-popover);
-  box-shadow: var(--shadow-2);
-}
-
-.tabrail-menu-title {
-  max-width: 180px;
-  padding: var(--space-1) var(--space-2) var(--space-3);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tabrail-close {
-  display: block;
-  width: 100%;
-  margin-top: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  font: inherit;
-  font-size: var(--fs-sm);
-  text-align: left;
-  color: var(--text);
-  background: transparent;
-  border: var(--control-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.tabrail-close:hover { background: var(--bg-hover); }
+/* Menu owns the surface (portal, position, elevation, dismissal) and the item vocabulary. All this
+   keeps is the rail's own width cap on the two title rows. */
+.tabrail-menu .ui-menu-label-row { max-width: 180px; }
 
 /* Workspace identity accent (docs/workspaces-and-tasks.md): task rows carry their workspace's colour as the 3px
    left accent (the docs/ui-design.md active-accent convention, tinted per workspace). */

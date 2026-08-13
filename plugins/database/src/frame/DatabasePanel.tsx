@@ -1,5 +1,5 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Picker } from '@acorn/plugin-api/ui'
+import { Alert, Checkbox, createArmedConfirm, EmptyState, Input, Picker, Toolbar } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import {
@@ -54,7 +54,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const [activeRow, setActiveRow] = createSignal<number | null>(null)
   const [inserting, setInserting] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
-  const [deleteArmed, setDeleteArmed] = createSignal(false)
+  // The armed button is the prompt; this used to be written into the error banner.
+  const deleteArmed = createArmedConfirm()
   const [generating, setGenerating] = createSignal(false)
   const [saving, setSaving] = createSignal<string | null>(null) // the SQL being saved (null = modal closed)
 
@@ -209,14 +210,14 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       </div>
 
       <Show when={error()}>
-        <div class="db-error">{error()}</div>
+        <Alert class="db-error">{error()}</Alert>
       </Show>
 
       <div class="db-body">
         <aside class="db-sidebar">
-          <input class="pr-filter db-filter" placeholder="Filter tables…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
+          <Input class="db-filter" kind="filter" placeholder="Filter tables…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
           <div class="db-table-list">
-            <For each={filtered()} fallback={<p class="placeholder">{status() === 'connected' ? 'No tables.' : ''}</p>}>
+            <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
               {(t) => (
                 <button
                   type="button"
@@ -237,7 +238,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               move makes to this pane. It stays the PLUGIN's because it is a searchable picker with
               per-row delete chips and a conditionally-visible button — common, not impossible, which is
               the bar a host-drawn region has to clear (docs/plugins.md § Document surfaces). */}
-          <div class="db-editor-bar">
+          <Toolbar class="db-editor-bar" variant="actions" ariaLabel="Query actions">
             <span class="muted db-hint">⌘↵ to run</span>
             <Picker<DbSavedQuery>
               label={loadedName() || 'Queries'}
@@ -267,16 +268,16 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</button>
             </Show>
             <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => void execute()}>Execute</button>
-          </div>
+          </Toolbar>
 
           <div class="db-result">
-            <div class="db-result-bar">
+            <Toolbar class="db-result-bar" size="sm" ariaLabel="Result actions">
               <span class="db-footer">{footer()}</span>
               <Show when={resultTable() && columns().some((c) => c.isPk)}>
                 <button type="button" class="db-icon-btn" title="Insert row" disabled={busy()} onClick={() => setInserting(true)}>+ Row</button>
               </Show>
-            </div>
-            <Show when={result()} fallback={<p class="placeholder">Select a table or run a query.</p>}>
+            </Toolbar>
+            <Show when={result()} fallback={<EmptyState align="start">Select a table or run a query.</EmptyState>}>
               {(r) => (
                 <ResultGrid
                   columns={r().columns}
@@ -324,7 +325,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             table={resultTable()}
             meta={columns()}
             busy={busy()}
-            onClose={() => { setActiveRow(null); setDeleteArmed(false) }}
+            onClose={() => { setActiveRow(null); deleteArmed.disarm() }}
             onSave={async (edits) => {
               const t = resultTable()
               if (!t) return
@@ -343,15 +344,11 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
                 setBusy(false)
               }
             }}
+            deleteArmed={!!deleteArmed.armed()}
             onDelete={async () => {
               const t = resultTable()
               if (!t) return
-              if (!deleteArmed()) {
-                setDeleteArmed(true)
-                setError('Click Delete again to permanently remove this row.')
-                return
-              }
-              setDeleteArmed(false)
+              if (!deleteArmed.request('row')) return
               const pk = primaryKey()
               setBusy(true)
               try {
@@ -407,6 +404,7 @@ function RowDetail(props: {
   onClose: () => void
   onSave?: (edits: [string, DbCell][]) => void | Promise<void>
   onDelete?: () => void | Promise<void>
+  deleteArmed?: boolean
   onInsert?: (values: Record<string, DbCell>) => void | Promise<void>
 }) {
   const metaByName = new Map(props.meta.map((c) => [c.name, c]))
@@ -474,7 +472,7 @@ function RowDetail(props: {
                     take their DB default); edit mode only for nullable columns. */}
                 <Show when={editable() && (props.insert || (m?.nullable ?? true))}>
                   <label class="db-null-toggle">
-                    <input type="checkbox" checked={draft()[col]?.isNull} onChange={(e) => set(col, { isNull: e.currentTarget.checked })} /> null
+                    <Checkbox label="null" checked={draft()[col]?.isNull} onChange={(e) => set(col, { isNull: e.currentTarget.checked })} />
                   </label>
                 </Show>
               </label>
@@ -486,7 +484,7 @@ function RowDetail(props: {
         <Show when={editable()} fallback={<span class="muted db-hint">Read-only (no single-table PK).</span>}>
           <button type="button" class="db-run-btn" disabled={props.busy} onClick={save}>Save</button>
           <Show when={!props.insert}>
-            <button type="button" class="db-del-btn" disabled={props.busy} onClick={() => void props.onDelete?.()}>Delete</button>
+            <button type="button" class="db-del-btn" data-armed={props.deleteArmed ? '' : undefined} disabled={props.busy} onClick={() => void props.onDelete?.()}>{props.deleteArmed ? 'Delete?' : 'Delete'}</button>
           </Show>
         </Show>
       </div>

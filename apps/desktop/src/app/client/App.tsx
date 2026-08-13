@@ -13,7 +13,8 @@ import AccountMenu from '@acorn/client-core/AccountMenu.tsx'
 import { initWorkflowNotices } from '@acorn/client-core/notifications/notifications.ts'
 import { initSessions, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
 import TabRail from '@acorn/client-core/tabs/TabRail.tsx'
-import RailTips from '@acorn/client-core/tooltip/RailTips.tsx'
+import Tips from '@acorn/client-core/ui/tips.tsx'
+import { ToastHost } from '@acorn/client-core/notifications/ToastHost.tsx'
 import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
 import { isTerminalTarget } from '@acorn/client-core/lib/isTypingTarget.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
@@ -433,7 +434,10 @@ export default function App() {
       <SlotHost slot="drawer" context={slotContext()} />
       <SlotHost slot="overlay" context={slotContext()} />
     </div>
-    <RailTips />
+    <Tips />
+    {/* One transient-feedback stack for the whole app, frames included — the bridge's ui.toast
+        lands here too. */}
+    <ToastHost />
     </div>
     </Show>
   )

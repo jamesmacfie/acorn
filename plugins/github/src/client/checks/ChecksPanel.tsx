@@ -2,8 +2,8 @@ import { createEffect, createMemo, createResource, createSignal, For, onCleanup,
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { jobLogOptions, runJobsOptions } from '../queries'
-import { FAILED_STATUSES, getHighlighter, tokenizeAnsiLines } from '@acorn/plugin-api/client'
-import { Icon } from '@acorn/plugin-api/ui'
+import { checkStatusTone, FAILED_STATUSES, getHighlighter, tokenizeAnsiLines } from '@acorn/plugin-api/client'
+import { CodeBlock, EmptyState, StatusDot } from '@acorn/plugin-api/ui'
 import { splitJobLog } from './splitJobLog'
 import '../styles/checks-panel.css'
 
@@ -13,24 +13,21 @@ function StepLog(props: { text: string }) {
     async (text) => (text.length > 300_000 ? null : tokenizeAnsiLines(await getHighlighter(), text)),
   )
   return (
-    <div class="step-log-wrap">
-      <button type="button" class="step-log-copy" title="Copy log" aria-label="Copy log" onClick={() => navigator.clipboard?.writeText(props.text)}>
-        <Icon name="copy" size={14} />
-      </button>
-      <pre class="step-log">
-        <Show when={lines()} fallback={props.text}>
-          {(ls) => (
-            <For each={ls()}>
-              {(line) => (
-                <div class="log-line">
-                  <For each={line}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>
-                </div>
-              )}
-            </For>
-          )}
-        </Show>
-      </pre>
-    </div>
+    // CodeBlock owns the box and the copy affordance; the ANSI line spans are children, which is the
+    // component's contract — it is the box, not the highlighter.
+    <CodeBlock class="step-log-wrap" copy={props.text} size="xs">
+      <Show when={lines()} fallback={props.text}>
+        {(ls) => (
+          <For each={ls()}>
+            {(line) => (
+              <div class="log-line">
+                <For each={line}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>
+              </div>
+            )}
+          </For>
+        )}
+      </Show>
+    </CodeBlock>
   )
 }
 
@@ -100,11 +97,11 @@ export default function ChecksPanel(props: { owner: string; repo: string; runId:
                     return (
                       <li class="step-row">
                         <button type="button" class="step-head" onClick={() => toggle(s.number)}>
-                          <span class={`check-dot check-${status()}`} />
+                          <StatusDot tone={checkStatusTone(status())} />
                           <span class="step-name">{s.name}</span>
                         </button>
                         <Show when={open().has(s.number)}>
-                          <Show when={!log.isLoading} fallback={<pre class="step-log">Loading log…</pre>}>
+                          <Show when={!log.isLoading} fallback={<EmptyState size="sm" busy>Loading log…</EmptyState>}>
                             <StepLog text={stepLog(s.number)} />
                           </Show>
                         </Show>

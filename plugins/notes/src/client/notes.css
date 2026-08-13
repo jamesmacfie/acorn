@@ -1,7 +1,8 @@
 /* Notes pane (docs/next/context-ui.md): scratchpad-first, library column + editor, flat + 1px borders. */
 .notes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .notes-header { display: flex; align-items: center; gap: var(--space-4); }
-.notes-filter { flex: 1; min-width: 0; font: inherit; font-size: var(--fs-sm); color: var(--text); background: var(--input-bg); border: var(--control-border); border-radius: var(--radius-control); padding: var(--space-1) var(--space-3); }
+/* Was a hand-copy of `.ui-input`'s tokens. Input kind="filter" owns the control now. */
+.notes-filter { padding: var(--space-1) var(--space-3); }
 .notes-collapse { flex: none; font: inherit; font-size: var(--fs-sm); color: var(--text-faint); background: transparent; border: 0; cursor: pointer; }
 .notes-collapse:hover { color: var(--text); }
 .notes-body { flex: 1; min-height: 0; display: flex; }
@@ -59,18 +60,13 @@
   cursor: pointer;
   visibility: hidden;
 }
-.notes-row-wrap:hover .notes-row-delete { visibility: visible; }
+/* :focus-within as well as :hover — a keyboard user could not reach this at all. */
+.notes-row-wrap:hover .notes-row-delete,
+.notes-row-wrap:focus-within .notes-row-delete { visibility: visible; }
 .notes-row-delete:hover { color: var(--del-marker); }
 .notes-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.notes-toolbar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-2) var(--space-4);
-  border-bottom: var(--chrome-divider);
-  background: var(--bg-subtle);
-}
+/* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
+.notes-toolbar { gap: var(--space-4); }
 .notes-title-input { flex: 1; min-width: 0; font: inherit; font-size: var(--fs-sm); color: var(--text); background: transparent; border: 0; outline: none; }
 .notes-scope-pill { flex: none; font-size: var(--fs-2xs); color: var(--text-muted); }
 .notes-view-context {
@@ -96,3 +92,6 @@
   resize: none;
 }
 .notes-preview { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5) var(--space-7); }
+
+/* Armed for a second click (createArmedConfirm) — the button IS the prompt. */
+.notes-row-delete[data-armed] { color: var(--danger); }

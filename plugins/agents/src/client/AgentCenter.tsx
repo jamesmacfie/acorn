@@ -8,7 +8,8 @@ import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
 import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { Button, Input, Row, Select } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, Input, Row, SegmentedControl, Select, StatusDot } from '@acorn/plugin-api/ui'
+import { providerTone, runtimeTone } from './stateTone'
 import './agent-center.css'
 
 
@@ -171,20 +172,20 @@ export default function AgentCenter() {
         </div>
       </header>
 
-      <Show when={error()}><div class="action-error agent-center-error" role="alert">{error()}</div></Show>
+      <Show when={error()}><Alert class="agent-center-error">{error()}</Alert></Show>
 
       {/* Partial node results remain visible while the unavailable-node banner explains the gap. */}
       <Show when={unavailable().length}>
-        <div class="agent-center-banner" role="status">
-          <For each={unavailable()}>{(entry) => <span>{entry.label} unavailable — {entry.reason}</span>}</For>
-        </div>
+        <For each={unavailable()}>
+          {(entry) => <Alert tone="warn" variant="banner" class="agent-center-banner">{entry.label} unavailable — {entry.reason}</Alert>}
+        </For>
       </Show>
 
       <section class="agent-center-providers">
         <For each={providers() ?? []}>
           {(provider: AgentProviderDescriptor) => (
             <div class="agent-center-provider" data-health={provider.installed ? provider.authenticated === false ? 'error' : 'ok' : 'missing'}>
-              <span class="agent-center-provider-dot" />
+              <StatusDot tone={providerTone(provider.installed ? provider.authenticated === false ? 'error' : 'ok' : 'missing')} />
               <span><strong>{provider.label}</strong><small>{provider.executableVersion ?? provider.driverVersion}</small></span>
               <span class="muted">{provider.installed ? provider.authenticated === false ? 'Authentication required' : 'Available' : 'Not installed'}</span>
             </div>
@@ -200,35 +201,27 @@ export default function AgentCenter() {
         </Select>
         {/* With one node the workspace and fleet scopes answer identically, so the switch is unnecessary. */}
         <Show when={nodes().length > 1}>
-          <div class="agent-center-segments">
-            <For each={['workspace', 'fleet'] as const}>
-              {(value) => (
-                <Button
-                  variant="bare"
-                  size="sm"
-                  classList={{ active: scope() === value }}
-                  onClick={() => setScope(value)}
-                >
-                  {value}
-                </Button>
-              )}
-            </For>
-          </div>
+          <SegmentedControl
+            ariaLabel="Scope"
+            size="sm"
+            value={scope()}
+            onChange={setScope}
+            options={[
+              { value: 'workspace', label: 'workspace' },
+              { value: 'fleet', label: 'fleet' },
+            ]}
+          />
         </Show>
-        <div class="agent-center-segments">
-          <For each={(fleetScope() ? ['all', 'active', 'attention'] : ['all', 'active', 'attention', 'archived']) as readonly ('all' | 'active' | 'attention' | 'archived')[]}>
-            {(filter) => (
-              <Button
-                variant="bare"
-                size="sm"
-                classList={{ active: stateFilter() === filter }}
-                onClick={() => setStateFilter(filter)}
-              >
-                {filter}
-              </Button>
-            )}
-          </For>
-        </div>
+        <SegmentedControl
+          ariaLabel="Session state"
+          size="sm"
+          value={stateFilter()}
+          onChange={setStateFilter}
+          options={(fleetScope()
+            ? (['all', 'active', 'attention'] as const)
+            : (['all', 'active', 'attention', 'archived'] as const)
+          ).map((filter) => ({ value: filter, label: filter }))}
+        />
       </section>
 
       <section class="agent-center-list">
@@ -237,7 +230,7 @@ export default function AgentCenter() {
         </div>
         <For
           each={shown()}
-          fallback={<div class="agent-center-empty"><span>✦</span><p>No sessions match these filters.</p></div>}
+          fallback={<EmptyState icon={<span class="agent-empty-mark">✦</span>}>No sessions match these filters.</EmptyState>}
         >
           {(row) => {
             const session = row.session
@@ -258,7 +251,7 @@ export default function AgentCenter() {
                   </small>
                 </span>
                 <span class="agent-center-state">
-                  <span data-state={session.runtimeState} />
+                  <StatusDot tone={runtimeTone(session.runtimeState)} />
                   <span>{session.runtimeState}<small>{session.attention === 'none' ? '' : session.attention.replace('_', ' ')}</small></span>
                 </span>
                 <span class="muted">{elapsed(session.updatedAt)}</span>

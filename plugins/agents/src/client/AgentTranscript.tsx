@@ -4,6 +4,7 @@ import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
 import { buildConversationItems } from './conversationItems'
+import { EmptyState } from '@acorn/plugin-api/ui'
 
 const VISIBLE_EVENT_TYPES = new Set([
   'user_message',
@@ -99,10 +100,9 @@ export default function AgentTranscript(props: {
         <Show
           when={items().length}
           fallback={
-            <div class="agent-conversation-empty">
-              <span class="agent-empty-mark">✦</span>
-              <p>This session is ready for its first turn.</p>
-            </div>
+            <EmptyState icon={<span class="agent-empty-mark">✦</span>}>
+              This session is ready for its first turn.
+            </EmptyState>
           }
         >
           <Show

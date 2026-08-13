@@ -209,7 +209,8 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
             {(h) => (
               <For each={markTokens(props.r.toks, h().ranges, h().current)}>
                 {(t) => (
-                  <span style={{ '--l': t.light, '--r': t.dark }} classList={{ 'diff-find-hit': t.mark > 0, 'diff-find-current': t.mark === 2 }}>
+                  <span style={{ '--l': t.light, '--r': t.dark }} classList={{ 'ui-find-mark': t.mark > 0 }}
+                  {...(t.mark === 2 ? { 'data-current': '' } : {})}>
                     {t.content}
                   </span>
                 )}
@@ -233,7 +234,8 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               <For each={markTokens(words(), h().ranges, h().current)}>
                 {(w) => (
                   <span
-                    classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del', 'diff-find-hit': w.mark > 0, 'diff-find-current': w.mark === 2 }}
+                    classList={{ 'diff-word-add': w.kind === 'add', 'diff-word-del': w.kind === 'del', 'ui-find-mark': w.mark > 0 }}
+                    {...(w.mark === 2 ? { 'data-current': '' } : {})}
                   >
                     {w.content}
                   </span>

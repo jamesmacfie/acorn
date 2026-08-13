@@ -6,6 +6,7 @@ import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
+import { Alert, createSplitDrag, DocumentTabs, EmptyState, Menu, SplitHandle } from '@acorn/plugin-api/ui'
 import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 
@@ -22,7 +23,6 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   const [profiles, setProfiles] = createSignal<TerminalProfile[]>([])
   const [activeId, setActiveId] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal(false)
-  const [menuOpen, setMenuOpen] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   // True while the rail-default profile is being auto-launched, so the body shows a loader instead
   // of the empty-state text during the spawn round-trip.
@@ -80,6 +80,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   // Cmd/Ctrl+W closes the active terminal tab when focus is inside the drawer.
   let drawerRef: HTMLElement | undefined
+  // Snapshotted at pointer-down. Null between drags, so a keyboard nudge measures from the CURRENT
+  // height instead of the last drag's starting point.
+  let dragStartHeight: number | null = null
   onClosePaneWithin(() => drawerRef, () => {
     const s = activeSession()
     if (s) void closeTab(s)
@@ -165,19 +168,20 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   createEffect(() => document.documentElement.style.setProperty('--term-drawer-h', `${height()}px`))
   onCleanup(() => document.documentElement.style.removeProperty('--term-drawer-h'))
 
-  const onHandleDown = (e: PointerEvent) => {
-    e.preventDefault()
-    const startY = e.clientY
-    const startH = height()
-    const onMove = (ev: PointerEvent) => setHeight(Math.min(Math.max(startH + (startY - ev.clientY), 160), window.innerHeight * 0.85))
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
+  // The drawer grows UPWARD, so a downward drag shrinks it — hence the inverted delta and
+  // `invert` for the keyboard. Height and its pref stay here; the hook owns the drag and the keys
+  // this handle never had.
+  const drawerDrag = createSplitDrag({
+    axis: 'y',
+    label: 'Resize terminal drawer',
+    invert: true,
+    onStart: () => { dragStartHeight = height() },
+    onDelta: (deltaPx) => setHeight(Math.min(Math.max((dragStartHeight ?? height()) - deltaPx, 160), window.innerHeight * 0.85)),
+    onCommit: () => {
+      dragStartHeight = null
       void savePref(queryClient, PrefKeys.terminalHeight, String(Math.round(height())))
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
+    },
+  })
 
   function titleFor(profileId: string, task?: Task | null): string {
     const ctx = task?.github ? `${task.github.owner}/${task.github.name}${task.pullNumber != null ? ` #${task.pullNumber}` : ''}` : task?.title ?? ''
@@ -209,7 +213,6 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // Launch a profile; the node resolves project path/worktree from taskId. docs/workspaces-and-tasks.md:
   // context comes from the task, not the URL; the worktree is created lazily in main (Flow C).
   async function startProfile(profileId: string) {
-    setMenuOpen(false)
     setError(null)
     const w = ws()
     if (!api || !w) return
@@ -229,77 +232,78 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     <Portal>
       <aside ref={drawerRef} class="terminal-drawer" classList={{ maximized: maximized() }} style={{ height: maximized() ? undefined : `${height()}px` }}>
         <Show when={!maximized()}>
-          <div class="terminal-resize" onPointerDown={onHandleDown} title="Drag to resize" />
+          <SplitHandle axis="y" drag={drawerDrag} class="terminal-resize" />
         </Show>
         <header class="terminal-tabs">
-          <Show when={api} fallback={<span class="terminal-unavailable">Terminal service unavailable</span>}>
-            <div class="terminal-tabstrip">
-              <For each={visibleSessions()}>
-                {(s) => (
-                  <div class="terminal-tab" classList={{ active: s.id === activeId() }} onClick={() => setActiveId(s.id)}>
-                    <span class="terminal-tab-dot" classList={{ exited: s.status === 'exited', idle: s.idle }} />
-                    <span class="terminal-tab-title">{s.title}</span>
-                    <Show when={s.idle}>
-                      <span class="terminal-tab-idle" title="Agent idle — may be waiting for input">
-                        idle
-                      </span>
-                    </Show>
+          <Show when={api} fallback={<Alert class="terminal-unavailable">Terminal service unavailable</Alert>}>
+            {/* Was a hand-rolled strip: the ✕ was mouse-only, there were no arrow keys and no
+                tablist roles, and the pending shimmer had an unguarded keyframe. */}
+            <DocumentTabs
+              class="terminal-tabstrip"
+              idPrefix="terminal"
+              ariaLabel="Terminal sessions"
+              active={activeId() ?? ''}
+              onActivate={setActiveId}
+              onClose={(id) => {
+                const session = visibleSessions().find((candidate) => candidate.id === id)
+                if (session) void closeTab(session)
+              }}
+              tabs={[
+                ...visibleSessions().map((session) => ({
+                  id: session.id,
+                  label: session.title,
+                  status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
+                  title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
+                })),
+                // The launching session has no id yet, so it cannot be activated or closed — it is a
+                // placeholder tab that the real session replaces.
+                ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
+              ]}
+            />
+            <div class="terminal-actions">
+              {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
+                  click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
+                  roles. Menu brings all of it. */}
+              <Menu
+                  class="terminal-menu"
+                  ariaLabel="New session"
+                  trigger={({ toggle, open }) => (
                     <button
                       type="button"
-                      class="terminal-tab-x"
-                      title={s.status === 'running' ? 'Kill session' : 'Dismiss'}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void closeTab(s)
-                      }}
+                      class="terminal-new"
+                      disabled={busy() || !ws()}
+                      title={ws() ? 'New session' : 'Select a task first'}
+                      aria-haspopup="menu"
+                      aria-expanded={open()}
+                      onClick={toggle}
                     >
-                      ✕
+                      +
                     </button>
-                  </div>
-                )}
-              </For>
-              <Show when={pendingTitle()}>
-                {(title) => (
-                  <div class="terminal-tab pending">
-                    <span class="terminal-tab-dot" />
-                    <span class="terminal-tab-title">{title()}</span>
-                  </div>
-                )}
-              </Show>
-            </div>
-            <div class="terminal-actions">
-              <div class="terminal-new-wrap">
-                <button type="button" class="terminal-new" disabled={busy() || !ws()} title={ws() ? 'New session' : 'Select a task first'} onClick={() => setMenuOpen((v) => !v)}>
-                  +
-                </button>
-                <Show when={menuOpen()}>
-                  {/* Click-away: a full-screen transparent layer behind the menu closes it. */}
-                  <div class="terminal-menu-backdrop" onClick={() => setMenuOpen(false)} />
-                  <div class="terminal-menu">
+                  )}
+                >
+                  {(menu) => (
                     <For each={profiles()}>
                       {(p) => (
-                        <button
-                          type="button"
-                          class="terminal-menu-item"
+                        <Menu.Item
+                          context={menu}
                           disabled={!p.available}
                           title={!p.available ? `${p.label} not found on PATH` : p.tmuxMissing ? 'tmux not found on PATH — this session will not survive an app restart' : undefined}
-                          onClick={() => void startProfile(p.id)}
+                          onSelect={() => void startProfile(p.id)}
+                          trailing={
+                            <>
+                              <Show when={!p.available}>not found</Show>
+                              {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still
+                                  works, but the durable backend silently fell back to node-pty. */}
+                              <Show when={p.available && p.tmuxMissing}>tmux missing — won't survive restart</Show>
+                            </>
+                          }
                         >
                           {p.label}
-                          <Show when={!p.available}>
-                            <span class="terminal-menu-missing">not found</span>
-                          </Show>
-                          {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still works,
-                              but the durable backend silently fell back to node-pty. */}
-                          <Show when={p.available && p.tmuxMissing}>
-                            <span class="terminal-menu-missing">tmux missing — won't survive restart</span>
-                          </Show>
-                        </button>
+                        </Menu.Item>
                       )}
                     </For>
-                  </div>
-                </Show>
-              </div>
+                  )}
+              </Menu>
               <Show when={activeRunning()}>
                 <button type="button" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api!.interrupt(activeId()!)}>
                   ^C
@@ -312,15 +316,15 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
           </button>
         </header>
 
-        <Show when={error()}>{(msg) => <div class="terminal-prompt-error terminal-error-banner">{msg()}</div>}</Show>
+        <Show when={error()}>{(msg) => <Alert class="terminal-error-banner">{msg()}</Alert>}</Show>
 
         <div class="terminal-body">
           <Show
             when={activeId()}
             fallback={
-              <div class="terminal-empty">
-                {launching() || pendingTitle() ? <span class="terminal-launching">Launching…</span> : 'No sessions. Press + to open one.'}
-              </div>
+              <EmptyState busy={launching() || !!pendingTitle()}>
+                {launching() || pendingTitle() ? 'Launching…' : 'No sessions. Press + to open one.'}
+              </EmptyState>
             }
             keyed
           >

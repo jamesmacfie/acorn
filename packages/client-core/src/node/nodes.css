@@ -22,19 +22,6 @@
 .node-chip-label {
   color: var(--text);
 }
-.node-chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-circle);
-  background: currentColor;
-  flex: none;
-}
-.node-chip[data-freshness='live'] .node-chip-dot { color: var(--success); }
-.node-chip[data-freshness='refreshing'] .node-chip-dot { color: var(--accent); }
-.node-chip[data-freshness='stale'] .node-chip-dot { color: var(--warn); }
-.node-chip[data-freshness='offline'] .node-chip-dot { color: var(--text-muted); }
-.node-chip[data-freshness='disabled'] .node-chip-dot { color: var(--text-muted); }
-.node-chip[data-freshness='error'] .node-chip-dot { color: var(--danger); }
 
 /* Dev-only node switcher (plan.md § 69: "a minimal node switcher in the dev UI"). */
 .node-switcher {
@@ -174,17 +161,6 @@
 }
 .fleet-home-head p {
   margin: var(--space-2) 0 0;
-  font-size: var(--fs-sm);
-}
-.fleet-banner {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3);
-  border: var(--control-border);
-  border-radius: var(--radius-control);
-  background: var(--bg-subtle);
-  color: var(--warn);
   font-size: var(--fs-sm);
 }
 .fleet-cards {

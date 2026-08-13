@@ -4,6 +4,7 @@
 // re-renders the same glyph next to what it means, so hovering both reports the task's live state
 // and teaches the icon. Pure/view-only — callers resolve the reactive inputs and pass them in.
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
+import { CHECK_TONE } from '../ui/displayMeta'
 
 export type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
 
@@ -19,7 +20,7 @@ export type RailStatusItem = {
   label: string
   overlayCls: string // positioned class(es) for the rail overlay
   glyph?: string // icon name for ui/Icon.tsx; omitted for the CI dot (which is a coloured circle)
-  dotCls?: string // 'checks-dot checks-dot-…' — the CI dot, self-coloured
+  dotTone?: 'ok' | 'warn' | 'bad' | 'mixed' // the CI dot's StatusDot tone; absent for glyph markers
   tone?: 'accent' | 'warn' | 'del' // legend glyph colour
 }
 
@@ -33,7 +34,7 @@ const CHECKS_LABEL: Record<RailChecks, string> = {
 export function railStatusItems({ checks, working, unread, status }: RailStatusInputs): RailStatusItem[] {
   const items: RailStatusItem[] = []
   if (checks)
-    items.push({ key: 'checks', label: CHECKS_LABEL[checks], overlayCls: `tabrail-checks checks-dot checks-dot-${checks}`, dotCls: `checks-dot checks-dot-${checks}` })
+    items.push({ key: 'checks', label: CHECKS_LABEL[checks], overlayCls: 'tabrail-checks', dotTone: CHECK_TONE[checks] })
   if (working) items.push({ key: 'working', label: `${working} agent${working > 1 ? 's' : ''} working`, overlayCls: 'tabrail-spinner spin', glyph: 'loader-circle', tone: 'accent' })
   if (unread) items.push({ key: 'needs', label: 'An agent needs you — unread notifications', overlayCls: 'tabrail-needs', glyph: 'circle-alert', tone: 'warn' })
   // Dirty and missing are mutually exclusive: a vanished worktree can't report a file count.

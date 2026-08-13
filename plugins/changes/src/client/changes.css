@@ -55,7 +55,9 @@
   cursor: pointer;
   visibility: hidden;
 }
-.changes-row-wrap:hover .changes-to-agent { visibility: visible; }
+/* :focus-within as well as :hover — a keyboard user could not reach this at all. */
+.changes-row-wrap:hover .changes-to-agent,
+.changes-row-wrap:focus-within .changes-to-agent { visibility: visible; }
 .changes-to-agent:hover { color: var(--text); }
 
 /* Bulk actions live in the header, not a hoverable row — keep them always visible. */
@@ -104,3 +106,6 @@
 
 /* Commit box (docs/panes.md) at the bottom of the file list. */
 .changes-commit { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: var(--chrome-divider); }
+
+/* Armed for a second click (createArmedConfirm) — the button IS the prompt. */
+.changes-to-agent[data-armed] { color: var(--danger); }

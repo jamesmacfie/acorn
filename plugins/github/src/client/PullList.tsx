@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { A, useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { activateTaskSignals, checksState, clientEvents, createTask, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, scanContentRefs, type Task, tasksKey, tasksOptions, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, CHECK_TONE, checksState, clientEvents, createTask, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, scanContentRefs, type Task, tasksKey, tasksOptions, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
 import { type Pull } from '../contract/api'
@@ -11,6 +11,7 @@ import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
+import { Alert, Button, EmptyState, Input, StatusDot } from '@acorn/plugin-api/ui'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -205,30 +206,31 @@ export default function PullList() {
         <button type="button" classList={{ active: tab() === 'closed' }} onClick={() => setTab('closed')}>
           Closed
         </button>
-        <input class="pr-filter" placeholder="Filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
+        <Input class="pr-filter" kind="filter" placeholder="Filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
       </div>
-      <Show when={taskError()}><div class="action-error" role="alert">{taskError()}</div></Show>
+      <Show when={taskError()}><Alert class="pr-task-error">{taskError()}</Alert></Show>
       {/* Scroll element stays mounted from first render so the virtualizer always observes it —
           publish the ref after layout so the first observed rect has the flexed pane height. */}
       <div class="pr-list-scroll" ref={publishScrollEl}>
         <Show
           when={ready()}
           fallback={
-            <Show when={!githubConnected() && (isError() || repoKnown())} fallback={<p class="placeholder">{isError() ? 'Failed to load PRs.' : 'Loading…'}</p>}>
-              <div class="placeholder pr-list-connect">
-                <p>acorn is not connected to GitHub on this node.</p>
-                <button
-                  type="button"
-                  class="ui-btn"
-                  onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}
-                >
-                  Connect GitHub
-                </button>
-              </div>
+            <Show when={!githubConnected() && (isError() || repoKnown())} fallback={<EmptyState align="start" busy={!isError()}>{isError() ? 'Failed to load PRs.' : 'Loading…'}</EmptyState>}>
+              <EmptyState
+                align="start"
+                title="Not connected to GitHub"
+                action={
+                  <Button onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
+                    Connect GitHub
+                  </Button>
+                }
+              >
+                This node has no GitHub credential, so it cannot list pull requests.
+              </EmptyState>
             </Show>
           }
         >
-          <Show when={shown().length} fallback={<p class="placeholder">No matching PRs.</p>}>
+          <Show when={shown().length} fallback={<EmptyState align="start">No matching PRs.</EmptyState>}>
             <div class="pr-list" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
               <For each={virtualRows()}>
                 {({ vi, pr }) => {
@@ -249,7 +251,7 @@ export default function PullList() {
                     >
                       <span class="pr-num">#{pr.number}</span>
                       <Show when={checks().length}>
-                        <span class={`checks-dot checks-dot-${checksState(checks())}`} />
+                        <StatusDot tone={CHECK_TONE[checksState(checks())]} />
                       </Show>
                       <span class="pr-title">{pr.title}</span>
                       <Show when={pr.draft}>

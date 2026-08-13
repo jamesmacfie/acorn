@@ -1,5 +1,6 @@
 import { For, Show, type Component } from 'solid-js'
-import { type AgentToolRendererProps, agentToolRendererRegistry } from '@acorn/plugin-api/client'
+import { agentToolTone, type AgentToolRendererProps, agentToolRendererRegistry } from '@acorn/plugin-api/client'
+import { StatusDot } from '@acorn/plugin-api/ui'
 
 export type {
   AgentToolRendererContribution,
@@ -9,7 +10,7 @@ export type {
 const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   <details class="agent-tool" open={props.tool.status === 'running'}>
     <summary>
-      <span class="agent-tool-state" data-state={props.tool.status} />
+      <StatusDot tone={agentToolTone(props.tool.status)} />
       <span>{props.tool.title}</span>
       <span class="muted">{props.tool.status}</span>
     </summary>

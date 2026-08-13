@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration, IntegrationProject, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import { integrationProjectsOptions, integrationsOptions, workspaceExternalProjectsKey, workspaceExternalProjectsOptions } from '../queries'
 import { setWorkspaceExternalProjects } from '../workspaces/mutations'
+import { Alert, Checkbox } from '../ui/primitives'
 
 // Settings → per-workspace page: which of a connected integration's projects this workspace follows.
 //
@@ -73,7 +74,7 @@ export default function WorkspaceExternalProjects(props: { workspace: Workspace 
           Which projects this workspace follows. Its rails show items from these; with nothing linked, an
           integration is unscoped and shows whatever it can reach.
         </span>
-        <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+        <Show when={error()}><Alert>{error()}</Alert></Show>
         <For each={candidates()}>
           {(connection) => (
             <ConnectionProjects
@@ -122,15 +123,14 @@ function ConnectionProjects(props: {
         >
           <For each={rows()} fallback={<p class="muted">No projects in this connection.</p>}>
             {(project) => (
-              <label class="settings-field-row" style={{ 'padding-left': '1.5rem' }}>
-                <input
-                  type="checkbox"
-                  disabled={props.busy}
-                  checked={props.isLinked(project.id)}
-                  onChange={(event) => props.onToggle(project.id, event.currentTarget.checked)}
-                />
-                <span class="settings-label">{project.label}</span>
-              </label>
+              <Checkbox
+                class="settings-field-row"
+                nested
+                label={project.label}
+                disabled={props.busy}
+                checked={props.isLinked(project.id)}
+                onChange={(event) => props.onToggle(project.id, event.currentTarget.checked)}
+              />
             )}
           </For>
         </Show>

@@ -238,48 +238,21 @@
 }
 /* In-diff find (⌘F). Lives in the toolbar, pushed to the far left so the view-mode toggle keeps
    its flex-end spot. */
-.diff-find { display: flex; align-items: center; gap: var(--space-2); margin-right: auto; }
-.diff-find-input {
-  width: 200px;
-  padding: 3px var(--space-4);
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-}
-.diff-find-input:focus { outline: none; border-color: var(--focus); }
-.diff-find-count { min-width: 40px; font-size: var(--fs-sm); color: var(--text-faint); text-align: center; }
-.diff-find-btn {
-  padding: var(--space-1) var(--space-3);
-  color: var(--text-muted);
-  background: transparent;
-  border: var(--control-bw) solid transparent;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.diff-find-btn:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
-.diff-find-btn:disabled { opacity: 0.4; cursor: default; }
-.diff-find-btn.active { color: var(--text); background: var(--bg-selected); }
+/* FindBar owns the strip, the input, the count and the prev/next/close buttons (ui/FindBar.tsx).
+   What is left is the diff toolbar's own placement: the bar sits hard left so the view-mode segments
+   keep their flex-end spot. */
+.diff-find { flex: 1; margin-right: auto; border-bottom: 0; background: none; }
+.diff-find .ui-findbar-input { width: 200px; flex: none; }
+/* The Aa toggle keeps its compact padding. */
+.diff-find-btn { padding: var(--space-1) var(--space-3); }
 
-/* Match highlights layer over the line/word backgrounds; theme-independent yellow/orange so the
-   syntax colour underneath stays legible. */
-.diff-find-hit { background: var(--find-hit-bg); border-radius: var(--radius-marker); }
-.diff-find-current { background: var(--find-current-bg); border-radius: var(--radius-marker); }
+/* Match highlights are `.ui-find-mark` now — one vocabulary across the diff, the log viewer and the
+   file search, defined beside FindBar in primitives.css. They still layer over the line/word
+   backgrounds, and the tokens are theme-independent so the syntax colour underneath stays legible. */
 
-.diff-viewmode { display: inline-flex; border: var(--control-border); border-radius: var(--radius); overflow: hidden; }
-.diff-viewmode-btn {
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: var(--bg);
-  border: 0;
-  padding: var(--space-2) var(--space-6);
-  cursor: pointer;
-}
-.diff-viewmode-btn + .diff-viewmode-btn { border-left: var(--control-border); }
-.diff-viewmode-btn:hover:not(.active) { color: var(--text); }
-.diff-viewmode-btn.active { color: var(--text); background: var(--bg-selected); }
+/* SegmentedControl owns the group; this keeps the toolbar's radius. */
+.diff-viewmode { border-radius: var(--radius); }
+.diff-viewmode .ui-segment { padding: var(--space-2) var(--space-6); font-size: var(--fs-sm); }
 
 /* Word-level intra-line diff: changed spans within a paired delete/insert line get a stronger
    background + (inherited) marker glyph on the line — never colour alone. Layers over the line bg. */
@@ -312,4 +285,6 @@
 .diff-split-full { width: 100%; white-space: normal; }
 .diff-split-full.diff-hunk { display: block; white-space: pre; }
 .diff-split-full.diff-file-row { padding: 0; }
-.diff-split-pair:hover .diff-add-btn { visibility: visible; }
+/* :focus-within as well as :hover — the unified row already had the keyboard half (line ~152). */
+.diff-split-pair:hover .diff-add-btn,
+.diff-split-pair:focus-within .diff-add-btn { visibility: visible; }

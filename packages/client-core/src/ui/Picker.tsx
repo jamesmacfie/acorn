@@ -1,5 +1,6 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
+import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { createAnchoredPopover } from './anchor'
 
 // Searchable popover picker: a button showing the current value opens a filter input + scrollable
 // list. Presentational chrome only — the parent supplies results(query) so it owns filtering and
@@ -11,10 +12,10 @@ import { Portal } from 'solid-js/web'
 // be clipped at the pane edge instead of overlaying the next column. The Portal lifts it out of
 // every overflow/stacking context so it floats above the rest of the app.
 //
-// The anchoring below is deliberately NOT extracted into a shared hook: it has exactly one
-// consumer. AccountMenu and NotificationBell position with plain CSS (no portal, no rect), and
-// MentionTextarea anchors to the text caret rather than to an element, which is a different
-// problem. Extract it if a second element-anchored popover appears.
+// Anchoring, dismissal and reflow now come from ui/anchor.ts. They used to live here, with a
+// comment saying to extract them once a second element-anchored popover appeared; several did, each
+// re-solving less of the problem. Picker keeps the filter/list semantics and owns nothing about
+// geometry.
 export default function Picker<T>(props: {
   label: string | JSX.Element // JSX so a picker can show its current value as an icon, not just text
   ariaLabel?: string
@@ -34,77 +35,35 @@ export default function Picker<T>(props: {
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
   placement?: 'top' | 'bottom'
 }) {
-  const [open, setOpen] = createSignal(false)
   const [filter, setFilter] = createSignal('')
-  const [pos, setPos] = createSignal({ top: 0, left: 0, width: 0 })
   let rootRef: HTMLDivElement | undefined
-  let popoverRef: HTMLDivElement | undefined
   let inputRef: HTMLInputElement | undefined
 
   const items = createMemo(() => props.results(filter()))
 
-  // Anchor the fixed popover under the button. min 300px so it stays readable when the button is
-  // narrow (e.g. "base"); recomputed on open and while open as the page scrolls/resizes.
-  const reposition = () => {
-    const r = rootRef?.getBoundingClientRect()
-    if (!r) return
-    const popoverHeight = popoverRef?.getBoundingClientRect().height ?? 0
-    setPos({
-      top: props.placement === 'top' ? r.top - popoverHeight - 4 : r.bottom + 4,
-      left: r.left,
-      width: Math.max(r.width, 300),
-    })
-  }
+  // min 300px so the list stays readable when the button is narrow (e.g. "base").
+  const popover = createAnchoredPopover({
+    anchor: () => rootRef,
+    placement: () => (props.placement === 'top' ? 'top-start' : 'bottom-start'),
+    minWidth: 300,
+    disabled: () => !!props.disabled,
+    onDismiss: () => setFilter(''),
+  })
+  const open = popover.open
 
   const close = () => {
-    setOpen(false)
+    popover.close()
     setFilter('')
   }
   const toggle = () => {
-    if (props.disabled) return
-    if (open()) close()
-    else {
-      reposition()
-      setOpen(true)
-      queueMicrotask(() => {
-        reposition()
-        inputRef?.focus()
-      })
-    }
+    popover.toggle()
+    if (open()) queueMicrotask(() => inputRef?.focus())
   }
   const choose = (item: T) => {
     if (props.isDisabled?.(item)) return
     props.onSelect(item)
     if (!props.keepOpen) close()
   }
-
-  // Outside-click must account for the portalled popover living outside rootRef.
-  const onDocPointer = (e: PointerEvent) => {
-    if (!open()) return
-    const t = e.target as Node
-    if (!rootRef?.contains(t) && !popoverRef?.contains(t)) close()
-  }
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && open()) {
-      e.preventDefault()
-      close()
-    }
-  }
-  const onReflow = () => {
-    if (open()) reposition()
-  }
-  onMount(() => {
-    document.addEventListener('pointerdown', onDocPointer)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('resize', onReflow)
-    window.addEventListener('scroll', onReflow, true) // capture: catch scrolls in inner panes too
-  })
-  onCleanup(() => {
-    document.removeEventListener('pointerdown', onDocPointer)
-    window.removeEventListener('keydown', onKey)
-    window.removeEventListener('resize', onReflow)
-    window.removeEventListener('scroll', onReflow, true)
-  })
 
   return (
     <div class="repo-picker" ref={rootRef}>
@@ -125,10 +84,10 @@ export default function Picker<T>(props: {
       <Show when={open()}>
         <Portal>
           <div
-            ref={popoverRef}
+            ref={(el) => popover.setSurface(el)}
             class="repo-picker-popover repo-picker-popover-fixed"
             role="listbox"
-            style={{ top: `${pos().top}px`, left: `${pos().left}px`, width: `${pos().width}px` }}
+            style={popover.surfaceStyle()}
           >
             <div class="repo-picker-tools">
               <input

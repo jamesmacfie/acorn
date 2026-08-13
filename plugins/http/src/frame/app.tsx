@@ -1,5 +1,5 @@
 import { createResource, createSignal, For, Match, Show, Switch } from 'solid-js'
-import { Spinner } from '@acorn/plugin-api/ui'
+import { EmptyState } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { projectRoute, projectsRoute, type Project, type ProjectsResponse } from '@acorn/protocol/api.ts'
 import HttpPanel from './HttpPanel'
@@ -52,7 +52,7 @@ export function HttpFrameApp(props: { bridge: AcornBridge }) {
         <SettingsSurface bridge={props.bridge} />
       </Match>
       <Match when={project.loading}>
-        <p class="placeholder"><Spinner /> Loading project…</p>
+        <EmptyState align="start" busy>Loading project…</EmptyState>
       </Match>
       <Match when={project.error}>
         <div class="http-choose-repo">

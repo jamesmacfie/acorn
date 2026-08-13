@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { defaultModelIdFor, Modal, ModelConnectionPicker, Picker } from '@acorn/plugin-api/ui'
+import { Alert, Chip, defaultModelIdFor, Modal, ModelConnectionPicker, Picker, Textarea } from '@acorn/plugin-api/ui'
 import { AcornBridgeError } from '@acorn/plugin-api/ui/sdk'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
@@ -61,10 +61,14 @@ export default function GenerateSqlModal(props: {
     }
   }
 
+  // Modal owns the deferred focus; a bare `autofocus` is unreliable inside a Solid modal.
+  let promptInput: HTMLTextAreaElement | undefined
+
   return (
     <Modal
       title="Generate SQL"
       class="db-generate"
+      autoFocus={() => promptInput}
       onClose={props.onClose}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return false
@@ -73,13 +77,13 @@ export default function GenerateSqlModal(props: {
       }}
     >
       <Modal.Body class="db-generate-body">
-        <textarea
-          class="settings-script"
+        <Textarea
+          mono
           rows="4"
           maxlength={GENERATE_MAX_PROMPT_CHARS}
           spellcheck={false}
           placeholder="Describe the query — e.g. the 10 most recent orders with the customer's email"
-          ref={(el) => queueMicrotask(() => el.focus())}
+          ref={(el) => { promptInput = el }}
           value={prompt()}
           onInput={(e) => setPrompt(e.currentTarget.value)}
         />
@@ -89,10 +93,7 @@ export default function GenerateSqlModal(props: {
             <div class="db-chips">
               <For each={chosen()}>
                 {(q) => (
-                  <span class="db-chip" title={q.notes ?? ''}>
-                    {q.name}
-                    <button type="button" class="db-chip-x" title="Remove" onClick={() => toggle(q)}>✕</button>
-                  </span>
+                  <Chip class="db-chip" title={q.notes ?? ''} onRemove={() => toggle(q)}>{q.name}</Chip>
                 )}
               </For>
               <Picker<DbSavedQuery>
@@ -119,7 +120,7 @@ export default function GenerateSqlModal(props: {
           }}
         />
         <Show when={error()}>
-          <div class="db-error">{error()}</div>
+          <Alert>{error()}</Alert>
         </Show>
       </Modal.Body>
       <div class="db-generate-actions">

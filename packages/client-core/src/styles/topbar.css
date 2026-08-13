@@ -207,7 +207,6 @@
 .repo-picker-name > small { margin-top: var(--space-1); color: var(--text-faint); font-size: var(--fs-2xs); }
 
 /* Top-right overflow menu (Settings / Clear cache). */
-.account-menu { position: relative; }
 .account-menu-button {
   display: inline-flex;
   align-items: center;
@@ -229,35 +228,5 @@
 }
 .account-menu-chevron { flex: none; font-size: var(--fs-2xs); line-height: 1; }
 
-.account-menu-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: var(--z-popover);
-  width: 184px;
-  max-width: calc(100vw - (2 * var(--pane-pad)));
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-2);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius-popover);
-  box-shadow: var(--shadow-5);
-}
-.account-menu-item {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 30px;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: none;
-  border: 0;
-  border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-.account-menu-item:hover { background: var(--bg-hover); }
+/* Menu owns the surface and the item vocabulary. This keeps only the topbar menu's fixed width. */
+.account-menu-popover { width: 184px; }

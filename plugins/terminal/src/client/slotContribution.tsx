@@ -5,6 +5,7 @@
 // apps/desktop/src/app/client/slotContributions.tsx — the shell contributed the toggle for the drawer
 // this plugin owns, which is the wrong way round.
 import type { UiSlotContribution } from '@acorn/plugin-api/client'
+import { ToggleButton } from '@acorn/plugin-api/ui'
 
 export const terminalToggleSlotContribution: UiSlotContribution = {
   id: 'terminal.topbar-toggle',
@@ -14,6 +15,15 @@ export const terminalToggleSlotContribution: UiSlotContribution = {
   requires: 'desktop',
   when: (context) => context.taskActive,
   component: (props) => (
-    <button type="button" class="theme-toggle" title="Terminal" aria-pressed={props.context.terminalOpen} onClick={props.context.toggleTerminal}>▣</button>
+    // Was borrowing `.theme-toggle`, a class belonging to a control this plugin does not own.
+    <ToggleButton
+      variant="bare"
+      class="terminal-topbar-toggle"
+      title="Terminal"
+      pressed={props.context.terminalOpen}
+      onPressedChange={props.context.toggleTerminal}
+    >
+      ▣
+    </ToggleButton>
   ),
 }

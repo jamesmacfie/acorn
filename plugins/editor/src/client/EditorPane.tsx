@@ -1,7 +1,7 @@
-import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import * as monaco from 'monaco-editor'
 import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWithin, type PaneIntent, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
-import { Tabs } from '@acorn/plugin-api/ui'
+import { Alert, Button, DocumentTabs, EmptyState, Tabs } from '@acorn/plugin-api/ui'
 import { MONACO_THEME, monacoLanguageForPath, watchMonacoTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi } from './editorClient'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
@@ -249,8 +249,8 @@ export default function EditorPane(props: { task: Task }) {
 
   return (
     <section ref={paneRef} class="pane editor-pane" style={{ 'grid-column': '1 / 3' }}>
-      <Show when={root() !== undefined} fallback={<div class="editor-empty muted">Loading…</div>}>
-        <Show when={root()} fallback={<div class="editor-empty muted">Open a terminal first to map this repo's checkout.</div>}>
+      <Show when={root() !== undefined} fallback={<EmptyState busy>Loading…</EmptyState>}>
+        <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
           <div class="editor-layout">
             <div class="editor-side">
               <Tabs
@@ -281,45 +281,47 @@ export default function EditorPane(props: { task: Task }) {
               <SearchPanel taskId={taskId} active={side() === 'search'} />
             </div>
             <div class="editor-main">
-              <div class="editor-tabs">
-                <For each={files()}>
-                  {(file) => (
-                    <div class="editor-tab" classList={{ active: active() === file.path, ephemeral: file.ephemeral }}>
-                      <button
-                        type="button"
-                        class="editor-tab-name"
-                        title={file.path}
-                        onClick={() => void show(file.path)}
-                        onDblClick={() => editorPromote(taskId, file.path)}
-                      >
-                        {file.path.split('/').pop()}
-                        {file.dirty ? ' ●' : ''}
-                      </button>
-                      <button type="button" class="editor-tab-close" title="Close" onClick={() => void close(file.path)}>✕</button>
-                    </div>
-                  )}
-                </For>
-                <div class="editor-tab-actions">
-                  <Show when={active()}>
-                    <button
-                      type="button"
-                      class="editor-save"
-                      title="Add file/selection reference to the agent composer"
-                      onClick={() => {
-                        const p = currentPath
-                        if (!p) return
-                        const sel = editor?.getSelection()
-                        const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
-                        void sendReferenceToAgent(taskId, ref).then((r) => {
-                          if (!r.ok && r.reason) setSaveErr(r.reason)
-                          else setSaveErr('')
-                        })
-                      }}
-                    >→ agent</button>
-                  </Show>
-                  <Show when={saveErr()}><span class="action-error">{saveErr()}</span></Show>
-                </div>
-              </div>
+              {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
+                  button was mouse-only, and there were no arrow keys. */}
+              <DocumentTabs
+                class="editor-tabs"
+                idPrefix="editor"
+                ariaLabel="Open files"
+                active={active() ?? ''}
+                onActivate={(path) => void show(path)}
+                onClose={(path) => void close(path)}
+                onPromote={(path) => editorPromote(taskId, path)}
+                tabs={files().map((file) => ({
+                  id: file.path,
+                  label: file.path.split('/').pop() ?? file.path,
+                  title: file.path,
+                  dirty: file.dirty,
+                  ephemeral: file.ephemeral,
+                }))}
+                actions={
+                  <>
+                    <Show when={active()}>
+                      <Button
+                        variant="bare"
+                        size="sm"
+                        class="editor-save"
+                        data-tip="Add file/selection reference to the agent composer"
+                        onClick={() => {
+                          const p = currentPath
+                          if (!p) return
+                          const sel = editor?.getSelection()
+                          const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
+                          void sendReferenceToAgent(taskId, ref).then((r) => {
+                            if (!r.ok && r.reason) setSaveErr(r.reason)
+                            else setSaveErr('')
+                          })
+                        }}
+                      >→ agent</Button>
+                    </Show>
+                    <Show when={saveErr()}><Alert>{saveErr()}</Alert></Show>
+                  </>
+                }
+              />
               <div class="editor-host" ref={host} />
             </div>
           </div>

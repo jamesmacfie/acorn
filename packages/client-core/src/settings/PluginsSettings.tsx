@@ -12,7 +12,7 @@ import {
 } from '../node/nodePlugins'
 import { readPluginHostState } from '../plugins/host'
 import { syncPluginDistribution } from '../plugins/distribution'
-import { Button, Input, Select } from '../ui/primitives'
+import { Alert, Button, Checkbox, Input, Select } from '../ui/primitives'
 import { nextDisabledList, pluginPending } from './pluginToggle'
 import './settings.css'
 
@@ -166,18 +166,20 @@ export default function PluginsSettings() {
       </p>
 
       <Show when={restartRequired()}>
-        <div class="settings-notice" role="status">
-          <span>This node is still running the previous set of plugins.</span>
-          <Show
-            when={node()?.local}
-            fallback={<span class="muted">Restart it on its own machine to apply the change.</span>}
-          >
-            <Button size="sm" disabled={busy()} onClick={() => void restart()}>Restart node</Button>
-          </Show>
-        </div>
+        <Alert
+          tone="warn"
+          variant="banner"
+          actions={
+            <Show when={node()?.local} fallback={<span class="muted">Restart it on its own machine to apply the change.</span>}>
+              <Button size="sm" disabled={busy()} onClick={() => void restart()}>Restart node</Button>
+            </Show>
+          }
+        >
+          This node is still running the previous set of plugins.
+        </Alert>
       </Show>
 
-      <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
 
       {/* The install form. Deliberately plain: there is no browse-and-discover surface and there is not
           going to be one soon, because any listing acorn could offer would be unreviewed
@@ -220,15 +222,12 @@ export default function PluginsSettings() {
         <For each={optional()}>
           {(row) => (
             <li class="plugin-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!row.disabled}
-                  disabled={busy()}
-                  onChange={(event) => void toggle(row.name, !event.currentTarget.checked)}
-                />
-                <span class="plugin-name">{row.name}</span>
-              </label>
+              <Checkbox
+                label={<span class="plugin-name">{row.name}</span>}
+                checked={!row.disabled}
+                disabled={busy()}
+                onChange={(event) => void toggle(row.name, !event.currentTarget.checked)}
+              />
               {/* Only a plugin that came off this node's disk has a version worth showing; a built-in's
                   is the app's. Absence of the block is also how the owner tells the two apart. */}
               <Show when={row.installed}>

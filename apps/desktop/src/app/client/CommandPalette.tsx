@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { tasksOptions } from '@acorn/client-core/queries.ts'
@@ -16,7 +16,8 @@ import { composeItems, fuzzyFilter, type PaletteItem } from '@acorn/client-core/
 import { paletteRowSources, type PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
 import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
 import { commandAvailable, commandHint, commandRegistry, commandTitle, executeCommand } from '@acorn/client-core/registries/commands.ts'
-import '@acorn/client-core/palette/palette.css'
+import { Alert } from '@acorn/client-core/ui/primitives.tsx'
+import { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'
 
 export default function CommandPalette() {
   const navigate = useNavigate()
@@ -169,39 +170,23 @@ export default function CommandPalette() {
   }
 
   return (
-    <Show when={palette.open()}>
-      <div class="overlay-backdrop" onClick={palette.close}>
-        <div class="overlay palette" role="dialog" aria-modal="true" onKeyDown={palette.onKeyDown} onMouseDown={palette.onDialogMouseDown} onClick={(e) => e.stopPropagation()}>
-          <input
-            ref={palette.setInputRef}
-            class="palette-input"
-            placeholder="Run a target, switch a pane, task or workspace, archive…"
-            value={palette.query()}
-            onInput={(e) => palette.setQuery(e.currentTarget.value)}
-          />
-          <Show when={actionError()}><div class="action-error palette-action-error" role="alert">{actionError()}</div></Show>
-          <ul class="palette-list">
-            <For each={items()} fallback={<li class="palette-empty muted">No matches.</li>}>
-              {(item, i) => (
-                <li>
-                  <button
-                    type="button"
-                    class="palette-row"
-                    classList={{ selected: i() === palette.sel(), 'palette-error': item.kind === 'error' }}
-                    onMouseEnter={() => palette.setSel(i())}
-                    onClick={() => void invoke(item)}
-                  >
-                    <span class="palette-label">{item.label}</span>
-                    <Show when={'hint' in item && item.hint}>
-                      <span class="palette-hint muted">{'hint' in item ? item.hint : ''}</span>
-                    </Show>
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
-      </div>
-    </Show>
+    <PaletteSurface
+      palette={palette}
+      items={items()}
+      ariaLabel="Command palette"
+      placeholder="Run a target, switch a pane, task or workspace, archive…"
+      emptyText="No matches."
+      status={<Show when={actionError()}><Alert>{actionError()}</Alert></Show>}
+      onPick={(item) => void invoke(item)}
+      rowClassList={(item) => ({ 'palette-error': item.kind === 'error' })}
+      row={(item) => (
+        <>
+          <span class="palette-label">{item.label}</span>
+          <Show when={'hint' in item && item.hint}>
+            <span class="palette-hint muted">{'hint' in item ? item.hint : ''}</span>
+          </Show>
+        </>
+      )}
+    />
   )
 }

@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { clientEvents, integrationsOptions, type ProjectImporterProps, projectsKey, taskBridge, workspacesKey, writeJson } from '@acorn/plugin-api/client'
-import { Button } from '@acorn/plugin-api/ui'
+import { Alert, Button } from '@acorn/plugin-api/ui'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
 import { githubImportRoute, reposKey, type GithubImportAction, type GithubImportItem, type GithubImportResponse, type Repo } from '../contract/api'
 import { reposOptions } from './queries'
@@ -72,10 +72,15 @@ export default function GithubImporter(props: ProjectImporterProps) {
   return (
     <div class="github-importer">
       <Show when={integrations.data && !githubReady()}>
-        <div class="settings-notice" role="status">
-          <p>Connect GitHub to discover repositories and import them into Projects.</p>
-          <Button onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Connect GitHub</Button>
-        </div>
+        <Alert
+          tone="info"
+          variant="banner"
+          actions={
+            <Button onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Connect GitHub</Button>
+          }
+        >
+          Connect GitHub to discover repositories and import them into Projects.
+        </Alert>
       </Show>
       <Show when={githubReady()}>
         <Show when={githubAccount(integrations.data)}>
@@ -84,7 +89,7 @@ export default function GithubImporter(props: ProjectImporterProps) {
         <Show when={api} fallback={<p class="muted">Folder selection is available in the desktop app.</p>}>
           <Show when={!repos.isLoading} fallback={<p class="muted">Loading GitHub repositories…</p>}>
             <Show when={repos.data?.length} fallback={<p class="muted">No mirrored GitHub repositories yet. Refresh GitHub and try again.</p>}>
-              <Show when={error()}><div class="action-error" role="alert">{error()}</div></Show>
+              <Show when={error()}><Alert>{error()}</Alert></Show>
               <div class="github-import-list">
                 <For each={repos.data ?? []}>
                   {(repo) => (

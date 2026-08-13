@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import type { PluginSlotDescriptor } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { createFleetQuery } from '../../node/fanout'
-import { Badge } from '../../ui/primitives'
+import { Badge, Button } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import { runChromeAction } from './actions'
 import { chromeKey, chromeRevision, readBadge } from './data'
@@ -37,18 +37,16 @@ export default function ChromeBadge(props: ChromeBadgeProps) {
   return (
     <Show when={badge()}>
       {(value) => (
-        <button
-          type="button"
-          class="ui-btn"
-          data-variant="ghost"
-          data-size="xs"
+        <Button
+          variant="ghost"
+          size="xs"
           title={value().tooltip ?? props.descriptor.id}
           disabled={!props.descriptor.onClick}
           onClick={click}
         >
           <Show when={props.descriptor.icon}>{(name) => <Icon name={name()} />}</Show>
           <Badge tone={value().tone ?? 'neutral'}>{value().text}</Badge>
-        </button>
+        </Button>
       )}
     </Show>
   )

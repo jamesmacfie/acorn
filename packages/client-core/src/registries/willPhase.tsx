@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { createDismissable } from '../ui/dismissable'
 import { collectConcerns, type Concern, type WillEventMap } from './willPhaseModel'
+import { Checkbox } from '../ui/primitives'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
 
@@ -61,14 +62,12 @@ export function WillConfirmationHost() {
                       <span class="muted">— {concern.feature}</span>
                       <Show when={concern.checkbox}>
                         {(checkbox) => (
-                          <label class="will-concern-option">
-                            <input
-                              type="checkbox"
-                              checked={checks()[concern.id] ?? checkbox().checked}
-                              onChange={(event) => setChecks((all) => ({ ...all, [concern.id]: event.currentTarget.checked }))}
-                            />
-                            {checkbox().label}
-                          </label>
+                          <Checkbox
+                            class="will-concern-option"
+                            label={checkbox().label}
+                            checked={checks()[concern.id] ?? checkbox().checked}
+                            onChange={(event) => setChecks((all) => ({ ...all, [concern.id]: event.currentTarget.checked }))}
+                          />
                         )}
                       </Show>
                     </li>

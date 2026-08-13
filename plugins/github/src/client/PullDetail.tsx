@@ -2,9 +2,9 @@ import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
-import { checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, learnRefPrefixes, linkifyRefs, openRefPanel, persistDraft, projectsOptions, refResolutionsOptions, scanContentRefs, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
+import { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, learnRefPrefixes, linkifyRefs, openRefPanel, persistDraft, projectsOptions, refResolutionsOptions, scanContentRefs, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
 import { requestFileScroll, routeKey } from './fileNavigation'
-import { CopyButton, MentionTextarea, Picker, UserAvatar } from '@acorn/plugin-api/ui'
+import { Button, Checkbox, Chip, CollapsibleSection, Composer, CopyButton, createArmedConfirm, EmptyState, Kbd, Picker, StatusDot, UserAvatar } from '@acorn/plugin-api/ui'
 import { mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions } from './queries'
 import { pullPrefixKey, pullsPrefixKey, type Label } from '../contract/api'
 import { addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel, removeReviewer, reopenPr, rerunFailed, requestReviewer, setDraft, setViewed, submitReview } from './mutations'
@@ -22,12 +22,6 @@ const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 
 
 // Render plain text with bare Linear identifiers (CRA-404) turned into clickable links — used for
 // the PR title, where the id is plain text. Prefixes gate which ids are real (see splitLinearIds).
-const rememberOpen = (key: string) => (el: HTMLDetailsElement) => {
-  const stored = localStorage.getItem(`section-open:${key}`)
-  if (stored !== null) el.open = stored === '1'
-  el.addEventListener('toggle', () => localStorage.setItem(`section-open:${key}`, el.open ? '1' : '0'))
-}
-
 // Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
 // Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-design.md).
 export default function PullDetail(props: { task?: Task } = {}) {
@@ -146,6 +140,8 @@ export default function PullDetail(props: { task?: Task } = {}) {
   }
 
   const [mergeMethod, setMergeMethod] = createSignal('squash')
+  // Destructive PR-side actions arm before they fire. github had NO confirmation on these at all.
+  const armed = createArmedConfirm()
   const [draftText, setDraftText] = createSignal('')
   const [reviewBody, setReviewBody] = createSignal('')
   // Persist in-progress comment/review text per PR so it survives navigation and reloads.
@@ -201,9 +197,9 @@ export default function PullDetail(props: { task?: Task } = {}) {
   }
 
   return (
-    <Show when={n()} fallback={<p class="placeholder">Select a PR.</p>}>
-      <Show when={repoKnown() || !projects.data} fallback={<p class="placeholder">Not found.</p>}>
-      <Show when={detail.data?.pull} fallback={<p class="placeholder">{detail.isError ? 'Not found.' : 'Loading…'}</p>}>
+    <Show when={n()} fallback={<EmptyState align="start">Select a PR.</EmptyState>}>
+      <Show when={repoKnown() || !projects.data} fallback={<EmptyState align="start">Not found.</EmptyState>}>
+      <Show when={detail.data?.pull} fallback={<EmptyState align="start" busy={!detail.isError}>{detail.isError ? 'Not found.' : 'Loading…'}</EmptyState>}>
         {(pull) => (
           <>
             <PullSummary
@@ -225,22 +221,23 @@ export default function PullDetail(props: { task?: Task } = {}) {
               conflicting={conflicting()}
               conflicts={() => conflicts.data}
               conflictsLoading={() => conflicts.isLoading}
-              conflictsRef={rememberOpen('conflicts')}
               selectFile={selectFile}
             />
 
             <Show when={pull().body}>
-              <details class="nav-section" open ref={rememberOpen('description')}>
-                <summary class="copyable">Description<CopyButton class="copy-right" text={() => descRef?.textContent ?? ''} title="Copy description" /></summary>
+              <CollapsibleSection
+                class="nav-section"
+                persistKey="description"
+                open
+                label="Description"
+                actions={<CopyButton class="copy-right" text={() => descRef?.textContent ?? ''} title="Copy description" />}
+              >
                 <div class="markdown" ref={descRef} onClick={onContentClick} innerHTML={pull().body!} />
-              </details>
+              </CollapsibleSection>
             </Show>
 
             <Show when={linearRefs().length > 0}>
-              <details class="nav-section" open ref={rememberOpen('integrations')}>
-                <summary>
-                  Integrations <span class="muted">({linearRefs().length})</span>
-                </summary>
+              <CollapsibleSection class="nav-section" persistKey="integrations" open label="Integrations" count={linearRefs().length}>
                 <Show
                   when={linearConnected()}
                   fallback={
@@ -275,11 +272,9 @@ export default function PullDetail(props: { task?: Task } = {}) {
                                   <>
                                     <span class="integration-row-title">{s().label}</span>
                                     <Show when={s().state}>
-                                      {(st) => (
-                                        <span class="integration-row-state" style={{ '--state-color': st().color }}>
-                                          {st().name}
-                                        </span>
-                                      )}
+                                      {/* The same visual the linear frame draws — two
+                                          implementations of one pill until Chip existed. */}
+                                      {(st) => <Chip size="xs" color={st().color}>{st().name}</Chip>}
                                     </Show>
                                   </>
                                 )}
@@ -291,18 +286,23 @@ export default function PullDetail(props: { task?: Task } = {}) {
                     </For>
                   </ul>
                 </Show>
-              </details>
+              </CollapsibleSection>
             </Show>
 
-            <details class="nav-section" open ref={rememberOpen('labels')}>
-              <summary>Labels</summary>
+            <CollapsibleSection class="nav-section" persistKey="labels" open label="Labels">
               <ul class="label-list">
                 <For each={detail.data?.labels} fallback={<li class="label-empty muted">None.</li>}>
                   {(l) => (
                     <li class="label-row" style={{ 'border-left-color': labelColor(l.color) }}>
                       <span class="label-row-name">{l.name}</span>
-                      <button type="button" class="label-row-remove" title="Remove label" onClick={() => run(removeLabel(o(), r(), n(), l.name))}>
-                        ×
+                      <button
+                        type="button"
+                        class="label-row-remove"
+                        data-armed={armed.armed() === `label:${l.name}` ? '' : undefined}
+                        title={armed.armed() === `label:${l.name}` ? 'Click again to remove' : 'Remove label'}
+                        onClick={() => { if (armed.request(`label:${l.name}`)) run(removeLabel(o(), r(), n(), l.name)) }}
+                      >
+                        {armed.armed() === `label:${l.name}` ? '?' : '×'}
                       </button>
                     </li>
                   )}
@@ -323,21 +323,18 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   )}
                 />
               </div>
-            </details>
+            </CollapsibleSection>
 
-            <details class="nav-section" open ref={rememberOpen('files')}>
-              <summary>
-                Files <span class="muted">({changedFiles.files().length})</span>
-              </summary>
+            <CollapsibleSection class="nav-section" persistKey="files" open label="Files" count={changedFiles.files().length}>
               <ul class="file-list">
                 <For each={changedFiles.files()} fallback={<li class="placeholder">{changedFiles.isLoading() ? 'Loading…' : 'No files.'}</li>}>
                   {(f) => {
                     const status = () => fileStatusMeta(f.status)
                     return (
                       <li class="file-row" classList={{ active: changedFiles.currentFile() === f.path, viewed: f.viewed }}>
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           class="file-viewed"
+                          aria-label="Mark viewed"
                           title="Mark viewed"
                           checked={f.viewed}
                           onChange={(e) => run(setViewed(o(), r(), n(), f.path, e.currentTarget.checked))}
@@ -355,19 +352,21 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   }}
                 </For>
               </ul>
-            </details>
+            </CollapsibleSection>
 
             <Show when={detail.data?.checks.length}>
-              <details class="nav-section" ref={rememberOpen('checks')}>
-                <summary>
-                  Checks <span class="muted">({detail.data!.checks.length})</span>
-                  <span class={`checks-dot checks-dot-${checksState(detail.data!.checks)}`} />
-                </summary>
+              <CollapsibleSection
+                class="nav-section"
+                persistKey="checks"
+                label="Checks"
+                count={detail.data!.checks.length}
+                actions={<StatusDot tone={CHECK_TONE[checksState(detail.data!.checks)]} />}
+              >
                 <ul class="check-list">
                   <For each={detail.data!.checks}>
                     {(ck) => (
                       <li class="check-row">
-                        <span class={`check-dot check-${(ck.status ?? '').toLowerCase()}`} />
+                        <StatusDot tone={checkStatusTone(ck.status)} />
                         <Show when={ck.runId != null} fallback={<span class="check-name">{ck.name}</span>}>
                           <button type="button" class="check-name check-name-link" onClick={() => setOpenCheck({ runId: ck.runId!, name: ck.name })}>
                             {ck.name}
@@ -389,27 +388,21 @@ export default function PullDetail(props: { task?: Task } = {}) {
                     )}
                   </For>
                 </ul>
-              </details>
+              </CollapsibleSection>
             </Show>
 
-            <details class="nav-section" open ref={rememberOpen('conversation')}>
-              <summary>
-                Comments/Commits{' '}
-                <span class="muted">({conversationEntries().length})</span>
-              </summary>
+            <CollapsibleSection class="nav-section" persistKey="conversation" open label="Comments/Commits" count={conversationEntries().length}>
               <Show when={detail.data}>
-                <div class="composer">
-                  <MentionTextarea
-                    class="composer-input"
-                    placeholder="Leave a comment…"
-                    value={draftText()}
-                    onInput={setDraftText}
-                    mentions={mentionsList()}
-                  />
-                  <button type="button" onClick={submitComment} disabled={comment.isPending || !draftText().trim()}>
-                    Comment
-                  </button>
-                </div>
+                <Composer
+                  class="composer"
+                  placeholder="Leave a comment…"
+                  value={draftText()}
+                  onInput={setDraftText}
+                  mentions={mentionsList()}
+                  busy={comment.isPending}
+                  onSubmit={submitComment}
+                  hint={<><Kbd size="xs">⌘↵</Kbd> to comment</>}
+                />
               </Show>
               <div class="conversation-items" ref={convRef} onClick={onContentClick}>
                 <For each={conversationEntries()} fallback={<span class="muted conversation-empty">No comments or commits.</span>}>
@@ -418,10 +411,9 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   )}
                 </For>
               </div>
-            </details>
+            </CollapsibleSection>
 
-            <details class="nav-section" open ref={rememberOpen('review')}>
-              <summary>Review</summary>
+            <CollapsibleSection class="nav-section" persistKey="review" open label="Review">
               <ul class="label-list">
                 <For each={detail.data?.requestedReviewers} fallback={<li class="label-empty muted">No reviewers requested.</li>}>
                   {(login) => (
@@ -430,8 +422,14 @@ export default function PullDetail(props: { task?: Task } = {}) {
                         <UserAvatar login={login} />
                         <span class="label-row-name">{login}</span>
                       </span>
-                      <button type="button" class="label-row-remove" title="Remove review request" onClick={() => run(removeReviewer(o(), r(), n(), login))}>
-                        ×
+                      <button
+                        type="button"
+                        class="label-row-remove"
+                        data-armed={armed.armed() === `reviewer:${login}` ? '' : undefined}
+                        title={armed.armed() === `reviewer:${login}` ? 'Click again to remove' : 'Remove review request'}
+                        onClick={() => { if (armed.request(`reviewer:${login}`)) run(removeReviewer(o(), r(), n(), login)) }}
+                      >
+                        {armed.armed() === `reviewer:${login}` ? '?' : '×'}
                       </button>
                     </li>
                   )}
@@ -450,28 +448,28 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   leading={(login) => <UserAvatar login={login} />}
                 />
               </div>
-              <div class="composer">
-                <MentionTextarea
-                  class="composer-input"
-                  placeholder="Leave a review comment…"
-                  value={reviewBody()}
-                  onInput={setReviewBody}
-                  disabled={review.isPending}
-                  mentions={mentionsList()}
-                />
-                <div class="pr-actions">
-                  <button type="button" onClick={() => submitReviewWith('APPROVE')} disabled={review.isPending}>
-                    {review.isPending ? 'Submitting…' : 'Approve'}
-                  </button>
-                  <button type="button" onClick={() => submitReviewWith('REQUEST_CHANGES')} disabled={review.isPending || !reviewBody().trim()}>
-                    Request changes
-                  </button>
-                  <button type="button" onClick={() => submitReviewWith('COMMENT')} disabled={review.isPending || !reviewBody().trim()}>
-                    Comment
-                  </button>
-                </div>
-              </div>
-            </details>
+              <Composer
+                class="composer"
+                placeholder="Leave a review comment…"
+                value={reviewBody()}
+                onInput={setReviewBody}
+                mentions={mentionsList()}
+                busy={review.isPending}
+                submitLabel="Comment"
+                onSubmit={() => submitReviewWith('COMMENT')}
+                hint={<><Kbd size="xs">⌘↵</Kbd> to comment</>}
+                secondary={
+                  <>
+                    {/* Approve is the only verb that works on an empty body, so it cannot be the
+                        primary submit — Composer disables that without text. */}
+                    <Button busy={review.isPending} onClick={() => submitReviewWith('APPROVE')}>Approve</Button>
+                    <Button disabled={review.isPending || !reviewBody().trim()} onClick={() => submitReviewWith('REQUEST_CHANGES')}>
+                      Request changes
+                    </Button>
+                  </>
+                }
+              />
+            </CollapsibleSection>
             <Show when={openCheck()}>
               {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}
             </Show>

@@ -12,6 +12,8 @@ import { composeAction, containerAction, dockerPrune, fetchImages, fetchNetworks
 import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRefresh } from './dockerStore'
 import ContainerDetail from './ContainerDetail'
 import './docker.css'
+import { Alert, Button, createArmedConfirm, EmptyState, Input, SectionHeader, StatusDot, Toolbar } from '@acorn/plugin-api/ui'
+import { containerTone } from './dockerViewState'
 
 type Section = 'containers' | 'images' | 'volumes' | 'networks'
 const SECTIONS: { id: Section; label: string }[] = [
@@ -54,7 +56,6 @@ export default function DockerBrowse() {
   const [filter, setFilter] = createSignal('')
   const [collapsed, setCollapsed] = createSignal<Set<string>>(new Set())
   const [rowBusy, setRowBusy] = createSignal<string | null>(null)
-  const [confirmRm, setConfirmRm] = createSignal<string | null>(null)
   const [groupBusy, setGroupBusy] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
   const [pruneNote, setPruneNote] = createSignal('')
@@ -86,17 +87,11 @@ export default function DockerBrowse() {
   const prefs = createQuery(() => prefsOptions(true))
   const dockerPrefs = () => readDockerPrefs(prefs.data)
 
-  // Two-click confirm shared by every destructive row action, keyed by an arbitrary id.
-  function confirmedOnce(key: string): boolean {
-    if (!dockerPrefs().confirmDestructive) return true
-    if (confirmRm() === key) {
-      setConfirmRm(null)
-      return true
-    }
-    setConfirmRm(key)
-    setTimeout(() => setConfirmRm((v) => (v === key ? null : v)), 3000)
-    return false
-  }
+  // Two-click confirm shared by every destructive row action, keyed by an arbitrary id. The arming,
+  // keying and auto-reset are the shared hook's; the pref gate is docker's own policy.
+  const armed = createArmedConfirm()
+  const confirmedOnce = (key: string): boolean =>
+    !dockerPrefs().confirmDestructive || armed.request(key)
 
   async function prune(kind: DockerPruneKind) {
     if (!confirmedOnce(`prune:${kind}`)) return
@@ -174,7 +169,7 @@ export default function DockerBrowse() {
         setSelected(c.id)
       }}
     >
-      <span class="docker-dot" data-state={c.state} />
+      <StatusDot tone={containerTone(c.state)} />
       <span class="docker-row-name" title={c.name}>{inGroup ? (c.composeService ?? c.name) : c.name}</span>
       <span class="docker-row-meta muted">{c.status}</span>
       <span class="docker-row-actions">
@@ -199,7 +194,7 @@ export default function DockerBrowse() {
             void rowAction(c, 'remove')
           }}
         >
-          {confirmRm() === c.id ? '?' : '🗑'}
+          {armed.armed() === c.id ? '?' : '🗑'}
         </button>
       </span>
     </div>
@@ -247,7 +242,7 @@ export default function DockerBrowse() {
                 void groupAction(g.project!, 'down')
               }}
             >
-              {confirmRm() === `down:${g.project}` ? '?' : '🗑'}
+              {armed.armed() === `down:${g.project}` ? '?' : '🗑'}
             </button>
           </span>
         </div>
@@ -261,25 +256,26 @@ export default function DockerBrowse() {
   return (
     <main class="panes docker-browse-panes">
       <section class="pane pane-left docker-browse">
-        <div class="section-header">
+        <SectionHeader
+          actions={
+            <Button variant="bare" iconOnly title="Refresh" aria-label="Refresh" busy={loading()} onClick={() => void refreshDocker()}>↻</Button>
+          }
+        >
           Docker{dockerInfo()?.available ? ` · ${runningCount()} running` : ''}
-          <button type="button" class="section-refresh" style={{ 'margin-left': 'auto' }} title="Refresh" aria-label="Refresh" disabled={loading()} onClick={() => void refreshDocker()}>
-            {loading() ? '...' : '↻'}
-          </button>
-        </div>
-        <Show when={loadError()}><div class="action-error" role="alert">{loadError()}</div></Show>
+        </SectionHeader>
+        <Show when={loadError()}><Alert>{loadError()}</Alert></Show>
 
         <Show
           when={dockerInfo()?.available !== false}
           fallback={
-            <div class="workspace-empty-inner">
-              <p class="muted">
-                {unavailableReason() === 'not_installed'
-                  ? 'The docker CLI was not found on PATH.'
-                  : 'The docker daemon is not reachable — is Docker/OrbStack running?'}
-              </p>
-              <button type="button" class="ui-btn" onClick={() => void refreshDocker()}>Try again</button>
-            </div>
+            <EmptyState
+              title="Docker is unavailable"
+              action={<Button onClick={() => void refreshDocker()}>Try again</Button>}
+            >
+              {unavailableReason() === 'not_installed'
+                ? 'The docker CLI was not found on PATH.'
+                : 'The docker daemon is not reachable — is Docker/OrbStack running?'}
+            </EmptyState>
           }
         >
           <nav class="docker-tabs docker-subnav">
@@ -287,22 +283,28 @@ export default function DockerBrowse() {
               {(s) => <button type="button" classList={{ active: section() === s.id }} onClick={() => setSection(s.id)}>{s.label}</button>}
             </For>
           </nav>
-          <Show when={actionError()}><div class="action-error" role="alert">{actionError()}</div></Show>
+          <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
 
           <Show when={section() === 'containers'}>
-            <div class="docker-filters">
-              <input class="docker-search" type="text" placeholder="Filter name / image / project" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
-            </div>
+            <Toolbar class="docker-filters" size="sm" ariaLabel="Filter containers">
+              <Input class="docker-search" kind="filter" type="text" placeholder="Filter name / image / project" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
+            </Toolbar>
             <Show when={staleProjects().length}>
-              <div class="docker-stale-banner">
-                <span>{staleProjects().length} stale project{staleProjects().length === 1 ? '' : 's'} — worktree gone.</span>
-                <button type="button" class="ui-btn" onClick={() => void cleanUpStale()}>
-                  {confirmRm() === 'stale-cleanup' ? 'Sure? Composes down all stale' : 'Clean up'}
-                </button>
-              </div>
+              <Alert
+                tone="warn"
+                variant="banner"
+                class="docker-stale-banner"
+                actions={
+                  <Button onClick={() => void cleanUpStale()}>
+                    {armed.armed() === 'stale-cleanup' ? 'Sure? Composes down all stale' : 'Clean up'}
+                  </Button>
+                }
+              >
+                {staleProjects().length} stale project{staleProjects().length === 1 ? '' : 's'} — worktree gone.
+              </Alert>
             </Show>
             <div class="docker-list">
-              <Show when={containers().length} fallback={<p class="placeholder">{loading() ? 'Loading…' : 'No containers.'}</p>}>
+              <Show when={containers().length} fallback={<EmptyState align="start" busy={loading()}>{loading() ? 'Loading…' : 'No containers.'}</EmptyState>}>
                 <For each={activeGroups()}>{groupBlock}</For>
                 <Show when={dockerPrefs().showStopped && stoppedGroups().length}>
                   <div class="docker-section-label muted">Stopped</div>
@@ -315,11 +317,11 @@ export default function DockerBrowse() {
           <Show when={section() === 'images'}>
             <div class="docker-filters docker-object-bar">
               <span class="muted">{(images() ?? []).length} images</span>
-              <button type="button" class="new-pr-btn" onClick={() => void prune('images')}>{confirmRm() === 'prune:images' ? 'Sure?' : 'Prune dangling'}</button>
+              <button type="button" class="new-pr-btn" onClick={() => void prune('images')}>{armed.armed() === 'prune:images' ? 'Sure?' : 'Prune dangling'}</button>
               <Show when={pruneNote()}><span class="muted" role="status">{pruneNote()}</span></Show>
             </div>
             <div class="docker-list">
-              <For each={images() ?? []} fallback={<p class="placeholder">{images.loading ? 'Loading…' : 'No images.'}</p>}>
+              <For each={images() ?? []} fallback={<EmptyState align="start" busy={images.loading}>{images.loading ? 'Loading…' : 'No images.'}</EmptyState>}>
                 {(img) => (
                   <div class="docker-row docker-object-row">
                     <span class="docker-row-name" title={`${img.repository}:${img.tag}`}>{img.repository}<span class="muted">:{img.tag}</span></span>
@@ -328,7 +330,7 @@ export default function DockerBrowse() {
                       <button type="button" class="docker-danger" title="Remove image" onClick={() => {
                         if (!confirmedOnce(`img:${img.id}`)) return
                         void failing(removeImage(img.id, false)).then(() => imagesCtl.refetch())
-                      }}>{confirmRm() === `img:${img.id}` ? '?' : '🗑'}</button>
+                      }}>{armed.armed() === `img:${img.id}` ? '?' : '🗑'}</button>
                     </span>
                   </div>
                 )}
@@ -339,11 +341,11 @@ export default function DockerBrowse() {
           <Show when={section() === 'volumes'}>
             <div class="docker-filters docker-object-bar">
               <span class="muted">{(volumes() ?? []).length} volumes</span>
-              <button type="button" class="new-pr-btn" onClick={() => void prune('volumes')}>{confirmRm() === 'prune:volumes' ? 'Sure? Deletes unused data' : 'Prune unused'}</button>
+              <button type="button" class="new-pr-btn" onClick={() => void prune('volumes')}>{armed.armed() === 'prune:volumes' ? 'Sure? Deletes unused data' : 'Prune unused'}</button>
               <Show when={pruneNote()}><span class="muted" role="status">{pruneNote()}</span></Show>
             </div>
             <div class="docker-list">
-              <For each={volumes() ?? []} fallback={<p class="placeholder">{volumes.loading ? 'Loading…' : 'No volumes.'}</p>}>
+              <For each={volumes() ?? []} fallback={<EmptyState align="start" busy={volumes.loading}>{volumes.loading ? 'Loading…' : 'No volumes.'}</EmptyState>}>
                 {(v) => (
                   <div class="docker-row docker-object-row">
                     <span class="docker-row-name" title={v.mountpoint}>{v.anonymous ? `${v.name.slice(0, 12)}… (anonymous)` : v.name}</span>
@@ -352,7 +354,7 @@ export default function DockerBrowse() {
                       <button type="button" class="docker-danger" title="Remove volume (deletes its data)" onClick={() => {
                         if (!confirmedOnce(`vol:${v.name}`)) return
                         void failing(removeVolume(v.name, false)).then(() => volumesCtl.refetch())
-                      }}>{confirmRm() === `vol:${v.name}` ? '?' : '🗑'}</button>
+                      }}>{armed.armed() === `vol:${v.name}` ? '?' : '🗑'}</button>
                     </span>
                   </div>
                 )}
@@ -363,10 +365,10 @@ export default function DockerBrowse() {
           <Show when={section() === 'networks'}>
             <div class="docker-filters docker-object-bar">
               <span class="muted">{(networks() ?? []).length} networks</span>
-              <button type="button" class="new-pr-btn" onClick={() => void prune('networks')}>{confirmRm() === 'prune:networks' ? 'Sure?' : 'Prune unused'}</button>
+              <button type="button" class="new-pr-btn" onClick={() => void prune('networks')}>{armed.armed() === 'prune:networks' ? 'Sure?' : 'Prune unused'}</button>
             </div>
             <div class="docker-list">
-              <For each={networks() ?? []} fallback={<p class="placeholder">{networks.loading ? 'Loading…' : 'No networks.'}</p>}>
+              <For each={networks() ?? []} fallback={<EmptyState align="start" busy={networks.loading}>{networks.loading ? 'Loading…' : 'No networks.'}</EmptyState>}>
                 {(n) => (
                   <div class="docker-row docker-object-row">
                     <span class="docker-row-name" title={n.id}>{n.name}</span>
@@ -376,7 +378,7 @@ export default function DockerBrowse() {
                         <button type="button" class="docker-danger" title="Remove network" onClick={() => {
                           if (!confirmedOnce(`net:${n.id}`)) return
                           void failing(removeNetwork(n.id)).then(() => networksCtl.refetch())
-                        }}>{confirmRm() === `net:${n.id}` ? '?' : '🗑'}</button>
+                        }}>{armed.armed() === `net:${n.id}` ? '?' : '🗑'}</button>
                       </Show>
                     </span>
                   </div>
@@ -390,7 +392,7 @@ export default function DockerBrowse() {
       <section class="pane pane-right docker-browse-detail">
         <Show
           when={section() === 'containers' && selected()}
-          fallback={<div class="pane-empty"><p class="placeholder">{section() === 'containers' ? 'Select a container.' : `Docker ${section()}.`}</p></div>}
+          fallback={<div class="pane-empty"><EmptyState align="start">{section() === 'containers' ? 'Select a container.' : `Docker ${section()}.`}</EmptyState></div>}
         >
           {(id) => <ContainerDetail target={id()} onRemoved={() => setSelected(null)} />}
         </Show>

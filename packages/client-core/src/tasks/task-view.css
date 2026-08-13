@@ -59,14 +59,6 @@
   align-items: center;
   justify-content: center;
 }
-.workspace-empty-inner {
-  max-width: 380px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-}
 .workspace-empty-term {
   align-self: center;
   font: inherit;
@@ -83,7 +75,6 @@
 /* Browser-preview pane: the <webview> fills the content columns. */
 .workspace-preview { grid-column: 1 / 3; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .workspace-preview-host { flex: 1; min-height: 0; display: flex; }
-.workspace-preview .workspace-empty-inner { margin: auto; text-align: center; }
 
 /* Browser chrome above the preview WebContentsView: navigation + URL bar + preview devtools + spinner. */
 .preview-chrome { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 5px var(--space-3); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
@@ -118,7 +109,6 @@
   border-radius: var(--radius);
 }
 .preview-url:focus { outline: none; border-color: var(--accent); }
-.preview-spinner { flex: none; font-size: var(--fs-sm); color: var(--accent); padding: 0 var(--space-2); }
 .plugin-webview-hostname {
   flex: 1;
   min-width: 0;
@@ -129,14 +119,14 @@
   font-size: var(--fs-sm);
   color: var(--text);
 }
+/* Alert owns the tone and size; this is the chrome-strip truncation it cannot know about. */
 .plugin-webview-blocked {
   flex: none;
   max-width: 45%;
+  margin-top: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs-xs);
-  color: var(--del-marker);
 }
 
 /* The pane-switcher mirrors the left TabRail exactly — same width and button size — for a symmetric
@@ -179,8 +169,6 @@
 .pane-switch-close:hover { color: var(--del-marker); }
 
 /* Close-task confirmation modal bits (reuses the shared .overlay shell). */
-.close-check { display: flex; align-items: center; gap: var(--space-4); font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
-.close-check input { accent-color: var(--accent); cursor: pointer; }
 .close-actions { display: flex; justify-content: flex-end; gap: var(--space-5); }
 .close-confirm { color: var(--del-marker); border-color: var(--del-marker); }
 .task-run-error { position: absolute; left: 12px; bottom: 12px; z-index: var(--z-float); max-width: min(620px, 70vw); display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-5); background: var(--bg); border: var(--control-bw) solid var(--del-marker); }
@@ -216,9 +204,7 @@
 .pr-pane-grid { flex: 1; display: flex; min-width: 0; min-height: 0; }
 .pr-pane-grid > .pane-mid { flex: 0 0 clamp(280px, 20vw, 430px); }
 .pr-pane-grid > .pane-right { flex: 1; min-width: 0; }
-.pane-divider { position: relative; z-index: var(--z-resizer); flex: 0 0 5px; margin: 0 -2px; cursor: col-resize; touch-action: none; outline: none; }
-.pane-divider::after { content: ''; position: absolute; inset: 0 2px; background: var(--border); }
-.pane-divider:hover::after, .pane-divider:focus-visible::after { background: var(--accent); }
+/* SplitHandle owns the hit area, the hairline and the hover/focus tone (ui/split.ts + primitives.css). */
 .pane-slot-actions { position: absolute; top: 4px; right: 4px; z-index: calc(var(--z-resizer) + 1); display: flex; gap: var(--space-1); }
 /* Close button, top-right of each slot (only rendered when more than one pane is open). */
 .pane-close-btn, .pane-pin-btn {

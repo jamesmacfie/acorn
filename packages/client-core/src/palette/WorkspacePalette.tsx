@@ -1,9 +1,10 @@
-import { createMemo, For, Show } from 'solid-js'
+import { createMemo, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { resolveWorkspaceColor } from '@acorn/protocol/workspaceIdentity.ts'
 import { createFleetWorkspaces, selectFleetWorkspace, type FleetWorkspace } from '../workspaces/fleetWorkspaces'
 import { fuzzyScore } from './model'
 import { createOverlayPalette } from './overlay'
+import { PaletteSurface } from './PaletteSurface'
 import './palette.css'
 
 export default function WorkspacePalette() {
@@ -43,45 +44,28 @@ export default function WorkspacePalette() {
   const glyph = (w: FleetWorkspace['workspace']) => (w.icon?.kind === 'emoji' ? `${w.icon.value} ` : '')
 
   return (
-    <Show when={palette.open()}>
-      <div class="overlay-backdrop" onClick={palette.close}>
-        <div class="overlay palette" role="dialog" aria-modal="true" onKeyDown={palette.onKeyDown} onMouseDown={palette.onDialogMouseDown} onClick={(e) => e.stopPropagation()}>
-          <input
-            ref={palette.setInputRef}
-            class="palette-input"
-            placeholder="Switch workspace…"
-            value={palette.query()}
-            onInput={(e) => palette.setQuery(e.currentTarget.value)}
-          />
-          <ul class="palette-list">
-            <For each={matches()} fallback={<li class="palette-empty muted">No workspaces.</li>}>
-              {(entry, i) => {
-                const w = entry.workspace
-                return (
-                  <li>
-                    <button
-                      type="button"
-                      class="palette-row"
-                      classList={{ selected: i() === palette.sel() }}
-                      onMouseEnter={() => palette.setSel(i())}
-                      onClick={() => pick(entry)}
-                    >
-                      <span class="ws-color-dot" style={{ background: resolveWorkspaceColor(w.color, w.name) }} />
-                      <span class="palette-label">{glyph(w)}{w.name}</span>
-                      <Show when={fleet().grouped}>
-                        <span class="palette-hint muted">{entry.node.label}</span>
-                      </Show>
-                      <Show when={w.projects.length}>
-                        <span class="palette-hint muted">{w.projects.length} projects</span>
-                      </Show>
-                    </button>
-                  </li>
-                )
-              }}
-            </For>
-          </ul>
-        </div>
-      </div>
-    </Show>
+    <PaletteSurface
+      palette={palette}
+      items={matches()}
+      ariaLabel="Switch workspace"
+      placeholder="Switch workspace…"
+      emptyText="No workspaces."
+      onPick={(entry) => pick(entry)}
+      row={(entry) => {
+        const w = entry.workspace
+        return (
+          <>
+            <span class="ws-color-dot" style={{ background: resolveWorkspaceColor(w.color, w.name) }} />
+            <span class="palette-label">{glyph(w)}{w.name}</span>
+            <Show when={fleet().grouped}>
+              <span class="palette-hint muted">{entry.node.label}</span>
+            </Show>
+            <Show when={w.projects.length}>
+              <span class="palette-hint muted">{w.projects.length} projects</span>
+            </Show>
+          </>
+        )
+      }}
+    />
   )
 }

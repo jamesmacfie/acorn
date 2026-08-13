@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '@acorn/protocol/managedAgents.ts'
-import { Button, Input, Select } from '@acorn/plugin-api/ui'
+import { Alert, Button, Input, Select } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
 
 export default function AgentRequestCard(props: {
@@ -98,7 +98,7 @@ export default function AgentRequestCard(props: {
           )}
         </For>
       </div>
-      <Show when={error()}><p class="action-error" role="alert">{error()}</p></Show>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
     </section>
   )
 }

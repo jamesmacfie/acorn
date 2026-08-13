@@ -1,6 +1,7 @@
 import { Show } from 'solid-js'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import DatabasePanel from './DatabasePanel'
+import { EmptyState } from '@acorn/plugin-api/ui'
 
 // One bundle, one manifest surface — the frame region of the `database` pane's `document-over-frame`
 // layout. What it renders is decided by `bridge.context`, which is the frame contract: the HOST says
@@ -16,7 +17,7 @@ export function DatabaseFrameApp(props: { bridge: AcornBridge }) {
       when={taskId}
       fallback={
         <div class="db-frame db-empty">
-          <p class="placeholder">This pane needs a task — its database comes from the task's worktree.</p>
+          <EmptyState align="start">This pane needs a task — its database comes from the task's worktree.</EmptyState>
         </div>
       }
     >

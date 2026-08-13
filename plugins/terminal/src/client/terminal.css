@@ -18,14 +18,9 @@
 .terminal-drawer.maximized {
   top: var(--topbar-h);
 }
-.terminal-resize {
-  height: 6px;
-  cursor: ns-resize;
-  background: transparent;
-}
-.terminal-resize:hover {
-  background: var(--border);
-}
+/* SplitHandle owns the grip. The drawer's is full-bleed rather than inset, because it sits flush
+   against the pane above it. */
+.terminal-resize { margin: 0; }
 
 /* Header = a scrolling tab strip (flex:1) + pinned actions, so tabs never squish and the +/^C/close
    stay visible no matter how many sessions are open. */
@@ -36,14 +31,13 @@
   font: var(--fs-sm) / 1 var(--font-mono);
   color: var(--text-muted);
 }
-.terminal-tabstrip {
-  display: flex;
-  gap: var(--space-1);
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  padding-left: var(--space-3);
-}
+/* DocumentTabs owns the strip, the tabs, the run-state dot and the close buttons. What is left is
+   the drawer's own bottom-accent tab look and its mono type. */
+.terminal-tabstrip { flex: 1; min-width: 0; border-bottom: 0; background: none; }
+.terminal-tabstrip .ui-doctab { border-right: 0; border-bottom: var(--tab-active-w) solid transparent; }
+.terminal-tabstrip .ui-doctab[data-active] { background: none; border-bottom-color: var(--accent); }
+.terminal-tabstrip .ui-doctab-label { min-height: auto; padding: var(--space-3) var(--space-4); font-family: var(--font-mono); }
+.terminal-tabstrip .ui-doctab-text { max-width: 220px; }
 .terminal-actions {
   display: flex;
   align-items: center;
@@ -52,58 +46,6 @@
   padding: 0 var(--space-2);
   border-left: var(--chrome-divider);
 }
-.terminal-tab {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex: none;
-  padding: var(--space-3) var(--space-4);
-  cursor: pointer;
-  color: var(--text-muted);
-  border-bottom: var(--tab-active-w) solid transparent;
-  white-space: nowrap;
-}
-.terminal-tab.active {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-}
-.terminal-tab.pending {
-  cursor: default;
-  opacity: 0.7;
-}
-.terminal-tab.pending .terminal-tab-dot {
-  animation: terminal-pending-pulse 1s ease-in-out infinite;
-}
-@keyframes terminal-pending-pulse {
-  50% {
-    opacity: 0.25;
-  }
-}
-.terminal-tab-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-circle);
-  background: var(--add-marker);
-  flex: none;
-}
-.terminal-tab-dot.exited {
-  background: var(--text-faint);
-}
-.terminal-tab-dot.idle {
-  background: var(--warn);
-}
-.terminal-tab-idle {
-  font-size: var(--fs-2xs);
-  color: var(--warn);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
-}
-.terminal-tab-title {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.terminal-tab-x,
 .terminal-new,
 .terminal-close,
 .terminal-interrupt {
@@ -114,7 +56,6 @@
   font-size: var(--fs-sm);
   padding: var(--space-1) var(--space-2);
 }
-.terminal-tab-x:hover,
 .terminal-new:hover,
 .terminal-close:hover,
 .terminal-interrupt:hover {
@@ -124,64 +65,10 @@
   font-size: 16px;
   padding: 0 var(--space-4);
 }
-.terminal-new-wrap {
-  position: relative;
-}
-/* Click-away layer for the "+" profile menu (sits behind the menu, above the rest). */
-.terminal-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-drawer-menu) - 1);
-}
+/* Menu owns the surface (portal, position, elevation, dismissal) and the item vocabulary. This is
+   only the menu's width — `position: relative` on the wrapper went with the absolute positioning. */
 .terminal-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: var(--z-drawer-menu);
   min-width: 180px;
-  background: var(--bg);
-  border: var(--surface-border);
-  border-radius: var(--radius-popover);
-  padding: var(--space-2);
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-4);
-}
-.terminal-menu-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  background: none;
-  border: none;
-  color: var(--text);
-  text-align: left;
-  padding: 5px var(--space-4);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font: var(--fs-sm) / 1.2 var(--font-mono);
-}
-.terminal-menu-item:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-.terminal-menu-item:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.terminal-menu-missing {
-  font-size: var(--fs-2xs);
-  color: var(--text-faint);
-}
-.terminal-menu-wt {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 5px var(--space-4);
-  font: 11px / 1.2 var(--font-mono);
-  color: var(--text-muted);
-  border-bottom: var(--chrome-divider);
-  margin-bottom: var(--space-1);
-  cursor: pointer;
 }
 .terminal-interrupt {
   border: var(--control-border);
@@ -192,10 +79,7 @@
   margin-right: var(--space-4);
   margin-left: var(--space-1);
 }
-.terminal-unavailable {
-  padding: var(--space-3) var(--space-4);
-  color: var(--del-marker);
-}
+.terminal-unavailable { margin-top: 0; padding: var(--space-3) var(--space-4); }
 .terminal-drawer-btn {
   background: none;
   border: var(--control-border);
@@ -224,13 +108,7 @@
   padding: var(--space-2) var(--space-3);
   font: var(--fs-sm) var(--font-mono);
 }
-.terminal-prompt-error {
-  color: var(--del-marker);
-}
-.terminal-error-banner {
-  padding: var(--space-2) var(--space-4);
-  border-bottom: var(--chrome-divider);
-}
+.terminal-error-banner { margin-top: 0; padding: var(--space-2) var(--space-4); border-bottom: var(--chrome-divider); }
 .terminal-body {
   flex: 1;
   min-height: 0;
@@ -247,17 +125,7 @@
   height: 100%;
   padding: var(--space-2) var(--space-3);
 }
-.terminal-empty {
-  margin: auto;
-  color: var(--text-faint);
-  font: var(--fs-sm) var(--font-mono);
-}
 
-.terminal-launching {
-  animation: terminal-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes terminal-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
+/* The topbar toggle. Was borrowing core's `.theme-toggle`; ToggleButton owns the control and its
+   pressed state, so this is only the topbar's tighter padding. */
+.terminal-topbar-toggle { padding: var(--space-1) var(--space-3); }

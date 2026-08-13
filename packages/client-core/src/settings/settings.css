@@ -132,6 +132,10 @@
 .shortcut-reset { margin-left: var(--space-4); padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; font-size: var(--fs-sm); }
 .shortcut-reset:hover { color: var(--text); text-decoration: underline; }
 .shortcut-conflict { border-color: var(--del-marker); }
+/* The conflict note is an Alert rendered mid-sentence, so it gives up the block box and the inline
+   variant's top margin. Every other Alert site is a standalone message. Distinct from
+   `.shortcut-conflict` above, which recolours the key INPUT. */
+.shortcut-conflict-note { display: inline; margin-top: 0; }
 .shortcut-group { display: contents; }
 .shortcut-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
 .shortcut-group-disabled .help-list { opacity: 0.62; }
@@ -157,16 +161,6 @@
 }
 
 /* Settings → Plugins (settings/PluginsSettings.tsx). */
-.settings-notice {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: var(--control-border);
-  border-radius: var(--radius-control);
-  color: var(--warn);
-  font-size: var(--fs-sm);
-}
 .plugin-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .plugin-row { display: flex; align-items: center; gap: var(--space-3); }
 .plugin-row label { display: flex; align-items: center; gap: var(--space-2); }

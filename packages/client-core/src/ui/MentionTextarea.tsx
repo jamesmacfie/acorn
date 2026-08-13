@@ -1,5 +1,6 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { createAnchoredPopover } from './anchor'
 
 // Detect an @-mention fragment ending at the cursor. Returns null when not in one.
 function detectFragment(value: string, cursor: number): { atIdx: number; query: string } | null {
@@ -31,8 +32,18 @@ export default function MentionTextarea(props: {
   let textareaEl: HTMLTextAreaElement | undefined
   const [fragment, setFragment] = createSignal<{ atIdx: number; query: string } | null>(null)
   const [cursorAt, setCursorAt] = createSignal(0)
-  const [pos, setPos] = createSignal({ top: 0, left: 0 })
   const [sel, setSel] = createSignal(0)
+
+  // Anchoring, outside-click and Escape come from ui/anchor.ts. This used to be a private
+  // pointerdown listener plus a one-shot measurement, so the popup did not follow a scrolling pane —
+  // it stayed where the textarea had been. The hook re-measures on scroll and resize.
+  //
+  // The fragment drives the surface rather than a toggle: an @-mention popup opens because the text
+  // says so, not because anything was clicked.
+  const popover = createAnchoredPopover({
+    anchor: () => textareaEl,
+    onDismiss: () => setFragment(null),
+  })
 
   const items = createMemo(() => {
     const f = fragment()
@@ -41,10 +52,10 @@ export default function MentionTextarea(props: {
     return props.mentions.filter((m) => m.toLowerCase().includes(q)).slice(0, 8)
   })
 
-  const reposition = () => {
-    const rect = textareaEl?.getBoundingClientRect()
-    if (rect) setPos({ top: rect.bottom + 2, left: rect.left })
-  }
+  createEffect(() => {
+    if (fragment() && items().length) popover.show()
+    else popover.close()
+  })
 
   const insert = (login: string) => {
     const f = fragment()
@@ -71,7 +82,6 @@ export default function MentionTextarea(props: {
     if (f) {
       setFragment(f)
       setSel(0)
-      reposition()
     } else {
       setFragment(null)
     }
@@ -97,13 +107,6 @@ export default function MentionTextarea(props: {
     }
   }
 
-  const onDocPointer = (e: PointerEvent) => {
-    if (!fragment()) return
-    if (textareaEl && !textareaEl.contains(e.target as Node)) setFragment(null)
-  }
-  onMount(() => document.addEventListener('pointerdown', onDocPointer))
-  onCleanup(() => document.removeEventListener('pointerdown', onDocPointer))
-
   return (
     <>
       <textarea
@@ -118,11 +121,12 @@ export default function MentionTextarea(props: {
         onInput={handleInput}
         onKeyDown={handleKeyDown}
       />
-      <Show when={fragment() !== null && items().length > 0}>
+      <Show when={popover.open()}>
         <Portal>
           <ul
+            ref={(el) => popover.setSurface(el)}
             class="mention-popup"
-            style={{ top: `${pos().top}px`, left: `${pos().left}px` }}
+            style={popover.surfaceStyle()}
             role="listbox"
           >
             <For each={items()}>

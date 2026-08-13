@@ -18,6 +18,11 @@ describe('no phantom tokens', () => {
       '--left', // reserved override hook for the left pane width
       '--l', '--r', // Shiki emits both syntax colours inline per token
       '--state-color', '--label-color', // inline per-element props carrying live Linear API colours
+      '--chip-color', // Chip's `color` prop — the shared successor to the two above
+      // Numbers handed to CSS from a component: a fill ratio and a column count. Passing the number
+      // rather than a computed width or a grid template is what keeps the SHAPE in the stylesheet
+      // where a style pack can reach it.
+      '--meter-value', '--kv-extra-cols',
     ])
 
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]

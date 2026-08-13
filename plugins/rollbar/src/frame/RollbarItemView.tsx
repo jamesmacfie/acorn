@@ -1,4 +1,4 @@
-import { Badge, Button, Row, Spinner, Tabs } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, DescriptionList, EmptyState, Row, Tabs } from '@acorn/plugin-api/ui'
 import { For, Show } from 'solid-js'
 import type {
   RollbarItemMetadata,
@@ -30,11 +30,10 @@ const badgeTone = (value: string): 'neutral' | 'add' | 'del' | 'warn' => {
   return 'neutral'
 }
 
+// `Fact` was a local div-pair with no <dt>/<dd> pairing; DescriptionList.Item is the same shape with
+// the semantics. This alias keeps the call sites reading as facts rather than as list items.
 const Fact = (props: { label: string; value: string }) => (
-  <div class="rb-fact">
-    <span class="rb-fact-label">{props.label}</span>
-    <span class="rb-fact-value">{props.value}</span>
-  </div>
+  <DescriptionList.Item class="rb-fact" label={props.label} mono>{props.value}</DescriptionList.Item>
 )
 
 export function RollbarItemView(props: {
@@ -75,33 +74,22 @@ export function RollbarItemView(props: {
         ariaLabel="Rollbar item sections"
       />
 
-      <section
-        id="rollbar-panel-overview"
-        class="rb-panel"
-        role="tabpanel"
-        aria-labelledby="rollbar-tab-overview"
-        hidden={props.activeTab !== 'overview'}
-      >
-        <div class="rb-stats">
+      {/* Was six hand-written attributes that had to agree with the strip's ids, twice. */}
+      <Tabs.Panel idPrefix="rollbar" id="overview" active={props.activeTab} class="rb-panel">
+        <DescriptionList class="rb-stats" layout="facts">
           <Fact label="Occurrences" value={String(item().totalOccurrences)} />
           <Fact label="First seen" value={relativeTime(item().firstOccurrenceAt)} />
           <Fact label="Last seen" value={relativeTime(item().lastOccurrenceAt)} />
           <Fact label="Framework" value={item().framework || 'unknown'} />
           <Fact label="Assigned to" value={item().assignedTo || 'unassigned'} />
           <Fact label="Resolved in" value={item().resolvedInVersion || '—'} />
-        </div>
-      </section>
+        </DescriptionList>
+      </Tabs.Panel>
 
-      <section
-        id="rollbar-panel-occurrences"
-        class="rb-panel"
-        role="tabpanel"
-        aria-labelledby="rollbar-tab-occurrences"
-        hidden={props.activeTab !== 'occurrences'}
-      >
+      <Tabs.Panel idPrefix="rollbar" id="occurrences" active={props.activeTab} class="rb-panel">
         <Show
           when={props.state.occurrences.length}
-          fallback={<div class="rb-placeholder">No occurrence sample is available.</div>}
+          fallback={<EmptyState>No occurrence sample is available.</EmptyState>}
         >
           <div class="rb-occurrence-workbench">
             <div class="rb-occurrence-list">
@@ -124,7 +112,7 @@ export function RollbarItemView(props: {
             <OccurrenceDetail state={props.occurrence} onCopy={props.onCopy} />
           </div>
         </Show>
-      </section>
+      </Tabs.Panel>
     </>
   )
 }
@@ -136,16 +124,15 @@ function OccurrenceDetail(props: {
   return (
     <div class="rb-occurrence-detail">
       <Show when={props.state.kind === 'empty'}>
-        <div class="rb-placeholder">Choose an occurrence to inspect its stack.</div>
+        <EmptyState>Choose an occurrence to inspect its stack.</EmptyState>
       </Show>
       <Show when={props.state.kind === 'loading'}>
-        <div class="rb-placeholder"><Spinner label="Loading occurrence" /></div>
+        <EmptyState busy>Loading occurrence…</EmptyState>
       </Show>
       <Show when={props.state.kind === 'error'}>
-        <div class="rb-error" role="alert">
-          <strong>Could not load the occurrence.</strong>
-          <span>{props.state.kind === 'error' ? props.state.detail : ''}</span>
-        </div>
+        <Alert variant="banner" title="Could not load the occurrence.">
+          {props.state.kind === 'error' ? props.state.detail : ''}
+        </Alert>
       </Show>
       <Show when={props.state.kind === 'ready' ? props.state.detail : undefined}>
         {(detail) => <OccurrenceContent detail={detail()} onCopy={props.onCopy} />}
@@ -170,11 +157,13 @@ function OccurrenceContent(props: {
         </div>
         <Button size="sm" onClick={() => props.onCopy(detail())}>Copy context</Button>
       </div>
-      <Show when={detail().request?.url}>
-        <Fact label="Request" value={[detail().request?.method, detail().request?.url].filter(Boolean).join(' ')} />
-      </Show>
-      <Show when={detail().context}><Fact label="Context" value={detail().context!} /></Show>
-      <Show when={detail().server?.host}><Fact label="Server" value={detail().server!.host!} /></Show>
+      <DescriptionList layout="facts">
+        <Show when={detail().request?.url}>
+          <Fact label="Request" value={[detail().request?.method, detail().request?.url].filter(Boolean).join(' ')} />
+        </Show>
+        <Show when={detail().context}><Fact label="Context" value={detail().context!} /></Show>
+        <Show when={detail().server?.host}><Fact label="Server" value={detail().server!.host!} /></Show>
+      </DescriptionList>
       <ol class="rb-stack">
         <For each={detail().frames}>{(frame) => (
           <li class="rb-stack-frame" classList={{ 'rb-stack-frame-project': frame.inProject !== false }}>

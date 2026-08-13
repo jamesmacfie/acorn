@@ -8,18 +8,9 @@
 
 .docker-browse { display: flex; flex-direction: column; overflow: hidden; }
 
-.docker-filters { display: flex; gap: var(--space-3); padding: 6px var(--pane-pad); border-bottom: var(--chrome-divider); }
-.docker-search {
-  flex: 1;
-  min-width: 120px;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-1) var(--space-3);
-}
+.docker-filters { padding: 6px var(--pane-pad); }
+/* Input kind="filter" owns the control. What is left is what differs. */
+.docker-search { min-width: 120px; }
 
 .docker-list { overflow-y: auto; flex: 1; }
 .docker-section-label { padding: var(--space-5) var(--space-6) var(--space-2); font-size: var(--fs-sm); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); }
@@ -60,12 +51,6 @@
 }
 .docker-row-actions button:hover { color: var(--text); background: var(--bg-subtle); }
 
-.docker-dot { width: 8px; height: 8px; border-radius: var(--radius-circle); flex: none; background: var(--text-muted); }
-.docker-dot[data-state='running'] { background: var(--state-ok); }
-.docker-dot[data-state='paused'],
-.docker-dot[data-state='restarting'] { background: var(--state-warn); }
-.docker-dot[data-state='exited'],
-.docker-dot[data-state='dead'] { background: var(--state-bad); }
 
 /* Detail pane */
 .docker-detail { display: flex; flex-direction: column; overflow: hidden; height: 100%; padding: var(--pane-pad); gap: var(--space-3); }
@@ -88,23 +73,18 @@
 }
 .docker-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 
-.docker-info { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-8); margin: var(--space-3) 0 0; overflow-y: auto; font-size: var(--fs-sm); }
-.docker-info dt { color: var(--text-muted); }
-.docker-info dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+/* DescriptionList owns the grid; these keep the detail pane's own gap and its scrolling. */
+.docker-info { gap: var(--space-2) var(--space-8); margin: var(--space-3) 0 0; overflow-y: auto; }
+.docker-info .ui-dl-item { gap: var(--space-2) var(--space-8); }
 
 .docker-ports { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+/* Chip owns the box, the tones and the interactivity. What is left is what differs. */
 .docker-port-chip {
-  font: inherit;
-  font-size: var(--fs-sm);
   font-family: var(--font-mono);
+  font-size: var(--fs-sm);
   color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--control-border);
   border-radius: var(--radius);
-  padding: 1px var(--space-3);
-  cursor: pointer;
 }
-.docker-port-chip:disabled { cursor: default; color: var(--text-muted); }
 
 .docker-mounts, .docker-env { list-style: none; margin: 0; padding: 0; }
 .docker-env { max-height: 200px; overflow-y: auto; }
@@ -120,32 +100,25 @@
   padding: 0 var(--space-3);
   flex: none;
 }
+/* Alert owns the tone; this makes it a full-bleed strip rather than an inset card. */
 .docker-stale-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
+  margin-top: 0;
   padding: 6px var(--pane-pad);
-  font-size: var(--fs-sm);
-  color: var(--state-warn);
+  border: 0;
   border-bottom: var(--chrome-divider);
+  border-radius: var(--radius-0);
+  background: none;
 }
 
 /* Task pane */
 .docker-task-pane { display: flex; flex-direction: column; overflow: hidden; }
 .docker-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 6px var(--pane-pad); border-bottom: var(--chrome-divider); }
 .docker-chip {
-  display: inline-flex;
-  align-items: center;
   gap: var(--space-3);
-  font: inherit;
   font-size: var(--fs-sm);
   color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--control-border);
   border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-5);
-  cursor: pointer;
 }
 .docker-chip.active { border-color: var(--accent); background: var(--bg-selected); }
 
@@ -177,15 +150,15 @@
   pointer-events: none;
 }
 
-.docker-logs-bar { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) 0; }
-.docker-logs-search { flex: 0 1 200px; min-width: 100px; }
-.docker-match-count { white-space: nowrap; }
-.docker-logs mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: var(--radius-marker); }
-.docker-logs mark.current { background: var(--accent); color: var(--bg); }
+/* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
+.docker-logs-bar { gap: var(--space-4); padding: var(--space-2) 0; background: none; border-bottom: 0; }
+/* FindBar owns the input, the count and the nav buttons. */
+.docker-logs-bar .ui-findbar-input { flex: 0 1 200px; min-width: 100px; }
+/* `.ui-find-mark` owns the highlight (see FindBar). */
 .docker-follow { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
-.docker-follow input { accent-color: var(--accent); cursor: pointer; }
 .docker-stats { align-content: start; }
-.docker-meter { width: 160px; height: 10px; vertical-align: middle; margin-right: var(--space-4); }
+/* Was a native <meter>, the one control no style pack could touch. Meter owns the look. */
+.docker-meter { display: inline-block; width: 160px; vertical-align: middle; margin-right: var(--space-4); }
 .docker-logs {
   flex: 1;
   overflow: auto;
