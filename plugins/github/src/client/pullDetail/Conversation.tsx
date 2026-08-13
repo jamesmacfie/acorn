@@ -63,7 +63,7 @@ function ConversationItem(props: { author: string | null; action: string; body: 
         </Show>
       </div>
       <Show when={hasBody()} fallback={<div class="comment-empty muted">No written summary.</div>}>
-        <div class="markdown" ref={bodyRef} innerHTML={props.body!} />
+        <div class="ui-markdown" ref={bodyRef} innerHTML={props.body!} />
       </Show>
     </div>
   )
@@ -135,7 +135,7 @@ function FileThreadComment(props: { comment: ThreadComment; compact: boolean }) 
         </div>
       </Show>
       <Show when={hasRenderableBody(props.comment.body)} fallback={<div class="comment-empty muted">No content.</div>}>
-        <div class="markdown" innerHTML={props.comment.body!} />
+        <div class="ui-markdown" innerHTML={props.comment.body!} />
       </Show>
     </div>
   )

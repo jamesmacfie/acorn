@@ -784,6 +784,38 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    that puts a modal inside a ListDetail would get a silently mispositioned overlay.
    A consumer that wants to stack can say so on its own class (linear does). */
 
+/* ── Markdown ───────────────────────────────────────────────────────────────────────────────
+   Rendered markdown, wherever it comes from: a PR body, a review comment, a Linear description, a
+   note preview, an agent turn. Four plugins render it and there were THREE stylesheets describing
+   how it should look — github's `.markdown`, linear's `.markdown` and agents' `.agent-markdown` —
+   which had already drifted apart on code backgrounds and border roles.
+
+   Worse, the class lived in the wrong package. `.linear-md` was USED by notes and DEFINED by github;
+   core's own diff comment bodies reached for github's `.markdown` too. Turning github off unstyled
+   both. That is the `.action-error` failure exactly — a shared class living in one feature's
+   stylesheet, with core among its dependents. It lives here now and belongs to nobody.
+
+   A class rather than a component because two call sites need a `ref` on the element, and a props
+   member named `ref` is a Solid DOM setter rather than data — see the rule in tools/arch. Consumers
+   keep their own element and add the class.
+
+   Frames get this free: primitives.css is served to a plugin origin whole as /ui.css. */
+.ui-markdown { font-size: var(--fs-sm); line-height: var(--lh); overflow-wrap: anywhere; }
+.ui-markdown p { margin: var(--space-3) 0; }
+.ui-markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
+/* --surface-border, not --control-bw: this is a surface, and linear's copy had the role wrong. */
+.ui-markdown pre { padding: var(--space-4); overflow-x: auto; border: var(--surface-border); }
+.ui-markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
+/* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
+.ui-markdown a { color: var(--accent); }
+.ui-markdown img { display: block; max-width: 100%; height: auto; border-radius: var(--radius); }
+.ui-markdown blockquote {
+  margin: var(--space-4) 0;
+  padding-left: var(--space-5);
+  border-left: var(--surface-bw) solid var(--border);
+  color: var(--text-muted);
+}
+
 /* ── FindBar ────────────────────────────────────────────────────────────────────────────────
    Toolbar geometry plus the search semantics. */
 .ui-findbar-search { flex: 1; min-width: 0; display: flex; }

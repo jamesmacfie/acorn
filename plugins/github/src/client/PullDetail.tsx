@@ -232,7 +232,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                 label="Description"
                 actions={<CopyButton class="copy-right" text={() => descRef?.textContent ?? ''} title="Copy description" />}
               >
-                <div class="markdown" ref={descRef} onClick={onContentClick} innerHTML={pull().body!} />
+                <div class="ui-markdown" ref={descRef} onClick={onContentClick} innerHTML={pull().body!} />
               </CollapsibleSection>
             </Show>
 
