@@ -120,8 +120,10 @@ export default function AgentTaskSidebar(props: {
     }
   }
 
+  // Contents only: ListDetail draws the <aside> and names the landmark, so returning one here would
+  // nest two complementary landmarks and leave the layout on the outer of the pair.
   return (
-    <aside class="agent-task-sidebar" aria-label="Agents in this task">
+    <>
       <header class="agent-task-sidebar-head">
         <strong>Agents</strong>
         <span>{props.managedSessions.length}</span>
@@ -207,6 +209,6 @@ export default function AgentTaskSidebar(props: {
           </section>
         </Show>
       </div>
-    </aside>
+    </>
   )
 }

@@ -3,22 +3,10 @@
   flex-direction: column;
   overflow: hidden;
 }
-.editor-layout {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-/* The sidebar: one column holding the file tree and the find-in-files panel, one visible at a time
-   (docs/panes.md — find-in-files is a panel here, not a pane of its own). */
-.editor-side {
-  flex: none;
-  width: 240px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: var(--chrome-divider);
-  background: var(--bg-subtle);
-}
+/* The split, the sidebar width, the divider and both columns' flex/overflow are ListDetail's, so
+   `.editor-layout` is gone and `.editor-side` keeps only what is this pane's own: one column holding
+   the file tree and the find-in-files panel, one visible at a time (docs/panes.md — find-in-files is
+   a panel here, not a pane of its own). The `--bg-subtle` tint went with the flat list column. */
 /* The shared tab strip, narrowed: 88px minimums do not fit two tabs and the pane's padding at 240px. */
 .editor-side .ui-tabs { flex: none; padding: 0; }
 .editor-side .ui-tab { flex: 1; min-width: 0; padding: 0 var(--space-4); }
@@ -30,12 +18,7 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
-.editor-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+/* `.editor-main` is ListDetail's detail column — the flex column it used to declare is the default. */
 .editor-bar {
   flex: none;
   display: flex;

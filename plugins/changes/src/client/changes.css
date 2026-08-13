@@ -1,13 +1,10 @@
 /* ChangesPane (docs/panes.md): file list + local diff, flat/1px-bordered per docs/ui-design.md. */
 .changes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
-.changes-body { flex: 1; min-height: 0; display: flex; }
-.changes-list {
-  flex: 0 0 clamp(200px, 18vw, 300px);
-  min-width: 0;
-  overflow-y: auto;
-  border-right: var(--chrome-divider);
-  background: var(--bg-subtle);
-}
+/* ListDetail owns the split, the column width and the divider, so `.changes-body` is gone entirely.
+   The non-Git fallback had borrowed it purely for the class name and was getting `display: flex` with
+   it, which laid its two paragraphs side by side; it is `.changes-empty` alone now and they stack.
+   The `--bg-subtle` tint went with the flat list column. */
+.changes-list { overflow-y: auto; }
 /* Group heads reuse .section-header (see JSX) so the two lists match the pane title; just size the
    divider down a touch inside the scrolling list. */
 .changes-group-head { height: auto; padding-top: var(--space-3); padding-bottom: var(--space-3); }

@@ -1,7 +1,7 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import * as monaco from 'monaco-editor'
 import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWithin, type PaneIntent, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, DocumentTabs, EmptyState, Tabs } from '@acorn/plugin-api/ui'
+import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Tabs } from '@acorn/plugin-api/ui'
 import { MONACO_THEME, monacoLanguageForPath, watchMonacoTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi } from './editorClient'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
@@ -251,80 +251,84 @@ export default function EditorPane(props: { task: Task }) {
     <section ref={paneRef} class="pane editor-pane" style={{ 'grid-column': '1 / 3' }}>
       <Show when={root() !== undefined} fallback={<EmptyState busy>Loading…</EmptyState>}>
         <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
-          <div class="editor-layout">
-            <div class="editor-side">
-              <Tabs
-                tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
-                active={side()}
-                onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
-                idPrefix="editor-side"
-                ariaLabel="Editor sidebar"
-              />
-              {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results. */}
-              <div
-                id="editor-side-panel-files"
-                role="tabpanel"
-                aria-labelledby="editor-side-tab-files"
-                class="editor-tree"
-                style={{ display: side() === 'files' ? undefined : 'none' }}
-              >
-                <FileTree
-                  taskId={taskId}
-                  onOpen={(p) => openPath(p, true)}
-                  openPath={active()}
-                  reveal={treeReveal()}
-                  onRevealed={(revision) => {
-                    setTreeReveal((request) => request?.revision === revision ? null : request)
-                  }}
+          <ListDetail
+            listLabel="Editor sidebar"
+            listClass="editor-side"
+            detailClass="editor-main"
+            list={
+              <>
+                <Tabs
+                  tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
+                  active={side()}
+                  onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
+                  idPrefix="editor-side"
+                  ariaLabel="Editor sidebar"
                 />
-              </div>
-              <SearchPanel taskId={taskId} active={side() === 'search'} />
-            </div>
-            <div class="editor-main">
-              {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
-                  button was mouse-only, and there were no arrow keys. */}
-              <DocumentTabs
-                class="editor-tabs"
-                idPrefix="editor"
-                ariaLabel="Open files"
-                active={active() ?? ''}
-                onActivate={(path) => void show(path)}
-                onClose={(path) => void close(path)}
-                onPromote={(path) => editorPromote(taskId, path)}
-                tabs={files().map((file) => ({
-                  id: file.path,
-                  label: file.path.split('/').pop() ?? file.path,
-                  title: file.path,
-                  dirty: file.dirty,
-                  ephemeral: file.ephemeral,
-                }))}
-                actions={
-                  <>
-                    <Show when={active()}>
-                      <Button
-                        variant="bare"
-                        size="sm"
-                        class="editor-save"
-                        data-tip="Add file/selection reference to the agent composer"
-                        onClick={() => {
-                          const p = currentPath
-                          if (!p) return
-                          const sel = editor?.getSelection()
-                          const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
-                          void sendReferenceToAgent(taskId, ref).then((r) => {
-                            if (!r.ok && r.reason) setSaveErr(r.reason)
-                            else setSaveErr('')
-                          })
-                        }}
-                      >→ agent</Button>
-                    </Show>
-                    <Show when={saveErr()}><Alert>{saveErr()}</Alert></Show>
-                  </>
-                }
-              />
-              <div class="editor-host" ref={host} />
-            </div>
-          </div>
+                {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results. */}
+                <div
+                  id="editor-side-panel-files"
+                  role="tabpanel"
+                  aria-labelledby="editor-side-tab-files"
+                  class="editor-tree"
+                  style={{ display: side() === 'files' ? undefined : 'none' }}
+                >
+                  <FileTree
+                    taskId={taskId}
+                    onOpen={(p) => openPath(p, true)}
+                    openPath={active()}
+                    reveal={treeReveal()}
+                    onRevealed={(revision) => {
+                      setTreeReveal((request) => request?.revision === revision ? null : request)
+                    }}
+                  />
+                </div>
+                <SearchPanel taskId={taskId} active={side() === 'search'} />
+              </>
+            }
+          >
+            {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
+                button was mouse-only, and there were no arrow keys. */}
+            <DocumentTabs
+              class="editor-tabs"
+              idPrefix="editor"
+              ariaLabel="Open files"
+              active={active() ?? ''}
+              onActivate={(path) => void show(path)}
+              onClose={(path) => void close(path)}
+              onPromote={(path) => editorPromote(taskId, path)}
+              tabs={files().map((file) => ({
+                id: file.path,
+                label: file.path.split('/').pop() ?? file.path,
+                title: file.path,
+                dirty: file.dirty,
+                ephemeral: file.ephemeral,
+              }))}
+              actions={
+                <>
+                  <Show when={active()}>
+                    <Button
+                      variant="bare"
+                      size="sm"
+                      class="editor-save"
+                      data-tip="Add file/selection reference to the agent composer"
+                      onClick={() => {
+                        const p = currentPath
+                        if (!p) return
+                        const sel = editor?.getSelection()
+                        const ref = sel && !sel.isEmpty() ? formatFileReference(p, sel.startLineNumber, sel.endLineNumber) : formatFileReference(p)
+                        void sendReferenceToAgent(taskId, ref).then((r) => {
+                          if (!r.ok && r.reason) setSaveErr(r.reason)
+                          else setSaveErr('')
+                        })
+                      }}
+                    >→ agent</Button>
+                  </Show>
+                  <Show when={saveErr()}><Alert>{saveErr()}</Alert></Show>
+                </>
+              }
+            />
+            <div class="editor-host" ref={host} />
+          </ListDetail>
         </Show>
       </Show>
     </section>

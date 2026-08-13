@@ -4,7 +4,7 @@ import { agentSessionsFor, fileStatusMeta, formatFileReference, getHighlighter, 
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { reviewNotesRoute, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
-import { Alert, CopyButton, createArmedConfirm, DiffLine, NonCodeRow, type LineComposerController } from '@acorn/plugin-api/ui'
+import { Alert, CopyButton, createArmedConfirm, DiffLine, ListDetail, NonCodeRow, type LineComposerController } from '@acorn/plugin-api/ui'
 import { buildDiffRows, type CodeRow, highlighterTokenize, isCodeRow, plainTokenize, type Row } from '@acorn/plugin-api/ui/diff'
 import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
@@ -169,7 +169,7 @@ export default function ChangesPane(props: { task: Task }) {
     <Show when={project()?.vcs === 'git'} fallback={
       <section class="pane changes-pane">
         <div class="section-header changes-header">Changes</div>
-        <div class="changes-body changes-empty">
+        <div class="changes-empty">
           <p class="muted">Changes are unavailable for this non-Git project.</p>
           <Show when={project()?.path}>
             <p class="muted copyable">Project folder: {project()!.path}<CopyButton text={() => project()!.path ?? ''} title="Copy project folder" /></p>
@@ -206,75 +206,80 @@ export default function ChangesPane(props: { task: Task }) {
         </Show>
         <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
       </div>
-      <div class="changes-body">
-        <div class="changes-list">
-          <For each={[{ title: 'Staged', list: groups().staged }, { title: 'Changes', list: groups().unstaged }]}>
-            {(group) => (
-              <Show when={group.list.length}>
-                <div class="section-header changes-group-head">{group.title} ({group.list.length})</div>
-                <For each={group.list}>
-                  {(c) => {
-                    const status = () => fileStatusMeta(c.status === 'untracked' ? 'added' : c.status)
-                    return (
-                      <div class="changes-row-wrap">
-                        <button
-                          type="button"
-                          class="changes-row"
-                          classList={{ active: selected() != null && changeKey(selected()!) === changeKey(c) }}
-                          title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
-                          onClick={() => setSelectedKey(changeKey(c))}
-                        >
-                          <span class={`file-status file-status-${status().tone}`}>{status().letter}</span>
-                          <span class="changes-row-path">{c.path}</span>
-                          <Show when={c.additions != null}>
-                            <span class="file-stat add">+{c.additions}</span>
-                            <span class="file-stat del">&#8722;{c.deletions ?? 0}</span>
+      <ListDetail
+        listLabel="Changed files"
+        listClass="changes-list"
+        list={
+          <>
+            <For each={[{ title: 'Staged', list: groups().staged }, { title: 'Changes', list: groups().unstaged }]}>
+              {(group) => (
+                <Show when={group.list.length}>
+                  <div class="section-header changes-group-head">{group.title} ({group.list.length})</div>
+                  <For each={group.list}>
+                    {(c) => {
+                      const status = () => fileStatusMeta(c.status === 'untracked' ? 'added' : c.status)
+                      return (
+                        <div class="changes-row-wrap">
+                          <button
+                            type="button"
+                            class="changes-row"
+                            classList={{ active: selected() != null && changeKey(selected()!) === changeKey(c) }}
+                            title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
+                            onClick={() => setSelectedKey(changeKey(c))}
+                          >
+                            <span class={`file-status file-status-${status().tone}`}>{status().letter}</span>
+                            <span class="changes-row-path">{c.path}</span>
+                            <Show when={c.additions != null}>
+                              <span class="file-stat add">+{c.additions}</span>
+                              <span class="file-stat del">&#8722;{c.deletions ?? 0}</span>
+                            </Show>
+                          </button>
+                          <Show
+                            when={c.staged}
+                            fallback={
+                              <>
+                                <button type="button" class="changes-to-agent" data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</button>
+                                <button type="button" class="changes-to-agent" data-armed={discardArmed.armed() === `file:${c.path}` ? '' : undefined} data-tip={discardArmed.armed() === `file:${c.path}` ? 'Click again to discard' : 'Discard changes'} data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>{discardArmed.armed() === `file:${c.path}` ? '?' : '↺'}</button>
+                              </>
+                            }
+                          >
+                            <button type="button" class="changes-to-agent" data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => api && void gitAction(() => localGitApi.unstage(props.task.id, c.path))}>−</button>
                           </Show>
-                        </button>
-                        <Show
-                          when={c.staged}
-                          fallback={
-                            <>
-                              <button type="button" class="changes-to-agent" data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</button>
-                              <button type="button" class="changes-to-agent" data-armed={discardArmed.armed() === `file:${c.path}` ? '' : undefined} data-tip={discardArmed.armed() === `file:${c.path}` ? 'Click again to discard' : 'Discard changes'} data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>{discardArmed.armed() === `file:${c.path}` ? '?' : '↺'}</button>
-                            </>
-                          }
-                        >
-                          <button type="button" class="changes-to-agent" data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => api && void gitAction(() => localGitApi.unstage(props.task.id, c.path))}>−</button>
-                        </Show>
-                        <button
-                          type="button"
-                          class="changes-to-agent"
-                          data-tip="Send to agent"
-                          data-tip-sub="Add file reference to the composer"
-                          onClick={() => void sendRef(formatFileReference(c.path))}
-                        >→</button>
-                      </div>
-                    )
-                  }}
-                </For>
-              </Show>
-            )}
-          </For>
-          <Show when={!groups().staged.length && !groups().unstaged.length}>
-            <p class="muted changes-empty">Working tree clean.</p>
-          </Show>
-          <Show when={groups().staged.length}>
-            <div class="changes-commit">
-              <input
-                class="ui-input"
-                type="text"
-                placeholder="Commit message"
-                value={commitMsg()}
-                onInput={(e) => setCommitMsg(e.currentTarget.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void commit()}
-              />
-              <button type="button" class="ui-btn" disabled={!commitMsg().trim()} onClick={() => void commit()}>
-                Commit staged
-              </button>
-            </div>
-          </Show>
-        </div>
+                          <button
+                            type="button"
+                            class="changes-to-agent"
+                            data-tip="Send to agent"
+                            data-tip-sub="Add file reference to the composer"
+                            onClick={() => void sendRef(formatFileReference(c.path))}
+                          >→</button>
+                        </div>
+                      )
+                    }}
+                  </For>
+                </Show>
+              )}
+            </For>
+            <Show when={!groups().staged.length && !groups().unstaged.length}>
+              <p class="muted changes-empty">Working tree clean.</p>
+            </Show>
+            <Show when={groups().staged.length}>
+              <div class="changes-commit">
+                <input
+                  class="ui-input"
+                  type="text"
+                  placeholder="Commit message"
+                  value={commitMsg()}
+                  onInput={(e) => setCommitMsg(e.currentTarget.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void commit()}
+                />
+                <button type="button" class="ui-btn" disabled={!commitMsg().trim()} onClick={() => void commit()}>
+                  Commit staged
+                </button>
+              </div>
+            </Show>
+          </>
+        }
+      >
         <div class="diff compare-diff changes-diff">
           <div class="diff-rows">
             <For each={rows() ?? []}>
@@ -334,7 +339,7 @@ export default function ChangesPane(props: { task: Task }) {
             </For>
           </div>
         </div>
-      </div>
+      </ListDetail>
     </section>
     </Show>
   )

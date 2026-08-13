@@ -4,7 +4,7 @@ import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from '.
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
 import './notes.css'
-import { Alert, createArmedConfirm, EmptyState, Input, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, createArmedConfirm, EmptyState, Input, ListDetail, Toolbar } from '@acorn/plugin-api/ui'
 import { toast } from '@acorn/plugin-api/client'
 
 // The Notes pane (docs/agent-tools.md): where you write context. Lands in this task's
@@ -275,88 +275,94 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
       </div>
       <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
       <Show when={api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
-        <div class="notes-body" classList={{ 'library-collapsed': collapsed() }}>
-          <div class="notes-list">
-            <GroupHeader label="Task" count={taskOther().length + 1} scope="task" />
-            <Show when={!scratchpad() && matches({ slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0 })}>
-              <div class="notes-row-wrap">
-                <span class="notes-include-dot placeholder" />
-                <button type="button" class="notes-row" classList={{ active: isActive('task', SCRATCHPAD_SLUG) }} onClick={() => landScratchpad()}>
-                  <span class="notes-row-title">Scratchpad</span>
-                </button>
-              </div>
-            </Show>
-            <Show when={scratchpad()}>{(n) => <NoteRow scope="task" note={n()} pinned />}</Show>
-            <For each={taskOther()}>{(n) => <NoteRow scope="task" note={n} />}</For>
+        {/* Collapsing the library is `list` going undefined, not a rule that hides a column that
+            is still there: ListDetail then has one track rather than a zero-width first one. */}
+        <ListDetail
+          listLabel="Notes library"
+          listClass="notes-list"
+          detailClass="notes-main"
+          list={collapsed() ? undefined : (
+            <>
+              <GroupHeader label="Task" count={taskOther().length + 1} scope="task" />
+              <Show when={!scratchpad() && matches({ slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0 })}>
+                <div class="notes-row-wrap">
+                  <span class="notes-include-dot placeholder" />
+                  <button type="button" class="notes-row" classList={{ active: isActive('task', SCRATCHPAD_SLUG) }} onClick={() => landScratchpad()}>
+                    <span class="notes-row-title">Scratchpad</span>
+                  </button>
+                </div>
+              </Show>
+              <Show when={scratchpad()}>{(n) => <NoteRow scope="task" note={n()} pinned />}</Show>
+              <For each={taskOther()}>{(n) => <NoteRow scope="task" note={n} />}</For>
 
-            <GroupHeader label="Workspace" count={wsNotes().length} scope="workspace" />
-            <For each={wsNotes()}>{(n) => <NoteRow scope="workspace" note={n} />}</For>
+              <GroupHeader label="Workspace" count={wsNotes().length} scope="workspace" />
+              <For each={wsNotes()}>{(n) => <NoteRow scope="workspace" note={n} />}</For>
 
-            <GroupHeader label="Global" count={globalNotes().length} scope="global" />
-            <For each={globalNotes()}>{(n) => <NoteRow scope="global" note={n} />}</For>
-          </div>
+              <GroupHeader label="Global" count={globalNotes().length} scope="global" />
+              <For each={globalNotes()}>{(n) => <NoteRow scope="global" note={n} />}</For>
+            </>
+          )}
+        >
 
-          <div class="notes-main">
-            <Show when={selected()} fallback={<EmptyState>Select or create a note.</EmptyState>}>
-              {(sel) => (
-                <>
-                  <Toolbar class="notes-toolbar" size="sm" ariaLabel="Note actions">
-                    <input
-                      ref={titleInputRef}
-                      class="notes-title-input"
-                      type="text"
-                      value={noteTitle()}
-                      placeholder="Untitled"
-                      onInput={(e) => {
-                        setNoteTitle(e.currentTarget.value)
-                        if (sel().virtual) void ensureScratchpad().then(() => scheduleTitle())
-                        else scheduleTitle()
-                      }}
-                    />
-                    <span class="notes-scope-pill" title={`${sel().scope} scope`}>{scopeGlyph(sel().scope)}</span>
-                    <button
-                      type="button"
-                      class="notes-include-dot"
-                      classList={{ on: selectedIncluded() }}
-                      title={selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
-                      disabled={sel().virtual}
-                      onClick={() => void toggleIncluded(sel().scope, sel().slug, !selectedIncluded())}
-                    />
-                    <button type="button" class="editor-save" onClick={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</button>
-                    {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
-                    <span class="notes-save-state muted">{saving() ? 'saving…' : ''}</span>
-                  </Toolbar>
-                  <Show when={!preview()} fallback={
-                    <div
-                      class="notes-preview linear-md"
-                      onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
-                      innerHTML={renderMarkdown(body())}
-                    />
-                  }>
-                    <textarea
-                      class="notes-editor"
-                      spellcheck={false}
-                      value={body()}
-                      onInput={(e) => onBodyInput(e.currentTarget.value)}
-                      onBlur={() => scheduleSave.flush()}
-                    />
-                  </Show>
-                  <div class="notes-footer">
-                    <span class="muted">{formatSize(bytesOf(body()))}</span>
-                    <button
-                      type="button"
-                      class="notes-view-context"
-                      disabled={sel().virtual}
-                      onClick={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
-                    >
-                      view in Context →
-                    </button>
-                  </div>
-                </>
-              )}
-            </Show>
-          </div>
-        </div>
+          <Show when={selected()} fallback={<EmptyState>Select or create a note.</EmptyState>}>
+            {(sel) => (
+              <>
+                <Toolbar class="notes-toolbar" size="sm" ariaLabel="Note actions">
+                  <input
+                    ref={titleInputRef}
+                    class="notes-title-input"
+                    type="text"
+                    value={noteTitle()}
+                    placeholder="Untitled"
+                    onInput={(e) => {
+                      setNoteTitle(e.currentTarget.value)
+                      if (sel().virtual) void ensureScratchpad().then(() => scheduleTitle())
+                      else scheduleTitle()
+                    }}
+                  />
+                  <span class="notes-scope-pill" title={`${sel().scope} scope`}>{scopeGlyph(sel().scope)}</span>
+                  <button
+                    type="button"
+                    class="notes-include-dot"
+                    classList={{ on: selectedIncluded() }}
+                    title={selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
+                    disabled={sel().virtual}
+                    onClick={() => void toggleIncluded(sel().scope, sel().slug, !selectedIncluded())}
+                  />
+                  <button type="button" class="editor-save" onClick={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</button>
+                  {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
+                  <span class="notes-save-state muted">{saving() ? 'saving…' : ''}</span>
+                </Toolbar>
+                <Show when={!preview()} fallback={
+                  <div
+                    class="notes-preview linear-md"
+                    onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
+                    innerHTML={renderMarkdown(body())}
+                  />
+                }>
+                  <textarea
+                    class="notes-editor"
+                    spellcheck={false}
+                    value={body()}
+                    onInput={(e) => onBodyInput(e.currentTarget.value)}
+                    onBlur={() => scheduleSave.flush()}
+                  />
+                </Show>
+                <div class="notes-footer">
+                  <span class="muted">{formatSize(bytesOf(body()))}</span>
+                  <button
+                    type="button"
+                    class="notes-view-context"
+                    disabled={sel().virtual}
+                    onClick={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
+                  >
+                    view in Context →
+                  </button>
+                </div>
+              </>
+            )}
+          </Show>
+        </ListDetail>
       </Show>
     </section>
   )

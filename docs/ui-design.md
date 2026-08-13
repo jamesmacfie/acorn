@@ -45,14 +45,24 @@ migrated.
 
 A pane that puts a list beside a detail uses the `ListDetail` primitive, not a hand-rolled grid. It
 owns the split, the two column widths (`narrow` for an identifier switcher, the default for a browse
-list), the `--chrome-divider` between them, and each column's flex/overflow behaviour. The Rollbar,
-Linear, API, and Database panes are its consumers; before it existed they had four different column
-widths, three different mechanisms, and two different border roles, which is why they read as
-variations on a pane rather than the same pane.
+list), the `--chrome-divider` between them, and each column's flex/overflow behaviour. Its consumers
+are the Rollbar, Linear, API and Database panes plus the Editor, Notes, Agents and Changes task
+panes; before it existed those eight had eight column widths and two different border roles, which is
+why they read as variations on a pane rather than the same pane.
 
-It is deliberately not the layout for a Source that claims the whole shell. Docker's browse is
-`.panes` + `.pane` from `styles/shell.css` — two separate inset surfaces with a gap, not one surface
-split by a divider — and that layout stays the shell's.
+**The list column is flat — no tint.** The four task panes each gave it `--bg-subtle` and the four
+rail/frame panes did not, so the split read differently depending on which rail you reached it from.
+One surface divided by a rule, not two shaded regions. There is no opt-out prop, because a per-pane
+choice is the thing this replaced.
+
+A list column that can be collapsed passes `list={undefined}` rather than hiding a column that is
+still in the grid — `ListDetail` then has one track instead of a zero-width first one. Notes' library
+toggle works this way.
+
+It is deliberately not the layout for two separate surfaces. Docker's browse and the GitHub PR pane
+are `.panes` + `.pane` from `styles/shell.css` — inset surfaces with a gap between them, and in the
+PR pane's case a `SplitHandle` that makes the divide draggable. That layout stays the shell's. The
+test is whether the two columns are one surface split by a divider or two surfaces side by side.
 
 `ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
 than a media query, and `container-type` would make the element a containing block for

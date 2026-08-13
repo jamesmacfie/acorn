@@ -16,7 +16,7 @@ import AgentTaskSidebar from './AgentTaskSidebar'
 import AgentUsageIndicator from './AgentUsageIndicator'
 import QueuedAgentTurns from './QueuedAgentTurns'
 import { latestAutomaticTaskContext } from './automaticTaskContext'
-import { Alert, Button, Card, EmptyState, Field, Icon, Input, Menu, Modal, Picker, StatusDot } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, EmptyState, Field, Icon, Input, ListDetail, Menu, Modal, Picker, StatusDot } from '@acorn/plugin-api/ui'
 import { runtimeTone } from './stateTone'
 import './managed-agents.css'
 
@@ -392,75 +392,79 @@ export default function AgentPane(props: { task: Task }) {
         />
       </header>
 
-      <div class="managed-agent-body">
-        <AgentTaskSidebar
-          task={props.task}
-          managedSessions={taskSessions()}
-          selectedSessionId={selectedSessionId()}
-          onSelectSession={(sessionId, requestId) => openManagedSession(props.task.id, sessionId, requestId)}
-          onError={setError}
-        />
-        <div class="managed-agent-conversation">
-          <Show when={error()}><Alert class="managed-agent-error">{error()}</Alert></Show>
-          <Show
-            when={selected()}
-            fallback={
-              <EmptyState
-                class="managed-agent-onboarding"
-                icon={<span class="agent-empty-mark">✦</span>}
-                title="Start a managed coding session"
-              >
-                <div class="managed-agent-provider-cards">
-                  <For each={providers() ?? []}>
-                    {(providerDescriptor) => (
-                      <Card
-                        class="managed-agent-provider-card"
-                        interactive
-                        disabled={!providerDescriptor.installed || creating()}
-                        onActivate={() => void createSession(providerDescriptor)}
-                      >
-                        <strong>{providerDescriptor.label}</strong>
-                        <span>{providerDescriptor.installed ? 'Start managed session' : providerDescriptor.diagnostics[0] ?? 'Unavailable'}</span>
-                      </Card>
-                    )}
-                  </For>
-                </div>
-              </EmptyState>
-            }
-          >
-            {(session) => (
-              <>
-                <Show when={snapshot()} fallback={<div class="managed-agent-loading">Loading conversation…</div>}>
-                  {(value) => (
-                    <>
-                      <AgentTranscript
-                        taskId={props.task.id}
-                        snapshot={value()}
-                        focusRequestId={focusedManagedRequest(session().id)}
-                        onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
-                      />
-                      <QueuedAgentTurns
-                        sessionId={session().id}
-                        turns={value().turns}
-                        onChanged={() => managedAgentStore.loadSnapshot(session().id)}
-                        onError={setError}
-                      />
-                    </>
+      <ListDetail
+        listLabel="Agents in this task"
+        listClass="agent-task-sidebar"
+        detailClass="managed-agent-conversation"
+        list={
+          <AgentTaskSidebar
+            task={props.task}
+            managedSessions={taskSessions()}
+            selectedSessionId={selectedSessionId()}
+            onSelectSession={(sessionId, requestId) => openManagedSession(props.task.id, sessionId, requestId)}
+            onError={setError}
+          />
+        }
+      >
+        <Show when={error()}><Alert class="managed-agent-error">{error()}</Alert></Show>
+        <Show
+          when={selected()}
+          fallback={
+            <EmptyState
+              class="managed-agent-onboarding"
+              icon={<span class="agent-empty-mark">✦</span>}
+              title="Start a managed coding session"
+            >
+              <div class="managed-agent-provider-cards">
+                <For each={providers() ?? []}>
+                  {(providerDescriptor) => (
+                    <Card
+                      class="managed-agent-provider-card"
+                      interactive
+                      disabled={!providerDescriptor.installed || creating()}
+                      onActivate={() => void createSession(providerDescriptor)}
+                    >
+                      <strong>{providerDescriptor.label}</strong>
+                      <span>{providerDescriptor.installed ? 'Start managed session' : providerDescriptor.diagnostics[0] ?? 'Unavailable'}</span>
+                    </Card>
                   )}
-                </Show>
-                <AgentComposer
-                  session={session()}
-                  disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
-                  previousAutomaticContext={previousAutomaticContext()}
-                  onSessionUpdated={managedAgentStore.upsertSession}
-                  onSent={() => void managedAgentStore.loadSnapshot(session().id)}
-                />
-              </>
-            )}
-          </Show>
-        </div>
-      </div>
+                </For>
+              </div>
+            </EmptyState>
+          }
+        >
+          {(session) => (
+            <>
+              <Show when={snapshot()} fallback={<div class="managed-agent-loading">Loading conversation…</div>}>
+                {(value) => (
+                  <>
+                    <AgentTranscript
+                      taskId={props.task.id}
+                      snapshot={value()}
+                      focusRequestId={focusedManagedRequest(session().id)}
+                      onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
+                    />
+                    <QueuedAgentTurns
+                      sessionId={session().id}
+                      turns={value().turns}
+                      onChanged={() => managedAgentStore.loadSnapshot(session().id)}
+                      onError={setError}
+                    />
+                  </>
+                )}
+              </Show>
+              <AgentComposer
+                session={session()}
+                disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
+                previousAutomaticContext={previousAutomaticContext()}
+                onSessionUpdated={managedAgentStore.upsertSession}
+                onSent={() => void managedAgentStore.loadSnapshot(session().id)}
+              />
+            </>
+          )}
+        </Show>
 
+      </ListDetail>
       <Show when={dialog() === 'rename'}>
         <Modal onClose={() => setDialog(null)} title="Rename session" size="sm">
           <Modal.Body>
