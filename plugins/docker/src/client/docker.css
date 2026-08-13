@@ -15,31 +15,13 @@
 .docker-list { overflow-y: auto; flex: 1; }
 .docker-section-label { padding: var(--space-5) var(--space-6) var(--space-2); font-size: var(--fs-sm); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); }
 
-.docker-group-header,
-.docker-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-6);
-  font-size: var(--fs-sm);
-  border-bottom: var(--divider);
-  border-left: var(--marker-w) solid transparent;
-  cursor: pointer;
-}
-.docker-group-header:hover,
-.docker-row:hover { background: var(--bg-hover); }
-.docker-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
-.docker-row-nested { padding-left: 28px; }
-.docker-group-chevron { width: 12px; color: var(--text-muted); }
-
-.docker-row-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.docker-row-meta { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: var(--fs-sm); }
-
-.docker-row-actions { display: flex; gap: var(--space-1); visibility: hidden; }
-.docker-row:hover .docker-row-actions,
-.docker-group-header:hover .docker-row-actions,
-.docker-row.active .docker-row-actions { visibility: visible; }
-.docker-row-actions button {
+/* Row/TreeRow own the row: box, compact height, left marker, hover, selected tint, the depth indent
+   that was `.docker-row-nested`, the twist that was `.docker-group-chevron`, the body/meta ellipsis
+   that were `.docker-row-name`/`.docker-row-meta`, and the reveal-on-hover that `.docker-row-actions`
+   spelled out with `visibility`. What is left is the rule between rows, which this list wants and a
+   switcher rail does not, and the look of the bare glyph buttons in the trailing slot. */
+.docker-row { border-bottom: var(--divider); }
+.docker-row .ui-row-trailing button {
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -49,7 +31,7 @@
   padding: 0 var(--space-2);
   cursor: pointer;
 }
-.docker-row-actions button:hover { color: var(--text); background: var(--bg-subtle); }
+.docker-row .ui-row-trailing button:hover { color: var(--text); background: var(--bg-subtle); }
 
 
 /* Detail pane */
@@ -91,7 +73,8 @@
 
 .docker-subnav { padding: 0 var(--pane-pad); }
 .docker-object-bar { align-items: center; gap: var(--space-5); }
-.docker-object-row { cursor: default; }
+/* `.docker-object-row` is gone: an image/volume/network row has no `onActivate`, so Row leaves off
+   role="button" and keeps its default cursor without being told. */
 .docker-stale-chip {
   font-size: var(--fs-sm);
   color: var(--state-warn);

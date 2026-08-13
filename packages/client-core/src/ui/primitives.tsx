@@ -879,6 +879,9 @@ export function TreeRow(props: {
   onActivate?: () => void
   leading?: JSX.Element
   trailing?: JSX.Element
+  /** Trailing metadata — Row's slot, forwarded. A tree row wants a size or a count as much as a
+   *  flat one does, and without this a caller has to hand-roll `.ui-row-meta` in the body. */
+  meta?: JSX.Element
   /** Hide `trailing` until hover or focus — the idiom five stylesheets implemented separately. */
   reveal?: boolean
   title?: string
@@ -892,6 +895,7 @@ export function TreeRow(props: {
       reveal={props.reveal}
       density="compact"
       title={props.title}
+      meta={props.meta}
       class={cx('ui-treerow', props.class)}
       onActivate={props.onActivate}
       leading={

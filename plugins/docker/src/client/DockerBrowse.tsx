@@ -12,7 +12,7 @@ import { composeAction, containerAction, dockerPrune, fetchImages, fetchNetworks
 import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRefresh } from './dockerStore'
 import ContainerDetail from './ContainerDetail'
 import './docker.css'
-import { Alert, Button, createArmedConfirm, EmptyState, Input, SectionHeader, StatusDot, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, createArmedConfirm, EmptyState, Input, Row, SectionHeader, StatusDot, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
 import { containerTone } from './dockerViewState'
 
 type Section = 'containers' | 'images' | 'volumes' | 'networks'
@@ -156,96 +156,106 @@ export default function DockerBrowse() {
     setRowBusy(null)
   }
 
+  // TreeRow rather than Row: a compose project expands into its containers, so this list is a tree,
+  // and the same primitive the API panel's request tree uses gives it the twist, the depth indent and
+  // the compact density for free. A standalone container still renders through it, so its label lines
+  // up with a project header's rather than sitting a twist-width to the left.
   const row = (c: DockerContainerSummary, inGroup: boolean) => (
-    <div
+    <TreeRow
       class="docker-row"
-      classList={{ active: selected() === c.id, 'docker-row-nested': inGroup }}
-      role="button"
-      tabindex="0"
-      onClick={() => setSelected(c.id)}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
-        e.preventDefault()
-        setSelected(c.id)
-      }}
+      depth={inGroup ? 1 : 0}
+      reveal
+      selected={selected() === c.id}
+      onActivate={() => setSelected(c.id)}
+      title={c.name}
+      leading={<StatusDot tone={containerTone(c.state)} />}
+      meta={c.status}
+      trailing={
+        <>
+          <button
+            type="button"
+            title={isActive(c) ? 'Stop' : 'Start'}
+            disabled={rowBusy() === c.id}
+            onClick={(e) => {
+              e.stopPropagation()
+              void rowAction(c, 'toggle')
+            }}
+          >
+            {isActive(c) ? '◼' : '▶'}
+          </button>
+          <button
+            type="button"
+            class="docker-danger"
+            title="Remove container"
+            disabled={rowBusy() === c.id}
+            onClick={(e) => {
+              e.stopPropagation()
+              void rowAction(c, 'remove')
+            }}
+          >
+            {armed.armed() === c.id ? '?' : '🗑'}
+          </button>
+        </>
+      }
     >
-      <StatusDot tone={containerTone(c.state)} />
-      <span class="docker-row-name" title={c.name}>{inGroup ? (c.composeService ?? c.name) : c.name}</span>
-      <span class="docker-row-meta muted">{c.status}</span>
-      <span class="docker-row-actions">
-        <button
-          type="button"
-          title={isActive(c) ? 'Stop' : 'Start'}
-          disabled={rowBusy() === c.id}
-          onClick={(e) => {
-            e.stopPropagation()
-            void rowAction(c, 'toggle')
-          }}
-        >
-          {isActive(c) ? '◼' : '▶'}
-        </button>
-        <button
-          type="button"
-          class="docker-danger"
-          title="Remove container"
-          disabled={rowBusy() === c.id}
-          onClick={(e) => {
-            e.stopPropagation()
-            void rowAction(c, 'remove')
-          }}
-        >
-          {armed.armed() === c.id ? '?' : '🗑'}
-        </button>
-      </span>
-    </div>
+      {inGroup ? (c.composeService ?? c.name) : c.name}
+    </TreeRow>
   )
 
   const groupBlock = (g: Group) => (
     <Show when={g.project} fallback={row(g.containers[0], false)}>
       <div class="docker-group">
-        <div
-          class="docker-group-header"
-          role="button"
-          tabindex="0"
-          onClick={() => toggleGroup(g.project!)}
-          onKeyDown={(e) => {
-            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
-            e.preventDefault()
-            toggleGroup(g.project!)
-          }}
+        <TreeRow
+          class="docker-row"
+          expandable
+          expanded={!collapsed().has(g.project!)}
+          onToggle={() => toggleGroup(g.project!)}
+          reveal
+          onActivate={() => toggleGroup(g.project!)}
+          title={g.project!}
+          // The stale chip rides in `meta`, not the body: Row's body ellipsises, so a warning sat
+          // after a long project name would be the first thing clipped.
+          meta={
+            <>
+              <Show when={g.containers.some((c) => c.workingDirMissing)}>
+                <span class="docker-stale-chip" title="The compose working directory no longer exists">stale</span>
+              </Show>
+              {g.running}/{g.containers.length} running
+            </>
+          }
+          trailing={
+            <>
+              <button
+                type="button"
+                title={g.running > 0 ? 'Stop project' : 'Start project'}
+                disabled={groupBusy() === g.project}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void groupAction(g.project!, g.running > 0 ? 'stop' : 'start')
+                }}
+              >
+                {g.running > 0 ? '◼' : '▶'}
+              </button>
+              <button
+                type="button"
+                class="docker-danger"
+                title="Compose down (remove the project's containers and networks; volumes kept)"
+                disabled={groupBusy() === g.project}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void groupAction(g.project!, 'down')
+                }}
+              >
+                {armed.armed() === `down:${g.project}` ? '?' : '🗑'}
+              </button>
+            </>
+          }
         >
-          <span class="docker-group-chevron">{collapsed().has(g.project!) ? '▸' : '▾'}</span>
-          <span class="docker-row-name" title={g.project!}>{g.project}</span>
+          {g.project}
           <Show when={g.containers.some((c) => c.workingDirMissing)}>
             <span class="docker-stale-chip" title="The compose working directory no longer exists">stale</span>
           </Show>
-          <span class="docker-row-meta muted">{g.running}/{g.containers.length} running</span>
-          <span class="docker-row-actions">
-            <button
-              type="button"
-              title={g.running > 0 ? 'Stop project' : 'Start project'}
-              disabled={groupBusy() === g.project}
-              onClick={(e) => {
-                e.stopPropagation()
-                void groupAction(g.project!, g.running > 0 ? 'stop' : 'start')
-              }}
-            >
-              {g.running > 0 ? '◼' : '▶'}
-            </button>
-            <button
-              type="button"
-              class="docker-danger"
-              title="Compose down (remove the project's containers and networks; volumes kept)"
-              disabled={groupBusy() === g.project}
-              onClick={(e) => {
-                e.stopPropagation()
-                void groupAction(g.project!, 'down')
-              }}
-            >
-              {armed.armed() === `down:${g.project}` ? '?' : '🗑'}
-            </button>
-          </span>
-        </div>
+        </TreeRow>
         <Show when={!collapsed().has(g.project!)}>
           <For each={g.containers}>{(c) => row(c, true)}</For>
         </Show>
@@ -323,16 +333,21 @@ export default function DockerBrowse() {
             <div class="docker-list">
               <For each={images() ?? []} fallback={<EmptyState align="start" busy={images.loading}>{images.loading ? 'Loading…' : 'No images.'}</EmptyState>}>
                 {(img) => (
-                  <div class="docker-row docker-object-row">
-                    <span class="docker-row-name" title={`${img.repository}:${img.tag}`}>{img.repository}<span class="muted">:{img.tag}</span></span>
-                    <span class="docker-row-meta muted">{img.size}{img.containers ? ` · in use (${img.containers})` : ''}</span>
-                    <span class="docker-row-actions">
+                  <Row
+                    class="docker-row"
+                    density="compact"
+                    reveal
+                    title={`${img.repository}:${img.tag}`}
+                    meta={`${img.size}${img.containers ? ` · in use (${img.containers})` : ''}`}
+                    trailing={
                       <button type="button" class="docker-danger" title="Remove image" onClick={() => {
                         if (!confirmedOnce(`img:${img.id}`)) return
                         void failing(removeImage(img.id, false)).then(() => imagesCtl.refetch())
                       }}>{armed.armed() === `img:${img.id}` ? '?' : '🗑'}</button>
-                    </span>
-                  </div>
+                    }
+                  >
+                    {img.repository}<span class="muted">:{img.tag}</span>
+                  </Row>
                 )}
               </For>
             </div>
@@ -347,16 +362,21 @@ export default function DockerBrowse() {
             <div class="docker-list">
               <For each={volumes() ?? []} fallback={<EmptyState align="start" busy={volumes.loading}>{volumes.loading ? 'Loading…' : 'No volumes.'}</EmptyState>}>
                 {(v) => (
-                  <div class="docker-row docker-object-row">
-                    <span class="docker-row-name" title={v.mountpoint}>{v.anonymous ? `${v.name.slice(0, 12)}… (anonymous)` : v.name}</span>
-                    <span class="docker-row-meta muted">{v.composeProject ?? v.driver}</span>
-                    <span class="docker-row-actions">
+                  <Row
+                    class="docker-row"
+                    density="compact"
+                    reveal
+                    title={v.mountpoint}
+                    meta={v.composeProject ?? v.driver}
+                    trailing={
                       <button type="button" class="docker-danger" title="Remove volume (deletes its data)" onClick={() => {
                         if (!confirmedOnce(`vol:${v.name}`)) return
                         void failing(removeVolume(v.name, false)).then(() => volumesCtl.refetch())
                       }}>{armed.armed() === `vol:${v.name}` ? '?' : '🗑'}</button>
-                    </span>
-                  </div>
+                    }
+                  >
+                    {v.anonymous ? `${v.name.slice(0, 12)}… (anonymous)` : v.name}
+                  </Row>
                 )}
               </For>
             </div>
@@ -370,18 +390,23 @@ export default function DockerBrowse() {
             <div class="docker-list">
               <For each={networks() ?? []} fallback={<EmptyState align="start" busy={networks.loading}>{networks.loading ? 'Loading…' : 'No networks.'}</EmptyState>}>
                 {(n) => (
-                  <div class="docker-row docker-object-row">
-                    <span class="docker-row-name" title={n.id}>{n.name}</span>
-                    <span class="docker-row-meta muted">{n.driver}{n.internal ? ' · internal' : ''}</span>
-                    <span class="docker-row-actions">
+                  <Row
+                    class="docker-row"
+                    density="compact"
+                    reveal
+                    title={n.id}
+                    meta={`${n.driver}${n.internal ? ' · internal' : ''}`}
+                    trailing={
                       <Show when={!BUILTIN_NETWORKS.has(n.name)}>
                         <button type="button" class="docker-danger" title="Remove network" onClick={() => {
                           if (!confirmedOnce(`net:${n.id}`)) return
                           void failing(removeNetwork(n.id)).then(() => networksCtl.refetch())
                         }}>{armed.armed() === `net:${n.id}` ? '?' : '🗑'}</button>
                       </Show>
-                    </span>
-                  </div>
+                    }
+                  >
+                    {n.name}
+                  </Row>
                 )}
               </For>
             </div>
