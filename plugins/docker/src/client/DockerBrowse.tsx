@@ -264,7 +264,7 @@ export default function DockerBrowse() {
   )
 
   return (
-    <main class="panes docker-browse-panes">
+    <main class="panes">
       <section class="pane pane-left docker-browse">
         <SectionHeader
           actions={
@@ -414,7 +414,11 @@ export default function DockerBrowse() {
         </Show>
       </section>
 
-      <section class="pane pane-right docker-browse-detail">
+      {/* Spans the shell grid's last two tracks rather than redefining the grid: this Source has two
+          columns and the shell has three, and spanning is how github's empty state and the editor
+          pane already say that. The left column is then the shell's own, identical to github's, and
+          left-collapse keeps working without a rule that has to out-specify each style pack. */}
+      <section class="pane pane-right docker-browse-detail" style={{ 'grid-column': '2 / -1' }}>
         <Show
           when={section() === 'containers' && selected()}
           fallback={<div class="pane-empty"><EmptyState align="start">{section() === 'containers' ? 'Select a container.' : `Docker ${section()}.`}</EmptyState></div>}

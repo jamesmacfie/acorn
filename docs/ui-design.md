@@ -47,8 +47,9 @@ A pane that puts a list beside a detail uses the `ListDetail` primitive, not a h
 owns the split, the two column widths (`narrow` for an identifier switcher, the default for a browse
 list), the `--chrome-divider` between them, and each column's flex/overflow behaviour. Its consumers
 are the Rollbar, Linear, API and Database panes plus the Editor, Notes, Agents and Changes task
-panes; before it existed those eight had eight column widths and two different border roles, which is
-why they read as variations on a pane rather than the same pane.
+panes, and Rollbar's occurrence workbench nests one inside another; before it existed those eight had
+eight column widths and two different border roles, which is why they read as variations on a pane
+rather than the same pane.
 
 **The list column is flat — no tint.** The four task panes each gave it `--bg-subtle` and the four
 rail/frame panes did not, so the split read differently depending on which rail you reached it from.
@@ -63,6 +64,13 @@ It is deliberately not the layout for two separate surfaces. Docker's browse and
 are `.panes` + `.pane` from `styles/shell.css` — inset surfaces with a gap between them, and in the
 PR pane's case a `SplitHandle` that makes the divide draggable. That layout stays the shell's. The
 test is whether the two columns are one surface split by a divider or two surfaces side by side.
+
+**A Source with fewer than three columns spans the shell grid; it never redefines it.** `grid-column:
+2 / -1` on the last pane is how GitHub's empty state, the editor pane and Docker's browse all say it.
+A plugin that writes its own `grid-template-columns` for `.panes` gets a column width that only
+resembles the shell's — Docker's was `clamp(320px, 30vw, 460px)` against the shell's
+`clamp(320px, 28vw, 420px)` — and a rule that has to out-specify every style pack's own
+`.app.left-collapsed .panes`. Spanning has neither problem and needs no CSS at all.
 
 `ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
 than a media query, and `container-type` would make the element a containing block for
