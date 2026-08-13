@@ -22,11 +22,12 @@ body {
 }
 :where(button, a, input, textarea, select) { transition: var(--transition-color); }
 
-/* Unicode glyphs that are still text, not icons: the brand marks Lucide has no equivalent for
-   (◇ GitHub, ◷ Linear, ◍ Rollbar, ◧ Docker, ◎ OpenAI) plus every inline literal this pass left
-   alone. They only align on a mono stack, so they stay pinned to --font-glyph even when a pack takes
-   the surrounding chrome sans. ui/Icon.tsx emits this class on its fallback path.
-   See docs/ui-design.md §Icons. */
+/* Unicode glyphs that are still text, not icons: state markers with no Lucide equivalent worth the
+   swap (◆/◇ pin state, ⊘/◉ hidden, ⎇, ▦) plus every inline literal this pass left alone. The brand
+   marks used to live here too and no longer do — they are path data now, see ui/brandMarks.ts.
+   These only align on a mono stack, so they stay pinned to --font-glyph even when a pack takes the
+   surrounding chrome sans. ui/Icon.tsx emits this class on its fallback path.
+   See docs/ui-design.md § Icons. */
 .glyph {
   font-family: var(--font-glyph);
   font-variant-numeric: var(--tabular);
@@ -59,8 +60,27 @@ svg.glyph,
 }
 
 /* ── Global utilities ─────────────────────────────────────────────────────────────────────── */
+/* Four idioms that had no shared home, so thirteen plugins retyped them: roughly a hundred rules
+   between them and none of it domain logic. They are classes rather than props because they apply
+   to arbitrary elements — a <span>, a <ul>, a scroll container — and carry no semantics a component
+   could own. Anything with meaning (a row, a label, a code block) is a primitive instead. */
 .muted { color: var(--text-muted); }
 .placeholder { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--pane-pad); }
+
+/* Single-line clamp. `min-width: 0` is the half everyone forgets: without it a flex or grid child
+   refuses to shrink below its content and the ellipsis never appears. */
+.truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The flex child that scrolls. `min-height: 0` for the same reason — a flex item's default
+   `min-height: auto` floors it at content height, so the parent scrolls instead of the child. */
+.scroll { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* Mono, at the size mono is nearly always set in. Already used by three elements in docker's
+   container detail that had no rule at all behind them. */
+.mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
+
+/* The unstyled list. */
+.list-reset { list-style: none; margin: 0; padding: 0; }
 
 /* Spinning glyph (agent-working indicators). */
 @keyframes spin { to { transform: rotate(360deg); } }

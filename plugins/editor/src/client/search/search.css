@@ -107,9 +107,4 @@
   min-width: 34px;
   text-align: right;
 }
-.search-hit-preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 /* `.ui-find-mark` owns the highlight (see FindBar). */

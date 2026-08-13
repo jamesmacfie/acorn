@@ -128,7 +128,7 @@ export default function AgentTaskSidebar(props: {
         <strong>Agents</strong>
         <span>{props.managedSessions.length}</span>
       </header>
-      <div class="agent-task-sidebar-scroll">
+      <div class="scroll">
         <Show when={managedRequests().length}>
           <section class="agent-task-sidebar-section">
             <div class="agent-task-sidebar-label">Needs you</div>

@@ -1,5 +1,4 @@
 /* PR list (left pane). */
-.pr-list { list-style: none; margin: 0; padding: 0; }
 .pr-row {
   display: flex;
   align-items: center;

@@ -200,7 +200,7 @@ export default function HttpPanel(props: {
             {props.projectName}
           </SectionHeader>
 
-          <nav class="http-tree">
+          <nav class="scroll">
             <Show when={props.taskId}>
               <div class="http-tree-group">
                 <span class="http-tree-folder">This task</span>
@@ -269,7 +269,7 @@ export default function HttpPanel(props: {
             <Show when={draft().folder}>
               <span class="http-name-folder">{draft().folder}/</span>
             </Show>
-            <span class="http-name-text">{draft().name || 'Untitled request'}</span>
+            <span class="truncate">{draft().name || 'Untitled request'}</span>
             <Show when={draft().taskId}>
               <span class="http-name-tag">task</span>
             </Show>

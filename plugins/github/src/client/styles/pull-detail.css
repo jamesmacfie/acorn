@@ -55,7 +55,6 @@
    once for this plugin and once as `.linear-md` — a class the NOTES plugin wore, so notes lost
    its link colour whenever github was disabled. */
 
-.check-list, .file-list { list-style: none; margin: 0; padding: 0; }
 .check-row {
   display: flex;
   align-items: center;
@@ -149,11 +148,6 @@
 .ui-composer .ui-composer-input { min-height: 64px; }
 .composer-input::placeholder, .diff-reply-input::placeholder, .repo-picker-filter::placeholder, .finder-input::placeholder { color: var(--text-muted); }
 
-.label-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
 .label-row {
   display: flex;
   align-items: center;
@@ -437,12 +431,6 @@
 }
 .commit-secondary {
   color: var(--text-muted);
-}
-.commit-author {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .review-state { text-transform: lowercase; }
 .review-approved { color: var(--add-marker); }

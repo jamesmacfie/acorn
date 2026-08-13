@@ -63,7 +63,6 @@
   border-radius: var(--radius);
 }
 
-.docker-mounts, .docker-env { list-style: none; margin: 0; padding: 0; }
 .docker-env { max-height: 200px; overflow-y: auto; }
 
 .docker-subnav { padding: 0 var(--pane-pad); }

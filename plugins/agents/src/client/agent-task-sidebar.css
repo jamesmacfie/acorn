@@ -15,7 +15,6 @@
 }
 .agent-task-sidebar-head strong { color: var(--text); }
 .agent-task-sidebar-head span { font-variant-numeric: tabular-nums; }
-.agent-task-sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .agent-task-sidebar-section { border-bottom: var(--chrome-divider); }
 .agent-task-sidebar-label {
   padding: var(--space-3) var(--space-5) var(--space-2);

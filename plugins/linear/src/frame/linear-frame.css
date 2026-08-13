@@ -63,7 +63,6 @@ button { font: inherit; }
 .ln-related-row:hover { background: var(--bg-hover); }
 .ln-related-row.ln-done { color: var(--text-muted); }
 .ln-related-id { font-family: var(--font-mono, monospace); color: var(--text-muted); }
-.ln-related-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .ln-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3, .375rem); }
 .ln-activity-row { display: flex; align-items: baseline; gap: var(--space-3, .375rem); min-width: 0; }

@@ -242,7 +242,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   when={linearConnected()}
                   fallback={
                     <>
-                      <ul class="check-list">
+                      <ul class="check-list list-reset">
                         <For each={linearRefs()}>
                           {(rf) => (
                             <li class="check-row">
@@ -259,7 +259,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                     </>
                   }
                 >
-                  <ul class="check-list">
+                  <ul class="check-list list-reset">
                     <For each={linearRefs()}>
                       {(rf) => {
                         const summary = () => linearSummary().get(rf.item)
@@ -290,7 +290,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
             </Show>
 
             <CollapsibleSection class="nav-section" persistKey="labels" open label="Labels">
-              <ul class="label-list">
+              <ul class="label-list list-reset">
                 <For each={detail.data?.labels} fallback={<li class="label-empty muted">None.</li>}>
                   {(l) => (
                     <li class="label-row" style={{ 'border-left-color': labelColor(l.color) }}>
@@ -326,7 +326,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
             </CollapsibleSection>
 
             <CollapsibleSection class="nav-section" persistKey="files" open label="Files" count={changedFiles.files().length}>
-              <ul class="file-list">
+              <ul class="file-list list-reset">
                 <For each={changedFiles.files()} fallback={<li class="placeholder">{changedFiles.isLoading() ? 'Loading…' : 'No files.'}</li>}>
                   {(f) => {
                     const status = () => fileStatusMeta(f.status)
@@ -362,7 +362,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                 count={detail.data!.checks.length}
                 actions={<StatusDot tone={CHECK_TONE[checksState(detail.data!.checks)]} />}
               >
-                <ul class="check-list">
+                <ul class="check-list list-reset">
                   <For each={detail.data!.checks}>
                     {(ck) => (
                       <li class="check-row">
@@ -414,7 +414,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
             </CollapsibleSection>
 
             <CollapsibleSection class="nav-section" persistKey="review" open label="Review">
-              <ul class="label-list">
+              <ul class="label-list list-reset">
                 <For each={detail.data?.requestedReviewers} fallback={<li class="label-empty muted">No reviewers requested.</li>}>
                   {(login) => (
                     <li class="label-row">

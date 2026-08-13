@@ -8,7 +8,6 @@
 
 /* ── sidebar ─────────────────────────────────────────────────────────────────────────────── */
 
-.http-tree { flex: 1; overflow-y: auto; min-height: 0; }
 
 .http-tree-group { padding-bottom: var(--space-3); }
 
@@ -87,7 +86,6 @@
 }
 .http-name-btn:hover { background: var(--bg-hover); }
 .http-name-folder { color: var(--text-faint); }
-.http-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .http-name-tag {
   font-size: var(--fs-2xs);
   color: var(--text-faint);
@@ -260,7 +258,6 @@
 .http-kv-list .ui-dl-item { grid-template-columns: minmax(8em, auto) minmax(0, 1fr); }
 .http-kv-list .ui-dl-label { font-family: var(--font-mono, monospace); }
 
-.http-timeline { list-style: none; margin: 0; padding: 0; }
 
 .http-timeline-row {
   display: grid;

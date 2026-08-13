@@ -46,11 +46,6 @@
   overflow-y: auto;
   padding: var(--pane-pad);
 }
-.step-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
 .step-row {
   border-bottom: var(--divider);
 }
@@ -67,11 +62,6 @@
   border: 0;
   padding: 7px 0;
   cursor: pointer;
-}
-.step-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 /* CodeBlock owns the box and the copy affordance. What is left is this panel's taller cap, its
    bottom margin and the ANSI line metrics. */

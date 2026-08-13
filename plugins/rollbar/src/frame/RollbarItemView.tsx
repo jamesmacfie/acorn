@@ -106,8 +106,8 @@ export function RollbarItemView(props: {
                   meta={relativeTime(entry.occurredAt)}
                 >
                   <span class="rb-occurrence-summary">
-                    <span class="rb-occurrence-title">{occurrenceTitle(entry)}</span>
-                    <span class="rb-occurrence-meta">
+                    <span class="truncate">{occurrenceTitle(entry)}</span>
+                    <span class="rb-occurrence-meta truncate">
                       {[entry.environment, entry.codeVersion].filter(Boolean).join(' · ')}
                     </span>
                   </span>
@@ -171,7 +171,7 @@ function OccurrenceContent(props: {
         <Show when={detail().context}><Fact label="Context" value={detail().context!} /></Show>
         <Show when={detail().server?.host}><Fact label="Server" value={detail().server!.host!} /></Show>
       </DescriptionList>
-      <ol class="rb-stack">
+      <ol class="list-reset">
         <For each={detail().frames}>{(frame) => (
           <li class="rb-stack-frame" classList={{ 'rb-stack-frame-project': frame.inProject !== false }}>
             <div class="rb-stack-location">

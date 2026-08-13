@@ -34,7 +34,7 @@ function CommitItem(props: { commit: PullCommit }) {
           <span class="commit-message">{props.commit.message || 'No commit message.'}</span>
         </div>
         <div class="commit-secondary">
-          <span class="commit-author">{author()}</span>
+          <span class="truncate">{author()}</span>
           <Show when={formatRelativeTime(props.commit.committedAt)}>
             {(age) => <span class="comment-time">{age()}</span>}
           </Show>

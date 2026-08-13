@@ -231,7 +231,7 @@ export default function PullList() {
           }
         >
           <Show when={shown().length} fallback={<EmptyState align="start">No matching PRs.</EmptyState>}>
-            <div class="pr-list" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
+            <div class="list-reset" style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}>
               <For each={virtualRows()}>
                 {({ vi, pr }) => {
                   // Reactively read the warmed detail cache (enabled:false → no fetch) so the rolled-up

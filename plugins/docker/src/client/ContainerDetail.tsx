@@ -260,7 +260,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 </Show>
                 <Show when={d().mounts.length}>
                   <DescriptionList.Item label="Mounts">
-                    <ul class="docker-mounts">
+                    <ul class="list-reset">
                       <For each={d().mounts}>
                         {(m) => <li class="mono" title={`${m.source} → ${m.destination}`}>{m.type}: {m.destination}{m.rw ? '' : ' (ro)'}</li>}
                       </For>
@@ -271,7 +271,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 <Show when={d().env.length}>
                   <DescriptionList.Item label="Env">
                     <Show when={showEnv()} fallback={<Button onClick={() => setShowEnv(true)}>Show {d().env.length} variables</Button>}>
-                      <ul class="docker-env mono"><For each={d().env}>{(line) => <li>{line}</li>}</For></ul>
+                      <ul class="docker-env list-reset mono"><For each={d().env}>{(line) => <li>{line}</li>}</For></ul>
                     </Show>
                   </DescriptionList.Item>
                 </Show>
