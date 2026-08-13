@@ -335,7 +335,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                 </Toolbar>
                 <Show when={!preview()} fallback={
                   <div
-                    class="notes-preview linear-md"
+                    class="notes-preview ui-markdown"
                     onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
                     innerHTML={renderMarkdown(body())}
                   />

@@ -51,18 +51,9 @@
 .nav-section > .label-list,
 .nav-section > .conversation-items { margin: 0; }
 
-.markdown { font-size: var(--fs-sm); line-height: var(--lh); overflow-wrap: anywhere; }
-.markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
-.markdown pre { padding: var(--space-4); overflow-x: auto; border: var(--surface-border); }
-.markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
-/* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
-.markdown a, .linear-md a { color: var(--accent); }
-.markdown img, .linear-md img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-}
+/* Rendered markdown is `.ui-markdown` in primitives.css now. It was defined here, twice over:
+   once for this plugin and once as `.linear-md` — a class the NOTES plugin wore, so notes lost
+   its link colour whenever github was disabled. */
 
 .check-list, .file-list { list-style: none; margin: 0; padding: 0; }
 .check-row {

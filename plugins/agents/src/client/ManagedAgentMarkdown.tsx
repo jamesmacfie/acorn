@@ -48,7 +48,7 @@ export default function AgentMarkdown(props: { text: string; taskId: string; cla
   return (
     <div
       ref={root}
-      class={`agent-markdown ${props.class ?? ''}`}
+      class={`ui-markdown agent-markdown ${props.class ?? ''}`}
       onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.taskId })}
     />
   )

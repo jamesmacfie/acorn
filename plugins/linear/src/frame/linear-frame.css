@@ -78,16 +78,8 @@ button { font: inherit; }
 .ln-composer { display: grid; gap: var(--space-3, .375rem); margin-top: var(--space-6, .75rem); }
 .ln-composer-actions { display: flex; align-items: center; gap: var(--space-3, .375rem); }
 
-/* Rendered ticket markdown. Mirrors github's rules for the same content, because a Linear description in
-   a PR view and one in this pane should not read differently. Remote images will not load: the frame's
-   CSP is `img-src 'self' data:` and there is no exception worth punching for a ticket attachment. */
-.markdown { font-size: var(--fs-sm, .75rem); line-height: var(--lh, 1.5); overflow-wrap: anywhere; }
-.markdown :is(pre, code) { font-family: var(--font-mono, monospace); background: var(--bg-subtle, var(--bg-hover)); }
-.markdown pre { padding: var(--space-4, .5rem); overflow-x: auto; border: var(--control-bw, .0625rem) solid var(--border); }
-.markdown :is(h1, h2, h3) { font-size: var(--fs, .8125rem); margin: var(--space-4, .5rem) 0 var(--space-2, .25rem); }
-.markdown a { color: var(--accent); }
-.markdown img { display: block; max-width: 100%; height: auto; }
-.markdown blockquote { margin: var(--space-4, .5rem) 0; padding-left: var(--space-5, .625rem); border-left: var(--control-bw, .0625rem) solid var(--border); color: var(--text-muted); }
+/* Rendered ticket markdown is `.ui-markdown`, served to this frame in /ui.css. This copy had the
+   border role wrong on `pre` (--control-bw, the width a pack may zero); the shared one does not. */
 
 @media (max-width: 45rem) {
   /* Drop the ticket switcher rather than squeeze it — it is a convenience for a task linking several

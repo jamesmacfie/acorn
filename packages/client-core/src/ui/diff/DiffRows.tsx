@@ -415,7 +415,7 @@ function ThreadRow(props: {
                 <UserAvatar login={c.author} />
                 <strong>{c.author ?? 'unknown'}</strong>
               </div>
-              <div class="markdown" innerHTML={c.body ?? ''} />
+              <div class="ui-markdown" innerHTML={c.body ?? ''} />
             </div>
           )}
         </For>

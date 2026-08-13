@@ -86,7 +86,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       {/* innerHTML over host-sanitised markup. `renderMarkdown` escapes the source, allows only
           http(s)/mailto hrefs and drops every attribute it did not write — which is exactly why it was
           moved onto the frame-safe barrel rather than reimplemented here. */}
-      <div class="markdown" innerHTML={renderMarkdown(entry.body)} onClick={props.onContentClick} />
+      <div class="ui-markdown" innerHTML={renderMarkdown(entry.body)} onClick={props.onContentClick} />
       <Show when={repliesOf(entry.id).length}>
         <ul class="ln-comment-children"><For each={repliesOf(entry.id)}>{(child) => comment(child, true)}</For></ul>
       </Show>
@@ -179,7 +179,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
         </DescriptionList>
 
         <Show when={issue().description} fallback={<p class="ln-muted">No description.</p>}>
-          {(description) => <div class="markdown" innerHTML={renderMarkdown(description())} onClick={props.onContentClick} />}
+          {(description) => <div class="ui-markdown" innerHTML={renderMarkdown(description())} onClick={props.onContentClick} />}
         </Show>
 
         <Show when={(issue().attachments ?? []).length}>
