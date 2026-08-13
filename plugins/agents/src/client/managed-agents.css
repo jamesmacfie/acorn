@@ -24,8 +24,8 @@
 .managed-agent-heading { min-width: 0; flex: 1; display: flex; align-items: baseline; gap: var(--space-3); }
 .managed-agent-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .managed-agent-heading span { flex: none; color: var(--text-faint); font-size: var(--fs-2xs); }
-.managed-agent-body { flex: 1; min-height: 0; display: flex; }
-.managed-agent-conversation { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+/* `.managed-agent-body` was the split and `.managed-agent-conversation` the detail column's flex
+   box; ListDetail owns both, so the first is gone and the second is only a name for the rules below. */
 
 .managed-agent-state {
   display: inline-flex;

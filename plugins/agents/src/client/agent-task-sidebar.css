@@ -1,12 +1,5 @@
-.agent-task-sidebar {
-  width: clamp(200px, 23%, 270px);
-  flex: none;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-subtle);
-  border-right: var(--chrome-divider);
-}
+/* ListDetail owns the column: width, flex, and the --chrome-divider. The --bg-subtle tint went with
+   the flat list column, so nothing of the old rule survives and the class is only a name now. */
 
 .agent-task-sidebar-head {
   min-height: 38px;
