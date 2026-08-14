@@ -1,19 +1,15 @@
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
-import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
-import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
-import type { Principal } from '@acorn/node-core/server/middleware/auth.ts'
-import type { PluginRequestContext } from '@acorn/plugin-api/node'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import type { PluginDatabase, Principal } from '@acorn/plugin-api/node'
+import { makeTestNodeContext, makeTestRequestContext, schema, validatePluginConfig, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { AgentContextOption } from '@acorn/protocol/agentContext.ts'
 import type { PluginRailItems } from '@acorn/protocol/api.ts'
 import type { HttpRequest, HttpVariable } from '../../shared/model'
 import { httpRequests, httpVariables } from '../../node/schema'
-import { migrationsDir } from '../../node/migrations'
 import { createHttpFetch } from './http'
 
-const ENC_KEY = '0'.repeat(64)
+// This package's own root, for reading the declaration below.
+const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const requestBody = {
   folder: '',
   taskId: null,
@@ -33,15 +29,27 @@ describe('HTTP credential isolation', () => {
   // The router is a factory over this plugin's own database, so the test hands it one instead of putting
   // core's handle on `c.env`. Nothing about `c.env` is used any more except the one symbol the carrier
   // puts there, which is what `call` below supplies.
-  let pluginDb: TestPluginDb
-  let coreDb: TestDb
+  // The host's own context for this plugin, on the loaded tier — which is the only tier http has. The
+  // permissions come from the plugin's own acorn-plugin.config.mjs, so `ctx.core` here holds exactly the
+  // facets the owner is told about: under-declare `tasks`, `projects:read` or `secrets` in the config and
+  // these routes stop working in this suite, which is the point.
+  let ctx: TestNodeContext
+  let pluginDb: PluginDatabase
 
   beforeEach(async () => {
-    pluginDb = makeTestPluginDb('http', migrationsDir())
-    coreDb = makeTestDb()
+    const config = await validatePluginConfig(PACKAGE_ROOT)
+    if (!config.ok) throw new Error(config.reason)
+    // No `migrations`: the testkit resolves this checkout's plugins/http/migrations from the id, the same
+    // chain the builder stages inside the package for the real loader to find.
+    ctx = makeTestNodeContext({
+      plugin: { name: 'http' },
+      permissions: config.manifest.permissions.node,
+    })
+    // The manifest-bound storage seam, opened and migrated by the host, exactly as init() does at boot.
+    pluginDb = ctx.storage.open()
     const now = Date.now()
-    await coreDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
-    await coreDb.db.insert(schema.projects).values([
+    await ctx.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await ctx.db.insert(schema.projects).values([
       {
         id: 'project-web', name: 'web', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
         vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/web.git', githubOwner: 'acme', githubName: 'web', githubRepoId: null,
@@ -53,7 +61,7 @@ describe('HTTP credential isolation', () => {
         createdAt: now, updatedAt: now,
       },
     ])
-    await coreDb.db.insert(schema.tasks).values([
+    await ctx.db.insert(schema.tasks).values([
       {
         id: 'task-web', title: 'Web task', icon: null, origin: 'local', projectId: 'project-web', branch: 'main', worktreePath: null,
         pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
@@ -66,25 +74,17 @@ describe('HTTP credential isolation', () => {
   })
 
   afterEach(() => {
-    pluginDb.cleanup()
-    coreDb.cleanup()
+    ctx.cleanup()
   })
 
   // Straight through the portable carrier, which is the only door these routes have now: no host Hono
   // stack, no middleware-set principal, and the identity arriving as the request context the host binds.
-  const call = (caller: Principal, path: string, init?: RequestInit) => {
-    const core = createCoreServices({ secrets: new SecretService(ENC_KEY), db: coreDb.db, activeIdentity: memoryIdentityStore() })
-    const context: PluginRequestContext = {
-      userId: caller.userId,
-      principal: caller,
-      providers: {
-        connections: () => { throw new Error('http has no provider') },
-        resource: () => { throw new Error('http has no provider') },
-        withConnections: () => { throw new Error('http has no provider') },
-        items: () => { throw new Error('http has no provider') },
-      },
-    }
-    return createHttpFetch(pluginDb.db, core)(new Request(`http://acorn.test${path}`, init), context)
+  const call = async (caller: Principal, path: string, init?: RequestInit) => {
+    // The real request context, over the real bindings. It used to be a literal with four throwing
+    // provider stubs; http registers no provider, so the host's own ownership check is what refuses them
+    // now — and nothing here has to remember to keep the shape up to date.
+    const context = await makeTestRequestContext({ plugin: 'http', principal: caller, env: ctx.env })
+    return createHttpFetch(pluginDb, ctx.core)(new Request(`http://acorn.test${path}`, init), context)
   }
 
   it('encrypts saved request payloads and returns them only to their owner', async () => {
@@ -96,7 +96,7 @@ describe('HTTP credential isolation', () => {
     expect(created.status).toBe(201)
     expect((await created.json()) as HttpRequest).toMatchObject(requestBody)
 
-    const [stored] = await pluginDb.db.select().from(httpRequests)
+    const [stored] = await pluginDb.select().from(httpRequests)
     expect(stored).toMatchObject({ userId: 'alice', encrypted: true })
     const raw = JSON.stringify(stored)
     for (const secret of ['query-secret', 'header-secret', 'body-secret', 'auth-secret', 'override-secret']) {
@@ -123,7 +123,7 @@ describe('HTTP credential isolation', () => {
     expect(bob.status).toBe(201)
     expect(((await alice.json()) as HttpVariable).value).toBe('')
 
-    const stored = await pluginDb.db.select().from(httpVariables)
+    const stored = await pluginDb.select().from(httpVariables)
     expect(stored).toHaveLength(2)
     expect(JSON.stringify(stored)).not.toContain('alice-secret')
     expect(JSON.stringify(stored)).not.toContain('bob-value')

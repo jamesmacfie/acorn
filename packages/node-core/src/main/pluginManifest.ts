@@ -333,13 +333,64 @@ export type PluginManifest = z.infer<typeof pluginManifestSchema>
 
 export const MANIFEST_FILE = 'acorn-plugin.json'
 
+// How many Zod issues a rejected manifest reports. A manifest that violates thirty rules is a manifest
+// nobody has run yet; the first few name the file well enough to start, and the whole list would push a
+// paragraph through the roster row and the attention bell.
+const MAX_REPORTED_ISSUES = 3
+
+export type PluginManifestResult = { ok: true; manifest: PluginManifest } | { ok: false; reason: string }
+
+/** The schema, run against an already-parsed object, with the issue paths kept.
+ *
+ * Split out of the reader below so there is one place that turns Zod issues into a sentence a human can
+ * act on. The other caller is testkit/manifest.ts, which validates a plugin's `acorn-plugin.config.mjs`
+ * at `pnpm test` time — the same rules, one step earlier, against the source the author edits rather
+ * than the JSON the builder writes.
+ *
+ * `source` only names the file in the message; the rules are the same wherever the bytes came from. */
+export function parsePluginManifest(json: unknown, source: string = MANIFEST_FILE): PluginManifestResult {
+  const parsed = pluginManifestSchema.safeParse(json)
+  if (parsed.success) return { ok: true, manifest: parsed.data }
+  // `path + message`, which is the whole point: `contributions.commands[2].run: ...` tells an author
+  // which line to open. A path-less issue (the schema's own cross-field refinements sometimes are) reads
+  // as the bare message rather than as an empty prefix.
+  const issues = parsed.error.issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => {
+    const path = issue.path.map((part) => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`)).join('').replace(/^\./, '')
+    return path ? `${path}: ${issue.message}` : issue.message
+  })
+  const extra = parsed.error.issues.length - issues.length
+  return { ok: false, reason: `${source} does not match the manifest schema — ${issues.join('; ')}${extra > 0 ? ` (and ${extra} more)` : ''}` }
+}
+
+/** Why this directory is not a plugin, in the words of the rule it broke.
+ *
+ * The pair to `readPluginManifest` below, which collapses every one of these to `null`. That collapse is
+ * what made a bad manifest the least debuggable failure in the system: the loader could only say
+ * "missing, unreadable, or does not match the schema", so an author who mistyped one field went looking
+ * through ~30 rules by hand.
+ *
+ * Still never throws. A skip plus a report is the loader's contract and this only changes what the report
+ * can say. */
+export function readPluginManifestResult(dir: string): PluginManifestResult {
+  let text: string
+  try {
+    text = readFileSync(join(dir, MANIFEST_FILE), 'utf8')
+  } catch (error) {
+    return { ok: false, reason: `${MANIFEST_FILE} is missing or unreadable: ${error instanceof Error ? error.message : String(error)}` }
+  }
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch (error) {
+    return { ok: false, reason: `${MANIFEST_FILE} is not valid JSON: ${error instanceof Error ? error.message : String(error)}` }
+  }
+  return parsePluginManifest(json)
+}
+
 // Never throws. A missing, unreadable, non-JSON or schema-violating manifest is all one outcome —
 // "this directory is not a plugin we can run" — and the loader turns that into a skip plus a report.
+// Callers that have somewhere to PUT the reason use readPluginManifestResult above instead.
 export function readPluginManifest(dir: string): PluginManifest | null {
-  try {
-    const parsed = pluginManifestSchema.safeParse(JSON.parse(readFileSync(join(dir, MANIFEST_FILE), 'utf8')))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
+  const result = readPluginManifestResult(dir)
+  return result.ok ? result.manifest : null
 }

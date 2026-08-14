@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../node/migrations'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { deleteRepoMirrorStatements, pruneOrphanedGithubMirror } from './mirrorRetention'
 import { checks, comments, prFiles, pullRequests, repos, reviews } from '../node/schema'
 
@@ -13,7 +12,7 @@ describe('GitHub mirror retention repair', () => {
   let testDb: TestPluginDb
 
   beforeEach(() => {
-    testDb = makeTestPluginDb('github', migrationsDir())
+    testDb = makeTestPluginDb('github')
   })
 
   afterEach(() => testDb.cleanup())

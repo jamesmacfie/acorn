@@ -72,6 +72,7 @@ Useful commands:
 
 ```sh
 pnpm dev:node                              # standalone Node, no Electron window
+pnpm dev:plugin <id>                       # rebuild one loaded plugin's package on every save
 pnpm lint                                  # strict TypeScript and architecture checks
 pnpm test                                  # native rebuild plus Vitest suites
 pnpm --filter @acorn/desktop test:e2e      # builds the service artifact, then Playwright

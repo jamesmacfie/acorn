@@ -131,8 +131,8 @@ github's PR detail renders, a descriptor rail source with host-owned task promot
 `linear.app` URL recognisers. The desktop ships every built package as app resources and the service
 reconciles them into the writable data root before plugin discovery; app-owned copies update with the
 app, while owner-installed overrides and uninstall tombstones win. A standalone Node has no app
-resources to reconcile from and deliberately skips that step — see
-[node-distribution.md](./node-distribution.md) § Plugins.
+resources to reconcile from, so that step does nothing unless a developer names a directory to reconcile
+from — see [node-distribution.md](./node-distribution.md) § Plugins.
 
 Plugins come in two tiers. Those feature packages are **compiled in**: they ship in the binary, run
 in the shell's own realm, and are trusted like the rest of the app. A Node can also **load** a

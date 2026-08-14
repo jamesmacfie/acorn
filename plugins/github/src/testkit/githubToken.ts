@@ -1,7 +1,11 @@
 // Test-only helper, in testkit/ for the same reason node-core's is: it is scaffolding, not surface,
 // and it was sitting in server/ where every import read like production code.
-import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
-import { seedProviderConnection } from '@acorn/node-core/testkit/integration.ts'
+//
+// It reaches core through @acorn/plugin-api/testkit rather than node-core's internals — the same seam a
+// third-party plugin's tests get, and this file is the first thing that moved onto it. What that
+// migration wanted was small and telling: core's `AppDatabase` type, because a github route test holds
+// core's test database in order to seed workspaces and tasks.
+import { seedProviderConnection, type AppDatabase } from '@acorn/plugin-api/testkit'
 import { GITHUB_PROVIDER } from '../server/githubToken'
 
 // The credential half of the mount contract for github route tests, alongside node-core's testDb and

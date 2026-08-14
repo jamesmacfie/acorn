@@ -15,6 +15,7 @@ import { integrationProviderRegistry } from '@acorn/node-core/server/integration
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routeRegistry.ts'
+import { readGolden, writeGolden } from './golden'
 
 describe('plugin route registry', () => {
   it('mounts a contribution under its declared plugin namespace', () => {
@@ -77,54 +78,23 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['GET', '/v2/core/integrations'],
 ]
 
-// One representative route per app/server/routes.ts contribution. Router unit tests cover behavior;
-// this table proves the composition root actually mounts them — and it is where the deliberate segment
-// doubling is visible (see the note in routes.ts): a router that names its own top-level segment repeats
-// it under its plugin namespace.
+// Every route the compiled plugins mount, as a GOLDEN LIST in `routeRegistry.snapshot.json` — see
+// ./golden.ts for the one command that regenerates it. This used to be one hand-typed REPRESENTATIVE route
+// per contribution, checked with `some()`; it is the whole mount table now, checked with exact equality, so
+// it caught a table going stale in one direction only and now catches both. It is also where the deliberate
+// segment doubling is visible (see the note in routes.ts): a router that names its own top-level segment
+// repeats it under its plugin namespace, e.g. `/v2/p/memory/memory`.
 //
-// No provider projection row any more. `/v2/p/linear/projects` was the one, and linear is a LOADED
-// package now: its routes reach the mount table through the loader's fetch carrier, which this suite
-// does not assemble. `apps/node/test/integration/pluginLoader.test.ts` is where a loaded plugin's routes
-// are exercised, and `linear.test.ts` drives linear's own router directly.
+// Duplicates are kept rather than deduped. Several github routers register under one path with different
+// handlers, and collapsing them would stop the list noticing nine of them disappearing.
 //
-// `/v2/p/http/projects/:projectId/requests` left this table for the same reason: http ships loaded too, so
-// nothing in the compiled graph mounts it. `httpLoaded.test.ts` drives it through the carrier the host
-// actually uses, against a package built from this source.
-const MOUNTED_PLUGIN_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
-  ['GET', '/v2/p/changes/tasks/:id/review-notes'],
-  ['GET', '/v2/p/changes/tasks/:id/local/changes'],
-  ['POST', '/v2/p/editor/tasks/:id/search'],
-  ['GET', '/v2/p/editor/tasks/:id/editor/root'],
-  ['GET', '/v2/p/docker/info'],
-  ['GET', '/v2/p/agents/usage'],
-  ['GET', '/v2/p/agents/sessions'],
-  ['GET', '/v2/p/workflows/tasks/:id/workflows'], // registered by the plugin's own init
-  ['GET', '/v2/p/workflows/workflows/runs/:runId/steps'], // doubled: the router owns '/workflows/*'
-  ['GET', '/v2/p/memory/memory'], // doubled: the router owns '/memory'
-  ['GET', '/v2/p/notes/tasks/:id/notes'],
-  ['GET', '/v2/p/notes/workspaces/:wsId/notes'],
-  ['GET', '/v2/p/memory/tasks/:id/notes'],
-  ['GET', '/v2/p/memory/workspaces/:wsId/notes'],
-  ['GET', '/v2/p/terminal/sessions'], // the terminal router owns the sessions namespace
-  ['GET', '/v2/p/terminal/profiles'],
-  ['GET', '/v2/p/github/repos'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/labels'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/pulls'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/pulls/:number'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/pulls/:number/conflicts'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/pulls/:number/files'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/blobs/:sha'],
-  ['POST', '/v2/p/github/repos/:owner/:repo/pulls/batch'],
-  ['POST', '/v2/p/github/repos/:owner/:repo/pulls/:number/merge'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/actions/runs/:runId/jobs'],
-  ['POST', '/v2/p/github/repos/:owner/:repo/pulls'], // prCreate
-  ['GET', '/v2/p/github/repos/:owner/:repo/branches'],
-  ['GET', '/v2/p/github/repos/:owner/:repo/mentions'],
-  ['GET', '/v2/p/github/pins'],
-  ['PUT', '/v2/p/github/pins'],
-  ['POST', '/v2/p/github/auth/device/start'],
-  ['POST', '/v2/p/github/import'],
-]
+// What is NOT in here, and would be a real change if it appeared: any route from a LOADED package. Linear's
+// `/v2/p/linear/projects` and http's `/v2/p/http/projects/:projectId/requests` both left when their plugins
+// did — their routes reach the mount table through the loader's fetch carrier, which this suite does not
+// assemble. `pluginLoader.test.ts` is where a loaded plugin's routes are exercised, `httpLoaded.test.ts`
+// drives http's through the carrier the host actually uses, and `linear.test.ts` drives linear's router
+// directly.
+const PLUGIN_ROUTES = 'routeRegistry.snapshot.json'
 
 describe('assembled routes', () => {
   let core: TestDb
@@ -162,6 +132,7 @@ describe('assembled routes', () => {
       {
         capabilities: new CapabilityRegistry(),
         core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
+        dataDir,
       },
     )
   })
@@ -175,8 +146,21 @@ describe('assembled routes', () => {
 
   const routes = () => createApp().routes
 
-  it.each([...MOUNTED_CORE_ROUTES, ...MOUNTED_PLUGIN_ROUTES])('mounts %s %s', (method, path) => {
+  it.each(MOUNTED_CORE_ROUTES)('mounts %s %s', (method, path) => {
     expect(routes().some((route) => route.method === method && route.path === path)).toBe(true)
+  })
+
+  it('mounts exactly the plugin routes in the golden list', () => {
+    const actual = routes()
+      .filter((route) => route.path.startsWith('/v2/p/'))
+      .map((route) => `${route.method} ${route.path}`)
+      .sort()
+    writeGolden(PLUGIN_ROUTES, actual)
+    // Anti-vacuity: the assertion below is an exact match against a file, so a boot that mounted nothing
+    // would pass against an empty golden. A floor rather than a count — the compiled tier shrinks by
+    // decision, so this comes down as plugins ship loaded instead.
+    expect(actual.length).toBeGreaterThanOrEqual(30)
+    expect(actual).toEqual(readGolden<string[]>(PLUGIN_ROUTES))
   })
 
   it('does not mount routes outside the current /v2 namespaces', () => {

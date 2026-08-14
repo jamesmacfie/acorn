@@ -3,7 +3,7 @@ import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { buildHeadlessArgv, buildSessionEnv, DEFAULT_PROFILE_ID, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, openPluginDb, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { buildHeadlessArgv, buildSessionEnv, DEFAULT_PROFILE_ID, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../main/workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from '../main/workflowRunner'
@@ -11,7 +11,6 @@ import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { encodeToolCeiling } from '../main/workflowTools'
 import { WorkflowValidationError } from '../main/workflowValidation'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
-import { migrationsDir } from './migrations'
 import { workflowRuns } from './schema'
 
 export type WorkflowsPluginDeps = {
@@ -29,18 +28,19 @@ export type WorkflowsPluginDeps = {
   failingChecks: (taskId: string) => Promise<string | null>
 }
 
-export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): NodePlugin => {
-  let db: ReturnType<typeof openPluginDb> | null = null
+export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   // Held so dispose can abort in-flight steps before the database closes (see dispose below).
   let live: WorkflowRunner | null = null
   let routeCapability: { dispose(): void } | null = null
   return {
     name: 'workflows',
+    // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host owns
+    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    migrationsModule: import.meta.url,
     init: (ctx) => {
-      // Opened and migrated before the listener binds: the runner and the bridge below both close over
-      // the handle, so no request can reach an unmigrated database.
-      db = openPluginDb(dataDir, 'workflows', { migrationsFolder: migrationsDir() })
-      const store = db
+      // Opened and migrated by the host before init returns: the runner and the bridge below both close
+      // over the handle, so no request can reach an unmigrated database.
+      const store = ctx.storage.open()
       const core = ctx.core
 
       const runner = new WorkflowRunner(store, {
@@ -229,19 +229,18 @@ export const workflowsPlugin = (dataDir: string, deps: WorkflowsPluginDeps): Nod
       // (main/workflowRunner.ts explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, { reconcile: () => runner.reconcile() })
     },
-    // The plugin's SQLite file is in WAL mode, so it has to be closed before the data root's lock is
-    // dropped — the composition root's own teardown invariant. The bridge slot is cleared explicitly
-    // rather than trusting teardown order: a second startServiceRuntime in one process would otherwise
-    // serve workflow requests through the first boot's closed database handle.
-    // Abort in-flight steps BEFORE closing the handle. A headless child outliving its database wrote its
-    // outcome onto a closed connection; the run rows stay 'running' and reconcile() sweeps them to
-    // 'pending' on the next boot, which is what that sweep exists for.
+    // The bridge slot is cleared explicitly rather than trusting teardown order: a second
+    // startServiceRuntime in one process would otherwise serve workflow requests through the first boot's
+    // closed database handle.
+    //
+    // In-flight steps are aborted HERE, which is still before the handle closes: the host drains it after
+    // this returns. A headless child outliving its database wrote its outcome onto a closed connection;
+    // the run rows stay 'running' and reconcile() sweeps them to 'pending' on the next boot, which is
+    // what that sweep exists for.
     dispose: () => {
       live?.stop()
       live = null
       routeCapability?.dispose()
-      db?.close()
-      db = null
     },
   }
 }

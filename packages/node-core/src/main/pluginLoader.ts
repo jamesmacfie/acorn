@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { confineExistingFile, resolveInRoot } from './core/filesystem/confinement'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './pluginInstaller'
-import { PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
+import { PLUGIN_API_MAJOR, readPluginManifestResult, type PluginManifest } from './pluginManifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './pluginMigrations'
 import { openPluginDb } from './pluginStorage'
 import { readBundledPluginState } from './bundledPluginState'
@@ -85,7 +85,20 @@ export type InstalledPluginInfo = {
 
 // Why one directory did not produce a plugin. `id` is the directory name when the manifest could not
 // be read at all — it is the only handle we have on the thing that failed.
-export type PluginLoadFailure = { id: string; dir: string; reason: string }
+// `at` is when this pass discovered the failure, and it exists so the bell can say "20 minutes ago".
+// Without it the roster row had no timestamp, the attention item fell back to 0, and every load failure
+// rendered as a 56-year-old event that also sorted last within its severity band.
+export type PluginLoadFailure = { id: string; dir: string; reason: string; at: number }
+
+// The same record before it is stamped. One timestamp per pass, applied at the return: these walks are
+// synchronous, so a clock at each of the nine record sites would differ by microseconds and claim a
+// precision the roster does not have.
+type UnstampedFailure = Omit<PluginLoadFailure, 'at'>
+
+const stamped = (failures: readonly UnstampedFailure[]): PluginLoadFailure[] => {
+  const at = Date.now()
+  return failures.map((failure) => ({ ...failure, at }))
+}
 
 export type PluginLoadResult = { loaded: LoadedPlugin[]; installed: InstalledPlugin[]; failures: PluginLoadFailure[] }
 
@@ -203,16 +216,19 @@ const isDirectory = (path: string): boolean => {
 export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[]; failures: PluginLoadFailure[] } {
   const root = pluginInstallRoot(dataRoot)
   const installed: InstalledPlugin[] = []
-  const failures: PluginLoadFailure[] = []
+  const failures: UnstampedFailure[] = []
   const seen = new Set<string>()
 
   for (const name of subdirectories(root).sort()) {
     const dir = join(root, name)
-    const manifest = readPluginManifest(dir)
-    if (!manifest) {
-      failures.push({ id: name, dir, reason: 'acorn-plugin.json is missing, unreadable, or does not match the manifest schema' })
+    // The reason carries the Zod issue paths, so "which of ~30 rules did I break" is answered on the
+    // roster row rather than by reading the schema (docs/plugins.md § Failures are contained).
+    const read = readPluginManifestResult(dir)
+    if (!read.ok) {
+      failures.push({ id: name, dir, reason: read.reason })
       continue
     }
+    const manifest = read.manifest
     if (manifest.apiVersion !== PLUGIN_API_MAJOR) {
       failures.push({
         id: manifest.id,
@@ -241,7 +257,7 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
           : {}),
     })
   }
-  return { installed, failures }
+  return { installed, failures: stamped(failures) }
 }
 
 export async function loadExternalPlugins(
@@ -255,7 +271,7 @@ export async function loadExternalPlugins(
   const scan = scanInstalled(dataRoot)
   const loaded: LoadedPlugin[] = []
   const installed: InstalledPlugin[] = []
-  const failures: PluginLoadFailure[] = [...scan.failures]
+  const failures: UnstampedFailure[] = [...scan.failures]
 
   for (const entry of scan.installed) {
     const { manifest, dir } = entry
@@ -334,5 +350,5 @@ export async function loadExternalPlugins(
   }
 
   for (const failure of failures) console.error(`[plugins] ${failure.id}: ${failure.reason}`)
-  return { loaded, installed, failures }
+  return { loaded, installed, failures: stamped(failures) }
 }

@@ -53,10 +53,17 @@ through one builder, `apps/node/src/server/pluginState.ts`. Two things differ on
 - **`{ path }` installs** symlink an author's working tree into the install directory, so they are
   gated on the build being a development one. Under Electron that question is answered by the
   packaging flag; a standalone node has no such flag and reads `NODE_ENV` instead.
-- **Bundled packages are not reconciled here.** The desktop ships every built plugin as app resources
-  and copies them into the writable data root before discovery. A standalone node has no
-  `resourcesPath` to copy from, so the step does not exist — plugins arrive only through the
+- **Bundled packages have nothing to be reconciled from.** The desktop ships every built plugin as app
+  resources and copies them into the writable data root before discovery. A standalone node has no
+  `resourcesPath`, so by default the step does nothing and plugins arrive only through the
   owner-authenticated install route. Nothing is stale as a result; there is simply no app-owned copy.
+  A developer running against a repo checkout can name one with `ACORN_BUNDLED_PLUGINS_DIR`, and then
+  this root reconciles exactly as the desktop's does — both call one
+  `reconcileBundledPackages`, so the outcome and the boot summary cannot differ. A service-managed node
+  sets no such variable.
+
+Both roots report every ownership row at boot, whether or not they had a bundled copy to offer, because
+a package frozen by an owner-installed row is the failure that looks like a feature that was never built.
 
 The disabled list is the data root's file, unioned with any start-config override. Only the supervised
 host passes an override (tests and `dev:node` pin a list without writing into a data root); a

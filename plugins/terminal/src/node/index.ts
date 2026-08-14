@@ -1,4 +1,4 @@
-import { type NodePlugin, openPluginDb, RUN_TARGETS, TASK_CREATED, TASK_SESSIONS, WORKTREE_CREATED } from '@acorn/plugin-api/node'
+import { type NodePlugin, RUN_TARGETS, TASK_CREATED, TASK_SESSIONS, WORKTREE_CREATED } from '@acorn/plugin-api/node'
 import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
@@ -7,7 +7,6 @@ import { runAgentTools } from '../main/agentTools'
 import { createRuntimeService } from '../main/runIpc'
 import { disposeTerminal, registerTerminalIpc, sendToAgent, sessionControl, terminalRunGlue, type TerminalIpcDeps } from '../main/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
-import { migrationsDir } from './migrations'
 
 // The four hooks this plugin still cannot resolve for itself. Each one's blocker is stated on
 // TerminalIpcDeps in main/terminal.ts; in short, one closes over the listener origin and the internal
@@ -15,17 +14,19 @@ import { migrationsDir } from './migrations'
 // deliberately not in a contract/.
 export type TerminalPluginDeps = Omit<TerminalIpcDeps, 'seedTaskNotes'>
 
-export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodePlugin => {
-  let db: ReturnType<typeof openPluginDb> | null = null
+export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
   return {
     name: 'terminal',
     required: true,
+    // This module's own URL: the chain sits at plugins/terminal/migrations beside it, and the host owns
+    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    migrationsModule: import.meta.url,
     init: (ctx) => {
-      // Opened and migrated before the listener binds: registerTerminalIpc installs the handle into the
-      // engine and fills the route's bridge in the same call, so no request and no PTY spawn can reach
-      // an unmigrated database.
-      db = openPluginDb(dataDir, 'terminal', { migrationsFolder: migrationsDir() })
+      // Opened and migrated by the host before init returns: registerTerminalIpc installs the handle into
+      // the engine and fills the route's bridge in the same call, so no request and no PTY spawn can
+      // reach an unmigrated database.
+      const db = ctx.storage.open()
       // Fills the terminal bridge, the WS stream handlers (including streamTaskId, which the task-scope
       // guard in main/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
@@ -72,8 +73,8 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
       ctx.capabilities.provide(TERMINAL_SESSIONS, sessionControl)
     },
     // Everything init reached out and touched, in reverse: the engine's idle-watch timer, its session
-    // displays and session map, the four slots it filled, and its own WAL-mode SQLite file — which has
-    // to be closed before the data root's lock is dropped (the composition root's teardown invariant).
+    // displays and session map, and the four slots it filled. The SQLite handle is not in the list any
+    // more — the host closes it right after this returns, which is the same point in the drain.
     //
     // The slots are cleared explicitly rather than trusting teardown order. disposeWsHub also clears the
     // hub, and the process is usually about to exit, but "release what init opened" has to hold on its
@@ -82,8 +83,6 @@ export const terminalPlugin = (dataDir: string, deps: TerminalPluginDeps): NodeP
       disposeTerminal()
       for (const disposable of routeDisposables) disposable.dispose()
       routeDisposables = []
-      db?.close()
-      db = null
     },
   }
 }

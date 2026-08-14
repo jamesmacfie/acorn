@@ -2,8 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../node/migrations'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import {
   contentHashId,
   listMemories,
@@ -66,7 +65,7 @@ describe('memory store + index over temp checkouts', () => {
     checkoutB = join(dir, 'b')
     home = join(dir, 'home')
     for (const d of [checkoutA, checkoutB, home]) mkdirSync(join(d, '.acorn', 'memory'), { recursive: true })
-    t = makeTestPluginDb('memory', migrationsDir())
+    t = makeTestPluginDb('memory')
   })
 
   afterEach(() => {

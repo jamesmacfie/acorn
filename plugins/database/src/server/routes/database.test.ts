@@ -11,7 +11,6 @@ import type { PluginCompletionResponse } from '@acorn/protocol/documentSurface.t
 import type { DbSavedQuery } from '../../shared/database'
 import type { DatabaseBridge } from '../../main/database'
 import { createDatabaseFetch } from './database'
-import { migrationsDir } from '../../node/migrations'
 
 // These routes run over the PORTABLE CARRIER now — no host Hono stack, no middleware-set principal, and
 // the identity arriving as the request context the host binds. So does the bridge: it is a closure
@@ -53,7 +52,7 @@ const json = (body: unknown): RequestInit => ({
 
 const fixture = (): Fixture => {
   const core = makeTestDb()
-  const plugin = makeTestPluginDb('database', migrationsDir())
+  const plugin = makeTestPluginDb('database')
   const generateText = vi.fn<ModelService['generateText']>()
   const available = vi.fn<ModelService['available']>(async () => [])
   const call: Fixture['call'] = async (path, init, bridge = fake(), caller = principal('james')) => {

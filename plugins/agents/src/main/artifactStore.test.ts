@@ -3,9 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import * as schema from '../node/schema'
-import { migrationsDir } from '../node/migrations'
 import { AgentArtifactStore } from './artifactStore'
 
 // This plugin's OWN migrated SQLite file, not core's. Deliberately not "makeTestDb with extra tables":
@@ -16,7 +15,7 @@ let dataDir: string
 let store: AgentArtifactStore
 
 beforeEach(async () => {
-  testDb = makeTestPluginDb('agents', migrationsDir())
+  testDb = makeTestPluginDb('agents')
   dataDir = await mkdtemp(join(tmpdir(), 'acorn-agent-artifacts-'))
   store = new AgentArtifactStore(testDb.db, dataDir)
 })

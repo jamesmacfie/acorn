@@ -18,7 +18,7 @@ import {
   parseCached,
   type PluginFetchHandler,
   type PluginProviderResourceRequest,
-  type PluginRequestContext,
+  portableCarrier,
   ProviderOperationError,
   providerRequestScheduler,
   respondError,
@@ -53,23 +53,12 @@ const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id ==
 
 // ── The portable carrier ──────────────────────────────────────────────────────────────────────────
 //
-// Linear ships loaded, so these routes run on ONE tier: a Hono instance cannot cross the contract,
-// the host gets `router.fetch` (createLinearFetch below), and the identity-bound runtime rides in
-// through `c.env` behind a module-level symbol nothing outside this file can name. The compiled-tier
-// fallbacks that used to sit beside each helper were deleted when the last compiled mount went; a
-// request that arrives without the context is a wiring bug, and saying so beats answering it from
-// host handles this bundle should no longer touch.
-const PORTABLE_REQUEST_CONTEXT = Symbol('linear-plugin-request-context')
-
-type PortableBindings = AppEnv['Bindings'] & {
-  [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext
-}
-
-const requestContext = (c: Context<AppEnv>): PluginRequestContext => {
-  const context = (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
-  if (!context) throw new Error('linear routes only run over the portable carrier (createLinearFetch)')
-  return context
-}
+// Linear ships loaded, so these routes run on ONE tier: a Hono instance cannot cross the contract, the
+// host gets `router.fetch` (createLinearFetch below), and the identity-bound runtime rides in through
+// `c.env`. The carrier is the host's (@acorn/plugin-api/node) rather than this file's; the
+// compiled-tier fallbacks that used to sit beside each helper were deleted when the last compiled
+// mount went.
+const { requestContext, portableFetch } = portableCarrier(PROVIDER)
 
 /** Every Linear connection this caller owns, credentials still sealed. */
 const linearStored = (c: Context<AppEnv>): Promise<StoredConnection[]> =>
@@ -376,7 +365,5 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
 // identity-bound provider runtime without exposing host database or secret-service handles to the
 // bundle. `projects` is optional for the suites that drive these routes without a project scope;
 // /rail-items then falls back for every connection, which is what a test asserting the fallback wants.
-export const createLinearFetch = (projects?: LinearProjectScope): PluginFetchHandler => {
-  const routes = createLinearRoutes(projects)
-  return (request, context) => routes.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
-}
+export const createLinearFetch = (projects?: LinearProjectScope): PluginFetchHandler =>
+  portableFetch(createLinearRoutes(projects))

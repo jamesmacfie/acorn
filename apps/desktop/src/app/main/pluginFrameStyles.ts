@@ -14,8 +14,10 @@ import cute from '@acorn/client-core/styles/style-cute.css?raw'
 import modern from '@acorn/client-core/styles/style-modern.css?raw'
 import cozy from '@acorn/client-core/styles/style-cozy.css?raw'
 import tabs from '@acorn/client-core/styles/tabs.css?raw'
-// The delegated tooltip bubble. A frame mounts its own listener (ui/tips.tsx mountFrameTips) because
-// the shell's singleton cannot see into another document.
+// The delegated tooltip bubble. A frame mounts its own listener — `mountFrameTips` from
+// client-core/ui/frameTips.ts, which `mountFrame` calls for it — because the shell's singleton cannot see
+// into another document. It lives apart from ui/tips.tsx so a frame bundle does not pull Solid and the
+// primitives in with it.
 import tips from '@acorn/client-core/ui/tips.css?raw'
 import picker from '@acorn/client-core/styles/topbar.css?raw'
 

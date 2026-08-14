@@ -113,7 +113,7 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
       const key = { userId, repoId, number }
       const [detail, files] = await Promise.all([
         readComposite(db, key),
-        filesMode === 'none' ? [] : readFiles(c.env, db, key, { includePatches: filesMode === 'full' }),
+        filesMode === 'none' ? [] : readFiles(c.env.BLOBS, db, key, { includePatches: filesMode === 'full' }),
       ])
       return { number, detail, files }
     }),

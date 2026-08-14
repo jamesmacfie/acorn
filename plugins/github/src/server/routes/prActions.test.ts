@@ -1,15 +1,12 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
-import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
+import type { AppEnv, Principal } from '@acorn/plugin-api/node'
 import { prActions } from './prActions'
-import { testGate } from '@acorn/node-core/testkit/auth.ts'
-import { makeTestDb, makeTestPluginDb, testSecretEnv, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../../node/migrations'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+// Everything this route test needs from the host, through the one seam a third-party author would use:
+// the auth gate, a migrated core database, this plugin's own database, and the `c.env` bindings.
+import { makeTestDb, makeTestPluginDb, testEnv, testGate, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { repos } from '../../node/schema'
-
-const ENC_KEY = '0'.repeat(64)
 
 const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
@@ -24,14 +21,14 @@ const req = (principal: Principal | null, method: string, path: string, body?: u
       headers: body === undefined ? undefined : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
-    { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env,
+    testEnv({ DB: core.db }),
   )
 }
 
 describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
   beforeEach(async () => {
     core = makeTestDb()
-    plugin = makeTestPluginDb('github', migrationsDir())
+    plugin = makeTestPluginDb('github')
     await plugin.db.insert(repos).values({ userId: 'james', id: 1, owner: 'acme', name: 'widget', fetchedAt: Date.now() })
   })
   afterEach(() => {

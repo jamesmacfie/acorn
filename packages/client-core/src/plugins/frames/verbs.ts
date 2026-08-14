@@ -36,10 +36,10 @@ type VerbName<R> = R extends { kind: 'api'; method: infer M extends string }
 
 export type FrameVerb = VerbName<PluginBridgeRequest>
 
-// Sent BY the SDK on the author's behalf, never called by them: `cancel` rides an AbortSignal and
-// `keydown` is forwarded from a key handler the SDK installs. They are wire verbs with no author
-// surface, on purpose.
-type SdkInternalVerb = 'cancel' | 'keydown'
+// Sent BY the SDK on the author's behalf, never called by them: `cancel` rides an AbortSignal,
+// `keydown` is forwarded from a key handler the SDK installs, and `connected` is the handshake ack the
+// SDK posts the moment `connect()` resolves. They are wire verbs with no author surface, on purpose.
+type SdkInternalVerb = 'cancel' | 'keydown' | 'connected'
 export type AuthoredVerb = Exclude<FrameVerb, SdkInternalVerb>
 
 // ── The two projections ───────────────────────────────────────────────────────────────────────────
@@ -104,9 +104,10 @@ type HostSurface = {
   keydown: FrameServices['keydown']
 }
 
-// `cancel` is the one wire verb with no host effect: the broker drops its own record of an in-flight
-// request rather than asking the host to undo anything.
-type HostHandledVerb = Exclude<FrameVerb, 'cancel'>
+// Two wire verbs ask nothing of the host's services bag. `cancel` makes the broker drop its own record of
+// an in-flight request rather than asking the host to undo anything; `connected` is consumed by the broker
+// as evidence the frame evaluated, which it reports through `onConnected` rather than through a service.
+type HostHandledVerb = Exclude<FrameVerb, 'cancel' | 'connected'>
 
 // ── The coverage checks ───────────────────────────────────────────────────────────────────────────
 

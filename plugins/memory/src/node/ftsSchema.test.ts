@@ -1,7 +1,6 @@
 import { getTableColumns, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from './migrations'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { memories } from './schema'
 
 // memories_fts is a hand-written FTS5 virtual table (drizzle cannot model one), kept in sync with
@@ -14,7 +13,7 @@ describe('memories_fts schema drift guard', () => {
   let t: TestPluginDb
 
   beforeEach(() => {
-    t = makeTestPluginDb('memory', migrationsDir())
+    t = makeTestPluginDb('memory')
   })
 
   afterEach(() => t.cleanup())

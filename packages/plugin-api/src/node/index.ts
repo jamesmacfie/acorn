@@ -4,63 +4,71 @@
 //
 // Everything below is a RE-EXPORT. The implementation stays in node-core, which is free to move
 // files around underneath as long as this list keeps resolving. Adding a line here is a contract
-// change: src/surface.test.ts fails until the snapshot is updated on purpose.
+// change: src/surface.test.ts fails until the snapshot is updated on purpose. TAKING one away is a
+// bigger one — regeneration refuses it unless PLUGIN_API_MAJOR moves, which is why sixteen names left
+// this file and the number is now '2' (docs/plugins.md § The plugin API).
+//
+// Every name here has a consumer, and that is the entry criterion: a name on a contract with nothing
+// importing it is a promise nobody asked for. `PLUGIN_API_MAJOR` is the single exception, below.
 //
 // Deliberately absent, and staying absent:
 //   ctx.events.streams()/channel() PTY and WS-channel ownership — exactly one plugin may own those,
 //     so they are terminal-plugin infrastructure handed in through ctx, not API.
 //   main/wsHub, main/notify — plugins broadcast through ctx, and a ratchet keeps it that way.
 //   server/db — a plugin owns its own SQLite file; core's tables are not its business.
-//   createCoreServices, createTaskService, testkit/* — test scaffolding. First-party plugin TESTS
-//     still import those from node-core directly; that is a first-party privilege, and a
-//     third-party author gets @acorn/plugin-api/testkit if and when one is built.
+//   createCoreServices, createTaskService, testkit/* — test scaffolding, and it has its own entrypoint
+//     now: @acorn/plugin-api/testkit. A test gets a REAL context from makeTestNodeContext rather than
+//     constructing core's services itself, which is why the factories are still not here.
 
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
 export type {
   NodePlugin,
-  NodePluginContext,
   PluginBroadcast,
   PluginFetchHandler,
-  PluginProviderConnectionVisitor,
   PluginProviderResourceRequest,
-  PluginProviderRuntime,
   PluginRequestContext,
 } from '@acorn/node-core/server/plugin/types.ts'
 // The major this build of the API speaks. A loaded plugin's acorn-plugin.json must name exactly this
-// in `apiVersion`, and a build script generating a manifest should read it from here.
+// in `apiVersion`, and a build script generating a manifest reads it from
+// @acorn/protocol/pluginApiVersion.ts, which is where this one comes from too.
+//
+// The one name on this surface kept without a consumer, on purpose: it is the contract's version, so it
+// is here by definition rather than because something imports it. Everything else with a zero consumer
+// count was deleted, including the context types — plugins keep `ctx` inside `init`/`activate` and pass
+// `ctx.core` onward, so `NodePluginContext` never had to be named. Re-adding any of them is one line;
+// carrying them was a promise.
 export { PLUGIN_API_MAJOR } from '@acorn/node-core/main/pluginManifest.ts'
-export type { NodePermissions, PluginManifest } from '@acorn/node-core/main/pluginManifest.ts'
 export { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
-export type { CapabilityId, Disposable } from '@acorn/node-core/server/plugin/capabilities.ts'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-export {
-  canUseProviderCredential,
-  isTaskConfined,
-  mayActOnTask,
-  ownerId,
-  requireDevice,
-  requireUser,
-} from '@acorn/node-core/server/middleware/requireUser.ts'
+export { isTaskConfined, mayActOnTask, ownerId, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
+// The portable carrier, both halves. A loaded plugin serves a fetch handler and builds its routes with
+// its own Hono; this is how the request context gets from one to the other, and it is here so the four
+// loaded plugins stop keeping four copies of it.
+export { portableCarrier } from '@acorn/node-core/server/plugin/portable.ts'
 export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
-// prune candidate: a Hono binding shape, reached by one github route. It is a type, so it costs
-// nothing at runtime, but a plugin should be reading its env off ctx rather than naming core's.
-export type { Env } from '@acorn/node-core/main/bindings.ts'
+// `Env` — core's runtime bindings, SECRETS/ACTIVE_IDENTITY/INTERNAL_TOKEN and friends — used to be here
+// for one github route that wanted `Env['BLOBS']`. It named the whole binding set to reach two methods.
+// A plugin reads its env off `ctx`; where it genuinely needs a store, it states the two methods it calls
+// (plugins/github/src/server/routes/prMirror.ts § PatchBlobStore).
 
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
-// Compile-time factories for built-ins. A loaded plugin uses its manifest-bound ctx.storage seam,
-// so it cannot choose a database id or discover a migration chain by filesystem proximity.
-export { openPluginDb } from '@acorn/node-core/main/pluginStorage.ts'
+// The HANDLE type, and nothing else. Both tiers get their database from `ctx.storage.open()`: declare
+// `migrationsModule: import.meta.url` on the plugin (a built-in) or `migrations` in the manifest (a
+// loaded package), and the host owns open, migrate and close. `openPluginDb` and
+// `pluginMigrationsFolder` were exported here until the eight built-ins that hand-rolled that
+// lifecycle adopted the seam; a plugin choosing its own database filename or discovering a chain by
+// filesystem proximity is what the seam exists to prevent.
 export type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
-export { pluginMigrationsFolder } from '@acorn/node-core/main/pluginMigrations.ts'
 
 // ── Core services ─────────────────────────────────────────────────────────────────────────────
 // The TYPE only. The object arrives on ctx.core; a plugin never constructs one and never
-// deep-imports the implementation.
-export type { CoreServices, ProjectRef, GenerateTextRequest, ModelService } from '@acorn/node-core/main/core/index.ts'
+// deep-imports the implementation. `ProjectRef` and `TaskRef` are the projections it hands back for a
+// core entity — never a drizzle row, never the core SQLite handle.
+export type { CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/main/core/index.ts'
 export { SecretUnavailableError } from '@acorn/node-core/main/core/secrets.ts'
 export type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 export type { PrefService } from '@acorn/node-core/main/core/prefs.ts'
@@ -71,8 +79,9 @@ export { brokerEnv } from '@acorn/node-core/main/core/proc.ts'
 // ── Task, worktree and run configuration ──────────────────────────────────────────────────────
 export { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
 export type { SessionTaskInfo } from '@acorn/node-core/main/taskEnv.ts'
+// `taskContext` and the WORKTREE_CREATED hook take a TaskRef (above), not the `tasks` row: the row was
+// `typeof schema.tasks.$inferSelect`, so a column rename in core was a silent plugin break.
 export { isDir, rendererBaseCheckout, taskContext, WORKTREE_CREATED } from '@acorn/node-core/main/taskWorktree.ts'
-export type { TaskRow } from '@acorn/node-core/main/taskWorktree.ts'
 export { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
 export type { LayoutRecipe, RunTarget } from '@acorn/node-core/main/runConfig.ts'
 export { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
@@ -118,24 +127,15 @@ export type {
   CachedItemCodec,
   CodecResult,
   MirroredResourceContribution,
-  ProviderProject,
-  ProviderProjectContext,
   ProviderProjectSource,
   ProviderResourceContext,
   ProviderResourceRefreshContext,
 } from '@acorn/node-core/server/integrations/types.ts'
 export { encodeCached, isRecord, parseCached, parseJson } from '@acorn/node-core/server/integrations/codec.ts'
-export {
-  connectionHasCapability,
-  connectProvider,
-  ownedConnections,
-  ownedExternalItems,
-  withOwnedConnections,
-} from '@acorn/node-core/server/integrations/connections.ts'
+export { connectionHasCapability, connectProvider } from '@acorn/node-core/server/integrations/connections.ts'
 export type { StoredConnection } from '@acorn/node-core/server/integrations/connections.ts'
 export { providerCredential } from '@acorn/node-core/server/integrations/credential.ts'
 export { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
 export { providerRequestScheduler } from '@acorn/node-core/server/integrations/budgetRuntime.ts'
-export { providerResource } from '@acorn/node-core/server/integrations/resourceRuntime.ts'
 export { defaultBudgets, externalIdsFor, publicConnectionProvider, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
 export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders/types.ts'

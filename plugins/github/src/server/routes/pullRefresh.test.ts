@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { patchBlobKey } from '@acorn/node-core/server/blobs.ts'
 import { filesResource, prResource, pullsResource } from '../resourceKeys'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../../node/migrations'
 import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import type { GqlPull } from './prMirror'
@@ -54,7 +53,7 @@ describe('shared pull refresh operations', () => {
 
   beforeEach(async () => {
     core = makeTestDb()
-    plugin = makeTestPluginDb('github', migrationsDir())
+    plugin = makeTestPluginDb('github')
     tasks = createTaskService(core.db)
     blobs = new Map()
     const now = Date.now()

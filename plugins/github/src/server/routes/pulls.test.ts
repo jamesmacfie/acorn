@@ -10,7 +10,6 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { pulls } from './pulls'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../../node/migrations'
 import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { seedGithubIntegration } from '../../testkit/githubToken'
@@ -63,7 +62,7 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     core = makeTestDb()
-    plugin = makeTestPluginDb('github', migrationsDir())
+    plugin = makeTestPluginDb('github')
     // The GitHub token comes from a stored integration row now, not from the caller's identity.
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     const now = Date.now()

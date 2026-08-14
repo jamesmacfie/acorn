@@ -50,6 +50,9 @@ window.addEventListener('message', (event) => {
       window.__context = message.context
       declaredClaims = new Set(message.context.claimsKeys || [])
       document.body.dataset.ready = '1'
+      // The handshake ack the real SDK sends. Without it the host's deadline fires and swaps this frame
+      // for the "UI failed to start" placeholder (client-core/plugins/frames/PluginFrame.tsx).
+      port.postMessage({ kind: 'connected' })
     }
     if (message.kind === 'appearance') {
       window.__appearance = message

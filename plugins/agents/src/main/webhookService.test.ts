@@ -6,7 +6,6 @@ import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import * as schema from '../node/schema'
-import { migrationsDir } from '../node/migrations'
 import { AgentWebhookService } from './webhookService'
 
 const ENCRYPTION_KEY = '22'.repeat(32)
@@ -21,7 +20,7 @@ describe('managed-agent signed webhooks', () => {
   let service: AgentWebhookService
 
   beforeEach(() => {
-    testDb = makeTestPluginDb('agents', migrationsDir())
+    testDb = makeTestPluginDb('agents')
     coreDb = makeTestDb()
     service = new AgentWebhookService(testDb.db, SECRETS, createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore() }))
   })

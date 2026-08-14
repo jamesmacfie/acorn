@@ -58,12 +58,19 @@ These plugins own SQLite files and migrations:
 | `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
 | `plugins/http.sqlite` | project-scoped requests/variables, encrypted request fields (a LOADED plugin — this file is bound from its manifest id, and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
-| `plugins/notes.sqlite` | task/workspace/global notes and revisions |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
 | `plugins/workflows.sqlite` | definitions, runs, steps, gates, and trigger state |
 
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
-profiles use core services or provider registries without their own database file.
+profiles use core services or provider registries without their own database file. Notes has no
+database either: task/workspace/global notes are markdown files under `<data-root>/notes`, and the
+row this table used to carry for `plugins/notes.sqlite` described a store that no longer exists
+(`plugins/notes/src/main/notes.ts`; `docs/notes-and-memory.md` still repeats the old claim).
+
+A plugin declares that it owns tables in one line — `migrationsModule: import.meta.url` on its
+`NodePlugin`, or `migrations` in its manifest if it is loaded from disk — and gets its handle from
+`ctx.storage.open()`. It never names the file, the data root, or the chain's directory, and it does not
+close the handle. See § Migrations below.
 
 Plugin databases have independent migration chains. There are no cross-database foreign keys,
 `ATTACH` queries, or transactions spanning files. A cross-plugin workflow uses IDs, capabilities,
@@ -119,9 +126,15 @@ Every chain starts from a single baseline migration that creates the current sch
 `(owner, name)` model and its one-way data migrations were squashed away with it, so a database
 written before that baseline cannot be upgraded — start from a fresh data root.
 
-Native SQLite access is centralized. Loaded plugins receive their own manifest-bound migrated handle
-through `ctx.storage.open()`; built-ins use the corresponding compile-time factories. Both use
-`CoreServices` for core-owned operations. What happens when a loaded plugin's chain GROWS between
+Native SQLite access is centralized, and both plugin tiers reach it the same way: `ctx.storage.open()`
+returns a migrated handle whose filename the host bound to the plugin id. Only the source of the chain
+differs — a loaded plugin's manifest names a directory confined to its package, a built-in declares
+`migrationsModule: import.meta.url` on its `NodePlugin` and the host walks from there
+(`packages/node-core/src/main/pluginMigrations.ts` covers all three runtime layouts). The host opens each
+file lazily on first use, hands out one handle per boot, and closes it immediately after that plugin's
+`dispose()` — so a plugin's dispose is about the resources the plugin itself owns, and a plugin whose only
+resource was the database needs no dispose at all. Both tiers use `CoreServices` for core-owned
+operations. What happens when a loaded plugin's chain GROWS between
 versions — the update applies at the next boot, against a database that already has rows — is covered by
 `apps/node/test/integration/httpLoaded.test.ts`, along with a broken chain failing contained and
 uninstall-without-purge keeping the file.

@@ -10,7 +10,6 @@ import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
 import { PLUGIN_STATE } from '@acorn/node-core/server/plugin/pluginState.ts'
-import { reconcileBundledPlugins } from '@acorn/node-core/main/bundledPlugins.ts'
 import { buildPluginDeps } from '../server/pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from '../server/pluginState'
 import { closeListener, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
@@ -22,7 +21,7 @@ import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
 import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
-import { assembleNodeGraph, drainNode, reconcileNode } from '../server/composition'
+import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from '../server/composition'
 
 export type ServiceRuntime = {
   previewRules(taskId: string): Promise<PreviewBrowserRule[]>
@@ -92,21 +91,13 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     stateChanged('failed', error instanceof Error ? error.message : String(error))
     throw error
   }
-  if (config.bundledPluginsDir) {
-    const bundled = reconcileBundledPlugins(config.dataDir, config.bundledPluginsDir)
-    if (bundled.installed.length || bundled.updated.length) {
-      console.log(`[plugins] bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
-    }
-    // `preserved` used to be silent, which is how a package that had quietly stopped taking updates
-    // looked exactly like one that had never needed any. Saying so is the difference between "this
-    // feature does not exist" and "the copy you are running is your own".
-    if (bundled.preserved.length) {
-      console.log(`[plugins] bundled packages NOT updated (owner-installed on this node): ${bundled.preserved.join(', ')}`)
-    }
-    for (const failure of bundled.failures) {
-      console.error(`[plugins] bundled ${failure.id} was not reconciled: ${failure.reason}`)
-    }
-  }
+  // Both hosts go through one reporter (server/composition.ts), so the account of what reconciliation
+  // did — and of a package that has quietly stopped taking updates — cannot exist on one root only.
+  reconcileBundledPackages({
+    dataDir: config.dataDir,
+    bundledRoot: config.bundledPluginsDir,
+    development: !config.isPackaged,
+  })
   const capabilities = new CapabilityRegistry()
   try {
     runtime = makeRuntime(dataRoot, config.version, capabilities)
@@ -128,12 +119,13 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // Bounded, and in this order — the same list, in the same order, as server/standalone.ts's:
     //   - the LISTENER first, so nothing new arrives while the rest tears down. This is also what stops
     //     the port outliving the drain, which is what made the two-node e2e reach for SIGKILL.
-    //   - plugins before core's DB and before the root lock: each plugin owns a WAL-mode SQLite file of
-    //     its own (main/pluginStorage.ts), and the invariant below applies to those too. This is also
-    //     where the terminal engine's idle watch and session displays, the docker streams, the database
-    //     plugin's pg pools and the agent runtime's live provider children / reconnect timers / webhook
-    //     pump are closed — each in its own plugin's dispose, rather than in a list here that a new
-    //     plugin has to remember to join.
+    //   - plugins before core's DB and before the root lock: each table-owning plugin has a WAL-mode
+    //     SQLite file of its own (main/pluginStorage.ts), and the invariant below applies to those too.
+    //     The plugin host closes each of them immediately after that plugin's dispose, inside this step
+    //     (server/plugin/host.ts). This is also where the terminal engine's idle watch and session
+    //     displays, the docker streams, the database plugin's pg pools and the agent runtime's live
+    //     provider children / reconnect timers / webhook pump are closed — each in its own plugin's
+    //     dispose, rather than in a list here that a new plugin has to remember to join.
     //   - the root lock LAST: only drop it once SQLite is closed, or a restart could open the database
     //     while this process still holds its WAL. A drain that hits the deadline leaves it to
     //     dataRoot's own `process.on('exit')` hook, which is why missing it here is survivable.
@@ -218,7 +210,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
       // file. The start config stays an override for tests and `dev:node`, which want to pin a list
       // without writing into a data root.
-      { capabilities, core, disabled: disabled(), loaded: graph.loaded },
+      { capabilities, core, dataDir: config.dataDir, disabled: disabled(), loaded: graph.loaded },
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
@@ -228,6 +220,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         dataDir: config.dataDir,
         roster: () => plugins.roster,
         booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+        loadFailures: () => graph.failures,
         disabled,
         setDisabled: (names) => disabledPlugins.set(names),
         // A packaged app is not a development build. The standalone root has no such flag and reads

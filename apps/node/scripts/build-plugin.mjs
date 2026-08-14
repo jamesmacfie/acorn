@@ -4,10 +4,17 @@
 //
 //   pnpm --filter @acorn/node build:plugin rollbar
 //   pnpm --filter @acorn/node build:plugin rollbar -- --package-root /path/to/resources/plugins
+//   pnpm dev:plugin rollbar          # the same build, re-run on every save
 //   pnpm dev:node
 //
 // The result is `<dataRoot>/plugins/<id>/` holding a generated `acorn-plugin.json` plus one ESM
 // bundle per declared runtime. On the next boot the loader picks it up like any installed package.
+//
+// ## The dev loop
+//
+// `scripts/dev-plugin.mjs` (`pnpm dev:plugin <id>`) re-runs this script on every save, so "see my
+// change running" is one command left open in a terminal instead of a remembered sequence
+// (docs/plugins.md § The dev loop).
 //
 // ## Where a plugin's declaration lives
 //
@@ -201,29 +208,37 @@ writeFileSync(
 // travelling into application resources would tell every user's node that its bundled plugins are
 // somebody's dev build. The name is duplicated in node-core/main/bundledPlugins.ts § DEV_BUILD_MARKER;
 // one string in two places beats making this script depend on a built package.
-if (!packageRoot) {
-  writeFileSync(join(outDir, '.acorn-dev-build'), `${new Date().toISOString()}\n`)
+if (!packageRoot) writeFileSync(join(outDir, '.acorn-dev-build'), `${new Date().toISOString()}\n`)
 
-  // And clear any `user` row this id already has. That row means "an owner installed this through the
-  // installer", and reconciliation checks it first — correctly, because an owner install must never be
-  // replaced by a bundled copy. But a package built by THIS script is not one, and any such row is a
-  // leftover from before the marker existed: without clearing it, a developer who was already trapped
-  // stays trapped no matter how many times they rebuild, which is the exact failure this is fixing.
-  //
-  // Read-modify-write of plain JSON rather than importing node-core's writer: this script is ESM run
-  // directly by node with no build step. Defensive — a missing or unreadable file means there is
-  // nothing to clear.
-  const statePath = join(dataRoot, 'plugins', 'bundled-state.json')
-  try {
-    const state = JSON.parse(readFileSync(statePath, 'utf8'))
-    if (state?.plugins?.[id]?.status === 'user') {
+// The `user` ownership row. It means "an owner installed this through the installer", and reconciliation
+// checks it first — correctly, because an owner install must never be replaced by a bundled copy. It is
+// also easy to acquire by accident (any unrecorded directory in the plugin root earns one), and once a
+// package has it, no number of rebuilds of anything reaches the node again.
+//
+// Read-modify-write of plain JSON rather than importing node-core's writer: this script is ESM run
+// directly by node with no build step. Defensive — a missing or unreadable file means there is nothing
+// to say.
+const statePath = join(dataRoot, 'plugins', 'bundled-state.json')
+try {
+  const state = JSON.parse(readFileSync(statePath, 'utf8'))
+  if (state?.plugins?.[id]?.status === 'user') {
+    if (packageRoot) {
+      // A staging build is not writing into this data root, so it does not get to rewrite its ownership
+      // records either — the two could even be different machines' worth of state. But it is the moment
+      // the developer finds out, so say what is wrong and what clears it.
+      console.warn(`[build-plugin] ${id} has a "user" ownership row in ${dataRoot}, so a bundled copy will not replace it there.`)
+      console.warn(`[build-plugin] delete its entry from ${statePath}, or rebuild without --package-root, which clears the row it wrote.`)
+    } else {
+      // A package built straight into the data root is not an owner install, and any such row is a
+      // leftover: without clearing it, a developer who was already trapped stays trapped no matter how
+      // many times they rebuild, which is the exact failure this is fixing.
       delete state.plugins[id]
       writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
       console.log(`[build-plugin] cleared the stale "user" ownership row for ${id}`)
     }
-  } catch {
-    // No state file yet, or one this script should not be rewriting. Either way, nothing to clear.
   }
+} catch {
+  // No state file yet, or one this script should not be reading. Either way, nothing to say.
 }
 
 console.log(`[build-plugin] ${id} -> ${outDir}`)

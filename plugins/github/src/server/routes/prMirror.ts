@@ -1,7 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '../../contract/api'
-import { chunkRowsByColumnBudget, type Env, patchBlobKey, type PluginDatabase, type RouteResult } from '@acorn/plugin-api/node'
+import { chunkRowsByColumnBudget, patchBlobKey, type PluginDatabase, type RouteResult } from '@acorn/plugin-api/node'
 import { filesResource, prResource } from '../resourceKeys'
 import { gh, ghError } from '..'
 import { checks as checksTable, comments as commentsTable, prCommits as prCommitsTable, prFiles as prFilesTable, prLabels as prLabelsTable, pullRequests as pullRequestsTable, reviewRequests as reviewRequestsTable, reviewThreads as reviewThreadsTable, reviews as reviewsTable, syncState as syncStateTable, viewedFiles as viewedFilesTable } from '../../node/schema'
@@ -300,7 +300,11 @@ export const fetchFiles = async (token: string, owner: string, repo: string, num
 // Re-mirror one PR's files: patch bodies → on-disk BLOBS by immutable sha (deduped, cached
 // forever — see server/blobs.ts); only the metadata rows go to the DB. Bodies resolve back from
 // BLOBS on read.
-export type PatchBlobStore = Pick<Env['BLOBS'], 'get' | 'put'>
+//
+// Stated structurally rather than as `Pick<Env['BLOBS'], …>`: naming core's runtime bindings put
+// `SECRETS`, `ACTIVE_IDENTITY` and `INTERNAL_TOKEN` on the plugin contract to reach one blob cache, and
+// a plugin should be reading what it needs off `ctx` or off the two methods it actually calls.
+export type PatchBlobStore = { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> }
 
 export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, body: GitHubFile[]) => {
   const now = Date.now()
@@ -330,7 +334,7 @@ type ReadFilesOptions = { includePatches?: boolean; paths?: string[] }
 // Read one PR's files back out of the mirror. `viewed` is app-state (viewed_files), merged in
 // fresh on every read so it survives mirror re-syncs. Callers can skip patch bodies for cheap
 // summary reads; patch bodies resolve from the on-disk BLOBS cache by sha when requested.
-export const readFiles = async (env: Env, db: Db, key: PrKey, options: ReadFilesOptions = {}): Promise<PullFile[]> => {
+export const readFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, options: ReadFilesOptions = {}): Promise<PullFile[]> => {
   const includePatches = options.includePatches ?? true
   const paths = options.paths?.length ? Array.from(new Set(options.paths)) : undefined
   const fileWhere = and(
@@ -355,7 +359,7 @@ export const readFiles = async (env: Env, db: Db, key: PrKey, options: ReadFiles
           deletions: f.deletions,
           sha: f.sha,
           viewed: seen.has(f.path),
-          patch: includePatches && f.sha ? await env.BLOBS.get(patchBlobKey(f.sha)) : null,
+          patch: includePatches && f.sha ? await blobs.get(patchBlobKey(f.sha)) : null,
         }) satisfies PullFile,
     ),
   )

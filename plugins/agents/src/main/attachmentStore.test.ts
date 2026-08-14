@@ -7,7 +7,6 @@ import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../node/migrations'
 import { AgentAttachmentStore } from './attachmentStore'
 
 // TWO databases, which is the point of the exercise: the attachment rows are in this plugin's file and
@@ -20,7 +19,7 @@ let store: AgentAttachmentStore
 
 beforeEach(async () => {
   coreDb = makeTestDb()
-  pluginDb = makeTestPluginDb('agents', migrationsDir())
+  pluginDb = makeTestPluginDb('agents')
   dataDir = await mkdtemp(join(tmpdir(), 'acorn-agent-objects-'))
   await coreDb.db.insert(schema.tasks).values({
     id: 'task',

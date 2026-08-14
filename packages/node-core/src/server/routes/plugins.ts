@@ -69,9 +69,12 @@ export const plugins = new Hono<AppEnv>()
     const parsed = body.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, PLUGIN_STATE, async (bridge) => {
-      // Roster UNION installed: a client-only package has no roster row, and a toggle it cannot
-      // accept is a checkbox that silently does not stick.
+      // Roster UNION installed UNION what the loader refused: a client-only package has no roster row,
+      // a package whose manifest never parsed is in neither, and a toggle this route cannot accept is a
+      // checkbox that silently does not stick. Turning a broken package off is the owner's ONE way to
+      // stop it reporting, so it has to be a name this route recognises.
       const known = new Map<string, { required: boolean }>([
+        ...bridge.loadFailures().map((entry) => [entry.id, { required: false }] as const),
         ...bridge.installed().map((entry) => [entry.id, { required: false }] as const),
         ...bridge.roster().map((entry) => [entry.name, entry] as const),
       ])

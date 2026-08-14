@@ -90,6 +90,12 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page; root: s
   const dist = join(dataDir, 'plugins', 'rollbar', 'dist')
   renameSync(join(dist, 'node.js'), join(dist, 'real-node.js'))
   writeFileSync(join(dist, 'node.js'), NODE_BUNDLE)
+  // Drop the dev-build marker `build:plugin` just wrote. It tells boot reconciliation "this package is a
+  // temporary override, replace it with the bundled copy" (node-core/main/bundledPlugins.ts), which is
+  // right for a developer and fatal here: the replacement would take the stubbed node bundle above with
+  // it and this spec would drive the real api.rollbar.com. Without the marker the package reads as
+  // owner-installed and is preserved, which is exactly what a fixture wants.
+  rmSync(join(dataDir, 'plugins', 'rollbar', '.acorn-dev-build'), { force: true })
 
   const app = await electron.launch({
     args: ['out/main/index.js', `--user-data-dir=${join(dataDir, 'chromium')}`],
@@ -163,23 +169,20 @@ test('the loaded Rollbar package renders native rows and its real sandbox frame'
   const { page, repo } = await launch()
   await dismissOnboarding(page)
 
-  // One prompt per bundle, and the desktop bundles more than one package with a client half — so the
-  // first prompt queued is not necessarily rollbar's, and answering only rollbar's leaves another modal
-  // over everything after it. Advance to the one this spec is about, then clear what is left.
-  const trust = page.locator('.plugin-trust-dialog')
-  const answerUntil = async (done: () => Promise<boolean>): Promise<void> => {
-    await expect.poll(async () => {
-      if (await done()) return true
-      await trust.getByRole('button', { name: /^Trust/ }).click({ timeout: 5_000 }).catch(() => {})
-      return false
-    }, { timeout: 60_000 }).toBe(true)
-  }
-  await expect(trust).toBeVisible({ timeout: 60_000 })
-  await answerUntil(async () => (await trust.filter({ hasText: 'rollbar wants to run in acorn' }).count()) > 0)
-  await expect(trust).toContainText('Read tasks')
-  await expect(trust).toContainText('api.rollbar.com')
-  await trust.getByRole('button', { name: /^Trust/ }).click()
-  await answerUntil(async () => (await trust.count()) === 0)
+  // No trust prompt at all: rollbar is on the bundled first-party roster, and a development build
+  // acknowledges that roster exactly as a packaged build does (main/bundledPluginTrust.ts). This used to
+  // be a sixty-second loop that answered one dialog per bundled client bundle to reach rollbar's, because
+  // the first prompt queued was not necessarily this spec's. What the dialog SAYS is asserted where it is
+  // still raised — twoNode.spec.ts for a package a node serves, pluginInstall.spec.ts for an install.
+  //
+  // One unstated dependency, worth knowing before blaming a diff: the auto-grant is keyed by
+  // (pluginId, hash) over the bytes read from `out/bundled-plugins`, and the fixture above installs its
+  // own build into the DATA ROOT. Zero dialogs therefore also requires the two builds of rollbar's client
+  // bundle to be byte-identical. They are, because the builder is deterministic over identical sources —
+  // but anything that puts a timestamp, a build id or an absolute path into that bundle turns this
+  // assertion into a surprise prompt, and the fix would be to build with `--package-root` into the
+  // staging directory instead.
+  await expect(page.locator('.plugin-trust-dialog')).toHaveCount(0)
 
   const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Rollbar' } })
   const project = await nodeJson<{ project: { id: string } }>(page, '/v2/core/projects', {

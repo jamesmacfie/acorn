@@ -33,16 +33,21 @@ it is a small delta on shipped machinery.
 Deliverable: a user or their agent iterates on a plugin against a live node with one approval per
 plugin, and "my plugins live in this folder" works.
 
-## Phase 2 — developer experience (owning doc: `docs/future/debug-plugin/`; runs alongside phase 1)
+## Phase 2 — developer experience (owning docs: `docs/plugins.md`, `docs/testing.md`; mostly done)
 
-The eight findings in their own suggested order — `01-failure-visibility` first, then boilerplate,
-dev loop, testkit, loadability tests, then the three worth-exploring items. Plus the one thing
-that folder does not cover because it is packaging, not review findings: **make
-`@acorn/plugin-api` installable from outside the workspace** (see `dx.md`). Scaffolding and
-authoring guides stay deliberately last per `docs/extensibility.md`.
+The eight review findings shipped in August 2026, in roughly their suggested order: failure
+visibility first, then boilerplate, the dev loop, the testkit, the loadability tests, then plugin
+storage, the golden lists and the facade prune. `docs/plugins.md`, `docs/testing.md`,
+`docs/data-layer.md` and `docs/local-development.md` are where that behavior is written down; the
+residue those eight left behind is listed in `dx.md § Verify before building`.
 
-Deliverable: an external author can `npm install` the facade, build against the documented
-profile, see failures that name themselves, and test without rebuilding the host.
+What remains of this phase is the one thing the review did not cover because it is packaging rather
+than a finding: **make `@acorn/plugin-api` installable from outside the workspace** (see `dx.md`).
+Scaffolding and authoring guides stay deliberately last per `docs/extensibility.md`.
+
+Deliverable: an external author can `npm install` the facade and build against the documented
+profile. The other half — failures that name themselves, and testing without rebuilding the host —
+is already true inside the workspace.
 
 ## Phase 3 — rung-2 containment (owning doc: `docs/security.md § The containment ladder`)
 
@@ -95,5 +100,5 @@ node, and the trust story told in the prompt is true.
 Each owning doc carries its own verify-before-building list — use those. Cross-cutting checks for
 this file: whether rung 2 shipped out of order (re-derive the phase 3/phase 1 interaction);
 whether `allowLocalPath` is still dev-gated (phase 1's folder-install item assumes it); whether
-ecosystem-last is still the recorded stance in `docs/extensibility.md`; and whether the
-debug-plugin list has shrunk enough that phase 2 is mostly done.
+ecosystem-last is still the recorded stance in `docs/extensibility.md`; and whether phase 2 has
+shrunk to the packaging item alone, or the facade has been published and phase 2 is closed.

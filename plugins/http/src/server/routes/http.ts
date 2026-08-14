@@ -8,8 +8,8 @@
 // router no longer needs `c.env` at all, which is the point.
 //
 // http ships LOADED, so these routes run on one tier: the host gets `router.fetch` (createHttpFetch at
-// the bottom) and the identity-bound runtime rides in through `c.env` behind a module-level symbol, the
-// same carrier rollbar and linear use. That is also why the identity below comes off the request context
+// the bottom) and the identity-bound runtime rides in through `c.env` behind `portableCarrier` —
+// literally the same carrier rollbar and linear use. That is also why the identity below comes off the request context
 // rather than out of `owner(c)`/`c.get('principal')`: a loaded bundle is not inside the host's Hono
 // stack, so those middleware-set values are simply not there.
 import { Hono, type Context } from 'hono'
@@ -19,7 +19,7 @@ import {
   type AppEnv,
   type PluginDatabase,
   type PluginFetchHandler,
-  type PluginRequestContext,
+  portableCarrier,
   respondError,
   type SecretService,
 } from '@acorn/plugin-api/node'
@@ -30,19 +30,9 @@ import { SendError, send, type SendCoreServices } from '../send'
 import { HttpStorageError, openHttpValue, protectHttpValue } from '../storage'
 import { MAX_CONTEXT_REQUESTS, requestOption, requestSnapshot } from '../agentContext'
 
-const PORTABLE_REQUEST_CONTEXT = Symbol('http-plugin-request-context')
-
-type PortableBindings = AppEnv['Bindings'] & {
-  [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext
-}
-
-// A request arriving without the context is a wiring bug, and saying so beats answering it from host
-// handles this bundle should no longer touch.
-const requestContext = (c: Context<AppEnv>): PluginRequestContext => {
-  const context = (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
-  if (!context) throw new Error('http routes only run over the portable carrier (createHttpFetch)')
-  return context
-}
+// The carrier is the host's (@acorn/plugin-api/node); a request arriving without the context is a
+// wiring bug, and saying so beats answering it from host handles this bundle should no longer touch.
+const { requestContext, portableFetch } = portableCarrier('http')
 
 const owner = (c: Context<AppEnv>): string => requestContext(c).userId
 
@@ -471,7 +461,5 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
 // identity without this bundle reaching for the host's middleware state, and the bundle keeps its OWN
 // Hono (build-plugin.mjs inlines every non-builtin dependency), which is why a router instance can never
 // cross the contract and `router.fetch` does.
-export const createHttpFetch = (db: PluginDatabase, core: SendCoreServices): PluginFetchHandler => {
-  const routes = httpRoutes(db, core)
-  return (request, context) => routes.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
-}
+export const createHttpFetch = (db: PluginDatabase, core: SendCoreServices): PluginFetchHandler =>
+  portableFetch(httpRoutes(db, core))

@@ -170,6 +170,10 @@
 .plugin-version { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
+/* What the node said broke. One line that shrinks and ellipsises rather than wrapping: the row is a flex
+   line with actions pinned right, and a thrown message can be a paragraph. The full text is the element's
+   `title`, and the attention row in the bell renders it unclipped. */
+.plugin-failed-reason { font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Row actions sit hard right, so the checkbox column stays a straight edge however long the names and
    sources are. */
 .plugin-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }

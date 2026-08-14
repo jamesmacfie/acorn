@@ -127,6 +127,16 @@ export type PluginBridgeWebviewRequest =
 export type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
 export type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
 
+// The acknowledgement. The SDK posts it the moment `connect()` resolves, and it is the only message a
+// frame is REQUIRED to send: the host starts a deadline when it transfers the port and shows a labelled
+// placeholder if nothing ever comes back, because a bundle that throws at module scope renders a blank
+// rectangle and reports nothing at all.
+//
+// No id and no reply. It is not a request, so the broker's request parser drops it and only the arrival
+// matters — which also means any OTHER message from the frame is just as good an ack, and the host treats
+// it as one.
+export type PluginBridgeConnected = { kind: 'connected' }
+
 export type PluginBridgeRequest =
   | PluginBridgeApiRequest
   | PluginBridgeSubscribeRequest
@@ -136,6 +146,7 @@ export type PluginBridgeRequest =
   | PluginBridgeWebviewRequest
   | PluginBridgeCancelRequest
   | PluginBridgeKeydown
+  | PluginBridgeConnected
 
 // ── Host → frame ──────────────────────────────────────────────────────────────────────────────────
 

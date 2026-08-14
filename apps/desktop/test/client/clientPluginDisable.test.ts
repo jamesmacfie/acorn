@@ -16,6 +16,7 @@ import { persistedStateRegistry } from '@acorn/client-core/persistence/persisted
 import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
 import { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
 import { clientPlugins } from '../../src/app/client/plugins'
+import { readGolden, writeGolden } from './golden'
 
 const REGISTRIES = {
   panes: paneRegistry,
@@ -60,70 +61,28 @@ const snapshot = (): Snapshot =>
     }),
   )
 
-// The complete contribution set, as a literal. `panes` and `sources` are docs/ui-design.md contracts in their own
-// right, so this doubles as the parity assertion for the compiled graph. Loaded packages are covered
-// through their manifest adapters and do not belong in this static ownership ledger.
-const FULL: Snapshot = {
-  panes: ['agents', 'changes', 'context', 'docker', 'editor', 'pr', 'notes', 'preview'],
-  sources: ['agents', 'docker', 'github'],
-  settingsPages: ['agent-pricing', 'docker', 'terminal', 'workflows'],
-  slots: ['overlay/palette.files', 'overlay/palette.pull-files', 'overlay/onboarding.first-run', 'topbar.right/terminal.topbar-toggle', 'drawer/terminal.drawer'],
-  taskSlots: ['task.footer/docker-footer-badge', 'tabrail.task-row/docker-rail-badge'],
-  contextSections: ['memory.section'],
-  // Empty, and worth stating rather than dropping the key: the registry's only entry was linear's, and
-  // linear is a loaded package now, so its panel reaches this registry through the manifest adapter in
-  // client-core/plugins/frames/register.tsx. A compiled panel reappearing here is a real change.
-  refPanels: [],
-  paletteRows: ['terminal.run', 'workflows.defs'],
-  agentContexts: ['acorn-task-context', 'acorn-docker', 'acorn-terminals'],
-  agentToolRenderers: ['changes.agent-file-tool'],
-  pollers: ['docker.task-containers', 'workflows.triggers'],
-  persistedState: ['context.section-selection', 'docker.prefs', 'editor.open-files', 'github.pr-filters'],
-  nodeStats: ['agents.active'],
-  attention: ['agents.sessions', 'memory.proposals'],
-  contentLinks: ['github.pull-request', 'github.repository'],
-  projectImporters: ['github'],
-}
-
-// What each OPTIONAL plugin owns. Registries it does not touch are omitted.
-const OWNED: Record<string, Partial<Snapshot>> = {
-  changes: { panes: ['changes'], agentToolRenderers: ['changes.agent-file-tool'] },
-  context: { panes: ['context'], agentContexts: ['acorn-task-context'], persistedState: ['context.section-selection'] },
-  docker: {
-    panes: ['docker'],
-    sources: ['docker'],
-    settingsPages: ['docker'],
-    taskSlots: ['task.footer/docker-footer-badge', 'tabrail.task-row/docker-rail-badge'],
-    agentContexts: ['acorn-docker'],
-    pollers: ['docker.task-containers'],
-    persistedState: ['docker.prefs'],
-  },
-  editor: { panes: ['editor'], slots: ['overlay/palette.files'], persistedState: ['editor.open-files'] },
-  onboarding: { slots: ['overlay/onboarding.first-run'] },
-  preview: { panes: ['preview'] },
-  github: {
-    panes: ['pr'],
-    sources: ['github'],
-    slots: ['overlay/palette.pull-files'],
-    projectImporters: ['github'],
-    persistedState: ['github.pr-filters'],
-    contentLinks: ['github.pull-request', 'github.repository'],
-  },
-  workflows: { settingsPages: ['workflows'], paletteRows: ['workflows.defs'], pollers: ['workflows.triggers'] },
-}
-
-// Multiset subtraction — remove ONE occurrence per expected id, so a duplicate vanishing is visible.
-const subtract = (from: readonly string[], take: readonly string[]): string[] => {
-  const remaining = [...from]
-  for (const id of take) {
+// Multiset subtraction — remove ONE occurrence per expected id, so a duplicate vanishing is visible — and
+// report what never matched.
+const minus = (from: readonly string[], take: readonly string[]): { rest: string[]; unmatched: string[] } => {
+  const remaining = [...take]
+  const rest: string[] = []
+  for (const id of from) {
     const at = remaining.indexOf(id)
-    if (at >= 0) remaining.splice(at, 1)
+    if (at === -1) rest.push(id)
+    else remaining.splice(at, 1)
   }
-  return remaining
+  return { rest, unmatched: remaining }
 }
 
 const without = (base: Snapshot, owned: Partial<Snapshot>): Snapshot =>
-  build((name) => subtract(base[name], owned[name] ?? []))
+  build((name) => {
+    const { rest, unmatched } = minus(base[name], owned[name] ?? [])
+    // A hand-edited golden claiming an id the full activation never produced would otherwise pass silently:
+    // subtracting a ghost removes nothing, so the equality still holds. Only reachable by hand-editing, since
+    // the derivation below can only record ids it saw.
+    if (unmatched.length) throw new Error(`golden names ${name} entries the full activation never produced: ${unmatched.join(', ')}`)
+    return rest
+  })
 
 const activate = (disabled: readonly string[] = []) => {
   const result = initClientPlugins(clientPlugins, { disabled })
@@ -133,6 +92,52 @@ const activate = (disabled: readonly string[] = []) => {
 const NAMES = clientPlugins.map((plugin) => plugin.name)
 const OPTIONAL = clientPlugins.filter((plugin) => !plugin.required).map((plugin) => plugin.name)
 const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) => plugin.name)
+
+// The complete contribution set, plus what each OPTIONAL plugin owns — the entries that must vanish when it
+// is disabled and, by omission, the ones that must not. A GOLDEN LIST in `clientPluginDisable.snapshot.json`
+// now, derived by the loop below and regenerated with the one command in ./golden.ts.
+//
+// `panes` and `sources` are docs/ui-design.md contracts in their own right, so `full` doubles as the parity
+// assertion for the compiled graph. Loaded packages are covered through their manifest adapters and do not
+// belong in this static ownership ledger. `refPanels` is expected to be an empty array, and the key is worth
+// keeping rather than dropping: the registry's only entry was linear's, and linear is a loaded package now,
+// so its panel reaches this registry through the manifest adapter in
+// client-core/plugins/frames/register.tsx. A compiled panel reappearing there is a real change.
+//
+// Derived, but not therefore toothless, and the distinction matters because a snapshot you can regenerate
+// looks like one you can launder a regression past. What regeneration CANNOT hide:
+//   - a plugin whose disable removes a SIBLING's entry still shows up, as that entry appearing in the wrong
+//     plugin's slice — a one-line diff a reviewer reads, which is the same review surface the facade's
+//     surface snapshot has;
+//   - a plugin whose disable ADDS something cannot be recorded at all. The derivation only records what a
+//     boot LOST, so an addition leaves the exact equality below failing however often you regenerate;
+//   - a plugin that contributes nothing gets an empty slice, which the anti-vacuity case rejects.
+// The ledger stays deliberately brittle: a plugin gaining or losing a contribution SHOULD fail this file and
+// be re-recorded, because that is the same edit that could take a sibling's contribution with it.
+type Golden = { full: Snapshot; owned: Record<string, Partial<Snapshot>> }
+
+const derive = (): Golden => {
+  const full = activate().snap
+  const owned: Record<string, Partial<Snapshot>> = {}
+  for (const name of OPTIONAL) {
+    const reduced = activate([name]).snap
+    const slice: Partial<Snapshot> = {}
+    // Registries the plugin does not touch are omitted, so the slice reads as a claim rather than a form.
+    for (const key of REGISTRY_NAMES) {
+      const lost = minus(full[key], reduced[key]).rest
+      if (lost.length) slice[key] = lost
+    }
+    owned[name] = slice
+  }
+  activate()
+  return { full, owned }
+}
+
+const GOLDEN = 'clientPluginDisable.snapshot.json'
+// Guarded on the flag as well as inside `writeGolden`, so a normal run does not pay for the extra
+// activate-per-optional-plugin cycle just to throw the result away.
+if (process.env.UPDATE_PLUGIN_GOLDENS) writeGolden(GOLDEN, derive())
+const { full: FULL, owned: OWNED } = readGolden<Golden>(GOLDEN)
 
 describe('disabling a client plugin', () => {
   afterEach(() => void activate())

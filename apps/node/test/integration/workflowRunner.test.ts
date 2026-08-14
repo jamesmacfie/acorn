@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
 import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
-import { migrationsDir } from '@acorn/plugin-workflows/node/migrations.ts'
 import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/node/schema.ts'
 import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/main/workflowRunner.ts'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
@@ -58,7 +57,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
   beforeEach(() => {
     t = makeTestDb()
-    wf = makeTestPluginDb('workflows', migrationsDir())
+    wf = makeTestPluginDb('workflows')
     dir = mkdtempSync(join(tmpdir(), 'acorn-wf-'))
     notes = new NotesStore(join(dir, 'notes'))
     structuredByStep = {}

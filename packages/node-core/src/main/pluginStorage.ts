@@ -5,9 +5,10 @@
 // Two reasons this is a separate function rather than a parameter on openDb:
 //
 //   1. Core cannot import a plugin's schema — @acorn/node-core is a lib, and a lib importing a plugin
-//      is a boundary violation (tools/arch/boundaries.test.ts rule 6). A built-in supplies its chain
-//      directly; the loaded-plugin host supplies the manifest-confined chain. Core owns the file,
-//      hardening and migration run in both cases.
+//      is a boundary violation (tools/arch/boundaries.test.ts rule 6). So the CHAIN is supplied per
+//      tier: a built-in declares the module it sits beside (builtinPluginStorage below), a loaded
+//      package declares a confined directory in its manifest. Core owns the file either way, and
+//      hardening plus migration run in both cases.
 //   2. The handle stays in the owning plugin's closure, NOT on `Env`. `c.env` reaches every core and
 //      plugin route (main/bindings.ts), so a per-plugin DB there would be readable by all routes.
 //
@@ -16,6 +17,8 @@
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import type { PluginStorage } from '../server/plugin/types'
+import { pluginMigrationsFolder } from './pluginMigrations'
 import { drizzleOverSqlite, openSqlite } from './sqlite'
 
 // One directory for every plugin DB, so a backup can enumerate them without knowing the plugin list
@@ -65,4 +68,22 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
     db.transaction((_tx) => statements.map((stmt) => stmt.run()))) as PluginDatabase['batch']
   withBatch.close = () => sqlite.close()
   return withBatch
+}
+
+// The compiled tier's half of `ctx.storage`, so a built-in stops hand-rolling a lifecycle the host
+// already owns for loaded plugins. Same factory, same filename, same hardening as the loader's binding
+// (main/pluginLoader.ts); the ONE difference is where the chain comes from — a built-in's is staged with
+// the app and resolved from the module that declared it, a loaded package's is confined to its own
+// directory by its manifest.
+//
+// Lazy, like the loader's: nothing touches the filesystem until the plugin's init calls open(), so the
+// host can build this for every plugin in the graph and a disabled plugin still creates no database.
+export function builtinPluginStorage(dataDir: string, plugin: string, moduleUrl: string): PluginStorage {
+  // A module URL, not a directory — the ancestor walk has to start from the PLUGIN's module
+  // (main/pluginMigrations.ts). Checked here because the alternative is fileURLToPath's bare
+  // "Invalid URL" with no mention of which plugin declared it.
+  if (!moduleUrl.startsWith('file:')) {
+    throw new Error(`Plugin '${plugin}' declares migrationsModule '${moduleUrl}'; it must be that module's own import.meta.url.`)
+  }
+  return { open: () => openPluginDb(dataDir, plugin, { migrationsFolder: pluginMigrationsFolder(plugin, moduleUrl) }) }
 }

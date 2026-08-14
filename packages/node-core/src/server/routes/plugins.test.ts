@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { NodePluginState } from '@acorn/protocol/api.ts'
-import type { InstalledPluginInfo } from '../../main/pluginLoader'
+import type { InstalledPluginInfo, PluginLoadFailure } from '../../main/pluginLoader'
 import type { AppEnv } from '../middleware/auth'
 import { requireDevice } from '../middleware/requireUser'
 import type { PluginRosterEntry } from '../plugin/host'
@@ -36,6 +36,10 @@ type WireOptions = {
   booted?: { id: string; version: string }[]
   bundles?: Record<string, string>
   roster?: PluginRosterEntry[]
+  // Why a package on disk produced no plugin at this boot. Defaults to none, which is every test here
+  // except the one about a package that would not load.
+  // Unstamped; the helper adds the clock, as in pluginState.test.ts.
+  loadFailures?: Omit<PluginLoadFailure, 'at'>[]
 }
 
 // The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
@@ -56,6 +60,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
       return { bytes, hash: createHash('sha256').update(bytes).digest('hex') }
     },
     disabled: () => saved,
+    loadFailures: () => (options.loadFailures ?? []).map((failure) => ({ ...failure, at: 1_700_000_000_000 })),
     setDisabled: (names) => void (saved = [...names]),
     install: async (source, opts) => {
       calls.install.push({ source, opts })
@@ -140,6 +145,26 @@ describe('GET /v2/core/plugins', () => {
     expect(state.plugins).toEqual([
       { name: 'ntfy', required: false, disabled: false, running: true, state: 'failed', failedAt: 1_700_000_000_000 },
     ])
+    expect(state.restartRequired).toBe(false)
+  })
+
+  it('serves a load failure as failed with its reason, not as pending-restart', async () => {
+    // The package is on disk with a parseable manifest, so it is in `installed()`; its bundle would not
+    // import, so it never booted. That pair used to read as "waiting for a restart", with a banner that
+    // restarting could never clear.
+    wire([], {
+      roster: [],
+      installed: [installedEntry('ntfy')],
+      booted: [],
+      loadFailures: [{ id: 'ntfy', dir: '/data/plugins/ntfy', reason: 'could not import node/index.js: SyntaxError' }],
+    })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.plugins[0]).toMatchObject({
+      name: 'ntfy',
+      state: 'failed',
+      stage: 'load',
+      reason: 'could not import node/index.js: SyntaxError',
+    })
     expect(state.restartRequired).toBe(false)
   })
 
@@ -278,6 +303,21 @@ describe('PUT /v2/core/plugins', () => {
     const res = await asDevice().fetch(request('PUT', { disabled: ['nope'] }))
     expect(res.status).toBe(400)
     expect(saved()).toEqual([])
+  })
+
+  it('accepts turning off a package the loader refused, which is the owner’s only escape hatch', async () => {
+    // Such a package is in neither the roster nor `installed()`: nothing about it parsed. Without the
+    // third clause in the route's `known` map, the row's own checkbox 400s.
+    const saved = wire([], {
+      roster: [],
+      loadFailures: [{ id: 'ntfy', dir: '/data/plugins/ntfy', reason: 'acorn-plugin.json is not valid JSON' }],
+    })
+    const res = await asDevice().fetch(request('PUT', { disabled: ['ntfy'] }))
+    expect(res.status).toBe(200)
+    expect(saved()).toEqual(['ntfy'])
+    const state = (await res.json()) as NodePluginState
+    expect(state.plugins).toEqual([{ name: 'ntfy', required: false, disabled: true, running: false, state: 'disabled' }])
+    expect(state.restartRequired).toBe(false)
   })
 
   it('rejects a required plugin rather than silently ignoring it', async () => {

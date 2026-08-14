@@ -23,6 +23,10 @@ import type {
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
 import { eventChord, hasCommandModifier, isNormalizedChord, isPluginKeyClaim, isTypingTarget } from '@acorn/protocol/keybindings.ts'
+// The one import from outside this directory, and it is safe for the same reason the protocol imports
+// above are: ui/frameTips.ts is framework-free with no imports of its own, so it carries none of the
+// shell into a plugin's bundle. mountFrame() below is what needs it.
+import { mountFrameTips } from '../../ui/frameTips'
 
 /** The error a rejected bridge call throws. `code` is the API's own vocabulary, so a plugin branches on
  * the same strings whether the call was denied at the bridge or refused by the node. */
@@ -233,6 +237,11 @@ function attach(port: MessagePort): Promise<AcornBridge> {
           claimed = new Set((message.context.claimsKeys ?? []).filter(isPluginKeyClaim))
           keyTarget.addEventListener?.('keydown', onKeyDown, { capture: true })
           detachKeyForwarding = () => keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true })
+          // The ack, before the plugin's own code gets the bridge: reaching this line is proof the bundle
+          // evaluated and called connect(), which is exactly what the host's handshake deadline is asking
+          // about. A frame that dies at module scope never gets here, and the host draws a labelled
+          // placeholder instead of a blank rectangle.
+          port.postMessage({ kind: 'connected' })
           ready(api)
           return
         case 'event':
@@ -362,6 +371,51 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       },
     }
   })
+}
+
+/**
+ * Everything between a frame's bundle evaluating and its own UI being on screen, which is the same
+ * sequence in every frame: inject the plugin's stylesheet, make the root element, mount the frame-side
+ * tooltip listener, connect, render — and draw the failure if the handshake never lands.
+ *
+ * Framework-free, and that is the whole reason it takes a callback instead of a component: the sandbox
+ * allows any framework (or none), so the last step is the only step a plugin owns. A Solid frame, whole:
+ *
+ * ```tsx
+ * mountFrame({ styles }, (bridge, root) => render(() => <MyApp bridge={bridge} />, root))
+ * ```
+ *
+ * `styles` is the plugin's own stylesheet, imported with `?inline`. It is injected rather than linked
+ * because a plugin origin serves exactly one file — `/client.js`, plus the host's `/ui.css` — so a
+ * frame with a separate asset is a broken frame.
+ *
+ * The failure path sets the Alert primitive's classes on the root by hand: there is no framework yet
+ * (that is what failed), and a blank rectangle tells the reader nothing.
+ */
+export function mountFrame(
+  options: { styles: string },
+  render: (bridge: AcornBridge, root: HTMLElement) => void,
+): void {
+  const style = document.createElement('style')
+  style.textContent = options.styles
+  document.head.append(style)
+
+  const root = document.createElement('div')
+  root.id = 'root'
+  document.body.append(root)
+
+  // Every frame wants it and every frame forgot it: a frame has its own document, so the shell's
+  // delegated tooltip singleton cannot see it and each `data-tip` in here is otherwise inert.
+  mountFrameTips(document)
+
+  void connect()
+    .then((bridge) => render(bridge, root))
+    .catch((error: unknown) => {
+      root.className = 'ui-alert'
+      root.dataset.variant = 'banner'
+      root.dataset.tone = 'danger'
+      root.textContent = error instanceof Error ? error.message : String(error)
+    })
 }
 
 /**

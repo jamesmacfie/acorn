@@ -146,9 +146,11 @@ or Electron object.
 service artifact and every core/plugin migration chain into `apps/desktop/out/`. The desktop's
 bundled-plugin build also stages normal plugin packages under `out/bundled-plugins`; electron-builder
 copies them to application resources, and main passes that read-only directory to the service for
-pre-discovery reconciliation. Packaged client bundles are hashed and trusted from that local resource
-directory, never from a node's claim. The desktop build must run the service and bundled-plugin builds
-first; staging detects missing artifacts, not stale ones.
+pre-discovery reconciliation. Bundled client bundles are hashed and trusted from that local resource
+directory — `out/bundled-plugins` in development, application resources when packaged — never from a
+node's claim, and on the same terms in both, so a development boot does not answer one dialog per bundled
+package (`docs/plugins.md` § The dev loop). The desktop build must run the service and bundled-plugin
+builds first; staging detects missing artifacts, not stale ones.
 
 `node-pty` must be rebuilt for the ABI of the process that will load it — SQLite is `node:sqlite`,
 which has no ABI to match. Plain

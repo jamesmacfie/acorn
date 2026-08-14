@@ -21,6 +21,7 @@ import {
   loadedPluginStateOnNode,
 } from '../distribution'
 import { eligiblePlugins, isTaskPane } from '../contributions'
+import { clearSurfaceFailures, recordSurfaceFailure } from '../surfaceFailures'
 import PluginFrame from './PluginFrame'
 import PluginWebview from './PluginWebview'
 import type { FrameBinding } from './broker'
@@ -118,7 +119,12 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
       // A duplicate id is the expected failure — contribution ids are un-namespaced by design, so a
       // third-party plugin can collide with a first-party pane. One bad surface is skipped; the rest of
       // the plugin still works, and the shell does not lose a pane it already had.
+      //
+      // Recorded as well as logged. On its own the warn was invisible — the author saw a pane that did not
+      // exist and nothing to explain it — so this also reaches the attention inbox through
+      // node/pluginFailures.ts.
       console.warn(`[plugins] ${pluginId} could not contribute ${surface.target} '${surface.id}':`, error)
+      recordSurfaceFailure(pluginId, surface.id, error)
     }
   }
   return disposables
@@ -385,6 +391,8 @@ export function syncFrameContributions(): void {
 
   for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
   registered.clear()
+  // This pass replaces every contribution, so it also replaces every reason one was missing.
+  clearSurfaceFailures()
 
   // Driven by the ROSTER rather than by the bundle map, because not every surface needs a bundle any
   // more. A document surface is host-drawn and executes nothing here, so the loop has to be able to

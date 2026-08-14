@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import { buildSessionEnv, childEnv, type CoreServices, getProfile, type InternalEnvFactory, type Launcher, launcherSpec, listProfileDefs, listProfiles, type PluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRow, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
+import { buildSessionEnv, childEnv, type CoreServices, getProfile, type InternalEnvFactory, type Launcher, launcherSpec, listProfileDefs, listProfiles, type PluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from '../server/routes/terminal'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -110,7 +110,7 @@ export const sessionControl = {
 
 let launchInjector: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 let memoryReviewTrigger: ((taskId: string, transcriptTail: string) => Promise<void>) | null = null
-let seedNotes: ((task: TaskRow) => Promise<void>) | null = null
+let seedNotes: ((task: TaskRef) => Promise<void>) | null = null
 let internalEnv: InternalEnvFactory = () => ({})
 let bootReconciled: Promise<void> = Promise.resolve()
 let statusBroadcast: () => void = () => {}
@@ -324,7 +324,7 @@ function startIdleWatch() {
 // exactly once no matter which path creates the worktree (first terminal, editor/changes pane,
 // onCreated eager pre-create, run config, workflows). Ordered before any requested session so a
 // setup spawned from create() is tab #1.
-async function maybeRunSetup(t: TaskRow, cwd: string): Promise<void> {
+async function maybeRunSetup(t: TaskRef, cwd: string): Promise<void> {
   if (!t.projectId) return
   const { script, trigger } = await services().projects.setup(t.projectId)
   if (trigger === 'off' || !script?.trim()) return
@@ -348,7 +348,7 @@ async function spawnOne(
   cwd: string,
   isWorktree: boolean,
   ctx: Pick<TerminalSession, 'repo' | 'pull'>,
-  task?: TaskRow,
+  task?: TaskRef,
 ): Promise<TerminalSession> {
   const profile = getProfile(opts.profileId)
   // Dev-server pane (docs/workspaces-and-tasks.md): a command override runs via the user's shell with env
@@ -525,7 +525,7 @@ export type TerminalIpcDeps = {
   internalEnv: InternalEnvFactory
   launchInjector: (taskId: string, sessionId: string) => Promise<void>
   memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
-  seedTaskNotes: (task: TaskRow) => Promise<void>
+  seedTaskNotes: (task: TaskRef) => Promise<void>
   // Resolves when the composition root's post-window reconcile pass is done (always resolves,
   // even on reconcile failure). Mutating surfaces that read the sessions map await it.
   reconciled: Promise<void>
@@ -568,7 +568,7 @@ export type TerminalIpcRegistrations = {
   terminal: TerminalBridge
   taskSessions: TaskSessionsBridge
   taskCreated: TaskCreatedHook
-  worktreeCreated: (task: TaskRow, cwd: string) => Promise<void>
+  worktreeCreated: (task: TaskRef, cwd: string) => Promise<void>
 }
 
 export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalIpcDeps): TerminalIpcRegistrations {
@@ -583,7 +583,7 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
 
   // Every worktree creation funnels through core's resolveTaskCwd; this hook makes the setup script run
   // regardless of which surface (terminal, pane, workflow) created the worktree.
-  const worktreeCreated = (t: TaskRow, cwd: string): Promise<void> => maybeRunSetup(t, cwd)
+  const worktreeCreated = (t: TaskRef, cwd: string): Promise<void> => maybeRunSetup(t, cwd)
 
   // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
   // routes (server/routes/terminal.ts).

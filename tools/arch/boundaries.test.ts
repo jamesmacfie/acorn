@@ -145,7 +145,11 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   // deliberately not `node`, because client-core/src/node/ is the FLEET node — client code), and a
   // renderer file importing @acorn/plugin-api/node would drag node code into the bundle with no
   // rule firing.
-  if (pkg.name === '@acorn/plugin-api') return segment(pkg, file) === 'node' ? 'node' : 'client'
+  // `testkit` counts as node for the same reason `node` does: it re-exports the host's context assembly,
+  // a real SQLite database and core's tables. It is test-only either way (the rule below fails a
+  // production file that imports any testkit/), so this classification is about keeping the client/node
+  // rule truthful rather than about who may import it.
+  if (pkg.name === '@acorn/plugin-api') return ['node', 'testkit'].includes(segment(pkg, file)) ? 'node' : 'client'
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
   if (seg === 'server' || seg === 'main' || seg === 'service' || seg === 'mcp' || seg === 'wiring') return 'node'
@@ -297,24 +301,34 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
-  it('plugin TESTS import core through a reviewed set of module roots (ratchet)', () => {
-    // Production code goes through the facade; test scaffolding does not, and should not be forced
-    // to. A test that seeds core's tables, builds a real CoreServices or opens a tmp-dir database is
-    // reaching for the HOST, not for an API — a third-party author gets a testkit entrypoint if and
-    // when one is built, and inventing that surface now would mean publishing core's internals as
-    // contract to satisfy first-party fixtures.
+  it('plugin TESTS reach core through @acorn/plugin-api/testkit (shrinking baseline)', () => {
+    // This used to be an allowlist of module roots asserting exact set equality, and the comment on it
+    // said a third-party author "gets a testkit entrypoint if and when one is built". One is built:
+    // @acorn/plugin-api/testkit, whose makeTestNodeContext calls the same context assembly the host calls
+    // at boot. So the list stopped being an allowlist and became a BASELINE — the deep imports still to
+    // migrate, which may only shrink.
     //
-    // ROOTS, not files: the value here is the review. A new entry means someone opened a new seam
-    // and had to say so; a new file under an existing root is ordinary work.
-    const TEST_IMPORT_ROOTS = [
-      '@acorn/client-core/lib',
+    // Why it can shrink now and could not before. The reason a test reached past the facade was that no
+    // seam existed for it: a test that seeds core's tables, needs an authenticated gate, or wants a real
+    // plugin context had nowhere else to go, and forty-odd test files rebuilt the host by hand — including
+    // forged `as unknown as NodePluginContext` literals, which stay green when the real host changes and
+    // are therefore the worst kind of test. The testkit is that seam,
+    // and it deliberately carries things ./node refuses (core's table schema, core's database type)
+    // because seeding a fixture is legitimate and always will be.
+    //
+    // How to work with this rule:
+    //   MIGRATE as you touch. A test you are editing anyway moves to the testkit; nobody sweeps the rest.
+    //   REMOVE a root when the last file under it goes. The assertion is exact, so that is enforced.
+    //   NEVER ADD a root. A new deep seam is the signal that the testkit is missing something — add it
+    //     there (packages/node-core/src/testkit/, re-exported from the facade) rather than here.
+    //   LOWER the ceiling. It is the count of surviving deep imports, so migrating one file lowers it.
+    const TESTKIT_BASELINE = [
       '@acorn/client-core/node',
       '@acorn/client-core/palette',
       '@acorn/client-core/registries',
       '@acorn/client-core/settings',
       '@acorn/client-core/tasks',
       '@acorn/client-core/ui',
-      '@acorn/client-core/ui/diff',
       '@acorn/client-core/wsClient.ts',
       '@acorn/node-core/main',
       '@acorn/node-core/main/core',
@@ -325,16 +339,22 @@ describe('architecture boundaries', () => {
       '@acorn/node-core/server/routes',
       '@acorn/node-core/testkit',
     ]
+    // 167 across 48 files the day before the testkit landed; 147 across 37 once the first eleven files
+    // moved across, which drained two client-core roots with them. Only ever smaller.
+    const MAX_DEEP_IMPORTS = 147
     const rootOf = (spec: string): string => {
       const pkg = spec.startsWith('@acorn/node-core/') ? '@acorn/node-core/' : '@acorn/client-core/'
       const parts = spec.slice(pkg.length).split('/')
       if (parts.length === 1) return spec
       return pkg + (parts.length > 2 ? `${parts[0]}/${parts[1]}` : parts[0])
     }
-    const used = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && isTestCode(e.fromFile))
+    const deep = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && isTestCode(e.fromFile))
       .filter((e) => e.spec.startsWith('@acorn/node-core/') || e.spec.startsWith('@acorn/client-core/'))
-      .map((e) => rootOf(e.spec))
-    expect([...new Set(used)].sort()).toEqual([...TEST_IMPORT_ROOTS].sort())
+    expect([...new Set(deep.map((e) => rootOf(e.spec)))].sort()).toEqual([...TESTKIT_BASELINE].sort())
+    expect(deep.length).toBeLessThanOrEqual(MAX_DEEP_IMPORTS)
+    // Anti-vacuity: the seam has to be carrying traffic, or this rule is measuring a migration that
+    // never started.
+    expect(EDGES.filter((e) => e.spec === '@acorn/plugin-api/testkit').length).toBeGreaterThan(4)
   })
 
   it('the testkit is imported only by tests', () => {
@@ -510,17 +530,62 @@ describe('architecture boundaries', () => {
   })
 
   it('the Electron surface stays where it is declared', () => {
-    // apps/desktop IS the Electron app, so anything in it may import electron. What matters is
-    // that the surface OUTSIDE it stays tiny and enumerated — those are the files that would have
-    // to move or grow an adapter when the node service is split out.
-    const ELECTRON_OK_OUTSIDE_DESKTOP = new Set([
-      'plugins/terminal/src/main/folderPickerIpc.ts',
-      'plugins/preview/src/main/previewService.ts',
-      'plugins/preview/src/main/browserService.ts',
-    ])
-    const importers = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => rel(e.fromFile)))].sort()
-    const outside = importers.filter((f) => !f.startsWith('apps/desktop/'))
-    expect(outside.filter((f) => !ELECTRON_OK_OUTSIDE_DESKTOP.has(f))).toEqual([])
+    // apps/desktop IS the Electron app, so anything in it may name electron. Outside it, the rule is
+    // about one thing only: nothing may STATICALLY import electron VALUES. A type-only import is
+    // erased, and a lazy `createRequire(import.meta.url)('electron')` behind a function only resolves
+    // when it is called — neither exists at the moment Node links the module, which is when the
+    // failure this rule exists to prevent happens ("The requested module 'electron' does not provide
+    // an export named 'dialog'", the standalone node dead at boot).
+    //
+    // This used to be a hand-maintained allowlist of three FILE NAMES, which answered "which files
+    // mention electron" rather than "can the Electron-free node boot" — and it passed while preview's
+    // previewService.ts held a static value import that was one innocent import away from breaking
+    // boot. The allowlist is gone: every remaining reference outside apps/desktop is type-only or lazy,
+    // so there is nothing left to enumerate.
+    //
+    // The durable check is execution — apps/node/test/integration/mainBarrelLoad.test.ts loads every
+    // plugin's main barrel in plain Node. This stays as the fast first line, and it catches one case
+    // execution cannot: an UNUSED static value import, which esbuild/tsx elides before Node sees it,
+    // so it loads fine today and breaks the day someone uses the binding.
+    //
+    // Same clause-parsing idiom as the schema and ui/ rules: `[^'"]*?`, because a preceding import's
+    // specifier carries the quotes that bound the statement.
+    //
+    // Comments ARE stripped here, unlike in the graph scan at the top of this file. Both files that
+    // got the lazy treatment describe the import they used to have, in the form they used to have it —
+    // the natural way to write that comment — and a rule that fails the fix it is documenting is a
+    // rule people delete. Stripping is safe at this narrow scale: the only false negative would be an
+    // electron import hidden inside a string literal containing `//`.
+    // `export … from 'electron'` counts too. A re-export is a static value binding exactly like an import,
+    // fails Node's linker in exactly the same way, and is the more likely form on a BARREL — which is
+    // precisely the file this rule is protecting. Execution only partly covers it: a re-export the barrel's
+    // consumers never touch is still linked, but one in a module nothing imports is elided like any other.
+    const ELECTRON_VALUE_IMPORT = /\b(?:import|export)\s+(?!type\b)([^'"]*?)\s+from\s*['"]electron['"]/g
+    const importsElectronValues = (source: string): boolean => {
+      const text = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+      ELECTRON_VALUE_IMPORT.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = ELECTRON_VALUE_IMPORT.exec(text))) {
+        // A named clause of only `type X` entries is type-only in substance.
+        const named = m[1].trim().match(/^\{([\s\S]*)\}$/)
+        if (named && named[1].split(',').every((part) => !part.trim() || /^type\s/.test(part.trim()))) continue
+        return true
+      }
+      return false
+    }
+    // The edge scan already found every file that names electron at all; this only has to decide how.
+    const naming = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))]
+    const offenders = naming.filter((f) => !rel(f).startsWith('apps/desktop/')).filter((f) => importsElectronValues(readFileSync(f, 'utf8')))
+    // Anti-vacuity: the regex must still recognise the real form, which apps/desktop is full of.
+    expect(naming.filter((f) => importsElectronValues(readFileSync(f, 'utf8'))).length).toBeGreaterThan(5)
+    // And the forms no file in the tree happens to use, so the predicate is pinned rather than trusted.
+    // Inline strings because the point is the shapes, not anyone's file.
+    expect(importsElectronValues("export { app } from 'electron'")).toBe(true)
+    expect(importsElectronValues("export * from 'electron'")).toBe(true)
+    expect(importsElectronValues("export type { BrowserWindow } from 'electron'")).toBe(false)
+    expect(importsElectronValues("import type { App } from 'electron'")).toBe(false)
+    expect(importsElectronValues("import { type App, type Menu } from 'electron'")).toBe(false)
+    expect(offenders.map(rel).sort()).toEqual([])
   })
 
   it('client code never imports node code, and vice versa', () => {
@@ -545,12 +610,24 @@ describe('architecture boundaries', () => {
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     // Re-exports only: no plain imports, and no declarations. `export … from` is the whole file.
     const DECLARES = /^\s*(import\s|export\s+(const|let|var|function|class|default|async)\b)/m
-    const entrypoints = walk(api.src).filter((f) => !isTestCode(f))
+    // The suite's own `*.test.ts` files are excluded, and nothing else is. Note this deliberately does
+    // NOT use isTestCode(), which would also exempt src/testkit/index.ts — the entrypoint a plugin's
+    // node-environment suite imports, and therefore the one that most needs the no-components rule below.
+    const entrypoints = walk(api.src).filter((f) => !/\.test\.tsx?$/.test(f))
     const declaring = entrypoints.filter((f) => DECLARES.test(readFileSync(f, 'utf8'))).map(rel)
     // Only the frame-safe ui/index.ts and compiled-host ui/host.ts barrels may re-export from a .tsx
     // module. Components anywhere else make that entrypoint unloadable from a plugin's
     // node-environment test suite. Keeping the two UI barrels separate prevents a sandboxed frame
     // importing Button from also evaluating router/query/registry machinery.
+    //
+    // A DIRECT-specifier grep, and the property it stands for is transitive — `/client` reaches
+    // client-core/registries/keybindings through two hops, and for a while that file was a `.tsx`
+    // containing no JSX, one component away from breaking every plugin's node-environment suite with
+    // nothing firing here. Nor is `.tsx` the only way to lose node-safety: ./ui/editor is plain `.ts`
+    // and still unloadable, because monaco-editor reads `window` at module scope.
+    // packages/plugin-api/src/entrypoints.test.ts is what actually knows — it imports each node-safe
+    // entrypoint in a node environment. This stays because it is instant and names the offending
+    // specifier, which a `window is not defined` stack does not.
     const componentEntrypoints = new Set([
       'packages/plugin-api/src/ui/index.ts',
       'packages/plugin-api/src/ui/host.ts',

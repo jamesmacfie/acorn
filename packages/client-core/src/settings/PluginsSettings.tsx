@@ -254,11 +254,22 @@ export default function PluginsSettings() {
               <Show when={row.state !== 'pending-restart' && pluginPending(row)}>
                 <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>
               </Show>
-              {/* A plugin installed on this node whose start-up threw. Restarting will not fix it, so
-                  this deliberately does not raise the restart banner — the owner has to turn it off or
-                  fix the plugin. */}
+              {/* A plugin installed on this node that threw, or that never loaded at all. Restarting will
+                  not fix either, so this deliberately does not raise the restart banner — the owner has to
+                  turn it off or fix the plugin.
+
+                  `reason` is the node's verbatim account of what broke: a thrown message from a contained
+                  init, or the loader's own sentence for a manifest that does not parse or a bundle that
+                  will not import. It is a loaded plugin's text crossing into the owner's UI, so it is
+                  interpolated as TEXT and arrives already capped from the node. Absent from an older
+                  node, which is why the label stands alone. */}
               <Show when={row.state === 'failed'}>
-                <span class="plugin-failed" role="status">failed to start</span>
+                <span class="plugin-failed" role="status">
+                  failed to {row.stage === 'load' ? 'load' : 'start'}
+                </span>
+                <Show when={row.reason}>
+                  {(reason) => <span class="plugin-failed-reason muted" title={reason()}>{reason()}</span>}
+                </Show>
               </Show>
 
               {/* Only a package that came off disk can be updated or removed; a built-in ships with the

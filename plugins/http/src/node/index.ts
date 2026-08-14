@@ -1,5 +1,4 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { createHttpFetch } from '../server/routes/http'
 
 // http ships as a loaded plugin, so BOTH host seams here are the manifest-bound ones:
@@ -14,21 +13,14 @@ import { createHttpFetch } from '../server/routes/http'
 //
 //   ctx.routes.fetch()  the portable route carrier. A Hono instance cannot cross a process boundary and
 //                       a (Request) → Response function can.
-export const httpPlugin = (): NodePlugin => {
-  let db: PluginDatabase | null = null
-  return {
-    name: 'http',
-    init: (ctx) => {
-      db = ctx.storage.open()
-      ctx.routes.fetch(createHttpFetch(db, ctx.core), { prefix: '', note: '/projects/:projectId/*' })
-    },
-    // One resource, this plugin's own WAL-mode SQLite file — closed before the data root's lock is
-    // dropped (the composition root's teardown invariant). There is no bridge slot to clear: the handler
-    // is a closure over the handle, and the plugin host drops a re-registered plugin's previous route
-    // contributions itself.
-    dispose: () => {
-      db?.close()
-      db = null
-    },
-  }
-}
+// No dispose at all. The one resource is this plugin's own WAL-mode SQLite file, and the host closes what
+// it opened through `ctx.storage` — before the data root's lock is dropped, as ever. There is no bridge
+// slot to clear either: the handler is a closure over the handle, and the plugin host drops a
+// re-registered plugin's previous route contributions itself.
+export const httpPlugin = (): NodePlugin => ({
+  name: 'http',
+  init: (ctx) => {
+    const db = ctx.storage.open()
+    ctx.routes.fetch(createHttpFetch(db, ctx.core), { prefix: '', note: '/projects/:projectId/*' })
+  },
+})

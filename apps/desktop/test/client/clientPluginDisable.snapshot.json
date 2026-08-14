@@ -1,0 +1,174 @@
+{
+  "full": {
+    "panes": [
+      "agents",
+      "changes",
+      "context",
+      "docker",
+      "editor",
+      "pr",
+      "notes",
+      "preview"
+    ],
+    "sources": [
+      "agents",
+      "docker",
+      "github"
+    ],
+    "settingsPages": [
+      "agent-pricing",
+      "docker",
+      "terminal",
+      "workflows"
+    ],
+    "slots": [
+      "overlay/palette.files",
+      "overlay/palette.pull-files",
+      "overlay/onboarding.first-run",
+      "topbar.right/terminal.topbar-toggle",
+      "drawer/terminal.drawer"
+    ],
+    "taskSlots": [
+      "task.footer/docker-footer-badge",
+      "tabrail.task-row/docker-rail-badge"
+    ],
+    "contextSections": [
+      "memory.section"
+    ],
+    "refPanels": [],
+    "paletteRows": [
+      "terminal.run",
+      "workflows.defs"
+    ],
+    "agentContexts": [
+      "acorn-task-context",
+      "acorn-docker",
+      "acorn-terminals"
+    ],
+    "agentToolRenderers": [
+      "changes.agent-file-tool"
+    ],
+    "pollers": [
+      "docker.task-containers",
+      "workflows.triggers"
+    ],
+    "persistedState": [
+      "context.section-selection",
+      "docker.prefs",
+      "editor.open-files",
+      "github.pr-filters"
+    ],
+    "nodeStats": [
+      "agents.active"
+    ],
+    "attention": [
+      "agents.sessions",
+      "memory.proposals"
+    ],
+    "contentLinks": [
+      "github.pull-request",
+      "github.repository"
+    ],
+    "projectImporters": [
+      "github"
+    ]
+  },
+  "owned": {
+    "changes": {
+      "panes": [
+        "changes"
+      ],
+      "agentToolRenderers": [
+        "changes.agent-file-tool"
+      ]
+    },
+    "context": {
+      "panes": [
+        "context"
+      ],
+      "agentContexts": [
+        "acorn-task-context"
+      ],
+      "persistedState": [
+        "context.section-selection"
+      ]
+    },
+    "docker": {
+      "panes": [
+        "docker"
+      ],
+      "sources": [
+        "docker"
+      ],
+      "settingsPages": [
+        "docker"
+      ],
+      "taskSlots": [
+        "task.footer/docker-footer-badge",
+        "tabrail.task-row/docker-rail-badge"
+      ],
+      "agentContexts": [
+        "acorn-docker"
+      ],
+      "pollers": [
+        "docker.task-containers"
+      ],
+      "persistedState": [
+        "docker.prefs"
+      ]
+    },
+    "editor": {
+      "panes": [
+        "editor"
+      ],
+      "slots": [
+        "overlay/palette.files"
+      ],
+      "persistedState": [
+        "editor.open-files"
+      ]
+    },
+    "github": {
+      "panes": [
+        "pr"
+      ],
+      "sources": [
+        "github"
+      ],
+      "slots": [
+        "overlay/palette.pull-files"
+      ],
+      "persistedState": [
+        "github.pr-filters"
+      ],
+      "contentLinks": [
+        "github.pull-request",
+        "github.repository"
+      ],
+      "projectImporters": [
+        "github"
+      ]
+    },
+    "onboarding": {
+      "slots": [
+        "overlay/onboarding.first-run"
+      ]
+    },
+    "preview": {
+      "panes": [
+        "preview"
+      ]
+    },
+    "workflows": {
+      "settingsPages": [
+        "workflows"
+      ],
+      "paletteRows": [
+        "workflows.defs"
+      ],
+      "pollers": [
+        "workflows.triggers"
+      ]
+    }
+  }
+}

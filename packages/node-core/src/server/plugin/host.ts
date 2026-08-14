@@ -6,33 +6,34 @@
 // removes a step from the sequence. Cross-plugin needs resolve through the capability registry at
 // CALL time instead, which is why capabilities.get() is documented as late-binding.
 import type { CoreServices } from '../../main/core'
-import type { NodePermissions } from '../../main/pluginManifest'
-import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
-import { registerAgentTool, removeAgentTools } from '../agentTools/registry'
-import { asContextSection, registerContextSection, removeContextSections } from '../agentTools/contextSections'
-import { registerRoute, removePluginRoutes } from '../routeRegistry'
+import { builtinPluginStorage, type PluginDatabase } from '../../main/pluginStorage'
+import { removeAgentTools } from '../agentTools/registry'
+import { removeContextSections } from '../agentTools/contextSections'
+import { removePluginRoutes } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
-import type { NodePlugin, NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
-import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
-import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
+import { buildPluginContext, type LoadedPluginBinding } from './context'
+import type { NodePlugin, NodePluginContext, PluginStorage } from './types'
 
 // What each plugin claimed on the WS hub, so a re-init can take it back. The hub's slots are module
 // singletons with no duplicate guard, unlike the route and tool registries.
 const wsRegistrations = new Map<string, (() => void)[]>()
 
-export type LoadedPluginBinding = {
-  permissions: NodePermissions
-  storage: PluginStorage
-}
+// Re-exported from its new home: the loader and the composition root import it from here, and the
+// context shape it feeds moved to context.ts so a test can build the same context the host does.
+export type { LoadedPluginBinding }
 
 export type PluginHostOptions = {
   // Owned by the caller, not by this module: see the note in capabilities.ts about why these are not
   // module singletons.
   capabilities: CapabilityRegistry
   core: CoreServices
+  // The node's data root, because the host — not the plugin — opens the per-plugin SQLite files under
+  // it (main/pluginStorage.ts). Required rather than optional: a caller that forgot it would boot a
+  // graph whose plugins silently found no `ctx.storage`, and a compile error is cheaper than that.
+  dataDir: string
   // Plugin ids the owner has turned off for this node. `required` plugins ignore it — disabling
   // github, terminal or agents is not a supported configuration, and silently honouring it would
   // produce a node that boots and then fails at the first task.
@@ -59,9 +60,16 @@ export type PluginRosterEntry = {
   state: 'active' | 'failed' | 'disabled'
   // When it failed, so the client's attention item can say how long it has been broken.
   failedAt?: number
+  // What it threw, verbatim, for the owner to read. The message used to die in this process's stdout,
+  // which a packaged app shows to nobody. It is plugin-authored text on its way to the owner's UI:
+  // display-only, rendered as text and capped at the wire boundary (server/plugin/pluginState.ts).
+  reason?: string
+  // Which pass it died in. 'load' never comes from the host — it is the loader's failure, folded into the
+  // roster one layer up — but the client renders all three from one field, so the vocabulary lives here.
+  stage?: 'load' | 'init' | 'ready'
 }
 
-export type PluginFailure = { name: string; error: string; at: number }
+export type PluginFailure = { name: string; error: string; at: number; stage: 'init' | 'ready' }
 
 export type PluginHostResult = {
   enabled: readonly string[]
@@ -70,8 +78,9 @@ export type PluginHostResult = {
   // continued; built-ins are never in here, because a built-in throwing still fails the boot.
   failed: readonly PluginFailure[]
   roster: readonly PluginRosterEntry[]
-  // Release every initialized plugin, newest first, before the data root lock is dropped. Never
-  // rejects: one plugin failing to close must not stop the rest, and teardown is already best-effort.
+  // Release every initialized plugin, newest first, and close the `ctx.storage` database each one
+  // opened — all of it before the data root lock is dropped. Never rejects: one plugin failing to close
+  // must not stop the rest, and teardown is already best-effort.
   dispose(): Promise<void>
 }
 
@@ -89,6 +98,44 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // Kept so the ready pass below hands each plugin the SAME context its init got.
   const contexts = new Map<string, NodePluginContext>()
 
+  // Every database handed out through `ctx.storage`, so the host can close what it opened. Per CALL,
+  // not a module singleton: a second startServiceRuntime in one process gets its own handles, exactly
+  // as it gets its own capability registry.
+  //
+  // Memoized per plugin, which is a behaviour change the plugins can see: two open() calls used to mean
+  // two handles on one file and one of them leaked. There is one connection per plugin per boot now.
+  const opened = new Map<string, PluginDatabase>()
+  const storageFor = (plugin: NodePlugin, loaded?: LoadedPluginBinding): PluginStorage | undefined => {
+    // The loaded binding first and unconditionally (server/plugin/context.ts says why); `migrationsModule`
+    // is the compiled tier's declaration and is only ever read for a plugin that is NOT loaded.
+    const source = loaded?.storage
+      ?? (plugin.migrationsModule ? builtinPluginStorage(options.dataDir, plugin.name, plugin.migrationsModule) : null)
+    if (!source) return undefined
+    return {
+      open: () => {
+        const existing = opened.get(plugin.name)
+        if (existing) return existing
+        const db = source.open()
+        opened.set(plugin.name, db)
+        return db
+      },
+    }
+  }
+  // Called after a plugin's own dispose has run, never before: agents flushes its transcript, workflows
+  // aborts live steps and database drains its pools THROUGH this handle, so closing it first would turn
+  // a clean shutdown into writes on a dead connection.
+  const closeStorage = (name: string): void => {
+    const db = opened.get(name)
+    if (!db) return
+    opened.delete(name)
+    try {
+      db.close()
+    } catch {
+      // An older loaded bundle may still close its own handle in dispose, and node:sqlite refuses a
+      // second close. Nothing to report: the file is drained either way.
+    }
+  }
+
   // Roll a contained plugin back to the state it was in before init: undo everything it registered,
   // let it release whatever it opened, and record why. Boot continues — that is the entire point of
   // the contained path, and the difference between "one installed plugin is broken" and "this node
@@ -101,7 +148,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     } catch (disposeError) {
       console.warn(`[plugin:${plugin.name}] dispose after a failed ${phase} also failed:`, disposeError)
     }
-    failed.push({ name: plugin.name, error: error instanceof Error ? error.message : String(error), at: Date.now() })
+    // Including the database it opened before it threw — a contained failure that left a WAL handle on
+    // the data root would be the same lock leak initPlugins' dispose contract exists to prevent.
+    closeStorage(plugin.name)
+    failed.push({ name: plugin.name, error: error instanceof Error ? error.message : String(error), at: Date.now(), stage: phase })
   }
 
   for (const plugin of plugins) {
@@ -115,87 +165,18 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       continue
     }
     // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from
-    // disk. Everything below that differs between the two tiers keys off this one value.
+    // disk; its presence is what shapes the context (server/plugin/context.ts).
     const loaded = options.loaded?.get(plugin.name)
     const permissions = loaded?.permissions
-    const ctx: NodePluginContext = {
-      name: plugin.name,
-      routes: {
-        // Absent for a loaded plugin: handing the host a live Hono instance from another realm is
-        // exactly what cannot survive the process boundary rung 2 puts there
-        // (docs/security.md § Design rules). `undefined as never` rather than a
-        // throwing stub, so the failure is the immediate "not a function" an author can act on.
-        register: permissions
-          ? (undefined as never)
-          : (router, opts) => registerRoute({ plugin: plugin.name, prefix: opts?.prefix ?? '', router, note: opts?.note }),
-        fetch: (handler, opts) =>
-          registerRoute({ plugin: plugin.name, prefix: opts?.prefix ?? '', fetch: handler, note: opts?.note }),
-      },
-      // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under
-      // another plugin's name, and cannot remove another plugin's tools.
-      tools: { register: (tool) => registerAgentTool(plugin.name, tool) },
-      // asContextSection is where core's database handle is DROPPED rather than merely left unused: core's
-      // own `issues` section keeps it, a plugin-registered one can never see it, and neither side has to be
-      // trusted to remember.
-      contextSections: { register: (section) => registerContextSection(plugin.name, asContextSection(section)) },
-      // Owner-bound like routes and tools: a plugin cannot contribute a provider under another plugin's
-      // name, and so cannot have its contributions cleared by another plugin's re-init.
-      providers: {
-        integration: (provider, route) => {
-          connectionProviderRegistry.register(provider, plugin.name)
-          integrationProviderRegistry.register(provider, plugin.name)
-          if (!route) return
-          if (permissions && typeof route !== 'function') {
-            throw new Error(`Plugin '${plugin.name}' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.`)
-          }
-          integrationProviderRegistry.registerRoute({
-            providerId: provider.id,
-            prefix: '',
-            ...(typeof route === 'function'
-              ? { fetch: route as PluginFetchHandler }
-              : { router: route }),
-          })
-        },
-        connection: (provider) => connectionProviderRegistry.register(provider, plugin.name),
-        model: (adapter) => modelProviderRegistry.register(adapter, plugin.name),
-      },
-      // Rung 1 of the containment ladder for a loaded plugin: only the capability ids and CoreServices
-      // facets its manifest declared. main/pluginPermissions.ts explains what that does and does not
-      // buy — it is least privilege for cooperative code, not a security boundary.
-      capabilities: permissions ? scopeCapabilities(options.capabilities, permissions.capabilities) : options.capabilities,
-      storage: loaded ? loaded.storage : (undefined as never),
-      core: permissions ? scopeCore(options.core, permissions, plugin.name) : options.core,
-      // The broadcast surface, projected rather than re-implemented: these are main/notify.ts and
-      // main/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
-      // `streams` return disposers, which the host records like any other contribution.
-      events: {
-        send: wsBroadcast,
-        status: broadcastStatus,
-        notice: broadcastWorkflowNotice,
-        repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
-        stepEvent: broadcastWorkflowStepEvent,
-        // Never present for a loaded plugin, whatever its manifest says. PTY stream ownership and WS
-        // channel prefixes are infrastructure that exactly one plugin may own, and neither survives a
-        // message-passing boundary (README § Two tiers).
-        channel: permissions
-          ? (undefined as never)
-          : (prefix, handler) => {
-            registerWsChannelHandler(prefix, handler)
-            wsRegistrations.set(plugin.name, [...(wsRegistrations.get(plugin.name) ?? []), () => registerWsChannelHandler(prefix, null)])
-          },
-        streams: permissions
-          ? (undefined as never)
-          : (handlers) => {
-            setStreamHandlers(handlers)
-            wsRegistrations.set(plugin.name, [...(wsRegistrations.get(plugin.name) ?? []), () => setStreamHandlers(null)])
-          },
-      },
-      log: {
-        log: (...args: unknown[]) => console.log(`[plugin:${plugin.name}]`, ...args),
-        warn: (...args: unknown[]) => console.warn(`[plugin:${plugin.name}]`, ...args),
-        error: (...args: unknown[]) => console.error(`[plugin:${plugin.name}]`, ...args),
-      },
-    }
+    const storage = storageFor(plugin, loaded)
+    const ctx = buildPluginContext({
+      plugin: plugin.name,
+      capabilities: options.capabilities,
+      core: options.core,
+      loaded,
+      ...(storage ? { storage } : {}),
+      onWsRegistration: (undo) => wsRegistrations.set(plugin.name, [...(wsRegistrations.get(plugin.name) ?? []), undo]),
+    })
     // A failing init still fails the boot — every plugin here is first-party code in the same binary, so
     // a node that cannot assemble should say so rather than run degraded. But the plugins that ALREADY
     // initialized have to be torn down first, and that is not cosmetic: each holds a WAL-mode SQLite
@@ -215,7 +196,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         await contain(plugin, 'init', error)
         continue
       }
-      await disposeStarted(started)
+      await disposeStarted(started, closeStorage)
       throw error
     }
     contexts.set(plugin.name, ctx)
@@ -240,7 +221,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         enabled.splice(enabled.indexOf(plugin.name), 1)
         continue
       }
-      await disposeStarted(started)
+      await disposeStarted(started, closeStorage)
       throw error
     }
   }
@@ -260,21 +241,26 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // A failure outranks the disabled flag in this field only because the two cannot co-occur: a
       // disabled plugin never ran, so it never failed.
       state: failure ? 'failed' : isDisabled ? 'disabled' : 'active',
-      ...(failure ? { failedAt: failure.at } : {}),
+      ...(failure ? { failedAt: failure.at, reason: failure.error, stage: failure.stage } : {}),
     }
   })
 
-  return { enabled, skipped, failed, roster, dispose: () => disposeStarted(started) }
+  return { enabled, skipped, failed, roster, dispose: () => disposeStarted(started, closeStorage) }
 }
 
 // Everything one plugin contributed to the module-singleton registries, undone.
+//
+// Exported for one reason beyond the two paths below: a TEST that inits a plugin against a real context
+// (testkit/pluginContext.ts) leaves the same registrations behind, in the same process-wide registries,
+// and the next test file's init would hit a duplicate guard. Its cleanup() calls this, so the rollback a
+// test gets is the host's rather than an approximation of it.
 //
 // Called on two paths. At boot it is idempotency: a second startServiceRuntime in one process must
 // REPLACE a plugin's contributions rather than append copies bound to the first boot's (now closed)
 // database — for routes that silently served every request from a closed handle; for tools it threw
 // on the duplicate name and failed the whole boot. On a contained failure it is the rollback: a
 // plugin that registered three routes and then threw must not leave those three routes serving.
-function clearRegistrations(name: string): void {
+export function clearRegistrations(name: string): void {
   removePluginRoutes(name)
   // The WS hub's two module-singleton slots have no duplicate guard, so a stale handler — closed
   // over an already-disposed engine — would keep claiming the prefix silently.
@@ -292,12 +278,19 @@ function clearRegistrations(name: string): void {
 // Reverse order, because a later plugin may depend on an earlier one's resources. Never rejects: one
 // plugin failing to close must not strand the rest with an open WAL file, and teardown is already
 // best-effort everywhere else.
-async function disposeStarted(started: readonly NodePlugin[]): Promise<void> {
+//
+// Each plugin's storage is closed immediately after its own dispose rather than in a second sweep at the
+// end. That keeps the moment each WAL file drains exactly where it was when the plugins closed their own
+// handles — inside the caller's `plugins` drain step, before `sqlite` and before the data-root lock
+// (apps/node/src/server/composition.ts § NODE_DRAIN_ORDER) — and it holds even when an earlier plugin's
+// dispose hangs long enough to hit the drain deadline.
+async function disposeStarted(started: readonly NodePlugin[], closeStorage: (name: string) => void): Promise<void> {
   for (const plugin of [...started].reverse()) {
     try {
       await plugin.dispose?.()
     } catch (error) {
       console.warn(`[plugin:${plugin.name}] dispose failed:`, error)
     }
+    closeStorage(plugin.name)
   }
 }

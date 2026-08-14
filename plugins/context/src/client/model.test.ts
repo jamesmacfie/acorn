@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskContext } from '@acorn/protocol/api.ts'
 import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary } from './model'
-import { bytesOf, formatSize } from '@acorn/client-core/lib/formatSize.ts'
+import { bytesOf, formatSize } from '@acorn/plugin-api/client'
 
 const ctx: TaskContext = {
   task: { id: 't', title: 'x', projectId: 'project-1', repo: 'a/b', branch: 'm', worktreePath: null, pullNumber: null },

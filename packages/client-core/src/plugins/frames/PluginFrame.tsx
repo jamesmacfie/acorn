@@ -84,9 +84,23 @@ const currentTokens = (): Record<string, string> => {
   return tokens
 }
 
+// How long a frame gets to say anything at all after the host transfers its port. The bundle is local
+// bytes out of a content-addressed cache and the ack is the first line the SDK runs, so this is generous
+// by an order of magnitude — it is a deadline for "did this code evaluate", not a performance budget.
+//
+// Any message counts as the ack, so a bundle built before the SDK started sending one still
+// clears this as soon as it calls the bridge. A bundle that was built before the ack existed AND never
+// calls the bridge (a purely static frame) will show the placeholder wrongly until it is rebuilt. Every
+// package in this repo is rebuilt by scripts/build-plugin.mjs; an installed third-party copy is not.
+const HANDSHAKE_DEADLINE_MS = 10_000
+
 export default function PluginFrame(props: PluginFrameProps) {
   const qc = useQueryClient()
   const [misbehaving, setMisbehaving] = createSignal<string | null>(null)
+  // The frame took the port and never said a word — a bundle that threw at module scope, or one that was
+  // never a frame bundle. Until this existed the surface was a blank rectangle and the only evidence was
+  // a console error inside an iframe nobody opens devtools on.
+  const [silent, setSilent] = createSignal(false)
 
   // The iframe element, for the broker's `frameHasFocus` gate on `openUrl`: a click or keypress
   // inside the frame's document makes this element the shell document's activeElement.
@@ -249,6 +263,15 @@ export default function PluginFrame(props: PluginFrameProps) {
     const target = frame.contentWindow
     if (!target) return
     const channel = new MessageChannel()
+    // Armed before the port is transferred and cleared by the frame's first message. A controller-only
+    // frame is exempt: it has no rectangle for a placeholder to occupy, and replacing its iframe would
+    // remove the very thing the host is driving.
+    const deadline = props.controllerOnly
+      ? null
+      : setTimeout(() => {
+        console.warn(`[plugins] ${props.binding.pluginId} surface '${props.binding.surface}' never connected its frame`)
+        setSilent(true)
+      }, HANDSHAKE_DEADLINE_MS)
     const bridge = createFrameBridge({
       port: channel.port1,
       binding: props.binding,
@@ -257,6 +280,9 @@ export default function PluginFrame(props: PluginFrameProps) {
       onMisbehaving: (reason) => {
         console.warn(`[plugins] ${props.binding.pluginId} misbehaved on the bridge: ${reason}`)
         setMisbehaving(reason)
+      },
+      onConnected: () => {
+        if (deadline !== null) clearTimeout(deadline)
       },
     })
     // Targeted, not '*': the sandbox keeps the frame's own origin through allow-same-origin (see the
@@ -289,6 +315,7 @@ export default function PluginFrame(props: PluginFrameProps) {
     })
     onCleanup(() => {
       port = null
+      if (deadline !== null) clearTimeout(deadline)
       unwebview?.()
       unaction()
       unselect()
@@ -299,12 +326,16 @@ export default function PluginFrame(props: PluginFrameProps) {
 
   return (
     <Show
-      when={!misbehaving()}
+      when={!misbehaving() && !silent()}
       fallback={
         <section class="pane contribution-failed" role="status">
-          <strong>Plugin misbehaving</strong>
+          {/* Two failures, one placeholder, because the reader's situation is the same either way: this
+              rectangle is not going to render. The wording separates them because the remedies differ —
+              misbehaving is the host cutting a running plugin off, silent is a plugin's UI that never
+              started at all. */}
+          <strong>{misbehaving() ? 'Plugin misbehaving' : 'This plugin’s UI failed to start'}</strong>
           <span class="muted">{props.binding.pluginId}</span>
-          <span class="sr-only">{misbehaving()}</span>
+          <span class="sr-only">{misbehaving() ?? `${props.binding.surface} never connected to the host`}</span>
         </section>
       }
     >

@@ -22,6 +22,12 @@ The data root defaults to `apps/node/.acorn/` and is gitignored. Set `ACORN_DATA
 run. Set `ACORN_PORT` to force a port for tests or a standalone process; otherwise the Node prefers
 the last port in `node.json` and falls back to an ephemeral port.
 
+Two variables exist for plugin work. `ACORN_BUNDLED_PLUGINS_DIR` gives a standalone Node a directory of
+app-owned plugin packages to reconcile from, which the desktop always has and `pnpm dev:node` otherwise
+has none of; unset, that step does not happen at all. `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` puts the
+per-bundle trust dialog back for the app's own bundled packages, which a development build otherwise
+acknowledges the same way a packaged build does — see [plugins.md](./plugins.md) § The dev loop.
+
 ## Start
 
 ```sh
@@ -33,6 +39,10 @@ pnpm dev
 `pnpm dev` builds the Node artifact, builds the desktop main/preload/renderer, stages migrations and
 Node output, and launches Electron. `pnpm dev:node` runs the standalone Node and prints one JSON
 handshake line containing endpoint, fingerprint, certificate, Node ID, and device token.
+
+Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those — it rebuilds the plugin's
+package on every save. [plugins.md](./plugins.md) § The dev loop has the whole loop, including which
+target to build into and why the node still restarts.
 
 ## Native ABI
 
@@ -49,6 +59,11 @@ pnpm run rebuild        # Electron: desktop development/build
 Do not rebuild per package; all packages resolve the same physical native copy.
 
 ## Database workflow
+
+`scripts/db.mjs` finds a chain by the presence of a `drizzle.config.ts`, and every plugin's is one line
+re-exporting `plugins/drizzle.shared.ts` (`./src/node/schema.ts` → `./migrations`). A new table-owning
+plugin adds that one-line file, plus `migrationsModule: import.meta.url` on its `NodePlugin` so the host
+opens and migrates the database for it (docs/data-layer.md § Migrations).
 
 Edit the schema in its owning package, then run:
 

@@ -3,8 +3,8 @@
 // table/column completions.
 //
 // database ships LOADED, so these routes run on one tier: the host gets `router.fetch`
-// (createDatabaseFetch at the bottom) and the identity-bound runtime rides in through `c.env` behind a
-// module-level symbol, the same carrier rollbar, linear and http use. The identity therefore comes off
+// (createDatabaseFetch at the bottom) and the identity-bound runtime rides in through `c.env` behind
+// `portableCarrier` — literally the same carrier rollbar, linear and http use. The identity therefore comes off
 // the request context rather than out of `ownerId(c)`/`c.get('principal')`: a loaded bundle is not
 // inside the host's Hono stack, so those middleware-set values are simply not there.
 //
@@ -27,7 +27,7 @@ import {
   type CoreServices,
   type PluginDatabase,
   type PluginFetchHandler,
-  type PluginRequestContext,
+  portableCarrier,
   ProviderOperationError,
   respondError,
 } from '@acorn/plugin-api/node'
@@ -41,19 +41,9 @@ import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '.
 import { completeSql } from '../completions'
 import { MAX_CONTEXT_QUERIES, savedQueryOption, savedQuerySnapshot } from '../agentContext'
 
-const PORTABLE_REQUEST_CONTEXT = Symbol('database-plugin-request-context')
-
-type PortableBindings = AppEnv['Bindings'] & {
-  [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext
-}
-
-// A request arriving without the context is a wiring bug, and saying so beats answering it from host
-// handles this bundle should no longer touch.
-const requestContext = (c: Context<AppEnv>): PluginRequestContext => {
-  const context = (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
-  if (!context) throw new Error('database routes only run over the portable carrier (createDatabaseFetch)')
-  return context
-}
+// The carrier is the host's (@acorn/plugin-api/node); a request arriving without the context is a
+// wiring bug, and saying so beats answering it from host handles this bundle should no longer touch.
+const { requestContext, portableFetch } = portableCarrier('database')
 
 const owner = (c: Context<AppEnv>): string => requestContext(c).userId
 
@@ -314,7 +304,5 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
 
 /** The portable carrier. A Hono instance cannot cross a process boundary and a (Request) → Response
  * function can, so this is what `ctx.routes.fetch` is handed. */
-export const createDatabaseFetch = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge): PluginFetchHandler => {
-  const routes = databaseRoutes(db, core, bridge)
-  return (request, context) => routes.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
-}
+export const createDatabaseFetch = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge): PluginFetchHandler =>
+  portableFetch(databaseRoutes(db, core, bridge))
