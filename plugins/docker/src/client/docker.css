@@ -13,20 +13,10 @@
 /* Row/TreeRow own the row: box, compact height, left marker, hover, selected tint, the depth indent
    that was `.docker-row-nested`, the twist that was `.docker-group-chevron`, the body/meta ellipsis
    that were `.docker-row-name`/`.docker-row-meta`, and the reveal-on-hover that `.docker-row-actions`
-   spelled out with `visibility`. What is left is the rule between rows, which this list wants and a
-   switcher rail does not, and the look of the bare glyph buttons in the trailing slot. */
+   spelled out with `visibility`. The trailing glyphs are Button variant="bare" and `.docker-danger`
+   is tone="danger", so what is left is the rule between rows — which this list wants and a switcher
+   rail does not. `.docker-tabs` is gone too: the sub-nav is the shared Tabs. */
 .docker-row { border-bottom: var(--divider); }
-.docker-row .ui-row-trailing button {
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius);
-  padding: 0 var(--space-2);
-  cursor: pointer;
-}
-.docker-row .ui-row-trailing button:hover { color: var(--text); background: var(--bg-subtle); }
 
 
 /* Detail pane */
@@ -35,20 +25,7 @@
 .docker-detail-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .docker-detail-actions { margin-left: auto; display: flex; gap: var(--space-3); align-items: center; }
 .docker-detail-sub { font-size: var(--fs-sm); }
-.docker-danger { color: var(--danger); }
 
-.docker-tabs { display: flex; gap: var(--space-1); border-bottom: var(--chrome-divider); }
-.docker-tabs button {
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  border-bottom: var(--tab-active-w) solid transparent;
-  padding: var(--space-2) var(--space-5);
-  cursor: pointer;
-}
-.docker-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 
 /* DescriptionList owns the grid; these keep the detail pane's own gap and its scrolling. */
 .docker-info { gap: var(--space-2) var(--space-8); margin: var(--space-3) 0 0; overflow-y: auto; }

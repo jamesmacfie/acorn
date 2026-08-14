@@ -11,7 +11,7 @@ import { refreshDocker } from './dockerStore'
 import { dockerLogBuffer, type DockerLogBuffer } from './dockerLogStore'
 import { containerTone, dockerDetailState, rememberDockerDetailState, type DockerDetailTab as Tab } from './dockerViewState'
 import DockerExecTerminal from './DockerExecTerminal'
-import { Alert, Button, Checkbox, Chip, createArmedConfirm, DescriptionList, EmptyState, FindBar, Meter, StatusDot } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, Chip, DescriptionList, EmptyState, FindBar, Meter, StatusDot, Tabs, createArmedConfirm } from '@acorn/plugin-api/ui'
 
 // Try bash, fall back to sh — works across alpine/debian-ish images.
 const execCommand = (ref: string): string => `docker exec -it ${ref} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`
@@ -196,23 +196,21 @@ export default function ContainerDetail(props: { target: string; taskId?: string
               <span class="docker-detail-name" title={d().name}>{d().name}</span>
               <span class="docker-detail-actions">
                 <Show when={!running()}>
-                  <button type="button" class="ui-btn" disabled={busy()} onClick={() => void act('start')}>Start</button>
+                  <Button disabled={busy()} onClick={() => void act('start')}>Start</Button>
                 </Show>
                 <Show when={running()}>
-                  <button type="button" class="ui-btn" disabled={busy()} onClick={() => void act('stop')}>Stop</button>
-                  <button type="button" class="ui-btn" disabled={busy()} onClick={() => void act('restart')}>Restart</button>
-                  <button
-                    type="button"
-                    class="ui-btn"
+                  <Button disabled={busy()} onClick={() => void act('stop')}>Stop</Button>
+                  <Button disabled={busy()} onClick={() => void act('restart')}>Restart</Button>
+                  <Button
                     title={props.taskId ? 'Open a shell in this container in the task terminal' : 'Copy a docker exec command'}
                     onClick={() => void openExec(d().name)}
                   >
                     {props.taskId ? 'Terminal' : 'Copy exec'}
-                  </button>
+                  </Button>
                 </Show>
-                <button type="button" class="ui-btn docker-danger" disabled={busy()} onClick={() => void remove()}>
+                <Button tone="danger" disabled={busy()} onClick={() => void remove()}>
                   {armed.armed() ? 'Sure?' : 'Remove'}
-                </button>
+                </Button>
                 {props.actions}
               </span>
             </header>
@@ -221,14 +219,19 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             </div>
             <Show when={error()}><Alert>{error()}</Alert></Show>
 
-            <nav class="docker-tabs">
-              <button type="button" classList={{ active: tab() === 'info' }} onClick={() => switchTab('info')}>Info</button>
-              <button type="button" classList={{ active: tab() === 'logs' }} onClick={() => switchTab('logs')}>Logs</button>
-              <button type="button" classList={{ active: tab() === 'stats' }} onClick={() => switchTab('stats')}>Stats</button>
-              <Show when={running()}>
-                <button type="button" classList={{ active: tab() === 'terminal' }} onClick={() => switchTab('terminal')}>Terminal</button>
-              </Show>
-            </nav>
+            {/* Terminal is conditional, so the tab list is derived rather than a module constant. */}
+            <Tabs
+              tabs={[
+                { id: 'info', label: 'Info' },
+                { id: 'logs', label: 'Logs' },
+                { id: 'stats', label: 'Stats' },
+                ...(running() ? [{ id: 'terminal', label: 'Terminal' }] : []),
+              ]}
+              active={tab()}
+              onChange={(id) => switchTab(id as Tab)}
+              idPrefix="docker-detail"
+              ariaLabel="Container detail"
+            />
 
             <Show when={tab() === 'info'}>
               <DescriptionList class="docker-info" size="sm">

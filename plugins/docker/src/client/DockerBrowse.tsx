@@ -12,7 +12,7 @@ import { composeAction, containerAction, dockerPrune, fetchImages, fetchNetworks
 import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRefresh } from './dockerStore'
 import ContainerDetail from './ContainerDetail'
 import './docker.css'
-import { Alert, Button, createArmedConfirm, EmptyState, Input, Row, SectionHeader, StatusDot, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, Input, Row, SectionHeader, StatusDot, Tabs, Toolbar, TreeRow, createArmedConfirm } from '@acorn/plugin-api/ui'
 import { containerTone } from './dockerViewState'
 
 type Section = 'containers' | 'images' | 'volumes' | 'networks'
@@ -172,8 +172,10 @@ export default function DockerBrowse() {
       meta={c.status}
       trailing={
         <>
-          <button
-            type="button"
+          <Button
+            variant="bare"
+            size="sm"
+            iconOnly
             title={isActive(c) ? 'Stop' : 'Start'}
             disabled={rowBusy() === c.id}
             onClick={(e) => {
@@ -182,10 +184,12 @@ export default function DockerBrowse() {
             }}
           >
             {isActive(c) ? '◼' : '▶'}
-          </button>
-          <button
-            type="button"
-            class="docker-danger"
+          </Button>
+          <Button
+            variant="bare"
+            size="sm"
+            iconOnly
+            tone="danger"
             title="Remove container"
             disabled={rowBusy() === c.id}
             onClick={(e) => {
@@ -194,7 +198,7 @@ export default function DockerBrowse() {
             }}
           >
             {armed.armed() === c.id ? '?' : '🗑'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -225,8 +229,10 @@ export default function DockerBrowse() {
           }
           trailing={
             <>
-              <button
-                type="button"
+              <Button
+                variant="bare"
+                size="sm"
+                iconOnly
                 title={g.running > 0 ? 'Stop project' : 'Start project'}
                 disabled={groupBusy() === g.project}
                 onClick={(e) => {
@@ -235,10 +241,12 @@ export default function DockerBrowse() {
                 }}
               >
                 {g.running > 0 ? '◼' : '▶'}
-              </button>
-              <button
-                type="button"
-                class="docker-danger"
+              </Button>
+              <Button
+                variant="bare"
+                size="sm"
+                iconOnly
+                tone="danger"
                 title="Compose down (remove the project's containers and networks; volumes kept)"
                 disabled={groupBusy() === g.project}
                 onClick={(e) => {
@@ -247,7 +255,7 @@ export default function DockerBrowse() {
                 }}
               >
                 {armed.armed() === `down:${g.project}` ? '?' : '🗑'}
-              </button>
+              </Button>
             </>
           }
         >
@@ -288,11 +296,14 @@ export default function DockerBrowse() {
             </EmptyState>
           }
         >
-          <nav class="docker-tabs docker-subnav">
-            <For each={SECTIONS}>
-              {(s) => <button type="button" classList={{ active: section() === s.id }} onClick={() => setSection(s.id)}>{s.label}</button>}
-            </For>
-          </nav>
+          <Tabs
+            class="docker-subnav"
+            tabs={SECTIONS}
+            active={section()}
+            onChange={(id) => setSection(id as Section)}
+            idPrefix="docker-section"
+            ariaLabel="Docker objects"
+          />
           <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
 
           <Show when={section() === 'containers'}>
@@ -327,7 +338,7 @@ export default function DockerBrowse() {
           <Show when={section() === 'images'}>
             <div class="docker-filters docker-object-bar">
               <span class="muted">{(images() ?? []).length} images</span>
-              <button type="button" class="new-pr-btn" onClick={() => void prune('images')}>{armed.armed() === 'prune:images' ? 'Sure?' : 'Prune dangling'}</button>
+              <Button onClick={() => void prune('images')}>{armed.armed() === 'prune:images' ? 'Sure?' : 'Prune dangling'}</Button>
               <Show when={pruneNote()}><span class="muted" role="status">{pruneNote()}</span></Show>
             </div>
             <div class="docker-list">
@@ -340,10 +351,10 @@ export default function DockerBrowse() {
                     title={`${img.repository}:${img.tag}`}
                     meta={`${img.size}${img.containers ? ` · in use (${img.containers})` : ''}`}
                     trailing={
-                      <button type="button" class="docker-danger" title="Remove image" onClick={() => {
+                      <Button variant="bare" size="sm" iconOnly tone="danger" title="Remove image" onClick={() => {
                         if (!confirmedOnce(`img:${img.id}`)) return
                         void failing(removeImage(img.id, false)).then(() => imagesCtl.refetch())
-                      }}>{armed.armed() === `img:${img.id}` ? '?' : '🗑'}</button>
+                      }}>{armed.armed() === `img:${img.id}` ? '?' : '🗑'}</Button>
                     }
                   >
                     {img.repository}<span class="muted">:{img.tag}</span>
@@ -356,7 +367,7 @@ export default function DockerBrowse() {
           <Show when={section() === 'volumes'}>
             <div class="docker-filters docker-object-bar">
               <span class="muted">{(volumes() ?? []).length} volumes</span>
-              <button type="button" class="new-pr-btn" onClick={() => void prune('volumes')}>{armed.armed() === 'prune:volumes' ? 'Sure? Deletes unused data' : 'Prune unused'}</button>
+              <Button onClick={() => void prune('volumes')}>{armed.armed() === 'prune:volumes' ? 'Sure? Deletes unused data' : 'Prune unused'}</Button>
               <Show when={pruneNote()}><span class="muted" role="status">{pruneNote()}</span></Show>
             </div>
             <div class="docker-list">
@@ -369,10 +380,10 @@ export default function DockerBrowse() {
                     title={v.mountpoint}
                     meta={v.composeProject ?? v.driver}
                     trailing={
-                      <button type="button" class="docker-danger" title="Remove volume (deletes its data)" onClick={() => {
+                      <Button variant="bare" size="sm" iconOnly tone="danger" title="Remove volume (deletes its data)" onClick={() => {
                         if (!confirmedOnce(`vol:${v.name}`)) return
                         void failing(removeVolume(v.name, false)).then(() => volumesCtl.refetch())
-                      }}>{armed.armed() === `vol:${v.name}` ? '?' : '🗑'}</button>
+                      }}>{armed.armed() === `vol:${v.name}` ? '?' : '🗑'}</Button>
                     }
                   >
                     {v.anonymous ? `${v.name.slice(0, 12)}… (anonymous)` : v.name}
@@ -385,7 +396,7 @@ export default function DockerBrowse() {
           <Show when={section() === 'networks'}>
             <div class="docker-filters docker-object-bar">
               <span class="muted">{(networks() ?? []).length} networks</span>
-              <button type="button" class="new-pr-btn" onClick={() => void prune('networks')}>{armed.armed() === 'prune:networks' ? 'Sure?' : 'Prune unused'}</button>
+              <Button onClick={() => void prune('networks')}>{armed.armed() === 'prune:networks' ? 'Sure?' : 'Prune unused'}</Button>
             </div>
             <div class="docker-list">
               <For each={networks() ?? []} fallback={<EmptyState align="start" busy={networks.loading}>{networks.loading ? 'Loading…' : 'No networks.'}</EmptyState>}>
@@ -398,10 +409,10 @@ export default function DockerBrowse() {
                     meta={`${n.driver}${n.internal ? ' · internal' : ''}`}
                     trailing={
                       <Show when={!BUILTIN_NETWORKS.has(n.name)}>
-                        <button type="button" class="docker-danger" title="Remove network" onClick={() => {
+                        <Button variant="bare" size="sm" iconOnly tone="danger" title="Remove network" onClick={() => {
                           if (!confirmedOnce(`net:${n.id}`)) return
                           void failing(removeNetwork(n.id)).then(() => networksCtl.refetch())
-                        }}>{armed.armed() === `net:${n.id}` ? '?' : '🗑'}</button>
+                        }}>{armed.armed() === `net:${n.id}` ? '?' : '🗑'}</Button>
                       </Show>
                     }
                   >
