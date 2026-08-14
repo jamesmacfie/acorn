@@ -1,5 +1,5 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Row, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Row, Toolbar } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import {
@@ -206,7 +206,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         <span class="db-status" classList={{ err: status() === 'error', ok: status() === 'connected' }}>
           {status() === 'connected' ? dbName() || 'connected' : status() === 'connecting' ? 'connecting…' : 'error'}
         </span>
-        <button type="button" class="db-icon-btn" title="Reconnect" onClick={() => void connect()}>⟳</button>
+        <Button size="sm" iconOnly title="Reconnect" aria-label="Reconnect" onClick={() => void connect()}>⟳</Button>
       </div>
 
       <Show when={error()}>
@@ -251,31 +251,30 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             rowLabel={savedQueryLabel}
             isActive={(q) => q.name === loadedName()}
             leading={(q) => (
-              <button type="button" class="db-chip-x" title="Delete query" onClick={() => void deleteSaved(q)}>✕</button>
+              <Button variant="bare" size="sm" iconOnly tone="danger" title="Delete query" aria-label="Delete query" onClick={() => void deleteSaved(q)}>✕</Button>
             )}
             onSelect={loadSaved}
           />
           {/* The editor's content is on the other side of a port, so this cannot be
               disabled-when-empty without polling it — an empty document just makes the click a
               no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
-          <button
-            type="button"
-            class="db-run-btn"
+          <Button
+            variant="solid"
             onClick={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
           >
             Save
-          </button>
+          </Button>
           <Show when={connections().length}>
-            <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</button>
+            <Button variant="solid" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</Button>
           </Show>
-          <button type="button" class="db-run-btn" disabled={busy() || status() !== 'connected'} onClick={() => void execute()}>Execute</button>
+          <Button variant="solid" disabled={busy() || status() !== 'connected'} onClick={() => void execute()}>Execute</Button>
         </Toolbar>
 
         <div class="db-result">
           <Toolbar class="db-result-bar" size="sm" ariaLabel="Result actions">
             <span class="db-footer">{footer()}</span>
             <Show when={resultTable() && columns().some((c) => c.isPk)}>
-              <button type="button" class="db-icon-btn" title="Insert row" disabled={busy()} onClick={() => setInserting(true)}>+ Row</button>
+              <Button size="sm" disabled={busy()} onClick={() => setInserting(true)}>+ Row</Button>
             </Show>
           </Toolbar>
           <Show when={result()} fallback={<EmptyState align="start">Select a table or run a query.</EmptyState>}>
@@ -446,7 +445,7 @@ function RowDetail(props: {
     <aside class="db-detail">
       <div class="db-detail-head">
         <span>{props.insert ? `${props.table?.name ?? ''} · new row` : props.table ? `${props.table.name} · row` : 'Row'}</span>
-        <button type="button" class="db-icon-btn" title="Close" onClick={props.onClose}>✕</button>
+        <Button size="sm" iconOnly title="Close" aria-label="Close" onClick={props.onClose}>✕</Button>
       </div>
       <div class="db-detail-fields">
         <For each={props.columns}>
@@ -482,9 +481,9 @@ function RowDetail(props: {
       </div>
       <div class="db-detail-actions">
         <Show when={editable()} fallback={<span class="muted db-hint">Read-only (no single-table PK).</span>}>
-          <button type="button" class="db-run-btn" disabled={props.busy} onClick={save}>Save</button>
+          <Button variant="solid" disabled={props.busy} onClick={save}>Save</Button>
           <Show when={!props.insert}>
-            <button type="button" class="db-del-btn" data-armed={props.deleteArmed ? '' : undefined} disabled={props.busy} onClick={() => void props.onDelete?.()}>{props.deleteArmed ? 'Delete?' : 'Delete'}</button>
+            <Button tone="danger" disabled={props.busy} onClick={() => void props.onDelete?.()}>{props.deleteArmed ? 'Delete?' : 'Delete'}</Button>
           </Show>
         </Show>
       </div>

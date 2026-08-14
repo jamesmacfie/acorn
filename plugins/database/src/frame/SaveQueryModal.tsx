@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { Alert, CodeBlock, Input, Modal, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, CodeBlock, Input, Modal, Textarea } from '@acorn/plugin-api/ui'
 import type { DbSavedQuery } from '../shared/database'
 import { saveQuery } from './databaseClient'
 
@@ -83,10 +83,10 @@ export default function SaveQueryModal(props: {
         </Show>
       </Modal.Body>
       <div class="db-generate-actions">
-        <button type="button" class="ui-btn" disabled={busy()} onClick={props.onClose}>Cancel</button>
-        <button type="button" class="db-run-btn" disabled={busy() || !name().trim()} onClick={() => void submit()}>
+        <Button disabled={busy()} onClick={props.onClose}>Cancel</Button>
+        <Button variant="solid" disabled={busy() || !name().trim()} onClick={() => void submit()}>
           {busy() ? 'Saving…' : overwrites() ? 'Overwrite' : 'Save'}
-        </button>
+        </Button>
       </div>
     </Modal>
   )

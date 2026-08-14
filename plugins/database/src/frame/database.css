@@ -33,20 +33,10 @@ body { font: var(--font-ui, inherit); }
 }
 .db-status.ok { color: var(--add-marker); }
 .db-status.err { color: var(--del-marker); }
-.db-head .db-icon-btn { margin-left: auto; }
+/* Button owns every control in this pane now: `.db-icon-btn` was <Button size="sm">,
+   `.db-run-btn` was variant="solid", `.db-del-btn` was tone="danger". */
+.db-head .ui-btn { margin-left: auto; }
 
-.db-icon-btn {
-  background: transparent;
-  border: var(--control-border);
-  color: var(--text-muted);
-  border-radius: var(--radius);
-  padding: var(--space-1) var(--space-4);
-  font: inherit;
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.db-icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.db-icon-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Alert owns the tone and size; this is the full-bleed banner strip above the grid. */
 .db-error {
@@ -86,28 +76,6 @@ body { font: var(--font-ui, inherit); }
   border-bottom: var(--chrome-divider);
 }
 .db-hint { font-size: var(--fs-sm); }
-.db-run-btn {
-  background: var(--accent);
-  color: var(--accent-fg);
-  border: none;
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-6);
-  font: inherit;
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.db-run-btn:disabled { opacity: 0.5; cursor: default; }
-.db-del-btn {
-  background: transparent;
-  color: var(--del-marker);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-6);
-  font: inherit;
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.db-del-btn:hover:not(:disabled) { background: var(--del-bg); }
 
 .db-result {
   flex: 1;
@@ -120,7 +88,7 @@ body { font: var(--font-ui, inherit); }
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
-.db-result-bar .db-icon-btn { margin-left: auto; }
+.db-result-bar .ui-btn { margin-left: auto; }
 
 /* Virtualized result grid */
 .dbgrid-scroll {
@@ -191,7 +159,7 @@ body { font: var(--font-ui, inherit); }
   text-transform: var(--label-transform);
   color: var(--text-muted);
 }
-.db-detail-head .db-icon-btn { margin-left: auto; }
+.db-detail-head .ui-btn { margin-left: auto; }
 .db-detail-fields {
   flex: 1;
   min-height: 0;
@@ -276,4 +244,3 @@ body { font: var(--font-ui, inherit); }
 .db-sql-preview .ui-code { max-height: 120px; color: var(--text-muted); }
 
 /* Armed for a second click (createArmedConfirm) — the button IS the prompt. */
-.db-del-btn[data-armed] { color: var(--danger); border-color: var(--danger); }

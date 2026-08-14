@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { Alert, Chip, defaultModelIdFor, Modal, ModelConnectionPicker, Picker, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, Chip, defaultModelIdFor, Modal, ModelConnectionPicker, Picker, Textarea } from '@acorn/plugin-api/ui'
 import { AcornBridgeError } from '@acorn/plugin-api/ui/sdk'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
@@ -124,10 +124,10 @@ export default function GenerateSqlModal(props: {
         </Show>
       </Modal.Body>
       <div class="db-generate-actions">
-        <button type="button" class="ui-btn" disabled={busy()} onClick={props.onClose}>Cancel</button>
-        <button type="button" class="db-run-btn" disabled={busy() || !prompt().trim()} onClick={() => void generate()}>
+        <Button disabled={busy()} onClick={props.onClose}>Cancel</Button>
+        <Button variant="solid" disabled={busy() || !prompt().trim()} onClick={() => void generate()}>
           {busy() ? 'Generating…' : 'Generate'}
-        </button>
+        </Button>
       </div>
     </Modal>
   )
