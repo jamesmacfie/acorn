@@ -569,10 +569,15 @@ describe('architecture boundaries', () => {
     //
     // An ALLOWLIST of destinations, not a denylist of data modules: a denylist silently stops
     // covering the next directory someone adds, which is the failure mode that matters here.
-    // Three carve-outs, all pure or presentation infrastructure:
+    // Four carve-outs, all pure or presentation infrastructure:
     //   lib/         DOM predicates, debounce, the localStorage draft helper DiffRows binds to
     //   highlight/   the shiki highlighter the diff model colours through
     //   palette/model.ts  fuzzyScore, a module with zero imports of its own
+    //   registries/registry.ts  the Registry CLASS — a container with an id index and disposal,
+    //     importing only solid-js. ui/brandMarks.ts holds the brand-mark corpus in one, because a
+    //     plugin's logo has to be able to arrive and leave with its roster row. Note this admits
+    //     the container and NOT any registry INSTANCE: `registries/sources.ts` and its siblings are
+    //     still application state and still out of bounds, which is the line the rule cares about.
     //
     // TYPE-ONLY imports pass. ui/WorkspacePicker.tsx does `import type { FleetWorkspace } from
     // '../workspaces/fleetWorkspaces'` — a shape it renders, not a store it reads — and a rule
@@ -585,7 +590,8 @@ describe('architecture boundaries', () => {
       const p = rel(file)
       if (!p.startsWith('packages/client-core/src/')) return false
       const inner = p.slice('packages/client-core/src/'.length)
-      return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('highlight/') || inner === 'palette/model.ts'
+      return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('highlight/')
+        || inner === 'palette/model.ts' || inner === 'registries/registry.ts'
     }
     // Same clause-parsing idiom as the schema ratchet below: `[^'"]*?` for the clause, because a
     // preceding import's specifier contains the quotes that bound the statement.
@@ -757,5 +763,94 @@ describe('architecture boundaries', () => {
       .filter((e) => !isContract(e.target.pkg, e.target.file))
       .map((e) => `${e.fromPkg.name} -> ${e.target.pkg!.name}`)
     expect([...new Set(seen)].sort()).toEqual([])
+  })
+
+  // A CSS class defined in a plugin's stylesheet must not be worn by markup outside that plugin.
+  //
+  // This is the `.action-error` failure, and it kept happening: `.linear-md` was worn by NOTES and
+  // defined by GITHUB; `.editor-save` was worn by notes and defined by EDITOR; `.new-pr-btn` was
+  // worn by DOCKER and defined by github; and `.file-status*` / `.file-stat*` — the rendering half
+  // of `fileStatusMeta`, which core exports on the PUBLIC plugin api — were worn by CORE's own diff
+  // rows and defined by github. Each one meant a pane silently lost its styling when an unrelated
+  // plugin was switched off, and none of it was visible to the compiler or to any other test.
+  //
+  // Shared presentation belongs in client-core (a primitive, a role sheet, a utility). A plugin
+  // stylesheet is for that plugin's own markup.
+  it('no plugin stylesheet styles another package\'s markup', () => {
+    const pluginDirs = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
+      .filter((e) => e.isDirectory()).map((e) => e.name)
+
+    // Class names too generic or too structural to attribute by grep: state flags a plugin sets on
+    // its own elements, and the shared vocabularies (ui-*, diff rows, tokens) that live in core.
+    const SHARED = /^(ui-|diff-|is-|has-|active$|muted$|glyph$|placeholder$|spin$|truncate$|scroll$|mono$|list-reset$|markdown$)/
+
+    // `walk` is the import-graph helper and only yields JS/TS, so it silently returns no stylesheets
+    // at all — which made the first draft of this rule pass unconditionally. Stylesheets need their
+    // own traversal.
+    const cssIn = (dir: string, out: string[] = []): string[] => {
+      if (!existsSync(dir)) return out
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name)
+        if (e.isDirectory()) cssIn(p, out)
+        else if (e.name.endsWith('.css')) out.push(p)
+      }
+      return out
+    }
+
+    const offenders: string[] = []
+    for (const plugin of pluginDirs) {
+      const cssFiles = cssIn(join(ROOT, 'plugins', plugin))
+      const declared = new Set<string>()
+      for (const file of cssFiles) {
+        const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+        for (const group of text.match(/[^{}]+(?=\{)/g) ?? []) {
+          for (const selector of group.split(',')) {
+            // Ownership is the FIRST class of the FIRST compound unit, and nothing else. `.a.b` is a
+            // modifier on `.a` (`.notes-include-dot.on` does not make `.on` notes'), and `.a .b` is
+            // this plugin scoping something inside its own container, which is legitimate.
+            const first = selector.trim().match(/^\.([a-zA-Z][\w-]*)/)
+            if (first && !SHARED.test(first[1])) declared.add(first[1])
+          }
+        }
+      }
+      if (!declared.size) continue
+
+      // Every .tsx outside this plugin. A class is "worn" when it appears inside a class attribute.
+      const outside = [join(ROOT, 'packages'), join(ROOT, 'apps', 'desktop', 'src'), join(ROOT, 'plugins')]
+        // `.flatMap(walk)` would hand walk the array index as its accumulator — call it explicitly.
+        .filter(existsSync).flatMap((d) => walk(d))
+        .filter((f) => f.endsWith('.tsx') && !f.startsWith(join(ROOT, 'plugins', plugin) + '/'))
+      for (const file of outside) {
+        const text = readFileSync(file, 'utf8')
+        for (const attr of text.match(/class(?:List)?=\{?[^}\n]*/g) ?? []) {
+          for (const name of declared) {
+            if (new RegExp(`[\\s"'\`{]${name}[\\s"'\`}:,]`).test(attr)) {
+              offenders.push(`plugins/${plugin} defines .${name}, worn by ${relative(ROOT, file)}`)
+            }
+          }
+        }
+      }
+    }
+    // Shrinking baseline, same idiom as the schema rule above. Everything left is one plugin
+    // CONTRIBUTING markup into another's container — memory renders a section inside context's tray,
+    // changes renders a tool card inside the agent transcript — so the markup genuinely belongs to
+    // the guest and the box genuinely belongs to the host. That wants a real seam (the host passing
+    // its own components down, or the classes moving to client-core), not a rename. The entries here
+    // may only be removed.
+    const BASELINE = [
+      'plugins/agents defines .agent-path-link, worn by plugins/changes/src/client/agentToolRenderer.tsx',
+      'plugins/agents defines .agent-tool, worn by plugins/changes/src/client/agentToolRenderer.tsx',
+      'plugins/context defines .context-tray-actions, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-kind, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-label, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-memform, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-proposal, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-proposal-desc, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-proposal-flag, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-proposal-flags, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/context defines .context-tray-proposals, worn by plugins/memory/src/client/MemorySection.tsx',
+      'plugins/editor defines .tree, worn by plugins/changes/src/client/ChangesPane.tsx',
+    ]
+    expect([...new Set(offenders)].sort()).toEqual(BASELINE)
   })
 })

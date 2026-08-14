@@ -784,6 +784,34 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    that puts a modal inside a ListDetail would get a silently mispositioned overlay.
    A consumer that wants to stack can say so on its own class (linear does). */
 
+/* ── UserAvatar / comment meta ──────────────────────────────────────────────────────────────
+   Worn by ui/UserAvatar.tsx and ui/diff/DiffRows.tsx — core's own primitive and its own diff
+   rows — and defined until now in the GITHUB plugin's stylesheet. A core primitive cannot have
+   its box behind a plugin: with github off, every avatar in the app lost its circle. */
+.user-avatar {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: var(--control-border);
+  border-radius: var(--radius-circle);
+  background: var(--bg-selected);
+  display: inline-block;
+  object-fit: cover;
+}
+.user-avatar-md { width: 24px; height: 24px; }
+.user-avatar-empty { border-style: dashed; }
+.comment-meta-with-avatar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.comment-meta {
+  margin-bottom: var(--space-3);
+  color: var(--text-muted);
+}
+.comment { font-size: var(--fs-sm); }
+
 /* ── Markdown ───────────────────────────────────────────────────────────────────────────────
    Rendered markdown, wherever it comes from: a PR body, a review comment, a Linear description, a
    note preview, an agent turn. Four plugins render it and there were THREE stylesheets describing
