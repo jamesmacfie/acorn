@@ -1,6 +1,8 @@
 # Move frame wiring decisions out of .tsx
 
-**Strength: Worth exploring.** Do plan 3 first — it carves off a chunk of this one.
+**Strength: Worth exploring.** Plan 3 (the eligibility module, since landed as
+`plugins/contributions.ts`) already carved off the eligibility walk and the trust gate; what's left
+here is the registration branches and the host services.
 
 ## The problem, plainly
 
@@ -17,17 +19,18 @@ profile, same era. One is `.ts`, one is `.tsx`:
 
 | | `chrome/register.ts` | `frames/register.tsx` |
 |---|---|---|
-| Size | 354 lines | 428 lines |
+| Size | 358 lines | 411 lines |
 | Unit tests | **457 lines, 25 tests** | **zero** |
 
 The frames file even exports `_resetFrameContributions` — a test seam, documented as mirroring the
 chrome one — **with no callers**. The scaffolding for tests exists; the tests can't.
 
-Across the stack, about 1,573 lines of `.tsx` wiring sit outside the suite entirely:
-`frames/register.tsx` (9 registration branches, the trust gate, route confinement), and
-`PluginFrame.tsx` (all 14 host-service implementations, the port handshake, the intent-consumption
-race). Meanwhile 2,109 lines of tests concentrate on the pure `.ts` modules — `broker.ts`,
-`scopes.ts`, `permissions.ts`.
+Across the stack, roughly 1,500 lines of `.tsx` wiring sit outside the suite entirely:
+`frames/register.tsx` (9 registration branches, route confinement), `PluginFrame.tsx` (all 14
+host-service implementations, the port handshake, the intent-consumption race), and
+`PluginTrustDialog.tsx` (the tier memo and `decide()`). Meanwhile over 2,000 lines of tests
+concentrate on the pure `.ts` modules — `broker.ts`, `scopes.ts`, `permissions.ts`, and now
+`contributions.ts`.
 
 ## How it surfaces
 
@@ -43,8 +46,8 @@ modules:
    recognisers once Linear registered first. Import order as a hidden input.
 3. **The one-key permanent disable** (`PluginTrustDialog.tsx:127-131`) — pressing Escape called
    `decide('rejected')`, permanently disabling a plugin with no undo surface anywhere in the UI.
-4. **The empty ref-panel title** (`frames/register.tsx:262-265`) — the Solid reserved-`ref`-prop
-   defect (see the arch rule that now guards it).
+4. **The empty ref-panel title** (`frames/register.tsx`, the refPanel branch) — the Solid
+   reserved-`ref`-prop defect (see the arch rule that now guards it).
 
 Four bugs, four call sites, zero in `broker.ts`/`scopes.ts`/`permissions.ts` — the three modules
 holding effectively all the unit tests. The test effort is real; it's just parked where the bugs
@@ -78,11 +81,14 @@ components; it should not decide anything worth testing.
    that hand-parse the raw prefs cache. `PluginFrame.tsx` keeps the component shell: the iframe,
    the port handshake, lifecycle. Test the services with fake callbacks, the same pattern
    `broker.test.ts` already uses from the other side of the seam.
-3. **Take the dialog's decision logic too.** `PluginTrustDialog.tsx`'s diff memo and `decide()`
-   belong beside the permission-line logic (plan 4 moves the diff anyway); the Escape-to-reject
-   class of bug becomes a unit test instead of a manual-QA find.
-4. **Sequence after plan 3.** The eligibility extraction removes `eligible()` and the trust gate
-   from `register.tsx` first; what remains for `registerPlan.ts` is smaller and cleaner.
+3. **Take the dialog's decision logic too.** Plan 4 already made the diff run on grant keys, but
+   the tier/diff memo and `decide()` still live in `PluginTrustDialog.tsx`; moving them beside the
+   permission-line logic makes the Escape-to-reject class of bug a unit test instead of a
+   manual-QA find.
+
+Plan 3 has landed since this was written: eligibility, the trust gate, and the surface
+classification are already out of `register.tsx` and tested in `plugins/contributions.ts` — so
+`registerPlan.ts` starts from a smaller, cleaner file than the one this plan first described.
 
 What this plan is *not*: adding jsdom, a Solid test renderer, or component tests. That's a bigger
 decision with its own costs, and nothing here depends on it. The point is that most of what's
@@ -99,7 +105,7 @@ wrong extension.
 ## Files
 
 - `packages/client-core/src/plugins/frames/register.tsx` — splits into plan + shell
-- `packages/client-core/src/plugins/frames/PluginFrame.tsx:97-207` — services move out
-- `packages/client-core/src/plugins/PluginTrustDialog.tsx:51-89, 92-124` — decision logic moves out
+- `packages/client-core/src/plugins/frames/PluginFrame.tsx` — `services()` (from line 97) moves out
+- `packages/client-core/src/plugins/PluginTrustDialog.tsx` — the tier memo and `decide()` move out
 - `packages/client-core/src/plugins/frames/documentSurfaces.ts` — the precedent to imitate
 - `packages/client-core/src/plugins/chrome/register.test.ts` — the template for the new tests

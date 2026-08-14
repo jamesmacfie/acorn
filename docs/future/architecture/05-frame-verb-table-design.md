@@ -1,7 +1,13 @@
 # Frame verbs: the design pass
 
-The design pass [plan 5](./05-frame-verb-table.md) asks for before any code, plus what was built as a
-result. Read the plan first; this is its steps 1 and 2, and the record of which of step 3 was taken.
+The decision record for `frames/verbs.ts`. The problem it answers: a sandboxed frame's vocabulary —
+every verb it can send the host — was spelled in five modules (the wire union in
+`@acorn/protocol/pluginBridge.ts`, the author-facing type and implementation in `frames/sdk.ts`, the
+host contract in `frames/broker.ts`, the host implementation in `PluginFrame.tsx`), and nothing
+checked the chain end to end because the MessagePort in the middle is untyped. The drift had already
+happened once: PUT existed in the protocol and the broker but not the SDK, so authors simply couldn't
+use it. The original plan (05-frame-verb-table.md, since retired) asked for an inventory, two designs,
+and a choice; this is that record.
 
 ## 1. The inventory
 
@@ -83,7 +89,7 @@ Runtime behaviour, the dispatch switch, and every denial path are byte-for-byte 
 
 ## What is still open
 
-The plan's step 4 — migrating verb groups onto a derived `FrameServices` — is deliberately not done,
-for the reason in section 2. Reopen it if a second consumer of the vocabulary appears (a second host
+The migration the original plan sketched as its last step — verb groups onto a derived
+`FrameServices` — is deliberately not done, for the reason in section 2. Reopen it if a second consumer of the vocabulary appears (a second host
 shell, say), because that is when the derivation starts paying for itself. Until then the assertion
 carries the whole cost of the drift it was written to stop, at one file and no runtime risk.
