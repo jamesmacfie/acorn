@@ -15,8 +15,7 @@ import { wsOnReconnect } from '@acorn/client-core/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/registries/sources.ts'
 import { projectSurfaceRoutes } from '@acorn/client-core/registries/projectSurfaces.ts'
 import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
-import { syncChromeContributions } from '@acorn/client-core/plugins/chrome/register.ts'
-import { syncFrameContributions } from '@acorn/client-core/plugins/frames/register.tsx'
+import { syncPluginContributions } from '@acorn/client-core/plugins/syncContributions.ts'
 
 const noop = () => null
 
@@ -50,10 +49,7 @@ await applyNodePlugins(activeNodeId() ?? undefined)
 // Chrome (docs/plugins.md) rides the same settle: it is registered from
 // the same roster rows, and a plugin that ships descriptors but no client bundle has nothing else to
 // wait for.
-void syncPluginDistribution().then(() => {
-  syncFrameContributions()
-  syncChromeContributions()
-})
+void syncPluginDistribution().then(syncPluginContributions)
 
 render(
   () => (

@@ -65,7 +65,13 @@ export type PluginTrustDecision = {
   keyClaims: PluginKeyClaimGrant[]
   decision: 'accepted' | 'rejected'
 }
-export type PluginAckRecord = PluginTrustDecision & { decidedAt: number }
+export type PluginAckRecord = PluginTrustDecision & {
+  decidedAt: number
+  // The decision was recorded but its disclosure snapshot could not be (main/pluginIpc.ts). Such a row
+  // is never used as the baseline of an update's "what changed" diff — an incomplete snapshot would
+  // report grants as newly requested that the owner had already seen.
+  partial?: true
+}
 export type PluginHostState = {
   cached: Record<string, { pluginId: string; version: string; bytes: number }>
   acks: PluginAckRecord[]

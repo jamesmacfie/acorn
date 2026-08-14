@@ -102,8 +102,11 @@ that matters and when it will have to.
 ### Loaded plugins
 
 A Node can also load a plugin's node half from disk, from `<dataRoot>/plugins/<id>/` — a directory
-holding an `acorn-plugin.json` manifest and an ESM bundle that default-exports a `NodePlugin`
-(`packages/node-core/src/main/pluginManifest.ts`, `pluginLoader.ts`). Loaded plugins join the same
+holding an `acorn-plugin.json` manifest and an ESM bundle that default-exports a `NodePlugin`. The
+manifest's shape is declared once, in `packages/protocol/src/pluginContract.ts`, because the client
+registers contributions from the same shape and neither side may import the other;
+`packages/node-core/src/main/pluginManifest.ts` adds the cross-field rules that need `id` — route
+confinement, surface reachability — and reads the file. Loaded plugins join the same
 array and the same host pass as the compiled-in ones, so ordering, `ready`, capability late-binding
 and disposal are identical.
 

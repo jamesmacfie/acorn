@@ -6,7 +6,9 @@ import type { InstalledPluginInfo } from '../../main/pluginLoader'
 import type { AppEnv } from '../middleware/auth'
 import { requireDevice } from '../middleware/requireUser'
 import type { PluginRosterEntry } from '../plugin/host'
-import { plugins, setPluginsBridge } from './plugins'
+import { setRouteTestCapability } from '../bridge'
+import { PLUGIN_STATE } from '../plugin/pluginState'
+import { plugins } from './plugins'
 
 const ROSTER: PluginRosterEntry[] = [
   { name: 'github', required: false, disabled: false, state: 'active' },
@@ -43,7 +45,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
   let saved = [...initial]
   const installed = options.installed ?? []
   const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[] } = { install: [], update: [], uninstall: [] }
-  setPluginsBridge({
+  setRouteTestCapability(PLUGIN_STATE, {
     roster: () => options.roster ?? ROSTER,
     installed: () => installed,
     booted: () => options.booted ?? installed.map((entry) => ({ id: entry.id, version: entry.version })),
@@ -103,11 +105,11 @@ const app = (principal: AppEnv['Variables']['principal']) => {
 const asDevice = () => app({ kind: 'device', userId: 'james', deviceId: 'd1' })
 const asTaskAgent = () => app({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
 
-afterEach(() => setPluginsBridge(null))
+afterEach(() => setRouteTestCapability(PLUGIN_STATE, null))
 
 describe('GET /v2/core/plugins', () => {
   it('503s with no bridge, so an unwired node says so instead of answering an empty roster', async () => {
-    setPluginsBridge(null)
+    setRouteTestCapability(PLUGIN_STATE, null)
     const res = await asDevice().fetch(request('GET'))
     expect(res.status).toBe(503)
   })
@@ -255,7 +257,7 @@ describe('GET /v2/core/plugins/:id/client.js', () => {
     wire([], { installed: [installedEntry('rollbar', { client: null })] })
     expect((await asDevice().fetch(bundleRequest('rollbar'))).status).toBe(404)
     expect((await asDevice().fetch(bundleRequest('nope'))).status).toBe(404)
-    setPluginsBridge(null)
+    setRouteTestCapability(PLUGIN_STATE, null)
     expect((await asDevice().fetch(bundleRequest('rollbar'))).status).toBe(503)
   })
 })
@@ -295,7 +297,7 @@ describe('PUT /v2/core/plugins', () => {
   })
 
   it('writes nothing when there is no bridge', async () => {
-    setPluginsBridge(null)
+    setRouteTestCapability(PLUGIN_STATE, null)
     expect((await asDevice().fetch(request('PUT', { disabled: ['docker'] }))).status).toBe(503)
   })
 })
@@ -483,7 +485,7 @@ describe('the install, update and uninstall routes', () => {
   })
 
   it('503s every mutation when there is no bridge', async () => {
-    setPluginsBridge(null)
+    setRouteTestCapability(PLUGIN_STATE, null)
     for (const attempt of [
       at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }, KEY),
       at('/ntfy/update', 'POST', {}, KEY),

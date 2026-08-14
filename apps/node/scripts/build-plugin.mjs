@@ -64,11 +64,24 @@ if (packageRootIndex !== -1 && !packageRoot) throw new Error('--package-root req
 // Matches main/serverPaths.ts's dev root, and honours the same override the node itself reads.
 const dataRoot = process.env.ACORN_DATA_DIR || join(NODE_APP, '.acorn')
 const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins'), id)
-// Read from protocol, which is where the constant is DECLARED — node-core re-exports it, and a regex
-// over the re-export would find the name without a value.
-const API_MAJOR_SOURCE = 'packages/protocol/src/api.ts'
-const apiMajor = /PLUGIN_API_MAJOR = '([^']+)'/.exec(readFileSync(join(ROOT, API_MAJOR_SOURCE), 'utf8'))?.[1]
-if (!apiMajor) throw new Error(`could not read PLUGIN_API_MAJOR from ${API_MAJOR_SOURCE}`)
+// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/api.ts,
+// because a .mjs script cannot import a built package — but it can import a .ts file with nothing in it
+// but one const, which is why pluginApiVersion.ts exists.
+//
+// That import relies on Node's own type stripping, so it has a version floor. The root package.json
+// pins it, but `engines` is a warning rather than a wall by default — and the failure without this
+// guard is an unresolved-module error that says nothing about Node versions.
+const API_VERSION_SOURCE = '@acorn/protocol/pluginApiVersion.ts'
+let apiMajor
+try {
+  ;({ PLUGIN_API_MAJOR: apiMajor } = await import(API_VERSION_SOURCE))
+} catch (error) {
+  throw new Error(
+    `could not read PLUGIN_API_MAJOR from ${API_VERSION_SOURCE}. This script imports a .ts file directly, `
+      + `which needs Node >=22.18 on the 22 LTS line or >=24.4 — this is ${process.version}.\n${error}`,
+  )
+}
+if (!apiMajor) throw new Error(`${API_VERSION_SOURCE} exported no PLUGIN_API_MAJOR`)
 
 // A temporary entry inside apps/node so Vite resolves the workspace package exactly as the app does.
 const entryDir = join(NODE_APP, '.plugin-build')

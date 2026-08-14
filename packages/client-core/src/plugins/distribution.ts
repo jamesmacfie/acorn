@@ -151,8 +151,12 @@ async function refreshPendingTrust(rosters: ReadonlyMap<string, readonly NodePlu
       // the node named is simply the first one we saw them from.
       if (decided.has(key) || queued.has(key)) continue
       queued.add(key)
+      // `partial` rows are skipped: their snapshot is known-incomplete, so a diff against one would
+      // mark grants as newly requested that the owner had in fact already accepted. With no baseline
+      // the prompt degrades to a plain first-time decision, which is honest — it says "here is what
+      // this asks for" rather than a wrong "here is what it gained".
       const previous = acks
-        .filter((ack) => ack.pluginId === row.name && ack.hash !== client.hash && ack.decision === 'accepted')
+        .filter((ack) => ack.pluginId === row.name && ack.hash !== client.hash && ack.decision === 'accepted' && !ack.partial)
         .sort((a, b) => b.decidedAt - a.decidedAt)[0]
       requests.push({ row, hash: client.hash, nodeId, ...(previous ? { previous } : {}) })
     }
@@ -173,8 +177,14 @@ export function _seedPluginDistribution(
   rosters: Iterable<readonly [string, readonly NodePluginRow[]]>,
   accepted: readonly string[] = [],
 ): void {
-  setInstalledByNode(new Map(rosters))
+  const seeded = new Map(rosters)
+  setInstalledByNode(seeded)
   setAcceptedBundles(new Set(accepted))
+  // Resolved the same way a real boot pass resolves it, because "which bundle wins" is now what
+  // decides which node's manifest a plugin's contributions come from and which bytes its trust
+  // decision is about (plugins/contributions.ts). A seam that left this null would have let the
+  // suites agree with each other about a world production never sees.
+  setActiveBundles(resolveActiveBundles(candidatesFrom(seeded), { apiVersion: PLUGIN_API_MAJOR }))
 }
 
 // Test seam. The signals are module-level because the registries they feed are, and a suite that

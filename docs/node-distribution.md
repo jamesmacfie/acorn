@@ -44,6 +44,24 @@ Standalone and Electron-supervised Node hosts use the same `apps/node/src/server
 post-listener reconciliation sequence, and bounded drain order. The host difference is supervision and
 native capability injection, not a second plugin assembly.
 
+## Plugins
+
+Both hosts build the `PLUGIN_STATE` bridge — the roster, the installer, the owner's disabled list —
+through one builder, `apps/node/src/server/pluginState.ts`. Two things differ on purpose, and
+`test/integration/standaloneParity.test.ts` asserts both:
+
+- **`{ path }` installs** symlink an author's working tree into the install directory, so they are
+  gated on the build being a development one. Under Electron that question is answered by the
+  packaging flag; a standalone node has no such flag and reads `NODE_ENV` instead.
+- **Bundled packages are not reconciled here.** The desktop ships every built plugin as app resources
+  and copies them into the writable data root before discovery. A standalone node has no
+  `resourcesPath` to copy from, so the step does not exist — plugins arrive only through the
+  owner-authenticated install route. Nothing is stale as a result; there is simply no app-owned copy.
+
+The disabled list is the data root's file, unioned with any start-config override. Only the supervised
+host passes an override (tests and `dev:node` pin a list without writing into a data root); a
+standalone node's list is the file alone.
+
 ## Install and start
 
 ```sh

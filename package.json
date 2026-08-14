@@ -2,6 +2,10 @@
   "name": "acorn",
   "private": true,
   "packageManager": "pnpm@11.0.0",
+  "//engines": "The same floor the packed standalone artifact declares (scripts/pack-node.mjs). Two things need it: the node:sqlite surface the DB shim uses, and apps/node/scripts/build-plugin.mjs importing a .ts file directly, which relies on Node's own type stripping.",
+  "engines": {
+    "node": ">=22.18 <23 || >=24.4"
+  },
   "scripts": {
     "build": "turbo run build",
     "db:check": "node scripts/db.mjs check",

@@ -49,14 +49,23 @@ describe('the route table covers every core route', () => {
     ])
   })
 
-  it('has stable owner-written consent copy for every grantable scope', () => {
-    expect(GRANTABLE_SCOPES.map((scope) => [scope, describeScope(scope)])).toEqual([
+  it('has owner-written consent copy for every grantable scope, and names the risky ones', () => {
+    // The copy is free to change — the update diff keys on the scope name, not the sentence
+    // (plugins/permissions.ts). What must not drift is that every grantable scope HAS a description,
+    // and that the three handing over where code lives on disk are marked high.
+    expect(GRANTABLE_SCOPES.map((scope) => [scope, describeScope(scope)?.text])).toEqual([
       ['core.projects:config', 'Read every project’s build, dev and database scripts'],
       ['core.projects:read', 'Read projects, including where every codebase lives on disk'],
       ['core.projects:write', 'Create and update projects, including their on-disk locations'],
       ['core.tasks:read', 'Read tasks'],
       ['core.tasks:write', 'Create and update tasks'],
       ['core.workspaces:read', 'Read workspaces'],
+    ])
+    expect(GRANTABLE_SCOPES.every((scope) => (describeScope(scope)?.icon.length ?? 0) > 0)).toBe(true)
+    expect(GRANTABLE_SCOPES.filter((scope) => describeScope(scope)?.high)).toEqual([
+      'core.projects:config',
+      'core.projects:read',
+      'core.projects:write',
     ])
   })
 

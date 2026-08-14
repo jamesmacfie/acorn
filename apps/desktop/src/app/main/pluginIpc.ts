@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import type { NodePluginPermissions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import type { PluginCache, PutResult } from './pluginCache'
 import type { PluginAck, PluginTrustStore } from './pluginTrustStore'
 
@@ -29,12 +30,30 @@ const putSchema = z.strictObject({
   version: z.string().min(1),
 })
 
-const recordSchema = z.strictObject({
+// The DECISION, split from the disclosure that came with it, because the two have different failure
+// budgets. This half identifies the bytes and says yes or no; it is entirely this app's own vocabulary,
+// so nothing a node does can make it unparseable, and it must always be recordable.
+//
+// A plain object rather than a strict one, because both halves are parsed out of the SAME payload and
+// each would otherwise reject the other's keys. Nothing is read from the raw payload after this — the
+// stored record is built from parsed fields only — so stripping an unknown key is exactly as safe as
+// refusing it, and it is what lets a newer renderer add a field without wedging an older main.
+const decisionSchema = z.object({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
   nodeId: z.string().min(1),
   version: z.string().min(1),
-  permissions: z.custom<NodePluginPermissions>(),
+  decision: z.enum(['accepted', 'rejected']),
+})
+
+// The SNAPSHOT, kept only so a later update can show what changed. Parsed, not cast — it is the
+// disclosure the owner consents to, so it has to be provably the shape the node parsed off disk
+// (@acorn/protocol/pluginContract.ts) — but parsed SEPARATELY, because a node running a newer manifest
+// schema than this shell can produce a grant this schema refuses. When that happened with one combined
+// schema the whole handler threw, so neither accept NOR reject could be recorded and the prompt
+// re-queued on every boot: a plugin the owner had explicitly turned away asked again forever.
+const disclosureSchema = z.object({
+  permissions: pluginPermissionsSchema,
   webviews: z.array(z.strictObject({
     surface: z.string().min(1).max(64),
     label: z.string().min(1).max(80),
@@ -45,8 +64,14 @@ const recordSchema = z.strictObject({
     label: z.string().min(1).max(80),
     chords: z.array(z.string().min(1).max(64)).min(1).max(32),
   })).max(32) as z.ZodType<PluginKeyClaimGrant[]>,
-  decision: z.enum(['accepted', 'rejected']),
 })
+
+// Nothing recognisable to record, which is still a real acknowledgement of a real decision.
+const NO_DISCLOSURE = {
+  permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+  webviews: [],
+  keyClaims: [],
+} satisfies z.infer<typeof disclosureSchema>
 
 export type PluginsState = {
   // hash → what we hold. The renderer diffs a node's listing against this to decide what to fetch.
@@ -70,12 +95,31 @@ export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): 
   })
 
   ipcMain.handle(PLUGINS_TRUST_RECORD, async (_event, raw: unknown): Promise<void> => {
-    const parsed = recordSchema.parse(raw)
+    const decision = decisionSchema.parse(raw)
     // Recording a decision about a bundle this device does not hold would leave an acknowledgement
     // pointing at nothing — and, on the accept path, would be an approval granted before the bytes
     // were ever seen. The hash has to be one main computed itself.
-    if (!cache.has(parsed.hash)) throw new Error(`No cached bundle for ${parsed.pluginId}@${parsed.hash.slice(0, 12)}`)
-    trust.record({ ...parsed, decidedAt: Date.now() })
+    if (!cache.has(decision.hash)) throw new Error(`No cached bundle for ${decision.pluginId}@${decision.hash.slice(0, 12)}`)
+
+    const disclosure = disclosureSchema.safeParse(raw)
+    if (disclosure.success) {
+      trust.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
+      return
+    }
+    // The decision stands either way; what is lost is the snapshot behind it. Stored as `partial` so
+    // it can never become the baseline of a later "what changed" diff, which would otherwise report
+    // grants as newly requested that the owner had already seen (main/pluginTrustStore.ts).
+    //
+    // Recording rather than refusing, on BOTH arms. A rejection needs no snapshot at all — nothing
+    // ever diffs against one. And an acceptance is still informed: the lines the owner read were
+    // rendered by the renderer from the roster row, which already classifies anything this shell does
+    // not recognise into its own "requests this version of acorn does not recognise" line rather than
+    // echoing it. Refusing here would leave the owner unable to answer the prompt at all.
+    console.warn(
+      `[plugins] the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record:`,
+      disclosure.error.message,
+    )
+    trust.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
   })
 
   return () => {

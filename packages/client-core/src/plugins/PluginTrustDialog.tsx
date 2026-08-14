@@ -7,13 +7,12 @@ import {
   keyClaimGrants,
   keyClaimPermissionLines,
   nodePermissionLines,
-  permissionLineStyle,
+  type PermissionLine,
   uiPermissionLines,
   webviewGrants,
   webviewPermissionLines,
 } from './permissions'
-import { syncChromeContributions } from './chrome/register'
-import { syncFrameContributions } from './frames/register'
+import { syncPluginContributions } from './syncContributions'
 import { recordPluginTrust } from './host'
 import './plugin-trust.css'
 import { Alert, Kbd } from '../ui/primitives'
@@ -47,14 +46,14 @@ export default function PluginTrustDialog() {
   const nodeLabel = (nodeId: string) => nodes().find((node) => node.nodeId === nodeId)?.label ?? nodeId
 
   // Every declared line, decorated with the tier that owns it and — on an update — whether the
-  // version the owner last approved had it. The diff is still set-difference over the permission
-  // STRINGS (plugins/permissions.ts states why the wording is the key).
+  // version the owner last approved had it. The diff runs over the grant KEY, never the sentence, so
+  // a copy edit is a copy edit rather than a fleet-wide "asks for more" (plugins/permissions.ts).
   const tiers = createMemo(() => {
     const current = request()
     const installed = current?.row.installed
     if (!installed) return []
     const previous = current?.previous
-    const groups: { key: TierKey; now: readonly string[]; was: readonly string[] | null }[] = [
+    const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
       {
         key: 'enforced',
         now: [...uiPermissionLines(installed.permissions), ...keyClaimPermissionLines(keyClaimGrants(installed.contributions))],
@@ -72,10 +71,10 @@ export default function PluginTrustDialog() {
       },
     ]
     return groups.map(({ key, now, was }) => {
-      const before = was ? new Set(was) : null
+      const before = was ? new Set(was.map((entry) => entry.key)) : null
       return {
         key,
-        lines: now.map((text) => ({ text, tier: key, added: before ? !before.has(text) : false, ...permissionLineStyle(text) })),
+        lines: now.map((entry) => ({ ...entry, tier: key, added: before ? !before.has(entry.key) : false })),
       }
     })
   })
@@ -112,10 +111,9 @@ export default function PluginTrustDialog() {
       // registered to take away.
       if (decision === 'accepted') {
         noteBundleAccepted(current.row.name, current.hash)
-        syncFrameContributions()
-        // A bundle-bearing plugin's chrome is gated on the same acceptance, so it appears with the rest of
-        // its surfaces rather than at the next boot (chrome/register.ts states the gate).
-        syncChromeContributions()
+        // Both passes, because a bundle-bearing plugin's chrome is gated on the same acceptance as its
+        // rectangles — so it appears with the rest of its surfaces rather than at the next boot.
+        syncPluginContributions()
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision.')

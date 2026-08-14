@@ -113,7 +113,7 @@ describe('syncChromeContributions', () => {
     const message = 'No boards linked yet.'
     const authored = (action: PluginSourceEmptyState['action']): PluginSourceEmptyState =>
       ({ message, action, actionLabel: 'Link one' })
-    const panes = { panes: new Set(['board']), overlays: new Set(['board-picker']) }
+    const panes = { panes: new Set(['board']), projectPanes: new Set<string>(), overlays: new Set(['board-picker']) }
 
     // Another plugin's route, a pane this manifest never declared, and a verb that needs a row.
     expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v2/p/other/go' }))).toEqual({ message })

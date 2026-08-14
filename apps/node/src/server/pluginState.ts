@@ -1,0 +1,58 @@
+import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/main/pluginInstaller.ts'
+import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/main/pluginLoader.ts'
+import type { PluginsBridge } from '@acorn/node-core/server/plugin/pluginState.ts'
+import type { PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
+
+// The PLUGIN_STATE bridge, built once for both composition roots — the other half of the extraction
+// pluginDeps.ts started. It was written out twice (service/runtime.ts and server/standalone.ts) and had
+// already drifted four ways: which builds allow `{ path }` installs, whether the disabled set was the
+// file alone or the file plus the start config, and which of those two the plugin host was handed.
+// Kept in step by hand, invisible to every test. The differences that are real are options now.
+export type DisabledPluginsStore = {
+  get(): readonly string[]
+  set(names: readonly string[]): void
+}
+
+// The file is the owner's setting; the start config is a test/`dev:node` override. Both are honoured,
+// and both have to be visible to the route, or it reports a state a restart cannot reach: a plugin
+// disabled at start showed as enabled-but-not-running with a Restart banner nothing could clear. The
+// Electron root had that fix and the standalone one did not, because the fix landed in one copy of a
+// paste. The union lives here now, so a root that grows an override gets it for free.
+export const effectiveDisabled =
+  (store: DisabledPluginsStore, extra: readonly string[] = []): (() => string[]) =>
+  () => [...new Set([...store.get(), ...extra])]
+
+export type PluginStateInput = {
+  dataDir: string
+  // What the plugin host assembled in THIS process, and at which versions. Snapshots rather than
+  // thunks would be wrong for the roster (a plugin's state can move), so both are passed as closures
+  // the roots already hold.
+  roster(): readonly PluginRosterEntry[]
+  booted(): readonly { id: string; version: string }[]
+  disabled(): readonly string[]
+  setDisabled(names: readonly string[]): void
+  // `{ path }` installs symlink an author's working tree into the install directory, so they are a
+  // development affordance and gated on the build being one. The two roots answer "is this a dev
+  // build" differently because they genuinely have different evidence: Electron has a packaging flag,
+  // and a standalone node has only NODE_ENV. That is the one divergence kept on purpose.
+  allowLocalPathInstalls: boolean
+}
+
+export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
+  const { dataDir, allowLocalPathInstalls: allowLocalPath } = input
+  return {
+    roster: input.roster,
+    // Re-scanned per call, not the boot snapshot: an install has to show up in the roster before the
+    // restart that runs it, and the device fetches its bundle from that same row to ask about it.
+    installed: () => scanInstalled(dataDir).installed.map(installedPluginInfo),
+    // What this process loaded, which is how the roster tells "installed and running" from
+    // "installed since the last restart".
+    booted: input.booted,
+    clientBundle: (id) => readClientBundle(scanInstalled(dataDir).installed, id),
+    disabled: input.disabled,
+    setDisabled: input.setDisabled,
+    install: (source, options) => installPlugin(dataDir, source, { ...options, allowLocalPath }),
+    update: (id, options) => updatePlugin(dataDir, id, { ...options, allowLocalPath }),
+    uninstall: (id, options) => uninstallPlugin(dataDir, id, options),
+  }
+}
