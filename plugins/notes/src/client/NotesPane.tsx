@@ -4,7 +4,7 @@ import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from '.
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
 import './notes.css'
-import { Alert, createArmedConfirm, EmptyState, Input, ListDetail, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, createArmedConfirm, EmptyState, Input, ListDetail, Row, Toolbar } from '@acorn/plugin-api/ui'
 import { toast } from '@acorn/plugin-api/client'
 
 // The Notes pane (docs/agent-tools.md): where you write context. Lands in this task's
@@ -242,27 +242,35 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     />
   )
 
+  // Dot, label and delete were three siblings in a wrapper because a <button> cannot nest one. Row is
+  // a div[role=button], so they are its leading and trailing slots and the wrapper is gone.
   const NoteRow = (rowProps: { scope: NoteScope; note: NoteSummary; pinned?: boolean }) => (
-    <div class="notes-row-wrap">
-      <IncludeDot scope={rowProps.scope} note={rowProps.note} />
-      <button type="button" class="notes-row" classList={{ active: isActive(rowProps.scope, rowProps.note.slug) }} onClick={() => void open(rowProps.scope, rowProps.note.slug)}>
-        <span class="notes-row-title">{rowProps.note.title}</span>
-        <Show when={authorBadge(rowProps.note.author)}><span class="notes-row-author">{authorBadge(rowProps.note.author)}</span></Show>
-      </button>
-      <button
-        type="button"
-        class="notes-row-delete"
-        data-armed={deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? '' : undefined}
-        title={deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
-        onClick={() => void remove(rowProps.scope, rowProps.note.slug)}
-      >{deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? '?' : '✕'}</button>
-    </div>
+    <Row
+      density="compact"
+      reveal
+      selected={isActive(rowProps.scope, rowProps.note.slug)}
+      onActivate={() => void open(rowProps.scope, rowProps.note.slug)}
+      leading={<IncludeDot scope={rowProps.scope} note={rowProps.note} />}
+      meta={authorBadge(rowProps.note.author)}
+      trailing={
+        <Button
+          variant="bare"
+          size="sm"
+          iconOnly
+          title={deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
+          aria-label="Delete note"
+          onClick={() => void remove(rowProps.scope, rowProps.note.slug)}
+        >{deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? '?' : '✕'}</Button>
+      }
+    >
+      {rowProps.note.title}
+    </Row>
   )
 
   const GroupHeader = (headProps: { label: string; count: number; scope: NoteScope }) => (
     <div class="notes-group-head">
       <span class="notes-group-label">{headProps.label} ({headProps.count})</span>
-      <button type="button" class="notes-group-add" title={`New ${headProps.label} note`} disabled={!locationFor(headProps.scope)} onClick={() => void createIn(headProps.scope)}>+</button>
+      <Button variant="bare" size="sm" iconOnly tone="accent" title={`New ${headProps.label} note`} aria-label={`New ${headProps.label} note`} disabled={!locationFor(headProps.scope)} onClick={() => void createIn(headProps.scope)}>+</Button>
     </div>
   )
 
@@ -271,7 +279,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
       <div class="section-header notes-header">
         <span>Notes — {props.workspace?.name ?? 'workspace'}</span>
         <Input class="notes-filter" kind="filter" type="text" placeholder="filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
-        <button type="button" class="notes-collapse" title={collapsed() ? 'Show library' : 'Hide library'} onClick={() => setLibraryCollapsed(props.task.id, !collapsed())}>{collapsed() ? '▶' : '◀'}</button>
+        <Button variant="bare" size="sm" iconOnly title={collapsed() ? 'Show library' : 'Hide library'} aria-label={collapsed() ? 'Show library' : 'Hide library'} onClick={() => setLibraryCollapsed(props.task.id, !collapsed())}>{collapsed() ? '▶' : '◀'}</Button>
       </div>
       <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
       <Show when={api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
@@ -285,12 +293,14 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
             <>
               <GroupHeader label="Task" count={taskOther().length + 1} scope="task" />
               <Show when={!scratchpad() && matches({ slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0 })}>
-                <div class="notes-row-wrap">
-                  <span class="notes-include-dot placeholder" />
-                  <button type="button" class="notes-row" classList={{ active: isActive('task', SCRATCHPAD_SLUG) }} onClick={() => landScratchpad()}>
-                    <span class="notes-row-title">Scratchpad</span>
-                  </button>
-                </div>
+                <Row
+                  density="compact"
+                  selected={isActive('task', SCRATCHPAD_SLUG)}
+                  onActivate={() => landScratchpad()}
+                  leading={<span class="notes-include-dot placeholder" />}
+                >
+                  Scratchpad
+                </Row>
               </Show>
               <Show when={scratchpad()}>{(n) => <NoteRow scope="task" note={n()} pinned />}</Show>
               <For each={taskOther()}>{(n) => <NoteRow scope="task" note={n} />}</For>
@@ -329,7 +339,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                     disabled={sel().virtual}
                     onClick={() => void toggleIncluded(sel().scope, sel().slug, !selectedIncluded())}
                   />
-                  <button type="button" class="editor-save" onClick={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</button>
+                  <Button size="sm" onClick={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</Button>
                   {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
                   <span class="notes-save-state muted">{saving() ? 'saving…' : ''}</span>
                 </Toolbar>
@@ -350,14 +360,15 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                 </Show>
                 <div class="notes-footer">
                   <span class="muted">{formatSize(bytesOf(body()))}</span>
-                  <button
-                    type="button"
-                    class="notes-view-context"
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    tone="accent"
                     disabled={sel().virtual}
                     onClick={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
                   >
                     view in Context →
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
