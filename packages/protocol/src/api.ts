@@ -554,6 +554,12 @@ export type InstalledPluginRow = {
   apiVersion: string
   permissions: NodePluginPermissions
   contributions: PluginContributions
+  // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document. The
+  // device registers `icon` as `brand:<pluginId>` and each `icons` key as `brand:<pluginId>/<key>`,
+  // stamping the prefix from the roster row so a package cannot claim another's mark. See
+  // client-core/ui/brandMarks.ts and docs/future/icons.md.
+  icon?: { d: string }
+  icons?: Record<string, { d: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
   // the sha256 the node computed from the file; it is a CACHE KEY HINT and nothing more — the device
   // hashes the bytes it received and refuses a mismatch, because a compromised node can lie here

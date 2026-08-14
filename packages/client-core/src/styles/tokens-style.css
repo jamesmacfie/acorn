@@ -112,8 +112,10 @@
   /* ── Typography ────────────────────────────────────────────────────────────────────────────
      --font-mono is PROTECTED: code, diffs, the terminal and the SQL grid are monospace in every
      pack, because their alignment is load-bearing and xterm measures cell width from the font.
-     Packs change --font-ui. --font-glyph keeps the Unicode contribution glyphs (◇ ◷ ◍ ◧ ▦ ⎇) on a
-     mono stack even when the chrome goes sans — those box-drawing characters only align there. */
+     Packs change --font-ui. --font-glyph keeps the remaining Unicode glyphs (◆ ◇ ⊘ ◉ ▦ ⎇) on a mono
+     stack even when the chrome goes sans — those box-drawing characters only align there. The brand
+     marks that used to be on this list are path data now (ui/brandMarks.ts), but the token still
+     earns its keep: pin state, dirty markers, notification and task-state glyphs are all still text. */
   --font-mono: "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --font-ui: var(--font-mono);
   --font-glyph: var(--font-mono);

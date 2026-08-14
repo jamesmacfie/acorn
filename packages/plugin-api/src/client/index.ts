@@ -55,6 +55,12 @@ export { paneContribution } from '@acorn/client-core/registries/panes.ts'
 export type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
 export { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 export type { SourceContribution, SourcePromotionContext, SourceRouteContribution } from '@acorn/client-core/registries/sources.ts'
+// A brand logo, as one SVG path's `d`. Only a COMPILED-IN plugin registers here — a loaded plugin
+// declares `icon`/`icons` in its manifest and the host registers on its behalf, which is why the
+// same `brand:<id>` glyph string works either way. Plain data, not a component, so `/client` is the
+// right entrypoint.
+export { brandMarkRegistry } from '@acorn/client-core/ui/brandMarks.ts'
+export type { BrandMark } from '@acorn/client-core/ui/brandMarks.ts'
 // Core's own URL for a project. A plugin building its own routes on top of `/p/:projectId` needs to be
 // able to get back to the bare project path — deselecting an item, a breadcrumb — without hardcoding a
 // shape core owns.

@@ -162,6 +162,10 @@ writeFileSync(
   `${JSON.stringify({
     id,
     name: spec.name,
+    // Brand marks, passed through untouched — node-core/main/pluginManifest.ts is the only thing
+    // that validates them and client-core/ui/Icon.tsx the only thing that renders them.
+    ...(spec.icon ? { icon: spec.icon } : {}),
+    ...(spec.icons ? { icons: spec.icons } : {}),
     version,
     apiVersion: apiMajor,
     node: './dist/node.js',

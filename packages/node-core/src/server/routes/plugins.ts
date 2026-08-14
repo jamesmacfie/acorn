@@ -114,6 +114,8 @@ const state = (bridge: PluginsBridge) => {
         apiVersion: entry.apiVersion,
         permissions: entry.permissions,
         contributions: entry.contributions,
+        ...(entry.icon === undefined ? {} : { icon: entry.icon }),
+        ...(entry.icons === undefined ? {} : { icons: entry.icons }),
         client: entry.client,
         ...(entry.source === undefined ? {} : { source: entry.source }),
         ...(entry.installedAt === undefined ? {} : { installedAt: entry.installedAt }),

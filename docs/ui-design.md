@@ -41,6 +41,43 @@ avoid raw buttons, selects, textareas, and retired shared classes. New component
 primitives from the start, and the retired-class check must remain clean while older surfaces are
 migrated.
 
+## Icons
+
+`ui/Icon.tsx` takes a **name string** and resolves it against two families, in this order:
+
+1. A **`brand:`-prefixed name** is a brand mark from `ui/brandMarks.ts`: one SVG path's `d`
+   attribute in a 24 box, drawn as a single `<path fill="currentColor">`.
+2. Any **other name** is a Lucide glyph from `lucide-static/icon-nodes.json`, drawn stroked and
+   unfilled in the same box, node by node through `<Dynamic>` and never `innerHTML`.
+3. An **unmatched name renders as text** in a `span.glyph`. That fallback is load-bearing rather
+   than a nicety — the remaining inline literals (◆/◇ pin state, ⊘/◉ hidden) ride it, which is also
+   why `--font-glyph` survives the brand marks leaving.
+
+The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
+names before and will again) and so brand marks stay out of `ICON_NAMES`, which `ui/IconPicker.tsx`
+enumerates for user-chosen workspace and task icons. Putting them in that picker is then a
+deliberate one-line decision rather than something that happens by accident.
+
+**A mark belongs in core if and only if a core surface renders it.** Otherwise it belongs to the
+plugin that draws it. The reason is the text fallback: if core names `brand:x` and no plugin has
+registered it — disabled, uninstalled, bundle untrusted — the literal string `brand:x` appears in
+the UI. Core's list is currently one entry, GitHub, because `project.github` is a first-class field
+on the project row and core draws it. The mark follows the data model, not the plugin boundary.
+
+A plugin supplies its own mark through one of two feeders, and they produce identical results:
+
+- **compiled in** — call `brandMarkRegistry.register()` from the plugin's `init`
+  (`@acorn/plugin-api/client`); see `plugins/docker/src/client/index.ts`.
+- **loaded** — declare `icon` (or `icons`, for a package hosting several brands) at the top level
+  of `acorn-plugin.json`; the host registers it under a name it stamps from the roster row, so a
+  package cannot claim another's mark. See `plugins/linear/acorn-plugin.config.mjs`.
+
+Because both feeders end at the same registry, a plugin moving from compiled-in to loaded changes
+no glyph string anywhere. Path data rather than a component is what makes that true: a loaded
+plugin's client bundle runs in a sandboxed iframe on its own origin, and a function cannot cross a
+MessagePort — and a rail source's logo has to draw whether or not that plugin's frame is mounted.
+`docs/future/icons.md` records the alternatives this rules out.
+
 ## Two-column panes
 
 A pane that puts a list beside a detail uses the `ListDetail` primitive, not a hand-rolled grid. It

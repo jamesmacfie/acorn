@@ -1,9 +1,28 @@
 # Brand marks, and letting a plugin ship its own
 
-Design notes from the icons session (2026-08-12). Nothing below has been built. The question that
-started it was "can we add brand logos alongside our SVG logos, and can plugins supply their own" —
-and the answer turned out to be that those are the same feature with two feeders, which is why this
-file describes one mechanism rather than two.
+Design notes from the icons session (2026-08-12). The question that started it was "can we add brand
+logos alongside our SVG logos, and can plugins supply their own" — and the answer turned out to be
+that those are the same feature with two feeders, which is why this file describes one mechanism
+rather than two.
+
+> **Built, 2026-08-14.** Both steps shipped, with all six marks moved out. The shipped shape is in
+> [ui-design.md § Icons](../ui-design.md#icons); this file stays as the record of *why*, including
+> the four rejected alternatives, which are the part worth keeping. Four deliberate deviations from
+> the design below, each noted again in place:
+>
+> - **No `box` field.** Every mark is 24, GitHub's included — it comes from simple-icons now rather
+>   than verbatim from the retired `GithubMark.tsx`, so the renderer hardcodes the viewBox. Adding
+>   `box` back is a backward-compatible optional field if a mark ever needs another size.
+> - **No shared `Frame`.** The brand branch got its own `<svg>` and the Lucide branch is untouched,
+>   rather than moving Lucide's stroke attributes onto a `<g>`. Equivalent inheritance, but not worth
+>   a behavioural change across thirty-odd call sites to save eight lines.
+> - **A fifth hop.** `apps/node/scripts/build-plugin.mjs` assembles `acorn-plugin.json` from each
+>   plugin's `acorn-plugin.config.mjs`; without it the manifest fields never reach disk.
+> - **`hasIcon` deleted rather than extended.** It had no call sites.
+>
+> Two things the build settled that were open below: the **fill rule** is nonzero for all six (the
+> shipped Rollbar render is pixel-identical to the upstream SVG, so no flag was needed), and the
+> **trust dialog** was left drawing the plugin's first letter, for the phishing reason stated below.
 
 Companion to [monaco.md](./monaco.md) in posture: the seam gets designed before the third-party
 consumer exists, on the same grounds that folder already argues — a contract retrofitted around
@@ -421,5 +440,5 @@ not exist. Either write it or drop the pointer; if written, it should state the 
 core-vs-plugin rule above.
 
 Note also that `--font-glyph` still earns its keep after the Unicode brand literals are gone: ◆/◇ pin
-state in `tasks/TaskPaneHost.tsx:153` and ⊘/◉ in `workspaces/WorkspaceProjectAssignments.tsx:306` are
+state in `tasks/TaskPaneHost.tsx:137` and ⊘/◉ in `workspaces/WorkspaceProjectAssignments.tsx:335` are
 still text. Do not remove it with them.
