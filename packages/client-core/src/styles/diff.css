@@ -288,3 +288,27 @@
 /* :focus-within as well as :hover — the unified row already had the keyboard half (line ~152). */
 .diff-split-pair:hover .diff-add-btn,
 .diff-split-pair:focus-within .diff-add-btn { visibility: visible; }
+
+/* Placeholder tone, which github's stylesheet used to supply for this core class. */
+.diff-reply-input::placeholder { color: var(--text-muted); }
+
+/* ── File status ────────────────────────────────────────────────────────────────────────────
+   The rendering half of `fileStatusMeta` (ui/displayMeta.ts), which is exported on the public
+   plugin API. It lived in the GITHUB plugin's stylesheet, so the diff rows below — core's own —
+   and the changes plugin only rendered their status letters and +/- counts while that plugin was
+   installed. A helper on the API contract cannot have its CSS behind a plugin. */
+.file-status {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  font-weight: 700;
+  font-size: var(--fs-xs);
+}
+.file-status-add { color: var(--add-marker); }
+.file-status-del { color: var(--del-marker); }
+.file-status-warn { color: var(--warn); }
+.file-status-muted { color: var(--text-muted); }
+.file-path { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.file-stat { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.file-stat.add { color: var(--add-marker); }
+.file-stat.del { color: var(--del-marker); }
