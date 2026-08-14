@@ -7,12 +7,6 @@
 .pr-detail-meta { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; font-size: var(--fs-sm); }
 .identity-chip,
 .branch-flow,
-.comment-meta-with-avatar {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-}
 .branch-flow { gap: 5px; }
 /* Chip owns the box, the tones and the interactivity. What is left is what differs. */
 .branch-chip {
@@ -237,20 +231,7 @@
   border-radius: var(--radius-circle);
 }
 
-.user-avatar {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  border: var(--control-border);
-  border-radius: var(--radius-circle);
-  background: var(--bg-selected);
-  display: inline-block;
-  object-fit: cover;
-}
-.user-avatar-md { width: 24px; height: 24px; }
-.user-avatar-empty { border-style: dashed; }
 
-.comment { font-size: var(--fs-sm); }
 .conversation-items {
   display: flex;
   flex-direction: column;
@@ -271,10 +252,6 @@
 .comment-card-empty {
   background: var(--bg-subtle);
   border-left-color: var(--text-faint);
-}
-.comment-meta {
-  margin-bottom: var(--space-3);
-  color: var(--text-muted);
 }
 .comment-author { color: var(--text); font-weight: 600; }
 .comment-action { color: var(--text-muted); }
