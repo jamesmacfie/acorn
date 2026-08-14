@@ -21,7 +21,8 @@ export type CoreServices = {
   proc: typeof proc
   // Use-scoped credential access; scrubs the plaintext out of anything thrown from its scope.
   secrets: SecretService
-  // Resolve a taskId against core-owned task tables for callers that hold only a task reference.
+  // Resolve a taskId against core-owned task tables for callers that hold only a task reference. What
+  // comes back is a TaskRef projection, never the `tasks` row and never the core SQLite handle.
   tasks: TaskService
   // The launch-context reads (the injection pref + core's section assembler), for the plugin that
   // pushes a first prompt into a new agent session.
@@ -70,6 +71,9 @@ export type { ProjectService } from './projects'
 // The shapes ProjectService hands back and takes in. A plugin that calls the seam has to be able to
 // name them; they carry no core config columns and no database handle.
 export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects'
+// The same arrangement one entity over: what TaskService hands back and takes in. Six fields off the
+// `tasks` row, no core columns a plugin has no business reading, and no database handle.
+export type { TaskRef } from '../taskWorktree'
 export type { ContextService } from './context/launch'
 export type { PrefService } from './identity/preferences'
 export type { GenerateTextRequest, ModelService } from './models/text'

@@ -1,7 +1,6 @@
 import { getTableColumns, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestPluginDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from './migrations'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { agentEvents } from './schema'
 
 // agent_events_fts is a hand-written FTS5 virtual table with three triggers over `agent_events`
@@ -15,7 +14,7 @@ describe('agent_events_fts schema drift guard', () => {
   let t: TestPluginDb
 
   beforeEach(() => {
-    t = makeTestPluginDb('agents', migrationsDir())
+    t = makeTestPluginDb('agents')
   })
 
   afterEach(() => t.cleanup())

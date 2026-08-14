@@ -30,7 +30,7 @@ const NEW_WORKSPACE = '__new__'
 
 // Hardcoded rather than read from the keybinding registry. `onboarded` is a node preference, so this
 // screen only ever renders for someone who has not rebound anything — and reaching the registry
-// would pull registries/keybindings.tsx onto the @acorn/plugin-api/client barrel, which a plugin's
+// would pull registries/keybindings.ts onto the @acorn/plugin-api/client barrel, which a plugin's
 // node-environment test suite has to be able to import.
 const SHORTCUTS: [string, string][] = [
   ['⌘⇧N', 'new task'],

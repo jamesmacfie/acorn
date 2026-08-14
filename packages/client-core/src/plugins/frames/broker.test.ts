@@ -44,6 +44,8 @@ type Harness = {
   // Every message the host has posted, in order.
   received: PluginBridgeMessage[]
   misbehaved: string[]
+  // How many times the host was told the frame is alive. Once, at most, however much it sends.
+  connects: number
   dispose(): void
   // Resolves once the host has posted at least `count` messages.
   settled(count: number): Promise<void>
@@ -53,6 +55,7 @@ const open = (over: Partial<FrameBinding> = {}, svc = services()): Harness & { s
   const channel = new MessageChannel()
   const received: PluginBridgeMessage[] = []
   const misbehaved: string[] = []
+  let connects = 0
   channel.port2.onmessage = (event: MessageEvent) => void received.push(event.data as PluginBridgeMessage)
   const bridge = createFrameBridge({
     port: channel.port1 as unknown as MessagePort,
@@ -60,11 +63,13 @@ const open = (over: Partial<FrameBinding> = {}, svc = services()): Harness & { s
     services: svc,
     context: CONTEXT,
     onMisbehaving: (reason) => void misbehaved.push(reason),
+    onConnected: () => void (connects += 1),
   })
   return {
     svc,
     received,
     misbehaved,
+    get connects() { return connects },
     send: (message) => channel.port2.postMessage(message),
     dispose: () => {
       bridge.dispose()
@@ -461,6 +466,22 @@ describe('malformed and hostile traffic', () => {
     }
     await new Promise((r) => setTimeout(r, 10))
     expect(h.received).toHaveLength(1) // still just the ready message
+  })
+
+  it('reports the frame alive on its first message, and only once', async () => {
+    // The host's handshake deadline hangs off this: a bundle that throws at module scope never sends
+    // anything, and the surface becomes a labelled placeholder instead of a blank rectangle.
+    const h = withBridge()
+    await h.settled(1)
+    expect(h.connects).toBe(0)
+    // The SDK's ack. Not a request — no id — so it is consumed here and never answered.
+    h.send({ kind: 'connected' })
+    await new Promise((r) => setTimeout(r, 10))
+    expect(h.connects).toBe(1)
+    expect(h.received).toHaveLength(1) // still just the ready message
+    h.send({ id: 30, kind: 'ui', op: 'copy', text: 'x' })
+    await h.settled(2)
+    expect(h.connects).toBe(1)
   })
 
   it('rejects an unknown message kind', async () => {

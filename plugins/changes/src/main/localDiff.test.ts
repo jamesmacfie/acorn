@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { synth } from '@acorn/client-core/ui/diff/synth.ts'
+import { synth } from '@acorn/plugin-api/ui/diff'
 import {
   commitStaged,
   discardFile,

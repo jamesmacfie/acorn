@@ -146,8 +146,8 @@ Settings pages are a registry whose core rows are a plain array in
 `apps/desktop/src/app/client/pageContributions.tsx`.
 
 The plugin-facing API surface is pinned by snapshot:
-`packages/plugin-api/src/surface.snapshot.txt` + `surface.test.ts`, six entrypoints across
-`node`/`client`/`ui`.
+`packages/plugin-api/src/surface.snapshot.txt` + `surface.test.ts`, eight entrypoints across
+`node`/`client`/`ui`/`testkit`.
 
 ### Theming, specifically
 

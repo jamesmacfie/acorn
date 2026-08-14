@@ -272,7 +272,10 @@ remains needs either a person in front of the running app or build work on a dec
 Carried forward from the retired review record so they are not lost with it. None blocks the
 remaining migrations; each is a decision or fix someone should own deliberately. The four that had
 task files — the two dead-click gates, the missing source empty state and the `build:plugin` dev-package
-trap — are fixed and gone from this list.
+trap — are fixed and gone from this list. So is "multiple bundled plugins raise multiple boot trust
+prompts": a development build now acknowledges the bundled first-party roster on the same terms a
+packaged build does, so there are no boot prompts to stack and the specs that answered them do not have
+to (`docs/plugins.md` § The dev loop).
 
 - **A frame surface has no `when` predicate**, so every provider pane appears on every task with an
   empty state. Deliberate for now (an empty state is more discoverable than a pane that silently is
@@ -285,9 +288,6 @@ trap — are fixed and gone from this list.
   root). A rename arguably belongs to the machine, not the identity.
 - **`pullsBatch` swallows GitHub server errors** — partial alias failures mirror the PRs that did
   resolve, so the UI keeps previously-mirrored rows with no visible signal that the pass failed.
-- **Multiple bundled plugins raise multiple boot trust prompts**, which wedges a dozen desktop e2e
-  specs that assert on one. Pre-existing suite assumption, not a plugin bug; the suite is being
-  extracted from this repo.
 - **`refs`/`onSelectTarget` on `RefPanelProps` have zero callers** of any kind and are carried dead;
   delete or justify.
 - **Verification debt** for everything only a running app can prove, now across three migrations. From

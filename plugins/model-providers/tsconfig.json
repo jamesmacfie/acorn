@@ -1,5 +1,6 @@
 {
-  "extends": "../../tsconfig.base.json",
+  // Node-only, unlike every other plugin: no client half, so no DOM lib and no vite/client types.
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext"],
     "types": ["node"]

@@ -36,6 +36,51 @@ export const rendererBaseCheckout = (cwd: string | undefined): string | undefine
 
 export type TaskRow = typeof schema.tasks.$inferSelect
 
+// The plugin-facing projection of a task, and the reason it exists is the same one `ProjectRef` gives
+// (main/projects.ts): `TaskRow` is `typeof schema.tasks.$inferSelect`, so returning it from
+// `CoreServices.tasks` put core's own column names on the plugin contract — rename a column and the
+// contract breaks with no signal, because the surface snapshot pins names and cannot see a type change
+// shape underneath a stable one.
+//
+// Six fields, and not a byte more: they are exactly what plugin code reads today, and they are also
+// everything core needs back when a plugin hands the ref straight to `resolveCwd` or `taskContext`.
+// `icon`, `origin`, `status`, `parentId`, `sort`, `createdAt`, `updatedAt` and `archivedAt` are read by
+// nobody outside core, so they stay core's.
+// A TaskRow is structurally assignable to a TaskRef, which is why core's internal callers are untouched.
+export type TaskRef = {
+  id: string
+  title: string
+  projectId: string
+  // null = run in the project root; non-null = an isolated Git worktree named for this branch.
+  branch: string | null
+  // null until the worktree is first created (Flow C), so a plugin that needs the path asks
+  // `tasks.root(taskId)` rather than reading this and finding nothing.
+  worktreePath: string | null
+  pullNumber: number | null
+}
+
+export function toTaskRef(row: TaskRow): TaskRef {
+  return {
+    id: row.id,
+    title: row.title,
+    projectId: row.projectId,
+    branch: row.branch,
+    worktreePath: row.worktreePath,
+    pullNumber: row.pullNumber,
+  }
+}
+
+// The columns `toTaskRef` reads, as a select shape: `tasks.active()` returns refs, and selecting the
+// whole row only to throw eight columns away would be the projection lying about what it costs.
+export const TASK_REF_COLUMNS = {
+  id: schema.tasks.id,
+  title: schema.tasks.title,
+  projectId: schema.tasks.projectId,
+  branch: schema.tasks.branch,
+  worktreePath: schema.tasks.worktreePath,
+  pullNumber: schema.tasks.pullNumber,
+} as const
+
 export const loadTask = async (db: AppDatabase, id: string): Promise<TaskRow | undefined> => {
   const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
   return t
@@ -108,7 +153,7 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
 
 // Repo / branch / PR context for a session, derived through the taskId → tasks join
 // (docs/workspaces-and-tasks.md). The session row no longer denormalizes repo/pull; this is the single read.
-export function taskContext(t: TaskRow | undefined, github?: { owner: string; name: string } | null): Pick<TerminalSession, 'repo' | 'pull'> {
+export function taskContext(t: TaskRef | undefined, github?: { owner: string; name: string } | null): Pick<TerminalSession, 'repo' | 'pull'> {
   if (!t) return {}
   return {
     repo: github ?? undefined,
@@ -116,7 +161,7 @@ export function taskContext(t: TaskRow | undefined, github?: { owner: string; na
   }
 }
 
-export async function projectForTask(db: AppDatabase, t: TaskRow): Promise<ProjectRow | null> {
+export async function projectForTask(db: AppDatabase, t: Pick<TaskRef, 'projectId'>): Promise<ProjectRow | null> {
   return getProject(db, t.projectId)
 }
 
@@ -124,14 +169,14 @@ export async function projectForTask(db: AppDatabase, t: TaskRow): Promise<Proje
 // The terminal plugin owns the implementation; core owns this choke point and resolves the hook from
 // the per-runtime registry passed by the caller. This avoids a process-global callback surviving one
 // runtime into the next.
-export type WorktreeCreatedHook = (task: TaskRow, cwd: string) => Promise<void>
+export type WorktreeCreatedHook = (task: TaskRef, cwd: string) => Promise<void>
 export const WORKTREE_CREATED = capabilityId<WorktreeCreatedHook>('core.taskWorktreeCreated')
 type CapabilityReader = Pick<CapabilityRegistry, 'get'>
 
 const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boolean; created: boolean }>>()
 export async function resolveTaskCwd(
   db: AppDatabase,
-  t: TaskRow | undefined,
+  t: TaskRef | undefined,
   baseCheckout: string | undefined,
   userId: string | null = null,
   capabilities?: CapabilityReader,
@@ -207,7 +252,7 @@ export async function projectSetup(db: AppDatabase, projectId: string): Promise<
 // Files-to-copy on a fresh worktree (docs/workflows.md §2): read the config from the SOURCE
 // checkout (the entries are usually gitignored, so only it has them) and copy each into the new
 // worktree. Best-effort — warnings are logged, never thrown.
-export async function copyConfiguredFiles(db: AppDatabase, t: TaskRow, checkout: string, worktreePath: string): Promise<void> {
+export async function copyConfiguredFiles(db: AppDatabase, t: Pick<TaskRef, 'projectId'>, checkout: string, worktreePath: string): Promise<void> {
   try {
     const project = await projectForTask(db, t)
     const config = project ? (await getProjectConfig(db, project.id))?.config : null

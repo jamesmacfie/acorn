@@ -260,6 +260,22 @@ describe('rejections', () => {
     expect(await reasonFor('bad')).toMatch(/manifest schema/)
   })
 
+  it('names the field a bad manifest broke, not just the schema', async () => {
+    // The whole reason this reason exists. One collapsed sentence sent an author looking through ~30
+    // rules by hand; the path is what tells them which line to open.
+    const bad = manifest('board', { contributions: { frames: [{ target: 'toolbar', id: 'board', label: 'Board' }] } })
+    install('board', bad, BUNDLE('board'))
+    const reason = await reasonFor('board')
+    expect(reason).toContain('contributions.frames[0]')
+  })
+
+  it('says a manifest is not JSON when it is not JSON', async () => {
+    const target = join(pluginInstallDir(root), 'broken')
+    mkdirSync(target, { recursive: true })
+    writeFileSync(join(target, 'acorn-plugin.json'), '{ "id": "broken",')
+    expect(await reasonFor('broken')).toMatch(/not valid JSON/)
+  })
+
   it('rejects a manifest built for another plugin API major', async () => {
     install('future', manifest('future', { apiVersion: '99' }), BUNDLE('future'))
     expect(await reasonFor('future')).toMatch(/plugin API 99/)

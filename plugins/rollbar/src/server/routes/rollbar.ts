@@ -12,7 +12,7 @@ import {
   type CoreServices,
   type PluginFetchHandler,
   type PluginProviderResourceRequest,
-  type PluginRequestContext,
+  portableCarrier,
   respondError,
   type RouteResult,
 } from '@acorn/plugin-api/node'
@@ -32,21 +32,11 @@ import { rollbarRailItem } from '../../shared/rail'
 
 const PROVIDER = 'rollbar'
 const RESOURCE = ROLLBAR_ITEMS_RESOURCE
-const PORTABLE_REQUEST_CONTEXT = Symbol('rollbar-plugin-request-context')
-
-type PortableBindings = AppEnv['Bindings'] & {
-  [PORTABLE_REQUEST_CONTEXT]?: PluginRequestContext
-}
 
 // Rollbar ships loaded, so these routes run on ONE tier: the host gets `router.fetch`
-// (createRollbarFetch below) and the identity-bound runtime rides in through `c.env` behind this
-// symbol. A request arriving without the context is a wiring bug, and saying so beats answering it
-// from host handles this bundle should no longer touch.
-const requestContext = (c: Context<AppEnv>): PluginRequestContext => {
-  const context = (c.env as PortableBindings)[PORTABLE_REQUEST_CONTEXT]
-  if (!context) throw new Error('rollbar routes only run over the portable carrier (createRollbarFetch)')
-  return context
-}
+// (createRollbarFetch below) and the identity-bound runtime rides in through `c.env`. The carrier
+// itself is the host's (@acorn/plugin-api/node).
+const { requestContext, portableFetch } = portableCarrier(PROVIDER)
 
 const rollbarConnections = (c: Context<AppEnv>, providerId: string) =>
   requestContext(c).providers.connections(providerId)
@@ -184,7 +174,5 @@ export const createRollbarRoutes = (projects?: RollbarProjectScope) => new Hono<
 // The Hono routes over the portable carrier — the only way in. Its request context supplies the
 // identity-bound provider runtime without exposing host database or secret-service handles to the
 // bundle. `projects` is optional for the suites that drive these routes without a project scope.
-export const createRollbarFetch = (projects?: RollbarProjectScope): PluginFetchHandler => {
-  const routes = createRollbarRoutes(projects)
-  return (request, context) => routes.fetch(request, { [PORTABLE_REQUEST_CONTEXT]: context } as PortableBindings)
-}
+export const createRollbarFetch = (projects?: RollbarProjectScope): PluginFetchHandler =>
+  portableFetch(createRollbarRoutes(projects))

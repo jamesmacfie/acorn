@@ -26,7 +26,7 @@ import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
 import { buildPluginDeps } from './pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from './pluginState'
-import { assembleNodeGraph, drainNode, reconcileNode } from './composition'
+import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from './composition'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
 import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
@@ -53,6 +53,27 @@ await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; s
 // Audit retention is enforced at boot so the append-only audit table remains bounded.
 await pruneAudit(runtime.DB).catch((error) => console.warn('[node] audit prune failed:', error))
 setWorktreesRoot(join(root.dir, 'worktrees'))
+
+// Same reporter as the supervised host, before the loader scans the install directory. Two things
+// differ, both from having no application around this process:
+//   - there is no `resourcesPath`, so the bundled root comes from the environment. Unset — which is
+//     every service-managed node — reconciles nothing at all, exactly as before
+//     (docs/node-distribution.md § Plugins). Set, and this root behaves like the desktop's, which is
+//     what a developer running `dev:node` against a repo checkout wants.
+//   - there is no packaging flag, so NODE_ENV is the development signal, the same substitution the
+//     PLUGIN_STATE bridge below already makes for `{ path }` installs.
+// Either way the ownership report runs, because a package frozen by a `user` row is frozen here too and
+// this root never said so.
+const bundledRoot = process.env.ACORN_BUNDLED_PLUGINS_DIR
+const development = process.env.NODE_ENV !== 'production'
+// The signpost for the case that reads as a bug and is not one. `dev:node` with no bundled root reconciles
+// nothing, so a `build:plugin` copy in the data root runs forever and a newer bundled package never
+// arrives — indistinguishable, from the outside, from a builder that silently did nothing. Development
+// only: for a service-managed node an empty reconciliation is the correct and permanent answer.
+if (development && !bundledRoot) {
+  console.log('[plugins] ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled — whatever is in the data root keeps running')
+}
+reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 
 // The same deps the supervised composition root supplies (service/runtime.ts explains why each one
 // cannot be a capability). A standalone node now runs a REAL terminal engine rather than leaving the PTY
@@ -86,13 +107,14 @@ const unavailableBrowser: BrowserDesktopCapability = {
 // The standalone and Electron roots activate the same plugin list, through the same builder. Their
 // behavior differs only where the available runtime bridge does — here, the preview browser.
 const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser }))
-const plugins = await initPlugins(graph.plugins, { capabilities, core, disabled: disabled(), loaded: graph.loaded })
+const plugins = await initPlugins(graph.plugins, { capabilities, core, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
 const pluginStateCapability = capabilities.provide(
   PLUGIN_STATE,
   buildPluginStateBridge({
     dataDir: root.dir,
     roster: () => plugins.roster,
     booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+    loadFailures: () => graph.failures,
     disabled,
     setDisabled: (names) => disabledPlugins.set(names),
     // A standalone node has no packaging flag to consult, so NODE_ENV is the only development signal it

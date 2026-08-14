@@ -1,0 +1,16 @@
+{
+  // The compiler options every plugin package shares, on top of the workspace base. Sixteen of the
+  // seventeen plugin tsconfigs were byte-identical before this file existed, and the seventeenth
+  // (model-providers) differed only in these two lines — which it still overrides, locally.
+  //
+  // `include` is NOT here, deliberately: TypeScript resolves relative paths in an inherited config
+  // against the file they were written in, so `["src"]` up here would mean `plugins/src` and every
+  // package would typecheck nothing at all — a vacuous green. It stays in each plugin's own config.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // A plugin ships client code by default (Solid components, DOM APIs); `types` is not inherited from
+    // the workspace base on purpose, so each layer asks for its globals by name.
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"]
+  }
+}

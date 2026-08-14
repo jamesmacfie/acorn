@@ -116,8 +116,8 @@ since been answered.
 - **A plugin package holds no `acorn-plugin.json`.** The manifest is *generated* by
   `apps/node/scripts/build-plugin.mjs` from the plugin's own `acorn-plugin.config.mjs`.
 - **The route carrier has a reference implementation**: `plugins/rollbar/src/server/routes/rollbar.ts`.
-  Keep the Hono router, hand `router.fetch` over, and carry the `PluginRequestContext` in through
-  `c.env` behind a module-level symbol.
+  Keep the Hono router and wrap it in `portableCarrier('<id>')` from `@acorn/plugin-api/node`, which
+  owns both halves of carrying the `PluginRequestContext` in through `c.env`.
 
 Read [README.md](./README.md) for the common mechanics.
 

@@ -48,6 +48,7 @@ describe('http as a loaded plugin with its own tables', () => {
         ? await initPlugins([entry.plugin], {
           capabilities: new CapabilityRegistry(),
           core: coreServices(),
+          dataDir: dataRoot,
           loaded: new Map([['http', { permissions: entry.manifest.permissions.node, storage: entry.storage }]]),
         })
         : null

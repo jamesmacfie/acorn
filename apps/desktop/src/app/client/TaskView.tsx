@@ -5,7 +5,7 @@ import { prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } fr
 import { archiveTask } from '@acorn/client-core/tasks/mutations.ts'
 import { paneAvailable, paneContributions } from '@acorn/client-core/registries/panes.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
-import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/registries/keybindings.tsx'
+import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/registries/keybindings.ts'
 import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/tasks/agentSessions.ts'
 import { capabilities } from '@acorn/client-core/capabilities.ts'

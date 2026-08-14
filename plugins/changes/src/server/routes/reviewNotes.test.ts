@@ -6,7 +6,6 @@ import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { reviewNotesRoutes } from './reviewNotes'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../../node/migrations'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 const jsonReq = (url: string, method: string, body?: unknown) =>
@@ -23,7 +22,7 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
-    plugin = makeTestPluginDb('changes', migrationsDir())
+    plugin = makeTestPluginDb('changes')
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })

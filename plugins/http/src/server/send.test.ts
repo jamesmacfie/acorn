@@ -8,7 +8,6 @@ import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { makeTestDb, makeTestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import type { HttpSendInput } from '../shared/model'
 import { httpVariables } from '../node/schema'
-import { migrationsDir } from '../node/migrations'
 import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send, type SendCoreServices } from './send'
 import { protectHttpValue } from './storage'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
@@ -39,7 +38,7 @@ type Fixture = { core: SendCoreServices; db: ReturnType<typeof makeTestPluginDb>
 
 function fixture(): Fixture {
   const coreDb = makeTestDb()
-  const pluginDb = makeTestPluginDb('http', migrationsDir())
+  const pluginDb = makeTestPluginDb('http')
   return {
     core: createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore() }),
     db: pluginDb.db,

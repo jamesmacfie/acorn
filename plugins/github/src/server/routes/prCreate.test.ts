@@ -5,7 +5,6 @@ import type { ApiError } from '@acorn/protocol/api.ts'
 import { gh } from '..'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prCreate } from './prCreate'
-import { migrationsDir } from '../../node/migrations'
 import { testGate } from '@acorn/node-core/testkit/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
@@ -45,7 +44,7 @@ const post = (principal: Principal | null, body: unknown) => {
 
 describe('prCreate auth + ApiError envelope', () => {
   beforeEach(() => {
-    plugin = makeTestPluginDb('github', migrationsDir())
+    plugin = makeTestPluginDb('github')
     vi.mocked(gh).mockReset()
   })
   afterEach(() => plugin.cleanup())

@@ -28,18 +28,20 @@ export type NodePluginDeps = {
   workflows: WorkflowsPluginDeps
 }
 
-// `dataDir` is threaded in because plugin SQLite files live under the Node data root. Cross-plugin
-// dependencies resolve through the capability/provider registries at call time; array order is not a
-// feature contract.
+// `dataDir` is threaded in for the three plugins that write files of their OWN under the data root —
+// agents' attachments and artifacts, memory's index sources, notes' markdown. It is no longer threaded
+// in so a plugin can open its database: the host does that behind `ctx.storage`, from each plugin's
+// declared `migrationsModule`. Cross-plugin dependencies resolve through the capability/provider
+// registries at call time; array order is not a feature contract.
 export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[] => [
   agentsPlugin(dataDir, deps.agents),
-  changesPlugin(dataDir),
+  changesPlugin(),
   dockerPlugin(),
   editorPlugin(),
-  githubPlugin(dataDir),
+  githubPlugin(),
   memoryPlugin(dataDir),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(deps.preview),
-  terminalPlugin(dataDir, deps.terminal),
-  workflowsPlugin(dataDir, deps.workflows),
+  terminalPlugin(deps.terminal),
+  workflowsPlugin(deps.workflows),
 ]

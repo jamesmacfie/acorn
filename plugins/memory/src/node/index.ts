@@ -1,24 +1,28 @@
-import { memorySection, type NodePlugin, openPluginDb } from '@acorn/plugin-api/node'
+import { memorySection, type NodePlugin } from '@acorn/plugin-api/node'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
 import { memoryAgentTools } from '../main/agentTools'
 import { registerKnowledgeIpc, type KnowledgeDeps } from '../main/knowledgeIpc'
 import { MEMORY_KNOWLEDGE } from '../contract/knowledge'
 import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
-import { migrationsDir } from './migrations'
 
 // No deps: both of this plugin's former app-supplied thunks now resolve through the plugin context —
 // sendToAgent and notes through capabilities, the owner identity through ctx.core.identity.
+//
+// `dataDir` stays a parameter, unlike changes' and github's: the knowledge index reads source files
+// under the data root, so this plugin needs the path for more than opening its database.
 export const memoryPlugin = (dataDir: string): NodePlugin => {
-  let db: ReturnType<typeof openPluginDb> | null = null
   let routeCapability: { dispose(): void } | null = null
   return {
     name: 'memory',
     required: true,
+    // This module's own URL: the chain sits at plugins/memory/migrations beside it, and the host owns
+    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    migrationsModule: import.meta.url,
     init: async (ctx) => {
-      // Opened and migrated before the listener binds: registerKnowledgeIpc closes over the handle and
-      // fills the route's bridge, so no request can reach an unmigrated database.
-      db = openPluginDb(dataDir, 'memory', { migrationsFolder: migrationsDir() })
+      // Opened and migrated by the host before init returns: registerKnowledgeIpc closes over the handle
+      // and fills the route's bridge, so no request can reach an unmigrated database.
+      const db = ctx.storage.open()
       // terminal.sendToAgent, resolved at CALL time rather than here. Plugin init order is not defined
       // (server/plugin/capabilities.ts), so resolving at init could capture `undefined` purely because
       // terminal is declared after memory in the plugin list.
@@ -57,11 +61,8 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
         }),
       )
     },
-    // The plugin's SQLite file is in WAL mode, so it has to be closed before the data root's lock is
-    // dropped — the composition root's own teardown invariant.
+    // The route bridge only. The SQLite handle is the host's to drain, right after this returns.
     dispose: () => {
-      db?.close()
-      db = null
       routeCapability?.dispose()
     },
   }

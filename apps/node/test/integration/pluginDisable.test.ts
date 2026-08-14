@@ -15,6 +15,7 @@ import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { SecretService } from '@acorn/node-core/main/core/index.ts'
 import { nodePlugins } from '../../src/server/plugins'
+import { readGolden, writeGolden } from './golden'
 
 const desktop: DesktopCapabilities = {
   preview: {
@@ -75,50 +76,68 @@ type Snapshot = {
 }
 const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'integrationProviders', 'providerRoutes', 'modelProviders', 'databases'] as const
 
-// What each optional plugin OWNS — every entry that must vanish when it is disabled, and by omission every
-// entry that must not.
+// The full boot's contribution set, and what each optional plugin OWNS within it — every entry that must
+// vanish when it is disabled, and by omission every entry that must not.
 //
-// Written down rather than derived, and that is the whole mechanism. The previous version compared the two
-// boots with `lostRoutes.every(id => id.startsWith(name))`, which is vacuously TRUE on an empty array — so a
-// plugin that lost nothing at all passed, and so did a plugin that contributed nothing in the first place.
-// Stating the expectation turns both of those into failures, and turns the comparison below into an exact
-// equality in both directions instead of a one-sided sanity check.
+// A GOLDEN LIST in `pluginDisable.snapshot.json` now, derived by the regeneration block below and rewritten
+// by the one command in ./golden.ts. It used to be this literal, hand-derived once by diffing boots and then
+// hand-edited by every plugin that changed shape:
 //
-// Derived once by diffing a full boot against each disabled boot (so it describes what the code does, not
-// what a reader hoped), then frozen here. It is deliberately brittle: a plugin gaining or losing a route,
-// tool, provider or database SHOULD fail this file and be re-recorded, because that is the same edit that
-// could silently take a sibling's contribution with it.
+//   changes: { routes: ['changes/tasks', 'changes/tasks'], tools: ['git_log', …], databases: ['changes.sqlite'] }
 //
-// Note what is absent: no optional plugin owns a context SECTION. All four belong to required plugins
-// (`pr` → github, `notes` → notes, `memory` → memory) or to core itself (`issues`), so `sections` must come
-// out of every case below byte-identical — which is a real assertion here, and was not one before.
-const OWNED: Record<string, Partial<Snapshot>> = {
-  changes: { routes: ['changes/tasks', 'changes/tasks'], tools: ['git_log', 'local_changes', 'local_diff'], databases: ['changes.sqlite'] },
-  docker: { routes: ['docker'] },
-  editor: { routes: ['editor/tasks', 'editor/tasks'] },
-  preview: { tools: ['browser_click', 'browser_console', 'browser_fill', 'browser_navigate', 'browser_screenshot', 'browser_snapshot'] },
-  workflows: { routes: ['workflows'], databases: ['workflows.sqlite'] },
-  github: { routes: [...Array.from({ length: 12 }, () => 'github/repos'), 'github/pins', 'github', 'github'], sections: ['pr'], databases: ['github.sqlite'], connectionProviders: ['github'], integrationProviders: ['github'] },
-}
+// The mechanism is unchanged, and it is worth restating because a regenerable snapshot looks like one you can
+// launder a regression past. Before this file stated the expectation at all it compared the two boots with
+// `lostRoutes.every(id => id.startsWith(name))`, which is vacuously TRUE on an empty array — so a plugin that
+// lost nothing passed, and so did a plugin that contributed nothing. Recording the expectation, wherever it
+// is recorded, turns both into failures and turns the comparison below into an exact equality in both
+// directions instead of a one-sided sanity check. What regeneration still cannot hide:
+//   - a disable that ADDS an entry cannot be recorded. The derivation only records what a boot LOST, so the
+//     equality below stays red however often you regenerate;
+//   - a route credited to the wrong plugin fails the attribution assertion at the end of each case, which
+//     reads the owner out of the route key rather than out of the ledger;
+//   - a plugin that contributes nothing gets an empty slice, which the anti-vacuity case rejects;
+//   - a ledger entry the full boot never produced throws out of `without` below.
+// What is left for the reviewer is the snapshot diff — a disable that takes a SIBLING's entry with it shows
+// up as that entry appearing in the wrong plugin's slice. Same review surface as the facade's own surface
+// snapshot, and the reason the diff belongs in its own commit hunk.
+//
+// The ledger stays deliberately brittle: a plugin gaining or losing a route, tool, provider or database
+// SHOULD fail this file and be re-recorded, because that is the same edit that could silently take a
+// sibling's contribution with it.
+//
+// Note what is absent from every slice: no optional plugin owns a context SECTION. All four belong to
+// required plugins (`pr` → github, `notes` → notes, `memory` → memory) or to core itself (`issues`), so
+// `sections` comes out of every case below byte-identical — which is a real assertion here.
+type Golden = { full: Snapshot; owned: Record<string, Partial<Snapshot>> }
+const GOLDEN = 'pluginDisable.snapshot.json'
+// Read per assertion rather than once at module scope, so a regenerating run writes the file before the
+// cases below read it back.
+const golden = (): Golden => readGolden<Golden>(GOLDEN)
 
-// Multiset subtraction: remove each expected entry ONCE, leave the rest in order.
+// Multiset subtraction: remove each expected entry ONCE, leave the rest in order, and report what never
+// matched.
 //
 // A plain `filter(x => !expected.includes(x))` would be wrong here and the reason is github: eleven of its
 // routers register under the same `github/repos` key, and `changes` and `editor` each register two under one
 // prefix. Set-style subtraction would delete all eleven for one expectation and, worse, would not notice
 // github quietly losing ten of them. Counting makes the comparison sensitive to a duplicate disappearing,
 // which is the only way "byte-identical" means anything for a key with repeats.
-const without = (from: readonly string[], expected: readonly string[] = []): string[] => {
-  const remaining = [...expected]
-  const out: string[] = []
+const minus = (from: readonly string[], take: readonly string[]): { rest: string[]; unmatched: string[] } => {
+  const remaining = [...take]
+  const rest: string[] = []
   for (const entry of from) {
     const at = remaining.indexOf(entry)
-    if (at === -1) out.push(entry)
+    if (at === -1) rest.push(entry)
     else remaining.splice(at, 1)
   }
+  return { rest, unmatched: remaining }
+}
+
+const without = (from: readonly string[], expected: readonly string[] = []): string[] => {
+  const { rest, unmatched } = minus(from, expected)
   // An expectation that matched nothing means the ledger and the code disagree about what this plugin owns.
-  if (remaining.length) throw new Error(`ledger names entries that the full boot never produced: ${remaining.join(', ')}`)
-  return out
+  if (unmatched.length) throw new Error(`ledger names entries that the full boot never produced: ${unmatched.join(', ')}`)
+  return rest
 }
 
 describe('disabling a node plugin', () => {
@@ -153,6 +172,9 @@ describe('disabling a node plugin', () => {
     const result = await initPlugins(buildPlugins(dataDir), {
       capabilities,
       core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db, activeIdentity: memoryIdentityStore() }),
+      // The host opens every plugin database under this root now, which is what the `databases` snapshot
+      // below reads back — so passing it is no longer a courtesy to the plugins, it is the boot.
+      dataDir,
       disabled,
     })
     dispose = result.dispose
@@ -190,20 +212,52 @@ describe('disabling a node plugin', () => {
   const optional = all.filter((p) => !p.required).map((p) => p.name)
   const required = all.filter((p) => p.required).map((p) => p.name)
 
+  // Regeneration, and nothing else: one full boot plus one per optional plugin, recording what each disable
+  // LOST. Declared before the cases below because those read the file back, and declared only when the flag
+  // is set so a normal run neither pays for the extra boots nor reports a permanently skipped test.
+  if (process.env.UPDATE_PLUGIN_GOLDENS) {
+    it(
+      'records the full boot and the ownership ledger',
+      async () => {
+        const full = await start()
+        const owned: Record<string, Partial<Snapshot>> = {}
+        for (const name of optional) {
+          await dispose?.()
+          dispose = null
+          const reduced = await start([name])
+          const slice: Partial<Snapshot> = {}
+          // Keys the plugin does not touch are omitted, so a slice reads as a claim rather than a form.
+          for (const key of SNAPSHOT_KEYS) {
+            const lost = minus(full.snapshot[key], reduced.snapshot[key]).rest
+            if (lost.length) slice[key] = lost
+          }
+          owned[name] = slice
+        }
+        writeGolden(GOLDEN, { full: full.snapshot, owned })
+      },
+      // Seven real boots, each opening its own WAL-mode plugin databases. Not a 5s job.
+      180_000,
+    )
+  }
+
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     // Every case below asserts "the others are still there", which an empty list satisfies trivially.
     // These floors track the COMPILED list, so they come down by one each time a plugin ships loaded
     // instead — rollbar, then linear, then model-providers, then http, now database.
     expect(all.length).toBeGreaterThanOrEqual(10)
     expect(optional.length).toBeGreaterThanOrEqual(6)
+    // Hand-written on purpose, and the only list in this file that is. Which plugins may not be turned off is
+    // POLICY, not something the composition can be asked — deriving it from `p.required` would make the
+    // assertion "the required plugins are the ones marked required", which is no assertion at all. Changing
+    // it should cost a deliberate edit here, not a regeneration.
     expect(required.sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     // The ledger covers exactly the plugins that get cycled — a plugin added to the list without an entry
     // fails here rather than quietly getting a case that asserts nothing.
-    expect(Object.keys(OWNED).sort()).toEqual([...optional].sort())
+    expect(Object.keys(golden().owned).sort()).toEqual([...optional].sort())
     // And every one of them owns SOMETHING. Without this, a refactor that stopped ten plugins registering
     // anything at all would leave all ten cases green — that is the exact mutation the previous version
     // survived, because "the others are still there" is trivially true when there is nothing to be there.
-    for (const [name, owned] of Object.entries(OWNED)) {
+    for (const [name, owned] of Object.entries(golden().owned)) {
       const total = SNAPSHOT_KEYS.reduce((n, key) => n + (owned[key]?.length ?? 0), 0)
       expect(total, `'${name}' contributes nothing, so disabling it proves nothing`).toBeGreaterThan(0)
     }
@@ -213,20 +267,20 @@ describe('disabling a node plugin', () => {
     const { enabled, skipped, snapshot } = await start()
     expect(skipped).toEqual([])
     expect(enabled).toEqual(all.map((p) => p.name))
-    expect(snapshot.sections).toEqual(['pr', 'issues', 'notes', 'memory'])
-    // Six, not eight: http.sqlite and database.sqlite are opened by their loaded packages now,
-    // through ctx.storage, so this boot never sees either.
+    // Floors first, and they are the anti-vacuity half: the equality below is against a file, so a boot that
+    // registered nothing would match an empty golden without anyone noticing. Six databases, not eight:
+    // http.sqlite and database.sqlite are opened by their loaded packages now, through ctx.storage, so this
+    // boot never sees either. The connection and integration registries have to have real content — github's
+    // — or the ledger's provider expectations would be satisfiable by an empty registry.
     expect(snapshot.databases.length).toBeGreaterThanOrEqual(6)
     expect(snapshot.routes.length).toBeGreaterThanOrEqual(15)
-    // The connection and integration registries still have real content — github's — so the ledger's
-    // provider expectations are not satisfiable by an empty registry. The other two keys are empty and
-    // asserted as empty: openai and anthropic come from the loaded model-providers package and linear's
-    // provider route from the loaded linear package, neither of which this boot assembles, so their
-    // absence here is what "the compiled composition no longer owns them" looks like.
-    expect(snapshot.connectionProviders).toEqual(['github'])
-    expect(snapshot.integrationProviders).toEqual(['github'])
-    expect(snapshot.modelProviders).toEqual([])
-    expect(snapshot.providerRoutes).toEqual([])
+    expect(snapshot.connectionProviders.length).toBeGreaterThan(0)
+    expect(snapshot.integrationProviders.length).toBeGreaterThan(0)
+    // And then the exact record. Two of the golden's keys come out EMPTY and that is the assertion: openai
+    // and anthropic come from the loaded model-providers package and linear's provider route from the loaded
+    // linear package, neither of which this boot assembles, so an entry appearing in `modelProviders` or
+    // `providerRoutes` would mean something in the binary had quietly started registering them again.
+    expect(snapshot).toEqual(golden().full)
   })
 
   for (const name of optional) {
@@ -249,13 +303,15 @@ describe('disabling a node plugin', () => {
       // after the disabled check instead of before, every optional plugin registering nothing, a disable
       // dropping a sibling's tool or a context section, and a disable dropping the provider registrations
       // (which were not snapshotted at all).
+      const owned = golden().owned[name]
       for (const key of SNAPSHOT_KEYS) {
-        expect(reduced.snapshot[key], `${key} after disabling '${name}'`).toEqual(without(full.snapshot[key], OWNED[name]?.[key]))
+        expect(reduced.snapshot[key], `${key} after disabling '${name}'`).toEqual(without(full.snapshot[key], owned?.[key]))
       }
       // Routes carry their owner in the key, so the removals can be attributed as well as counted. Kept as a
       // separate assertion because it catches a wrong LEDGER — an entry credited to the wrong plugin would
-      // satisfy the equality above and still be a lie about who owns what.
-      const lostRoutes = OWNED[name]?.routes ?? []
+      // satisfy the equality above and still be a lie about who owns what. It is also the one check a
+      // regeneration cannot launder: the owner comes out of the route key, not out of the golden.
+      const lostRoutes = owned?.routes ?? []
       expect(lostRoutes.filter((id) => !id.startsWith(name))).toEqual([])
     })
   }

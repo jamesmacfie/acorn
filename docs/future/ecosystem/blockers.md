@@ -67,21 +67,22 @@ stays dev-mode plugins; store installs keep restart-required semantics deliberat
 
 ## 4. External authors cannot build a plugin
 
-**What.** `@acorn/plugin-api` (six entrypoints, snapshot-pinned surface) is a workspace
+**What.** `@acorn/plugin-api` (eight entrypoints, snapshot-pinned surface) is a workspace
 dependency. `docs/extensibility.md § Plugins get building blocks` records that it is "not yet
-resolvable for a genuinely external" plugin — an accepted intermediate state. Around it sit the
-eight developer-experience findings of `docs/future/debug-plugin/`: failures that misreport or say
-nothing, no watch mode, four trust prompts per dev boot, tests that rebuild the host by hand, ~90
-lines of copied boilerplate per loaded plugin.
+resolvable for a genuinely external" plugin — an accepted intermediate state. The eight
+developer-experience findings that used to sit around it are done: failures name themselves on the
+roster row and in the attention inbox, `pnpm dev:plugin` watches and rebuilds, development builds no
+longer ask about their own bundled packages at boot, plugin tests take a real context from
+`@acorn/plugin-api/testkit`, and the copied host mechanics moved behind the host or a one-line
+re-export. `docs/plugins.md`, `docs/testing.md` and `docs/data-layer.md` own that behavior now.
 
-**Why it gates.** Until the facade installs from npm and failures name themselves, third-party DX
-is not a polish question — the front door is closed. No amount of marketplace work matters before
-this.
+**Why it gates.** Until the facade installs from npm, third-party DX is not a polish question — the
+front door is closed. No amount of marketplace work matters before this.
 
-**The designed answer.** Fully designed: each debug-plugin file carries a plan, with
-`01-failure-visibility.md` first for reach. Publishing the facade is packaging work with one
-design decision attached (what version/compat contract to promise — the `PLUGIN_API_MAJOR` gate
-already exists). Details and the authoring-experience bar in `dx.md`.
+**The designed answer.** What is left is packaging work with one design decision attached (what
+version/compat contract to promise — the `PLUGIN_API_MAJOR` gate already exists, and the surface
+snapshot now refuses to shed a name unless that major moves). The authoring-experience bar and the
+residue the DX work left behind are in `dx.md`.
 
 ## What is deliberately not on this list
 
@@ -100,4 +101,5 @@ already exists). Details and the authoring-experience bar in `dx.md`.
 Whether rung 2 has shipped (changes gates 1 and 3's risk text); whether the lockfile still pins
 hashes and the installer still refuses downgrades; whether `activeBundles` is still
 session-pinned and contribution sync still boot-only; whether `@acorn/plugin-api` became
-publishable in the meantime; and whether the debug-plugin findings list has shrunk.
+publishable in the meantime; and whether gate 4 still has anything in it beyond that packaging
+work (`dx.md` names the residue).

@@ -15,6 +15,7 @@
     "db:reset": "node scripts/db-reset.mjs",
     "dev": "turbo run dev",
     "dev:node": "pnpm --filter @acorn/node dev:node",
+    "dev:plugin": "pnpm --filter @acorn/node dev:plugin",
     "dist": "pnpm --filter @acorn/desktop dist",
     "lint": "oxlint && turbo run lint",
     "lint:types": "turbo run lint",

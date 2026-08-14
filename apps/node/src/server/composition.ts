@@ -5,7 +5,9 @@ import { logStorageFootprint } from '@acorn/node-core/main/storageFootprint.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import type { LoadedPluginBinding } from '@acorn/node-core/server/plugin/host.ts'
-import { loadExternalPlugins, type InstalledPlugin } from '@acorn/node-core/main/pluginLoader.ts'
+import { loadExternalPlugins, type InstalledPlugin, type PluginLoadFailure } from '@acorn/node-core/main/pluginLoader.ts'
+import { reconcileBundledPlugins } from '@acorn/node-core/main/bundledPlugins.ts'
+import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/main/bundledPluginState.ts'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { reconcileTmux } from '@acorn/plugin-terminal/main/index.ts'
@@ -25,6 +27,11 @@ export type NodeComposition = {
   // Every package on disk, including the client-only ones that produced no NodePlugin. This is what
   // the roster route distributes from; `loaded` above is only what this process runs.
   installed: readonly InstalledPlugin[]
+  // Why the rest of the install directory produced nothing. Kept rather than dropped: the loader's report
+  // is the only place a bad manifest or an unimportable bundle is ever explained, and it used to end at a
+  // console.error. Both roots hand this to the PLUGIN_STATE bridge, which is how it reaches the roster
+  // row and the attention bell.
+  failures: readonly PluginLoadFailure[]
   drainOrder: typeof NODE_DRAIN_ORDER
 }
 
@@ -36,7 +43,7 @@ export type NodeComposition = {
 // (docs/plugins.md).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
   const builtins = nodePlugins(dataDir, deps)
-  const { loaded, installed } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
+  const { loaded, installed, failures } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
   // A loaded plugin may deliberately replace a built-in of the same id — that is how the loader is
   // dogfooded (scripts/build-plugin.mjs). Only one of them may be in the graph: the ids are route
   // namespaces and database filenames, and initPlugins rejects a duplicate name outright.
@@ -48,6 +55,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
       { permissions: entry.manifest.permissions.node, storage: entry.storage },
     ])),
     installed,
+    failures,
     drainOrder: NODE_DRAIN_ORDER,
   }
 }
@@ -56,6 +64,59 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
 // fixture the standalone/supervised comparison uses, and it must describe what the BUILD contains,
 // not what happens to be installed in whichever data root the process was pointed at.
 export const nodePluginNames = (): string[] => nodePlugins('', {} as NodePluginDeps).map((plugin) => plugin.name)
+
+export type BundledReconcileOptions = {
+  dataDir: string
+  /** Where the app's own read-only plugin packages live. Absent means there are none to reconcile FROM:
+   * a service-managed standalone node has no `resourcesPath`, and that is the whole difference between
+   * the two hosts here (docs/node-distribution.md § Plugins). */
+  bundledRoot?: string | undefined
+  /** A packaged app is not a development build. Only used to decide whether to print the escape hatch
+   * for a frozen ownership row, which is a developer's problem and a user's normal state. */
+  development: boolean
+}
+
+/** Reconcile app-owned plugin packages into the data root, then account for every outcome — including
+ * the ones that used to be silent.
+ *
+ * Shared by both Node hosts rather than copied into each: this used to be an inline block in the
+ * supervised root only, so `pnpm dev:node` ran whatever the last `build:plugin` left behind forever and
+ * printed none of these lines. Reconciliation itself is still gated on a bundled root, so nothing
+ * changes for a node that has none. */
+export function reconcileBundledPackages({ dataDir, bundledRoot, development }: BundledReconcileOptions): void {
+  const preserved: string[] = []
+  if (bundledRoot) {
+    const bundled = reconcileBundledPlugins(dataDir, bundledRoot)
+    preserved.push(...bundled.preserved)
+    if (bundled.installed.length || bundled.updated.length) {
+      console.log(`[plugins] bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
+    }
+    // An uninstall writes a tombstone outside the package directory so a later app update cannot restore
+    // it (main/bundledPluginState.ts) — deliberate, and indistinguishable from a feature that was never
+    // built: the plugin ships in every app version from then on and never appears, with no output
+    // anywhere. Reinstalling it is the fix, and nothing said so.
+    if (bundled.removed.length) {
+      console.log(`[plugins] bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`)
+    }
+    for (const failure of bundled.failures) {
+      console.error(`[plugins] bundled ${failure.id} was not reconciled: ${failure.reason}`)
+    }
+  }
+
+  // `preserved` used to be the only account of this, which is how a package that had quietly stopped
+  // taking updates looked exactly like one that had never needed any. It is also the account a node with
+  // no bundled root cannot give, so the ownership rows are read directly and unioned in: the row is what
+  // freezes the package, whether or not there was a newer copy to refuse this boot.
+  const frozen = [...new Set([...preserved, ...userManagedPluginIds(dataDir)])].sort()
+  if (frozen.length === 0) return
+  console.log(`[plugins] NOT taking app updates (installed by the owner on this node): ${frozen.join(', ')}`)
+  if (development) {
+    // Only in a development build, because for a user this row is correct and permanent — an owner
+    // install must never be replaced by a bundled copy. For a developer it is a trap that is easy to
+    // acquire (a hand-copied directory earns one) and used to have no visible escape at all.
+    console.log(`[plugins] an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`)
+  }
+}
 
 export type ReconcileOptions = {
   db: AppDatabase

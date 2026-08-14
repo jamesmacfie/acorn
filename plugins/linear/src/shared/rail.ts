@@ -1,27 +1,18 @@
-import type { PluginRailItem } from '@acorn/protocol/api.ts'
+import { parseRailItemId, railItemId, type PluginRailItem } from '@acorn/protocol/api.ts'
 import type { LinearProjectIssue } from './api'
 import { priorityMeta } from './triage'
 
-// A rail row's id has to survive the round trip: the host hands it back verbatim as the pane frame's
-// `context.item`, and the frame has to recover BOTH halves of an issue's identity from it. Linear team
-// keys make `ENG-42` look globally unique and it is not — two connected workspaces can share a prefix
-// — so the connection travels with it. Percent-encoded around a single `:` for the same reason
-// rollbar's is: either half may legitimately contain the delimiter.
+// The encoding is the host's (protocol/api.ts § railItemId); these two name its halves for Linear. The
+// connection has to travel with the identifier because Linear team keys make `ENG-42` look globally
+// unique and it is not — two connected workspaces can share a prefix.
 export type LinearRailTarget = { connectionId: string; identifier: string }
 
 export const linearRailItemId = (target: LinearRailTarget): string =>
-  `${encodeURIComponent(target.connectionId)}:${encodeURIComponent(target.identifier)}`
+  railItemId(target.connectionId, target.identifier)
 
 export function parseLinearRailItemId(value: string): LinearRailTarget | null {
-  const separator = value.indexOf(':')
-  if (separator <= 0 || separator === value.length - 1) return null
-  try {
-    const connectionId = decodeURIComponent(value.slice(0, separator))
-    const identifier = decodeURIComponent(value.slice(separator + 1))
-    return connectionId && identifier ? { connectionId, identifier } : null
-  } catch {
-    return null
-  }
+  const parts = parseRailItemId(value)
+  return parts && { connectionId: parts[0], identifier: parts[1] }
 }
 
 // One rail row, including the promotion seed the host acts on when the row's +TASK is used.

@@ -60,6 +60,18 @@ const setEntry = (dataRoot: string, id: string, entry: BundledPluginStateEntry):
 export const readBundledPluginState = (dataRoot: string, id: string): BundledPluginStateEntry | undefined =>
   readState(dataRoot).plugins[id]
 
+/** Every id whose ownership row says an owner installed it, so reconciliation will never replace it.
+ *
+ * Read on its own, rather than only as reconciliation's `preserved` list, because the row is what makes
+ * a frozen copy frozen and a node with no bundled root to reconcile FROM never produces that list —
+ * which is exactly the `dev:node` case where a `build:plugin` output outlived every later build and
+ * nothing said so. */
+export const userManagedPluginIds = (dataRoot: string): string[] =>
+  Object.entries(readState(dataRoot).plugins)
+    .filter(([, entry]) => entry.status === 'user')
+    .map(([id]) => id)
+    .sort()
+
 export const markBundledPluginInstalled = (
   dataRoot: string,
   id: string,

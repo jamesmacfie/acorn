@@ -10,7 +10,6 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { REPOS_STALE_AFTER_MS } from '../syncPolicy'
 import { repos } from './repos'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir } from '../../node/migrations'
 import { seedGithubIntegration } from '../../testkit/githubToken'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 // Aliased away from the `repos` router imported above because the table and route factory share a name.
@@ -48,7 +47,7 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     core = makeTestDb()
-    plugin = makeTestPluginDb('github', migrationsDir())
+    plugin = makeTestPluginDb('github')
     // The GitHub token comes from a stored integration row now, not from the caller's identity.
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
     app = new Hono<AppEnv>()

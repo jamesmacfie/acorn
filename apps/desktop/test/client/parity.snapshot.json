@@ -1,0 +1,19 @@
+{
+  "panes": [
+    "10 pr meta+shift+r",
+    "15 agents meta+shift+a",
+    "20 changes meta+shift+g",
+    "30 notes meta+shift+d",
+    "40 context meta+shift+x",
+    "50 editor meta+shift+e",
+    "75 docker -",
+    "80 preview meta+shift+b"
+  ],
+  "sources": [
+    "0 home",
+    "1 fleet",
+    "10 github",
+    "40 docker",
+    "60 agents"
+  ]
+}

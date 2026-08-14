@@ -1,9 +1,11 @@
 # World-class plugin DX: the bar, the gaps, the differentiator
 
 Design notes from the ecosystem-feasibility session (2026-08-14). Nothing here is scheduled. The
-detailed findings live in `docs/future/debug-plugin/` (eight files, each with a plan); this file
-adds what that review scoped out — the external author, who was not its subject — and states the
-bar the ecosystem goal actually requires.
+plugin-DX review that sat under this file — eight findings, each with a plan — has been implemented
+and retired; the behavior it produced is now documented in `docs/plugins.md`, `docs/testing.md`,
+`docs/data-layer.md` and `docs/local-development.md`. This file adds what that review scoped out —
+the external author, who was not its subject — and states the bar the ecosystem goal actually
+requires.
 
 ## The bar
 
@@ -26,8 +28,9 @@ part other platforms get wrong:
 - **The frame is vanilla JS.** A frame is a host-generated document, not a component in the
   shell's tree; there is no framework requirement, and the bridge SDK (`api`, `state`, `ui`,
   `keys`, `document`) is the whole surface. Single file is already the scheme's contract.
-- **The API surface is pinned** — six entrypoints, snapshot-tested
-  (`packages/plugin-api/src/surface.snapshot.txt`), gated by `PLUGIN_API_MAJOR`.
+- **The API surface is pinned** — eight entrypoints, snapshot-tested
+  (`packages/plugin-api/src/surface.snapshot.txt`), gated by `PLUGIN_API_MAJOR`, and the snapshot
+  now refuses to shed a name unless that major moves.
 - **Storage is host-owned.** Declare a Drizzle migration chain; the host opens, migrates, and
   contains failures per plugin.
 
@@ -38,15 +41,26 @@ part other platforms get wrong:
    Publishing it is packaging work plus one real decision: the compat promise. The snapshot test
    and API major already exist; the promise is "your plugin keeps loading within a major." Without
    this, nothing else on the list matters to an external author.
-2. **Failures misreport** (`debug-plugin/01`) — the widest-reach fix and the review's own first
-   pick. An author whose plugin silently doesn't appear will not file a bug; they will leave.
-3. **The loop is restart-shaped** (`debug-plugin/02` + user-extensions reload path + dev trust
-   grant). Watch mode, no prompt per save, contributions refresh live.
-4. **Testing rebuilds the host** (`debug-plugin/03`). A testkit that boots a minimal node host,
-   loads one plugin, and hands back typed handles. The review reopened this deliberately; the
-   evidence held.
-5. **Boilerplate** (`debug-plugin/04`) — ~90 identical lines per loaded plugin belong behind the
-   facade.
+2. **Failures misreport** — closed. A failed plugin now carries `reason` and `stage` on its roster
+   row and into the attention inbox instead of a console line nobody sees, a bad manifest names the
+   field path it broke, and a frame that never evaluates gets a labelled placeholder rather than a
+   blank rectangle (`docs/plugins.md § Loaded plugins`, `§ Loaded plugins: the client half`).
+3. **The loop is restart-shaped** — half closed. `pnpm dev:plugin <id>` watches and rebuilds, and
+   boot trust prompts are gone from development builds because the grant now covers the same
+   application-owned directory a packaged build trusts (`docs/plugins.md § The dev loop`). Two
+   things remain: contributions still refresh only at boot and on a trust decision, which is the
+   user-extensions reload path, and a client bundle rebuilt mid-session prompts once because trust
+   is keyed by hash and the grant was made at Electron boot.
+4. **Testing rebuilds the host** — closed. `@acorn/plugin-api/testkit` hands a test the real plugin
+   and request context, a temp-directory database, the auth gate and core's tables
+   (`docs/testing.md § Test layers`). Roughly 147 deep imports across 37 plugin test files have yet
+   to move onto it; `tools/arch/boundaries.test.ts` holds that as a baseline that may only shrink,
+   and tests migrate as someone touches them rather than in a sweep.
+5. **Boilerplate** — closed. The per-plugin database lifecycle, the migrations module, the vitest
+   and tsconfig and drizzle configs and the frame mount all moved behind the host or a one-line
+   re-export (`docs/plugins.md § Package shape`, `docs/data-layer.md § Plugin databases`).
+   `package.json` was the one thing that could not be hoisted — npm has no `extends` — so its
+   `exports` and `scripts` blocks stay duplicated per package.
 6. **Docs generated from the running node** (user-extensions § 5): the agent-facing projection of
    the pinned surface doubles as the human reference. bb's rule transfers: never answer an API
    question from a built bundle.
@@ -68,6 +82,15 @@ messages serve both audiences.
 
 ## Verify before building
 
-Whether `@acorn/plugin-api` became publishable (gap 1 may be done); how much of the debug-plugin
-list has landed; whether the no-bundler profile got written as a real contract; and whether the
-frame bridge SDK grew members the pinned snapshot doesn't yet show.
+Whether `@acorn/plugin-api` became publishable (gap 1 may be done); whether the no-bundler profile
+got written as a real contract; and whether the frame bridge SDK grew members the pinned snapshot
+doesn't yet show.
+
+Three residues of the shipped work are worth checking before anyone builds on them. Three exports on
+the facade are still marked `// prune candidate` because retiring them needs a new `ctx` seam that
+does not exist yet — the raw WebSocket attach, the node's capability read model, and the agent-tool
+renderer registry — and each says so where it sits (`packages/plugin-api/src/client/index.ts`). The
+deep-import baseline in `tools/arch/boundaries.test.ts` should be lower than 147 imports across 37
+files; if it is not, the migrate-as-you-touch rule is not being followed. And none of the eight items
+was ever checked in a running app: plugin suites are node-environment with no Solid transform, so a
+green suite is not evidence about anything rendered.

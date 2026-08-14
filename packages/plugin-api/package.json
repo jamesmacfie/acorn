@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     "./node": "./src/node/index.ts",
+    "./testkit": "./src/testkit/index.ts",
     "./client": "./src/client/index.ts",
     "./ui": "./src/ui/index.ts",
     "./ui/host": "./src/ui/host.ts",

@@ -10,6 +10,8 @@ const candidate = (over: Partial<BundleCandidate> = {}): BundleCandidate => ({
   ...over,
 })
 
+// Hermetic on purpose — this file is about resolution, not about which major the app happens to speak — so
+// the supported major is a local literal and the unspeakable one is '99', which no real build will ever be.
 const resolve = (candidates: BundleCandidate[]) => resolveActiveBundles(candidates, { apiVersion: '1' })
 
 describe('comparing versions', () => {
@@ -45,12 +47,12 @@ describe('picking one bundle per plugin', () => {
   it('drops a bundle built for a plugin API this client does not speak', () => {
     // Dropped rather than deferred: a bundle for another API major cannot be run, and pretending
     // otherwise moves the failure from here to an import that throws.
-    const winners = resolve([candidate({ version: '9.0.0', apiVersion: '2', hash: 'b'.repeat(64) }), candidate({ version: '1.0.0' })])
+    const winners = resolve([candidate({ version: '9.0.0', apiVersion: '99', hash: 'b'.repeat(64) }), candidate({ version: '1.0.0' })])
     expect(winners.get('sparkline')?.version).toBe('1.0.0')
   })
 
   it('has no winner when every candidate is for another API major', () => {
-    expect(resolve([candidate({ apiVersion: '2' })]).size).toBe(0)
+    expect(resolve([candidate({ apiVersion: '99' })]).size).toBe(0)
   })
 
   it('resolves two builds of one version the same way every boot', () => {

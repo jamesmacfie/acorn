@@ -1,10 +1,15 @@
-import { readFile } from 'node:fs/promises'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { agentProfileRegistry } from '@acorn/node-core/main/agentProfiles/index.ts'
 import { agentToolContributions } from '@acorn/node-core/server/agentTools/registry.ts'
+import { markPluginUserManaged } from '@acorn/node-core/main/bundledPluginState.ts'
+import { pluginDir } from '@acorn/node-core/main/pluginInstaller.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/node-core/main/pluginManifest.ts'
 import { makeTestDb } from '@acorn/node-core/testkit/db.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
-import { NODE_DRAIN_ORDER, assembleNodeGraph, nodePluginNames } from '../../src/server/composition'
+import { NODE_DRAIN_ORDER, assembleNodeGraph, nodePluginNames, reconcileBundledPackages } from '../../src/server/composition'
 import { effectiveDisabled } from '../../src/server/pluginState'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
@@ -33,11 +38,50 @@ describe('plugin-state parity', () => {
     expect(effectiveDisabled(store)()).toEqual(['github'])
   })
 
-  it('does not reconcile bundled packages on a standalone node', async () => {
-    // The Electron root calls reconcileBundledPlugins with config.bundledPluginsDir; a standalone node
-    // has no resourcesPath to reconcile FROM, so there is deliberately no such call (docs/node-distribution.md).
-    const source = await readFile(new URL('../../src/server/standalone.ts', import.meta.url), 'utf8')
-    expect(source).not.toContain('reconcileBundledPlugins')
+  it('reconciles bundled packages only when a bundled root is configured', () => {
+    // Both roots now call the same reporter, so the account of what reconciliation did cannot exist on
+    // one root only. What still differs is the input: the Electron root always has application resources,
+    // while a standalone node's bundled root comes from the environment and is unset on every
+    // service-managed node — which is the documented "there is nothing to reconcile FROM" case
+    // (docs/node-distribution.md § Plugins).
+    const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-data-'))
+    const resources = mkdtempSync(join(tmpdir(), 'acorn-parity-resources-'))
+    try {
+      mkdirSync(join(resources, 'rollbar', 'dist'), { recursive: true })
+      writeFileSync(join(resources, 'rollbar/acorn-plugin.json'), JSON.stringify({
+        id: 'rollbar', name: 'Rollbar', version: '1.0.0', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
+      }))
+      writeFileSync(join(resources, 'rollbar/dist/node.js'), 'export default {}\n')
+
+      reconcileBundledPackages({ dataDir: dataRoot, bundledRoot: undefined, development: true })
+      expect(existsSync(pluginDir(dataRoot, 'rollbar'))).toBe(false)
+
+      reconcileBundledPackages({ dataDir: dataRoot, bundledRoot: resources, development: true })
+      expect(existsSync(join(pluginDir(dataRoot, 'rollbar'), 'dist/node.js'))).toBe(true)
+    } finally {
+      rmSync(dataRoot, { recursive: true, force: true })
+      rmSync(resources, { recursive: true, force: true })
+    }
+  })
+
+  it('names a package frozen by an ownership row even with no bundled root to refuse an update from', () => {
+    // The `preserved` list can only report a package it declined to replace THIS boot, so a standalone
+    // node — which has nothing to replace it with — used to say nothing at all while a `build:plugin`
+    // output outlived every later build. The row itself is the fact, so it is read directly.
+    const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-frozen-'))
+    const lines: string[] = []
+    const log = console.log
+    console.log = (...args: unknown[]) => void lines.push(args.join(' '))
+    try {
+      markPluginUserManaged(dataRoot, 'rollbar')
+      reconcileBundledPackages({ dataDir: dataRoot, bundledRoot: undefined, development: true })
+    } finally {
+      console.log = log
+      rmSync(dataRoot, { recursive: true, force: true })
+    }
+    expect(lines.join('\n')).toContain('NOT taking app updates (installed by the owner on this node): rollbar')
+    // The escape hatch, which is a development-build line: for a user this row is correct and permanent.
+    expect(lines.join('\n')).toContain('bundled-state.json')
   })
 })
 

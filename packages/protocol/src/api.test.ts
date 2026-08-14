@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as api from './api'
-import { prefsKey } from './api'
+import { parseRailItemId, prefsKey, railItemId } from './api'
 
 describe('shared API contract helpers', () => {
   // A net under the ~90 route literals above, which were namespaced by hand: every one of them must
@@ -26,5 +26,17 @@ describe('shared API contract helpers', () => {
 
   it('preserves query key shapes for cache compatibility', () => {
     expect(prefsKey).toEqual(['prefs'])
+  })
+
+  // The rail id is a round trip the plugin does not control — the host hands the string back as a
+  // frame's `context.item` — so the encoding is pinned here rather than only in the two plugins that
+  // put their own names on the halves.
+  it('round-trips a rail item id through a delimiter in either half', () => {
+    expect(railItemId('rollbar:production', '142/7')).toBe('rollbar%3Aproduction:142%2F7')
+    expect(parseRailItemId('rollbar%3Aproduction:142%2F7')).toEqual(['rollbar:production', '142/7'])
+    expect(parseRailItemId('no-delimiter')).toBeNull()
+    expect(parseRailItemId(':leading')).toBeNull()
+    expect(parseRailItemId('trailing:')).toBeNull()
+    expect(parseRailItemId('%broken:value')).toBeNull()
   })
 })

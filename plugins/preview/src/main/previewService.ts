@@ -1,6 +1,7 @@
 // Preview's thin Electron adapter over the host-owned view service. Preview still owns its page
 // rules, tunnel headers and CDP binding; native view lifecycle and session isolation are shared.
-import { BrowserWindow, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { createRequire } from 'node:module'
+import type { BrowserWindow, IpcMainEvent, IpcMainInvokeEvent, WebContents } from 'electron'
 import { matchesUrlPattern } from '@acorn/protocol/browserRules.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { bindBrowserContents, unbindBrowserContents } from './browserService'
@@ -40,6 +41,15 @@ export type PreviewViewService = {
   evict(key: string): boolean
   evictMatching(predicate: (key: string) => boolean): void
 }
+
+// `electron` is resolved when registerPreviewIpc is CALLED, not when this module is imported — the
+// same treatment plugins/terminal/src/main/folderPickerIpc.ts gets, for the same reason. A barrel
+// evaluates every module on it, so a static `import { BrowserWindow, ipcMain } from 'electron'` here
+// makes main/index.ts unloadable outside Electron: Node's ESM linker fails on the named exports of
+// electron's CommonJS shim before a line of it runs. The types stay static (they are erased), and only
+// calling this needs a desktop. apps/node/test/integration/mainBarrelLoad.test.ts loads the barrel in
+// plain Node and fails if a static value import comes back.
+const electron = () => createRequire(import.meta.url)('electron') as typeof import('electron')
 
 const previewKey = (taskId: string): string => `preview:${taskId}`
 const isPreviewKey = (key: string): boolean => key.startsWith('preview:')
@@ -90,7 +100,8 @@ export function registerPreviewIpc(deps: {
 }): () => void {
   const { viewService, rulesForTask, tunnelHeadersFor } = deps
   activeService = viewService
-  const winOf = (event: IpcMainInvokeEvent | IpcMainEvent) => BrowserWindow.fromWebContents(event.sender)
+  const { BrowserWindow: browserWindow, ipcMain } = electron()
+  const winOf = (event: IpcMainInvokeEvent | IpcMainEvent) => browserWindow.fromWebContents(event.sender)
   const emit = (owner: BrowserWindow, taskId: string, state: ViewState): void => {
     if (owner.isDestroyed()) return
     const payload: PreviewState = { taskId, url: state.url, loading: state.loading, canGoBack: state.canGoBack, canGoForward: state.canGoForward }

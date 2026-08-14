@@ -21,7 +21,29 @@ plugins/<name>/
     frame/      the sandboxed-frame bundle a LOADED plugin's UI is instead
     contract/   narrow cross-plugin types, capability IDs, and provider contracts
     shared/     types/logic shared by this plugin's runtimes
+  migrations/       the Drizzle chain, if this plugin owns tables
+  tsconfig.json     { "extends": "../tsconfig.base.json", "include": ["src"] }
+  vitest.config.ts  export { default } from '../vitest.shared'
+  drizzle.config.ts export { default } from '../drizzle.shared'   (table-owning plugins only)
 ```
+
+The three config files are one line each on purpose. They were forty-two byte-identical copies, so the
+content moved to `plugins/tsconfig.base.json`, `plugins/vitest.shared.ts` and
+`plugins/drizzle.shared.ts` and each package keeps only the pointer — the same reasoning as
+`tsconfig.base.json` at the workspace root, and all three are in `turbo.json`'s `globalDependencies` so
+editing one invalidates every plugin's cached lint and test. `include` stays in each plugin's tsconfig
+because TypeScript resolves a relative path against the file that declares it, so hoisting it would mean
+seventeen packages typechecking nothing. `package.json` is not hoistable — npm has no `extends` — and
+its identical `exports`/`scripts` blocks stay copied rather than generated.
+
+"Electron-free" in `main/` means loadable, not Electron-ignorant: a plugin's main barrel is imported
+by `apps/node`, which has no Electron, and a barrel evaluates every module on it. So the one or two
+files that genuinely need a desktop resolve it lazily — `createRequire(import.meta.url)('electron')`
+inside the function, with the types imported statically because types are erased
+(`plugins/terminal/src/main/folderPickerIpc.ts`, `plugins/preview/src/main/previewService.ts`). A
+static value import there kills the standalone node at link time, before a line of it runs, and
+`apps/node/test/integration/mainBarrelLoad.test.ts` loads every `plugins/*/src/main/index.ts` in a
+plain Node child to catch it at the commit that causes it.
 
 Not every plugin has every directory. The built-in Claude, Codex, and Aider profiles are registered
 by `plugins/agents`; there are no separate profile packages. Onboarding is a client overlay with
@@ -37,23 +59,42 @@ import. It adds no behavior of its own: it re-exports an enumerated slice of nod
 client-core, and `tools/arch/boundaries.test.ts` enforces both halves of that — plugins reach the
 host only through the facade, and the facade only re-exports.
 
-Six entrypoints:
+**A name is on it because something imports it.** Not because it might be useful — a contract is a promise
+about what will not change, and a promise nobody asked for is one you can only break. Seventy-one names
+came off in one pass on 2026-08-14 — 441 pinned names down to 371, with `TaskRef` the single addition —
+each verified free by counting its consumers two ways: imports through the facade, and imports of the
+same declaration by the deep-import baseline that first-party tests are still migrating off. A name with
+zero on both went; a name reached only by a deep
+import stayed, because deleting it strands a migration rather than removing dead weight. The one
+deliberate exception is `PLUGIN_API_MAJOR`, which is the contract's version and is therefore on the
+surface by definition. Anything that turns out to be missing is one line to add back, under the
+add-is-free rule below.
+
+Eight entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
-| `@acorn/plugin-api/node` | `NodePlugin` and the context types, the route toolkit (`AppEnv`, `requireUser` and friends, `respondError`, the bridge), per-plugin SQLite and migrations, the `CoreServices` type, capability ids, provider and integration contracts |
-| `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, and the design system's plain functions (`cx`, `token`, metrics) |
+| `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser` and friends, `respondError`, the bridge, `portableCarrier`), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef`/`TaskRef` projections, `capabilityId`, provider and integration contracts |
+| `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, and the design system's plain functions (`token`, the metrics, the status/display vocabulary) |
 | `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives (including the `ListDetail` two-column pane layout), `Icon`, `Picker`, `Modal`, `Tabs`, and the diff rows |
 | `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass |
 | `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
-| `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims |
+| `@acorn/plugin-api/ui/editor` | The host-owned Monaco surface: the theme and the language map. Compiled panes only, and browser-realm only — it pulls in `monaco-editor`, which reads `window` at module scope |
+| `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims, plus `mountFrame` |
+| `@acorn/plugin-api/testkit` | Test scaffolding: a real plugin context and request context, temp-directory databases, the auth gate, core's tables for seeding fixtures, and the manifest validator |
 
 The line between `/client`, `/ui`, and `/ui/host` is drawn by the runtime, not by taste. Solid
 compiles a component to code that touches `window` at module scope, so `/client` remains free of
 `.tsx`. The frame-safe `/ui` barrel reaches only the pure `client-core/src/ui/` presentation tree;
 router/query/registry-connected components sit on `/ui/host`. The facade is declared side-effect
-free so a frame bundle retains only the named presentation components it imports. Boundary tests
-enforce all three properties.
+free so a frame bundle retains only the named presentation components it imports.
+
+Boundary tests grep for those properties, and `packages/plugin-api/src/entrypoints.test.ts` executes
+them: it imports every entrypoint except `/ui`, `/ui/host` and `/ui/editor` in a node-environment
+vitest worker, which is the same shape a plugin's own suite runs in. That is the check that matters,
+because the property is transitive — a `.tsx` module three hops behind `/client` breaks a plugin's
+tests just as thoroughly as one named in the barrel — and it doubles as enforcement of the
+side-effect-free claim.
 
 `packages/plugin-api/src/surface.snapshot.txt` pins every exported name. A change to the surface
 fails that test until the snapshot is regenerated
@@ -62,12 +103,66 @@ should be a deliberate act. The implementation still lives in
 `packages/node-core/src/server/plugin/types.ts` and
 `packages/client-core/src/registries/plugin.ts`, which stay free to move files around underneath.
 
-Two things stay outside the facade. `@acorn/protocol` is the shared wire-type package and is
-imported directly. And plugin TEST code may still reach node-core and client-core: a test that seeds
-core's tables, builds a real `CoreServices` or opens a temp-directory database is reaching for the
-host rather than for an API, and a second ratchet in the boundaries test reviews what it reaches.
-That is a first-party privilege; a third-party author gets a testkit entrypoint if and when one is
-built.
+**Adding a name is free. Removing one is a major bump.** The snapshot's first line records the
+`PLUGIN_API_MAJOR` it was written under, and regeneration REFUSES to drop a name while that major is
+unchanged — it prints the names that would vanish and tells you to bump or put them back. That is not a
+style rule: the major is compared by exact string match at plugin load, at install, and at client bundle
+resolution, so a plugin built against a surface that has since lost a name does not degrade gracefully, it
+fails to resolve a symbol at run time in someone else's process with no version having said so. Bumping
+without regenerating fails the same test, so the pair cannot drift apart in either direction. Bumping
+means editing `packages/protocol/src/pluginApiVersion.ts` and rebuilding every loaded package
+(`pnpm --filter @acorn/node build:plugin <id>` per package, plus
+`pnpm --filter @acorn/desktop run build:bundled-plugins`) — a stale package keeps the old number and stops
+loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one names.
+
+**Hono and drizzle are part of the tier-1 contract, and that is a decision, not an oversight.**
+`PluginRouteRegistry.register` takes a `Hono<AppEnv>` and `PluginDatabase` is
+`ReturnType<typeof drizzleOverSqlite> & …`, so a compiled-in plugin shares the host's HTTP framework and
+query builder by construction — thirteen plugins declare `hono` and eight `drizzle-orm` as their own
+dependencies. That stays. Abstracting either means writing a routing layer and a query layer of our own,
+which is a bigger and less useful thing than the coupling it removes, and first-party code in the same
+binary sharing the host's frameworks is the normal case rather than a leak.
+
+The loaded tier is where the line is drawn, and it is drawn in exactly one and a half places:
+
+- **Routing: genuinely neutral.** A loaded plugin serves `ctx.routes.fetch` — a `Request` in, a `Response`
+  out, with `portableCarrier` moving the request context across the boundary. Nothing in that signature
+  names a framework. The four loaded packages that use Hono to build their routes bring *their own copy*;
+  the host neither supplies nor requires it.
+- **Storage: neutral lifecycle, drizzle handle.** `ctx.storage.open()` means the host owns the filename,
+  the migration run and the close, so a plugin never picks a database path or discovers a chain by
+  filesystem proximity. But what it hands back is still a drizzle handle, and `database` and `http` declare
+  `drizzle-orm` because of it. That is the one framework that crosses into tier 2, said plainly rather
+  than papered over. The ceiling on fixing it is the same as above — a query layer of our own — so it is
+  not being fixed.
+
+So: nothing NEW should push a framework across the tier-2 boundary, and the two carriers that already
+exist are the ones to widen if a third-party author needs more.
+
+One thing stays outside the facade: `@acorn/protocol`, the shared wire-type package, which is
+imported directly.
+
+Test code crosses the same seam as production code, through `@acorn/plugin-api/testkit`. That
+entrypoint exists because the alternative was worse than a deep import: with no way to get a real
+plugin context, every plugin forged one — `{ routes: { register: undefined }, … } as unknown as
+NodePluginContext` — and a forgery cannot fail when the host's context changes, so those tests stayed
+green against a shape that no longer existed.
+
+`makeTestNodeContext({ plugin, permissions?, migrations? })` is therefore not a mock. It calls the
+same `server/plugin/context.ts` the host calls at boot, over a temp data root, so which tier a test
+gets — `routes.register` present or absent, core scoped or whole, storage bound or missing — is the
+host's decision and not the test's. Its `cleanup()` runs the host's own registration rollback.
+`makeTestRequestContext` does the same for a loaded plugin's fetch handler: the real
+`PluginRequestContext`, with canned answers allowed on top for the provider calls a test cannot make
+for real. Alongside them: `makeTestDb`/`makeTestPluginDb`, `testEnv`, `testGate`,
+`seedProviderConnection`, core's `schema` for seeding fixtures, and `validatePluginConfig`, which runs
+the real manifest schema over a plugin's `acorn-plugin.config.mjs` so a bad declaration fails in
+`pnpm test` rather than at the next boot (`apps/node/test/pluginConfigs.test.ts` checks every one).
+
+The testkit is node-environment safe by rule — no components, no `window` — because plugin vitest
+configs are node-env and a barrel evaluates every module on it. First-party tests that still reach
+node-core and client-core directly are a shrinking baseline in the boundaries suite, migrated as they
+are touched; a new deep seam means the testkit is missing something, and the fix goes there.
 
 ## Activation
 
@@ -96,6 +191,16 @@ The host supplies `CoreServices` for confined filesystem access, Git, processes,
 repositories, task context, model generation, preferences, and the machine identity. Plugins do not
 receive the core database handle merely to query shared tables.
 
+What `CoreServices` hands back for a core entity is a PROJECTION, never the row. `projects` answers with
+`ProjectRef` — id, name, path, workspace, GitHub facet — and `tasks` answers with `TaskRef`: id, title,
+projectId, branch, worktreePath, pullNumber, and nothing else. `tasks.load()` used to return
+`typeof schema.tasks.$inferSelect`, which put core's own column names on the plugin contract: renaming a
+column would have broken every plugin with no signal at all, because the surface snapshot pins names and
+cannot see a type change shape underneath a stable one. The six fields on `TaskRef` are exactly what
+plugin code reads; `icon`, `origin`, `status`, `parentId`, `sort`, `createdAt`, `updatedAt` and
+`archivedAt` are read by nobody outside core and stay core's. `taskContext()` and the `WORKTREE_CREATED`
+hook take a `TaskRef` too, so a plugin can hand back what it was given.
+
 It supplies no HTTP client. This list named one, and none exists — see docs/http-client.md for why
 that matters and when it will have to.
 
@@ -118,14 +223,34 @@ Three things differ, and all three follow from the code not being ours:
   a hash-pinned lockfile beside it (`packages/node-core/src/main/pluginInstaller.ts`,
   docs/plugins.md). Uninstalling removes the package and, by default, leaves its
   SQLite file alone. Each device then asks its own owner before running the plugin's interface code.
-- **Failures are contained.** A built-in throwing from `init` still fails the boot — it is first-party
-  code in the same binary, and a node that cannot assemble should say so. A loaded plugin throwing has
-  its registrations rolled back, is reported through the roster (`state: 'failed'`) and the attention
-  inbox, and the node keeps starting.
+- **Failures are contained, and every failure names itself.** A built-in throwing from `init` still
+  fails the boot — it is first-party code in the same binary, and a node that cannot assemble should say
+  so. A loaded plugin throwing has its registrations rolled back, is reported through the roster
+  (`state: 'failed'`) and the attention inbox, and the node keeps starting.
+
+  A failed roster row carries `reason` and `stage` alongside `failedAt`. `stage` is `'init'` or
+  `'ready'` for a plugin that ran and threw, and `'load'` for a package that never ran at all: a
+  manifest that does not parse (the reason names the offending field paths, not just "does not match the
+  schema"), an `apiVersion` this node does not speak, an id a second directory already claims, a bundle
+  that throws on import, a wrong default export. Those load failures used to end at a `console.error`
+  in the node's stdout, which a packaged app shows to nobody — and a package whose bundle would not
+  import read as `pending-restart`, with a Restart banner that restarting could never clear because
+  restarting re-ran the same failing import. A load failure is now `state: 'failed'` with its reason,
+  raises no banner, and a package the loader dropped before it could even be listed still gets a row.
+
+  `reason` is a **loaded plugin's own text on its way to the owner's UI**: display-only, capped by the
+  node, rendered as text and never as markup. Both fields are optional on the wire, so a client talking
+  to an older node degrades to the generic sentence rather than to nothing. A load failure is a fact
+  about the boot that observed it, so fixing the package on disk leaves the row reading `failed` with
+  its original reason until the restart that re-reads it.
 - **The context is shaped by the manifest.** `permissions.node` decides which `CoreServices` facets
   and capability ids the plugin can see; `ctx.routes.register` (Hono), `ctx.events.channel` and
   `ctx.events.streams` are never present, whatever the manifest says. A loaded plugin serves routes as
-  `ctx.routes.fetch(handler)` instead — a `(Request, PluginRequestContext) → Response` function. The
+  `ctx.routes.fetch(handler)` instead — a `(Request, PluginRequestContext) → Response` function. A
+  plugin that wants Hono anyway wraps its router in `portableCarrier(id)` from
+  `@acorn/plugin-api/node`, which hands back the `portableFetch` wrapper and the matching
+  `requestContext(c)` accessor; that pairing used to be fifteen pasted lines per plugin, and the four
+  loaded plugins are its callers. The
   request context projects authenticated identity plus a provider runtime; it exposes provider-owned
   resource, connection and external-item operations without exposing Hono, the core database, or the
   secret service. The external-item calls exist for the read no per-connection resource can express —
@@ -165,9 +290,59 @@ directory carries it, and a real install is protected exactly as before. Because
 is still checked first — deliberately, so a marker file cannot override ownership — `build:plugin` also
 clears a `user` row for the id it is writing: that row is a claim about how the directory got there, the
 script is authoritatively changing that, and without this a developer already trapped by a pre-marker
-build would stay trapped through any number of rebuilds.
-Packaged client bytes are trusted only after Electron main reads and hashes its own application
-resource; a node cannot acquire that trust by labelling a roster row as bundled.
+build would stay trapped through any number of rebuilds. Under `--package-root` the script cannot clear
+that row — the staged output is not going into that data root, and could be for a different machine's —
+so it prints the row, the file and the fix instead. Both Node hosts also report every ownership row at
+boot (`reconcileBundledPackages` in `apps/node/src/server/composition.ts`), because reconciliation's
+"declined to update" list can only name a package it had a newer copy of, and the whole failure mode is a
+frozen package on a node that has no newer copy to decline.
+Bundled client bytes are trusted only after Electron main reads and hashes its own application
+resource directory; a node cannot acquire that trust by labelling a roster row as bundled.
+
+### The dev loop
+
+Seeing a change to a loaded plugin run used to be four steps and a page of host knowledge: rebuild by
+hand, restart the node, reload the renderer, answer a trust dialog per bundled package. Three of the four
+are the host's business, so the host does them.
+
+```sh
+pnpm dev:plugin rollbar     # rebuild the package on every save
+pnpm dev:node               # and this restarts itself when the bundle changes
+```
+
+`pnpm dev:plugin <id>` (`apps/node/scripts/dev-plugin.mjs`) watches the plugin's `src/`, its
+`acorn-plugin.config.mjs` and its migration chain, and re-runs `build-plugin.mjs` — a fresh process per
+rebuild, so there is no module cache to invalidate. It builds wherever `build-plugin.mjs` would: the dev
+data root by default, or `-- --package-root ../desktop/out/bundled-plugins` to write into the desktop's
+staging directory instead, which is the one to use when iterating on a **bundled** plugin's frame under
+`pnpm dev` (that directory is the copy the app trusts and reconciles from).
+
+A malformed `acorn-plugin.config.mjs` no longer waits for a rebuild or a boot to announce itself:
+`validatePluginConfig` (`@acorn/plugin-api/testkit`) runs the real manifest schema over it, and
+`apps/node/test/pluginConfigs.test.ts` does that for every loadable plugin at `pnpm test` time.
+
+The node restart is the step that is real rather than ritual: a loaded plugin's routes, tables and jobs
+wire at init, so a rebuilt bundle is not live until the node re-runs it. Under `pnpm dev:node` node's own
+`--watch` sees the rewritten bundle and restarts for you. Under the desktop, use Settings → Plugins →
+Restart: it re-runs reconciliation and reloads the renderer, which is the other half — frame
+contributions resolve once per session, so the client has to re-ask.
+
+**Boot** trust prompts are gone from development, because a development build acknowledges the bundled
+first-party roster on exactly the terms a packaged build does — the same directory, read and hashed by
+Electron main (`apps/desktop/src/app/main/bundledPluginTrust.ts`). This is parity, not a widening: a
+hand-installed package, a third-party one, and anything a node serves this device still prompt. Set
+`ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` to get the prompts back when the trust flow itself is what you are
+working on.
+
+Mid-session rebuilds are not covered, and the reason is structural: the grant is made once, at Electron
+boot, over the bytes in the staging directory, and trust is keyed by `(pluginId, hash)`. Rebuild a client
+bundle while the app is running and its new hash has never been granted, so the next registration pass
+prompts — once, and not again after a relaunch. Rebuilding into the data root instead (a plain
+`build:plugin`, or a package served by a paired `dev:node`) is outside the grant entirely and prompts per
+rebuild by design; the marker that would let the host recognise a dev build cannot be a security signal
+(`packages/node-core/src/main/bundledPlugins.ts` says why). So: iterate on a client bundle with
+`--package-root` into `apps/desktop/out/bundled-plugins` and relaunch, and a node-only change needs no
+prompt at all.
 
 Four first-party packages ship this way and none is also present in the compiled composition.
 Rollbar was the first production caller of the route, descriptor and frame seams. `model-providers` is
@@ -178,7 +353,9 @@ a `refPanel` frame that ANOTHER plugin renders, a descriptor rail source with ho
 declarative `contentLinks`, a command and a keybinding. HTTP is the other end from model-providers —
 the only one that owns TABLES, so it is the only production caller of `ctx.storage` and of a
 manifest-declared migration chain, and it also serves an `agentContexts` descriptor from its own
-routes. Read it for the storage seam, read linear for the two surfaces rollbar does not
+routes. Read it for the manifest half of the storage seam — the seam itself is shared with the compiled
+tier now, so its whole node half is an `init` that opens storage and registers one route, with no
+`dispose` at all. Read linear for the two surfaces rollbar does not
 exercise, and read `docs/third-party/README.md` for what all of these moves cost. The loader still supports a package id shadowing a built-in during
 a staged migration; when that happens it drops the compiled copy from the graph and logs which
 directory won.
@@ -216,6 +393,23 @@ kinds of contribution come out of one manifest:
   reserved JSX attribute that Solid compiles into a DOM setter, so a props member of that name silently
   arrives as a function instead of data. `tools/arch/boundaries.test.ts` holds the line, because
   TypeScript cannot — Solid declares `ref` on `IntrinsicAttributes`.
+
+  A frame's boot is one call. `mountFrame({ styles }, (bridge, root) => …)` on `/ui/sdk` injects the
+  plugin's inlined stylesheet, makes the root element, mounts the frame-side tooltip listener (a frame
+  has its own document, so the shell's delegated singleton cannot see it and every `data-tip` inside
+  is otherwise inert), waits for the bridge, and paints an alert banner on the root if the handshake
+  never lands. It takes a render CALLBACK rather than a component so the entrypoint stays
+  framework-free: the four first-party frames happen to use Solid, the sandbox allows anything.
+
+  A frame has to say hello. The SDK posts one `connected` message the moment `connect()` resolves, and
+  the host starts a deadline when it transfers the port: a frame that never sends anything is replaced by
+  a labelled "This plugin’s UI failed to start" placeholder instead of staying a blank rectangle, which
+  is what a bundle throwing at module scope used to render. Any message counts as the acknowledgement, so
+  a bundle built before the ack existed clears the deadline as soon as it calls the bridge; a purely
+  static frame from such a bundle needs rebuilding. A surface the device could not register at all —
+  usually a contribution id a first-party pane already owns, since ids are un-namespaced by design — is
+  skipped so the rest of the plugin still works, and reported in the attention inbox rather than only in
+  the console.
 
   The bridge's `api` surface is five verbs — `get`, `post`, `put`, `patch`, `del` — matching
   `PluginBridgeApiRequest.method` exactly. That last part is the rule rather than a coincidence: a method
@@ -702,16 +896,32 @@ dependencies, an acyclic package graph, and the client/Node split.
 
 ## Data ownership
 
-Table-owning plugins open one `plugins/<name>.sqlite` file under the Node data root and own its
-migrations. Current table-owning plugins include agents, changes, database, GitHub, HTTP, memory,
-notes, terminal, and workflows. Core owns shared workspace/task/integration/external-item/security
-tables. Docker, editor, Linear, Rollbar, model providers, preview, and the built-in agents profiles
-use core services or provider registries without owning a database file.
+Table-owning plugins get one `plugins/<name>.sqlite` file under the Node data root and own its
+migrations. There are eight: agents, changes, database, GitHub, HTTP, memory, terminal, and workflows.
+Core owns shared workspace/task/integration/external-item/security tables. Docker, editor, Linear,
+Rollbar, model providers, preview, notes and the built-in agents profiles use core services, provider
+registries or plain files without owning a database (notes writes markdown under `<data-root>/notes`).
 
-A loaded plugin that owns tables declares a package-relative `migrations` directory in
-`acorn-plugin.json` and calls `ctx.storage.open()`. The loader confines and validates that chain,
-while the host binds the SQLite filename to the manifest id. No declaration means no storage; there
-is no fallback search outside the package.
+Both tiers get their handle from `ctx.storage.open()`, and the host owns the lifecycle either way: it
+opens the file lazily on the first call, applies the chain, returns the same handle to every later call
+in that boot, and closes it immediately after that plugin's `dispose()` — inside the `plugins` step of
+`NODE_DRAIN_ORDER`, before core's SQLite and before the data-root lock. A plugin's `dispose` is for what
+the plugin itself opened (timers, children, pools, capability slots); GitHub and HTTP need none at all.
+
+What each tier declares:
+
+- **A compiled plugin** sets `migrationsModule: import.meta.url` on its `NodePlugin`. The host walks
+  from that module for the chain, which is how one declaration covers all three runtime layouts —
+  `plugins/<id>/migrations/` in a source tree, `out/migrations/<id>/` in a build, `<resources>/migrations/<id>/`
+  when packaged (`packages/node-core/src/main/pluginMigrations.ts`).
+- **A loaded plugin** declares a package-relative `migrations` directory in `acorn-plugin.json`. The
+  loader confines and validates that chain and the host binds the filename to the manifest id. A
+  `migrationsModule` on a loaded plugin's exported object is IGNORED — a bundle must not be able to point
+  the migrator outside its own package.
+
+No declaration means no storage: `ctx.storage` is absent, and reaching for it is an immediate
+"not a function". There is no fallback search, and a plugin never names the file, the data root, or the
+directory its chain lives in.
 
 HTTP is the only plugin on that path, and it is what makes the rest of this paragraph real rather than
 designed: `build-plugin.mjs` stages the declared directory into the package it builds — a chain that
@@ -740,8 +950,72 @@ databases directly.
 
 1. Put the behavior in the owning plugin and choose the correct runtime directory.
 2. Use CoreServices rather than importing core implementation modules or another plugin's internals.
+   If it needs tables of its own, declare the chain (§ Data ownership) — do not open a database.
 3. Add a narrow `contract/` export, capability, or client registry entry when collaboration is
    needed; `ctx.events` if the renderer needs telling.
-4. Register the Node/client entry in the appropriate composition list.
+4. Register the Node/client entry in the appropriate composition list (named below).
 5. Add package-local tests and, for rendered behavior, desktop e2e coverage.
-6. Run the architecture test, `pnpm lint`, and the relevant tests.
+6. Regenerate the golden lists (below) and read the diff before you commit it.
+7. Run the architecture test, `pnpm lint`, and the relevant tests.
+
+### The files a contribution touches
+
+None of this is discoverable from a stack trace, so it is written down here rather than met as red CI. A
+contribution INSIDE an existing compiled plugin — a pane, a rail source, a route, a tool, a settings page —
+touches that plugin's own `src/` and then only the golden lists. A whole new compiled plugin also touches:
+
+- `plugins/<id>/package.json`, plus the three one-line config files (§ Package shape). Nothing lists the
+  plugin anywhere: `scripts/db.mjs` finds `drizzle.config.ts` by scanning, and `pnpm lint`/`pnpm test` reach
+  the package through the workspace.
+- `apps/node/src/server/plugins.ts` — the Node activation list. A plugin that is not in it does not exist in
+  that Node. If it needs an adapter only the composition root can build, `NodePluginDeps` grows a key here
+  and the adapter itself goes in `apps/node/src/server/pluginDeps.ts`, which builds the bag once for both
+  composition roots.
+- `apps/desktop/src/app/client/plugins.ts` — the client activation list. Rail and pane ORDER is a declared
+  field on the contribution, not a position in this array.
+- `apps/node/package.json` and `apps/desktop/package.json` — each needs `"@acorn/plugin-<id>": "workspace:*"`
+  for the half it composes, the Node one for `node/`, the desktop one for `client/`. A plugin with only one
+  half needs only that one entry.
+
+A LOADED plugin instead needs one row in `BUNDLED_PLUGINS` in `apps/desktop/scripts/build-bundled-plugins.mjs`
+and its own `acorn-plugin.config.mjs`, and touches no composition list and no golden list: the manifest is
+the record, validated at parse time, and it carries the panes, sources, order and chords the compiled lists
+would otherwise hold. (Several loaded packages do have an `apps/node` dependency entry, but only because that
+app's own tests import them directly — nothing composes them.) Stylesheets are central in neither tier — a plugin's CSS sits next to its component
+and is imported by it, and `tools/arch/boundaries.test.ts` enforces that no plugin reaches into another's.
+
+### The golden lists
+
+Four test files hold an exact, reviewed record of what each COMPILED plugin claims. They are snapshots, not
+hand-edited tables, and one command rewrites all four:
+
+```sh
+UPDATE_PLUGIN_GOLDENS=1 pnpm --filter @acorn/desktop --filter @acorn/node test
+```
+
+- `apps/desktop/test/client/parity.snapshot.json` — every compiled pane with its order and chord, and every
+  rail source with its order (`parity.test.ts`).
+- `apps/desktop/test/client/clientPluginDisable.snapshot.json` — every client registry entry, and which
+  optional plugin owns each one (`clientPluginDisable.test.ts`).
+- `apps/node/test/integration/routeRegistry.snapshot.json` — every `/v2/p/<plugin>/…` route the compiled
+  plugins mount (`routeRegistry.test.ts`).
+- `apps/node/test/integration/pluginDisable.snapshot.json` — the full Node boot's routes, tools, context
+  sections, providers and databases, and which optional plugin owns each (`pluginDisable.test.ts`).
+
+Every assertion is exact equality against the file, never a subset, so a contribution that silently VANISHES
+fails as loudly as one that appears. That is also what makes the diff the point: regenerating is a deliberate
+act, and the snapshot diff is the only place a reviewer sees what a plugin now claims — a disable that took a
+sibling's entry with it shows up there as that entry sitting in the wrong plugin's slice. Regenerate in its
+own commit hunk and say why the list moved.
+
+Three things in those files stay hand-written, and should keep costing a deliberate edit: the `required` list
+in `pluginDisable.test.ts` (`agents`, `memory`, `notes`, `terminal`), because which plugins may not be turned
+off is policy and deriving it from `p.required` would assert nothing; the anti-vacuity floors, which are what
+stops an exact match against an empty snapshot passing; and the prose above each snapshot read, explaining
+what is ABSENT and why, which a generated file cannot say for itself.
+
+Two neighbours have the same shape and different commands. `packages/plugin-api/src/surface.snapshot.txt`
+pins the facade's exports and regenerates with `UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`; a
+contribution touches it only if it needs a new export from `@acorn/plugin-api`. The exact-set baselines in
+`tools/arch/boundaries.test.ts` are ratchets rather than snapshots — they may only shrink, and no flag
+rewrites them.

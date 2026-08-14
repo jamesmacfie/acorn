@@ -16,7 +16,7 @@ import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 import { MAX_CRASHES_PER_WINDOW, recordCrash } from './crashBudget'
 import { WebviewService } from './webviewService'
-import { trustBundledClientPlugins } from './bundledPluginTrust'
+import { trustBundledClientPlugins, trustsBundledClientPlugins } from './bundledPluginTrust'
 
 export type BootstrapOptions = {
   dataDir: string
@@ -109,10 +109,12 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const pluginCache = new PluginCache(userDataDir, broker)
   pluginCache.sweep()
   const pluginTrust = new PluginTrustStore(userDataDir)
-  // In a packaged build these exact bytes are part of the application the owner installed. Cache and
-  // acknowledge them locally before the renderer asks for plugin state, so a node cannot turn the
-  // "bundled" label into an auto-trust primitive for arbitrary remote bytes.
-  if (app.isPackaged) trustBundledClientPlugins(bundledPluginsDir, app.getVersion(), pluginCache, pluginTrust)
+  // These exact bytes are part of the application this process is: `resourcesPath` when packaged, the
+  // build's own `out/bundled-plugins` when not. Cache and acknowledge them locally before the renderer
+  // asks for plugin state, so a node cannot turn the "bundled" label into an auto-trust primitive for
+  // arbitrary remote bytes. `trustsBundledClientPlugins` owns the one condition, and says why it is not
+  // `app.isPackaged`.
+  if (trustsBundledClientPlugins()) trustBundledClientPlugins(bundledPluginsDir, app.getVersion(), pluginCache, pluginTrust)
   const disposePluginIpc = registerPluginIpc(pluginCache, pluginTrust)
   // The origin plugin UI renders on (docs/plugins.md). Registered here rather
   // than beside registerAppScheme in electron.ts because it serves out of the cache above and nothing

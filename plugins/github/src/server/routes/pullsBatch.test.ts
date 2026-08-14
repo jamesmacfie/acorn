@@ -59,7 +59,12 @@ const makeDb = () =>
 // because the batch is fully fresh.
 const noIntegrations = { select: () => ({ from: () => ({ where: async () => [] }) }) } as unknown as Env['DB']
 
-const env = () => ({ DB: noIntegrations, ...testSecretEnv('0'.repeat(64)) }) as unknown as Env
+// `BLOBS` is here because the route hands `readFiles` a blob store rather than the whole binding set:
+// `readFiles(env: Env, …)` named SECRETS/ACTIVE_IDENTITY/INTERNAL_TOKEN to reach two methods, so it now
+// takes the two methods (prMirror.ts § PatchBlobStore). A fixture that omitted them passed only because
+// `Env` was an object and `expect.anything()` does not look inside one.
+const blobs = { get: vi.fn(async () => null), put: vi.fn(async () => undefined) }
+const env = () => ({ DB: noIntegrations, BLOBS: blobs, ...testSecretEnv('0'.repeat(64)) }) as unknown as Env
 
 let app: Hono<AppEnv>
 
@@ -117,13 +122,13 @@ describe('pulls batch route', () => {
         ],
       },
     ])
-    expect(readFiles).toHaveBeenCalledWith(expect.anything(), expect.anything(), { userId: 'james', repoId: 19847, number: 42 }, { includePatches: false })
+    expect(readFiles).toHaveBeenCalledWith(blobs, expect.anything(), { userId: 'james', repoId: 19847, number: 42 }, { includePatches: false })
   })
 
   it('keeps full file payloads as the backward-compatible default', async () => {
     const res = await app.fetch(jsonRequest({ numbers: [42] }), env())
 
     expect(res.status).toBe(200)
-    expect(readFiles).toHaveBeenCalledWith(expect.anything(), expect.anything(), { userId: 'james', repoId: 19847, number: 42 }, { includePatches: true })
+    expect(readFiles).toHaveBeenCalledWith(blobs, expect.anything(), { userId: 'james', repoId: 19847, number: 42 }, { includePatches: true })
   })
 })

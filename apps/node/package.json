@@ -11,6 +11,7 @@
     "test": "vitest run",
     "build": "vite build",
     "build:plugin": "node scripts/build-plugin.mjs",
+    "dev:plugin": "node scripts/dev-plugin.mjs",
     "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/server/standalone.ts"
   },
   "dependencies": {

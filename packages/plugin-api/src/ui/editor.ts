@@ -10,5 +10,10 @@
 //
 // Compiled first-party panes only. A LOADED plugin never drives an editor: it declares a document
 // surface in its manifest and the host draws the whole thing.
-export { applyMonacoTheme, MONACO_THEME, watchMonacoTheme } from '@acorn/client-core/editor/theme.ts'
-export { monacoLanguageFor, monacoLanguageForPath } from '@acorn/client-core/editor/language.ts'
+//
+// Two names, one per module, came off here in the prune pass (docs/plugins.md § The plugin API):
+// `applyMonacoTheme` (which `watchMonacoTheme` already calls, once, on subscribe) and the by-language-id
+// `monacoLanguageFor` (a pane holds a path, so it wants `monacoLanguageForPath`). Both are still core's,
+// reachable inside client-core; neither was reached from outside it.
+export { MONACO_THEME, watchMonacoTheme } from '@acorn/client-core/editor/theme.ts'
+export { monacoLanguageForPath } from '@acorn/client-core/editor/language.ts'

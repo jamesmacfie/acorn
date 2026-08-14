@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,8 +14,10 @@ import { connectionProviderRegistry } from '@acorn/node-core/server/integrations
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { pluginState } from '@acorn/node-core/server/plugin/pluginState.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { assembleNodeGraph } from '../../src/server/composition'
+import { buildPluginStateBridge } from '../../src/server/pluginState'
 
 // The dogfood (docs/plugins.md). Rollbar's two halves are built into a real package and loaded off
 // disk, which exercises the whole path end to end — manifest, bundles, shape check, permission-shaped
@@ -64,6 +66,7 @@ describe('loading rollbar from disk', () => {
       plugins = await initPlugins([loaded[0].plugin], {
         capabilities: new CapabilityRegistry(),
         core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
+        dataDir: dataRoot,
         loaded: new Map([['rollbar', {
           permissions: loaded[0].manifest.permissions.node,
           storage: loaded[0].storage,
@@ -146,6 +149,53 @@ describe('loading rollbar from disk', () => {
     } finally {
       vi.unstubAllEnvs()
       warn.mockRestore()
+    }
+  })
+
+  it('reports a package whose bundle will not import on the roster route, with its reason', async () => {
+    // A SECOND data root holding a copy of the built package, because Node's ESM registry is keyed by
+    // resolved URL: the tests above already imported this entrypoint, so corrupting the same file in place
+    // would hand the loader the cached module and succeed.
+    const broken = mkdtempSync(join(tmpdir(), 'acorn-dogfood-broken-'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const source = pluginDir(dataRoot, 'rollbar')
+      const target = pluginDir(broken, 'rollbar')
+      mkdirSync(dirname(target), { recursive: true })
+      cpSync(source, target, { recursive: true })
+      const manifest = JSON.parse(readFileSync(join(target, 'acorn-plugin.json'), 'utf8')) as { node: string; version: string }
+      // What an author's own typo looks like from here.
+      writeFileSync(join(target, manifest.node), 'export default {\n')
+
+      const { loaded, installed, failures } = await loadExternalPlugins(broken, { builtins: [] })
+      expect(loaded).toEqual([])
+      // Deliberately absent from `installed` too: a package whose node half declared itself and then
+      // failed to import is broken rather than client-only, so its UI is not distributed either.
+      expect(installed).toEqual([])
+      expect(failures).toHaveLength(1)
+      expect(failures[0]).toMatchObject({ id: 'rollbar', reason: expect.stringContaining(`could not import ${manifest.node}`) })
+
+      // And the whole point: what the owner is told. The route is parse → call → respond over this, and
+      // the row it serves used to say 'pending-restart' with a Restart banner that restarting could never
+      // clear, because restarting re-runs the same failing import.
+      const state = pluginState(buildPluginStateBridge({
+        dataDir: broken,
+        roster: () => [],
+        booted: () => [],
+        loadFailures: () => failures,
+        disabled: () => [],
+        setDisabled: () => {},
+        allowLocalPathInstalls: false,
+      }))
+      const row = state.plugins.find((entry) => entry.name === 'rollbar')
+      expect(row).toMatchObject({ state: 'failed', stage: 'load' })
+      expect(row?.reason).toContain('could not import')
+      expect(state.restartRequired).toBe(false)
+    } finally {
+      error.mockRestore()
+      warn.mockRestore()
+      rmSync(broken, { recursive: true, force: true })
     }
   })
 

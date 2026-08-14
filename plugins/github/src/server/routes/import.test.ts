@@ -6,7 +6,6 @@ import { testSecretEnv, makeTestPluginDb, type TestPluginDb } from '@acorn/node-
 import { testGate } from '@acorn/node-core/testkit/auth.ts'
 import type { ProjectRef } from '@acorn/node-core/main/core/index.ts'
 import { repos } from '../../node/schema'
-import { migrationsDir } from '../../node/migrations'
 import { githubImport } from './import'
 
 const principal = { kind: 'device' as const, deviceId: 'device', userId: 'james' }
@@ -22,7 +21,7 @@ describe('GitHub project importer', () => {
   const gitOrThrow = vi.fn()
 
   beforeEach(async () => {
-    plugin = makeTestPluginDb('github', migrationsDir())
+    plugin = makeTestPluginDb('github')
     await plugin.db.insert(repos).values([
       { userId: 'james', id: 101, owner: 'acme', name: 'map-me', private: false, defaultBranch: 'main', pushedAt: null, fetchedAt: Date.now() },
       { userId: 'james', id: 102, owner: 'acme', name: 'clone-me', private: false, defaultBranch: 'main', pushedAt: null, fetchedAt: Date.now() },

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type { NodePluginRow, PluginContributions, PluginFrameSurface } from '@acorn/protocol/api.ts'
+import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, isTaskPane } from './contributions'
 import { _resetPluginDistribution, _seedPluginDistribution } from './distribution'
 
@@ -25,7 +25,9 @@ const row = (name: string, over: Partial<NodePluginRow['installed']> = {}, frame
   state: 'active',
   installed: {
     version: '1.0.0',
-    apiVersion: '1',
+    // The real constant, not '1': the literal made every fixture here a candidate this shell could not
+    // speak the day PLUGIN_API_MAJOR moved, and the failure looked like a bug in resolution.
+    apiVersion: PLUGIN_API_MAJOR,
     permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
     contributions: { frames } as PluginContributions,
     client: null,

@@ -17,7 +17,6 @@ import {
 } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { taskContext } from '@acorn/node-core/server/routes/taskContext.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { migrationsDir as githubMigrationsDir } from '@acorn/plugin-github/node/migrations.ts'
 import { mirroredPullRequest } from '@acorn/plugin-github/server/mirrorQueries.ts'
 import { pullRequests, prFiles, repos } from '@acorn/plugin-github/node/schema.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
@@ -41,7 +40,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
-    gh = makeTestPluginDb('github', githubMigrationsDir())
+    gh = makeTestPluginDb('github')
     notesSource = async () => []
     memorySource = async () => []
     // Sections are registered per owner now (server/plugin/types.ts § PluginContextSectionRegistry), so the

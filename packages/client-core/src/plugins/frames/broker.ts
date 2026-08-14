@@ -145,8 +145,13 @@ export function createFrameBridge(input: {
   // Called when the rate limiter trips. The port is already dead by then; the host shows a
   // "plugin misbehaving" placeholder in place of the surface.
   onMisbehaving(reason: string): void
+  // Called once, on the first message of ANY kind from the frame — the SDK's `connected` ack, or a real
+  // request from a bundle built before that ack existed. It is the host's only evidence that the bundle
+  // evaluated, and it cancels the handshake deadline in PluginFrame.
+  onConnected?(): void
 }): FrameBridge {
   const { port, binding, services, onMisbehaving } = input
+  let spoke = false
 
   const inFlight = new Map<number, AbortController>()
   const detachers: (() => void)[] = []
@@ -439,6 +444,13 @@ export function createFrameBridge(input: {
     if (!event.data || typeof event.data !== 'object') return
     const data = event.data as Record<string, unknown>
     if (typeof data.kind !== 'string') return
+    // Before the budget check, deliberately: even a frame whose first act is to flood the port has
+    // demonstrably started, and reporting it as "failed to start" as well as "misbehaving" would be two
+    // placeholders racing for one rectangle.
+    if (!spoke) {
+      spoke = true
+      input.onConnected?.()
+    }
     const budget = overBudget()
     if (budget) return kill(budget)
     if (data.kind === 'keydown') {

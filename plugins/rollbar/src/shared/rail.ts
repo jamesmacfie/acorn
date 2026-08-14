@@ -1,21 +1,16 @@
-import type { PluginRailItem } from '@acorn/protocol/api.ts'
+import { parseRailItemId, railItemId, type PluginRailItem } from '@acorn/protocol/api.ts'
 import type { RollbarItemSummary } from './api'
 
+// The encoding is the host's (protocol/api.ts § railItemId); these two put Rollbar's names on its two
+// halves, because `integrationId` is what every other Rollbar type calls a connection.
 export type RollbarRailTarget = Pick<RollbarItemSummary, 'integrationId' | 'identifier'>
 
 export const rollbarRailItemId = (target: RollbarRailTarget): string =>
-  `${encodeURIComponent(target.integrationId)}:${encodeURIComponent(target.identifier)}`
+  railItemId(target.integrationId, target.identifier)
 
 export function parseRollbarRailItemId(value: string): RollbarRailTarget | null {
-  const separator = value.indexOf(':')
-  if (separator <= 0 || separator === value.length - 1) return null
-  try {
-    const integrationId = decodeURIComponent(value.slice(0, separator))
-    const identifier = decodeURIComponent(value.slice(separator + 1))
-    return integrationId && identifier ? { integrationId, identifier } : null
-  } catch {
-    return null
-  }
+  const parts = parseRailItemId(value)
+  return parts && { integrationId: parts[0], identifier: parts[1] }
 }
 
 export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {

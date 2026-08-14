@@ -2,7 +2,17 @@
   "$schema": "https://turbo.build/schema.json",
   // tsconfig.base.json supplies the compiler options for every package. Without it here, editing
   // it (e.g. turning off `strict`) leaves all 25 lint tasks on a cache hit and tsc never reruns.
-  "globalDependencies": ["tsconfig.base.json", "pnpm-workspace.yaml"],
+  //
+  // The three plugins/ files are the same hazard one level down: each plugin's tsconfig, vitest and
+  // drizzle config is a one-line re-export of them now, and they sit OUTSIDE every package directory,
+  // so nothing in the default input set would hash them.
+  "globalDependencies": [
+    "tsconfig.base.json",
+    "pnpm-workspace.yaml",
+    "plugins/tsconfig.base.json",
+    "plugins/vitest.shared.ts",
+    "plugins/drizzle.shared.ts"
+  ],
   "tasks": {
     // Transit node. Workspace packages are consumed as SOURCE and have no `build` script, so a
     // `dependsOn: ["^build"]` resolves to nothing and a change in @acorn/node-core would NOT

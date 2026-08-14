@@ -7,7 +7,7 @@ import type { LayoutRecipe, RunTarget } from '../../runConfig'
 import type { AppDatabase } from '../../../server/db'
 import { schema } from '../../../server/db'
 import { broadcastStatus } from '../../notify'
-import { loadTask, projectForTask, resolveTaskCwd, taskRoot, taskRunConfig, workspaceIdFor, type TaskRow } from '../../taskWorktree'
+import { loadTask, projectForTask, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../../taskWorktree'
 import { normalizeGithubPart } from '../../projects'
 import type { CapabilityRegistry } from '../../../server/plugin/capabilities'
 
@@ -29,9 +29,11 @@ export type TaskLinkRef = { provider: string; integrationId: string; identifier:
 export type ChildTaskSeed = { title: string; branch: string }
 
 export type TaskService = {
-  // The tasks row, or undefined when the id does not resolve — the "validated by the owning plugin"
-  // half of a plain-ID reference.
-  load(taskId: string): Promise<TaskRow | undefined>
+  // The task's plugin-facing projection (main/taskWorktree.ts § TaskRef), or undefined when the id does
+  // not resolve — the "validated by the owning plugin" half of a plain-ID reference. A TaskRef, not the
+  // `tasks` row: a drizzle-inferred row here would have made core's column names part of the plugin
+  // contract, which is the same mistake `ProjectRef` exists to avoid.
+  load(taskId: string): Promise<TaskRef | undefined>
   // The task's worktree root, resolving through the project checkout and creating the worktree
   // lazily if needed. null when no checkout is mapped.
   //
@@ -49,17 +51,17 @@ export type TaskService = {
   // `base_ref` preference, which is user-owned — so a caller that HAS an authorizing identity (the
   // workflow runner resolves it from the node's active owner identity) passes it, and one that does not
   // (terminal's spawn path, which runs for whoever is at the keyboard) omits it and gets git's fallback.
-  resolveCwd(task: TaskRow | undefined, baseCheckout: string | undefined, userId?: string | null): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
+  resolveCwd(task: TaskRef | undefined, baseCheckout: string | undefined, userId?: string | null): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
   // Run targets + cwd for a task: project settings merged with the project's committed
   // `.acorn/config.toml`. plugins/terminal's RuntimeService is the only consumer, and it cannot read
   // either source itself — one is a core table, the other needs the lazily-created worktree.
   runConfig(taskId: string): Promise<TaskRunConfig>
   // Every non-archived task. Two plugins need the whole set rather than one id: docker matches every
   // live container against every active task's worktree/branch to build the rail badge, and memory
-  // reconciles its file index from every active worktree. Full rows because those two read different
-  // columns (docker: id/worktreePath/branch; memory: worktreePath/projectId) and a narrowed
-  // projection would just be the union of both.
-  active(): Promise<TaskRow[]>
+  // reconciles its file index from every active worktree. The union of what those two read (docker:
+  // id/worktreePath/branch; memory: worktreePath/projectId) is a subset of TaskRef, so they get refs
+  // like every other reader; `status` stays core's because the filter is already applied here.
+  active(): Promise<TaskRef[]>
   // The workspace a task belongs to, resolved task → project → workspace membership. Throws when the task or
   // its membership is missing, because the one caller (plugins/notes' `notes_*` tools with
   // `scope: 'workspace'`) has no meaningful degraded answer: a workspace-scoped note has to land in a
@@ -138,11 +140,14 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
       await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
       return updates.length
     },
-    load: (taskId) => loadTask(db, taskId),
+    load: async (taskId) => {
+      const row = await loadTask(db, taskId)
+      return row && toTaskRef(row)
+    },
     root: (taskId, userId = null) => taskRoot(db, taskId, userId, capabilities),
     resolveCwd: (task, baseCheckout, userId = null) => resolveTaskCwd(db, task, baseCheckout, userId, capabilities),
     runConfig: (taskId) => taskRunConfig(db, taskId, capabilities),
-    active: () => db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')),
+    active: () => db.select(TASK_REF_COLUMNS).from(schema.tasks).where(eq(schema.tasks.status, 'active')),
     workspaceId: (taskId) => workspaceIdFor(db, taskId),
     // Built from the same two queries as `workspaceIdFor` rather than by catching its throw: catching cannot tell
     // "no membership" from "the database is broken", which is the whole point of this method existing.

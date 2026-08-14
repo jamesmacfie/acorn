@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NodePluginRow, PluginContributions, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
+import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginSourceEmptyState } from '@acorn/protocol/api.ts'
 
 const readJson = vi.fn()
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
@@ -43,7 +43,8 @@ const row = (name: string, over: Partial<NodePluginRow> = {}, declared: Partial<
   state: 'active',
   installed: {
     version: '1.0.0',
-    apiVersion: '1',
+    // The real constant: a literal here fails the day PLUGIN_API_MAJOR moves, for no reason this file is about.
+    apiVersion: PLUGIN_API_MAJOR,
     permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
     contributions: contributions(declared),
     client: null,

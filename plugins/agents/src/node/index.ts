@@ -1,4 +1,4 @@
-import { agentProfileRegistry, getProfile, type InternalEnvFactory, type NodePlugin, openPluginDb, resolveCommand } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -13,7 +13,6 @@ import { createAgentUsageService } from '../main/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
-import { migrationsDir } from './migrations'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../main/index'
 
 let builtInProfileDisposables: (() => void)[] | null = null
@@ -49,23 +48,26 @@ export type AgentsPluginDeps = {
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
 }
 
+// `dataDir` stays a parameter, unlike changes' and github's: the runtime writes attachments, artifacts
+// and the usage probe under the data root, so this plugin needs the path for more than its database.
 export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugin => {
-  let db: ReturnType<typeof openPluginDb> | null = null
   let runtime: ManagedAgentRuntime | null = null
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   return {
     name: 'agents',
     required: true,
+    // This module's own URL: the chain sits at plugins/agents/migrations beside it, and the host owns
+    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    migrationsModule: import.meta.url,
     init: (ctx) => {
       registerBuiltInProfiles()
       registerBuiltInDrivers()
-      // Opened and migrated before the listener binds: the runtime below closes over the handle and
+      // Opened and migrated by the host before init returns: the runtime below closes over the handle and
       // fills both bridges in this same call, so no request and no provider spawn can reach an
       // unmigrated database. This chain also creates `agent_events_fts` and its three triggers by hand
       // — drizzle-kit cannot model a virtual table (node/schema.ts).
-      db = openPluginDb(dataDir, 'agents', { migrationsFolder: migrationsDir() })
-      const store = db
+      const store = ctx.storage.open()
       const core = ctx.core
 
       runtime = new ManagedAgentRuntime({
@@ -136,9 +138,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     // Everything init reached out and touched, in reverse. The runtime's stop() is the load-bearing part
     // and it does four things a second boot in one process would otherwise inherit: cancel the pending
     // provider-reconnect timers, stop every live provider child, flush the durable event buffer's
-    // per-session timers, and stop the webhook delivery pump. Only then is the WAL-mode SQLite file
-    // closed — the composition root's teardown invariant, and here also the ordering that keeps the
-    // final transcript rows durable, since every step above may still write one.
+    // per-session timers, and stop the webhook delivery pump. All of it still runs BEFORE the WAL-mode
+    // SQLite file is closed, because the host closes it after this resolves — which is the ordering that
+    // keeps the final transcript rows durable, since every step above may still write one.
     //
     // The two bridge slots are cleared explicitly rather than trusting teardown order: without that, a
     // second startServiceRuntime in one process would serve agent requests through the first boot's
@@ -150,8 +152,6 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       usageRoute?.dispose()
       for (const dispose of builtInProfileDisposables ?? []) dispose()
       builtInProfileDisposables = null
-      db?.close()
-      db = null
     },
   }
 }

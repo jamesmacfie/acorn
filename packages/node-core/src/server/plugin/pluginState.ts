@@ -1,6 +1,6 @@
 import { routeCapability } from '../bridge'
 import type { PluginRosterEntry } from './host'
-import type { InstalledPluginInfo } from '../../main/pluginLoader'
+import type { InstalledPluginInfo, PluginLoadFailure } from '../../main/pluginLoader'
 import type {
   InstalledPluginRow,
   NodePluginRow,
@@ -36,6 +36,14 @@ export type PluginsBridge = {
   // What this process actually loaded, at the version it loaded. The counterpart to `installed()`, and
   // the only way to tell "installed and running" from "installed since the last restart".
   booted(): readonly { id: string; version: string }[]
+  // Why a package on disk produced no plugin at THIS boot: a manifest that does not parse, an apiVersion
+  // mismatch, an id collision, a bundle that threw on import, a wrong default export. The loader has always
+  // built these and then printed them to a stdout the packaged app shows to nobody; this is the seam
+  // that carries them out.
+  //
+  // A boot snapshot, unlike `installed()`, because that is what it is a fact about. The consequence is
+  // named where it bites, in `rows` below.
+  loadFailures(): readonly PluginLoadFailure[]
   // The client bundle's bytes, hashed at read time. Kept on the bridge rather than done in the
   // route because the file lives under the data root, which the server layer has no handle on.
   clientBundle(id: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; hash: string } | null>
@@ -70,10 +78,24 @@ type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
 const DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW: Exact<keyof DeclaredRow, keyof InstalledPluginRow> = true
 void DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW
 
+// The ceiling on failure text leaving this node. A thrown message can be a whole stack, a Zod dump or
+// whatever a third-party bundle chose to put in an Error; this row is read by a notification row and a
+// settings line, and one sentence is what either can render. Capped here rather than at the two render
+// sites so there is one number, and truncated rather than dropped because the first sentence is almost
+// always the useful one.
+const MAX_REASON_CHARS = 400
+
+const trimReason = (reason: string | undefined): { reason?: string } => {
+  const text = reason?.trim()
+  if (!text) return {}
+  return { reason: text.length > MAX_REASON_CHARS ? `${text.slice(0, MAX_REASON_CHARS - 1)}…` : text }
+}
+
 // The running plugin set, plus the pending one. They differ exactly when a toggle has been saved and
 // the node has not restarted, which is the state the UI has to render.
 export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; restartRequired: boolean } => {
   const pending = new Set(bridge.disabled())
+  const loadFailed = new Map(bridge.loadFailures().map((failure) => [failure.id, failure]))
   const installed = new Map(bridge.installed().map((entry) => [entry.id, entry]))
   // What this process loaded, at the version it loaded. A package on disk that is absent here, or here
   // at a different version, arrived after the last start; one here but no longer on disk was
@@ -114,6 +136,8 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     // init throws, so it must not raise the banner even if its directory also changed.
     state: entry.state === 'failed' ? 'failed' : stale(entry.name) ? 'pending-restart' : entry.state,
     ...(entry.failedAt === undefined ? {} : { failedAt: entry.failedAt }),
+    ...(entry.state === 'failed' ? trimReason(entry.reason) : {}),
+    ...(entry.stage === undefined ? {} : { stage: entry.stage }),
     ...declared(entry.name),
   }))
   // Packages the plugin host never saw. Two kinds, and they are not the same answer:
@@ -123,18 +147,62 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   //     host on a roster change (apps/desktop client/activate.ts disposes-then-registers).
   //   just installed — it HAS a node half that this process never loaded. Not running, and a restart is
   //     exactly what makes it run.
+  //   failed to load — it has a node half that this process TRIED to load and could not. This was the
+  //     worst row in the system: it is absent from `booted()` for the same reason a fresh install is, so
+  //     it read as 'pending-restart' with a Restart banner that restarting could never clear, because
+  //     restarting re-runs the same failing import. The loader knew why the whole time.
   const known = new Set(rows.map((row) => row.name))
   for (const entry of installed.values()) {
     if (known.has(entry.id)) continue
     const off = pending.has(entry.id)
-    const waiting = entry.hasNode && !off && booted.get(entry.id) !== entry.version
+    const failure = loadFailed.get(entry.id)
+    const waiting = entry.hasNode && !off && !failure && booted.get(entry.id) !== entry.version
     rows.push({
       name: entry.id,
       required: false,
       disabled: off,
+      // `true` for a failed row, matching what the roster does with a contained plugin: `running` is what
+      // `restartRequired` is computed from, and a restart cannot fix a bundle that will not import.
       running: !off && !waiting,
-      state: off ? 'disabled' : waiting ? 'pending-restart' : 'active',
+      state: off ? 'disabled' : failure ? 'failed' : waiting ? 'pending-restart' : 'active',
+      ...(failure && !off ? { stage: 'load' as const, failedAt: failure.at, ...trimReason(failure.reason) } : {}),
       ...declared(entry.id),
+    })
+  }
+  // And the packages that never even got a row: a manifest that does not parse, an apiVersion this node
+  // does not speak, an id a second directory already claimed. `scanInstalled` drops all three, so before
+  // this the owner saw NOTHING — an installed plugin that simply was not in the list.
+  //
+  // A boot snapshot, so a package FIXED on disk keeps its boot-time reason until the restart that re-reads
+  // it, rather than flipping to 'pending-restart'. Telling the two apart needs the version that failed,
+  // which for an unparseable manifest does not exist. The reason text says what to fix.
+  for (const failure of loadFailed.values()) {
+    const shadowed = rows.find((row) => row.name === failure.id)
+    // The name is already taken by something that IS running. Two ways to get here, and the loader's own
+    // message distinguishes them: a package dogfooding a built-in (build-plugin.mjs installs the disk copy
+    // and the compiled-in one steps aside — but only if the disk copy actually loads), or a second
+    // directory claiming an id the first one won. Both used to end here silently, which is the worst of
+    // the three: the row said 'active' and it was TRUE, so nothing anywhere said that the copy the owner
+    // installed is not the code they are running.
+    //
+    // The running row's `state` is left exactly as it is, because it is honest. The reason rides along, and
+    // the render side reads "a reason with no failure" as precisely this case.
+    if (shadowed) {
+      if (shadowed.state !== 'failed' && shadowed.reason === undefined) {
+        shadowed.stage = 'load'
+        shadowed.failedAt = failure.at
+        Object.assign(shadowed, trimReason(failure.reason))
+      }
+      continue
+    }
+    const off = pending.has(failure.id)
+    rows.push({
+      name: failure.id,
+      required: false,
+      disabled: off,
+      running: !off,
+      state: off ? 'disabled' : 'failed',
+      ...(off ? {} : { stage: 'load' as const, failedAt: failure.at, ...trimReason(failure.reason) }),
     })
   }
   // A restart is needed exactly where what WOULD run differs from what IS running. That covers the

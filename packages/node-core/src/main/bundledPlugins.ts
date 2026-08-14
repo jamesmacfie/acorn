@@ -3,7 +3,7 @@ import { cpSync, existsSync, lstatSync, readdirSync, readFileSync, renameSync, r
 import { join, relative } from 'node:path'
 import { resolveInRoot } from './core/filesystem/confinement'
 import { pluginDir, pluginInstallRoot, sweepDebris } from './pluginInstaller'
-import { PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
+import { PLUGIN_API_MAJOR, readPluginManifestResult, type PluginManifest } from './pluginManifest'
 import {
   markBundledPluginInstalled,
   markPluginUserManaged,
@@ -41,8 +41,12 @@ const packageFingerprint = (root: string): string => {
 }
 
 const packageManifest = (dir: string, expectedId: string): PluginManifest => {
-  const manifest = readPluginManifest(dir)
-  if (!manifest) throw new Error('acorn-plugin.json is missing or invalid')
+  // The result form, so a bundled package that fails reconciliation says which field broke rather than
+  // "invalid". Same reason the loader uses it (docs/plugins.md § Failures are contained): this sentence
+  // is printed at boot and is the only account anyone gets.
+  const read = readPluginManifestResult(dir)
+  if (!read.ok) throw new Error(read.reason)
+  const manifest = read.manifest
   if (manifest.id !== expectedId) throw new Error(`manifest id '${manifest.id}' does not match directory '${expectedId}'`)
   if (manifest.apiVersion !== PLUGIN_API_MAJOR) {
     throw new Error(`built for plugin API ${manifest.apiVersion}; this app speaks ${PLUGIN_API_MAJOR}`)

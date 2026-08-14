@@ -2,10 +2,10 @@
 
 Design notes from the ecosystem-feasibility session (2026-08-14). Nothing here is scheduled; this
 folder records the assessment so a future project starts from conclusions instead of re-deriving
-them. It is the umbrella over four folders that already hold the detailed designs —
-`docs/future/user-extensions/`, `docs/future/dashboards/`, `docs/future/debug-plugin/`, and
-`docs/future/architecture/` — plus `docs/extensibility.md` and `docs/security.md`. Where this
-folder disagrees with any of those, those win.
+them. It is the umbrella over three folders that already hold the detailed designs —
+`docs/future/user-extensions/`, `docs/future/dashboards/`, and `docs/future/architecture/` — plus
+`docs/extensibility.md` and `docs/security.md`. Where this folder disagrees with any of those,
+those win.
 
 ## The end goal being assessed
 
@@ -33,8 +33,10 @@ with a recorded rationale and a designed answer:
    The fix is designed in `docs/future/user-extensions/agent-authored-plugins.md` and is smaller
    than it looks.
 4. An external author cannot build a plugin today, because `@acorn/plugin-api` only resolves
-   inside this workspace. The rest of the developer-experience gaps are catalogued with plans in
-   `docs/future/debug-plugin/`.
+   inside this workspace. That is now the whole of this gate: the eight developer-experience
+   findings that sat behind it were implemented in August 2026, and the behavior they produced is
+   documented in `docs/plugins.md`, `docs/testing.md`, `docs/data-layer.md` and
+   `docs/local-development.md`. What is left over is small and named in `dx.md`.
 
 The one place the vision collides with a decision this repo defends well is the "permanent"
 first-party tier: streams, in-shell components, and Electron-main code stay first-party, and the
@@ -49,9 +51,9 @@ it is the part users care about. `shell-vision.md` records this stance and why.
 1. **The agent-authored dev loop** — the five items in `docs/future/user-extensions/README.md`
    (authoring profile, reload path, approval-mediated install, dev trust grant, agent
    enablement). This delivers "point at a folder and iterate" and the self-modification loop.
-2. **Developer experience, in parallel** — the eight findings in `docs/future/debug-plugin/`
-   (failure visibility first), plus making `@acorn/plugin-api` installable from outside the
-   workspace. (`dx.md`)
+2. **Developer experience, in parallel** — mostly done. The eight review findings (failure
+   visibility first) shipped; what remains of this item is making `@acorn/plugin-api` installable
+   from outside the workspace, plus the residue the review left behind. (`dx.md`)
 3. **Rung-2 containment** — the long pole, and the gate on anything marketplace-shaped. Ship it
    before any discovery surface exists. (`blockers.md`)
 4. **Dashboards phases 1–3** — per `docs/future/dashboards/README.md`. Independent of the above;

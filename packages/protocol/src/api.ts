@@ -282,6 +282,20 @@ export type NodePluginRow = {
   state: 'active' | 'failed' | 'disabled' | 'pending-restart'
   // Epoch millis, present only on a failed row.
   failedAt?: number
+  // Why it failed, in the words of whatever broke: the thrown message from a contained init/ready, or the
+  // loader's own sentence for a manifest that does not parse, a bundle that will not import, an apiVersion
+  // this node does not speak. Present only on a failed row, and absent rather than empty when the node is
+  // older than this field — which is why it is optional, along with `stage` below: the per-node IndexedDB
+  // query cache (docs/caching.md) has no version buster, so a REQUIRED field on a persisted response type
+  // would have to arrive with a bumped query key. Optional avoids the whole question.
+  //
+  // UNTRUSTED DISPLAY TEXT. It originates in a loaded plugin's own throw, so it crosses the trust boundary
+  // into the owner's UI: render it as text, never as markup, and expect it capped (the node caps it in
+  // node-core/server/plugin/pluginState.ts).
+  reason?: string
+  // Which pass it died in, so the UI can say "failed to load" rather than "failed to start" for a package
+  // that never got as far as running.
+  stage?: 'load' | 'init' | 'ready'
   // Present exactly when this plugin came off the node's disk rather than out of the app binary,
   // which also makes it the client's answer to "is this third-party?" (docs/third-party).
   installed?: InstalledPluginRow
@@ -362,6 +376,32 @@ export type PluginRailItem = {
   task?: PluginRailTask
 }
 export type PluginRailItems = { items: PluginRailItem[] }
+
+// A rail row's `id` has to survive a round trip the plugin does not control: the host hands it back
+// verbatim as the pane frame's `context.item`, and the frame has to recover the row's full identity
+// from that one string. Two halves, because a provider's own identifier is not globally unique — two
+// connected Linear workspaces can share a team prefix, two Rollbar projects an item number — so the
+// connection travels with it.
+//
+// Percent-encoded around a single `:` because either half may legitimately contain the delimiter.
+// Here rather than in each plugin because round-tripping a rail id is the HOST's contract; linear and
+// rollbar had written the same twenty lines, and the second one's comment said so.
+export const railItemId = (connectionId: string, identifier: string): string =>
+  `${encodeURIComponent(connectionId)}:${encodeURIComponent(identifier)}`
+
+/** The inverse. `null` for anything that is not one of ours — a truncated id, a bad escape, an empty
+ * half — so a caller branches once instead of validating the parts itself. */
+export function parseRailItemId(value: string): [connectionId: string, identifier: string] | null {
+  const separator = value.indexOf(':')
+  if (separator <= 0 || separator === value.length - 1) return null
+  try {
+    const connectionId = decodeURIComponent(value.slice(0, separator))
+    const identifier = decodeURIComponent(value.slice(separator + 1))
+    return connectionId && identifier ? [connectionId, identifier] : null
+  } catch {
+    return null
+  }
+}
 // `null` hides the badge, which is how a badge with nothing to say disappears without the host
 // needing a second route to ask.
 export type PluginSlotBadge = { text: string; tone?: 'neutral' | 'accent' | 'warn'; tooltip?: string } | null

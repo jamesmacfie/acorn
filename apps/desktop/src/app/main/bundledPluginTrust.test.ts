@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 import { PluginCache } from './pluginCache'
 import { PluginTrustStore } from './pluginTrustStore'
-import { trustBundledClientPlugins } from './bundledPluginTrust'
+import { BUNDLED_TRUST_OPT_OUT, trustBundledClientPlugins, trustsBundledClientPlugins } from './bundledPluginTrust'
 
 const roots: string[] = []
 const temporary = (prefix: string): string => {
@@ -57,5 +57,21 @@ describe('bundled plugin client trust', () => {
     const trust = new PluginTrustStore(userData)
     expect(trustBundledClientPlugins(resources, '0.1.0', cache, trust)).toEqual([])
     expect(trust.list()).toEqual([])
+  })
+})
+
+describe('when the grant applies', () => {
+  // A development build gets the same grant a packaged build does, over the same application-owned
+  // directory: gating it on packaging is what made every dev and e2e boot answer four dialogs about the
+  // developer's own build output.
+  it('applies whether or not the build is packaged', () => {
+    expect(trustsBundledClientPlugins({})).toBe(true)
+  })
+
+  it('steps aside for anyone whose subject is the trust flow itself', () => {
+    expect(trustsBundledClientPlugins({ [BUNDLED_TRUST_OPT_OUT]: '1' })).toBe(false)
+    // Only the exact opt-in value, so a stray empty or "0" does not silently reintroduce four prompts.
+    expect(trustsBundledClientPlugins({ [BUNDLED_TRUST_OPT_OUT]: '0' })).toBe(true)
+    expect(trustsBundledClientPlugins({ [BUNDLED_TRUST_OPT_OUT]: '' })).toBe(true)
   })
 })

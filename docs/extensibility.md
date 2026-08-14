@@ -241,7 +241,11 @@ Recorded because each has been questioned, and each answer is deliberate:
 Roughly in order of how much they matter:
 
 1. **Node-half containment.** The one honest weakness. Everything else is defence in depth around
-   a server half that is disclosed rather than contained.
+   a server half that is disclosed rather than contained. One step of it is paid: every table-owning
+   built-in now gets its database from the host's `ctx.storage` seam instead of opening one itself, so
+   six plugins stopped naming a data root and a chain directory, and the host owns the whole
+   open/migrate/close lifecycle for both tiers (`docs/plugins.md § Data ownership`). That is confinement
+   of an existing seam, not a tier migration — the plugins stayed compiled.
 2. **The editor plugin's move, the last one.** The migration candidates are done being candidates.
    http moved first with tables; database followed over the **document surface** — the host owns one
    editor and lends it through a vendor-neutral contract (`docs/plugins.md § Document surfaces`,

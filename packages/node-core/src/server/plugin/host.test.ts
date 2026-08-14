@@ -1,6 +1,11 @@
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { memoryIdentityStore } from '../../main/activeIdentity'
 import { createCoreServices, SecretService } from '../../main/core'
+import { openPluginDb, type PluginDatabase } from '../../main/pluginStorage'
 import { makeTestDb } from '../../testkit/db'
 import { CapabilityRegistry, capabilityId } from './capabilities'
 import { Hono } from 'hono'
@@ -86,11 +91,14 @@ describe('plugin host', () => {
     ...opts,
   })
 
-  // A fresh graph per call, mirroring how startServiceRuntime owns one per boot.
+  // A fresh graph per call, mirroring how startServiceRuntime owns one per boot. `dataDir: ''` is
+  // deliberate: no plugin in this block declares `migrationsModule`, so nothing here opens a database and
+  // there is no root for the host to need. The one case that does opens its own temp directory.
   const host = (plugins: readonly NodePlugin[], disabled?: readonly string[]) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
       core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      dataDir: '',
       disabled,
     })
 
@@ -207,6 +215,107 @@ describe('plugin host', () => {
     expect(disposed).toEqual(['second', 'first'])
   })
 
+  // The compiled tier's half of ctx.storage. Six built-ins used to open, migrate and close their own
+  // SQLite file — a five-line migrations module, a hand-wired openPluginDb call and an identical dispose
+  // block each. All the host needs now is the module the chain sits beside.
+  it("opens, reuses and closes a built-in's database from its declared chain", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acorn-builtin-storage-'))
+    try {
+      // A chain with an empty journal: what is under test is the lifecycle, not anyone's schema. It sits
+      // where the plugin's own does — beside the module that declared it, found by the ancestor walk.
+      mkdirSync(join(dir, 'migrations/meta'), { recursive: true })
+      writeFileSync(join(dir, 'migrations/meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
+      let opened: PluginDatabase | null = null
+      let again: PluginDatabase | null = null
+      let liveInDispose = false
+      const result = await initPlugins(
+        [plugin('widgets', {
+          migrationsModule: pathToFileURL(join(dir, 'src/node/index.ts')).href,
+          init: (ctx) => {
+            opened = ctx.storage.open()
+            again = ctx.storage.open()
+          },
+          // The ordering the conversion had to preserve: agents flushes transcripts, workflows aborts
+          // steps and database drains pools THROUGH this handle on the way out, so it has to still be
+          // open here. The host closes it after this returns, at the same point in the drain the plugins'
+          // own `db.close()` used to sit.
+          dispose: () => {
+            opened!.$client.prepare('select 1').get()
+            liveInDispose = true
+          },
+        })],
+        {
+          capabilities: new CapabilityRegistry(),
+          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+          dataDir: dir,
+        },
+      )
+      // Bound to the plugin id, under the one plugins directory — the same file and filename the plugin
+      // used to open for itself, so adopting the seam moves nobody's rows.
+      expect(existsSync(join(dir, 'plugins/widgets.sqlite'))).toBe(true)
+      // One handle per boot however many times a plugin asks. Two openPluginDb calls used to mean two
+      // connections on one file, and nothing closed the second.
+      expect(again).toBe(opened)
+      await result.dispose()
+      expect(liveInDispose).toBe(true)
+      // Closed by the HOST rather than by the plugin: node:sqlite refuses a second close, so this
+      // throwing is the proof the WAL file was drained inside the `plugins` drain step.
+      expect(() => opened!.close()).toThrow()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  // The twin of the case above, and the one whose absence let the bug through: everything the built-in
+  // case proves has to hold for a plugin off disk too, because http and database deleted their own
+  // dispose-close on the strength of the host doing it. It did not — the context threw away the host's
+  // memoizing wrapper for this tier (server/plugin/context.ts), so the `opened` map never saw a loaded
+  // handle, closing was a no-op, and a WAL handle outlived the plugins drain, the sqlite drain and the
+  // data-root lock release. Same assertions, other tier.
+  it("opens, reuses and closes a LOADED plugin's database from the manifest chain", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acorn-loaded-storage-'))
+    try {
+      mkdirSync(join(dir, 'migrations/meta'), { recursive: true })
+      writeFileSync(join(dir, 'migrations/meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
+      let opened: PluginDatabase | null = null
+      let again: PluginDatabase | null = null
+      let liveInDispose = false
+      const result = await initPlugins(
+        [plugin('ntfy', {
+          init: (ctx) => {
+            opened = ctx.storage.open()
+            again = ctx.storage.open()
+          },
+          dispose: () => {
+            opened!.$client.prepare('select 1').get()
+            liveInDispose = true
+          },
+        })],
+        {
+          capabilities: new CapabilityRegistry(),
+          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+          dataDir: dir,
+          // The binding as the loader builds it: the chain already resolved from the manifest, which is why
+          // this tier never consults the plugin object's own `migrationsModule` (see the case at the
+          // bottom of this file).
+          loaded: new Map([['ntfy', {
+            permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+            storage: { open: () => openPluginDb(dir, 'ntfy', { migrationsFolder: join(dir, 'migrations') }) },
+          }]]),
+        },
+      )
+      expect(existsSync(join(dir, 'plugins/ntfy.sqlite'))).toBe(true)
+      // The binding's `open` is unmemoized on purpose above — it returns a fresh connection every call.
+      // So this passing is specifically the host's wrapper doing its job, not the binding's.
+      expect(again).toBe(opened)
+      await result.dispose()
+      expect(liveInDispose).toBe(true)
+      expect(() => opened!.close()).toThrow()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('runs every ready() only after every init, so cross-plugin reads do not depend on list order', async () => {
     // The hazard this closes: a plugin whose init reads a slot another plugin fills in its own init
     // works only by alphabetical luck. Reordering the list by domain would silently break it.
@@ -284,6 +393,7 @@ describe('loaded plugins', () => {
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
       core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      dataDir: '',
       loaded: new Map(
         Object.entries(loaded).map(([name, node]) => [
           name,
@@ -319,13 +429,16 @@ describe('loaded plugins', () => {
       ],
       { ntfy: {}, after: {} },
     )
-    expect(result.failed).toEqual([{ name: 'ntfy', error: 'boom', at: expect.any(Number) }])
+    expect(result.failed).toEqual([{ name: 'ntfy', error: 'boom', at: expect.any(Number), stage: 'init' }])
     expect(result.enabled).toEqual(['after'])
     // The rollback is the load-bearing part: three routes registered before the throw must not stay
     // mounted, serving from a plugin that never finished starting.
     expect(pluginRouteContributions().some((c) => c.plugin === 'ntfy')).toBe(false)
     expect(disposed).toBe(true)
-    expect(result.roster.find((entry) => entry.name === 'ntfy')).toMatchObject({ state: 'failed', failedAt: expect.any(Number) })
+    // The message travels with the row. It used to stop at this process's stderr, which a packaged app
+    // shows to nobody.
+    expect(result.roster.find((entry) => entry.name === 'ntfy'))
+      .toMatchObject({ state: 'failed', failedAt: expect.any(Number), reason: 'boom', stage: 'init' })
     error.mockRestore()
   })
 
@@ -336,7 +449,8 @@ describe('loaded plugins', () => {
       [plugin('ntfy', { ready: () => { throw new Error('late') }, dispose: () => void (disposals += 1) })],
       { ntfy: {} },
     )
-    expect(result.failed[0]).toMatchObject({ name: 'ntfy', error: 'late' })
+    expect(result.failed[0]).toMatchObject({ name: 'ntfy', error: 'late', stage: 'ready' })
+    expect(result.roster[0]).toMatchObject({ state: 'failed', reason: 'late', stage: 'ready' })
     expect(result.enabled).toEqual([])
     await result.dispose()
     expect(disposals).toBe(1)
@@ -370,18 +484,33 @@ describe('loaded plugins', () => {
     expect(() => ctx.storage.open()).toThrow('test storage is not configured')
   })
 
+  it("ignores a loaded bundle's own migrationsModule, so the manifest chain always wins", async () => {
+    // The compiled tier declares its chain on the plugin object, and a loaded plugin's object comes out
+    // of a bundle the owner installed. If that declaration were honoured, a package could point the
+    // migrator at any directory it can name and the manifest's confinement would be advisory.
+    let captured!: NodePluginContext
+    await host(
+      [plugin('ntfy', { migrationsModule: 'file:///tmp/not-my-chain/index.ts', init: (ctx) => void (captured = ctx) })],
+      { ntfy: {} },
+    )
+    expect(() => captured.storage.open()).toThrow('test storage is not configured')
+  })
+
   it('leaves a built-in with the full context', async () => {
     let captured!: NodePluginContext
     const core = createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() })
     await initPlugins([plugin('terminal', { init: (ctx) => void (captured = ctx) })], {
       capabilities: new CapabilityRegistry(),
       core,
+      dataDir: '',
     })
     expect(captured.routes.register).toBeTypeOf('function')
     expect(captured.events.streams).toBeTypeOf('function')
     expect(captured.core.secrets).toBeDefined()
     expect(captured.core.proc).toBeDefined()
     expect(captured.core.prefs).toBe(core.prefs)
+    // No `migrationsModule`, so no storage: a plugin that owns no tables gets the same immediate
+    // "not a function" as one reaching for routes.register it never had.
     expect(captured.storage).toBeUndefined()
   })
 

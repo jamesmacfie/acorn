@@ -1,0 +1,154 @@
+{
+  "full": {
+    "routes": [
+      "agents",
+      "agents",
+      "changes/tasks",
+      "changes/tasks",
+      "docker",
+      "editor/tasks",
+      "editor/tasks",
+      "github",
+      "github",
+      "github/pins",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "github/repos",
+      "memory",
+      "notes",
+      "terminal",
+      "workflows"
+    ],
+    "tools": [
+      "browser_click",
+      "browser_console",
+      "browser_fill",
+      "browser_navigate",
+      "browser_screenshot",
+      "browser_snapshot",
+      "git_log",
+      "local_changes",
+      "local_diff",
+      "memory_get",
+      "memory_list",
+      "memory_search",
+      "memory_write",
+      "notes_append",
+      "notes_list",
+      "notes_read",
+      "notes_write",
+      "run_restart",
+      "run_start",
+      "run_status",
+      "run_stop",
+      "run_targets"
+    ],
+    "sections": [
+      "pr",
+      "issues",
+      "notes",
+      "memory"
+    ],
+    "connectionProviders": [
+      "github"
+    ],
+    "integrationProviders": [
+      "github"
+    ],
+    "providerRoutes": [],
+    "modelProviders": [],
+    "databases": [
+      "agents.sqlite",
+      "changes.sqlite",
+      "github.sqlite",
+      "memory.sqlite",
+      "terminal.sqlite",
+      "workflows.sqlite"
+    ]
+  },
+  "owned": {
+    "changes": {
+      "routes": [
+        "changes/tasks",
+        "changes/tasks"
+      ],
+      "tools": [
+        "git_log",
+        "local_changes",
+        "local_diff"
+      ],
+      "databases": [
+        "changes.sqlite"
+      ]
+    },
+    "docker": {
+      "routes": [
+        "docker"
+      ]
+    },
+    "editor": {
+      "routes": [
+        "editor/tasks",
+        "editor/tasks"
+      ]
+    },
+    "github": {
+      "routes": [
+        "github",
+        "github",
+        "github/pins",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos",
+        "github/repos"
+      ],
+      "sections": [
+        "pr"
+      ],
+      "connectionProviders": [
+        "github"
+      ],
+      "integrationProviders": [
+        "github"
+      ],
+      "databases": [
+        "github.sqlite"
+      ]
+    },
+    "preview": {
+      "tools": [
+        "browser_click",
+        "browser_console",
+        "browser_fill",
+        "browser_navigate",
+        "browser_screenshot",
+        "browser_snapshot"
+      ]
+    },
+    "workflows": {
+      "routes": [
+        "workflows"
+      ],
+      "databases": [
+        "workflows.sqlite"
+      ]
+    }
+  }
+}

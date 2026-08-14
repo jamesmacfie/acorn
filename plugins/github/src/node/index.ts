@@ -1,4 +1,4 @@
-import { type NodePlugin, openPluginDb, pullRequestSection } from '@acorn/plugin-api/node'
+import { type NodePlugin, pullRequestSection } from '@acorn/plugin-api/node'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/actions'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
@@ -18,22 +18,22 @@ import { repoLabels } from '../server/routes/repoLabels'
 import { repos } from '../server/routes/repos'
 import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
-import { migrationsDir } from './migrations'
 import { githubClientId } from './config'
 
-export const githubPlugin = (dataDir: string): NodePlugin => {
-  let db: ReturnType<typeof openPluginDb> | null = null
+export const githubPlugin = (): NodePlugin => {
   return {
     name: 'github',
     required: false,
+    // This module's own URL: the chain sits at plugins/github/migrations beside it, and the host owns
+    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    migrationsModule: import.meta.url,
     init: async (ctx) => {
-      // Opened and migrated before the listener binds. Every router below is a FACTORY closing over this
-      // handle rather than a module-scope router reading `getDb(c.env)`, for the reason
+      // Opened and migrated by the host before init returns. Every router below is a FACTORY closing over
+      // this handle rather than a module-scope router reading `getDb(c.env)`, for the reason
       // plugins/changes/src/server/routes/reviewNotes.ts states first: the tables are in
       // <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
       // (docs/data-layer.md § Plugin DBs). So there is no request that can reach an unmigrated database.
-      db = openPluginDb(dataDir, 'github', { migrationsFolder: migrationsDir() })
-      const store = db
+      const store = ctx.storage.open()
 
       // Bounded startup repair of parent-only mirror evictions (server/mirrorRetention.ts). Pre-listener,
       // as it was when the composition root owned it — see the ordering note in this file's header.
@@ -105,12 +105,8 @@ export const githubPlugin = (dataDir: string): NodePlugin => {
       ))
 
     },
-    // The plugin's SQLite file is in WAL mode, so it has to be closed before the data root's lock is
-    // dropped — the composition root's own teardown invariant. Every router above closes over the handle
-    // and is discarded with the plugin's route contributions by the host.
-    dispose: () => {
-      db?.close()
-      db = null
-    },
+    // No dispose. The only resource this plugin held was its SQLite handle, and the host drains that —
+    // still before the data root's lock is dropped. Every router above closes over the handle and is
+    // discarded with the plugin's route contributions by the host.
   }
 }

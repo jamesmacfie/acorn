@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const electron = vi.hoisted(() => {
@@ -75,11 +76,29 @@ const electron = vi.hoisted(() => {
   return { FakeBrowserWindow, FakeWebContentsView, invoke, events, ipcMain }
 })
 
-vi.mock('electron', () => ({
+const fakeElectron = {
   BrowserWindow: electron.FakeBrowserWindow,
   WebContentsView: electron.FakeWebContentsView,
   ipcMain: electron.ipcMain,
-}))
+}
+
+// webviewService.ts is apps/desktop code and imports electron statically, so the module registry is
+// the right seam for it.
+vi.mock('electron', () => fakeElectron)
+
+// previewService.ts is PLUGIN code, and it resolves electron with `createRequire(import.meta.url)`
+// inside registerPreviewIpc so that plugins/preview's main barrel stays loadable outside Electron
+// (apps/node/test/integration/mainBarrelLoad.test.ts is what enforces that). A real Node `require`
+// does not consult vitest's module registry, so the fake is installed in the CJS require cache as
+// well — the same door the production code walks through.
+const nodeRequire = createRequire(import.meta.url)
+const electronModulePath = nodeRequire.resolve('electron')
+nodeRequire.cache[electronModulePath] = {
+  id: electronModulePath,
+  filename: electronModulePath,
+  loaded: true,
+  exports: fakeElectron,
+} as NodeModule
 
 const { registerPreviewIpc } = await import('@acorn/plugin-preview/main/previewService.ts')
 const { driverFor } = await import('@acorn/plugin-preview/main/browserService.ts')

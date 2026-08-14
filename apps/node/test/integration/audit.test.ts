@@ -32,6 +32,7 @@ beforeEach(async () => {
     // Nothing installed from disk: this harness is about the audit record, not about distribution.
     installed: () => [],
     booted: () => [],
+    loadFailures: () => [],
     clientBundle: async () => null,
     disabled: () => disabled,
     setDisabled: (names) => {

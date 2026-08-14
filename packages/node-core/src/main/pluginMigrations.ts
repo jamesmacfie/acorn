@@ -4,9 +4,12 @@
 //   built  (pnpm dev, e2e)     apps/desktop/out/migrations/<name>/   — beside core's at out/migrations/
 //   packaged (.app)            <resources>/migrations/<name>/
 //
-// The plugin passes its own `import.meta.url` because the ancestor walk has to start from the PLUGIN's
-// module, not from this one — resolving from here would find node-core's chain. Loaded plugins use the
-// manifest-bound `ctx.storage` seam instead; they never need an ancestor search.
+// The walk starts from the PLUGIN's own module, not from this one — resolving from here would find
+// node-core's chain at packages/node-core/migrations. A built-in declares that module as
+// `migrationsModule: import.meta.url` on its NodePlugin and the host passes it in (server/plugin/host.ts);
+// nothing here is reachable from a plugin, which is what stops a plugin choosing a chain by proximity.
+// A loaded plugin never needs an ancestor search at all: its manifest names the directory, confined to
+// its package, and pluginMigrationsChain below only validates it.
 //
 // The plugin-scoped candidate is checked first at every level. Built and packaged layouts place core
 // and plugin chains beside one another, so selecting a bare migrations directory could apply the wrong

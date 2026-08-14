@@ -53,7 +53,7 @@ const handleFilesRead = async (db: PluginDatabase, c: Context<AppEnv>, options: 
   const includePatches = !options.summaryOnly || !!paths
 
   const resource = filesResource(repoId, number)
-  const readCached = async () => orderedByRequest(await readFiles(c.env, db, key, { includePatches, paths }), paths)
+  const readCached = async () => orderedByRequest(await readFiles(c.env.BLOBS, db, key, { includePatches, paths }), paths)
 
   // Cold only when the files were never fetched (no sync row); a PR with zero changed files still
   // has a sync row → serves `{ data: [], fetchedAt }`.

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
-import { AcornBridgeError, connect, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
+import { AcornBridgeError, connect, mountFrame, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
 
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node
 // (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it — something
@@ -85,6 +85,15 @@ describe('connect', () => {
     host(() => undefined)
     const acorn = await handshake()
     expect(await connect()).toBe(acorn)
+  })
+
+  it('acks the handshake, which is the host\'s only evidence the bundle evaluated', async () => {
+    // A bundle that throws at module scope never calls connect(), so this message never arrives and the
+    // host draws a placeholder instead of a blank rectangle.
+    host(() => undefined)
+    await handshake()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(sent).toEqual([{ kind: 'connected' }])
   })
 })
 
@@ -339,7 +348,24 @@ describe('openLinkOnClick', () => {
 
   // The helper is fire-and-forget by design — a click handler cannot await — so the port hop has to be
   // let through before `sent` can be read.
-  const flushed = () => new Promise((resolve) => setTimeout(resolve, 0))
+  //
+  // A poll and not a single `setTimeout(0)`, which is what this was. A MessagePort is its own task source,
+  // so a zero-delay timer is not a barrier for it: under real load — the whole workspace's suites running
+  // at once — the timer fired first and the assertion read an empty `sent`. It passed in isolation every
+  // time, which is the worst version of this bug.
+  const delivered = async (op: string): Promise<Record<string, unknown> | undefined> => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const message = sent.find((entry) => entry.op === op)
+      if (message) return message
+      await new Promise((resolve) => setTimeout(resolve, 1))
+    }
+    return undefined
+  }
+  // For the negative cases, which have no message to wait for. Bounded ticks rather than one, for the same
+  // reason: "nothing arrived" is only meaningful once something had the chance to.
+  const flushed = async () => {
+    for (let attempt = 0; attempt < 10; attempt++) await new Promise((resolve) => setTimeout(resolve, 1))
+  }
 
   const connected = async (): Promise<AcornBridge> => {
     host((message) => (message.kind === 'ui' ? { id: message.id, ok: true, status: 200, body: null } : undefined))
@@ -351,8 +377,9 @@ describe('openLinkOnClick', () => {
     const event = clickOn('https://github.com/runn/acorn/pull/20535')
     expect(openLinkOnClick(acorn, event)).toBe(true)
     expect(event.prevented).toBe(true)
-    await flushed()
-    expect(sent.at(-1)).toMatchObject({ kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/20535' })
+    // The message this click sent, found by name rather than taken as the last one to arrive: the SDK's
+    // handshake ack rides the same port unasked, so `sent.at(-1)` is a race even when nothing is slow.
+    expect(await delivered('openUrl')).toMatchObject({ kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/20535' })
   })
 
   it('takes a MODIFIED click too, unlike the shell handler it mirrors', async () => {
@@ -362,8 +389,7 @@ describe('openLinkOnClick', () => {
     const acorn = await connected()
     const event = clickOn('https://example.com/', { metaKey: true, shiftKey: true })
     expect(openLinkOnClick(acorn, event)).toBe(true)
-    await flushed()
-    expect(sent.at(-1)).toMatchObject({ op: 'openUrl' })
+    expect(await delivered('openUrl')).toMatchObject({ op: 'openUrl' })
   })
 
   it('leaves a non-https href alone, with its default intact', async () => {
@@ -377,7 +403,9 @@ describe('openLinkOnClick', () => {
       expect(event.prevented, String(href)).toBe(false)
     }
     await flushed()
-    expect(sent.length).toBe(before)
+    // Filtered, because the handshake ack is the one message that arrives unasked — the SDK posts it on
+    // `ready` and the port delivers it a tick later, which is after `before` was read.
+    expect(sent.filter((message) => message.kind !== 'connected').length).toBe(before)
   })
 
   it('ignores a click something else has already handled', async () => {
@@ -423,5 +451,77 @@ describe('appearance', () => {
     push({ kind: 'appearance', theme: 'light', style: 'modern', tokens: {} })
     await new Promise((r) => setTimeout(r, 5))
     expect(seen).toEqual([{ theme: 'dark', style: 'terminal' }])
+  })
+})
+
+describe('mountFrame', () => {
+  // The smallest document the boot sequence touches. There is no DOM in this suite and the helper needs
+  // no real one: it creates two elements, appends them, and (through mountFrameTips) listens on the
+  // document. Anything it reaches for that is not here shows up as a TypeError rather than as silence.
+  type FakeElement = {
+    tag: string
+    id?: string
+    className?: string
+    hidden?: boolean
+    textContent?: string
+    dataset: Record<string, string>
+    style: Record<string, string>
+    children: FakeElement[]
+    append(...nodes: FakeElement[]): void
+    replaceChildren(): void
+    remove(): void
+  }
+  const element = (tag: string): FakeElement => ({
+    tag,
+    dataset: {},
+    style: {},
+    children: [],
+    append(...nodes) { this.children.push(...nodes) },
+    replaceChildren() { this.children = [] },
+    remove() {},
+  })
+
+  let head: FakeElement
+  let body: FakeElement
+
+  beforeEach(() => {
+    head = element('head')
+    body = element('body')
+    vi.stubGlobal('document', {
+      head,
+      body,
+      createElement: element,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })
+  })
+
+  const root = () => body.children.find((child) => child.id === 'root')!
+
+  it('injects the stylesheet, makes the root, and renders once the bridge is up', async () => {
+    host(() => undefined)
+    const rendered: { bridge: AcornBridge; root: unknown }[] = []
+    mountFrame({ styles: '.rb-row { color: red }' }, (bridge, node) => void rendered.push({ bridge, root: node }))
+    // The stylesheet is injected before the handshake — a frame that never connects still has its CSS,
+    // which is what makes the failure banner below legible.
+    expect(head.children.map((child) => child.textContent)).toEqual(['.rb-row { color: red }'])
+    expect(root()).toBeTruthy()
+    const acorn = await handshake()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(rendered).toEqual([{ bridge: acorn, root: root() }])
+  })
+
+  it('paints the alert primitive on the root when the bridge never arrives', async () => {
+    // No window to hear the handshake on, which is what `connect` refuses. There is no framework at this
+    // point — that is the thing that failed — so the Alert primitive's classes go on the root by hand,
+    // and the reader gets a sentence instead of a blank rectangle.
+    vi.stubGlobal('addEventListener', undefined)
+    let rendered = false
+    mountFrame({ styles: '' }, () => void (rendered = true))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(rendered).toBe(false)
+    expect(root().className).toBe('ui-alert')
+    expect(root().dataset).toEqual({ variant: 'banner', tone: 'danger' })
+    expect(root().textContent).toBe('acorn: no window to receive the bridge on')
   })
 })

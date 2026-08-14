@@ -2,6 +2,7 @@ import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/m
 import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/main/pluginLoader.ts'
 import type { PluginsBridge } from '@acorn/node-core/server/plugin/pluginState.ts'
 import type { PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
+import type { PluginLoadFailure } from '@acorn/node-core/main/pluginLoader.ts'
 
 // The PLUGIN_STATE bridge, built once for both composition roots — the other half of the extraction
 // pluginDeps.ts started. It was written out twice (service/runtime.ts and server/standalone.ts) and had
@@ -29,6 +30,10 @@ export type PluginStateInput = {
   // the roots already hold.
   roster(): readonly PluginRosterEntry[]
   booted(): readonly { id: string; version: string }[]
+  // What the loader refused at this boot, and why. A closure over the graph both roots already hold; a
+  // re-scan would answer a different question (what is on disk now) and cannot answer this one at all,
+  // because importing a bundle is the only way to find out that it throws.
+  loadFailures(): readonly PluginLoadFailure[]
   disabled(): readonly string[]
   setDisabled(names: readonly string[]): void
   // `{ path }` installs symlink an author's working tree into the install directory, so they are a
@@ -48,6 +53,7 @@ export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
     // What this process loaded, which is how the roster tells "installed and running" from
     // "installed since the last restart".
     booted: input.booted,
+    loadFailures: input.loadFailures,
     clientBundle: (id) => readClientBundle(scanInstalled(dataDir).installed, id),
     disabled: input.disabled,
     setDisabled: input.setDisabled,

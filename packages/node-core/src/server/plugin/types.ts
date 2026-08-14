@@ -159,17 +159,23 @@ export type PluginBroadcast = {
 // plugin receives a filtered wrapper (main/pluginPermissions.ts) rather than the registry instance.
 export type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
 
-// Host-bound storage for a loaded plugin: its manifest chooses a confined migrations directory and
-// the host binds the database filename to the manifest id. Built-ins retain their existing explicit
-// openPluginDb calls because their migration chains are staged with the app.
+// Host-bound storage, for BOTH tiers. The host binds the database filename to the plugin id, applies
+// the Drizzle chain, hands back one handle per boot however many times open() is called, and closes it
+// after that plugin's dispose (server/plugin/host.ts). Where the chain comes from is the only thing
+// that differs: a loaded plugin's manifest names a directory confined to its package, a built-in
+// declares the module its chain sits beside (`migrationsModule` below).
+//
+// The handle is the full PluginDatabase in both tiers — `batch` and `close` included. Nothing was
+// widened for the compiled tier: `openPluginDb`'s return type IS this type, which is why adopting the
+// seam cost the six built-ins no capability they had before.
 export type PluginStorage = {
   open(): PluginDatabase
 }
 
 // The two plugin tiers receive different runtime projections of this common authoring type. Loaded
 // plugins omit undeclared core facets plus the first-party route/event members, and receive storage
-// bound from their manifest. Built-ins receive the full core/route/event surface and keep their
-// compile-time database factories, so `storage` is absent. server/plugin/host.ts builds both shapes;
+// bound from their manifest. Built-ins receive the full core/route/event surface, and storage bound
+// from their own `migrationsModule` declaration. server/plugin/host.ts builds both shapes;
 // main/pluginPermissions.ts explains why the type deliberately does not describe every omission.
 export type NodePluginContext = {
   readonly name: string
@@ -178,8 +184,9 @@ export type NodePluginContext = {
   contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities
-  // Present for loaded plugins. A missing manifest `migrations` declaration fails loudly on open;
-  // built-ins use their compile-time storage factories and do not receive this projection.
+  // Present for a loaded plugin, and for a built-in that declared `migrationsModule`. A plugin that
+  // owns no tables declares nothing and never receives this projection — reaching for it is the
+  // immediate "not a function" its author can act on.
   storage: PluginStorage
   // Path confinement, git, the process broker and use-scoped secrets (main/core/). A plugin consumes
   // core capability through this, rather than deep-importing whichever core module has the helper.
@@ -194,13 +201,24 @@ export type NodePlugin = {
   // agents, memory, notes and terminal: core (or the shell in front of it) assumes their contributions
   // exist, so they cannot be disabled. GitHub owns an optional provider surface and importer.
   required?: boolean
+  // "I own tables; here is where my Drizzle chain lives" — as this module's own `import.meta.url`,
+  // because the chain sits beside the plugin in all three runtime layouts and the ancestor walk has to
+  // start from the plugin (main/pluginMigrations.ts). Declaring it is what turns `ctx.storage` on; the
+  // host owns open, migrate and close from there.
+  //
+  // IGNORED for a plugin loaded from disk, whatever its bundle sets. A loaded plugin's chain is the
+  // manifest-declared, package-confined one the loader resolved (main/pluginLoader.ts) — otherwise a
+  // bundle could point the migrator at any directory it can name, which is the whole thing confinement
+  // buys. server/plugin/context.ts is where the binding wins.
+  migrationsModule?: string
   // Awaited before the listener binds. Initialization may open plugin storage, migrate rows, or prepare
   // route state that must be complete before requests can be served.
   init(ctx: NodePluginContext): void | Promise<void>
   // A second pass runs after every plugin's init and still before the listener binds. Use it only for
   // work that needs another plugin's contribution; initialization order is not a dependency contract.
   ready?(ctx: NodePluginContext): void | Promise<void>
-  // Release resources opened by init(). The host awaits disposal before closing plugin databases and
-  // releasing the data-root lock.
+  // Release what the PLUGIN opened — timers, children, pools, slots. Not its database: the host awaits
+  // this and then closes the `ctx.storage` handle, so an in-flight write still has a live connection
+  // here, and a plugin whose only resource was that handle needs no dispose at all.
   dispose?(): void | Promise<void>
 }
