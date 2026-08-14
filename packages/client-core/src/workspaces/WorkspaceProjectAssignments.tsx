@@ -8,7 +8,6 @@ import { taskBridge } from '../tasks/taskBridge'
 import { projectImporterRegistry } from '../registries/projectImporters'
 import { Alert, Button, Input, Select } from '../ui/primitives'
 import Icon from '../ui/Icon'
-import GithubMark from '../ui/GithubMark'
 import { Modal } from '../ui/Modal'
 import './onboarding.css'
 
@@ -146,7 +145,13 @@ export default function WorkspaceProjectAssignments() {
             <Button onClick={() => void addFolder()}>Add folder…</Button>
           </Show>
           <For each={projectImporterRegistry.entries()}>
-            {(entry) => <Button onClick={() => setActiveImporter(entry.id)}>{entry.glyph} {entry.label}</Button>}
+            {/* Through Icon, not raw text: an importer's glyph is an icon name like every other
+                registry's, so a Lucide name or a `brand:` mark both resolve here. */}
+            {(entry) => (
+              <Button onClick={() => setActiveImporter(entry.id)}>
+                <Icon name={entry.glyph} /> {entry.label}
+              </Button>
+            )}
           </For>
         </div>
       </div>
@@ -359,7 +364,7 @@ function ProjectRows(props: {
             <Show when={!project().path}><Icon name="folder-x" title="No folder on disk" /></Show>
             <Show when={project().path && project().vcs !== 'git'}><Icon name="folder" title="Plain folder" /></Show>
             <Show when={project().vcs === 'git'}><Icon name="git-commit-horizontal" title="Git repository" /></Show>
-            <Show when={project().github}><GithubMark title="GitHub repository" /></Show>
+            <Show when={project().github}><Icon name="brand:github" title="GitHub repository" /></Show>
           </span>
           <Select
             class="ws-row-move"

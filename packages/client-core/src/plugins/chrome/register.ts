@@ -11,6 +11,7 @@ import { keybindingRegistry } from '../../registries/keybindings'
 import type { Disposable } from '../../registries/registry'
 import { sourceRegistry } from '../../registries/sources'
 import { taskSlotRegistry } from '../../registries/slots'
+import { brandMarkRegistry } from '../../ui/brandMarks'
 import {
   bundleAccepted,
   installedByNode,
@@ -109,7 +110,8 @@ function eligible(): Map<string, NodePluginRow> {
 }
 
 function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[]): Disposable[] {
-  const contributions = row.installed!.contributions
+  const installed = row.installed!
+  const contributions = installed.contributions
   const disposables: Disposable[] = []
   const add = (what: string, id: string, register: () => Disposable): void => {
     try {
@@ -121,6 +123,23 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     }
   }
   const note = (seconds: number | undefined): void => void (seconds !== undefined && refreshes.push(seconds))
+
+  // Brand marks first, so a contribution registered below can already name `brand:<id>` — Icon reads
+  // the registry reactively, so ordering is a nicety rather than a correctness rule.
+  //
+  // The name is stamped from the plugin id and never read off the manifest, the same rule
+  // contentLinks' `providerId` follows below: a package cannot claim another package's mark, with
+  // `icons` no more able to than `icon`. `add` already warns on a collision with a core mark, and
+  // core wins, which is the correct precedence while both exist.
+  if (installed.icon) {
+    const { d } = installed.icon
+    add('icon', pluginId, () => brandMarkRegistry.register({ id: pluginId, d }))
+  }
+  for (const [key, mark] of Object.entries(installed.icons ?? {})) {
+    const id = `${pluginId}/${key}`
+    add('icon', id, () => brandMarkRegistry.register({ id, d: mark.d }))
+  }
+
   const frames = contributions.frames ?? []
   const surfaceIds = new Set(frames.map((surface) => surface.id))
   // TASK-scoped panes only. Everything below that consumes this set puts a pane into a task's layout —

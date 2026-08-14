@@ -1,6 +1,7 @@
 client: AgentToolRendererContribution
 client: AgentToolRendererProps
 client: ApiError
+client: BrandMark
 client: CHECK_TONE
 client: ClientPlugin
 client: ClientPluginContext
@@ -52,6 +53,7 @@ client: agentContextContributions
 client: agentSessionsFor
 client: agentToolRendererRegistry
 client: agentToolTone
+client: brandMarkRegistry
 client: bytesOf
 client: capabilities
 client: checkStatusTone

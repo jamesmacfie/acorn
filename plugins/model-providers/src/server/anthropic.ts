@@ -49,7 +49,7 @@ export const createAnthropicProviders = (
   const connectionProvider = publicConnectionProvider({
     id: 'anthropic',
     label: 'Anthropic',
-    glyph: 'A',
+    glyph: 'brand:model-providers/anthropic',
     kind: 'model-provider',
     connection: {
       authKind: 'api-key',

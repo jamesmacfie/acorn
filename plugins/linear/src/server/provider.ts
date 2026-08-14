@@ -245,7 +245,7 @@ const linearProjectSource: ProviderProjectSource = {
 export const linearProvider = publicProvider({
   id: 'linear',
   label: 'Linear',
-  glyph: '◷',
+  glyph: 'brand:linear',
   kind: 'issue-tracker',
   connection: {
     authKind: 'api-key',

@@ -23,14 +23,14 @@ export const githubClientPlugin: ClientPlugin = {
     // as it goes) rather than through PromoteToTaskModal, so there is nothing for the registry to hold.
     // `providerId` is enforced by the client host and gates the source on the GitHub integration.
     ctx.sources.register({
-      id: 'github', order: 10, glyph: '◇', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
+      id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
       routes: githubRouteContributions,
       // A PR-backed task lives at its PR URL. Core used to encode this itself by asking the route registry
       // for whatever owned `kind: 'detail'` — which was only ever this plugin, by luck of being the only
       // one with routes. The claim belongs here, where the shape of a PR URL is already known.
       taskPath: (task) => (task.pullNumber != null && task.github ? `${githubBrowsePath(task.projectId)}/${task.pullNumber}` : undefined),
     })
-    ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: '◇', component: GithubImporter })
+    ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: 'brand:github', component: GithubImporter })
     ctx.commands.register({
       id: 'source.github.open',
       title: 'Go to GitHub in the left rail',

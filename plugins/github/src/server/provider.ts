@@ -15,7 +15,7 @@ type GithubValidated = { secret: string; viewer: GithubViewer; scopes: string[] 
 export const githubProvider = publicProvider({
   id: 'github',
   label: 'GitHub',
-  glyph: '◇',
+  glyph: 'brand:github',
   kind: 'identity',
   connection: {
     authKind: 'oauth',

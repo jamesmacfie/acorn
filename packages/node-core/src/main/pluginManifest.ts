@@ -60,6 +60,20 @@ const nodePermissions = z.object({
 
 export type NodePermissions = z.infer<typeof nodePermissions>
 
+// The plugin's logo: one SVG path's `d` attribute, and deliberately not an SVG document.
+//
+// A document would mean `<script>`, `<use href>`, `<image href>`, `<foreignObject>`, `on*` handlers
+// and CSS `@import` — an allowlist parser and a new trust boundary, for a logo. A `d` string has
+// none of that reachable from its grammar, so the check below is the whole check. The renderer
+// (client-core/ui/Icon.tsx) fills it with `currentColor`, which is why this shape themes and a
+// data-URI `<img>` would not. docs/future/icons.md records the alternatives.
+const PATH_D_RE = /^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\s+-]+$/
+
+const brandMark = z.object({
+  // Authored in a 24x24 box, as simple-icons is throughout — the renderer hardcodes that viewBox.
+  d: z.string().min(1).max(4_096).regex(PATH_D_RE, 'icon must be a single SVG path `d` string'),
+})
+
 // A relative entrypoint. Absolute paths and `..` escapes are rejected here so the loader's
 // confinement check never has to reason about a path that was hostile from the start.
 const entry = z.string().min(1).max(256).refine(
@@ -513,6 +527,18 @@ export type PluginClientRouteDescriptor = z.infer<typeof clientRouteDescriptor>
 const manifestShape = z.object({
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
   name: z.string().min(1).max(120),
+  // The plugin's own logo, registered by the host under `brand:<id>` so every contribution in this
+  // manifest can name it as a `glyph`. Top level beside `name` because it identifies the package,
+  // where `glyph` stays per-contribution.
+  icon: brandMark.optional(),
+  // The plural feeder, for a package that is home to several brands (model-providers hosts two).
+  // Keys become the suffix in `brand:<pluginId>/<key>`; the prefix is stamped by the host, so the
+  // key namespace is private to the plugin and needs no global uniqueness — and `icons` can no more
+  // claim another plugin's mark than `icon` can. Capped because a manifest is wire input and every
+  // entry becomes a registry row.
+  icons: z.record(z.string().min(1).max(32).regex(/^[a-z0-9][a-z0-9-]*$/), brandMark)
+    .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
+    .optional(),
   version: z.string().min(1).max(64),
   apiVersion: z.string().min(1).max(16),
   node: entry.optional(),

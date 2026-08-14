@@ -322,7 +322,7 @@ const CONFORMANCE_SUMMARY: RollbarItemSummary = {
 export const rollbarProvider = publicProvider({
   id: 'rollbar',
   label: 'Rollbar',
-  glyph: '◍',
+  glyph: 'brand:rollbar',
   kind: 'error-tracker',
   connection: {
     authKind: 'api-key',

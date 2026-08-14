@@ -70,6 +70,10 @@ export type InstalledPluginInfo = {
   // Passed through untouched: the node neither renders nor validates these beyond the schema, and the
   // device binds each one to this plugin's id.
   contributions: PluginManifest['contributions']
+  // The package's brand marks, if it declared any. Same pass-through rule as `contributions`: the
+  // node validated the `d` grammar in the manifest schema and does nothing else with them.
+  icon?: PluginManifest['icon']
+  icons?: PluginManifest['icons']
   client: { hash: string; bytes: number } | null
   // Whether the package declares a node half at all. The roster needs it to tell a client-only package
   // (nothing to start, so no restart is ever pending for it) from one that was installed and is waiting
@@ -136,6 +140,8 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   apiVersion: entry.manifest.apiVersion,
   permissions: entry.manifest.permissions,
   contributions: entry.manifest.contributions,
+  ...(entry.manifest.icon === undefined ? {} : { icon: entry.manifest.icon }),
+  ...(entry.manifest.icons === undefined ? {} : { icons: entry.manifest.icons }),
   client: entry.client,
   hasNode: entry.manifest.node !== undefined,
   ...(entry.source === undefined ? {} : { source: entry.source }),

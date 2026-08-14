@@ -50,7 +50,7 @@ export const createOpenAIProviders = (
   const connectionProvider = publicConnectionProvider({
     id: 'openai',
     label: 'OpenAI',
-    glyph: '◎',
+    glyph: 'brand:model-providers/openai',
     kind: 'model-provider',
     connection: {
       authKind: 'api-key',

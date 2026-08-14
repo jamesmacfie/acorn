@@ -18,6 +18,34 @@ const messages = (result: ReturnType<typeof manifest>) =>
 
 const PANE = { target: 'pane', id: 'board', label: 'Board' }
 
+describe('brand marks', () => {
+  const withIcons = (icons: Record<string, unknown>) =>
+    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', ...icons })
+
+  it('accepts a path `d` and passes it through untouched', () => {
+    const result = withIcons({ icon: { d: 'M12 .297c-6.63 0-12 5.373-12 12Z' } })
+    expect(result.success && result.data.icon?.d).toBe('M12 .297c-6.63 0-12 5.373-12 12Z')
+  })
+
+  it('refuses anything the `d` grammar cannot express', () => {
+    // The whole trust argument for shipping path data instead of an SVG document rests on this: if a
+    // mark cannot carry a tag, a url() or an event handler, there is nothing in it to sanitise.
+    expect(withIcons({ icon: { d: '<script>alert(1)</script>' } }).success).toBe(false)
+    expect(withIcons({ icon: { d: 'M0 0 url(https://evil.example/x)' } }).success).toBe(false)
+    expect(withIcons({ icon: { d: '' } }).success).toBe(false)
+    expect(withIcons({ icon: { d: `M${'0'.repeat(4_096)}` } }).success).toBe(false)
+  })
+
+  it('bounds the plural feeder, whose every entry becomes a registry row', () => {
+    expect(withIcons({ icons: { openai: { d: 'M0 0Z' }, anthropic: { d: 'M1 1Z' } } }).success).toBe(true)
+    expect(withIcons({ icons: { 'Not A Key': { d: 'M0 0Z' } } }).success).toBe(false)
+    // A key cannot reach out of the plugin's own namespace: the host stamps `brand:<pluginId>/` in
+    // front of it, so a slash here would be a second segment, not an escape — but bound it anyway.
+    expect(withIcons({ icons: { 'other/mark': { d: 'M0 0Z' } } }).success).toBe(false)
+    expect(withIcons({ icons: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`m${i}`, { d: 'M0 0Z' }])) }).success).toBe(false)
+  })
+})
+
 describe('permission identifier shape', () => {
   it('bounds scope and event strings before they can reach the trust layout', () => {
     expect(permissionManifest({ api: ['x'.repeat(65)] }).success).toBe(false)
