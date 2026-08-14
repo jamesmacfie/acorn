@@ -4,8 +4,8 @@ import { agentSessionsFor, fileStatusMeta, formatFileReference, getHighlighter, 
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { reviewNotesRoute, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
-import { Alert, CopyButton, createArmedConfirm, DiffLine, ListDetail, NonCodeRow, type LineComposerController } from '@acorn/plugin-api/ui'
-import { buildDiffRows, type CodeRow, highlighterTokenize, isCodeRow, plainTokenize, type Row } from '@acorn/plugin-api/ui/diff'
+import { Alert, Button, CopyButton, DiffLine, ListDetail, NonCodeRow, Row, createArmedConfirm, type LineComposerController } from '@acorn/plugin-api/ui'
+import { buildDiffRows, type CodeRow, highlighterTokenize, isCodeRow, plainTokenize, type Row as DiffRow } from '@acorn/plugin-api/ui/diff'
 import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
@@ -51,7 +51,7 @@ export default function ChangesPane(props: { task: Task }) {
       const sel = selected()
       return sel ? { taskId: props.task.id, sel, tick: taskStatus(props.task.id)?.dirtyCount ?? 0 } : null
     },
-    async (src): Promise<Row[]> => {
+    async (src): Promise<DiffRow[]> => {
       if (!api) return []
       const res = await localGitApi.diff(src.taskId, src.sel.path, src.sel.staged ? 'staged' : 'unstaged')
       if ('error' in res) return []
@@ -59,7 +59,7 @@ export default function ChangesPane(props: { task: Task }) {
       // Whole-file view: the patch carries full context (server -U1e6), so drop the expand gaps and
       // hunk-header rows — every line is already shown, just with +/- highlights.
       const diff = buildDiffRows(file, tokenize()).filter((r) => r.kind !== 'gap' && r.kind !== 'hunk')
-      return [{ kind: 'file', file }, ...(diff.length ? diff : [{ kind: 'nodiff' } as Row])]
+      return [{ kind: 'file', file }, ...(diff.length ? diff : [{ kind: 'nodiff' } as DiffRow])]
     },
     { initialValue: [] },
   )
@@ -185,21 +185,21 @@ export default function ChangesPane(props: { task: Task }) {
         </Show>
         <Show when={groups().staged.length || groups().unstaged.length}>
           <span class="changes-toolbar">
-            <button type="button" class="changes-to-agent" disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => api && void gitAction(() => localGitApi.stageAll(props.task.id))}>++</button>
-            <button type="button" class="changes-to-agent" disabled={!groups().staged.length} data-tip="Unstage all" data-tip-sub="git reset" onClick={() => api && void gitAction(() => localGitApi.unstageAll(props.task.id))}>−−</button>
-            <button type="button" class="changes-to-agent" data-armed={discardArmed.armed() === 'all' ? '' : undefined} data-tip={discardArmed.armed() === 'all' ? 'Click again to discard all' : 'Discard all'} data-tip-sub="Reset tracked + remove untracked — cannot be undone" onClick={() => void discardAll()}>{discardArmed.armed() === 'all' ? '?' : '↺'}</button>
+            <Button variant="bare" size="sm" iconOnly disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => api && void gitAction(() => localGitApi.stageAll(props.task.id))}>++</Button>
+            <Button variant="bare" size="sm" iconOnly disabled={!groups().staged.length} data-tip="Unstage all" data-tip-sub="git reset" onClick={() => api && void gitAction(() => localGitApi.unstageAll(props.task.id))}>−−</Button>
+            <Button variant="bare" size="sm" iconOnly data-armed={discardArmed.armed() === 'all' ? '' : undefined} data-tip={discardArmed.armed() === 'all' ? 'Click again to discard all' : 'Discard all'} data-tip-sub="Reset tracked + remove untracked — cannot be undone" onClick={() => void discardAll()}>{discardArmed.armed() === 'all' ? '?' : '↺'}</Button>
           </span>
         </Show>
-        <button type="button" class="changes-send" disabled={pushing()} data-tip="Push to origin" data-tip-sub="git push -u origin HEAD" onClick={() => void push()}>
+        <Button disabled={pushing()} data-tip="Push to origin" data-tip-sub="git push -u origin HEAD" onClick={() => void push()}>
           {pushing() ? 'Pushing…' : 'Push → origin'}
-        </button>
+        </Button>
         <Show when={pushMsg()}>
           <span class="changes-push-status">{pushMsg()}</span>
         </Show>
         <Show when={unsent().length}>
-          <button type="button" class="changes-send" title="Bracketed-paste the unsent notes into the task's agent (queued until idle)" onClick={() => void sendNotes()}>
+          <Button title="Bracketed-paste the unsent notes into the task's agent (queued until idle)" onClick={() => void sendNotes()}>
             Send {unsent().length} note{unsent().length === 1 ? '' : 's'} → agent{agentSessionsFor(props.task.id)[0]?.idle ? ' ●' : ''}
-          </button>
+          </Button>
         </Show>
         <Show when={sendMsg()}>
           <span class="muted">{sendMsg()}</span>
@@ -219,40 +219,44 @@ export default function ChangesPane(props: { task: Task }) {
                     {(c) => {
                       const status = () => fileStatusMeta(c.status === 'untracked' ? 'added' : c.status)
                       return (
-                        <div class="changes-row-wrap">
-                          <button
-                            type="button"
-                            class="changes-row"
-                            classList={{ active: selected() != null && changeKey(selected()!) === changeKey(c) }}
-                            title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
-                            onClick={() => setSelectedKey(changeKey(c))}
-                          >
-                            <span class={`file-status file-status-${status().tone}`}>{status().letter}</span>
-                            <span class="changes-row-path">{c.path}</span>
+                        <Row
+                          density="compact"
+                          reveal
+                          selected={selected() != null && changeKey(selected()!) === changeKey(c)}
+                          onActivate={() => setSelectedKey(changeKey(c))}
+                          title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
+                          leading={<span class={`file-status file-status-${status().tone}`}>{status().letter}</span>}
+                          meta={
                             <Show when={c.additions != null}>
                               <span class="file-stat add">+{c.additions}</span>
                               <span class="file-stat del">&#8722;{c.deletions ?? 0}</span>
                             </Show>
-                          </button>
+                          }
+                          trailing={<>
+                          
                           <Show
                             when={c.staged}
                             fallback={
                               <>
-                                <button type="button" class="changes-to-agent" data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</button>
-                                <button type="button" class="changes-to-agent" data-armed={discardArmed.armed() === `file:${c.path}` ? '' : undefined} data-tip={discardArmed.armed() === `file:${c.path}` ? 'Click again to discard' : 'Discard changes'} data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>{discardArmed.armed() === `file:${c.path}` ? '?' : '↺'}</button>
+                                <Button variant="bare" size="sm" iconOnly data-tip="Stage file" data-tip-sub="git add" onClick={() => api && void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</Button>
+                                <Button variant="bare" size="sm" iconOnly data-armed={discardArmed.armed() === `file:${c.path}` ? '' : undefined} data-tip={discardArmed.armed() === `file:${c.path}` ? 'Click again to discard' : 'Discard changes'} data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>{discardArmed.armed() === `file:${c.path}` ? '?' : '↺'}</Button>
                               </>
                             }
                           >
-                            <button type="button" class="changes-to-agent" data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => api && void gitAction(() => localGitApi.unstage(props.task.id, c.path))}>−</button>
+                            <Button variant="bare" size="sm" iconOnly data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => api && void gitAction(() => localGitApi.unstage(props.task.id, c.path))}>−</Button>
                           </Show>
-                          <button
-                            type="button"
-                            class="changes-to-agent"
+                          <Button
+                            variant="bare"
+                            size="sm"
+                            iconOnly
                             data-tip="Send to agent"
                             data-tip-sub="Add file reference to the composer"
                             onClick={() => void sendRef(formatFileReference(c.path))}
-                          >→</button>
-                        </div>
+                          >→</Button>
+                          </>}
+                        >
+                          <span class="changes-row-path">{c.path}</span>
+                        </Row>
                       )
                     }}
                   </For>
@@ -272,9 +276,9 @@ export default function ChangesPane(props: { task: Task }) {
                   onInput={(e) => setCommitMsg(e.currentTarget.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void commit()}
                 />
-                <button type="button" class="ui-btn" disabled={!commitMsg().trim()} onClick={() => void commit()}>
+                <Button disabled={!commitMsg().trim()} onClick={() => void commit()}>
                   Commit staged
-                </button>
+                </Button>
               </div>
             </Show>
           </>
@@ -303,7 +307,7 @@ export default function ChangesPane(props: { task: Task }) {
                   <Show
                     when={isCodeRow(row) ? row : null}
                     fallback={
-                      <NonCodeRow row={row as Exclude<Row, CodeRow>} onMutated={() => void refetch()} resolveThread={noop} reply={noop} />
+                      <NonCodeRow row={row as Exclude<DiffRow, CodeRow>} onMutated={() => void refetch()} resolveThread={noop} reply={noop} />
                     }
                   >
                     {(r) => (
@@ -322,12 +326,15 @@ export default function ChangesPane(props: { task: Task }) {
                                 {note.sentAt ? '✓ sent' : '● unsent'}
                               </span>
                               <span class="review-note-body">{note.body}</span>
-                              <button
-                                type="button"
-                                class="review-note-delete"
+                              <Button
+                                variant="bare"
+                                size="sm"
+                                iconOnly
+                                tone="danger"
                                 title="Delete note"
+                                aria-label="Delete note"
                                 onClick={() => void deleteReviewNote(props.task.id, note.id).then(() => refetchNotes())}
-                              >✕</button>
+                              >✕</Button>
                             </div>
                           )}
                         </For>

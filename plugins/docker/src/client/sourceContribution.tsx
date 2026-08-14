@@ -8,7 +8,7 @@ export const dockerSourceContribution: SourceContribution<never> = {
   // Rail position, declared (registries/sources.ts § order). Was implied by this plugin's place in
   // apps/desktop/src/app/client/plugins.ts.
   order: 40,
-  glyph: '◧',
+  glyph: 'brand:docker',
   label: 'Docker',
   component: DockerBrowse,
   promotion: {
