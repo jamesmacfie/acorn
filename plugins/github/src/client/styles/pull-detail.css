@@ -146,7 +146,10 @@
   resize: vertical;
 }
 .ui-composer .ui-composer-input { min-height: 64px; }
-.composer-input::placeholder, .diff-reply-input::placeholder, .repo-picker-filter::placeholder, .finder-input::placeholder { color: var(--text-muted); }
+/* Only this plugin's own input. `.diff-reply-input` is core's (diff.css), `.repo-picker-filter`
+   is core's (topbar.css) and `.finder-input` is nobody's any more — Input kind="bare" retired it.
+   Reaching across for all three from here is what made github's stylesheet load-bearing. */
+.composer-input::placeholder { color: var(--text-muted); }
 
 .label-row {
   display: flex;
@@ -468,21 +471,10 @@
   text-align: left;
   cursor: pointer;
 }
-.file-status {
-  flex: none;
-  width: 16px;
-  text-align: center;
-  font-weight: 700;
-  font-size: var(--fs-xs);
-}
-.file-status-add { color: var(--add-marker); }
-.file-status-del { color: var(--del-marker); }
-.file-status-warn { color: var(--warn); }
-.file-status-muted { color: var(--text-muted); }
-.file-path { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; }
-.file-stat { flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.file-stat.add { color: var(--add-marker); }
-.file-stat.del { color: var(--del-marker); }
+/* `.file-status*` / `.file-stat*` moved to core's diff.css. They are the rendering half of
+   `fileStatusMeta`, which core exports on the PUBLIC plugin API — so this stylesheet was what
+   made a shared helper's output legible, and core's own diff rows plus the changes plugin both
+   depended on the github plugin being installed to get it. */
 
 /* Armed for a second click (createArmedConfirm). github had no confirmation on these at all; the
    changed label is the prompt and the tone is what marks it destructive. */
