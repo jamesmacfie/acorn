@@ -9,11 +9,10 @@ import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/main/disabledPlugins.ts'
-import { PLUGIN_STATE } from '@acorn/node-core/server/routes/plugins.ts'
-import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/main/pluginInstaller.ts'
-import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/main/pluginLoader.ts'
+import { PLUGIN_STATE } from '@acorn/node-core/server/plugin/pluginState.ts'
 import { reconcileBundledPlugins } from '@acorn/node-core/main/bundledPlugins.ts'
 import { buildPluginDeps } from '../server/pluginDeps'
+import { buildPluginStateBridge, effectiveDisabled } from '../server/pluginState'
 import { closeListener, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
@@ -120,9 +119,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   // Read before the plugin host runs and before any route can answer, which is why it is a file in the
   // data root rather than a settings row: the list decides which databases get opened at all.
   const disabledPlugins = disabledPluginsStore(config.dataDir)
-  // The file is the owner's setting; the start config is a test/`dev:node` override. Both are honoured, and
-  // both have to be visible to the route, or it reports a state a restart cannot reach.
-  const effectiveDisabled = (): string[] => [...new Set([...disabledPlugins.get(), ...(config.disabledPlugins ?? [])])]
+  const disabled = effectiveDisabled(disabledPlugins, config.disabledPlugins)
 
   const stop = async (): Promise<void> => {
     if (stopped) return
@@ -221,31 +218,23 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
       // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
       // file. The start config stays an override for tests and `dev:node`, which want to pin a list
       // without writing into a data root.
-      { capabilities, core, disabled: effectiveDisabled(), loaded: graph.loaded },
+      { capabilities, core, disabled: disabled(), loaded: graph.loaded },
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
-    pluginStateCapability = capabilities.provide(PLUGIN_STATE, {
-      roster: () => plugins.roster,
-      // Re-scanned per call, not the boot snapshot: an install has to show up in the roster before the
-      // restart that runs it, and the device fetches its bundle from that same row to ask about it.
-      installed: () => scanInstalled(config.dataDir).installed.map(installedPluginInfo),
-      // What this process loaded, which is how the roster tells "installed and running" from
-      // "installed since the last restart".
-      booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
-      clientBundle: (id) => readClientBundle(scanInstalled(config.dataDir).installed, id),
-      // `{ path }` installs symlink an author's working tree into the install directory, so they are a
-      // development affordance and gated on the build being one.
-      install: (source, options) => installPlugin(config.dataDir, source, { ...options, allowLocalPath: !config.isPackaged }),
-      update: (id, options) => updatePlugin(config.dataDir, id, { ...options, allowLocalPath: !config.isPackaged }),
-      uninstall: (id, options) => uninstallPlugin(config.dataDir, id, options),
-      // The EFFECTIVE set, not the file alone. Reporting only the file made `restartRequired` permanently
-      // true whenever the start config pinned a list without writing one (`dev:node`, an integration
-      // harness): the page showed the plugin as enabled, not running, and a Restart banner that a restart
-      // could never clear.
-      disabled: effectiveDisabled,
-      setDisabled: (names) => disabledPlugins.set(names),
-    })
+    pluginStateCapability = capabilities.provide(
+      PLUGIN_STATE,
+      buildPluginStateBridge({
+        dataDir: config.dataDir,
+        roster: () => plugins.roster,
+        booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+        disabled,
+        setDisabled: (names) => disabledPlugins.set(names),
+        // A packaged app is not a development build. The standalone root has no such flag and reads
+        // NODE_ENV instead; that is the one deliberate difference between the two.
+        allowLocalPathInstalls: !config.isPackaged,
+      }),
+    )
 
     wireAgentTools({ db })
     mark('install')

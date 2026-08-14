@@ -297,197 +297,43 @@ export type NodePluginRow = {
 //
 // In protocol rather than node-core because both sides hold it against the same manifest: the node
 // decides what to load, the device decides which of a fleet's bundles it can run.
-export const PLUGIN_API_MAJOR = '1'
-
-// What a plugin's manifest DECLARED. Not what is enforced: until loaded plugins move out of process
-// the node block is context-shaping plus disclosure (docs/security.md § Design
-// rules, rule 6), so every surface that renders this says "declared" and flips to "enforced" with no
-// vocabulary change when the boundary lands.
-export type NodePluginPermissions = {
-  api: string[]
-  events: string[]
-  node: { core: string[]; capabilities: string[]; secrets: boolean; exec: boolean; net: string[] }
-}
-
-// One sandboxed rectangle the plugin's client bundle draws, as its manifest declared it
-// (docs/plugins.md; the Zod schema is node-core/main/pluginManifest.ts).
-// Hand-written here for the same reason NodePluginPermissions is: the node parses the manifest, and
-// this is the projection the device registers contributions from.
-// A document the HOST draws an editor for, with the plugin supplying only its content
-// (docs/future/monaco.md). `languageId` is one of ./languageIds.ts — typed as a plain string here
-// because this is the wire projection and a roster row is bytes a node sent, so the device re-checks
-// it rather than believing the type. Absent `write` means read-only.
-// `completions` is the first LSP-shaped capability: the host POSTs a position into the plugin's own
-// route and maps what comes back onto editor items. The host never learns the language.
-export type PluginDocumentCompletions = { route: string; triggerCharacters?: string[] }
-export type PluginDocumentRegion = {
-  languageId: string
-  read: string
-  write?: string
-  completions?: PluginDocumentCompletions
-}
-// Which arrangement of regions the host draws for a pane. Region-addressed from the first release, which
-// is what lets a second template arrive without changing what an already-published declaration means.
+// ── The loaded-plugin manifest contract ───────────────────────────────────────────────────────────
 //
-// `document` is degenerate — the whole pane is the document, and nothing is left for a frame.
-// `document-over-frame` splits the rectangle: the host's editor on top, the plugin's own frame below, and
-// a host-owned drag handle between them. The frame region is why the second template needs a client
-// bundle and a trust decision where the first needs neither.
-export type PluginPaneLayout = { template: 'document' | 'document-over-frame'; document: PluginDocumentRegion }
+// One declaration, two consumers. The manifest's shape — its permissions, its frame surfaces, its
+// declarative chrome — is the Zod schema in ./pluginContract.ts, and the types below are `z.infer` of
+// it. Until recently this file carried a hand-written twin of all of it, ~330 lines kept in step with
+// the node's schema by nothing at all, and the compiler could not help because the data crosses a
+// process boundary as `unknown`. Re-exported rather than moved so the 134 importers of this file keep
+// working; new code should import from ./pluginContract.ts directly.
+export { PLUGIN_API_MAJOR } from './pluginApiVersion.ts'
+export type {
+  NodePluginPermissions,
+  PluginAgentContextDescriptor,
+  PluginAttentionDescriptor,
+  PluginChromeAction,
+  PluginClientRouteDescriptor,
+  PluginCommandAction,
+  PluginCommandCategory,
+  PluginCommandDescriptor,
+  PluginContentLinkDescriptor,
+  PluginContributions,
+  PluginDocumentCompletions,
+  PluginDocumentRegion,
+  PluginFrameSurface,
+  PluginKeybindingDescriptor,
+  PluginNodeStatDescriptor,
+  PluginPaletteDescriptor,
+  PluginPaneLayout,
+  PluginRefResolverDescriptor,
+  PluginSlotDescriptor,
+  PluginSourceDescriptor,
+  PluginSourceEmptyState,
+} from './pluginContract.ts'
 
-export type PluginFrameSurface = {
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay'
-  // `pane` only, and OPTIONAL on the wire rather than defaulted: an older node's roster row does not
-  // carry it, and absent has to mean `task` — the scope a pane has always had. A project-scoped pane is
-  // the detail half of its plugin's rail Source browse, not a rectangle in a task's layout, and it lands
-  // in a different registry (client-core/registries/projectSurfaces.ts).
-  scope?: 'task' | 'project'
-  // The contribution id, which is also a persisted layout key for a task-scoped pane. Bound to the
-  // plugin by the HOST — a bundle cannot claim a surface its manifest did not declare.
-  id: string
-  label: string
-  glyph: string
-  order: number
-  formFactor: ('desktop' | 'mobile')[]
-  providerId?: string
-  group?: 'general' | 'workspace'
-  // Webview-only. Exactly one URL form and a non-empty host list are guaranteed by the node's
-  // manifest parser, then re-checked by the device before use because roster rows are untrusted wire.
-  url?: string
-  urlSource?: string
-  hosts?: string[]
-  // `pane` only. Absent is a plain frame filling the pane, which is every manifest written so far.
-  layout?: PluginPaneLayout
-  claimsKeys?: string[]
-}
+// The two grants the DEVICE derives from a manifest's frame surfaces and records against a trust
+// decision. Not manifest shapes: they are what the owner consented to, one row per surface.
 export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
 export type PluginKeyClaimGrant = { surface: string; label: string; chords: string[] }
-
-// ── Declarative chrome (docs/plugins.md) ───────────────────────────
-//
-// The other half of what a manifest may contribute: small chrome the HOST draws natively from data,
-// with no plugin code in the renderer at all. Hand-written twins of the Zod schemas in
-// node-core/main/pluginManifest.ts, for the same reason PluginFrameSurface is one — the node parses
-// the manifest, and this is the projection the device registers contributions from.
-
-// The closed verb set. `invoke` is deliberately absent in v1; adding a verb is additive.
-export type PluginChromeAction =
-  // A task-scoped pane the same manifest declares. The selected row's id rides along as a pane intent.
-  | { verb: 'openPane'; pane: string }
-  // A project-scoped pane the same manifest declares, reached by navigating to its declared route. The
-  // selected row's id becomes the addressed item, because for this scope the URL IS the selection.
-  | { verb: 'navigate'; surface: string }
-  | { verb: 'runNodeAction'; path: string }
-  | { verb: 'createTask' }
-  | { verb: 'openUrl'; url: string }
-  // An `overlay` surface the same manifest declares: a full-screen picker the host places. It needs
-  // nothing from its click site, so unlike `createTask` and `navigate` it survives into
-  // `PluginCommandAction` — which is where it will actually be used, since a picker is opened by a chord.
-  | { verb: 'openOverlay'; overlay: string }
-  // Deliver this command to the frame region of one of the plugin's own composed panes. The only verb
-  // whose effect lands INSIDE a plugin rather than on the shell: the host flushes that pane's document
-  // first and then posts the command id over the frame's bridge, and the frame handles it exactly as it
-  // would its own button click. A pane nobody has open has no frame, so the verb is a no-op.
-  | { verb: 'surfaceAction'; surface: string }
-
-// Every `path`/`items`/`data` below is confined to the plugin's OWN route namespace when the node
-// parses the manifest, and confined again on the device before it is fetched. Neither the prefix nor
-// the check is spelled here: an architecture rule forbids this package from naming a plugin route at
-// all, and the two halves that do the confining are node-core/main/pluginManifest.ts and
-// client-core/plugins/chrome/data.ts.
-// What a rail source says when its route answered with nothing, in place of the host's fixed
-// "Nothing here yet." — one bounded message and at most one context-free action, because an empty rail
-// has no row in scope. See pluginManifest.ts for why it stops there.
-export type PluginSourceEmptyState = {
-  message: string
-  action?: PluginCommandAction
-  actionLabel?: string
-}
-export type PluginSourceDescriptor = {
-  id: string
-  label: string
-  glyph: string
-  order: number
-  providerId?: string
-  items: string
-  onSelect?: PluginChromeAction
-  emptyState?: PluginSourceEmptyState
-  refresh?: number
-}
-export type PluginSlotDescriptor = {
-  id: string
-  slot: 'footer'
-  icon?: string
-  data: string
-  onClick?: PluginChromeAction
-  refresh?: number
-}
-export type PluginPaletteDescriptor = { id: string; title: string; action: PluginChromeAction }
-export type PluginCommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
-// `createTask` needs a selected rail row; `navigate` needs a routed project and the shell's navigator. A
-// command registry row has none of the three, so neither verb is expressible here.
-export type PluginCommandAction = Exclude<PluginChromeAction, { verb: 'createTask' } | { verb: 'navigate' }>
-export type PluginCommandDescriptor = {
-  id: string
-  title: string
-  category: PluginCommandCategory
-  palette: boolean
-  action: PluginCommandAction
-}
-export type PluginKeybindingDescriptor = {
-  command: string
-  defaultChord: string
-  when: 'global' | 'task' | 'surface'
-  surface?: string
-}
-export type PluginAttentionDescriptor = { id: string; order: number; items: string; refresh?: number }
-export type PluginNodeStatDescriptor = {
-  id: string
-  order: number
-  label: [one: string, many: string]
-  data: string
-  refresh?: number
-}
-export type PluginContentLinkDescriptor = {
-  id: string
-  match: string
-  // Absent means the plugin's reference PANEL is the destination instead — a panel is addressed by provider,
-  // which for a manifest surface is always the plugin id, so there is nothing here to name. The node
-  // refuses a link with neither destination (node-core/main/pluginManifest.ts).
-  openPane?: string
-  item: string
-}
-// A renderer URL the host matches on the plugin's behalf, addressing one item inside a project-scoped
-// surface. `path` is confined to a host-minted prefix when the node parses the manifest, and confined
-// again on the device before a Route is registered from it — the same two-sided rule every plugin path
-// gets, for the same reason: a roster row is bytes a node sent. The prefix itself is not spelled in this
-// package; client-core/registries/corePaths.ts mints it.
-export type PluginClientRouteDescriptor = {
-  id: string
-  path: string
-  surface: string
-  item: string
-  order: number
-}
-// An entry in the agent composer's "add Acorn context" list. The registry behind it takes two async
-// functions, which is why it had no manifest form for a while — but the contract was already
-// data-in/data-out, so two routes carry it. `options` is a GET, `capture` a POST; the response shapes
-// and everything the host binds rather than reads are in agentContext.ts.
-export type PluginAgentContextDescriptor = {
-  id: string
-  label: string
-  description?: string
-  options: string
-  capture: string
-}
-// One batch-enrichment route: identifiers of this plugin's items in, display rows out, so another
-// plugin's surface can render a chip for them without importing this one. The response schema and the
-// argument for keeping its vocabulary tiny are in refResolvers.ts; `providerId` is stamped by the host.
-export type PluginRefResolverDescriptor = {
-  id: string
-  kind: string
-  resolve: string
-}
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
 // serves: the host is the one rendering these, so the shape is its contract and not the plugin's
@@ -531,29 +377,11 @@ export type PluginAttentionWireItem = {
 export type PluginAttentionItems = { items: PluginAttentionWireItem[] }
 export type PluginNodeStatValue = { value: number }
 
-// Still loose on the wire as well as in the schema, now that phase 4's keys are named: a client that
-// does not know a future sibling key should contribute less rather than fail to parse. The arrays are
-// optional because an older node's roster row will not carry them — every reader uses `?? []`.
-export type PluginContributions = {
-  frames: PluginFrameSurface[]
-  sources?: PluginSourceDescriptor[]
-  slots?: PluginSlotDescriptor[]
-  palette?: PluginPaletteDescriptor[]
-  commands?: PluginCommandDescriptor[]
-  keybindings?: PluginKeybindingDescriptor[]
-  attention?: PluginAttentionDescriptor[]
-  nodeStats?: PluginNodeStatDescriptor[]
-  contentLinks?: PluginContentLinkDescriptor[]
-  agentContexts?: PluginAgentContextDescriptor[]
-  refResolvers?: PluginRefResolverDescriptor[]
-  routes?: PluginClientRouteDescriptor[]
-} & Record<string, unknown>
-
 export type InstalledPluginRow = {
   version: string
   apiVersion: string
-  permissions: NodePluginPermissions
-  contributions: PluginContributions
+  permissions: import('./pluginContract.ts').NodePluginPermissions
+  contributions: import('./pluginContract.ts').PluginContributions
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document. The
   // device registers `icon` as `brand:<pluginId>` and each `icons` key as `brand:<pluginId>/<key>`,
   // stamping the prefix from the roster row so a package cannot claim another's mark. See

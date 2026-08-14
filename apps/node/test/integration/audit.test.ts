@@ -3,7 +3,8 @@ import { createApp } from '@acorn/node-core/server/index.ts'
 import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
 import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
-import { setPluginsBridge } from '@acorn/node-core/server/routes/plugins.ts'
+import { setRouteTestCapability } from '@acorn/node-core/server/bridge.ts'
+import { PLUGIN_STATE } from '@acorn/node-core/server/plugin/pluginState.ts'
 import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
@@ -22,7 +23,7 @@ beforeEach(async () => {
   disabled = []
   // The plugin toggle goes through a bridge, because the roster only exists once the composition root
   // has run the plugin host. Two plugins is enough to show the recorded list is the STATE, not a diff.
-  setPluginsBridge({
+  setRouteTestCapability(PLUGIN_STATE, {
     roster: () => [
       { name: 'docker', required: false, disabled: false, state: 'active' },
       { name: 'http', required: false, disabled: false, state: 'active' },
@@ -60,7 +61,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
-  setPluginsBridge(null as never)
+  setRouteTestCapability(PLUGIN_STATE, null)
   harness.cleanup()
 })
 

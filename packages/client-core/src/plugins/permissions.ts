@@ -16,106 +16,123 @@ import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
 // A plain module rather than exports on the dialog, so a node-env suite can import it: client-core's
 // tests run under plain Node with no Solid plugin, and a .tsx does not parse there.
 //
-// The update prompt's "what is new" mark is set-difference over these strings, so the WORDING is the
-// diff key — rephrasing a line without changing the grant would light it up as newly requested.
-
-const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  fs: 'Read and write task files',
-  git: 'Read repository history and run Git commands',
-  tasks: 'Read task details',
-  context: 'Read task launch context',
-  models: 'Generate text with configured model providers',
-  prefs: 'Read and write this plugin’s saved state',
-  identity: 'Read the node owner identity',
-  'projects:read': 'Read projects, including where every codebase lives on disk',
-  'projects:config': 'Read every project’s build, dev and database scripts',
-  'projects:write': 'Create and update projects, including their on-disk locations',
+// Every line is a RECORD, and the split between `key` and `text` is the point of it. The update
+// prompt's "what is new" mark is a set-difference, and it used to run over the sentences — so the
+// user-facing copy was the identifier. Improving the wording of a line ("Read your projects" →
+// "See your projects") would then re-prompt every owner of every installed plugin with that line
+// highlighted as newly requested: the dialog wrong, in the alarming direction, over a copy edit.
+// Owners who see enough false "asks for more" learn to click through it, which is the one reflex a
+// trust prompt exists to prevent. The grant identifier is the key now, and the sentence is free.
+//
+// `icon` and `high` ride along for the same reason. They used to be reconstructed downstream by
+// prefix-matching the copy against a table of twenty `startsWith` rules plus a substring sniff, which
+// meant a new high-risk grant whose sentence matched no prefix rendered as boring as "show a toast".
+// The tables below already know how serious each grant is; they just stop discarding it.
+export type PermissionLine = {
+  // The stable grant identifier the update diff compares. Never shown.
+  key: string
+  // The human sentence. Free to change at any time.
+  text: string
+  icon: string
+  high: boolean
 }
 
-const ignoredLine = (count: number, kind = ''): string =>
-  `${count} ${kind}${kind ? ' ' : ''}request${count === 1 ? '' : 's'} this version of acorn does not recognise (ignored)`
+/** What a description table holds for one grant: the copy plus how the prompt draws it. */
+export type GrantDescription = { text: string; icon: string; high?: boolean }
 
-export const nodePermissionLines = (permissions: NodePluginPermissions): string[] => {
-  const core = permissions.node.core.flatMap((facet) => NODE_CORE_DESCRIPTIONS[facet] ?? [])
+const line = (key: string, description: GrantDescription): PermissionLine =>
+  ({ key, text: description.text, icon: description.icon, high: description.high ?? false })
+
+const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
+  fs: { text: 'Read and write task files', icon: 'file-text' },
+  git: { text: 'Read repository history and run Git commands', icon: 'git-branch' },
+  tasks: { text: 'Read task details', icon: 'list' },
+  context: { text: 'Read task launch context', icon: 'info' },
+  models: { text: 'Generate text with configured model providers', icon: 'sparkles' },
+  prefs: { text: 'Read and write this plugin’s saved state', icon: 'database' },
+  identity: { text: 'Read the node owner identity', icon: 'user-round' },
+  // The three that hand over where code lives on disk, and the reason `high` exists.
+  'projects:read': { text: 'Read projects, including where every codebase lives on disk', icon: 'folder-tree', high: true },
+  'projects:config': { text: 'Read every project’s build, dev and database scripts', icon: 'file-cog', high: true },
+  'projects:write': { text: 'Create and update projects, including their on-disk locations', icon: 'folder-plus', high: true },
+}
+
+// One line for everything this acorn could not name.
+//
+// The COUNT is part of the key, and that is the whole point of the line. An update that asks for three
+// unrecognised things where it previously asked for one has grown its reach — this shell just cannot
+// say into what — and a constant key would let exactly that slide past the "what is new" mark
+// unremarked. Growth in the unnamed is still growth, and it is the growth an owner has least ability
+// to reason about, so it is the last thing that should diff as unchanged.
+const ignoredLine = (key: string, count: number, kind = ''): PermissionLine => ({
+  key: `${key}:${count}`,
+  text: `${count} ${kind}${kind ? ' ' : ''}request${count === 1 ? '' : 's'} this version of acorn does not recognise (ignored)`,
+  icon: 'circle-dashed',
+  high: false,
+})
+
+export const nodePermissionLines = (permissions: NodePluginPermissions): PermissionLine[] => {
+  const core = permissions.node.core.flatMap((facet) => {
+    const description = NODE_CORE_DESCRIPTIONS[facet]
+    return description ? [line(`node.core:${facet}`, description)] : []
+  })
   const ignored = permissions.node.core.length - core.length
   return [
-    ...(permissions.node.secrets ? ['Use your saved credentials to make requests on its behalf'] : []),
-    ...(permissions.node.exec ? ['Run commands on the node'] : []),
-    ...permissions.node.net.map((host) => `Reach ${host}`),
+    ...(permissions.node.secrets
+      ? [line('node.secrets', { text: 'Use your saved credentials to make requests on its behalf', icon: 'key-round', high: true })]
+      : []),
+    ...(permissions.node.exec ? [line('node.exec', { text: 'Run commands on the node', icon: 'square-terminal', high: true })] : []),
+    ...permissions.node.net.map((host) => line(`node.net:${host}`, { text: `Reach ${host}`, icon: 'globe' })),
     ...core,
-    ...permissions.node.capabilities.map((id) => `Use capability ${id}`),
-    ...(ignored ? [ignoredLine(ignored, 'node permission')] : []),
+    ...permissions.node.capabilities.map((id) => line(`node.capability:${id}`, { text: `Use capability ${id}`, icon: 'puzzle' })),
+    ...(ignored ? [ignoredLine('node.ignored', ignored, 'node permission')] : []),
   ]
 }
 
-export const uiPermissionLines = (permissions: NodePluginPermissions): string[] => {
+export const uiPermissionLines = (permissions: NodePluginPermissions): PermissionLine[] => {
   // Classify instead of echoing: these strings came from an untrusted manifest, while every grant
-  // sentence under "In this app — enforced" must be copy the host owns and can actually enforce.
+  // sentence under "In this app — enforced" must be copy the host owns and can actually enforce. The
+  // KEY is the scope name, which is host-recognised by the time it gets here.
   const scopes = permissions.api.flatMap((scope) => {
     if (!GRANTABLE_SCOPES.includes(scope)) return []
     const description = describeScope(scope)
-    return description ? [description] : []
+    return description ? [line(scope, description)] : []
   })
   const events = permissions.events.flatMap((channel) => {
     if (!isSubscribable(channel)) return []
     const description = describeChannel(channel)
-    return description ? [description] : []
+    return description ? [line(channel, description)] : []
   })
   const ignored = permissions.api.length + permissions.events.length - scopes.length - events.length
-  return [...scopes, ...events, ...(ignored ? [ignoredLine(ignored)] : [])]
+  return [...scopes, ...events, ...(ignored ? [ignoredLine('ui.ignored', ignored)] : [])]
 }
 
 export const webviewGrants = (contributions: PluginContributions): PluginWebviewGrant[] =>
   pluginWebviewGrants(contributions)
 
-export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): string[] =>
+export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.surface.localeCompare(b.surface))
-    .map((grant) => `Show web pages from ${[...grant.hosts].sort().join(', ')} in the "${grant.label}" pane`)
-
-// How a line is DRAWN, keyed off the sentences above. Presentation only: an icon that helps a reader
-// skim, and `high` for the handful of grants that deserve to survive a skim — credentials, running
-// commands, and the two that hand over where code lives on disk.
-//
-// Keyed off the copy rather than threading a second value out of every describe* function in three
-// files. The strings are host-owned constants, so the failure mode of a rewording is a neutral icon
-// on one row — cosmetic, not a wrong claim. Keep this table next to the copy it reads.
-const LINE_STYLES: readonly (readonly [prefix: string, icon: string, high?: boolean])[] = [
-  ['Use your saved credentials', 'key-round', true],
-  ['Run commands on the node', 'square-terminal', true],
-  ['Read projects, including where every codebase lives on disk', 'folder-tree', true],
-  ['Read every project’s build, dev and database scripts', 'file-cog', true],
-  ['Create and update projects', 'folder-plus', true],
-  ['Reach ', 'globe'],
-  ['Read and write task files', 'file-text'],
-  ['Read repository history and run Git commands', 'git-branch'],
-  ['Read task details', 'list'],
-  ['Read task launch context', 'info'],
-  ['Generate text with configured model providers', 'sparkles'],
-  ['Read and write this plugin’s saved state', 'database'],
-  ['Read the node owner identity', 'user-round'],
-  ['Use capability ', 'puzzle'],
-  ['Create and update tasks', 'square-pen'],
-  ['Read tasks', 'list'],
-  ['Read workspaces', 'layout-grid'],
-  ['Receive ', 'radio'],
-  ['Show web pages from ', 'app-window'],
-  ['Handle ', 'keyboard'],
-]
-
-export type PermissionLineStyle = { icon: string; high: boolean }
-
-export const permissionLineStyle = (text: string): PermissionLineStyle => {
-  // The ignored line opens with a count, so it is the one entry that cannot be matched by prefix.
-  if (text.includes('does not recognise')) return { icon: 'circle-dashed', high: false }
-  const hit = LINE_STYLES.find(([prefix]) => text.startsWith(prefix))
-  return { icon: hit?.[1] ?? 'shield', high: hit?.[2] ?? false }
-}
+    .map((grant) => {
+      const hosts = [...grant.hosts].sort()
+      // The hosts are part of the grant, not decoration, so they belong in the key: widening a
+      // surface's host list has to read as newly requested.
+      return line(`webview:${grant.surface}:${hosts.join(' ')}`, {
+        text: `Show web pages from ${hosts.join(', ')} in the "${grant.label}" pane`,
+        icon: 'app-window',
+      })
+    })
 
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   pluginKeyClaimGrants(contributions)
 
-export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]): string[] =>
+export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.surface.localeCompare(b.surface))
-    .map((grant) => `Handle ${grant.chords.map(formatChord).join(', ')} in the "${grant.label}" surface`)
+    // Same rule as the webview hosts: the chords ARE the grant.
+    .map((grant) =>
+      line(`keys:${grant.surface}:${[...grant.chords].sort().join(' ')}`, {
+        text: `Handle ${grant.chords.map(formatChord).join(', ')} in the "${grant.label}" surface`,
+        icon: 'keyboard',
+      }),
+    )

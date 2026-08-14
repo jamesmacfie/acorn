@@ -18,6 +18,13 @@ const messages = (result: ReturnType<typeof manifest>) =>
 
 const PANE = { target: 'pane', id: 'board', label: 'Board' }
 
+// A webview needs a client bundle to steer it, so every webview case declares one. `manifest()` stays
+// bundle-less because most surfaces do not need one.
+const webviewManifest = (contributions: Record<string, unknown>) =>
+  pluginManifestSchema.safeParse({
+    id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', client: './dist/client.js', contributions,
+  })
+
 describe('brand marks', () => {
   const withIcons = (icons: Record<string, unknown>) =>
     pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', ...icons })
@@ -91,10 +98,10 @@ describe('overlay surfaces', () => {
 
 describe('webview surfaces', () => {
   it('accepts literal and plugin-route URL sources', () => {
-    expect(manifest({
+    expect(webviewManifest({
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com/start', hosts: ['docs.example.com'] }],
     }).success).toBe(true)
-    expect(manifest({
+    expect(webviewManifest({
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', urlSource: '/v2/p/board/webview-url', hosts: ['*.example.com'] }],
     }).success).toBe(true)
   })
@@ -112,18 +119,28 @@ describe('webview surfaces', () => {
   })
 
   it('validates hosts and requires a literal URL to stay inside them', () => {
-    expect(manifest({
+    expect(webviewManifest({
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://other.example.com', hosts: ['docs.example.com'] }],
     }).success).toBe(false)
-    expect(manifest({
+    expect(webviewManifest({
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['*.*.example.com'] }],
     }).success).toBe(false)
-    expect(manifest({
+    expect(webviewManifest({
       frames: [{ target: 'webview', id: 'local', label: 'Local', url: 'http://localhost:3000', hosts: ['localhost'] }],
     }).success).toBe(true)
-    expect(manifest({
+    expect(webviewManifest({
       frames: [{ target: 'webview', id: 'remote', label: 'Remote', url: 'http://docs.example.com', hosts: ['docs.example.com'] }],
     }).success).toBe(false)
+  })
+
+  it('refuses a webview from a package with no client bundle', () => {
+    // Two reasons, and the second is the one with teeth. The host mounts the bundle controller-only to
+    // drive the view, so without one nothing steers it — and the trust queue holds BUNDLES, so a
+    // bundle-less package never reaches the prompt at all. Its declared hosts would be a disclosure
+    // nobody was ever shown, for a surface that displays arbitrary web content.
+    const declared = { target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }
+    expect(messages(manifest({ frames: [declared] }))).toContain('a webview surface needs a client bundle; declare `client` in the manifest')
+    expect(webviewManifest({ frames: [declared] }).success).toBe(true)
   })
 })
 

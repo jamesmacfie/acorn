@@ -13,12 +13,11 @@ import { sourceRegistry } from '../../registries/sources'
 import { taskSlotRegistry } from '../../registries/slots'
 import { brandMarkRegistry } from '../../ui/brandMarks'
 import {
-  bundleAccepted,
-  installedByNode,
   loadedPluginStateOnNode,
   pluginEnabledOnNode,
   pluginInstalledAtOnNode,
 } from '../distribution'
+import { declaredSurfaces, eligiblePlugins, hasWithheldCode, type DeclaredSurfaces } from '../contributions'
 import { runChromeAction } from './actions'
 import {
   captureAgentContext,
@@ -66,7 +65,7 @@ const registered = new Map<string, Disposable[]>()
 const chromeNode = (): string => activeNodeId() ?? ''
 
 // The surface ids a manifest declared, as the DEVICE read them, split by what each verb may name.
-export type DeclaredSurfaces = { panes: ReadonlySet<string>; overlays: ReadonlySet<string> }
+export type { DeclaredSurfaces }
 
 // Can this action actually do anything from a click site with no row and no routed project? The node
 // checked all three when it parsed the manifest; a roster row is wire input, so the device checks them
@@ -93,21 +92,6 @@ export const usableEmptyState = (
   // The message survives on its own: it is the part the rail was missing, and losing a sentence over a
   // button would be the worse trade.
   empty?.action && !contextFreeActionUsable(pluginId, surfaces, empty.action) ? { message: empty.message } : empty
-
-// Every plugin whose chrome this device may draw, one row per plugin id. The manifest travels with the
-// roster row and one version wins per id, so the first node offering it is as good as any.
-function eligible(): Map<string, NodePluginRow> {
-  const rows = new Map<string, NodePluginRow>()
-  for (const roster of installedByNode().values()) {
-    for (const row of roster) {
-      if (!row.installed || rows.has(row.name)) continue
-      const client = row.installed.client
-      if (client && !bundleAccepted(row.name, client.hash)) continue
-      rows.set(row.name, row)
-    }
-  }
-  return rows
-}
 
 function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[]): Disposable[] {
   const installed = row.installed!
@@ -142,17 +126,10 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   const frames = contributions.frames ?? []
   const surfaceIds = new Set(frames.map((surface) => surface.id))
-  // TASK-scoped panes only. Everything below that consumes this set puts a pane into a task's layout —
-  // `openPane` on a command, a content link's retained intent, an agent-context deep link's `?pane=` — so a
-  // project-scoped surface in here would be an offer that can only fail. It reaches the shell through
-  // plugins/frames/register.tsx and the project-surface registry instead.
-  const taskPanes = new Set(frames.filter((frame) => frame.target === 'webview' || (frame.target === 'pane' && frame.scope !== 'project')).map((frame) => frame.id))
-  // The other set a context-free verb may name. An overlay is not a pane — it belongs to no task layout
-  // — so it is kept apart rather than folded into the set above, where `openPane` would then accept it.
-  const surfaces: DeclaredSurfaces = {
-    panes: taskPanes,
-    overlays: new Set(frames.filter((frame) => frame.target === 'overlay').map((frame) => frame.id)),
-  }
+  // Classified once, in ../contributions.ts, because plugins/frames/register.tsx feeds the same
+  // `openPane` allowlist from the same declaration.
+  const surfaces = declaredSurfaces(contributions)
+  const taskPanes = surfaces.panes
 
   // `palette` is the one-release compatibility alias. Both forms become commands, and the palette's
   // existing command-registry pass renders only those whose `palette` flag is true.
@@ -349,7 +326,15 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 export function syncChromeContributions(): void {
   disposeAll()
   const refreshes: number[] = []
-  for (const [pluginId, row] of eligible()) registered.set(pluginId, registerChrome(pluginId, row, refreshes))
+  // A package with code this device has not been cleared to run drops out here: a descriptor is a click
+  // site, and a rail row that opens a pane which will never mount is worse than no rail row. But the
+  // question is `hasWithheldCode`, NOT `!trusted` — a descriptor-only package (model-providers ships
+  // one) has no bytes to accept and must still contribute, and the frames pass asks the stronger
+  // question because it is the one that mounts code (../contributions.ts).
+  for (const entry of eligiblePlugins()) {
+    if (hasWithheldCode(entry)) continue
+    registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.row, refreshes))
+  }
   // One timer at the smallest declared interval, rather than one per descriptor. The polling fallback is
   // for data that changes with no node-side trigger; the primary path is still the status ping, and a
   // handful of tiny reads sharing a tick is not worth five timers.

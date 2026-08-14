@@ -60,9 +60,9 @@ describe('documentRegionFor', () => {
   // A capability route is a route like any other: the host POSTs to it on the plugin's behalf on every
   // completion trigger, so it is confined on the same terms as the two above.
   it('refuses an escaping COMPLETIONS route', () => {
-    expect(() => documentRegionFor('board', withDocument({ read: '/v2/p/board/doc', completions: { route: '/v2/core/tasks' } })))
+    expect(() => documentRegionFor('board', withDocument({ read: '/v2/p/board/doc', completions: { route: '/v2/core/tasks', triggerCharacters: [] } })))
       .toThrow(/completions route/)
-    expect(documentRegionFor('board', withDocument({ read: '/v2/p/board/doc', completions: { route: '/v2/p/board/complete' } })))
+    expect(documentRegionFor('board', withDocument({ read: '/v2/p/board/doc', completions: { route: '/v2/p/board/complete', triggerCharacters: [] } })))
       .toMatchObject({ completions: { route: '/v2/p/board/complete' } })
   })
 })

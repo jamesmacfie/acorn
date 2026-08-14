@@ -193,20 +193,28 @@ export function classifyPath(path: string): Partial<Record<ApiMethod, string>> |
   return rule ? rule.scopes : null
 }
 
+// Type-only, so it is erased and creates no runtime edge back to the module that consumes these.
+import type { GrantDescription } from '../permissions'
+
 /** Every scope name the table can grant. The trust dialog and the docs read from this, not a copy. */
 export const GRANTABLE_SCOPES: readonly string[] = [
   ...new Set(RULES.flatMap((rule) => Object.values(rule.scopes))),
 ].sort()
 
-// Consent copy for every scope this table can grant. These strings are also update-diff keys, so keep
-// them stable: changing copy marks the line as newly requested on the next plugin update.
-const SCOPE_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  'core.projects:config': 'Read every project’s build, dev and database scripts',
-  'core.projects:read': 'Read projects, including where every codebase lives on disk',
-  'core.projects:write': 'Create and update projects, including their on-disk locations',
-  'core.tasks:read': 'Read tasks',
-  'core.tasks:write': 'Create and update tasks',
-  'core.workspaces:read': 'Read workspaces',
+// Consent copy for every scope this table can grant, with how the trust prompt draws it. The severity
+// and the icon live HERE, beside the grant, rather than being guessed back from the sentence: this
+// table is the only place that knows how serious `core.projects:read` is.
+//
+// The copy is free to change. It used to be the update-diff key — a rewording marked the line as newly
+// requested for every owner of every installed plugin — and the scope name is the key now
+// (plugins/permissions.ts).
+const SCOPE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
+  'core.projects:config': { text: 'Read every project’s build, dev and database scripts', icon: 'file-cog', high: true },
+  'core.projects:read': { text: 'Read projects, including where every codebase lives on disk', icon: 'folder-tree', high: true },
+  'core.projects:write': { text: 'Create and update projects, including their on-disk locations', icon: 'folder-plus', high: true },
+  'core.tasks:read': { text: 'Read tasks', icon: 'list' },
+  'core.tasks:write': { text: 'Create and update tasks', icon: 'square-pen' },
+  'core.workspaces:read': { text: 'Read workspaces', icon: 'layout-grid' },
 }
 
-export const describeScope = (scope: string): string | undefined => SCOPE_DESCRIPTIONS[scope]
+export const describeScope = (scope: string): GrantDescription | undefined => SCOPE_DESCRIPTIONS[scope]

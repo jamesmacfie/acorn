@@ -24,9 +24,30 @@ A few words the docs use with a specific meaning:
 | 2 | [Declare the manifest once](./02-manifest-declared-once.md) | Strong | The plugin manifest shape is written twice — a Zod schema and a hand-written twin — with no test that they agree, and the trust prompt's data crosses to the desktop unvalidated. |
 | 3 | [One eligibility module behind client registration](./03-client-registration-eligibility.md) | Strong | The security predicate deciding which plugin panes exist is copy-pasted between two register modules with different trust gates. |
 | 4 | [Permission lines become records, not copy](./04-permission-lines-as-records.md) | Strong | The trust prompt diffs on user-facing wording, so a copy edit falsely re-prompts every owner with "asks for more". |
-| 5 | [A frame-verb table](./05-frame-verb-table.md) | Worth exploring | Adding one verb to the frame bridge takes five edits in five modules; the drift this invites has already happened once. |
+| 5 | [A frame-verb table](./05-frame-verb-table.md) | Worth exploring | Adding one verb to the frame bridge takes five edits in five modules; the drift this invites has already happened once. Design pass done and partly built — see [05-frame-verb-table-design.md](./05-frame-verb-table-design.md). |
 | 6 | [Move frame wiring decisions out of .tsx](./06-frame-wiring-out-of-tsx.md) | Worth exploring | The test suite can't render components, so the file extension decides coverage — and all four documented bugs in this stack were in the untested `.tsx` half. |
 | 7 | [The plugin-api client barrel](./07-plugin-api-barrel.md) | Speculative | 173 exports and zero behaviour is a namespace, not a contract; a watch item, not a work item. |
+
+## Status
+
+Plans 1–5 have landed. 1 extracted `buildPluginStateBridge` and moved the roster reconciliation out
+of its route; 2 moved the manifest schema into `@acorn/protocol/pluginContract.ts` and gave the trust
+store a real parse; 3 put eligibility and the surface predicates in
+`client-core/plugins/contributions.ts`; 4 turned permission lines into records keyed on the grant; 5
+got its design pass and the type-level half of it (`client-core/plugins/frames/verbs.ts`). Plans 6 and
+7 are untouched.
+
+A review of that work found ten regressions, all in places where behaviour was unified rather than
+moved, and all fixed. Three were about what "trusted" means: it is now the strong question ("may this
+device execute these bytes"), answered only against the bundle that WON fleet resolution, from the
+same roster row the manifest comes from — and the chrome pass asks the separate weaker question
+(`hasWithheldCode`) so a descriptor-only package still contributes. Two were about the trust file and
+IPC failing closed too broadly: acknowledgements are parsed one at a time, an unreadable file is set
+aside rather than overwritten, and a disclosure this shell cannot parse no longer stops the owner
+recording a decision. The rest were smaller: the unrecognised-permission count is part of its diff
+key, the wire projection is loosened wherever an older node would not have sent a field, the roster
+row's projection fails closed at compile time, and the task-pane classification is one exported
+predicate instead of three spellings.
 
 ## Suggested order
 

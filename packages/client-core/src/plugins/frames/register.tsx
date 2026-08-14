@@ -16,12 +16,11 @@ import { uiSlotRegistry } from '../../registries/slots'
 import { activeTaskId } from '../../tasks/tasks'
 import {
   activeBundles,
-  bundleAccepted,
-  installedByNode,
   pluginEnabledOnNode,
   pluginInstalledAtOnNode,
   loadedPluginStateOnNode,
 } from '../distribution'
+import { eligiblePlugins, isTaskPane } from '../contributions'
 import PluginFrame from './PluginFrame'
 import PluginWebview from './PluginWebview'
 import type { FrameBinding } from './broker'
@@ -92,9 +91,7 @@ const bindingFor = (pluginId: string, surface: PluginFrameSurface, row: NodePlug
   // The plugin's own TASK-scoped pane ids, which is the allowlist for the `openPane` verb. Project-scoped
   // surfaces are excluded because the verb opens into a task's layout and there is nothing there for one
   // of them to become — `services.openPane` below already refuses when the frame has no task.
-  panes: (row.installed?.contributions.frames ?? [])
-    .filter((entry) => entry.target === 'webview' || (entry.target === 'pane' && entry.scope !== 'project'))
-    .map((entry) => entry.id),
+  panes: (row.installed?.contributions.frames ?? []).filter(isTaskPane).map((entry) => entry.id),
   // Roster rows are wire input. The node parsed these already, but the device re-applies the closed
   // claim policy before handing the declaration to a frame.
   claimsKeys: (surface.claimsKeys ?? []).filter(isPluginKeyClaim),
@@ -382,8 +379,9 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
  * on a node switch, and it does not need to be — nothing registered here holds a node id (see `frameNode`).
  */
 export function syncFrameContributions(): void {
-  const bundles = activeBundles()
-  if (!bundles) return
+  // Still gated on the distribution pass having run: a frame mounts BYTES, and until one bundle has
+  // won per plugin id there is nothing to mount. The chrome pass has no such gate.
+  if (!activeBundles()) return
 
   for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
   registered.clear()
@@ -391,27 +389,18 @@ export function syncFrameContributions(): void {
   // Driven by the ROSTER rather than by the bundle map, because not every surface needs a bundle any
   // more. A document surface is host-drawn and executes nothing here, so the loop has to be able to
   // reach a plugin that has no client half at all.
-  for (const [pluginId, row] of eligible()) {
-    const bundle = bundles.get(pluginId)
-    // Trust binds to bytes: a hash this device has not accepted runs nothing, whether it was rejected
-    // or simply never asked about yet. What that withholds is the code-bearing surfaces only.
-    const trusted = !!bundle && bundleAccepted(pluginId, bundle.hash)
-    const disposables = registerSurfaces(pluginId, bundle?.hash ?? '', row, trusted)
-    if (disposables.length) registered.set(pluginId, disposables)
+  // Trust binds to bytes, and ../contributions.ts decided against which bytes — the resolved winner's,
+  // never a hash a roster row merely claims. An untrusted row is KEPT here rather than dropped the way
+  // the chrome pass drops it: what acceptance withholds is the code-bearing surfaces only, and a
+  // document surface is host-drawn and executes nothing.
+  //
+  // A package with no client half is `trusted: false` for the same reason, and that is load-bearing
+  // rather than pedantic: its webview surfaces would otherwise mount external web content with no
+  // prompt ever firing, because the trust queue only ever holds bundles.
+  for (const entry of eligiblePlugins()) {
+    const disposables = registerSurfaces(entry.pluginId, entry.hash, entry.row, entry.trusted)
+    if (disposables.length) registered.set(entry.pluginId, disposables)
   }
-}
-
-/** One row per plugin id, the same way chrome/register.ts picks one: the manifest travels with the
- * roster row and one bundle wins per id, so the first node offering it is as good as any. */
-function eligible(): Map<string, NodePluginRow> {
-  const rows = new Map<string, NodePluginRow>()
-  for (const roster of installedByNode().values()) {
-    for (const row of roster) {
-      if (!row.installed || rows.has(row.name)) continue
-      rows.set(row.name, row)
-    }
-  }
-  return rows
 }
 
 /** Test seam, mirroring _resetPluginDistribution: the registry is module-level, so a suite that asserts
