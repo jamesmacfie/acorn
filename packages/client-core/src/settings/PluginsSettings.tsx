@@ -12,6 +12,7 @@ import {
   uninstallNodePlugin,
   updateNodePlugin,
 } from '../node/nodePlugins'
+import { canPickFolder, pickFolder } from '../platform'
 import { readPluginHostState, setPluginDevGrant } from '../plugins/host'
 import { syncPluginDistribution } from '../plugins/distribution'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../ui/primitives'
@@ -183,6 +184,18 @@ export default function PluginsSettings() {
       if (!result.ok) throw new Error(result.reason ?? 'That task has no agent session to send to.')
     })
 
+  // Offered only for a LOCAL node, and that is not a polish detail: the dialog browses this device's
+  // filesystem and the path is resolved by the node, so picking a folder for a remote node would hand it
+  // an absolute path that means something else there, or nothing at all. Remote nodes keep the text
+  // field, where the owner is typing a path on the remote machine and knows it.
+  const canBrowse = () => kind() === 'path' && node()?.local === true && canPickFolder()
+
+  const browse = () =>
+    run(async () => {
+      const path = await pickFolder()
+      if (path) setSpec(path)
+    })
+
   const install = () =>
     run(async () => {
       const source = buildInstallSource(kind(), spec())
@@ -277,12 +290,24 @@ export default function PluginsSettings() {
           disabled={busy()}
           onInput={(event) => setSpec(event.currentTarget.value)}
         />
+        <Show when={canBrowse()}>
+          <Button type="button" variant="ghost" disabled={busy()} onClick={() => void browse()}>Choose…</Button>
+        </Show>
         <Button type="submit" disabled={busy() || !spec().trim()}>Install</Button>
       </form>
       <p class="muted plugin-install-hint">
         A plugin's server code runs with the same access as acorn itself. This device asks again, showing
         what the plugin declared, before any of its interface code runs here.
       </p>
+      {/* Said only for the source it is true of. A folder is symlinked, not copied, so it is the one
+          install whose bytes keep changing after the fact — the owner should know that before they point
+          acorn at a directory something else writes to (docs/security.md § Installing from a folder). */}
+      <Show when={kind() === 'path'}>
+        <p class="muted plugin-install-hint">
+          A folder is linked, not copied: whatever is in it when the node next starts is what runs, and
+          acorn cannot pin those bytes the way it pins a downloaded package.
+        </p>
+      </Show>
 
       <Show when={state.loading && !state()}><p class="muted">Reading the plugin list…</p></Show>
       {/* A node that cannot answer is not an empty list. Saying so beats rendering nothing, which reads as

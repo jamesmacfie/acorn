@@ -60,7 +60,8 @@ export type PluginProvenance = Record<string, string>
 export type PluginLockfile = {
   source: PluginInstallSource
   resolvedVersion: string
-  // null for a `{ path }` dev install, where there was no archive.
+  // null for a `{ path }` folder install, where there was no archive — and nothing to pin, since the
+  // directory is symlinked and stays editable. `entrypoints` is empty for the same reason.
   archiveSha256: string | null
   entrypoints: { node?: string; client?: string }
   provenance?: PluginProvenance
@@ -338,10 +339,6 @@ export function sweepDebris(dataRoot: string): void {
 
 export type InstallOptions = {
   allowDowngrade?: boolean
-  // `{ path }` is a plugin author's dogfood loop and nothing else: it symlinks a working tree into the
-  // install directory, so whatever is in that tree at the node's next start is what runs. Off unless the
-  // composition root says this is a development build.
-  allowLocalPath?: boolean
 }
 
 export async function installPlugin(dataRoot: string, source: PluginInstallSource, options: InstallOptions = {}): Promise<PluginInstallResult> {
@@ -396,8 +393,20 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
   }
 }
 
+// A folder install, and the one source whose bytes are not pinned: the directory is SYMLINKED rather
+// than copied, so whatever is in that tree at the node's next start is what runs. That is the point —
+// it is what makes the author's edit-in-place loop worth having — and it is why the lockfile below
+// records no archive hash and no entrypoint digests. There is nothing to pin.
+//
+// Allowed on every build, packaged included (docs/security.md § Installing from a folder). The bytes
+// are the owner's own, named by absolute path on the node's own filesystem, and for a folder only this
+// user can write the symlink hands out no authority that account did not already have. The mode of the
+// folder is NOT checked, and that is the one real cost: a group-writable or shared directory is a wider
+// write surface than the `0700` install root, so pointing at one turns write access there into durable
+// code execution as the node's user. The security doc says so in those words; a mode check here would be
+// a boundary shaped like advice. The client half is unaffected either way — distribution is keyed on the
+// hash of the bytes that arrive, so an in-place edit re-prompts the device on its own.
 function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): PluginInstallResult {
-  if (!options.allowLocalPath) fail('Installing a plugin from a local path is only available in a development build.')
   if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
   const manifest = validate(source.path, expectId)
   guardDowngrade(readLockfile(dataRoot, manifest.id), manifest.version, options)
@@ -430,7 +439,7 @@ export function uninstallPlugin(dataRoot: string, id: string, options: { purgeDa
   const target = pluginDir(dataRoot, id)
   if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id))) fail(`'${id}' is not installed on this node.`)
   markPluginRemoved(dataRoot, id)
-  // lstat, so a `{ path }` dev symlink is unlinked rather than followed into the author's working tree.
+  // lstat, so a `{ path }` folder symlink is unlinked rather than followed into the owner's directory.
   rmSync(target, { recursive: true, force: true })
   rmSync(lockfilePath(dataRoot, id), { force: true })
 

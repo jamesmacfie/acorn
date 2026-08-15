@@ -94,7 +94,7 @@ describe('bundled plugin reconciliation', () => {
     reconcileBundledPlugins(root, resources)
     const workshop = mkdtempSync(join(tmpdir(), 'acorn-bundled-override-'))
     const override = packageAt(workshop, '9.0.0', 'owner version')
-    await installPlugin(root, { path: override }, { allowLocalPath: true })
+    await installPlugin(root, { path: override })
 
     packageAt(resources, '2.0.0')
     expect(reconcileBundledPlugins(root, resources)).toMatchObject({ preserved: ['rollbar'] })

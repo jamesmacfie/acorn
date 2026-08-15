@@ -8,9 +8,10 @@ import { nodePluginNames } from './composition'
 
 // The PLUGIN_STATE bridge, built once for both composition roots — the other half of the extraction
 // pluginDeps.ts started. It was written out twice (service/runtime.ts and server/standalone.ts) and had
-// already drifted four ways: which builds allow `{ path }` installs, whether the disabled set was the
-// file alone or the file plus the start config, and which of those two the plugin host was handed.
-// Kept in step by hand, invisible to every test. The differences that are real are options now.
+// already drifted four ways: which builds allowed `{ path }` installs (a divergence that is gone — a
+// folder is a first-class source on every build now), whether the disabled set was the file alone or the
+// file plus the start config, and which of those two the plugin host was handed. Kept in step by hand,
+// invisible to every test. The differences that are real are options now.
 export type DisabledPluginsStore = {
   get(): readonly string[]
   set(names: readonly string[]): void
@@ -38,18 +39,13 @@ export type PluginStateInput = {
   loadFailures(): readonly PluginLoadFailure[]
   disabled(): readonly string[]
   setDisabled(names: readonly string[]): void
-  // `{ path }` installs symlink an author's working tree into the install directory, so they are a
-  // development affordance and gated on the build being one. The two roots answer "is this a dev
-  // build" differently because they genuinely have different evidence: Electron has a packaging flag,
-  // and a standalone node has only NODE_ENV. That is the one divergence kept on purpose.
-  allowLocalPathInstalls: boolean
   // The running plugin host, for the one mutation that does not wait for a restart
   // (@acorn/node-core/main/pluginReload.ts). Both roots hold the `initPlugins` result already.
   reloadHost: Pick<PluginHostResult, 'reload'>
 }
 
 export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
-  const { dataDir, allowLocalPathInstalls: allowLocalPath } = input
+  const { dataDir } = input
   // Built here rather than in each root, so the two cannot drift the way install/uninstall once did. The
   // built-in names come from the BUILD (composition.ts), not from the assembled graph: they are only used
   // to warn when a disk package shadows a compiled one.
@@ -68,8 +64,8 @@ export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
     clientBundle: (id) => readClientBundle(scanInstalled(dataDir).installed, id),
     disabled: input.disabled,
     setDisabled: input.setDisabled,
-    install: (source, options) => installPlugin(dataDir, source, { ...options, allowLocalPath }),
-    update: (id, options) => updatePlugin(dataDir, id, { ...options, allowLocalPath }),
+    install: (source, options) => installPlugin(dataDir, source, options),
+    update: (id, options) => updatePlugin(dataDir, id, options),
     uninstall: (id, options) => uninstallPlugin(dataDir, id, options),
     reload: (id) => reloader.reload(id),
   }

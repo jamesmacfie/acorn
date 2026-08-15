@@ -1,8 +1,9 @@
 # The gates, and what answers each
 
 From the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16. The session found four
-gates; **the reload gate is gone** — a loaded plugin now hot-swaps in place
-(`docs/plugins.md § Reloading one plugin without a restart`), so what was gate 3 no longer exists.
+gates; **two are now gone**. The reload gate went first — a loaded plugin hot-swaps in place
+(`docs/plugins.md § Reloading one plugin without a restart`). The authoring/install gate went on
+2026-08-16, and its closing note is kept below because the argument it settles keeps coming back.
 Each remaining gate is a deliberate decision with recorded rationale — not a gap someone forgot —
 which means each is reversed by a decision plus its designed answer, not by rearchitecture.
 Ordered by how hard they gate the end goal.
@@ -48,31 +49,27 @@ update-consent flow it would ride — per-(plugin, hash) device trust with a per
 update — is shipped. Work plan: design signing first, then discovery as a listing over signed
 packages, and only after rung 2.
 
-## 3. External authors cannot install on a build they have
+## 3. External authors cannot install on a build they have — **CLOSED 2026-08-16**
 
-**Was**: "external authors cannot build a plugin", and that half is done. `npm create acorn-plugin`
-writes the whole no-bundler profile (`packages/create-acorn-plugin`); `acorn-plugin-sdk` publishes
-the frame bridge for anyone running a bundler (`packages/plugin-sdk`); the compatibility promise is
-written down in `docs/plugins.md § What is published`, along with why the other seven facade
-entrypoints are not published and never will be. With the authoring contract, roster rows that name
-their own failure, the testkit and a reload-shaped loop already in place, building one is no longer
-the gate.
+Both halves are done. Building: `npm create acorn-plugin` writes the whole no-bundler profile
+(`packages/create-acorn-plugin`) and `acorn-plugin-sdk` publishes the frame bridge for anyone running a
+bundler (`packages/plugin-sdk`), with the compatibility promise in `docs/plugins.md § What is
+published`. Installing: `allowLocalPath` is gone, and `{ path }` — an absolute directory on the node's
+own filesystem — is a first-class install source on every build, packaged included. Settings → Plugins
+offers a native folder picker when the target node is this machine.
 
-**What.** Installing is. A local-path install is symlinked in place and gated on `allowLocalPath`,
-which is `!app.isPackaged` under the desktop and `NODE_ENV !== 'production'` standalone. So the last
-step of the authoring guide fails on every build an external author actually has: they can write a
-plugin and not install it.
+**Kept because the argument recurs.** The decision was a trust-boundary one, not a config flag, and
+`docs/security.md § Installing from a folder` holds it in full. The short form: a folder install is the
+owner naming bytes already theirs, and anyone who can rewrite that directory can already rewrite the
+install root beside it, so the symlink grants no new authority; the node half is uncontained for every
+source alike, which is gate 1's problem and not this one's; and the client half is untouched because
+device consent is keyed on the hash of the bytes that arrive, so an in-place edit re-prompts by itself.
 
-**Why it gates.** It is the whole remaining distance between "an afternoon" and "an afternoon, on a
-machine that is not a dev checkout". Nothing downstream — discovery, a marketplace — is worth
-anything while the local case does not close.
-
-**The designed answer.** Generalize the local path into "point acorn at a folder of plugins" as a
-first-class install source on the same trust flow (`work-plan.md § Phase 1`). Costed there as a
-trust-boundary decision rather than an installer change: `allowLocalPath` is dev-only on purpose, and
-widening it means saying what a symlinked, in-place-editable, unsandboxed node half may be on a
-released build. It does not need rung 2 first — the bytes are the owner's own, chosen by absolute
-path — but the reasoning belongs beside it in `docs/security.md`.
+**What it costs, and must keep saying.** A symlinked folder cannot be pinned. The lockfile records
+`archiveSha256: null` and empty `entrypoints`, a test holds that, and the install form says so in its
+own sentence. Folder installs sit outside the supply-chain story in gate 2 — signing will never cover
+them. If someone later "fixes" the lockfile by recording digests for a `{ path }` source, that is not a
+tidy-up; it is a claim of provenance the source cannot support.
 
 ## What is deliberately not on this list
 
@@ -90,6 +87,5 @@ path — but the reasoning belongs beside it in `docs/security.md`.
 
 ## Verify before building
 
-Whether rung 2 has shipped (changes gate 1's risk text and the dev-grant note); whether the
-lockfile still pins hashes and the installer still refuses downgrades; and whether
-`@acorn/plugin-api` became publishable in the meantime (gate 3 closed).
+Whether rung 2 has shipped (changes gate 1's risk text and the dev-grant note); and whether the
+lockfile still pins hashes for fetched sources and the installer still refuses downgrades.

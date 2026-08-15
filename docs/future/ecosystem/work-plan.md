@@ -1,6 +1,8 @@
 # The sequenced work
 
-From the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16 to what is still ahead.
+From the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16, and pruned again the same day
+when phase 1 shipped — the phase numbers below are the original ones and do not renumber, because
+several docs cite them.
 Nothing here is scheduled. This is the ordering and the dependency argument; the designs live in
 the owning docs and are not repeated here. A developer or agent picking up any phase should read
 the owning doc first and treat this file as the map.
@@ -16,27 +18,56 @@ independently useful), put containment before discovery so acorn never has a win
 strangers can find plugins whose node halves run uncontained, and keep distribution last because
 everything before it makes distribution worth having.
 
-## Phase 1 — the folder install (owned here)
+## What is actually waiting on something (2026-08-16)
 
-Most of this phase shipped. The scaffold is `npm create acorn-plugin`
-(`packages/create-acorn-plugin`); the publishable half of the facade is `acorn-plugin-sdk`
-(`packages/plugin-sdk`), unscoped so it needed no npm organisation, with the compatibility promise
-written down in `docs/plugins.md § What is published`. The seven entrypoints that were *not*
-published never will be, and that section says why. `dx.md`, which owned this phase, is gone with it.
+The phases below say what depends on what. This says what is *blocked*, which is a different and much
+shorter list: **nothing here waits on another team or an external dependency, with one exception.**
+For everything else "when" is a capacity question, not a sequencing one — so the answer to "when can
+we start phase N" is almost always "now, and the real question is what else stops".
 
-What is left is the one thing that actually strands a stranger today, and it was never packaging.
-Generalize the local-path source (`allowLocalPath`, today dev-build-only) into "point acorn at a
-folder of plugins" as a first-class install source, riding the same trust flow. A **packaged** acorn
-refuses the directory the scaffold just wrote, so the authoring guide's last step fails on every
-build an external author actually has.
+Startable today, in any order:
 
-It is small and user-facing, and blocked on nothing — but read it as a **trust-boundary** change,
-not a config flag. `allowLocalPath` is dev-build-only on purpose, and widening it means deciding
-what a symlinked, in-place-editable, unsandboxed node half is allowed to be on a released build
-(`docs/security.md`). Start there, not in the installer.
+- **Phase 2's first sub-step** — process supervision and lifecycle, reusing the reload path's
+  candidate-then-commit shape. Nothing gates it, it is independently useful, and it is the critical
+  path for anything discovery-shaped.
+- **Phase 3's first step** — the typed-collection contract, proven on GitHub PRs and Linear issues.
+  Genuinely independent of phase 2, so taking it costs the containment track nothing. Read the drift
+  warning first: `docs/future/dashboards/` was verified against the tree on **2026-08-12** and files
+  3–6 each carry their own verify-before-building list. Budget a re-verify pass, not a rewrite.
+- **The signing design doc** — it does not exist, and writing it is not gated on phase 2.
+- **`bundle.md` steps 2–4** — the Linux node-pty prebuild in CI, the CI matrix and release upload for
+  Linux and Windows, then the Windows `openssl` problem. Do that last one before anyone downloads a
+  Windows build: `ensureCert` shells out to `openssl`, stock Windows has none, and it fails at first
+  boot with the node refusing to start.
 
-Deliverable: an external author with no checkout of this repo can scaffold, follow
-`docs/plugin-authoring.md`, and install from a folder on a released build.
+Gated, and it is the only item on the list: **discovery** — hard on phase 2, and it has a recorded
+stance without a design.
+
+**The one thing effort cannot route around.** macOS is stuck in two separate places on a single
+purchase. A downloaded node tarball containing `.node` binaries is quarantined by Gatekeeper
+(`bundle.md § Two snags`), and the desktop app still ships unsigned with no auto-update. Both clear
+with one Apple Developer Program membership plus notarization, and notarization needs setup time
+before it works. Worth buying before it is on the critical path, because it is the only item here that
+waiting does not shrink.
+
+**Two different signing problems, easy to confuse.** Phase 4 says "signing" twice and means different
+things each time. Item 1 is **plugin-package attestation** (sigstore-style, gate 2 in `blockers.md`) —
+that is what the standing refusal on plugin auto-update hangs off. The macOS signing inside item 2 is
+**Apple Developer ID code signing and notarization**, which is about distributing the app and the node
+tarball. Neither substitutes for the other, and they unblock different things.
+
+## Phase 1 — the front door — **shipped 2026-08-16**
+
+Kept as a numbered stub because other docs cite it. The scaffold is `npm create acorn-plugin`
+(`packages/create-acorn-plugin`) and the publishable half of the facade is `acorn-plugin-sdk`
+(`packages/plugin-sdk`), with the compatibility promise in `docs/plugins.md § What is published`.
+The last item — the folder install — landed the same day: `allowLocalPath` is gone and `{ path }` is a
+first-class source on every build, so the directory the scaffold writes installs on a packaged acorn.
+It was decided as a trust-boundary question rather than a config flag, and the reasoning is
+`docs/security.md § Installing from a folder` — including the one thing it must not claim, that a
+symlinked folder is not hash-pinned and never will be.
+
+Phases 2–4 do not renumber.
 
 ## Phase 2 — rung-2 containment (owning doc: `docs/security.md § The containment ladder`)
 
@@ -64,11 +95,13 @@ scenario.
 
 In order:
 
-1. **Signing** — needs a design doc first (sigstore-style attestation is the named direction).
-   Unlocks the standing refusal on auto-update.
-2. **The node install story** — the unfinished half of `bundle.md`: Linux node-pty prebuilds, the
-   CI release matrix, Windows `openssl`, macOS signing. A remote node becomes a download instead
-   of a tarball ritual. (The app's own Developer-ID/notarization question is the same knot.)
+1. **Signing** — plugin-package attestation, needs a design doc first (sigstore-style is the named
+   direction). Unlocks the standing refusal on *plugin* auto-update. Not the same thing as the macOS
+   signing in item 2 — see the note above.
+2. **The node install story** — the unfinished half of `bundle.md`, in its own order: Linux node-pty
+   prebuilds, the CI release matrix, Windows `openssl`, then macOS. A remote node becomes a download
+   instead of a tarball ritual. The first three are startable today; macOS is the one item behind the
+   Apple Developer Program purchase, which the app's own auto-update is also behind.
 3. **Discovery** — an unreviewed listing over signed packages, honest about being unreviewed,
    riding the shipped per-(plugin, hash) trust and permission-diff consent. Hard-gated on phase 2;
    do not ship discovery over uncontained node halves.
@@ -92,6 +125,7 @@ deleted when it goes. Consult it whenever a move is proposed; moves stay opportu
 ## Verify before building
 
 Each owning doc carries its own verify-before-building list — use those. Cross-cutting checks for
-this file: whether rung 2 shipped out of order; whether `allowLocalPath` is still dev-gated
-(phase 1's folder-install item assumes it); whether ecosystem-last is still the recorded stance in
-`docs/extensibility.md`; and whether the facade has been published (phase 1 closed).
+this file: whether rung 2 shipped out of order; whether ecosystem-last is still the recorded stance
+in `docs/extensibility.md`; and whether a folder install still refuses to pin (if something started
+recording entrypoint digests for `{ path }`, the honesty argument in
+`docs/security.md § Installing from a folder` has quietly changed).
