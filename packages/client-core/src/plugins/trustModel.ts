@@ -1,0 +1,104 @@
+import { noteBundleAccepted, resolvePendingTrust, type PluginTrustRequest } from './distribution'
+import {
+  keyClaimGrants,
+  keyClaimPermissionLines,
+  nodePermissionLines,
+  type PermissionLine,
+  uiPermissionLines,
+  webviewGrants,
+  webviewPermissionLines,
+} from './permissions'
+import { recordPluginTrust } from './host'
+import { syncPluginContributions } from './syncContributions'
+
+// What the trust prompt SAYS and what answering it DOES (PluginTrustDialog.tsx draws it).
+//
+// A plain module rather than two memos inside the dialog, for the reason documentSurfaces.ts gives:
+// the repo's client suites run in bare Node with no Solid transform, so anything in a `.tsx` file is
+// structurally untestable — and the two things here are the ones worth pinning. The tier split is a
+// security claim (docs/security.md § Design rules, rule 6): `Enforced` is a fence the UI bridge holds,
+// `Declared` is a disclosure the plugin can ignore entirely, and the three lists may never be merged,
+// because a strong claim must not lend credibility to a weaker one sitting beside it. And `decide` is
+// where a stray keypress once permanently disabled a plugin with no undo surface anywhere in the UI.
+
+export type TierKey = 'enforced' | 'declared' | 'web'
+
+export const TIER_LABEL: Record<TierKey, string> = { enforced: 'Enforced', declared: 'Declared', web: 'Web pages' }
+
+export type TrustLine = PermissionLine & {
+  tier: TierKey
+  // Did the version the owner last approved lack this grant? Always false on a first install, where
+  // there is no previous version for anything to be new against.
+  added: boolean
+}
+
+export type TrustTier = { key: TierKey; lines: TrustLine[] }
+
+/**
+ * Every declared line, decorated with the tier that owns it and — on an update — whether the version
+ * the owner last approved had it.
+ *
+ * The diff runs over the grant KEY, never the sentence, so a copy edit is a copy edit rather than a
+ * fleet-wide "asks for more" (plugins/permissions.ts).
+ */
+export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[] {
+  const installed = request?.row.installed
+  if (!installed) return []
+  const previous = request?.previous
+  const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
+    {
+      key: 'enforced',
+      now: [...uiPermissionLines(installed.permissions), ...keyClaimPermissionLines(keyClaimGrants(installed.contributions))],
+      was: previous ? [...uiPermissionLines(previous.permissions), ...keyClaimPermissionLines(previous.keyClaims ?? [])] : null,
+    },
+    {
+      key: 'declared',
+      now: nodePermissionLines(installed.permissions),
+      was: previous ? nodePermissionLines(previous.permissions) : null,
+    },
+    {
+      key: 'web',
+      now: webviewPermissionLines(webviewGrants(installed.contributions)),
+      was: previous ? webviewPermissionLines(previous.webviews ?? []) : null,
+    },
+  ]
+  return groups.map(({ key, now, was }) => {
+    const before = was ? new Set(was.map((entry) => entry.key)) : null
+    return {
+      key,
+      lines: now.map((entry) => ({ ...entry, tier: key, added: before ? !before.has(entry.key) : false })),
+    }
+  })
+}
+
+/**
+ * Record an ANSWER — accepted or rejected — and let the shell catch up.
+ *
+ * Both answers are remembered (main/pluginTrustStore.ts keeps a rejection so a turned-away plugin does
+ * not ask every boot), which is exactly why dismissal must not come through here: Escape is "not now"
+ * and records nothing. See the dialog's `dismiss`.
+ */
+export async function recordTrustDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
+  const installed = request.row.installed
+  if (!installed) return
+  await recordPluginTrust({
+    pluginId: request.row.name,
+    hash: request.hash,
+    nodeId: request.nodeId,
+    version: installed.version,
+    permissions: installed.permissions,
+    webviews: webviewGrants(installed.contributions),
+    keyClaims: keyClaimGrants(installed.contributions),
+    decision,
+  })
+  resolvePendingTrust(request.row.name, request.hash)
+  // An acceptance is what lets the plugin's surfaces exist at all (frames/register.ts gates on it), so
+  // register them now rather than at the next boot. A rejection needs no counterpart: nothing was
+  // registered to take away.
+  if (decision === 'accepted') {
+    noteBundleAccepted(request.row.name, request.hash)
+    // Both passes, because a bundle-bearing plugin's chrome is gated on the same acceptance as its
+    // rectangles — so it appears with the rest of its surfaces rather than at the next boot.
+    syncPluginContributions()
+  }
+}
