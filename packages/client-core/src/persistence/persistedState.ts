@@ -79,6 +79,23 @@ export const storageKeyFor = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 
   return `${slice.key}:${nodeId ? `${encodeURIComponent(nodeId)}/` : ''}${encodeURIComponent(scopeId)}`
 }
 
+// Which node a storage key is qualified for, without knowing which slice wrote it — `null` for an
+// unqualified key (an `app` slice, or a pre-qualification leftover). The raw `/` is the qualifier's tell,
+// per the note above; slice keys never contain one, so the id is the segment between the last `:` before
+// that slash and the slash itself. Used by the device-storage drain, which has a bag of keys and no
+// slice to match them against, and must not hand one node's layouts to another.
+export const nodeIdFromStorageKey = (key: string): string | null => {
+  const slash = key.indexOf('/')
+  if (slash === -1) return null
+  const colon = key.lastIndexOf(':', slash)
+  if (colon === -1) return null
+  try {
+    return decodeURIComponent(key.slice(colon + 1, slash))
+  } catch {
+    return null
+  }
+}
+
 export const scopeIdFromStorageKey = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, key: string): string | null => {
   if (slice.scope === 'app') return key === slice.key ? '' : null
   const prefix = `${slice.key}:`

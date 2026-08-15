@@ -172,7 +172,8 @@ root.
 ## Client state and fleet behavior
 
 The client has one disposable query cache and IndexedDB persister per Node. It also persists fleet
-membership, endpoint pins, device tokens, device preferences, layouts, drafts, and selection state.
+membership, endpoint pins, device tokens, device preferences, drafts, and selection state. Pane
+layouts and the other compositions belong to the Node they describe, not the device (docs/state.md).
 Every Node-backed query is rendered with `live`, `refreshing`, `stale`, `offline`, `disabled`, or
 `error` status. Cached reads remain visible when a Node is offline; mutations fail fast and retain
 the user's text as a draft. There is no automatic mutation queue.
