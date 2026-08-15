@@ -153,11 +153,20 @@ Two earlier decisions are what make this possible, and neither was made for this
 
 Today the components are reachable as `@acorn/plugin-api/ui`, which is a workspace dependency —
 fine for plugins in this repo, not yet resolvable for a genuinely external one. **That is an
-accepted intermediate state, not an argument against using them.** The kit will be extracted into
-its own published dependency later; a plugin written against these imports today is written against
-the right surface, and only the package name will change. The alternative — hand-rolling UI until
-the packaging is finished — produces exactly the reference implementations we do not want people
-copying.
+accepted intermediate state, not an argument against using them.** A plugin written against these
+imports today is written against the right surface, and only the package name would change. The
+alternative — hand-rolling UI until the packaging is finished — produces exactly the reference
+implementations we do not want people copying.
+
+What shipped in front of it is the **bridge**, as `acorn-plugin-sdk`
+(`docs/plugins.md § What is published`): framework-free, dependency-free, and publishable because its
+whole declaration is six functions somebody can hand-write and review. The component kit is not that.
+Publishing it means a Solid peer dependency, a bundled slice of client-core, and prop types for forty
+components — which is a declaration rollup, and therefore the API Extractor this monorepo deliberately
+does not have. So it stays a workspace dependency until an out-of-tree plugin actually wants it, and the
+gap is smaller than it sounds in the meantime: the host already serves `/ui.css` at every plugin origin,
+so an external frame gets acorn's own chrome from `class="ui-btn"` with no JavaScript, no types and no
+package at all.
 
 The host-generated frame document now links `/ui.css`, assembled from the same presentation-only
 stylesheets as the shell, and the appearance bridge projects the complete theme and style token axes.
@@ -288,7 +297,10 @@ Roughly in order of how much they matter:
    `state.get`/`state.set` is the tier's store, with the cost named in `docs/plugins.md`.
 4. **Ecosystem, if and when it is wanted** — discovery, a scaffold, an authoring guide, a written
    compatibility policy. Deliberately last: none of it is worth building before a plugin someone
-   outside this repo actually wants to ship.
+   outside this repo actually wants to ship. The authoring guide shipped as
+   `docs/plugin-authoring.md`, and the scaffold as `packages/create-acorn-plugin` — both once the
+   contract stopped moving, which was the whole reason for the ordering. Discovery and the written
+   compatibility policy are still ahead (`docs/future/ecosystem/`).
 5. **Web and mobile**, analysed in `future/remote.md`. The plugin work quietly prepared for it —
    the sandbox is standard web platform, and the client's platform-specific access sits behind one
    adapter — but the hard parts are auth and reachability, not plugins.

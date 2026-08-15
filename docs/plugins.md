@@ -118,6 +118,42 @@ means editing `packages/protocol/src/pluginApiVersion.ts` and rebuilding every l
 `pnpm --filter @acorn/desktop run build:bundled-plugins`) — a stale package keeps the old number and stops
 loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one names.
 
+### What is published, and what acorn promises about it
+
+Two packages leave this repository. Both are unscoped, which is a decision and not a placeholder:
+`@acorn/*` would need an npm organisation that does not exist, and nothing about these two artifacts
+is improved by waiting for one.
+
+| Package | What it is |
+| --- | --- |
+| `create-acorn-plugin` | The scaffold (`packages/create-acorn-plugin`). Emits the whole no-bundler profile; depends on nothing, including this list's other entry. |
+| `acorn-plugin-sdk` | The frame bridge (`packages/plugin-sdk`) — `connect`, `mountFrame`, `openLinkOnClick`, `AcornBridgeError` and the `AcornBridge` type, re-exported from `@acorn/plugin-api/ui/sdk` so the two cannot drift. |
+
+**Only the frame bridge is published, and the other seven entrypoints never will be.** They re-export
+node-core and client-core — Hono, drizzle, Solid, Monaco — and a plugin does not want a second copy of
+any of those. It wants the host's, which a compiled plugin gets from the builder and a loaded plugin
+gets through `ctx` and through the document its frame is served in. The bridge is the one thing an
+out-of-tree author cannot obtain any other way, because the alternative is copying a handshake. That
+also keeps the published bundle honest: 17 kB, seven modules, zero external imports, and a test that
+imports it in a bare node environment so the day someone re-exports a Solid component it fails here
+rather than in a stranger's bundler.
+
+**The promise: a plugin that loads under `PLUGIN_API_MAJOR` keeps loading under it.** That is what
+publishing converts from an internal invariant into something owed to someone else, and it is the same
+invariant the snapshot already enforced — a removal requires the major to move, and the major is compared
+by exact string match at three places. What is *not* promised: that the major will never move, that a
+prior major keeps working, or that anything below carries a deprecation window. There is no deprecation
+program and none is planned; the ceiling stays "the number cannot lie about a removal".
+
+`packages/plugin-sdk/src/public.ts` is the published declaration, **hand-written** and copied verbatim
+to `dist/sdk.d.ts`. Nothing here emits declarations — `noEmit` is global and every package is consumed as
+source — so a rollup would mean adding a declaration build and API Extractor to describe six functions,
+and it would drag `ErrorEnvelope`, and therefore Zod, into the published types for a shape that never
+appears on the surface. Hand-written is also the better artifact for a compatibility promise: something a
+person wrote and a person reviewed. It is held to the implementation by mutual-assignability assertions in
+`packages/plugin-sdk/src/contract.test.ts`, which `tsc --noEmit` fails the moment an upstream shape moves
+underneath a stable name — the exact drift the name-level snapshot cannot see.
+
 **Hono and drizzle are part of the tier-1 contract, and that is a decision, not an oversight.**
 `PluginRouteRegistry.register` takes a `Hono<AppEnv>` and `PluginDatabase` is
 `ReturnType<typeof drizzleOverSqlite> & …`, so a compiled-in plugin shares the host's HTTP framework and

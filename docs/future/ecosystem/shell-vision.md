@@ -52,6 +52,23 @@ composable acorn: dashboards, third-party sources, panes, tools, themes, cross-p
 contributions. What they don't get is a marketplace terminal replacement, and that is a feature
 of the trust story, not a failure of the vision.
 
+## The differentiator this buys
+
+Worth stating separately, because it is the thing the trade above is *for*, and it survives every
+argument about how thin the shell is.
+
+Every project in `references/` with a plugin story picked one side of the trade: bb has the magical
+loop with no trust boundary; herdr has a real marketplace over a socket API; the rest have no
+third-party story at all. Nobody has **an agent-authored plugin loop behind a real sandbox**. acorn's
+shape — "make my acorn look like X / build me a pane for Y" as a one-session agent task, mediated by
+one human approval, iterating without prompts, distributed later through signed per-hash consent — is
+the pitch no neighbour can copy without rebuilding their security model. That is also why the ordering
+in `work-plan.md` puts containment before discovery: the differentiator is the boundary, so shipping
+discovery over uncontained node halves would be spending it.
+
+The loop is live and the front door is open (`npm create acorn-plugin`, `acorn-plugin-sdk`). Rung 2
+(`blockers.md § 1`) is what lets strangers join.
+
 ## What this stance implies for "only where security needs it" first-party plugins
 
 The phrase in the vision — first-party only "where security needs it and the functionality is so

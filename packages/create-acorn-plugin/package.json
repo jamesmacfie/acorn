@@ -1,0 +1,29 @@
+{
+  "name": "create-acorn-plugin",
+  "version": "0.1.0",
+  "description": "Scaffold an acorn plugin: manifest, node half, sandboxed client frame. No build step.",
+  "type": "module",
+  "bin": {
+    "create-acorn-plugin": "./index.mjs"
+  },
+  "exports": "./index.mjs",
+  "files": [
+    "index.mjs"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "keywords": [
+    "acorn",
+    "acorn-plugin"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@acorn/node-core": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "vitest": "^4.1.9"
+  }
+}

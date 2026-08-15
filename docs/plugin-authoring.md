@@ -20,6 +20,23 @@ Neither is a new rule. Both are properties the loader and the frame scheme have 
 shipped; what is new is that they are a contract, so a change in the loader's tolerance is a
 deliberate edit here rather than a silent widening.
 
+## Start from the scaffold
+
+```sh
+npm create acorn-plugin my-widget
+```
+
+`packages/create-acorn-plugin` writes the whole profile below — manifest, two-file node half, and a
+`client.js` with the bridge handshake already inlined — as a directory with no dependencies and no
+build step. It is the same package as the worked example at the end of this file; the rest of this
+document is what to change and why.
+
+It is published standalone, which means it carries a **copy** of two things this repository owns: the
+API major it stamps into `apiVersion`, and the handshake. `packages/create-acorn-plugin/index.test.ts`
+is what keeps the copy honest — it asserts the major against `PLUGIN_API_MAJOR`, runs the emitted
+manifest through `parsePluginManifest`, and imports the emitted node half. A change here that the
+scaffold should have followed fails there rather than in a stranger's first install.
+
 ## The package
 
 ```text
@@ -311,8 +328,21 @@ nowhere to serve the resolved file from even if there were. Copying the SDK's so
 option either: `packages/client-core/src/plugins/frames/sdk.ts` is TypeScript and imports from
 `@acorn/protocol`, so it has the same problem one level down.
 
-So the supported answer is: **inline the handshake yourself.** It is about thirty lines, the protocol
-is versioned, and there is a worked precedent in the tree —
+There are two answers, and which one you want is decided by a question this profile otherwise never
+asks you: **do you have a bundler?**
+
+**If you do** — and you may; nothing here forbids it, the rule is that the *output* is one file —
+`npm install acorn-plugin-sdk` and import `connect`, `mountFrame`, `openLinkOnClick` and the
+`AcornBridge` type from it. It is the same code in-repo frames import, published from
+`packages/plugin-sdk`, framework-free and dependency-free, and bundling it into your one `client.js`
+satisfies the single-file rule exactly as your own modules do. Your node half still may not use bare
+specifiers unless you bundle that too. What you get over the copy below is the typed surface and the
+parts that are easy to get subtly wrong — abort signals, key-claim narrowing, the subscribe bookkeeping,
+`mountFrame`'s failure rendering.
+
+**If you do not**, which is the profile this document is about: **inline the handshake yourself.** It is
+about thirty lines, the protocol is versioned, and `npm create acorn-plugin` writes a working copy of it
+for you. There is also a worked precedent in the tree —
 `apps/desktop/e2e/pluginFrame.spec.ts`'s fixture bundle is hand-written ESM with the handshake inlined
 precisely so the fixture does not depend on a bundler run. Read `sdk.ts` for the semantics; it stays
 the reference implementation even when you are not importing it.
