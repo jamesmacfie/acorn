@@ -25,7 +25,7 @@ export type Notice = {
   detail?: string
   at: number
   read: boolean
-  action?: 'review-config'
+  action?: 'review-config' | 'review-plugin-request'
   target?: NoticeTarget
   // Which node the notice is about. Stamped by `pushNotice` from the active node rather than passed by
   // each of the six call sites: every notice originates from a frame or a session list belonging to
@@ -195,7 +195,8 @@ export function pushBackgroundError(taskId: string, title: string, detail?: stri
 export function initWorkflowNotices(): () => void {
   return wsOnNotice((n) => {
     const at = Date.now()
-    pushNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail: n.action === 'review-config' ? 'Review & trust' : undefined, action: n.action, at })
+    const detail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
+    pushNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail, action: n.action, at })
     if (typeof Notification !== 'undefined' && shouldToast({ taskId: n.taskId, kind: n.kind, at }, { focused: document.hasFocus(), lastToastAt })) {
       try {
         new Notification(n.title)

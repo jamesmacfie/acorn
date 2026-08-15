@@ -5,7 +5,7 @@
 // platform concerns and live in client-core/tasks/taskBridge.ts.
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../contract/routes'
-import { readJson, writeJson, wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite } from '@acorn/plugin-api/client'
+import { readJson, writeJson, wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite, type WorkflowNotice } from '@acorn/plugin-api/client'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>
@@ -20,7 +20,7 @@ export type TerminalApi = {
   attach(id: string, on: (m: ServerMsg) => void): () => void
   // Workflow commands use workflowClient's HTTP routes; notices and live step events use WebSocket.
   workflow: {
-    onNotice(cb: (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void): () => void
+    onNotice(cb: (n: WorkflowNotice) => void): () => void
     onStepEvent(cb: (event: { runId: string; stepId: string; event: unknown }) => void): () => void
   }
 }
@@ -30,7 +30,7 @@ const post = <T>(url: string, body?: unknown) =>
 
 // Always available: every verb here is an HTTP route or a WebSocket frame against the node. It used to
 // return null unless Electron's preload exposed a native folder picker, which is neither a PTY nor
-// anything this file has an opinion about (docs/future/node-first/platform-seam.md). Whether the node
+// anything this file has an opinion about (git history: docs/future/node-first/platform-seam.md). Whether the node
 // runs terminals at all is `capabilities().terminal`, read from the node's plugin roster.
 export const terminalApi = (): TerminalApi => {
   return {

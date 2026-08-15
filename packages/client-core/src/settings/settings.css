@@ -170,6 +170,10 @@
 .plugin-version { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
+/* Development mode. Drawn as a warning rather than as muted meta text on purpose: it says this device
+   accepts new code for this plugin without asking, which is the loudest thing a row on this page can say
+   (docs/security.md § The dev grant). */
+.plugin-dev { font-size: var(--fs-xs); color: var(--warn); }
 /* What the node said broke. One line that shrinks and ellipsises rather than wrapping: the row is a flex
    line with actions pinned right, and a thrown message can be a paragraph. The full text is the element's
    `title`, and the attention row in the bell renders it unclipped. */
@@ -181,6 +185,8 @@
 .plugin-install { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-install .ui-input[data-width='full'] { flex: 1; }
 .plugin-install-hint { font-size: var(--fs-xs); margin-top: calc(var(--space-2) * -1); }
+.plugin-authoring { display: flex; align-items: center; gap: var(--space-2); }
+.plugin-authoring .muted { font-size: var(--fs-xs); }
 
 /* Section headings inside a settings page. Settings → Security is the first page with two independent
    halves (backup, audit trail), and an unstyled <h3> inherits a browser default that fights every style

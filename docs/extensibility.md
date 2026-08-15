@@ -108,6 +108,31 @@ response was to move that exploration into the frame and say so — not to grow 
 vocabulary until it became a UI framework. **The closed verb set stays closed**; every time it is
 widened for one plugin's convenience, every future plugin inherits a larger thing to get wrong.
 
+## Plugins may extend each other, and only by invitation
+
+The same split applied one level up. A plugin can declare, in its manifest, a strip inside one of its
+own panes that other plugins may fill; another plugin declares — also in its manifest, also by id —
+what it puts there. The host carries the descriptors from one to the other, stamps whose they are, and
+draws them with its own components ([plugins.md](./plugins.md) § Cooperative extension points).
+
+Three things about that are the design rather than the implementation:
+
+- **Both sides are declared.** Nothing is inferred and nothing is discovered at runtime. An owner
+  installing either package sees "this plugin opens a list to others" or "this plugin adds rows to
+  that plugin's list" in the trust prompt, before any of it runs.
+- **A opted in.** There is no uncooperative extension, and there will not be one. bb's answer here is
+  content scripts — any plugin may rewrite any other plugin's DOM — which it documents honestly as
+  "trusted same-origin page code, not a security sandbox". That is not an extension point; it is the
+  absence of a boundary, and it makes every plugin part of every other plugin's attack surface. DOM
+  access into another realm, patching another plugin's registrations and reading another plugin's
+  routes are all refused, permanently. **If a real need cannot be expressed as a cooperative point,
+  the answer is to widen the descriptor vocabulary, not to open the realm** — and sometimes the answer
+  is that it stays in the compiled tier, which is a cost paid on purpose rather than a gap.
+- **Registering never seizes anything.** The related pattern for *core's* surfaces — a plugin offering
+  to draw acorn's own rail task list — is an offer, not a claim. The user arbitrates in settings, and
+  core is what draws whenever the chosen provider is missing, disabled or broken. bb's exclusive slot
+  is the source of that shape and the one mechanic worth taking from it wholesale.
+
 ## Plugins get building blocks, not just a boundary
 
 A sandbox that isolates a plugin and then leaves it to rebuild a button is a sandbox nobody enjoys

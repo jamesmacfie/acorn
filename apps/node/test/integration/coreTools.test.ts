@@ -58,6 +58,12 @@ describe('the full agent-tool manifest', () => {
     'pr_changed_files',
     'linked_issues',
     'repo_info',
+    // How to write a plugin against THIS node, read off its own schemas so the agent never answers a
+    // manifest question from memory (docs/agent-tools.md, docs/plugins.md § Teaching the agent).
+    'plugin_authoring',
+    // The only core tool that can change what code this node runs, and it does so by asking: it raises a
+    // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
+    'plugin_request',
   ]
   // Preview tools remain an Electron capability exposed through the same assembled tool manifest.
   const PREVIEW_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']

@@ -98,7 +98,7 @@ const rosterFor = async (nodeId: string): Promise<readonly NodePluginRow[] | nul
 //
 // Fire-and-forget from the composition root. It must never be able to fail a boot — a fleet where
 // every node is offline, or a build with no plugin host at all, simply ends with nothing pending.
-export async function syncPluginDistribution(): Promise<void> {
+export async function syncPluginDistribution(options: { repin?: boolean } = {}): Promise<void> {
   if (!pluginHostAvailable()) return
 
   const rosters = new Map(installedByNode())
@@ -127,7 +127,14 @@ export async function syncPluginDistribution(): Promise<void> {
   // Chosen once per session and never recomputed. A better candidate appearing later — a node coming
   // online with a newer version — applies at the next boot: re-initialising a plugin's UI underneath
   // panes the user has open is churn with no payoff, and contribution ids are persisted layout keys.
-  if (!activeBundles()) setActiveBundles(resolveActiveBundles(candidatesFrom(rosters), { apiVersion: PLUGIN_API_MAJOR }))
+  //
+  // `repin` is the one exception, and only the node's own "plugins changed" event asks for it
+  // (plugins/reload.ts): a reload replaced the BYTES behind a plugin id, so the pinned winner names a
+  // bundle the node no longer offers. That is the churn being paid for deliberately rather than the churn
+  // the pin exists to avoid.
+  if (options.repin || !activeBundles()) {
+    setActiveBundles(resolveActiveBundles(candidatesFrom(rosters), { apiVersion: PLUGIN_API_MAJOR }))
+  }
 
   await refreshPendingTrust(rosters)
 }

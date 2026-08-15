@@ -1,0 +1,23 @@
+/* The strip a plugin's layout reserves for another plugin's rows (plugins/chrome/ExtensionPointHost.tsx).
+   Geometry only — every colour, border and radius is a token, so a contributed section follows the
+   appearance packs with the rest of the shell. `--divider` is the ROLE token for a list separator; a
+   pack that zeroes it means no line, which is the correct outcome for a pack that wants none. */
+.extension-point {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  overflow-y: auto;
+  /* A strip, not a second pane: it may not push the owner's frame off the screen, however many rows
+     another plugin decides to send. */
+  max-height: 40%;
+  flex: 0 0 auto;
+  border-top: var(--divider);
+  background: var(--bg-subtle);
+}
+
+.extension-group-owner { font-size: var(--fs-xs); }
+
+/* The owner's frame above, the host-drawn strip below (plugins/frames/ExtendedPane.tsx). */
+.extended-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.extended-pane-frame { flex: 1 1 auto; min-height: 0; display: flex; }
+.extended-pane-frame > * { flex: 1 1 auto; min-width: 0; }

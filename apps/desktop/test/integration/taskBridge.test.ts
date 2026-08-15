@@ -4,7 +4,7 @@ import { canPickFolder, pickFolder } from '@acorn/client-core/platform/index.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { terminalApi } from '@acorn/plugin-terminal/client/terminalClient.ts'
 
-// The probe split (docs/future/node-first/platform-seam.md § The fix, item 3).
+// The probe split (git history: docs/future/node-first/platform-seam.md § The fix, item 3).
 //
 // This file used to assert the opposite: that `window.acorn.terminal` — a preload key whose entire
 // contents were a native folder dialog — was "the single probe behind BOTH typed accessors and core's

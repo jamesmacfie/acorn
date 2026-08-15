@@ -1,4 +1,4 @@
-import { pluginCustody, type PluginHostState, type PluginPutResult, type PluginTrustDecision } from '../platform'
+import { pluginCustody, type PluginDevGrantRequest, type PluginHostState, type PluginPutResult, type PluginTrustDecision } from '../platform'
 
 // The client's platform adapter for third-party plugin bundles
 // (docs/plugins.md).
@@ -19,7 +19,7 @@ export const pluginHostAvailable = (): boolean => bridge() !== null
 
 export const readPluginHostState = async (): Promise<PluginHostState> => {
   const host = bridge()
-  if (!host) return { cached: {}, acks: [] }
+  if (!host) return { cached: {}, acks: [], devGrants: [] }
   return host.state()
 }
 
@@ -39,4 +39,10 @@ export const cachePluginBundle = async (request: {
 
 export const recordPluginTrust = async (decision: PluginTrustDecision): Promise<void> => {
   await bridge()?.trustRecord(decision)
+}
+
+// Enter or leave development mode for a plugin on a node (docs/security.md § The dev grant). A build with
+// no plugin host has no bundles to auto-trust, so this is a no-op there rather than an error.
+export const setPluginDevGrant = async (request: PluginDevGrantRequest): Promise<void> => {
+  await bridge()?.devGrant(request)
 }

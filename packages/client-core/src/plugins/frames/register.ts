@@ -1,6 +1,7 @@
 import { createComponent, lazy } from 'solid-js'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
+import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { commandRegistry } from '../../registries/commands'
 import { pluginProjectRoutePrefix } from '../../registries/corePaths'
@@ -8,6 +9,7 @@ import { keybindingRegistry } from '../../registries/keybindings'
 import { paneRegistry } from '../../registries/panes'
 import { projectImporterRegistry } from '../../registries/projectImporters'
 import { projectSurfaceRegistry } from '../../registries/projectSurfaces'
+import { clearExclusiveSlotFailures, exclusiveSlotRegistry } from '../../registries/exclusiveSlots'
 import { refPanelRegistry } from '../../registries/refPanels'
 import type { Disposable } from '../../registries/registry'
 import { settingsRegistry } from '../../registries/settings'
@@ -62,6 +64,10 @@ const PluginFrame = lazy(() => import('./PluginFrame'))
 const PluginWebview = lazy(() => import('./PluginWebview'))
 const PluginRefPanel = lazy(() => import('./PluginRefPanel'))
 const PluginOverlay = lazy(() => import('./PluginOverlay'))
+// The pane wrapper for an owner that reserved a strip for other plugins' rows. Lazy like the rest, and
+// only reached at all by a manifest that declared a point — a pane with no point renders the bare frame,
+// so nothing about this pulls into a shell where nobody cooperates.
+const ExtendedPane = lazy(() => import('./ExtendedPane'))
 // Lazy for the reason above and, for this one, for a second reason that predates it: this file is
 // evaluated on every shell boot, and a static import would put Monaco's tree in the boot graph for a
 // pane most sessions never open — including in the client-graph test suites, where `monaco-editor`
@@ -242,19 +248,57 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           }),
         })
       }
-      return paneRegistry.register({
-        id: surface.id,
+      // Did this manifest reserve a strip under this pane for OTHER plugins' rows? Read off the manifest
+      // rather than off the registry, and the difference matters: the chrome pass registers the point on
+      // its own schedule, so asking the registry here would make the wrapper depend on which pass ran
+      // first. The host renders nothing when nobody has contributed, so a reserved-but-empty strip costs
+      // the owner a component and no pixels (registries/extensionPoints.ts owns that decision).
+      {
+        const point = (row.installed?.contributions.extensionPoints ?? [])
+          .find((entry) => entry.surface === surface.id && entry.location === 'pane.footer')
+        const pointId = point ? qualifiedExtensionPointId(pluginId, point.id) : null
+        return paneRegistry.register({
+          id: surface.id,
+          label: surface.label,
+          glyph: surface.glyph,
+          order: surface.order,
+          // The per-node gate. A plugin installed on node A contributes nothing to a task on node B, so the
+          // switcher never offers a pane whose routes are not there (distribution.ts states the argument).
+          when: () => pluginEnabledOnNode(frameNode(), pluginId),
+          component: (props) => {
+            const frame = createComponent(PluginFrame, {
+              binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
+              hash,
+            })
+            return pointId ? createComponent(ExtendedPane, { pointId, children: frame }) : frame
+          },
+        })
+      }
+    case 'coreSlot': {
+      // The exclusive slot: an offer to draw one of CORE's own surfaces (registries/exclusiveSlots.ts).
+      //
+      // REGISTERING SEIZES NOTHING. This lands in a registry whose read step is `resolveExclusiveSlot`,
+      // and that function answers "core" for everything except the one plugin the user picked in
+      // settings. Three plugins may register for the same slot and the rail keeps drawing its own list.
+      //
+      // Re-checked against this shell's own designated list, for the reason every other adapter states:
+      // a roster row is bytes a node sent, and a newer node's slot name must not be coerced into one this
+      // shell has a host for.
+      if (!isCoreExclusiveSlot(surface.coreSlot)) {
+        throw new Error(`coreSlot surface '${surface.id}' names an unknown core surface '${surface.coreSlot}'`)
+      }
+      const slot = surface.coreSlot
+      return exclusiveSlotRegistry.register({
+        id: `plugin:${pluginId}:${surface.id}`,
+        pluginId,
+        slot,
         label: surface.label,
-        glyph: surface.glyph,
-        order: surface.order,
-        // The per-node gate. A plugin installed on node A contributes nothing to a task on node B, so the
-        // switcher never offers a pane whose routes are not there (distribution.ts states the argument).
         when: () => pluginEnabledOnNode(frameNode(), pluginId),
-        component: (props) => createComponent(PluginFrame, {
-          binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
-          hash,
-        }),
+        // No task and no project in the binding: a core surface is not inside anybody's task layout, and
+        // a replacement that could ask for one would be a replacement for a different surface.
+        component: () => createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
       })
+    }
     case 'refPanel': {
       // A panel names the provider whose items it renders, and may only name its own — the same check the
       // client plugin host runs over first-party contributions, applied to a manifest instead of a call.
@@ -381,6 +425,10 @@ export function syncFrameContributions(): void {
   registered.clear()
   // This pass replaces every contribution, so it also replaces every reason one was missing.
   clearSurfaceFailures()
+  // Including the exclusive-slot providers that threw. A sync is the one moment the bytes behind a
+  // provider can have changed, so it is the one moment a provider that fell back to core has earned
+  // another attempt (registries/exclusiveSlots.ts).
+  clearExclusiveSlotFailures()
 
   // Driven by the ROSTER rather than by the bundle map, because not every surface needs a bundle any
   // more. A document surface is host-drawn and executes nothing here, so the loop has to be able to

@@ -5,6 +5,7 @@ import type {
   PluginRailItem,
   PluginSlotBadge,
 } from '@acorn/protocol/api.ts'
+import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import {
   agentContextBudget,
   MAX_AGENT_CONTEXT_BYTES,
@@ -200,6 +201,42 @@ export async function readAttention(pluginId: string, path: string, nodeId: stri
   const body = await read<{ items?: unknown }>(pluginId, path, nodeId, signal)
   const rows = Array.isArray(body?.items) ? body.items : []
   return rows.filter((row) => isAttentionItem(row) || (drop(pluginId, 'attention item', row), false)) as PluginAttentionWireItem[]
+}
+
+// One row a cooperative extension point delivers. Display strings only — there is no `action` on the
+// wire, because the verb was declared once on the contribution and checked when the node parsed the
+// manifest. That is the difference between a descriptor crossing a plugin boundary and a plugin handing
+// another plugin's surface something to run.
+export const sanitizeExtensionItem = (row: unknown): PluginExtensionItem | null => {
+  const item = row as PluginExtensionItem
+  if (!item || typeof item !== 'object' || !str(item.id) || !str(item.title)
+    || !opt(item.subtitle) || !opt(item.icon) || !opt(item.badge)) return null
+  return {
+    id: item.id,
+    title: item.title,
+    ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
+    ...(str(item.icon) ? { icon: item.icon } : {}),
+    ...(str(item.badge) ? { badge: item.badge } : {}),
+  }
+}
+
+/** A contribution's rows, read from the CONTRIBUTOR's own namespace. Per-row sanitising rather than
+ *  all-or-nothing, exactly as the rail list is: these are drawn inside somebody else's surface, and one
+ *  malformed row must not blank a section the owner reserved. */
+export async function readExtensionItems(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  signal: AbortSignal,
+): Promise<PluginExtensionItem[]> {
+  const body = await read<{ items?: unknown }>(pluginId, path, nodeId, signal)
+  const rows = Array.isArray(body?.items) ? body.items : []
+  return rows.flatMap((row) => {
+    const item = sanitizeExtensionItem(row)
+    if (item) return [item]
+    drop(pluginId, 'extension item', row)
+    return []
+  })
 }
 
 // ── Agent context ─────────────────────────────────────────────────────────────────────────────────

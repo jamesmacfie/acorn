@@ -28,6 +28,40 @@ feature CSS is scoped to its plugin.
 All 12 shipped themes and 4 style packs are registered literals and covered by parity tests. Device
 preferences persist locally; they do not depend on which Node is active.
 
+### Plugin themes
+
+A plugin may contribute a **colour** theme, and only as data. `contributions.themes` in
+`acorn-plugin.json` is a map of theme-token values; the host validates it and generates the
+`:root[data-theme="plugin:<pluginId>:<themeId>"]` block itself
+(`client-core/src/plugins/chrome/themes.ts`). **No plugin-authored CSS ever reaches the shell.** The
+theme cannot break shape, density or layout because it cannot express anything but colour, which is
+what makes this seam cheap: there is no stylesheet to parse and no selector to confine.
+
+The token contract splits three ways, and only the first is declarable:
+
+| Group | Count | Who writes it |
+| --- | --- | --- |
+| **Palette primitives** (`--bg`, `--text`, `--accent`, `--del-marker`, …) | 22 | The manifest, in full. `@acorn/protocol/themeTokens.ts` is the list, so the node can refuse an incomplete map at parse time without importing the client. |
+| **Derived** (`--danger`, `--surface-sunken`, `--state-ok`, …) | 12 | `:root`, once, as `var()` references into the palette — so they follow every theme for free. A manifest naming one is refused: restating it in a theme block is what would break the derivation. |
+| **Self-description** (`--is-dark`, `--color-scheme`, `--syntax-fg`) | 3 | The host, from the theme's one `dark` boolean. They are not colours, so they cannot go through the colour check, and a theme that could set them could tell the terminal it was dark while rendering a light palette. |
+
+Validation is "every primitive present, no unknown key, every value a hex colour or a flat colour
+function". Named colours, `var()` and nested functions (`url(…)`, `calc(…)`) are refused: the value
+alphabet is the injection gate, so a value that passes cannot close a declaration, close the block or
+open a tag. Both ends check — the node when it parses the manifest, the client again immediately
+before generating CSS, because a roster row is bytes a node sent.
+
+Ids are namespaced `plugin:<pluginId>:<themeId>`, so a plugin can never redefine a built-in and two
+plugins can ship the same theme name. They appear in Settings → Appearance beside the built-in twelve,
+labelled with their owner. **A stored preference naming a theme that is not registered right now falls
+back to Light/Dark and is never rewritten** — a disabled plugin, an untrusted bundle and an unreachable
+node all arrive as the same absence, and a preference erased on the third cannot be recovered when the
+node comes back. The theme returns by itself when the plugin does.
+
+**Style packs are deliberately not contributable.** Style tokens touch layout and density, where
+"cannot break the app" is a much weaker promise than it is for colour. The mechanism would be the same;
+the judgement is not, and one contribution never spans both axes.
+
 Feature-owned styles live beside the feature components that consume them. For example, the GitHub
 pull list, pull detail, and checks panel import their own plugin styles; genuinely shared integration
 settings remain in the client-core `integrations.css` role sheet. This keeps plugin presentation out
@@ -124,6 +158,28 @@ that wants to stack declares it on its own class.
 - Typing fields, editors, terminals, and contenteditable elements stop global shortcuts unless the
   action is explicitly text-safe.
 - Destructive actions and approvals use shell-owned confirmation chrome.
+
+### Menus and right-click
+
+There is one menu. `ui/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, arrow-key roving with
+Home/End, close-on-select, Escape, outside-click, and focus returning to where it came from — and both
+ways of opening it mount that same surface (`MenuSurface`) over the same hook (`ui/anchor.ts`). A
+button anchors it to a rect; a right-click anchors it to a point, which is the only difference. A
+right-click menu with its own markup would be a second place for the accessibility to be wrong.
+
+**Right-click is never the only door.** The rows come from the context-menu registry
+(`registries/contextMenus.ts`), and the button menu on the same row renders the identical list, so
+nothing is mouse-only. It is also keyboard-reachable directly: `contextmenu` is what the platform
+dispatches for Shift+F10 and the menu key as well as for the right button, and the surface focuses its
+first item on mount, so the menu is operable the moment it appears rather than something to Tab into.
+Point-anchored menus clamp to the viewport rather than flipping — the pointer really can be a pixel
+from the bottom edge, and there is no trigger rect to fall back to.
+
+A contribution is a label, an optional icon, an order, a predicate over the host-defined target, and
+one action. Core's own rows fit that shape — the tab rail's Pin/Unpin/Rename/Archive are registrations,
+not inline JSX — which is what makes the contract real before a plugin uses it. Plugins declare the
+same thing from a manifest (`docs/plugins.md § Context menus`); the host binds the owner into the id
+and evaluates the declared predicate itself.
 
 ## States
 

@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
+import { decidePluginRequest } from '../agentTools/pluginRequests'
 import { auditRequest } from '../auditRequest'
 import { routeCapabilityFor, BridgeError, viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
@@ -19,6 +20,12 @@ const installSource = z.union([
 const installBody = z.strictObject({ source: installSource, allowDowngrade: z.boolean().optional() })
 const updateBody = z.strictObject({ allowDowngrade: z.boolean().optional() })
 const uninstallBody = z.strictObject({ purgeData: z.boolean().optional() })
+// The owner's answer to one agent-raised request. `message` is written by the DEVICE, never by the agent:
+// the sentence the agent is told is the one piece of this exchange the human's side owns.
+const requestDecisionBody = z.strictObject({
+  decision: z.enum(['approved', 'denied']),
+  message: z.string().min(1).max(400).optional(),
+})
 
 // Every mutation here changes which code a node runs, and a client that retries a timed-out install
 // must not install twice. The global middleware (server/index.ts) replays a repeated key but does not
@@ -143,6 +150,24 @@ export const plugins = new Hono<AppEnv>()
       return result
     })
   })
+  // The one exception to "nothing here starts a plugin" (docs/plugins.md § The dev loop). Loaded plugins
+  // only; a built-in is refused with the installer's own 400 shape.
+  //
+  // A reload whose new code fails to start is a 200 carrying `state: 'failed'`, not an error: the host
+  // ran the candidate against a buffered registration set, so the previous instance never stopped
+  // serving and the reason is on the roster row. A 500 would say the opposite.
+  .post('/:id/reload', async (c) => {
+    const missing = requireIdempotencyKey(c)
+    if (missing) return missing
+    const id = c.req.param('id')
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      const result = await asBadRequest(() => bridge.reload(id))
+      // Audited like install/update/uninstall: this replaces the code a node is running, which is the
+      // same class of decision even though no bytes arrived.
+      auditRequest(c, { action: 'plugins.reloaded', subject: id, details: { state: result.state, version: result.version } })
+      return result
+    })
+  })
   .delete('/:id', async (c) => {
     const missing = requireIdempotencyKey(c)
     if (missing) return missing
@@ -156,4 +181,28 @@ export const plugins = new Hono<AppEnv>()
       auditRequest(c, { action: 'plugins.uninstalled', subject: id, details: { dataPurged: result.dataPurged } })
       return result
     })
+  })
+  // The owner's answer to an agent-raised request (server/agentTools/pluginRequests.ts). Device-gated by
+  // the same mount as everything above it, which is the point: the agent that raised the request is an
+  // internal principal and cannot reach this route to answer its own question.
+  //
+  // It performs no install. The device has already done the install (or not) over the routes above, with
+  // its own principal; this only closes the record and decides what the agent is told. No
+  // Idempotency-Key requirement for the same reason — a replayed decision changes no code, and the store
+  // refuses a second answer with a 404 anyway.
+  .post('/requests/:requestId', async (c) => {
+    const parsed = requestDecisionBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const fallback = parsed.data.decision === 'approved' ? 'The owner approved this request.' : 'The owner declined this request.'
+    const request = decidePluginRequest(c.req.param('requestId'), { decision: parsed.data.decision, message: parsed.data.message ?? fallback })
+    if (!request) return respondError(c, 404, 'not_found')
+    // On the same trail as install/update/uninstall, because "an agent asked and a human said yes" is the
+    // decision the trail exists to hold. The agent's own sentence is deliberately NOT recorded: an audit
+    // row that quotes untrusted text becomes a second place that text gets read as fact.
+    auditRequest(c, {
+      action: 'plugins.request.decided',
+      subject: request.pluginId ?? request.action,
+      details: { decision: parsed.data.decision, action: request.action, dev: request.dev, taskId: request.taskId },
+    })
+    return c.json({ ok: true })
   })

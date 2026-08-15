@@ -469,7 +469,10 @@ describe('architecture boundaries', () => {
     // Kept OUT of the baseline on purpose, because a baseline means "still to fix" and these are not.
     // The match is a name collision with core vocabulary, not a dependency: `AgentContextContribution`
     // is client-core's registry type and has nothing to do with plugins/context.
-    const NAME_COLLISIONS = ['agentContext.ts']
+    // `contextMenus.ts` is the same kind of collision: it holds the host's right-click location
+    // vocabulary, which the node checks a manifest against and the client re-checks a roster row
+    // against. Nothing to do with plugins/context; it merely starts with the same seven letters.
+    const NAME_COLLISIONS = ['agentContext.ts', 'contextMenus.ts']
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)
@@ -595,7 +598,7 @@ describe('architecture boundaries', () => {
     //
     // The rule already existed in prose — plugins/host.ts's header says "sprinkling `window.acorn.*`
     // through client code would make the storage the contract by accident" — and was applied to exactly
-    // one of fifteen modules, because nothing enforced it (docs/future/node-first/platform-seam.md).
+    // one of fifteen modules, because nothing enforced it (git history: docs/future/node-first/platform-seam.md).
     // The seam was a TypeScript type, not a boundary. It is a boundary now.
     //
     // Why a scan rather than an import-graph edge: the global is not imported, it is READ. `acornGlobal`
@@ -963,18 +966,23 @@ describe('architecture boundaries', () => {
     // the guest and the box genuinely belongs to the host. That wants a real seam (the host passing
     // its own components down, or the classes moving to client-core), not a rename. The entries here
     // may only be removed.
+    //
+    // Seven of memory's nine went when the cooperative extension point landed, and not by using it:
+    // those seven rules were memory's own markup living in context's stylesheet, so they moved to
+    // plugins/memory/src/client/memory-section.css and took their names with them. The two that
+    // remain are context's VOCABULARY — `.context-tray-kind` and `.context-tray-label` are worn by
+    // ContextPane too — so they are a real host/guest contract rather than a misplaced rule.
+    //
+    // Those two do not go until memory's section stops being a component in context's realm, and the
+    // cooperative point cannot take it: the section renders editable inputs, a select, a textarea and
+    // a two-button accept/reject gate per proposal, which is UI rather than a descriptor. Widening the
+    // descriptor vocabulary far enough to express it would be shipping a widget toolkit in the wire
+    // format, which the plugin contract refuses by name.
     const BASELINE = [
       'plugins/agents defines .agent-path-link, worn by plugins/changes/src/client/agentToolRenderer.tsx',
       'plugins/agents defines .agent-tool, worn by plugins/changes/src/client/agentToolRenderer.tsx',
-      'plugins/context defines .context-tray-actions, worn by plugins/memory/src/client/MemorySection.tsx',
       'plugins/context defines .context-tray-kind, worn by plugins/memory/src/client/MemorySection.tsx',
       'plugins/context defines .context-tray-label, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/context defines .context-tray-memform, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/context defines .context-tray-proposal, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/context defines .context-tray-proposal-desc, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/context defines .context-tray-proposal-flag, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/context defines .context-tray-proposal-flags, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/context defines .context-tray-proposals, worn by plugins/memory/src/client/MemorySection.tsx',
       'plugins/editor defines .tree, worn by plugins/changes/src/client/ChangesPane.tsx',
     ]
     expect([...new Set(offenders)].sort()).toEqual(BASELINE)

@@ -101,13 +101,20 @@ namespace.
 | `DELETE` | `/v2/core/devices/:id` | Revoke a device |
 | `GET` | `/v2/core/plugins` | List plugin status and capabilities |
 | `PUT` | `/v2/core/plugins/:name` | Enable/disable an optional plugin |
+| `POST` | `/v2/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process |
+| `POST` | `/v2/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
 | `GET` | `/v2/core/audit` | Read the retained audit trail |
 | `GET` | `/v2/core/security` | Read Node security posture |
 | `GET` | `/v2/core/backup` | Suggest a destination path for a backup |
 | `POST` | `/v2/core/backup` | Create a credential-scrubbed database archive |
 
 These routes are device-only. Backup uses Node filesystem paths, so an internal task token must not
-reach it.
+reach it. `GET /v2/core/plugins` also carries `requests` — the queue of installs an agent has asked for
+and the owner has not answered — and the decision route is what closes one. A task-scoped agent can raise a
+request through the `plugin_request` tool and can reach neither route, which is the whole point
+(docs/plugins.md § Approval-mediated install). What it *can* read is the authoring contract, through the
+`plugin_authoring` tool — a read of this node's own schemas, on the agent-tool surface rather than as a
+route, so it adds nothing here for a plugin frame to be denied (docs/plugins.md § Teaching the agent).
 
 ### Preferences and integrations
 
@@ -144,7 +151,7 @@ write-only.
 | `PATCH` | `/v2/core/tasks/:id` | Update task metadata or archive/activate a task |
 | `POST` | `/v2/core/tasks/:id/links` | Add an external item link |
 | `DELETE` | `/v2/core/tasks/:id/links` | Remove an external item link |
-| `GET` | `/v2/core/tasks/:id/context` | Assemble task context |
+| `GET` | `/v2/core/tasks/:id/context` | Assemble task context (`?include=` names section ids; `*` for all) |
 | `GET` | `/v2/core/tasks/:id/tools` | List task agent tools |
 | `POST` | `/v2/core/tasks/:id/tools/:name` | Invoke an authorized task tool |
 | `GET` | `/v2/core/agent-tools` | Catalog tools for Settings |
@@ -257,3 +264,10 @@ marks the Node stale and refetches. Durable agent and workflow history is read f
 
 PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview tunnels use the
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
+
+A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
+both ends. Core owns three of them: `term:` (transport on both ends), `workflow:` (the notification
+bell's notices and step events) and `plugins:` — whose one frame, `plugins:changed`, is the content-free
+ping the Node sends when it reloads a plugin's node half in place (docs/plugins.md § The dev loop). The
+client re-reads the roster route rather than trusting a payload. Every other prefix belongs to the plugin
+that registered it.

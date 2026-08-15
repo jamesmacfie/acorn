@@ -1,5 +1,7 @@
 import { noteBundleAccepted, resolvePendingTrust, type PluginTrustRequest } from './distribution'
 import {
+  extensionGrants,
+  extensionPermissionLines,
   keyClaimGrants,
   keyClaimPermissionLines,
   nodePermissionLines,
@@ -43,13 +45,26 @@ export type TrustTier = { key: TierKey; lines: TrustLine[] }
  */
 export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[] {
   const installed = request?.row.installed
-  if (!installed) return []
-  const previous = request?.previous
+  if (!request || !installed) return []
+  const previous = request.previous
   const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
     {
       key: 'enforced',
-      now: [...uiPermissionLines(installed.permissions), ...keyClaimPermissionLines(keyClaimGrants(installed.contributions))],
-      was: previous ? [...uiPermissionLines(previous.permissions), ...keyClaimPermissionLines(previous.keyClaims ?? [])] : null,
+      now: [
+        ...uiPermissionLines(installed.permissions),
+        ...keyClaimPermissionLines(keyClaimGrants(installed.contributions)),
+        // Both directions of the cooperative seam plus any core-surface offer. `request.row.name` is the
+        // plugin id the host read the manifest under — the same value every other namespace is minted
+        // from — so a point's public name here is the one the rest of the app will address it by.
+        ...extensionPermissionLines(extensionGrants(request.row.name, installed.contributions)),
+      ],
+      was: previous
+        ? [
+          ...uiPermissionLines(previous.permissions),
+          ...keyClaimPermissionLines(previous.keyClaims ?? []),
+          ...extensionPermissionLines(previous.extensions ?? []),
+        ]
+        : null,
     },
     {
       key: 'declared',
@@ -89,6 +104,11 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     permissions: installed.permissions,
     webviews: webviewGrants(installed.contributions),
     keyClaims: keyClaimGrants(installed.contributions),
+    // Recorded as well as shown, for the reason the key claims are: the update prompt's "what is new"
+    // mark is a set difference against what the owner last approved, and a grant that is not stored can
+    // never read as newly requested. A plugin that starts reaching into a different package between
+    // versions is exactly the change that must not slide past unremarked.
+    extensions: extensionGrants(request.row.name, installed.contributions),
     decision,
   })
   resolvePendingTrust(request.row.name, request.hash)

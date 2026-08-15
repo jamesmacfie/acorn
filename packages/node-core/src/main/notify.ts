@@ -23,6 +23,26 @@ export function broadcastRepoConfigTrustNotice(taskId: string): void {
   broadcastStatus()
 }
 
+// An agent asked for a plugin to be installed, updated or removed and the owner has not answered
+// (docs/plugins.md § Approval-mediated install). Content-free apart from the verb: the request itself —
+// including the agent's own sentence about why — is read from the device-only roster route, so nothing an
+// agent wrote reaches the notification bell over the wire.
+export function broadcastPluginApprovalNotice(taskId: string, action: 'install' | 'update' | 'uninstall'): void {
+  wsBroadcast({
+    channel: 'workflow:notice',
+    notice: { taskId, kind: 'plugin-request', title: `A plugin ${action} needs your approval`, action: 'review-plugin-request' },
+  })
+  broadcastStatus()
+}
+
 export function broadcastWorkflowStepEvent(runId: string, stepId: string, event: unknown): void {
   wsBroadcast({ channel: 'workflow:step:event', runId, stepId, event })
+}
+
+// This node's plugin set moved under a running client: a reload swapped a plugin's node half, so its
+// roster row, its routes and the bundle hash behind its UI may all be different (docs/plugins.md § The
+// dev loop). Content-free, like `term:status` — the roster is already a fetchable route, and duplicating
+// it on the wire would mean two projections of the same state to keep in step.
+export function broadcastPluginsChanged(): void {
+  wsBroadcast({ channel: 'plugins:changed' })
 }

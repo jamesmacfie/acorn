@@ -58,6 +58,9 @@ contextBridge.exposeInMainWorld('acorn', {
     state: () => ipcRenderer.invoke('acorn:plugins-state'),
     cachePut: (request: unknown) => ipcRenderer.invoke('acorn:plugins-cache-put', request),
     trustRecord: (request: unknown) => ipcRenderer.invoke('acorn:plugins-trust-record', request),
+    // Enter or leave development mode for one plugin on one node (main/pluginTrustStore.ts). Grants
+    // nothing on its own: it records the owner's decision, and main applies it when a bundle arrives.
+    devGrant: (request: unknown) => ipcRenderer.invoke('acorn:plugins-dev-grant', request),
   },
   // Node recovery screen (client-core/node/NodeGate.tsx). Only reachable when there is no node to
   // talk to, which is also why `quit` cannot go through the renderer's will-quit prompt: the shell
@@ -71,7 +74,7 @@ contextBridge.exposeInMainWorld('acorn', {
   //
   // It used to live under a `terminal` key, and the renderer read that key's PRESENCE as "this node runs
   // terminals" — which hid the whole terminal/agents/workflows block from every non-Electron client for
-  // no reason (docs/future/node-first/platform-seam.md). It is a folder dialog. It is named after one.
+  // no reason (git history: docs/future/node-first/platform-seam.md). It is a folder dialog. It is named after one.
   folderPath: {
     pick: () => ipcRenderer.invoke('term:folderPath:pick'),
   },

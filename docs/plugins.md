@@ -8,6 +8,9 @@ and trust boundary differ by tier.
 This file is the mechanism. [extensibility.md](./extensibility.md) is the reasoning — why there are
 two tiers, where the line between them is, and which of the constraints below are deliberate rather
 than unfinished. Read it before widening a seam.
+[plugin-authoring.md](./plugin-authoring.md) is the subset of this file an author needs to write a
+loaded plugin **by hand, with no build step** — plain multi-file ESM on the node, one vanilla-JS file
+in the frame — with a complete worked example.
 
 ## Package shape
 
@@ -223,6 +226,9 @@ Three things differ, and all three follow from the code not being ours:
   a hash-pinned lockfile beside it (`packages/node-core/src/main/pluginInstaller.ts`,
   docs/plugins.md). Uninstalling removes the package and, by default, leaves its
   SQLite file alone. Each device then asks its own owner before running the plugin's interface code.
+  Nothing in that family starts a plugin — each answers "the disk now says this". The one exception is
+  `POST /v2/core/plugins/:id/reload`, which swaps a loaded plugin's node half in the running process;
+  see § The dev loop for its semantics and its four limits.
 - **Failures are contained, and every failure names itself.** A built-in throwing from `init` still
   fails the boot — it is first-party code in the same binary, and a node that cannot assemble should say
   so. A loaded plugin throwing has its registrations rolled back, is reported through the roster
@@ -305,6 +311,10 @@ Seeing a change to a loaded plugin run used to be four steps and a page of host 
 hand, restart the node, reload the renderer, answer a trust dialog per bundled package. Three of the four
 are the host's business, so the host does them.
 
+This is the loop for a **repository** plugin, which is built. A package written by hand has no build
+step to watch and is installed by absolute path as a symlink, so the rebuild half does not apply —
+[plugin-authoring.md](./plugin-authoring.md) is that contract and that loop.
+
 ```sh
 pnpm dev:plugin rollbar     # rebuild the package on every save
 pnpm dev:node               # and this restarts itself when the bundle changes
@@ -326,6 +336,50 @@ wire at init, so a rebuilt bundle is not live until the node re-runs it. Under `
 `--watch` sees the rewritten bundle and restarts for you. Under the desktop, use Settings → Plugins →
 Restart: it re-runs reconciliation and reloads the renderer, which is the other half — frame
 contributions resolve once per session, so the client has to re-ask.
+
+#### Reloading one plugin without a restart
+
+`POST /v2/core/plugins/:id/reload` (owner/device principal, `Idempotency-Key` required, audited) swaps
+one **loaded** plugin's node half in the running process. Built-ins are refused with a 400: they are
+compiled into the binary, so there is no second copy on disk to swap in, and their restart-required flow
+already works.
+
+The semantics are **candidate-then-commit**. The new bundle's `init` runs against a *buffered*
+registration set rather than the live registries, because every registry here rejects a duplicate — tool
+names, provider ids, capability ids — and the previous instance is still in all of them. So if `init`
+throws, nothing moved: the previous instance is still registered, still serving and still holding its
+database, and the failure lands as `state: 'failed'` with its `reason` on the roster row, exactly like a
+contained failure at boot. The route answers **200 with `state: 'failed'`** for that, not an error — the
+request did nothing wrong and nothing was lost. Only on success does the host clear the previous
+registrations, run its `dispose`, close its database, revoke its context and replay the buffer.
+
+Four limits, all deliberate:
+
+- **A revoked context throws.** After a swap, anything reached through the previous instance's `ctx` —
+  a registration, a broadcast, `storage.open()` — throws rather than writing through a plugin that is no
+  longer running. `ctx.core` and `ctx.capabilities.get` stay live: they are host services that did not go
+  anywhere.
+- **Only the entry module is re-evaluated.** Node caches an ES module permanently by resolved URL, so the
+  loader stamps a generation onto the entry's file URL (`?load=<n>`) when a reload names it. A relative
+  specifier *inside* that module resolves against the URL's path and does not inherit the query, so
+  `./chunk.js` comes back from the cache with the code it had at boot. A single-file node half — the
+  authoring profile — is fully covered; a multi-file one needs a restart for a change that lands outside
+  the entry file, until a `module.register` resolve hook stamps the whole subgraph.
+- **Registration rollback is not schema rollback.** The candidate's `init` may open and migrate the
+  plugin's database, mid-process, before it fails. The host puts every registration back; it cannot
+  un-migrate. The author iterating on the plugin owns the data whose shape they just changed.
+- **An invalid registration fails inside the commit window.** Two tools sharing a name, or a provider
+  that fails its shape check, can only be found when the buffer is replayed — the registries are what
+  validate it. The plugin then ends up unregistered and marked failed, as a contained boot failure does.
+  What candidate-then-commit protects is `init` *throwing*, which is the failure a dev loop produces.
+
+The client half is one event and no new machinery. The node broadcasts a content-free `plugins:changed`
+frame; the shell re-reads the roster, re-resolves which bundle wins per plugin id — the one place the
+once-per-session pin is deliberately dropped — and re-runs both contribution passes, which already
+dispose-then-register. Trust is not bypassed: consent is keyed to a hash, so a plugin whose winning hash
+moved to bytes this device has never accepted comes back untrusted, its code-bearing surfaces are
+withheld, and the distribution pass queues the usual prompt. A plugin frame is an iframe whose ORIGIN is
+its bundle hash, so a new hash is a new origin and a new document with nothing carried over.
 
 **Boot** trust prompts are gone from development, because a development build acknowledges the bundled
 first-party roster on exactly the terms a packaged build does — the same directory, read and hashed by
@@ -359,6 +413,133 @@ tier now, so its whole node half is an `init` that opens storage and registers o
 exercise, and read `docs/third-party/README.md` for what all of these moves cost. The loader still supports a package id shadowing a built-in during
 a staged migration; when that happens it drops the compiled copy from the graph and logs which
 directory won.
+
+### Approval-mediated install
+
+The install route is device-gated, unmappable from a plugin frame, and audited, and none of that
+changes. What exists on top of it is a way for an **agent's request** to reach the **owner's decision**.
+
+The `plugin_request` agent tool (core-owned, `execute` tier — see
+[agent-tools.md](./agent-tools.md)) takes an action (`install` / `update` / `uninstall`), a source or a
+plugin id, an optional `dev` flag and one line of the agent's own reasoning. It installs nothing. It
+cannot: `server/agentTools/pluginRequests.ts` imports `node:crypto`, `zod`, the tool registry and the
+protocol types, and a test asserts that exact list, because the request/decision split is only a defence
+for as long as that module has no installer within reach. The handler writes an in-memory row, broadcasts
+a content-free `workflow:notice`, and throws `needs-trust` — a 409 to the agent, carrying a sentence
+telling it to call again with the same arguments to collect the answer.
+
+The owner sees the notice in the bell, which opens the approval dialog in the **shell's** overlay slot —
+chrome a plugin frame cannot draw over. On approval **the device performs the install**, over the same
+`/v2/core/plugins/*` routes Settings → Plugins uses, with its own principal. The agent never holds a
+credential that can install code; a prompt-injected agent can produce a row in a queue and nothing else.
+
+Four properties worth stating because they are easy to lose:
+
+- **The queue rides the roster.** `GET /v2/core/plugins` carries `requests`, so there is no second route
+  to remember to gate. `POST /v2/core/plugins/requests/:requestId` records the answer, is device-only by
+  the same mount, and is permanently unmappable from a frame
+  (`client-core/plugins/frames/scopes.ts`) — a frame that could post an approval would answer the very
+  question that exists because an agent must not install.
+- **One ask is one question.** Identical arguments resolve to the same pending row, and only the *first*
+  raise rings the bell, so an agent cannot put a prompt on the owner's screen in a loop. Twenty
+  outstanding requests is the cap.
+- **An approval is spent once.** Collecting the decision deletes the row. A second identical call is a new
+  question, not a second use of an old yes.
+- **The store is in memory.** A pending request is a question waiting on someone looking at the app right
+  now; a node restart is a perfectly good "no", and an hour is the expiry.
+
+#### What the owner can know before the download
+
+The installer only validates a manifest *after* fetching and unpacking, so the first screen genuinely
+cannot show one. The approval is therefore two screens, and the split is deliberate:
+
+1. **The ask.** The action, the source string, the agent's stated reason, the dev flag. This is everything
+   knowable before anything is fetched, and it is the gate on the fetch itself — a node reaching out to a
+   URL an agent chose is a network action taken on an agent's say-so, so a No here means nothing is
+   downloaded at all.
+2. **The review.** The device installs, then reads the real manifest back off the roster and shows what
+   the package declares. Install runs no plugin code — every result is `installed-restart-required` — so
+   this still happens before anything executes, and its No uninstalls the package again (keeping its
+   data, as every other uninstall path does by default).
+
+The alternative — download and validate first, then approve against the real manifest — was rejected for
+two reasons. It fetches on the agent's word with no human in between, and pinning the reviewed bytes
+through to the install would need either a staging directory that outlives the request or a second
+download that can resolve to something else. The second screen buys the same disclosure without either.
+
+The client half of a plugin gets a third look regardless: the per-hash bundle trust prompt fires from the
+next distribution pass, with the full permission diff. What screen 2 adds is the **node half**, which has
+no other disclosure surface — it would otherwise start at the next restart with nobody having read what
+it declared.
+
+### Development mode
+
+Per-hash trust is right for distribution and wrong for iteration: an agent saving a file every minute
+would mean a prompt per save. So the owner makes one decision instead — approving a `dev: true` request —
+and the device stores a **dev trust grant**.
+
+The grant lives in the device's existing trust file (`apps/desktop/src/app/main/pluginTrustStore.ts`),
+beside the acknowledgements, as `{ pluginId, nodeId, path?, grantedAt }`. It is keyed on the **pair**.
+The design note says "per (pluginId, device)" and the device half is the file itself; the node half is an
+addition, because fleet resolution picks the highest version across every paired node and a grant keyed on
+the name alone would auto-trust a bundle a *different* node started serving under it.
+
+What it does: when Electron main caches a bundle for a plugin under grant, it records an ordinary accepted
+acknowledgement for those bytes right there — beside the hash it computed itself, in the process that
+holds the grant. The renderer therefore never queues a prompt, and nothing about eligibility changes:
+`bundleAccepted` and `eligiblePlugins().trusted` see an acceptance and behave exactly as they would for
+one the owner clicked. A dev-written row is marked `dev: true` (so revocation can find it) and
+`partial: true` (nobody read a disclosure, so it must never become the baseline of a later "what changed"
+diff).
+
+It hangs off the local-path install seam — `{ path }`, the absolute-path symlink — so the agent has an
+in-place directory to iterate in, and a dev-mode install ends in a **reload** rather than a restart
+prompt where the plugin is reloadable.
+
+**Visibly different, and endable.** Settings → Plugins badges the row *in development — bundle changes are
+auto-trusted* and puts an **End dev mode** button beside it. That is not decoration: the moment a dev-mode
+plugin is indistinguishable from a normal install, the trust story has rotted. Ending it is one act with
+two halves — the grant goes, and so does every acknowledgement the grant wrote. Without the second half
+"revoke" would leave every auto-trusted hash still accepted. What survives is whatever the owner answered
+by hand, so the plugin goes back to exactly where it was, and with nothing left the current bundle is
+undecided again and the normal per-hash prompt asks about it on the next distribution pass. That is what
+promoting a plugin out of dev mode means in practice, and revoking and promoting are the same operation.
+
+**In a packaged build.** Dev mode widens nothing: `allowLocalPath` is still `!app.isPackaged` (and
+`NODE_ENV !== 'production'` for a standalone node), so a `{ path }` install in a packaged app is refused
+by the installer with its own sentence, dev flag or not. The grant itself is source-agnostic and is not
+gated on packaging — it is a device-side trust decision about a plugin the owner administers — so dev mode
+on a packaged app is reachable for a remotely-sourced plugin and simply means "future versions of this one
+do not re-prompt". Without a local path there is no in-place directory, so each iteration is still an
+explicit update.
+
+### Teaching the agent
+
+The mechanics above do nothing on their own. An agent that has to guess at the manifest vocabulary spends
+its first session finding out that `zod` will not resolve and that a second client module 404s, and the
+loop is not worth entering. So the contract is served *by the node that enforces it*, through two doors
+onto one text (`server/agentTools/pluginAuthoring.ts`).
+
+The door the agent uses is the `plugin_authoring` tool — no arguments, `read` tier, and every list in its
+answer derived at call time from the schema that enforces it rather than written down beside it
+([agent-tools.md](./agent-tools.md) has the derivation table and the two omissions). The door a human uses
+is the `plugin-authoring` **context section**, which is `defaultIncluded: false` and therefore free: a task
+that is not writing a plugin never assembles it. That flag is why acorn can afford an authoring guide at
+all, where bb pays for its 1,678-line equivalent on every session.
+
+What the derivation cannot cover is process, so that half is prose: write the directory, ask with
+`plugin_request { action: 'install', source: { path }, dev: true }`, expect `needs-trust`, call again with
+identical arguments to collect the answer, then iterate with `action: 'update'` and the same `dev: true`
+so the approval ends in a reload rather than a restart. The one limit that will otherwise baffle an
+author is stated in those words: **only the entry module is re-evaluated**, so a multi-file node half needs
+a restart for a change outside its entry file, and a plugin being iterated on hard wants to be one file.
+
+The entry point is **Settings → Plugins → Create a plugin**, which drafts that starting prompt into the
+current task's agent composer through the same `sendReferenceToAgent` seam the editor and changes panes
+use. A draft, not a send: the owner reads it, says what the plugin should do and presses send themselves.
+It deliberately does not open a *new* task — `TaskSeed` carries no prompt field and settings has no project
+in scope, so that would be a protocol field and a column for the sake of an entry point, and the existing
+seam is honest about the case where there is no agent session to draft into.
 
 ### Loaded plugins: the client half
 
@@ -566,9 +747,10 @@ kinds of contribution come out of one manifest:
   isolated ephemeral partition, no preload, no CDP, no devtools, no tunnel credentials, and no script
   or message bridge. The plugin's sandboxed client frame remains the controller for only
   `navigate`, `back`, `forward`, and `reload`; it cannot read the page or type into it.
-- **Descriptors** — a rail source, task-footer badge, commands/keybindings, attention items, node stats,
+- **Descriptors** — a rail source, a badge in the task footer or the topbar, commands/keybindings,
+  attention items, node stats, context-menu rows (`contextMenus`),
   restricted URL recognizers (`contentLinks`), renderer routes (`routes`), agent-context entries
-  (`agentContexts`), and batch reference resolvers (`refResolvers`).
+  (`agentContexts`), batch reference resolvers (`refResolvers`), and colour themes (`themes`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
   mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
@@ -681,6 +863,220 @@ kinds of contribution come out of one manifest:
   slope this tier has declined more than once. The route spends provider credentials on a cache miss,
   and is already behind `requireProviderAccess` through the provider mount — that gate is the
   authorisation, the identifier cap is the budget, and neither replaces the other.
+
+  A `themes` entry is the descriptor tier taken to its limit: a **colour** theme with no route, no
+  bundle and no CSS, declared as a map of the 22 palette tokens plus a `dark` flag. The host validates
+  the map and generates the `:root[data-theme="plugin:<id>:<theme>"]` block itself, so nothing a plugin
+  wrote is ever parsed as a stylesheet — which is why this seam needed no new trust boundary. A theme
+  cannot express shape, density or layout, cannot restate a derived token, and cannot set the three
+  self-description tokens (the host writes those from `dark`). Both ends validate: the node at parse
+  time so an author sees the error at install, the client again before generating CSS because a roster
+  row is bytes a node sent. The token contract, the value grammar and what happens to a stored
+  preference when the owning plugin disappears are in `docs/ui-design.md § Plugin themes`.
+
+  ```json
+  {
+    "contributions": {
+      "themes": [{
+        "id": "nightfall",
+        "label": "Nightfall",
+        "dark": true,
+        "tokens": { "--bg": "#12121a", "--text": "#dcd7ff", "…": "…" }
+      }]
+    }
+  }
+  ```
+
+### Descriptors for chrome, frames for rectangles
+
+The rule of thumb, and it is a refusal as much as a guideline. **A frame is for a rectangle with real
+UI inside it. Everything smaller is a descriptor.** A status chip, a footer badge, a menu row, a
+palette entry — each of those as an iframe would cost a process-isolated document, could never look
+native, and would be dead whenever no frame of that plugin happened to be mounted. So none of the
+small surfaces are open to frames, and the answer to "I want a chip in the topbar" is to grow the
+descriptor vocabulary rather than to open a slot id to an iframe.
+
+That is why the `slots` enum is two names rather than the client's five, and why the refusals are
+recorded next to it in `@acorn/protocol/pluginContract.ts`:
+
+| Manifest slot | Host slot | Why |
+| --- | --- | --- |
+| `footer` | `task.footer` | The task footer — the slot `docker-footer-badge` occupies. Invisible until a task is open. |
+| `topbar` | `topbar.right` | The app's status bar, beside the node chip and the notification bell. The right home for a status chip. |
+
+Refused, deliberately: `overlay` is the full-window layer that draws the config-trust gate, the plugin
+trust dialog and the command palette — a contribution there would paint over the very prompts asking
+whether to trust it. `drawer` is a rectangle with real UI in it, which is what a frame is for, and its
+slot context carries shell callbacks a descriptor cannot receive. `topbar.left` and
+`task.switcher.extra` are members of the client's slot union with no host rendering them at all, so a
+manifest naming one would parse and never appear. `tabrail.task-row` is per-task while a slot's `data`
+route is node-scoped — opening it would mean either the same badge on every row or one fetch per
+visible row per tick.
+
+### Context menus
+
+`contextMenus` is the declarative right-click contribution, and the registry behind it
+(`packages/client-core/src/registries/contextMenus.ts`) is core's as much as a plugin's: the tab rail's
+own Pin / Unpin / Rename / Archive rows are registrations on it. That is the point — a contribution
+contract whose only consumer is a third party is a contract nobody has used. Both doors onto a task row
+(the button menu it already had, and the new right-click) draw the same list from the same registry, so
+they cannot offer different things.
+
+An entry is `{ id, location, label, icon?, order?, when?, action }`:
+
+- **`location`** comes from a closed vocabulary (`@acorn/protocol/contextMenus.ts`). `task.row` is the
+  only member today; the list grows when a surface appears to draw it, never ahead of one.
+- **`when`** is a map of literals that must *all* equal the target's own facts — not an expression. A
+  manifest is data, and a predicate language would need a parser, an evaluator and a decision about
+  what it may call. `task.row` supplies `origin`, `projectId` and `pinned`; naming anything else is a
+  parse error, because a predicate that can never match is a contribution that installs and does
+  nothing. Identity fields (`id`, `title`) are deliberately not facts: a menu row keyed to one task id
+  is not an extension point.
+- **`action`** is the *context-free* verb set — the same one a command and a slot badge take. A menu
+  row can therefore do exactly what a command can do and nothing more. `createTask` and `navigate` are
+  absent because the thing under the cursor is a **core** resource: the first needs the host's
+  promotion callback over a rail item, the second a project-scoped surface of the plugin's own.
+- The host binds the rest. The id becomes `plugin:<pluginId>:<id>`, so a package cannot take a core
+  row's place; the row is hidden unless its plugin is running on the node being looked at; and the verb
+  receives the id of the thing that was right-clicked, never an id the descriptor chose. There is no
+  `tone` — a red row is a claim that an action destroys something, and that is core's claim to make
+  about core's resources.
+
+  ```json
+  {
+    "contributions": {
+      "contextMenus": [{
+        "id": "open-card",
+        "location": "task.row",
+        "label": "Open the board card",
+        "icon": "kanban",
+        "when": { "origin": "board" },
+        "action": { "verb": "runNodeAction", "path": "/v2/p/board/open" }
+      }]
+    }
+  }
+  ```
+
+Nothing here is reachable from a plugin frame. The registry is populated host-side from manifests the
+device read; the frame bridge gained no message kind and no route, so a frame can neither open a menu
+nor synthesise a selection on one.
+
+### Cooperative extension points
+
+Plugin B could not add anything *inside* plugin A's surfaces, even when A would welcome it. The only
+way was for A to import B, which is the coupling the registries were built to remove. Two manifest
+keys close that, and the shape is the same one every other contribution has:
+`@acorn/protocol/extensionPoints.ts` holds the vocabulary, the node checks it at parse, the client
+checks it again on arrival, and the host mints every name.
+
+**A declares the point it hosts.** One entry, and it is all the code A writes:
+
+```json
+{ "contributions": {
+  "frames": [{ "target": "pane", "id": "board", "label": "Board" }],
+  "extensionPoints": [{ "id": "card-links", "label": "Linked items", "location": "pane.footer", "surface": "board" }]
+} }
+```
+
+`location` is a closed list with one member — `pane.footer`, a strip the host draws under a plugin
+pane's frame — and it grows when a surface appears to draw it, never ahead of one. `surface` must be a
+`pane` this same manifest declares; a settings page, importer, overlay, reference panel or webview is
+chrome the host already draws around a frame, with nowhere to reserve a strip. One point per surface
+per location.
+
+**B declares what it puts there, by id.**
+
+```json
+{ "contributions": { "extensions": [{
+  "id": "board-issues",
+  "point": "board:card-links",
+  "label": "Linear issues",
+  "items": "/v2/p/tracker/board-issues",
+  "onSelect": { "verb": "runNodeAction", "path": "/v2/p/tracker/open" }
+}] } }
+```
+
+`point` is `<ownerPluginId>:<pointId>`, so B's manifest names A out loud and an owner reading it at
+install time can see which package this one reaches into. `items` is a GET on **B's own** namespace
+answering `{ items: [{ id, title, subtitle?, icon?, badge? }] }` — display strings, nothing else.
+`onSelect` is declared once, on the contribution, from the context-free verb set, so the node can check
+it against B's own surfaces at parse time; the clicked row's id rides along as the item. There is no
+per-item action, because that would be an unchecked verb arriving over a route.
+
+What the host binds, and what a manifest therefore cannot state:
+
+| | |
+| --- | --- |
+| the point's public name | `<owner>:<point>`, minted from the plugin the manifest was read under. B cannot advertise a point in A's name. |
+| the provenance | every delivered group is stamped with the **contributing** plugin's id and renders it beside the rows. An owner looking at somebody else's items inside a pane can always see whose they are. |
+| the fetch | confined to the contributor's own `/v2/p/<id>/`. A contribution cannot make the host read the point owner's routes on its behalf — the "reading another plugin's routes" refusal below is enforced by construction, not by a rule. |
+| the gate | nothing is delivered unless **both** plugins are running on the node being looked at, and neither has code this device withheld. |
+
+**Descriptors cross; code does not.** The rows are drawn by the host, with the shell's own `Row`,
+`Badge`, `SectionHeader` and `Icon`, in host markup that sits *outside* A's iframe. A never receives
+B's data and B never touches A's document. That is the same rule
+[first-party-plugins.md](./first-party-plugins.md) gives for why in-realm composition is banned, applied
+one level up, and it is why this is an extension point rather than a hole.
+
+**An unmatched contribution is silent.** A point that is not there — A not installed, disabled on this
+node, its bundle refused here, or A dropped the point in an update — delivers nothing. No error, no
+warning, nothing to catch. The two halves come from two manifests registered in an order nobody
+controls, so a contribution never resolves its point at registration time; delivery is resolved at read
+time, and "there is nobody on both ends of this pipe today" is one outcome with one behaviour.
+
+Both directions appear in the trust prompt under **Enforced**, and both are recorded against the
+decision so a version that starts reaching into a *different* package reads as newly requested rather
+than sliding past unremarked.
+
+### Replacing a core surface
+
+The other half is bb's exclusive slot, and the important word is *offer*. A plugin may declare a
+replacement for one of acorn's own designated surfaces:
+
+```json
+{ "client": "./dist/client.js", "contributions": { "frames": [
+  { "target": "coreSlot", "id": "board-rail", "label": "Board task list", "coreSlot": "rail.taskList" }
+] } }
+```
+
+**Registering seizes nothing.** Three plugins may all offer to replace the rail's task list and the
+rail keeps drawing its own. The user picks a provider in **Settings → Plugins → replaced surfaces**,
+and that choice is a device preference — which list a person looks at is a property of the screen they
+are looking at.
+
+**Core is the fallback in the strong sense**: not "when nothing is set" but whenever anything at all is
+off. Nobody chosen, the chosen plugin not installed on this node, installed but disabled or untrusted,
+or its surface threw while rendering — all four draw core's own implementation, and the settings row
+says so when the last one is why. A provider that threw gets another attempt at the next contribution
+sync, which is the one moment its bytes can have changed.
+
+`rail.taskList` is the only designated surface, and the list grows the way every other vocabulary in
+this document does: when a second surface has both a reason and a fallback worth writing.
+
+### There is no uncooperative extension
+
+On the record, because the absence is the feature. **Nothing lets plugin B alter plugin A's UI or
+behaviour without A's declared consent.** Specifically refused, permanently:
+
+- **DOM access into another realm.** bb's de facto universal mechanism is content scripts — any plugin
+  may rewrite any other plugin's rendered DOM. bb documents its version honestly as "trusted
+  same-origin page code, not a security sandbox," and that honesty is the whole problem: it makes
+  every plugin part of every other plugin's attack surface, and it makes A's behaviour undebuggable
+  from A's own source.
+- **Patching another plugin's registrations.** A plugin's contributions are registered by the host from
+  the manifest the host read. There is no runtime door onto anyone's, including its own.
+- **Reading another plugin's routes.** Refused at manifest parse, refused again on the device, and
+  refused a third time at the frame bridge (`plugins/frames/scopes.ts`).
+
+If a real need surfaces that cooperative points cannot express, **the answer is to widen the descriptor
+vocabulary, not to open the realm.** Some things will not fit, and that is a real cost paid on purpose:
+memory's section inside context's tray renders editable inputs, a select, a textarea and a two-button
+gate per proposal, which is UI rather than a descriptor. It stays a compiled-tier component, and the
+answer is not to grow descriptors into a widget toolkit until it fits.
+
+Nothing here is reachable from a plugin frame. Both registries are populated host-side from manifests
+the device read; the bridge gained no message kind and no route, so a frame can neither read a point's
+deliveries nor contribute to one.
 
 ### Frame authoring and the UI kit
 

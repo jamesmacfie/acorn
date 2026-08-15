@@ -1,5 +1,5 @@
-import type { NodePluginPermissions, PluginContributions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { pluginKeyClaimGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { pluginExtensionGrants, pluginKeyClaimGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { formatChord } from '../tasks/paneShortcuts'
 import { describeChannel, isSubscribable } from './frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
@@ -125,6 +125,37 @@ export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): P
 
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   pluginKeyClaimGrants(contributions)
+
+export const extensionGrants = (pluginId: string, contributions: PluginContributions): PluginExtensionGrant[] =>
+  pluginExtensionGrants(pluginId, contributions)
+
+// The cross-plugin lines, and they belong under `Enforced` rather than `Declared`. That is a claim about
+// what the host actually does, and it is true in both directions: the host delivers only to points a
+// manifest declared, draws only the descriptor shapes it knows, and never puts a replacement on screen
+// that the owner did not pick in settings. Nothing about any of it depends on the plugin behaving.
+//
+// The COPY is the host's, not the plugin's. `label` is manifest text and reaches the sentence as an
+// interpolated string, exactly as a webview surface's label already does; what the sentence CLAIMS is
+// host vocabulary, so a plugin cannot phrase its own grant.
+const EXTENSION_KIND_ICON: Record<PluginExtensionGrant['kind'], string> = {
+  hosts: 'door-open',
+  extends: 'puzzle',
+  replaces: 'replace',
+}
+
+export const extensionPermissionLines = (grants: readonly PluginExtensionGrant[]): PermissionLine[] =>
+  grants.map((grant) => {
+    const text = grant.kind === 'hosts'
+      ? `Let other plugins add rows to its “${grant.label}” list`
+      : grant.kind === 'extends'
+        // The owner half of the reference is the whole point of this line: it names the package this one
+        // reaches into, so "this plugin extends that plugin" is on screen before anything runs.
+        ? `Add its own rows to ${grant.target.split(':')[0]}’s “${grant.label}” list`
+        : `Offer to replace acorn’s own ${grant.target} — you choose in Settings`
+    // Kind and target together: a package that starts extending a DIFFERENT plugin's point has grown its
+    // reach, and a constant key would let that slide past the update prompt's "what is new" mark.
+    return line(`extension:${grant.kind}:${grant.target}`, { text, icon: EXTENSION_KIND_ICON[grant.kind] })
+  })
 
 export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]): PermissionLine[] =>
   [...grants]

@@ -53,6 +53,25 @@ manifest adapter draws the overlay and the dismiss control itself, using the sam
 panel would, and the shell's host adds no second wrapper. A frame ref panel supplies the body; the host
 supplies the box.
 
+There is now a sanctioned alternative for the *cooperative* half of B, and it is a different shape
+rather than a relaxation. A **cooperative extension point** ([plugins.md](./plugins.md) § Cooperative
+extension points) lets plugin A declare, in its manifest, a strip inside one of its panes that other
+plugins may fill — and what crosses is a *descriptor*: an id, a label, an icon, a badge, and a verb from
+the closed set, fetched by the host from the contributor's own node route and drawn by the host in its
+own markup, outside A's iframe. So it is not B: no component enters anyone's render tree, in either
+direction. It is B's use case served by data.
+
+The reason B is still B is that the descriptor vocabulary does not stretch to a real UI, and it is not
+going to. memory's section inside context's tray is the clean example: editable inputs, a type and a
+scope select, a textarea, and a two-button accept/reject gate per proposal. That is a component. It
+stays in the compiled tier as `contextSections`, and the answer to "make the descriptors richer until it
+fits" is no — that is a widget toolkit in the wire format, which the plugin contract refuses by name.
+The bar for a cooperative point is the same as the bar for a host-owned pane region: a list of things
+with names, not an interface.
+
+What has no sanctioned alternative, ever, is the *uncooperative* half — B reaching into A without A
+saying so. See [plugins.md](./plugins.md) § There is no uncooperative extension.
+
 **C. Electron main-process code** — a `src/main/` half that imports `electron`. The desktop
 surface is enumerated and boundary-tested; a loaded plugin has no main-process presence at all.
 

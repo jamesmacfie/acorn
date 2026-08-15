@@ -1,12 +1,15 @@
 import { createSignal } from 'solid-js'
 import {
   corePluginInstallRoute,
+  corePluginReloadRoute,
+  corePluginRequestRoute,
   corePluginRoute,
   corePluginsRoute,
   corePluginUpdateRoute,
   type NodePluginState,
   type PluginInstallResult,
   type PluginInstallSource,
+  type PluginReloadResult,
   type PluginUninstallResult,
   type PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
@@ -95,6 +98,24 @@ export const uninstallNodePlugin = async (
   options: { purgeData?: boolean } = {},
   nodeId?: string,
 ): Promise<PluginUninstallResult> => await mutate(corePluginRoute(id), 'DELETE', options, nodeId)
+
+// Swap a loaded plugin's node half in the running process, no restart (docs/plugins.md § The dev loop). A
+// 200 carrying `state: 'failed'` is the normal shape for code that would not start — the previous instance
+// is still serving — so callers read the state rather than treating a rejection as the only failure.
+export const reloadNodePlugin = async (id: string, nodeId?: string): Promise<PluginReloadResult> =>
+  await mutate(corePluginReloadRoute(id), 'POST', {}, nodeId)
+
+// The owner's answer to one agent-raised approval request (docs/plugins.md § Approval-mediated install).
+// It performs nothing: by the time this is called the device has already done the install — or decided not
+// to — with its own principal, and this closes the record and settles what the agent is told.
+export const answerPluginRequest = async (
+  requestId: string,
+  decision: 'approved' | 'denied',
+  message: string,
+  nodeId?: string,
+): Promise<void> => {
+  await mutate(corePluginRequestRoute(requestId), 'POST', { decision, message }, nodeId)
+}
 
 // Test seam, and the node-switch reset: a stale list from the previous node must not decide which
 // contributions the next node's shell gets.

@@ -15,7 +15,7 @@ const electron = vi.hoisted(() => {
 
 vi.mock('electron', () => ({ ipcMain: electron.ipcMain }))
 
-const { PLUGINS_TRUST_RECORD, registerPluginIpc } = await import('./pluginIpc')
+const { PLUGINS_CACHE_PUT, PLUGINS_DEV_GRANT, PLUGINS_STATE, PLUGINS_TRUST_RECORD, registerPluginIpc } = await import('./pluginIpc')
 const { PluginTrustStore } = await import('./pluginTrustStore')
 
 // Recording a trust decision must not be defeatable by a node running a newer manifest schema than
@@ -29,8 +29,13 @@ let dir = ''
 let trust: InstanceType<typeof PluginTrustStore>
 let dispose = () => {}
 
-// Only the two members the handler touches.
-const cache = { has: () => true } as unknown as Parameters<typeof registerPluginIpc>[0]
+// Only the members the handlers touch. `putFromNode` answers with the hash it says it computed, which is
+// what the dev grant keys off — the renderer's claim never reaches the acknowledgement.
+const cache = {
+  has: () => true,
+  list: () => ({}),
+  putFromNode: async (_nodeId: string, _pluginId: string, claim: { hash: string }) => ({ hash: claim.hash }),
+} as unknown as Parameters<typeof registerPluginIpc>[0]
 
 const record = async (raw: unknown): Promise<void> => {
   await electron.invoke.get(PLUGINS_TRUST_RECORD)!({}, raw)
@@ -103,5 +108,54 @@ describe('recording a trust decision', () => {
     dispose = registerPluginIpc({ has: () => false } as unknown as Parameters<typeof registerPluginIpc>[0], trust)
     await expect(record(decision())).rejects.toThrow(/No cached bundle/)
     expect(trust.list()).toEqual([])
+  })
+})
+
+// The dev grant's only effect, and it lives here rather than in the renderer for the same reason the hash
+// does: the acknowledgement is written beside the bytes main verified, by the process holding the grant
+// (docs/security.md § The dev grant).
+
+const grant = async (raw: unknown): Promise<void> => {
+  await electron.invoke.get(PLUGINS_DEV_GRANT)!({}, raw)
+}
+const cachePut = async (over: Record<string, unknown> = {}): Promise<void> => {
+  await electron.invoke.get(PLUGINS_CACHE_PUT)!({}, { nodeId: 'node-a', pluginId: 'sparkline', hash: HASH, version: '1.0.0', ...over })
+}
+
+describe('development mode', () => {
+  it('does not accept a bundle when nothing is in development', async () => {
+    await cachePut()
+    expect(trust.list()).toEqual([])
+  })
+
+  it('accepts a bundle as it lands, once the owner has granted dev mode', async () => {
+    await grant({ pluginId: 'sparkline', nodeId: 'node-a', path: '/src/sparkline', grant: true })
+    await cachePut()
+    expect(trust.decisionFor('sparkline', HASH)).toMatchObject({ decision: 'accepted', dev: true, partial: true })
+  })
+
+  it('does not stretch to another node serving the same plugin name', async () => {
+    await grant({ pluginId: 'sparkline', nodeId: 'node-a', grant: true })
+    await cachePut({ nodeId: 'node-b' })
+    expect(trust.list()).toEqual([])
+  })
+
+  it('revokes through the same channel, dropping what the grant trusted', async () => {
+    await grant({ pluginId: 'sparkline', nodeId: 'node-a', grant: true })
+    await cachePut()
+    await grant({ pluginId: 'sparkline', nodeId: 'node-a', grant: false })
+    expect(trust.listDevGrants()).toEqual([])
+    expect(trust.decisionFor('sparkline', HASH)).toBeUndefined()
+  })
+
+  it('reports grants to the renderer, which is what puts the badge and the revoke on the settings row', async () => {
+    await grant({ pluginId: 'sparkline', nodeId: 'node-a', path: '/src/sparkline', grant: true })
+    const state = (await electron.invoke.get(PLUGINS_STATE)!({})) as { devGrants: unknown[] }
+    expect(state.devGrants).toMatchObject([{ pluginId: 'sparkline', nodeId: 'node-a', path: '/src/sparkline' }])
+  })
+
+  it('refuses a malformed grant rather than storing half of one', async () => {
+    await expect(grant({ pluginId: 'sparkline', grant: true })).rejects.toThrow()
+    expect(trust.listDevGrants()).toEqual([])
   })
 })

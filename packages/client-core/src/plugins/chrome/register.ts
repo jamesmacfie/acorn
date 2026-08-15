@@ -10,7 +10,7 @@ import { commandRegistry } from '../../registries/commands'
 import { keybindingRegistry } from '../../registries/keybindings'
 import type { Disposable } from '../../registries/registry'
 import { sourceRegistry } from '../../registries/sources'
-import { taskSlotRegistry } from '../../registries/slots'
+import { taskSlotRegistry, uiSlotRegistry } from '../../registries/slots'
 import { brandMarkRegistry } from '../../ui/brandMarks'
 import {
   loadedPluginStateOnNode,
@@ -30,6 +30,9 @@ import {
   watchChrome,
 } from './data'
 import { descriptorPromotion } from './promotion'
+import { registerPluginContextMenu } from './contextMenus'
+import { registerPluginExtension, registerPluginExtensionPoint } from './extensionPoints'
+import { registerPluginTheme } from './themes'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../../registries/contentLinks'
 import { refResolverRegistry } from '../../registries/refResolvers'
@@ -240,13 +243,78 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   for (const descriptor of contributions.slots ?? []) {
     note(descriptor.refresh)
-    add('slot', descriptor.id, () => taskSlotRegistry.register({
-      id: descriptor.id,
-      // The manifest's one slot name. `docker-footer-badge` is the precedent, and it is a task slot.
-      slot: 'task.footer',
-      order: 500,
-      component: () => createComponent(ChromeBadge, { pluginId, descriptor }),
+    // Two manifest slot names, two registries. `footer` is a TASK slot — it draws inside a task's
+    // layout and gets a taskId it does not use — while `topbar` is a SHELL slot whose context is the
+    // whole window. The badge component ignores both, because its data comes from a node route rather
+    // than from anything the slot could hand it; what differs is which host draws it and when.
+    //
+    // A slot name this client does not know is skipped rather than mapped to a default. A roster row
+    // is bytes a node sent, and a newer node's `topbar.left` must not silently become the footer.
+    if (descriptor.slot === 'footer') {
+      add('slot', descriptor.id, () => taskSlotRegistry.register({
+        id: descriptor.id,
+        slot: 'task.footer',
+        order: 500,
+        component: () => createComponent(ChromeBadge, { pluginId, descriptor }),
+      }))
+    } else if (descriptor.slot === 'topbar') {
+      add('slot', descriptor.id, () => uiSlotRegistry.register({
+        id: descriptor.id,
+        // The topbar's right end — the app's status bar, and the only topbar slot with a host. Order
+        // 500 puts plugin chips after the notification bell (10) and before the account menu, which is
+        // not a slot at all.
+        slot: 'topbar.right',
+        order: 500,
+        when: () => pluginEnabledOnNode(chromeNode(), pluginId),
+        component: () => createComponent(ChromeBadge, { pluginId, descriptor }),
+      }))
+    } else {
+      console.warn(`[plugin-chrome] ${pluginId} slot '${descriptor.id}' names an unknown slot '${descriptor.slot}'.`)
+    }
+  }
+
+  for (const descriptor of contributions.contextMenus ?? []) {
+    // The verb is checked here rather than inside the adapter, because this is where the manifest's own
+    // declared surfaces are in scope — the same check a command and a source's empty state get, for the
+    // same reason: a row that parses and can only toast is worse for an author than one that is refused.
+    if (!contextFreeActionUsable(pluginId, surfaces, descriptor.action)) {
+      console.warn(`[plugin-chrome] ${pluginId} context menu '${descriptor.id}' has an action this device cannot honour.`)
+      continue
+    }
+    add('context menu', descriptor.id, () => registerPluginContextMenu(pluginId, descriptor, {
+      nodeId: chromeNode,
+      enabled: () => pluginEnabledOnNode(chromeNode(), pluginId),
     }))
+  }
+
+  // ── Cooperative cross-plugin extension (registries/extensionPoints.ts) ──────────────────────────
+  //
+  // Both halves ride this pass rather than the frames pass, and both are gated on the same
+  // `hasWithheldCode` question every other descriptor is, because both ARE descriptors: a point is a
+  // manifest line and a contribution is a route plus a verb. No plugin code executes on either side.
+  const pointBinding = { nodeId: chromeNode, enabled: () => pluginEnabledOnNode(chromeNode(), pluginId) }
+  for (const descriptor of contributions.extensionPoints ?? []) {
+    // The surface is re-checked here rather than inside the adapter, because this is where the manifest's
+    // own declared frames are in scope. A point hanging off a surface this manifest does not declare
+    // would be a strip with no rectangle above it — the "parses and can never appear" failure the node's
+    // parser refuses, re-refused on the device because a roster row is bytes a node sent.
+    if (!surfaceIds.has(descriptor.surface)) {
+      console.warn(`[plugin-chrome] ${pluginId} extension point '${descriptor.id}' names an undeclared surface '${descriptor.surface}'.`)
+      continue
+    }
+    add('extension point', descriptor.id, () => registerPluginExtensionPoint(pluginId, descriptor, pointBinding))
+  }
+
+  for (const descriptor of contributions.extensions ?? []) {
+    // Same check a command and a context-menu row get, for the same reason: a row that parses and can
+    // only toast is worse for an author than one that is refused. The point owner never sees this
+    // failure — a contribution the device cannot honour simply never delivers.
+    if (descriptor.onSelect && !contextFreeActionUsable(pluginId, surfaces, descriptor.onSelect)) {
+      console.warn(`[plugin-chrome] ${pluginId} extension '${descriptor.id}' has an action this device cannot honour.`)
+      continue
+    }
+    note(descriptor.refresh)
+    add('extension', descriptor.id, () => registerPluginExtension(pluginId, descriptor, pointBinding))
   }
 
   for (const descriptor of contributions.attention ?? []) {
@@ -298,6 +366,18 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
         ? captureAgentContext(pluginId, descriptor.capture, chromeNode(), scope, optionIds, { source, panes: taskPanes })
         : [],
     }))
+  }
+
+  for (const descriptor of contributions.themes ?? []) {
+    // A theme is a descriptor in the strictest sense available: not merely "data the host renders",
+    // but data the host cannot render as anything except colour, because the only thing it becomes is
+    // a block of `--token: <colour>` declarations the host composed (./themes.ts). It
+    // therefore rides this pass's gate unchanged — a descriptor-only package contributes its themes,
+    // a package whose code this device refused contributes none of its chrome, themes included. The
+    // second half is a judgement rather than a necessity: nothing in a theme executes, so it could
+    // safely register from a withheld package. It does not, because a picker entry from a package the
+    // owner declined is still the shell decorating itself on behalf of something the owner said no to.
+    add('theme', descriptor.id, () => registerPluginTheme(pluginId, descriptor))
   }
 
   for (const descriptor of contributions.refResolvers ?? []) {

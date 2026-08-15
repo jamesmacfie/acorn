@@ -119,6 +119,14 @@ const RULES: readonly RouteRule[] = [
   // other line here would stop mattering (docs/security.md).
   { path: shape('/v2/core/plugins/install'), scopes: {}, note: 'Installs code that runs with the Node’s own access.' },
   { path: shape(`/v2/core/plugins/${SEG}/update`), scopes: {} },
+  // The one route in this family that makes code run RIGHT NOW rather than after a restart, which is
+  // exactly why a frame must not be able to reach it: a prompt-injected agent driving a frame could
+  // otherwise re-run a plugin's node half on its own timing.
+  { path: shape(`/v2/core/plugins/${SEG}/reload`), scopes: {} },
+  // The owner's answer to an agent's install request. Unmappable for the same reason as the three above,
+  // and it is the line that keeps the approval split honest: a frame that could POST an approval would be
+  // able to answer the very question that exists because an agent must not install code.
+  { path: shape(`/v2/core/plugins/requests/${SEG}`), scopes: {} },
   { path: shape(`/v2/core/plugins/${SEG}`), scopes: {}, note: 'Uninstall, including the option to delete another plugin’s data.' },
   { path: shape('/v2/core/prefs'), scopes: {}, note: 'Every preference on the node, including other plugins’ persisted state. Frames get their own namespaced `state` verb instead.' },
   { path: shape('/v2/core/agent-tools'), scopes: {}, note: 'Agent tool catalog and permissions.' },

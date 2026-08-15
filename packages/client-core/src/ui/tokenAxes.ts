@@ -6,24 +6,31 @@
 // This module is the single declaration of which token belongs to which axis.
 // `styles/tokenAxes.test.ts` reads the stylesheets and asserts they agree, so the contract fails
 // the suite rather than degrading silently.
+import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 
-/** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`. */
-export const THEME_TOKENS = [
-  '--bg', '--bg-subtle', '--bg-hover', '--bg-selected',
-  '--border', '--border-strong',
-  '--text', '--text-muted', '--text-faint',
-  '--accent', '--focus',
-  '--add-bg', '--add-marker', '--del-bg', '--del-marker',
-  '--add-word-bg', '--del-word-bg',
-  '--hunk-bg', '--hunk-text',
-  '--warn', '--badge-border', '--shadow-popover',
-  // Theme self-description. Dark themes flip all three.
-  '--is-dark', '--color-scheme', '--syntax-fg',
-  // Derived — declared once on :root as var() references, so they follow every theme for free.
+/** Theme self-description: what a theme says ABOUT itself, and the only theme tokens that are not
+ * colours. Dark themes flip all three. A plugin theme cannot spell them — the host writes them from
+ * that theme's `dark` flag (`plugins/chrome/themes.ts`). */
+export const SELF_DESCRIPTION_TOKENS = ['--is-dark', '--color-scheme', '--syntax-fg'] as const
+
+/** Declared ONCE on `:root` as `var()` references into the palette, so they follow every theme for
+ * free — which is exactly why a theme block must never restate one. */
+export const DERIVED_THEME_TOKENS = [
   '--danger', '--danger-fg', '--success', '--success-fg',
   '--surface-sunken', '--accent-fg',
   '--state-ok', '--state-warn', '--state-bad',
   '--find-hit-bg', '--find-current-bg', '--scrim-color',
+] as const
+
+/** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`.
+ *
+ * The palette half lives in `@acorn/protocol/themeTokens.ts` because it is also the manifest contract
+ * for a plugin-contributed theme and the node has to validate one without importing the client. Which
+ * tokens belong to which AXIS is still decided here, by this list. */
+export const THEME_TOKENS = [
+  ...THEME_PALETTE_TOKENS,
+  ...SELF_DESCRIPTION_TOKENS,
+  ...DERIVED_THEME_TOKENS,
 ] as const
 
 /** Shape, typography, space, density, chrome, motion. Defaults in `styles/tokens-style.css`. */

@@ -67,6 +67,7 @@ const request = (over: {
         permissions: permissions(),
         webviews: [],
         keyClaims: [],
+        extensions: [],
         ...over.previous,
       } as PluginAckRecord,
     }
@@ -88,6 +89,51 @@ afterEach(() => {
 describe('trustTiers', () => {
   it('has nothing to say about a row with no manifest', () => {
     expect(trustTiers(undefined)).toEqual([])
+  })
+
+  it('discloses cross-plugin reach in both directions, and a core-surface offer', () => {
+    // Both directions is the requirement rather than a nicety. The owner of the EXTENDING package must
+    // see whose surface its rows land in; the owner of the EXTENDED package must see that it opened a
+    // door. Neither is inferable from the other side's manifest at trust time — they are two installs,
+    // possibly weeks apart — so each manifest discloses its own half.
+    //
+    // Under `enforced`, and that is a claim about what the host does: it delivers only to points a
+    // manifest declared, draws only descriptor shapes it knows, and never puts a replacement on screen
+    // the owner did not pick. None of it depends on the plugin behaving.
+    const tiers = trustTiers(request({
+      contributions: {
+        frames: [
+          { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] },
+          { target: 'coreSlot', id: 'board-rail', label: 'Board task list', glyph: 'puzzle', order: 500, formFactor: ['desktop'], coreSlot: 'rail.taskList' },
+        ],
+        extensionPoints: [{ id: 'card-links', label: 'Linked items', location: 'pane.footer', surface: 'board' }],
+        extensions: [{ id: 'tracker-rows', point: 'tracker:issues', label: 'Board cards', order: 500, items: '/v2/p/board/rows' }],
+      },
+    }))
+    expect(keysIn(tiers, 'enforced')).toEqual([
+      'extension:extends:tracker:issues',
+      'extension:hosts:board:card-links',
+      'extension:replaces:rail.taskList',
+    ])
+    const texts = tiers.find((tier) => tier.key === 'enforced')!.lines.map((line) => line.text)
+    // The package this one reaches into is named in the sentence, not just in the key.
+    expect(texts[0]).toContain('tracker')
+    expect(texts[1]).toContain('Linked items')
+    expect(texts[2]).toContain('Settings')
+  })
+
+  it('marks a version that starts reaching into a different plugin as newly requested', () => {
+    // The whole reason the grants are RECORDED as well as shown. A constant key, or no key at all,
+    // would let a package quietly change which plugin it reaches into between versions — which is the
+    // one growth an owner has least ability to reason about.
+    const tiers = trustTiers(request({
+      contributions: {
+        extensions: [{ id: 'rows', point: 'linear:issues', label: 'Board cards', order: 500, items: '/v2/p/board/rows' }],
+      },
+      previous: { extensions: [{ kind: 'extends', target: 'tracker:issues', label: 'Board cards' }] },
+    }))
+    const enforced = tiers.find((tier) => tier.key === 'enforced')!.lines
+    expect(enforced.map((line) => [line.key, line.added])).toEqual([['extension:extends:linear:issues', true]])
   })
 
   it('keeps the enforced, declared and web claims in three separate lists', () => {

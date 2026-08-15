@@ -28,6 +28,7 @@ client: Task
 client: TaskLayout
 client: TaskSlotContribution
 client: UiSlotContribution
+client: WorkflowNotice
 client: Workspace
 client: activateTaskSignals
 client: activeNodeId

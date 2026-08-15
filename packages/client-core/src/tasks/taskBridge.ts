@@ -45,7 +45,7 @@ const put = <T>(url: string, body: unknown) =>
 // Every route below is ordinary `/v2` against the node, so this is available wherever a node is —
 // there is nothing left to probe for. It used to return null unless Electron's preload exposed a native
 // FOLDER PICKER, which took the terminal drawer, agents, run targets and workflows down with it on any
-// other host (docs/future/node-first/platform-seam.md). The picker now lives on the platform seam as
+// other host (git history: docs/future/node-first/platform-seam.md). The picker now lives on the platform seam as
 // `pickFolder()`, where it belongs, and this is a plain accessor.
 export const taskBridge = (): TaskBridge => {
   return {

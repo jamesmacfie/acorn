@@ -55,7 +55,7 @@ export type {
 // plugin may address its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read
 // core routes, or another plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The RENDERER twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -213,6 +213,9 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.data, ['contributions', 'slots', i, 'data'])
     if (entry.onClick) action(entry.onClick, ['contributions', 'slots', i, 'onClick'])
   })
+  // The location and the `when` keys were checked on the descriptor itself (@acorn/protocol/contextMenus.ts);
+  // what is left is the verb, which needs the frame list only this refinement can see.
+  contextMenus.forEach((entry, i) => action(entry.action, ['contributions', 'contextMenus', i, 'action']))
   palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
   commands.forEach((entry, i) => action(entry.action, ['contributions', 'commands', i, 'action']))
   const commandIds = new Set([...commands, ...palette].map((entry) => entry.id))
@@ -244,6 +247,54 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.capture, ['contributions', 'agentContexts', i, 'capture'])
   })
   refResolvers.forEach((entry, i) => route(entry.resolve, ['contributions', 'refResolvers', i, 'resolve']))
+  // ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ──────────────────────
+  //
+  // A point is a promise that somebody else's rows will appear inside one of THIS manifest's surfaces,
+  // so the surface has to be one this manifest declares — and it has to be a surface with a rectangle
+  // the strip can hang off. `pane.footer` draws under a PANE's frame; a settings page, importer, overlay,
+  // reference panel or webview is not a candidate, because each is chrome the host already draws around
+  // a frame (or, for a webview, pixels that are not the renderer's at all) with nowhere to reserve a
+  // strip of its own. The surface list grows when a host for one appears, not before.
+  const pointSurfaces = new Set(frames.filter((frame) => frame.target === 'pane').map((frame) => frame.id))
+  const claimedPoints = new Set<string>()
+  extensionPoints.forEach((entry, i) => {
+    const at = ['contributions', 'extensionPoints', i] as (string | number)[]
+    if (!pointSurfaces.has(entry.surface)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `extension point names '${entry.surface}', which this manifest does not declare as a pane surface` })
+    }
+    // One point per (surface, location). A second would be a strip the host has no second place to draw,
+    // so it would parse and never appear — the failure this file spends its length refusing.
+    const claim = `${entry.surface} ${entry.location}`
+    if (claimedPoints.has(claim)) {
+      ctx.addIssue({ code: 'custom', path: at, message: `'${entry.surface}' already has an extension point at '${entry.location}'` })
+    }
+    claimedPoints.add(claim)
+  })
+  extensions.forEach((entry, i) => {
+    const at = ['contributions', 'extensions', i] as (string | number)[]
+    route(entry.items, [...at, 'items'])
+    if (entry.onSelect) action(entry.onSelect, [...at, 'onSelect'])
+    // A plugin extending its OWN point is legal and pointless — it can put the rows there itself. It is
+    // not refused, because refusing it would mean a rule whose only effect is on a plugin harming nobody.
+  })
+  // A `coreSlot` surface is the exclusive-slot half. Two rules, both of which turn a surface that would
+  // silently never appear into an error the author sees at install time.
+  frames.forEach((frame, i) => {
+    const at = ['contributions', 'frames', i] as (string | number)[]
+    if (frame.target === 'coreSlot') {
+      if (!frame.coreSlot) {
+        ctx.addIssue({ code: 'custom', path: [...at, 'coreSlot'], message: 'a coreSlot surface must name which core surface it replaces' })
+      }
+      // The host mounts the plugin's own bundle here, exactly as it does for a pane. Without one there is
+      // nothing to draw in place of core's list, and the trust queue holds BUNDLES — so a bundle-less
+      // package offering to replace a core surface would never reach the prompt that discloses it.
+      if (!manifest.client) {
+        ctx.addIssue({ code: 'custom', path: at, message: 'a coreSlot surface needs a client bundle; declare `client` in the manifest' })
+      }
+    } else if (frame.coreSlot !== undefined) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'coreSlot'], message: 'coreSlot is only valid on a coreSlot surface' })
+    }
+  })
   // Every project-scoped surface needs two things this manifest alone can supply, and both are checked
   // here rather than left to a runtime that would have nothing to say about them.
   const routedSurfaces = new Set<string>()
@@ -323,7 +374,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

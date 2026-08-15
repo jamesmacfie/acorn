@@ -43,6 +43,7 @@ beforeEach(async () => {
     uninstall: () => {
       throw new Error('not wired in this harness')
     },
+    reload: () => Promise.reject(new Error('not wired in this harness')),
   })
   env = {
     DB: harness.db,

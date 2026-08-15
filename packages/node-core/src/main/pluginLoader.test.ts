@@ -222,7 +222,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [] })
+      .toEqual({ frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {
@@ -328,5 +328,40 @@ describe('rejections', () => {
     const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(loaded.map((entry) => entry.manifest.id)).toEqual(['fine'])
     expect(failures).toHaveLength(1)
+  })
+})
+
+// The half of the reload path that lives in this file: defeating Node's ES module cache, which is
+// permanent and keyed on the resolved URL. Without this, "reload" would re-run the FIRST load's module
+// object forever and every assertion about candidate-then-commit would be about nothing.
+describe('re-importing a package for a reload', () => {
+  const marked = (name: string, marker: string) =>
+    `export default { name: ${JSON.stringify(name)}, init: () => {}, marker: ${JSON.stringify(marker)} }\n`
+  const markerOf = async (options: Parameters<typeof loadExternalPlugins>[1]): Promise<string | undefined> => {
+    const { loaded } = await loadExternalPlugins(root, options)
+    return (loaded.find((entry) => entry.manifest.id === 'acme')?.plugin as { marker?: string } | undefined)?.marker
+  }
+
+  it('serves the cached module until a load names the id, then evaluates the file again', async () => {
+    const dir = install('acme', manifest('acme'), marked('acme', 'v1'))
+    expect(await markerOf({ builtins: [] })).toBe('v1')
+
+    writeFileSync(join(dir, 'dist', 'node.js'), marked('acme', 'v2'))
+    // Boot behaviour is deliberately unchanged: a second load with no `reimport` is the same module.
+    expect(await markerOf({ builtins: [] })).toBe('v1')
+    expect(await markerOf({ builtins: [], reimport: ['acme'] })).toBe('v2')
+  })
+
+  it('does NOT invalidate what the entry imports, which is the ceiling the docs state', async () => {
+    const dir = install('acme', manifest('acme'), `import { marker } from './dep.js'\nexport default { name: 'acme', init: () => {}, marker }\n`)
+    writeFileSync(join(dir, 'dist', 'dep.js'), `export const marker = 'dep-v1'\n`)
+    expect(await markerOf({ builtins: [] })).toBe('dep-v1')
+
+    // The generation stamp goes on the ENTRY's URL, and a relative specifier resolves against the URL's
+    // path rather than inheriting its query — so the child comes back from the cache with the code it had
+    // at boot. Pinned here so the limit cannot quietly change in either direction: a multi-file node half
+    // needs a restart until a resolve hook stamps the whole subgraph.
+    writeFileSync(join(dir, 'dist', 'dep.js'), `export const marker = 'dep-v2'\n`)
+    expect(await markerOf({ builtins: [], reimport: ['acme'] })).toBe('dep-v1')
   })
 })

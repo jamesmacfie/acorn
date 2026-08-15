@@ -1,4 +1,6 @@
 [
+  "ALL /v2/p/:plugin",
+  "ALL /v2/p/:plugin/*",
   "ALL /v2/p/:plugin/tasks/:id",
   "ALL /v2/p/:plugin/tasks/:id/*",
   "ALL /v2/p/agents/*",

@@ -52,6 +52,7 @@ export type { PaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
 export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/wsClient.ts'
+export type { WorkflowNotice } from '@acorn/client-core/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/wsChannels.ts'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
@@ -152,7 +153,7 @@ export { contextSnapshot } from '@acorn/client-core/agent/contextSnapshot.ts'
 export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from '@acorn/client-core/agent/reference.ts'
 
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────
-// What the HOST provides, as opposed to what the node provides (docs/future/node-first/platform-seam.md).
+// What the HOST provides, as opposed to what the node provides (git history: docs/future/node-first/platform-seam.md).
 // A plugin gets the two groups it has a legitimate use for — the native folder dialog and the host-owned
 // preview view — and nothing else: transport, fleet and plugin custody are core's business.
 export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/platform/index.ts'

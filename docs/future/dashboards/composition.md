@@ -88,7 +88,7 @@ construction. Selectors are also where plugin-hosted placement constraints bite
 - **Panel and dashboard definitions live on the owning node, in its per-user prefs store — never
   in device localStorage.** A user builds a board once and every client that pairs with that node
   renders it, and the agent can read it through `/v2` like everything else. This is the
-  state-ownership rule (`docs/future/node-first/state-ownership.md`): state follows the resource
+  state-ownership rule (`docs/state.md § Scope rules`): state follows the resource
   it describes. The device's query cache stays the offline read fallback, as for every other
   node-backed read.
 - Scoping is per-user-per-node (placement scope keys are in `placements.md`). A panel referencing
@@ -123,5 +123,5 @@ Dragging a card between board columns means mutating the underlying field. v1 is
   "source unavailable" behavior mirrors it.
 - Whether the query-key/persisted-cache conventions moved (`node/fleet.ts`, `node/fanout.ts`) —
   panel queries live inside them, and the persisted-cache buster gotcha applies to panel data.
-- Whether a context-menu registry appeared (`docs/future/user-extensions/extension-points.md`
-  designs one) — panel rows and panel chrome would want it.
+- The context-menu contract that has since shipped (`docs/plugins.md § Context menus`) — panel
+  rows and panel chrome should declare theirs through it, not invent one.

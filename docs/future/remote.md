@@ -123,7 +123,7 @@ and (c) could carry pairing handshakes ("enter this code on your node"). Notes:
 
 All three are reflected in the shipped system. Item 1 was **not** true when this file first claimed
 it — a 2026-08-15 survey found the seam existed as a TypeScript type and nothing else — and it landed
-that day (`docs/future/node-first/platform-seam.md`). Everything else here waits.
+that day (`git history: docs/future/node-first/platform-seam.md`). Everything else here waits.
 
 1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/platform/`.)
    Everything that touches `window.acorn` (apiClient's nodeFetch, stream attach, plugin cache access,

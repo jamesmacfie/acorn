@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono'
+import { Hono } from 'hono'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { idempotency } from './middleware/idempotency'
@@ -20,7 +20,7 @@ import { workspaces } from './routes/workspaces'
 import { tasks } from './routes/tasks'
 import { configTrust } from './routes/configTrust'
 import { worktree } from './routes/worktree'
-import { servePluginFetch } from './plugin/fetchRoute'
+import { dispatchPluginFetch } from './plugin/fetchRoute'
 
 // One server, one namespace: /v2. createApp() is a factory so the bootstrap can build a fresh instance.
 // Core mounts only core routers by name, under /v2/core; every plugin-owned router arrives through the
@@ -117,24 +117,24 @@ export function createApp() {
 
   // Plugin-owned routes, projected from the registry AFTER the auth gate above (still inside the
   // authMiddleware/requireUser envelope). See app/server/routes.ts for the contributions.
+  //
+  // Built-ins only: a Hono instance is a live object, so mounting it is the only thing to do with it, and
+  // a built-in is compiled into this binary and cannot change without a restart.
   for (const contribution of pluginRouteContributions()) {
-    const mount = routeMountPath(contribution)
-    if (contribution.router) {
-      app.route(mount, contribution.router)
-      continue
-    }
-    // A fetch-shaped contribution (a loaded plugin). Two mounts because Hono's `/*` does not match
-    // the bare mount path itself, and a plugin owning its whole namespace has to be able to answer
-    // `/v2/p/<id>`. The handler is given the request with the mount stripped from the path, so it
-    // sees the same relative paths `app.route()` gives a router.
-    const serve = (c: Context<AppEnv>): Promise<Response> => servePluginFetch(c, {
-      pluginId: contribution.plugin,
-      mount,
-      fetch: contribution.fetch,
-    })
-    app.all(mount, serve)
-    app.all(`${mount}/*`, serve)
+    if (contribution.router) app.route(routeMountPath(contribution), contribution.router)
   }
+
+  // Fetch-shaped contributions (loaded plugins) are DISPATCHED, not mounted. One handler pair over the
+  // whole plugin namespace, resolving the current contribution per request, because a reload replaces a
+  // plugin's registry entries while this mount table stays as it was built (routeRegistry.ts
+  // § resolvePluginFetch). Two mounts because Hono's `/*` does not match the bare path itself, and a
+  // plugin owning its whole namespace has to answer `/v2/p/<id>`.
+  //
+  // Registered LAST and falling through with next() when nothing matches, which is what keeps it
+  // invisible: a built-in's router, and the provider routes above, are earlier in the chain and answer
+  // first, and a path no plugin claims reaches the app's own 404 exactly as it did before.
+  app.all(`${PLUGIN_NAMESPACE}/:plugin`, dispatchPluginFetch)
+  app.all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
 
   return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/api-reference.md § Errors)
 }

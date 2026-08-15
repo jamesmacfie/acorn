@@ -32,6 +32,13 @@ export type AuditAction =
   | 'plugins.installed'
   | 'plugins.updated'
   | 'plugins.uninstalled'
+  // A loaded plugin's node half swapped in place, with no bytes arriving and no restart. It changes
+  // which code is running, so it belongs on the same trail as the three above.
+  | 'plugins.reloaded'
+  // An agent asked for a plugin to be installed, updated or removed, and the owner answered. The three
+  // rows above say what happened to the node; this one says who asked for it and whether a human agreed
+  // (docs/plugins.md § Approval-mediated install).
+  | 'plugins.request.decided'
   // Data leaving or entering the node.
   | 'backup.created'
 

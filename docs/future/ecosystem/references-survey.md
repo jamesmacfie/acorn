@@ -2,14 +2,14 @@
 
 Design notes from the ecosystem-feasibility session (2026-08-14). Source: the English READMEs of
 the thirteen projects vendored under `references/` on that date — READMEs only, not code, except
-where `docs/future/user-extensions/bb-reference.md` already recorded bb's internals. That folder
+where the retired `docs/future/user-extensions/bb-reference.md` (git history) recorded bb's internals. That folder
 may move or be deleted; this file is written to outlive it. The question asked: which of these
 could acorn-with-an-ecosystem mostly replace, and what would it have to match to win their users.
 
 ## Per project, one paragraph each
 
 - **bb** — an agentic IDE that can modify itself; desktop, web, CLI, and HTTP API all first-class.
-  The closest philosophical neighbour and the reason `docs/future/user-extensions/` exists. Its
+  The closest philosophical neighbour and the reason the (since shipped) user-extensions dev loop exists. Its
   loop is real and its trust model is the warning prompt. Steal: every-surface-is-an-API, the
   `experimental_` prefix + audit ledger discipline for new plugin API members.
 - **emdash** (YC W26) — Electron app for parallel agents in worktrees, local or SSH; pulls issues

@@ -118,6 +118,7 @@ const pluginStateCapability = capabilities.provide(
     loadFailures: () => graph.failures,
     disabled,
     setDisabled: (names) => disabledPlugins.set(names),
+    reloadHost: plugins,
     // A standalone node has no packaging flag to consult, so NODE_ENV is the only development signal it
     // has. It gates one thing: `{ path }` installs, which symlink an author's working tree into the
     // install directory (docs/plugins.md).

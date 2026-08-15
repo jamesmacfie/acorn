@@ -1,8 +1,10 @@
 import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/main/pluginInstaller.ts'
 import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/main/pluginLoader.ts'
+import { createPluginReloader } from '@acorn/node-core/main/pluginReload.ts'
 import type { PluginsBridge } from '@acorn/node-core/server/plugin/pluginState.ts'
-import type { PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
+import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
 import type { PluginLoadFailure } from '@acorn/node-core/main/pluginLoader.ts'
+import { nodePluginNames } from './composition'
 
 // The PLUGIN_STATE bridge, built once for both composition roots — the other half of the extraction
 // pluginDeps.ts started. It was written out twice (service/runtime.ts and server/standalone.ts) and had
@@ -41,18 +43,27 @@ export type PluginStateInput = {
   // build" differently because they genuinely have different evidence: Electron has a packaging flag,
   // and a standalone node has only NODE_ENV. That is the one divergence kept on purpose.
   allowLocalPathInstalls: boolean
+  // The running plugin host, for the one mutation that does not wait for a restart
+  // (@acorn/node-core/main/pluginReload.ts). Both roots hold the `initPlugins` result already.
+  reloadHost: Pick<PluginHostResult, 'reload'>
 }
 
 export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
   const { dataDir, allowLocalPathInstalls: allowLocalPath } = input
+  // Built here rather than in each root, so the two cannot drift the way install/uninstall once did. The
+  // built-in names come from the BUILD (composition.ts), not from the assembled graph: they are only used
+  // to warn when a disk package shadows a compiled one.
+  const reloader = createPluginReloader({ dataDir, builtins: nodePluginNames(), host: input.reloadHost })
   return {
     roster: input.roster,
     // Re-scanned per call, not the boot snapshot: an install has to show up in the roster before the
     // restart that runs it, and the device fetches its bundle from that same row to ask about it.
     installed: () => scanInstalled(dataDir).installed.map(installedPluginInfo),
     // What this process loaded, which is how the roster tells "installed and running" from
-    // "installed since the last restart".
-    booted: input.booted,
+    // "installed since the last restart". A reloaded plugin's version lands AFTER the boot snapshot on
+    // purpose: the consumer builds a Map from this list, so the later entry wins and a plugin swapped in
+    // place stops claiming a restart is pending for code that is already live.
+    booted: () => [...input.booted(), ...reloader.reloaded()],
     loadFailures: input.loadFailures,
     clientBundle: (id) => readClientBundle(scanInstalled(dataDir).installed, id),
     disabled: input.disabled,
@@ -60,5 +71,6 @@ export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
     install: (source, options) => installPlugin(dataDir, source, { ...options, allowLocalPath }),
     update: (id, options) => updatePlugin(dataDir, id, { ...options, allowLocalPath }),
     uninstall: (id, options) => uninstallPlugin(dataDir, id, options),
+    reload: (id) => reloader.reload(id),
   }
 }
