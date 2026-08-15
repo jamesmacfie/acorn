@@ -15,6 +15,7 @@ import { closeListener, devDataDir, makeRuntime, startListener } from '@acorn/no
 import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/main/advertise.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
+import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { pruneAudit } from '@acorn/node-core/server/audit.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
@@ -181,6 +182,10 @@ process.once('SIGTERM', (signal) => void shutdown(signal))
 console.log(
   JSON.stringify({
     nodeId: root.nodeId,
+    // Which protocol this node speaks, on the line a supervisor reads before it ever makes a request.
+    // The same number GET /v2/node reports; here so a launcher can refuse a node it cannot drive without
+    // first pairing to it (docs/api-reference.md § Versioning).
+    protocolVersion: NODE_PROTOCOL_VERSION,
     endpoint: listener.endpoint.origin,
     fingerprint: listener.fingerprint,
     certPem: listener.certPem,

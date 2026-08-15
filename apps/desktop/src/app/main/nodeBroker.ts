@@ -3,6 +3,7 @@ import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
 import { nodeRequest } from './nodeRequest'
 import { WS_PATH, type WsClientFrame } from '@acorn/protocol/ws.ts'
+import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import {
   type NodeConnectionState,
   type NodeFetchRequest,
@@ -32,6 +33,9 @@ const PING_INTERVAL_MS = 15_000
 // Two intervals of silence, not one: a single missed pong on a congested link is not evidence, and the
 // cost of being wrong is tearing down a working socket and refetching everything on it.
 const MISSED_PONGS_BEFORE_DEAD = 2
+// Short: this sits in front of the socket on every connect, so a slow or dead node must not delay the
+// reconnect it would otherwise get. Timing out here reads as "no clear answer" and the socket opens.
+const PROTOCOL_PROBE_TIMEOUT_MS = 5_000
 
 // A node plus the material only main may hold: the bearer, and the certificate to pin against.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string }
@@ -106,7 +110,63 @@ export class NodeBroker {
       closed: false,
     }
     this.connections.set(node.nodeId, connection)
+    void this.openConnection(connection)
+  }
+
+  // The version gate, and the reason it is here rather than at pairing: pairing checks once, and a node
+  // upgrades. `incompatible` and `protocol_mismatch` have been in the protocol since it was written with
+  // nothing anywhere producing either, so a node that drifted past this client kept connecting and failed
+  // later as an `undefined` deep inside a component.
+  //
+  // Before the socket, not alongside it: a client that cannot speak the protocol should not open a
+  // WebSocket and start interpreting frames on it.
+  //
+  // A failure to REACH the node is not a version failure — it is the ordinary offline path, and treating
+  // an unreachable node as incompatible would be a sticky, alarming state for a laptop that is merely
+  // asleep. So only a definite, parseable, different major stops us; anything else opens the socket and
+  // lets the existing reconnect machinery say what it always said.
+  private async openConnection(connection: Connection): Promise<void> {
+    if (connection.closed) return
+    const major = await this.probeProtocol(connection)
+    if (connection.closed) return
+    if (major !== null && major !== NODE_PROTOCOL_VERSION) {
+      // Sticky, like `revoked`: retrying cannot fix a version, and `downState` already refuses to
+      // downgrade either state. Only an upsert — a re-pair, or the app relaunching after an upgrade —
+      // clears it, which is exactly when the answer could have changed.
+      this.setState(connection, 'incompatible', { code: 'protocol_mismatch' })
+      connection.closed = true
+      return
+    }
     this.openSocket(connection)
+  }
+
+  // The node's own claim, over the pinned agent. Unauthenticated `GET /v2/node` — it needs no token, and
+  // asking for one here would confuse "your device was revoked" with "we disagree about the protocol".
+  //
+  // `null` for anything that is not a clear answer: unreachable, non-JSON, or a body without a numeric
+  // protocol. The schema is additive-forever so a newer node still parses; if it somehow does not, the
+  // raw field is still read, because refusing to learn a version from a response we could not fully
+  // parse is how a client ends up unable to explain itself.
+  private async probeProtocol(connection: Connection): Promise<number | null> {
+    try {
+      const response = await nodeRequest({
+        url: new URL('/v2/node', connection.node.endpoint),
+        method: 'GET',
+        // Deliberately no authorization header: this is the pre-auth identity route, and sending the
+        // bearer would let a revoked device read "unauthorized" as a version disagreement.
+        headers: {},
+        agent: connection.agent,
+        signal: AbortSignal.timeout(PROTOCOL_PROBE_TIMEOUT_MS),
+      })
+      if (response.status !== 200) return null
+      const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
+      const parsed = nodeInfoSchema.safeParse(payload)
+      if (parsed.success) return parsed.data.protocolVersion
+      const claimed = (payload as { protocolVersion?: unknown } | null)?.protocolVersion
+      return typeof claimed === 'number' ? claimed : null
+    } catch {
+      return null
+    }
   }
 
   remove(nodeId: string): void {
@@ -313,7 +373,11 @@ export class NodeBroker {
     connection.attempt += 1
     connection.reconnectTimer = setTimeout(() => {
       connection.reconnectTimer = null
-      this.openSocket(connection)
+      // Re-probed, not just re-opened, and this is the case the gate actually exists for: a node that
+      // upgrades restarts, which drops the socket, so reconnect is the moment its new major arrives. A
+      // probe only at upsert would notice a version that changed while the app was closed and miss the
+      // one that changed while it was open.
+      void this.openConnection(connection)
     }, delay)
   }
 

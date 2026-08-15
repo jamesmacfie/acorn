@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
-import { NODE_PROTOCOL_VERSION, nodeIdentitySchema, type NodeIdentity } from '@acorn/protocol/node.ts'
+import { nodeIdentitySchema, type NodeIdentity } from '@acorn/protocol/node.ts'
 
 const IDENTITY_FILE = 'node.json'
 const LOCK_FILE = 'node.lock'
@@ -142,8 +142,13 @@ export function openDataRoot(dir: string): DataRoot {
     if (existed && !existing) {
       throw new Error(`${identityPath} is unreadable or malformed. Fix or remove it — refusing to mint a second identity for this root.`)
     }
-    let identity: NodeIdentity =
-      existing ?? { nodeId: randomUUID(), createdAt: Date.now(), protocolVersion: NODE_PROTOCOL_VERSION }
+    // No `protocolVersion` here any more. It was written once at first boot and then read by nothing,
+    // ever — and worse, it was a lie waiting to happen: a root created by protocol 2 and later served by
+    // a protocol 3 binary kept claiming 2 forever, because nothing rewrote it either. The live answer is
+    // NODE_PROTOCOL_VERSION in the running binary, which is what GET /v2/node reports. An existing
+    // node.json still carrying the key parses fine and the key is dropped on the next rewrite
+    // (protocol/node.ts explains why that schema is not strict).
+    let identity: NodeIdentity = existing ?? { nodeId: randomUUID(), createdAt: Date.now() }
     if (!existing) writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
     else chmodSync(identityPath, 0o600)
 

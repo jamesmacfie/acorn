@@ -37,6 +37,41 @@ branch; otherwise the transport codes are `bad_request`, `unauthorized`, `forbid
 `revision_conflict`, `idempotency_conflict`, `provider_error`, `rate_limited`, `timeout`, and
 `internal`.
 
+## Versioning
+
+**One number, one meaning.** `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
+protocol major, and it is the entire compatibility contract — there is no minor, no capability
+negotiation and no feature handshake. Each side refuses a major it does not speak: the pairing probe
+refuses before pairing, and the broker re-probes `GET /v2/node` on every connect, producing the
+`incompatible` connection state and the `protocol_mismatch` error code. Checking only at pairing is
+not enough, because a paired node upgrades — usually by restarting, which drops the socket, so the
+reconnect is where a new major shows up.
+
+**Within a major, changes are additive only.** New routes, new optional response fields and new
+WebSocket channels are all safe. Renaming a field, removing one, or changing what one means is the
+next major, not a patch. Reads are tolerant by rule and not by accident: `readJson` does not validate,
+so unknown fields pass and a missing field arrives as `undefined` — which is a licence to ADD, never a
+licence to remove, because the removal surfaces as a crash deep inside a component rather than at the
+boundary. Mutations keep their Zod validation exactly as they are; a request body is not a read.
+
+**The handshake is the most tolerant surface, not the least.** `nodeInfoSchema` and `pairResultSchema`
+ignore unknown fields, in every major, forever. This is the response by which a client learns it
+*cannot* speak to a node, so every version of it must be readable by every client — a client that
+cannot parse it cannot even say why, and reports "this is not an acorn node" about something that
+plainly is. Both were `strictObject` until 2026-08-15, which meant the first field any future node
+added would have broken every older client in exactly that way.
+
+Why the rules are this blunt, and this early: today the client and node ship together, so any wire
+change is safe and none of this costs anything. Once a node is a download (`docs/future/bundle.md`),
+old nodes exist forever and that freedom is gone. There is deliberately no response-schema validation,
+no OpenAPI and no codegen (see `docs/architecture-overview.md § Wire validation`), and no protocol
+export snapshot — the plugin API has one because its authors are outside the repo, and the protocol's
+consumers are all inside it until standalone nodes ship.
+
+The plugin bridge inherits the same posture for the same reason: frame-SDK verbs ship inside plugin
+bundles while the broker ships in the shell, so within a `PLUGIN_API_MAJOR` bridge verbs are additive
+only (`docs/plugins.md § The plugin API`).
+
 ## Request processing
 
 `createApp()` applies the following order:
