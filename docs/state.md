@@ -10,6 +10,11 @@ notes, memories, integrations, provider mirrors, terminal metadata, managed sess
 Docker/database configuration, saved requests, secrets, devices, plugin enablement, config trust,
 and audit records.
 
+It is also authoritative for what the owner *composes* about those resources — a task's pane layout,
+a task's open editor files, a repo's PR filters, a task's context selection — held as per-user
+preferences (`GET|PUT /v2/core/prefs`). These follow the resource, so any client that pairs with a
+Node renders that Node's arrangements and the agent can read them.
+
 Each Node has an independent data root and database set. A Node ID is part of every renderer query,
 selection scope, layout scope, and fleet aggregate input.
 
@@ -18,7 +23,7 @@ selection scope, layout scope, and fleet aggregate input.
 The desktop persists:
 
 - paired Node records, labels, endpoints, certificate fingerprints, and local-node identity;
-- device-scoped appearance, shortcuts, pane layouts, task ordering, and window geometry;
+- device-scoped appearance, shortcuts, rail order, collapse state, and window geometry;
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.
 
@@ -28,14 +33,22 @@ while a Node is offline.
 
 ## Scope rules
 
+**State follows the resource it describes.** State about a Node's resources goes to that Node's
+per-user prefs, so every client renders it; state about this machine or the person at it — theme,
+style, keybindings, window and collapse state, notices, caches, trust, tokens — stays device-local on
+purpose. There is no "home node" to store things on: `homeNode()` picks which Node a fresh window
+opens on and nothing else. Drafts stay device-local by a separate recorded decision, because losable
+is acceptable for a draft and not for a composition.
+
 Use the persistence scope that owns the state:
 
 | State | Scope |
 | --- | --- |
 | Fleet membership and token custody | desktop installation; token in main, membership in fleet store |
-| Appearance and shortcuts | device |
+| Appearance, shortcuts, rail order, notices, trust, tokens | device |
 | Query cache | Node |
-| Task layout and last source | device, keyed by Node + task (stored in device prefs today; `docs/future/node-first/state-ownership.md` proposes moving layouts to the owning Node) |
+| Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
+| Last path, last task, last source | device |
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text | client + current task |
 | Provider data and task mutations | owning Node |
@@ -59,8 +72,15 @@ should this outlive the tab?":
 | Mechanism | Use when | Example |
 | --- | --- | --- |
 | TanStack query | The Node owns it and the client is caching a read | tasks, workspaces, a PR's files |
-| Persisted state slice | The client owns it and it must survive a relaunch | appearance, pane layout, open editor files |
+| Persisted state slice | It must survive a relaunch | appearance, pane layout, open editor files |
 | Module-level signal | The client owns it and it is session-only | a live roster, a scroll position, a draft |
+
+A persisted state slice is a shape, not a location. Where its value lands is decided by one set,
+`DEVICE_KEYS` in `client-core/persistence/devicePrefs.ts`: listed keys go to `localStorage`, and
+everything else — including every scoped slice — goes to the owning Node through `savePref`. Unknown
+means Node, deliberately, so a new per-task or per-repo slice is portable by default. The cost is
+honest: editing a layout while its Node is offline stalls the write until reconnect, where
+`localStorage` never stalled. That is the right trade for state that is *about* that Node.
 
 A module-level signal is the default for anything ephemeral, and the cost of that default is exactly
 the eviction question above — so a signal keyed by task, workspace or node owes an `onScopeEvicted`

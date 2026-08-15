@@ -5,8 +5,9 @@
 // Provider-specific routes and wire types stay with their plugins. The shell owns only core-backed
 // project, task, workspace, preference, and integration queries.
 import { readJson } from './apiClient'
-import { homeNodeTarget } from './node/fleet'
-import { mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
+import { activeNodeId } from './node/activeNode'
+import { drainMigratedPrefs, mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
+import { setPref } from './settings/savePref'
 import { integrationProjectsRoute, integrationsKey, integrationsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
@@ -66,10 +67,17 @@ export const integrationProjectsOptions = (connectionId: string, enabled: boolea
 export const prefsOptions = (enabled: boolean) => ({
   queryKey: prefsKey,
   enabled,
+  // The ACTIVE node's prefs. Everything left in this store describes that node's resources, and the
+  // per-node QueryClient partition (node/fleet.ts) already keeps one node's answer out of another's.
   queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> => {
-    const nodePrefs = await readJson<Record<string, string>>(prefsRoute, { signal, ...homeNodeTarget() })
+    const nodePrefs = await readJson<Record<string, string>>(prefsRoute, { signal })
     seedDevicePrefs(nodePrefs)
-    return mergePrefs(nodePrefs)
+    // One-shot, and a no-op on every fetch after the first: hands back whatever composition state the
+    // previous release seeded into this device's storage. Awaited rather than fired off, so the value
+    // this query resolves with already includes it and the shell restores layouts on the first paint
+    // rather than the second.
+    const drained = await drainMigratedPrefs(activeNodeId(), nodePrefs, setPref)
+    return mergePrefs({ ...nodePrefs, ...drained })
   },
   // A persisted TanStack snapshot can hydrate without running queryFn while it is still fresh. Device
   // preferences live outside that cache, so project them at read time as well or a just-saved shortcut

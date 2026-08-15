@@ -1,17 +1,20 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from '../apiClient'
-import { homeNodeTarget } from '../node/fleet'
 import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'
 
-const setPref = async (key: string, value: string) =>
+// The ACTIVE node, which is apiClient's default target — not a home node. What survives in this store
+// after the device migration all describes one node's resources: a task's pane layout, a task's open
+// files, a repo's PR filters, what the agent running THERE may do, whether that node has been set up.
+// State follows the resource it describes (docs/state.md § Scope rules), so there is no home node to
+// pick and no divergence to explain.
+export const setPref = async (key: string, value: string) =>
   writeJson<{ key: string; value: string }>(prefsRoute, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
-    ...homeNodeTarget(),
   }, (res) => `prefs ${res.status}`)
 
 type PrefWriteState = {

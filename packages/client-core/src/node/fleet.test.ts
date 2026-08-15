@@ -7,7 +7,7 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 const idb = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(async () => {}) }))
 vi.mock('idb-keyval', () => idb)
 
-const { _resetFleet, cacheKeyFor, clientFor, dropNode, homeNodeId, homeNodeTarget, nodeState, nodes, refreshFleet } =
+const { _resetFleet, cacheKeyFor, clientFor, dropNode, homeNodeId, nodeState, nodes, refreshFleet } =
   await import('./fleet')
 const { activeCacheId, activeNodeId, nodeReadiness, selectActiveNode, setActiveNode } = await import('./activeNode')
 
@@ -78,7 +78,6 @@ describe('fleet projection', () => {
 
     expect(nodes().map((node) => node.nodeId)).toEqual(['remote', 'local-node'])
     expect(homeNodeId()).toBe('local-node')
-    expect(homeNodeTarget()).toEqual({ nodeId: 'local-node' })
     expect(nodeState('remote')).toBe('degraded')
     // A node the broker has not reported on reads as offline, not as a sixth "unknown" state.
     expect(nodeState('local-node')).toBe('offline')
@@ -92,11 +91,8 @@ describe('fleet projection', () => {
     expect(nodeState('remote')).toBe('online')
   })
 
-  it('addresses the home node only when one is known', () => {
+  it('has no home node until the broker reports one', () => {
     expect(homeNodeId()).toBe(null)
-    // Absent rather than `{ nodeId: undefined }`: an own undefined property would override
-    // apiClient's active-node default instead of falling through to it.
-    expect(homeNodeTarget()).toEqual({})
   })
 })
 

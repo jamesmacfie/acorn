@@ -44,19 +44,11 @@ export const nodeStatus = (nodeId: string): NodeStatus | undefined => statuses()
 // "may I trust what I have?", and the answer for a node the broker has not reported on is no.
 export const nodeState = (nodeId: string): NodeConnectionState => statuses()[nodeId]?.state ?? 'offline'
 
-// The node whose prefs, keybindings and theme this client obeys. See the divergence note in
-// queries.ts's `prefsOptions`: presentation prefs are stored per node, so one node has to win.
+// The node this window opens on when nothing else is selected, and the one a notification with no node
+// of its own is attributed to. NOT a prefs home: preferences follow the resource they describe, so this
+// pick no longer decides where anything is stored (docs/state.md § Scope rules).
 export const homeNode = (): NodeRecord | undefined => nodes().find((node) => node.local) ?? nodes()[0]
 export const homeNodeId = (): string | null => homeNode()?.nodeId ?? null
-
-// An apiClient target for a request that must go to the home node whatever is active. `nodeId:
-// undefined` would be an own property that overrides apiClient's default, so this is spread in or
-// omitted entirely; omitted means "the active node", which is right when there is no broker at all
-// (the origin IS the node).
-export const homeNodeTarget = (): { nodeId?: string } => {
-  const nodeId = homeNodeId()
-  return nodeId ? { nodeId } : {}
-}
 
 let subscribed = false
 // Idempotent, never torn down: the push stream's lifetime is the renderer's.

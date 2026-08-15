@@ -1,5 +1,10 @@
 # State ownership: what lives on the node, what lives on the device
 
+> **Implemented 2026-08-15.** All four composition kinds moved, prefs now address the active node
+> rather than a home node, and a one-shot drain hands each device's leftovers back. The rule and the
+> shipped split live in [docs/state.md](../../state.md); the rest of this file is the reasoning that
+> got there, kept for the record. Dashboards inheriting the rule is still ahead.
+
 From the node-first session (2026-08-15). Nothing here is scheduled. The end goal says any client
 that pairs with your node gets *your* acorn. Today that is true for data and false for
 arrangement: everything the user composes about their workspace lives in one device's
