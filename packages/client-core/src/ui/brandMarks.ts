@@ -10,7 +10,8 @@ import { Registry } from '../registries/registry'
 // across every theme exactly as a first-party one does — which a data-URI `<img>` could not, since
 // CSS does not cross into its document.
 //
-// See docs/future/icons.md for the alternatives this rules out, and docs/ui-design.md § Icons.
+// See docs/ui-design.md § Icons; the retired docs/future/icons.md (git history) records the
+// alternatives this rules out.
 export type BrandMark = {
   // Bare for a core mark, `<pluginId>` or `<pluginId>/<key>` for a plugin's. Icon looks it up under
   // a `brand:` prefix; the prefix keeps these out of ICON_NAMES and stays unambiguous if Lucide ever

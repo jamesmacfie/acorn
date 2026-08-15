@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PluginDocumentRegion, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { documentRegionFor, isHostOwnedSurface } from './documentSurfaces'
 
-// The line between a surface that RUNS plugin code and one the host draws (docs/future/monaco.md).
+// The line between a surface that RUNS plugin code and one the host draws (docs/third-party/monaco.md).
 // It is the trust gate for a whole class of surface, so it is worth pinning in both directions: a
 // frame stays behind the bytes-hash prompt, a document surface does not need one, and neither gets to
 // name a route outside its own plugin.

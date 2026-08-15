@@ -8,7 +8,7 @@ import { SplitHandle } from '../../ui/primitives'
 import { createSplitDrag } from '../../ui/split'
 
 // The `document-over-frame` template: a host-owned editor above the plugin's own frame, with a
-// host-owned drag handle between them (docs/future/monaco.md § document-over-frame, concretely).
+// host-owned drag handle between them (docs/third-party/monaco.md § document-over-frame, concretely).
 //
 // ┌──────────────────────────────────┐
 // │ host document surface            │  host: Monaco, theme, workers, dirty state, ⌘S, view state

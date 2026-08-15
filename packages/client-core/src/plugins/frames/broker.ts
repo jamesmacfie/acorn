@@ -363,7 +363,7 @@ export function createFrameBridge(input: {
     }
   }
 
-  // The composed pane's shared document (docs/future/monaco.md § Communication between regions). Three
+  // The composed pane's shared document (docs/third-party/monaco.md § Communication between regions). Three
   // operations, and the interesting thing about them is what is NOT here: no cursor, no selection, no
   // decorations, no "open this other document". Each of those is either the host's state or an
   // LSP-shaped route, and the growth rule sends new asks to the second rather than to this list.

@@ -109,6 +109,11 @@ This is the build-the-seam-anyway principle applied one level up: contracts betw
 designed like contracts between plugin and host, even while the first consumer pair is
 first-party.
 
+And the first consumer pair already exists in the tree: **memory renders inside context's tray
+in-realm today** — nine of the twelve entries in the CSS cross-package baseline are that one
+coupling. Build the cooperative point there first; it proves the seam on a real pair and
+un-blocks memory's tier move as a side effect (`docs/future/node-first/compiled-tier.md`).
+
 ## What is refused, on the record
 
 **bb-style content scripts / uncooperative extension.** Any mechanism that lets plugin B alter

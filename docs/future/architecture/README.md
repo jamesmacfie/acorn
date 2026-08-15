@@ -1,30 +1,22 @@
 # Architecture deepening plans
 
-What remains from the August 2026 architecture review of the plugin runtime — the part of the
-codebase the last 80 commits cluster on. The review produced seven plans; **plans 1–5 landed**
-(commit `b732c69c`, including the fixes from its own review) and their files are deleted — the code
-and its comments are the record now. What stays here is the open work and one decision record.
+What remains from the August 2026 architecture review of the plugin runtime. The review produced
+seven plans; **plans 1–5 landed** (commit `b732c69c`, including the fixes from its own review) and
+their files are deleted — the code and its comments are the record now. One plan remains open:
 
-A few words the docs use with a specific meaning:
+- **[Move frame wiring decisions out of .tsx](./06-frame-wiring-out-of-tsx.md)** — the test suite
+  can't render components, so the file extension decides coverage, and all four documented bugs in
+  this stack were in the untested `.tsx` half. Self-contained; pick it up, land it, delete it.
+
+A few words the doc uses with a specific meaning:
 
 - **Module** — a file or small cluster of files with one job.
 - **Interface** — everything a caller has to know to use a module. **Deep** means a small interface
   hiding a lot of work; **shallow** means the interface is nearly as complicated as the code behind it.
-- **Seam** — a place where you can swap one side out without the other noticing. A seam with only
-  one real implementation is hypothetical; two implementations make it real.
 - **Locality** — bugs live where code is *called*, not just inside the functions themselves. A pure
   function with tests proves little if the wiring around it is untested.
-- **Leverage** — one change in one place improving many call sites.
 
-## What's here
-
-| File | Status | One line |
-|------|--------|----------|
-| [Move frame wiring decisions out of .tsx](./06-frame-wiring-out-of-tsx.md) | **Open** | The test suite can't render components, so the file extension decides coverage — and all four documented bugs in this stack were in the untested `.tsx` half. |
-| [The plugin-api client barrel](./07-plugin-api-barrel.md) | **Watch item** | 173 exports and zero behaviour is a namespace, not a contract; a curation ratchet, not a work item. |
-| [Frame verbs: the design pass](./05-frame-verb-table-design.md) | **Decision record** | Why the verb table is a type-level coverage assertion (`frames/verbs.ts`) and deliberately not a derived dispatch table — don't re-propose the derivation without a second consumer. |
-
-## What landed (so nothing re-suggests it)
+## What landed or was decided (so nothing re-suggests it)
 
 - **1 — one plugin-state bridge.** `apps/node/src/server/pluginState.ts` builds the `PLUGIN_STATE`
   capability for both composition roots; the roster reconciliation moved out of its route into
@@ -39,8 +31,14 @@ A few words the docs use with a specific meaning:
   from.
 - **4 — permission lines as records.** `PermissionLine { key, text, icon, high }`; the trust
   dialog diffs on the grant key, never the sentence.
-- **5 — frame verbs.** Type-level coverage assertions in `frames/verbs.ts`; see the decision
-  record above for what was deliberately not built.
+- **5 — frame verbs.** Type-level coverage assertions in `frames/verbs.ts`; the header comment
+  there is the decision record. Deliberately NOT built: deriving `FrameServices`/the SDK from the
+  vocabulary — don't re-propose the derivation unless a second consumer of the vocabulary appears
+  (a second host shell, say).
+- **The plugin-api client barrel** (was plan 7) is a watch item, not a work item: 173 exports of
+  pure re-export is a namespace, not a contract. The ratchet now lives in the comment at the top of
+  `packages/plugin-api/src/surface.test.ts` — additions get the new-dependency question; curation
+  toward fewer, deeper objects waits for real third-party usage.
 
 A review of that work found ten regressions, all in places where behaviour was unified rather than
 moved, and all fixed. Three were about what "trusted" means: it is now the strong question ("may this

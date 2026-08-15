@@ -23,7 +23,7 @@ export const dbSavedQueries = sqliteTable(
   (t) => [uniqueIndex('db_saved_queries_project_name_idx').on(t.projectId, t.name)],
 )
 
-// The task's query editor, as a document (docs/future/monaco.md). It exists because the pane's editor
+// The task's query editor, as a document (docs/third-party/monaco.md). It exists because the pane's editor
 // is now the HOST's: a document surface is defined by a route that reads it and a route that writes it,
 // so the text has to live somewhere the plugin can serve it from, and that is here.
 //

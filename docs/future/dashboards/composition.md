@@ -85,6 +85,12 @@ construction. Selectors are also where plugin-hosted placement constraints bite
   Perses layouts-reference-panels precedent. This is the cheap-now/expensive-later call:
   embedding panel config inside a "home dashboard" blob works until panels need to live in a
   second place (`placements.md`), and then it is a migration. Reference from day one.
+- **Panel and dashboard definitions live on the owning node, in its per-user prefs store — never
+  in device localStorage.** A user builds a board once and every client that pairs with that node
+  renders it, and the agent can read it through `/v2` like everything else. This is the
+  state-ownership rule (`docs/future/node-first/state-ownership.md`): state follows the resource
+  it describes. The device's query cache stays the offline read fallback, as for every other
+  node-backed read.
 - Scoping is per-user-per-node (placement scope keys are in `placements.md`). A panel referencing
   a collection whose plugin is disabled or gone renders as an inert "source unavailable" panel and
   survives — the pane-layout unknown-ids rule applied here. User compositions are never

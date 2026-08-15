@@ -15,7 +15,7 @@ import './editor.css'
 // (@acorn/protocol/languageIds.ts + client-core/editor/), because this file and DatabasePane.tsx were
 // each carrying a copy and the theme NAME is a Monaco global — two panes writing the same global and
 // agreeing by luck. Same reason the host now owns the whole document surface a loaded plugin gets
-// (docs/future/monaco.md).
+// (docs/third-party/monaco.md).
 
 // The Monaco editor pane (docs/panes.md): a lazy file tree on the left, a file TAB BAR + one reused
 // Monaco instance on the right. Single-click opens an ephemeral (italic) preview tab; editing or

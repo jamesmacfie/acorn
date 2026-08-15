@@ -17,7 +17,7 @@ second tier will not grow until it can do everything the first can" is *not* the
 third-party plugin needs one of those, the recorded answer is review and adoption into
 first-party, not a wider sandbox.
 
-The proof case is Monaco (`docs/third-party/README.md`, `docs/future/monaco.md`): a single-file
+The proof case is Monaco (`docs/third-party/README.md`, `docs/third-party/monaco.md`): a single-file
 editor frame measured 7.93 MiB against the 8 MiB cap and its language workers were undeliverable
 under the frame CSP. The answer was a **host-owned document surface plugins borrow** — core grew
 so the sandbox didn't have to widen. Expect that pattern to repeat for every heavyweight surface:

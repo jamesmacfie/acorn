@@ -2,7 +2,7 @@
 // build the bundles and generate `acorn-plugin.json`. It lives here, not in the build script, so the
 // plugin's declared surface is visible from the plugin's own directory.
 //
-// THE FIRST CONSUMER OF `document-over-frame` (docs/future/monaco.md § Sequence, step 5), and that is
+// THE FIRST CONSUMER OF `document-over-frame` (docs/third-party/monaco.md § Sequence, step 5), and that is
 // why this plugin moved rather than because the migration bought it anything on the storage path. It was
 // stuck first-party for one measured reason: the pane embedded Monaco, a single-file Monaco frame comes
 // to 7.93 MiB against an 8.00 MiB cap with a stub UI, and its four language-service workers (14.58 MiB)

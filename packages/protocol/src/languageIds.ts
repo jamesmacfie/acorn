@@ -1,4 +1,4 @@
-// The language-id vocabulary, published once (docs/future/monaco.md § Naming, § Sequence step 3).
+// The language-id vocabulary, published once (docs/third-party/monaco.md § Naming, § Sequence step 3).
 //
 // It lives here because THREE parties need the same words and no two of them share a package: the
 // node parses a manifest that names one (node-core/main/pluginManifest.ts), the renderer maps it onto

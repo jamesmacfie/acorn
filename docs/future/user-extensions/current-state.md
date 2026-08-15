@@ -169,7 +169,7 @@ un-replaceable. This exact gap is what `extension-points.md § Themes` fills.
   no asset tree** (`apps/desktop/src/app/main/pluginScheme.ts`). The document is host-generated.
 - CSP: `default-src 'none'`; scripts/styles self; `connect-src 'none'` — **a frame has no network
   at all**; no workers (this is what killed a bundled Monaco: 7.93 MiB against the 8 MiB cap and
-  undeliverable workers — the origin of the host-owned document surface, `docs/future/monaco.md`).
+  undeliverable workers — the origin of the host-owned document surface, `docs/third-party/monaco.md`).
 - One `MessagePort`; every bridge call is checked against the manifest by an allowlist of
   (path shape, method) with `mapped`/`unmappable`/`unknown` classes and an exhaustive route-sweep
   test (`plugins/frames/scopes.ts`). A frame may not call another plugin's routes or fetch another

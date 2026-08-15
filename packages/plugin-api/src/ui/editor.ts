@@ -1,4 +1,4 @@
-// The Monaco surface, owned once by the host (docs/future/monaco.md § Sequence step 1): the theme
+// The Monaco surface, owned once by the host (docs/third-party/monaco.md § Sequence step 1): the theme
 // both compiled panes were carrying a copy of, and the canonical-language-id → Monaco map that
 // replaces their two divergent extension tables.
 //

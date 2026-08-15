@@ -1,4 +1,4 @@
-// The parts of a host-owned document surface that are not a component (docs/future/monaco.md).
+// The parts of a host-owned document surface that are not a component (docs/third-party/monaco.md).
 //
 // Everything here is deliberately pure or a plain module-level map, because the surface itself is a
 // .tsx and this repo's vitest runs in node with no Solid plugin — a green suite proves nothing about
@@ -30,7 +30,7 @@ export { MAX_DOCUMENT_BYTES }
 export type DocumentScope = { taskId?: string; projectId?: string }
 
 /** What a composed pane's FRAME may do to the document it shares the rectangle with
- * (docs/future/monaco.md § Communication between regions). Three methods, each with a proven consumer,
+ * (docs/third-party/monaco.md § Communication between regions). Three methods, each with a proven consumer,
  * and deliberately nothing about the editor — no cursor, no selection, no decorations. */
 export type DocumentHandle = {
   read(): string

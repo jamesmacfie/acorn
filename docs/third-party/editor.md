@@ -2,7 +2,7 @@
 
 **Blocked on ONE thing, and it is now a build rather than a question.** A Monaco frame cannot be served
 (measured below), and the answer on the record is the host-owned document surface
-(`docs/future/monaco.md`): the host owns one editor and lends it through a vendor-neutral contract, and
+(`docs/third-party/monaco.md`): the host owns one editor and lends it through a vendor-neutral contract, and
 this plugin contributes the file tree, tabs and search panel around a document region the host draws.
 
 **That contract is finished and has a real consumer.** `database` moved over it
@@ -82,7 +82,7 @@ it. Two ways out, and they are not equivalent. Multi-file plugin origins plus `w
 CSP is a standing grant to every installed plugin. A **host-owned document surface** — the app owning one
 editor and lending it through a vendor-neutral contract — widens nothing and costs no plugin a duplicated
 7.9 MiB. That is the direction on the record, and it is now a full design with a build sequence:
-`docs/future/monaco.md`, including the composed-pane decision (region-addressed templates), the bridge
+`docs/third-party/monaco.md`, including the composed-pane decision (region-addressed templates), the bridge
 document API, and the completions capability. This plugin is the template's whole-pane consumer and the
 first one the contract should be built against.
 

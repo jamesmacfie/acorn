@@ -4,7 +4,7 @@
 // so ("mirrored here to keep that pane untouched"). The duplication was load-bearing by accident: the
 // theme NAME is a Monaco global, so two panes were writing the same global and it worked because both
 // copies happened to agree. Last writer won, and nothing would have said otherwise
-// (docs/future/monaco.md § What is already true).
+// (docs/third-party/monaco.md § What is already true).
 //
 // Monaco (like xterm) ignores CSS custom properties, so it gets an explicit theme: base vs/vs-dark
 // supplies the syntax colours, chrome colours come from the live app tokens (tokens-layout.css) — the
