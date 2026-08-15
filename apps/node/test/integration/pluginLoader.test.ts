@@ -188,7 +188,6 @@ describe('loading rollbar from disk', () => {
         setDisabled: () => {},
         // Nothing in this case reloads; the bridge only needs a host to hand the reloader.
         reloadHost: { reload: () => Promise.reject(new Error('not wired in this test')) },
-        allowLocalPathInstalls: false,
       }))
       const row = state.plugins.find((entry) => entry.name === 'rollbar')
       expect(row).toMatchObject({ state: 'failed', stage: 'load' })

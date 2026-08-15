@@ -138,6 +138,57 @@ back off disk before anything runs — install never starts a plugin — with a 
 `docs/plugins.md § What the owner can know before the download` records why that ordering was chosen over
 downloading first.
 
+### Installing from a folder
+
+`{ path }` — an absolute directory on the node's own filesystem — is a first-class install source on
+**every** build, packaged included. It was dev-build-only for most of the plugin system's life, gated on
+an `allowLocalPath` flag each composition root answered from its own evidence. That gate is gone, and
+since removing a gate is the kind of change that should have to argue for itself, here is the argument.
+
+**What it was costing.** The scaffold (`npm create acorn-plugin`) writes a directory, and the authoring
+guide's last step installs it. On a packaged build that step failed, which meant an external author could
+write a plugin and not run it — the whole remaining distance between "an afternoon" and "an afternoon on a
+machine that is not a dev checkout". Every downstream ambition (discovery, a listing, distribution) is
+worth nothing while the local case does not close, so this was the first thing to fix and it never
+depended on containment landing first.
+
+**Why widening it is sound.** A folder install is the owner naming bytes that are already theirs, by
+absolute path, on a filesystem the node process already reads and writes as the user who runs it. Compare
+what an attacker gains:
+
+- **For a folder only the node's own user can write** — a home-directory checkout, which is where an
+  author's working tree normally lives — whoever can write it can also write the install root beside it
+  (`<data>/plugins/<id>/`, created `0700`), the node's own binary, or the user's shell profile. There the
+  symlink hands out no authority that account did not already have.
+- **That is an assumption, not a guarantee, and it is the one real cost.** The install root is `0700`;
+  the folder the owner names is whatever mode it happens to have. A group-writable checkout, a shared or
+  network mount, a synced folder, `/tmp` — each is a strictly wider write surface than the install root,
+  and pointing acorn at one converts write access to that directory into durable code execution as the
+  node's user, re-established at every restart, without ever needing the data root. acorn does not check
+  the mode and should not pretend to; a mode check would be a boundary shaped like advice, and the owner
+  chose the path. What it does instead is say so — the install form carries its own sentence about a
+  folder being linked rather than copied. **Point acorn at a directory only you can write.**
+- The **node half** is uncontained for every source, not just this one — that is the disclosure recorded
+  above and in § Node-half plugin security, and rung 2 fixes it for all of them at once. `{ path }` is not
+  a hole in a boundary; it arrives at the same place a `{ url }` install does.
+- The **client half** is genuinely unaffected. Device consent is keyed on the hash of the bytes that
+  arrive, computed by the device, so editing the client file in place produces a new hash and re-prompts.
+  The one mechanism that could have been undermined here already handles it.
+
+**What it does not get, and must not claim.** The directory is symlinked rather than copied — that is the
+point, it is what makes edit-in-place work — so the bytes are live and there is nothing to pin. The
+lockfile records `archiveSha256: null` and an empty `entrypoints` map, and a test asserts it stays that
+way: a digest captured at install would go stale on the author's next keystroke and would read as
+provenance it is not. So a folder install is outside the supply-chain story in § Supply chain. It is not
+hash-pinned, signing will never cover it, and the settings form says so in its own sentence rather than
+letting the general install hint imply otherwise. The honest summary is that the owner vouched for a
+directory, not for a version.
+
+**What is deliberately still refused.** The path must be absolute — a relative one would resolve against
+whatever the node's working directory happens to be. And the picker in Settings is offered only for a
+*local* node, because the dialog browses this device's filesystem while the node resolves the path on its
+own; for a remote node the owner types a path they know. That is a correctness gate, not a trust one.
+
 ### The dev grant
 
 Per-hash consent is right for distribution and wrong for iteration, so a plugin the owner is actively
@@ -171,10 +222,11 @@ Three things keep it bounded:
 - **Auditable.** Every approval that entered dev mode is a `plugins.request.decided` row on the Node's
   audit trail, carrying the action, the decision, the dev flag and the task whose agent asked.
 
-Dev mode widens nothing in a packaged build. Local-path (symlink) installs are still gated on
-`!app.isPackaged`, so the in-place directory a dev loop needs is unavailable there; the grant itself is a
-device-side trust decision and still applies to a remotely-sourced plugin, where it means "future versions
-of this one do not re-prompt" and each iteration is still an explicit update.
+Dev mode widens nothing in a packaged build, and no longer needs to: the local-path source it hangs off
+is allowed everywhere now (§ Installing from a folder above), so a packaged app gets the same in-place
+directory a dev checkout does. The grant itself is a device-side trust decision, independent of source,
+so over a remotely-sourced plugin it still means only "future versions of this one do not re-prompt" —
+and each iteration there is still an explicit update, because there is no directory to edit.
 
 Frame key capture is also manifest-bounded. A frame already sees key events delivered to its own
 document, but it may suppress shell forwarding only for modified chords listed in `claimsKeys`; those
@@ -420,9 +472,12 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 
 ### Supply chain
 
-- The phase-5 lockfile hash-pins what was installed and records source + resolved version. Add
-  **provenance**: resolved commit SHA / release tag / npm integrity value, so "what exactly is
-  running" is answerable after the fact and auditable across a fleet.
+- The phase-5 lockfile hash-pins what was installed and records source + resolved version — for every
+  source that was *fetched*. A `{ path }` folder install is outside this section entirely and always
+  will be: it is symlinked, its bytes keep changing, and it pins nothing (§ Installing from a folder).
+  Signing will not cover it either. Add **provenance** for the fetched sources: resolved commit SHA /
+  release tag / npm integrity value, so "what exactly is running" is answerable after the fact and
+  auditable across a fleet.
 - **Updates are the attack window** (adversary 1). Already mitigated by design: no auto-update,
   no background checks, every hash change re-prompts, permission diffs render `node` additions
   most prominently (phase 5). Do not weaken any of these for convenience; "auto-update trusted

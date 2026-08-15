@@ -184,7 +184,11 @@
 .plugin-confirm { font-size: var(--fs-sm); }
 .plugin-install { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-install .ui-input[data-width='full'] { flex: 1; }
-.plugin-install-hint { font-size: var(--fs-xs); margin-top: calc(var(--space-2) * -1); }
+.plugin-install-hint { font-size: var(--fs-xs); }
+/* The pull-up hugs the FORM, so it is scoped to the hint that actually follows one. The second hint
+   (folder installs only) sits under the first and keeps normal spacing rather than inheriting a negative
+   margin meant for a different neighbour. */
+.plugin-install + .plugin-install-hint { margin-top: calc(var(--space-2) * -1); }
 .plugin-authoring { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-authoring .muted { font-size: var(--fs-xs); }
 

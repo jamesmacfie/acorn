@@ -487,8 +487,9 @@ export type PluginApprovalRequest = {
 // response type can gain the field without a query-key bump (docs/caching.md).
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests?: PluginApprovalRequest[] }
 
-// Where a plugin package is fetched from (docs/plugins.md
-// installer). `path` is a plugin author's dogfood loop and is refused outside a development build.
+// Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory on
+// the NODE's filesystem, allowed on every build and symlinked rather than copied, so it is the one source
+// whose bytes are not pinned (docs/security.md § Installing from a folder).
 export type PluginInstallSource =
   | { github: string; tag?: string }
   | { npm: string; version?: string }

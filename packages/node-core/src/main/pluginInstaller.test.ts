@@ -292,28 +292,38 @@ describe('uninstalling', () => {
   })
 })
 
-describe('local path installs', () => {
-  it('are refused unless the caller says this is a development build', async () => {
-    await expect(installPlugin(root, { path: packageDir() })).rejects.toThrow(/development build/)
+describe('folder installs', () => {
+  // The gate this used to assert — `allowLocalPath`, dev builds only — is gone. A folder is a
+  // first-class source on every build (docs/security.md § Installing from a folder), so the absence of
+  // any option at all is the assertion: nothing left for a composition root to get wrong.
+  it('need no option to say which kind of build this is', async () => {
+    const result = await installPlugin(root, { path: packageDir() })
+    expect(result).toMatchObject({ id: 'ntfy', state: 'installed-restart-required' })
   })
 
   it('symlink rather than copy, so the author edits one tree', async () => {
     const dir = packageDir()
-    await installPlugin(root, { path: dir }, { allowLocalPath: true })
+    await installPlugin(root, { path: dir })
     writeFileSync(join(dir, 'marker.txt'), 'live')
     expect(existsSync(join(pluginInstallRoot(root), 'ntfy', 'marker.txt'))).toBe(true)
-    expect(readLockfile(root, 'ntfy')!.archiveSha256).toBeNull()
+  })
+
+  // The other half of "symlinked": there is nothing to pin, and the lockfile must not claim otherwise.
+  // A recorded digest would go stale on the author's next keystroke and read as provenance it is not.
+  it('pin nothing, because the tree stays editable', async () => {
+    await installPlugin(root, { path: packageDir() })
+    expect(readLockfile(root, 'ntfy')).toMatchObject({ archiveSha256: null, entrypoints: {} })
   })
 
   it('unlink the symlink on uninstall rather than following it into the working tree', async () => {
     const dir = packageDir()
-    await installPlugin(root, { path: dir }, { allowLocalPath: true })
+    await installPlugin(root, { path: dir })
     uninstallPlugin(root, 'ntfy')
     expect(existsSync(join(dir, 'acorn-plugin.json'))).toBe(true)
   })
 
   it('refuse a relative path', async () => {
-    await expect(installPlugin(root, { path: './somewhere' }, { allowLocalPath: true })).rejects.toThrow(/absolute/)
+    await expect(installPlugin(root, { path: './somewhere' })).rejects.toThrow(/absolute/)
   })
 })
 

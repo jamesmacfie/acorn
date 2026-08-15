@@ -47,12 +47,8 @@ native capability injection, not a second plugin assembly.
 ## Plugins
 
 Both hosts build the `PLUGIN_STATE` bridge — the roster, the installer, the owner's disabled list —
-through one builder, `apps/node/src/server/pluginState.ts`. Two things differ on purpose, and
-`test/integration/standaloneParity.test.ts` asserts both:
+through one builder, `apps/node/src/server/pluginState.ts`. One thing differs on purpose:
 
-- **`{ path }` installs** symlink an author's working tree into the install directory, so they are
-  gated on the build being a development one. Under Electron that question is answered by the
-  packaging flag; a standalone node has no such flag and reads `NODE_ENV` instead.
 - **Bundled packages have nothing to be reconciled from.** The desktop ships every built plugin as app
   resources and copies them into the writable data root before discovery. A standalone node has no
   `resourcesPath`, so by default the step does nothing and plugins arrive only through the

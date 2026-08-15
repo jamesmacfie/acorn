@@ -257,9 +257,10 @@ and disposal are identical.
 Three things differ, and all three follow from the code not being ours:
 
 - **They get there through the installer.** `POST /v2/core/plugins/install` (owner/device principal,
-  `Idempotency-Key` required, audited) resolves a GitHub release, an npm package, a tarball URL or — on
-  a development build — a local folder; validates the manifest; and places the package atomically with
-  a hash-pinned lockfile beside it (`packages/node-core/src/main/pluginInstaller.ts`,
+  `Idempotency-Key` required, audited) resolves a GitHub release, an npm package, a tarball URL or a
+  local folder; validates the manifest; and places the package atomically with a hash-pinned lockfile
+  beside it — except for a folder, which is symlinked and therefore pins nothing
+  ([security.md § Installing from a folder](./security.md)) (`packages/node-core/src/main/pluginInstaller.ts`,
   docs/plugins.md). Uninstalling removes the package and, by default, leaves its
   SQLite file alone. Each device then asks its own owner before running the plugin's interface code.
   Nothing in that family starts a plugin — each answers "the disk now says this". The one exception is
@@ -541,13 +542,12 @@ by hand, so the plugin goes back to exactly where it was, and with nothing left 
 undecided again and the normal per-hash prompt asks about it on the next distribution pass. That is what
 promoting a plugin out of dev mode means in practice, and revoking and promoting are the same operation.
 
-**In a packaged build.** Dev mode widens nothing: `allowLocalPath` is still `!app.isPackaged` (and
-`NODE_ENV !== 'production'` for a standalone node), so a `{ path }` install in a packaged app is refused
-by the installer with its own sentence, dev flag or not. The grant itself is source-agnostic and is not
+**In a packaged build.** Dev mode widens nothing, and it no longer has to: the `{ path }` source it hangs
+off is allowed on every build now ([security.md § Installing from a folder](./security.md)), so a packaged
+app gets the same in-place directory a dev checkout does. The grant itself is source-agnostic and is not
 gated on packaging — it is a device-side trust decision about a plugin the owner administers — so dev mode
-on a packaged app is reachable for a remotely-sourced plugin and simply means "future versions of this one
-do not re-prompt". Without a local path there is no in-place directory, so each iteration is still an
-explicit update.
+over a remotely-sourced plugin still means only "future versions of this one do not re-prompt", and each
+iteration there is still an explicit update because there is no directory to edit.
 
 ### Teaching the agent
 

@@ -26,25 +26,30 @@ extension points and exclusive slots are manifest vocabulary (`docs/plugins.md`,
 client↔node version contract (`docs/api-reference.md § Versioning`), the platform seam, and
 node-side ownership of user compositions (`docs/state.md`).
 
+The front door is now finished too. `npm create acorn-plugin` and `acorn-plugin-sdk` both ship
+(`packages/create-acorn-plugin`, `packages/plugin-sdk`), so an author with no checkout gets the whole
+no-bundler profile in one command or the typed bridge if they run a bundler
+(`docs/plugins.md § What is published`); and as of **2026-08-16** the **folder install** works on every
+build, so the directory the scaffold just wrote installs on a packaged acorn instead of being refused
+(`docs/security.md § Installing from a folder`).
+
 What remains is exactly three programs plus one map:
 
-1. **The front door** — one thing left. `npm create acorn-plugin` and `acorn-plugin-sdk` both ship
-   (`packages/create-acorn-plugin`, `packages/plugin-sdk`), so an author with no checkout gets the
-   whole no-bundler profile in one command, or the typed bridge if they run a bundler. What is
-   published and what acorn promises about it is `docs/plugins.md § What is published`. Left: the
-   **folder install** — a packaged acorn still refuses the directory the scaffold just wrote
-   (`allowLocalPath` is dev-build-only), which is what strands a stranger today. It is a
-   trust-boundary change, not packaging. (`work-plan.md § Phase 1`.)
-2. **Rung-2 containment** — the long pole, and the hard gate on anything discovery-shaped. A
+1. **Rung-2 containment** — the long pole, and the hard gate on anything discovery-shaped. A
    loaded plugin's node half still runs in-process, disclosed rather than contained.
    (`blockers.md`)
-3. **Dashboards** — phases 1–3 of `docs/future/dashboards/README.md`. Independent of the above;
+2. **Dashboards** — phases 1–3 of `docs/future/dashboards/README.md`. Independent of the above;
    this is where plugin composition becomes visible to users.
-4. **Distribution, last** — signing, the `docs/future/bundle.md` release work so a remote node is
+3. **Distribution, last** — signing, the `docs/future/bundle.md` release work so a remote node is
    a download, then discovery over signed packages. (`work-plan.md`)
 
 `docs/future/compiled-tier.md` is not a phase — it is the standing per-plugin map for shrinking
 the compiled tier, consulted whenever a move is considered.
+
+Before picking one up, read `work-plan.md § What is actually waiting on something`. The short version:
+all three are startable today except discovery, which is hard-gated on containment — and the only item
+no amount of effort routes around is the Apple Developer Program purchase, which macOS node downloads
+and desktop auto-update are both stuck behind.
 
 ## The files
 
@@ -70,8 +75,8 @@ installable plugin in an afternoon, and from there to something they'd publish i
 reading acorn's source. Concretely: install one package, follow one guide, get errors that name
 themselves, test without the host, and iterate without restarts.
 
-Everything in that sentence holds today except the last step of installing on a build an external
-author actually has, which is gap 1 above. What clears it: one authoring document
+Every clause in that sentence holds today, the last one included since the folder install landed. What
+clears it: one authoring document
 (`docs/plugin-authoring.md`) and one command (`npm create acorn-plugin`); a reload-shaped loop with a
 dev grant that keeps trust prompts out of iteration; an agent taught by `plugin_authoring` from the
 live schema rather than from memory, with `plugin_request` turning its installs into human approvals;

@@ -253,7 +253,8 @@ strips the mount, so \`/v2/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx
 5. After editing, ask again with \`{ action: 'update', pluginId: '<id>', dev: true }\`. A local-path
    install is a symlink, so the files you edit are the files that load.
 
-Local-path installs are development-only (\`allowLocalPath\`); a packaged app refuses one outright.
+A local-path install works on every build, packaged included. The path must be ABSOLUTE — a relative one
+is refused, because the node resolves it against a working directory you cannot see from here.
 
 ## What a reload does and does not do
 

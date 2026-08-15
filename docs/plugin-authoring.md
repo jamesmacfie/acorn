@@ -431,10 +431,15 @@ audited. For a hand-written directory the source form is a local path:
 ```
 
 `linkLocal` (`pluginInstaller.ts`) **symlinks** the directory rather than copying it, which is what
-makes the loop worth having: you edit in place and the next boot runs what you edited. It is gated on
-`allowLocalPath`, which is on for development builds only (`!config.isPackaged` under the desktop,
-`NODE_ENV !== 'production'` standalone) — a packaged app refuses a local path outright. The path must
-be absolute. Uninstall unlinks rather than following the symlink into your working tree.
+makes the loop worth having: you edit in place and the next boot runs what you edited. This works on
+every build, packaged included — Settings → Plugins → *Local folder* has a **Choose…** button when the
+target node is this machine. The path must be absolute. Uninstall unlinks rather than following the
+symlink into your working tree.
+
+The trade is that a folder is the one source acorn cannot pin: the lockfile records no archive hash and
+no entrypoint digests, because the bytes keep changing by design.
+[security.md § Installing from a folder](./security.md) has the reasoning for allowing it anywhere and
+what it deliberately does not claim.
 
 Installing writes a lockfile and reports `installed-restart-required`. A loaded plugin's routes,
 tables and jobs wire at init, so a package is not live until the node re-runs it: restart the node,
