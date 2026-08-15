@@ -23,9 +23,7 @@ export function formatFileReference(path: string, startLine?: number | null, end
 export async function sendReferenceToAgent(taskId: string, ref: string): Promise<{ ok: boolean; reason?: string }> {
   const managed = await managedReferenceHandler?.(taskId, ref)
   if (managed) return managed
-  const api = taskBridge()
-  if (!api) return { ok: false, reason: 'Desktop only.' }
   const target = agentSessionsFor(taskId)[0]
   if (!target) return { ok: false, reason: 'No running agent session for this task.' }
-  return api.sendToAgent(target.id, ref, 'draft')
+  return taskBridge().sendToAgent(target.id, ref, 'draft')
 }

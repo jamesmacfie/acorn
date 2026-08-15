@@ -9,7 +9,6 @@ import {
 } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch, ProjectConfigResponse } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
-import { acornGlobal } from '../capabilities'
 
 // plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
 // here as literals because client-core is a shared library and may not import a plugin — the arch
@@ -27,9 +26,6 @@ export type TaskBridge = {
     runTargets(id: string, runTargets: string): Promise<ProjectConfigResponse>
     config(id: string, patch: ProjectConfigPatch): Promise<ProjectConfigResponse>
   }
-  folderPath: {
-    pick(): Promise<string | null>
-  }
   // Run a repo's browser-preview script in the task's worktree; stdout (trimmed) is the URL.
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
   // Bracketed-paste delivery into an agent PTY (docs/panes.md): one block, three submit modes.
@@ -46,17 +42,17 @@ const post = <T>(url: string, body?: unknown) =>
 const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-export const taskBridge = (): TaskBridge | null => {
-  const bridge = acornGlobal()?.terminal
-  if (!bridge) return null
+// Every route below is ordinary `/v2` against the node, so this is available wherever a node is —
+// there is nothing left to probe for. It used to return null unless Electron's preload exposed a native
+// FOLDER PICKER, which took the terminal drawer, agents, run targets and workflows down with it on any
+// other host (docs/future/node-first/platform-seam.md). The picker now lives on the platform seam as
+// `pickFolder()`, where it belongs, and this is a plain accessor.
+export const taskBridge = (): TaskBridge => {
   return {
     project: {
       get: (id) => readJson<ProjectConfigResponse | null>(projectConfigRoute(id)),
       runTargets: (id, runTargets) => put<ProjectConfigResponse>(projectRunTargetsRoute(id), { runTargets }),
       config: (id, patch) => put<ProjectConfigResponse>(projectConfigRoute(id), { patch }),
-    },
-    folderPath: {
-      pick: () => bridge.folderPath.pick(),
     },
     previewUrl: (taskId, script) => post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),
     sendToAgent: (sessionId, text, submit) => post<{ ok: boolean; queued?: boolean; reason?: string }>(terminalSessionActionRoute(sessionId, 'send'), { text, submit }),

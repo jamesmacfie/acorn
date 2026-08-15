@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { corePluginsRoute, PLUGIN_API_MAJOR, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
-import type { PluginAckRecord } from '../capabilities'
+import type { PluginAckRecord } from '../platform'
 import { readJson } from '../apiClient'
 import { nodes } from '../node/fleet'
 import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './host'

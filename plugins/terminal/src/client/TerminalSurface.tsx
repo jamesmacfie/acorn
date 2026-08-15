@@ -36,7 +36,6 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
   })
 
   onMount(() => {
-    if (!api) return
     installScrollAreaGuard()
     // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
     // TUI (Claude/Codex) drives the cursor itself — rewriting bare \n to \r\n injects stray carriage

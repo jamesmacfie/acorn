@@ -31,8 +31,9 @@ The shell consumes that accessor for initial selection, persistence, workspace r
 fallbacks; provider-specific navigation commands belong to the owning plugin.
 
 The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `CommandPalette.tsx` consume
-registry entries and client-core contracts. A feature that needs native behavior uses typed
-`window.acorn` capabilities through client-core; plugins do not import Electron.
+registry entries and client-core contracts. A feature that needs native behavior goes through the
+platform seam (`client-core/src/platform/`), which `@acorn/plugin-api/client` re-exports the plugin-safe
+parts of; plugins do not import Electron and do not read the host global.
 
 The router is registry-driven. A source contributes path shapes with an explicit `order`, and the desktop
 shell composes them before rendering, so a static route stays ahead of a parameter route without embedding a
@@ -57,8 +58,9 @@ maximise state persisted per task, so the URL carries the intent, not the layout
 ## Node data access
 
 `packages/client-core/src/apiClient.ts` uses route builders and response types from
-`@acorn/protocol/api.ts`. In the desktop it calls `window.acorn.nodeFetch(nodeId, request)`, which
-Electron main sends through the pinned broker. The standalone server can be tested with a direct
+`@acorn/protocol/api.ts`. In the desktop it calls the platform seam's `nodeTransport().fetch(nodeId,
+request)`, which Electron main sends through the pinned broker; with no transport it falls back to a
+same-origin `fetch`. The standalone server can be tested with a direct
 fetch client, but it does not provide a renderer shell. Shared repository-picker and task-status
 reads are generic shell query wrappers backed by the owning source's `repository` contribution;
 provider routes and response types do not live in client-core.

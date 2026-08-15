@@ -588,6 +588,55 @@ describe('architecture boundaries', () => {
     expect(offenders.map(rel).sort()).toEqual([])
   })
 
+  it('the platform seam is the only door to the host (shrinking baseline)', () => {
+    // Same shape as the electron rule above, one layer up. That one keeps the NODE bootable by banning
+    // static electron value imports outside the desktop app; this one keeps the CLIENT portable by
+    // banning direct reads of the injected `window.acorn` global outside packages/client-core/src/platform/.
+    //
+    // The rule already existed in prose — plugins/host.ts's header says "sprinkling `window.acorn.*`
+    // through client code would make the storage the contract by accident" — and was applied to exactly
+    // one of fifteen modules, because nothing enforced it (docs/future/node-first/platform-seam.md).
+    // The seam was a TypeScript type, not a boundary. It is a boundary now.
+    //
+    // Why a scan rather than an import-graph edge: the global is not imported, it is READ. `acornGlobal`
+    // is module-private inside platform/index.ts, so the only spelling left to police is `window.acorn`
+    // itself.
+    //
+    // Comments ARE stripped, same reasoning as the electron rule: every file that got migrated describes
+    // the global it used to read, in the form it used to read it, and a rule that fails the fix it is
+    // documenting is a rule people delete.
+    //
+    // TESTS are exempt, and permanently. A test that stubs `globalThis.window = { acorn: … }` is
+    // exercising the platform implementation, which is a legitimate thing to do forever — unlike a
+    // production module reaching around the seam, which never is. Same for apps/desktop/e2e, which
+    // asserts from OUTSIDE the renderer that the preload did or did not run.
+    const READS_GLOBAL = /\bwindow\s*(?:\.\s*acorn\b|\?\.\s*acorn\b|\[\s*['"]acorn['"]\s*\])/
+    const readsHostGlobal = (source: string): boolean =>
+      READS_GLOBAL.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    const SEAM = join(ROOT, 'packages', 'client-core', 'src', 'platform') + '/'
+    // The Electron preload is the seam's IMPLEMENTATION. It writes the global (exposeInMainWorld) rather
+    // than reading it, so it does not match — but name it here so the next implementation knows where the
+    // other end of this contract lives.
+    const files = PACKAGES.flatMap((p) => walk(p.src))
+      .filter((f) => !isTestCode(f) && !f.startsWith(SEAM))
+      .filter((f) => readsHostGlobal(readFileSync(f, 'utf8')))
+    // Baseline, not an allowlist: entries may only be removed. Empty since the seam landed — every reach
+    // was mechanical, and there were only fifteen. Migrate a new one rather than listing it here; if the
+    // seam does not carry what you need, widen the seam.
+    const PLATFORM_BASELINE: string[] = []
+    expect(files.map(rel).sort()).toEqual(PLATFORM_BASELINE)
+    // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree, or this
+    // rule passes because it stopped looking. Inline strings, because the point is the shapes.
+    expect(readsHostGlobal('const off = window.acorn?.onClosePane?.(cb)')).toBe(true)
+    expect(readsHostGlobal("window.acorn?.preview?.evict(taskId)")).toBe(true)
+    expect(readsHostGlobal("if (!window.acorn?.terminal) return null")).toBe(true)
+    expect(readsHostGlobal("window['acorn'].nodeFetch(id, req)")).toBe(true)
+    expect(readsHostGlobal('// the `window.acorn` global is declared in the platform seam')).toBe(false)
+    expect(readsHostGlobal('const w = window.acornish')).toBe(false)
+    // And the seam itself must still be the thing doing the reading, or it has been hollowed out.
+    expect(readsHostGlobal(readFileSync(join(SEAM, 'index.ts'), 'utf8'))).toBe(true)
+  })
+
   it('client code never imports node code, and vice versa', () => {
     const crossed = firstParty
       .filter((e) => !e.isTest)

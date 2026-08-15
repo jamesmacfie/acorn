@@ -1,12 +1,12 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { clientEvents } from '@acorn/plugin-api/client'
+import { clientEvents, previewViews } from '@acorn/plugin-api/client'
 import { EmptyState, Spinner } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
 // Drop an archived task's preview view (called by every archive path via the runtime event below).
 export function evictPreviewWebview(taskId: string): void {
-  window.acorn?.preview?.evict(taskId)
+  previewViews()?.evict(taskId)
 }
 
 export const activatePreviewEvents = (): (() => void) =>
@@ -14,7 +14,7 @@ export const activatePreviewEvents = (): (() => void) =>
 
 export default function PreviewPane(props: { taskId: string; url: string | null }) {
   let host!: HTMLDivElement
-  const preview = window.acorn?.preview
+  const preview = previewViews()
   const [loading, setLoading] = createSignal(false)
   const [addr, setAddr] = createSignal('')
   const [canBack, setCanBack] = createSignal(false)

@@ -56,15 +56,16 @@ Ranked by leverage toward the goal. Each has its own file with the evidence and 
 |---|---|---|---|
 | 1 | ~~**There is no client↔node compatibility contract.**~~ **Shipped 2026-08-15.** The contract is `docs/api-reference.md § Versioning`: handshake schemas are additive-forever, the broker re-probes the major on every connect and produces `incompatible`/`protocol_mismatch`, and the dead `protocolVersion`/`appVersion` fields are gone. | Was the one finding with a deadline — it had to land before the first standalone release. It did. | [version-skew.md](./version-skew.md) (spent) |
 | 2 | **User compositions are trapped on one device.** Task layouts, editor open-file sets, PR filters, and context selections are keyed by node and task but stored in the device's localStorage. The node's prefs table is almost empty. | "Any client connects and gets your acorn" is false today for everything the user arranged. Dashboards would inherit the same trap. | [state-ownership.md](./state-ownership.md) |
-| 3 | **The platform seam is a type, not a boundary.** 44 direct `window.acorn` reaches across 14 modules, no arch rule, and `remote.md`'s claim that this seam shipped is wrong. One wrong probe (the native folder picker) gates the whole terminal/agents/workflows surface. | Every reach is a line a web client trips over. The probe bug hides how portable the client already is. | [platform-seam.md](./platform-seam.md) |
+| 3 | ~~**The platform seam is a type, not a boundary.**~~ **Shipped 2026-08-15.** The seam is `packages/client-core/src/platform/` — capability-grouped, nullable, Electron preload as its only implementation — with an empty-baseline arch rule banning `window.acorn` everywhere else, and the folder-picker probe split from "does this node run terminals". | Was: every reach is a line a web client trips over, and the probe bug hid how portable the client already is. Both fixed. | [platform-seam.md](./platform-seam.md) (spent) |
 | 4 | **Twelve compiled plugins and the private registries only they can use.** Some registries are dead, some die the day one plugin moves, and four in-realm couplings (memory↔context, changes↔agents, workflows↔agents, github↔project row) have no designed seam. | Whatever is compiled into the client is invisible to a web or terminal client and unreachable for the agent-author tier. | [compiled-tier.md](./compiled-tier.md) |
 
 ## The order
 
 1. **Version-skew first** (finding 1). Small, and it is the one with a closing window. Land it
    before `docs/future/bundle.md`'s release pipeline ships anything.
-2. **The platform ratchet and the probe fix** (finding 3). Mechanical, cheap, independently
-   useful today.
+2. ~~**The platform ratchet and the probe fix**~~ (finding 3). Shipped 2026-08-15, the day after this
+   folder was written. Mechanical and cheap, as predicted; the probe fix unhid the terminal, agents,
+   run-target and workflow surfaces on every non-Electron host.
 3. **State ownership** (finding 2). Adopt the rule, move the four trapped composition kinds
    node-side. Do it before dashboards phase 2 so panels never learn the wrong home.
 4. **The compiled-tier map** (finding 4) is not a phase — it is the standing answer to "which

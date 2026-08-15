@@ -18,10 +18,14 @@ const record = (nodeId: string, local = false): NodeRecord => ({
   local,
 })
 
-// The preload bridge, as the renderer sees it. Only the three members the fleet store touches.
+// The preload bridge, as the renderer sees it. Only the members the fleet store touches.
+  // `nodeFetch` is what makes the host's transport EXIST as far as platform/index.ts is concerned — it is
+  // the "there is a broker" discriminator — so a fake that pushes frames has to answer requests too, even
+  // if this suite never sends one.
 function stubBridge(nodes: NodeRecord[], statuses: NodeStatus[] = []): (status: NodeStatus) => void {
   let push: (status: NodeStatus) => void = () => {}
   const acorn = {
+    nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
     fleetList: async () => ({ nodes, statuses }),
     onNodeStatus: (cb: (status: NodeStatus) => void) => {
       push = cb

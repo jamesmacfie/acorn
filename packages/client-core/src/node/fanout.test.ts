@@ -20,6 +20,9 @@ function installFleet(nodes: NodeRecord[], statuses: NodeStatus[]): void {
   ;(globalThis as { window?: unknown }).window = {
     acorn: {
       desktop: true,
+      // The "there is a broker" discriminator (platform/index.ts). fetchFleet takes its fetcher as a
+      // callback, so nothing here ever reaches it.
+      nodeFetch: () => Promise.reject(new Error('fetchFleet is driven by its callback, not by apiClient')),
       fleetList: () => Promise.resolve({ nodes, statuses }),
       onNodeStatus: () => () => {},
     },

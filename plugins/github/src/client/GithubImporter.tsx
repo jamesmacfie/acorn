@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { clientEvents, integrationsOptions, type ProjectImporterProps, projectsKey, taskBridge, workspacesKey, writeJson } from '@acorn/plugin-api/client'
+import { canPickFolder, clientEvents, integrationsOptions, pickFolder, type ProjectImporterProps, projectsKey, workspacesKey, writeJson } from '@acorn/plugin-api/client'
 import { Alert, Button } from '@acorn/plugin-api/ui'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
 import { githubImportRoute, reposKey, type GithubImportAction, type GithubImportItem, type GithubImportResponse, type Repo } from '../contract/api'
@@ -22,7 +22,6 @@ export default function GithubImporter(props: ProjectImporterProps) {
   const integrations = createQuery(() => integrationsOptions(true))
   const githubReady = () => !!integrations.data && connectedGithub(integrations.data)
   const repos = createQuery(() => reposOptions(githubReady()))
-  const api = taskBridge()
   // The row AND the action, so the spinner lands on the button that was pressed. One import at a
   // time: each of these opens a native folder dialog and shells out to git.
   const [running, setRunning] = createSignal<{ repoId: number; action: GithubImportAction } | null>(null)
@@ -32,11 +31,10 @@ export default function GithubImporter(props: ProjectImporterProps) {
 
   const importOne = async (repo: Repo, action: GithubImportAction) => {
     if (running()) return
-    if (!api) return
     setError('')
     // Ask for the folder before anything is written, so cancelling the dialog cancels the import
     // rather than leaving a half-made project behind.
-    const path = await api.folderPath.pick()
+    const path = await pickFolder()
     if (!path) return
     const item: GithubImportItem = action === 'map'
       ? { repoId: repo.id, action, path }
@@ -86,7 +84,7 @@ export default function GithubImporter(props: ProjectImporterProps) {
         <Show when={githubAccount(integrations.data)}>
           {(login) => <p class="muted github-importer-account">Connected as <strong>@{login()}</strong>.</p>}
         </Show>
-        <Show when={api} fallback={<p class="muted">Folder selection is available in the desktop app.</p>}>
+        <Show when={canPickFolder()} fallback={<p class="muted">Folder selection is available in the desktop app.</p>}>
           <Show when={!repos.isLoading} fallback={<p class="muted">Loading GitHub repositories…</p>}>
             <Show when={repos.data?.length} fallback={<p class="muted">No mirrored GitHub repositories yet. Refresh GitHub and try again.</p>}>
               <Show when={error()}><Alert>{error()}</Alert></Show>

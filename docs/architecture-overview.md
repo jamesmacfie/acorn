@@ -80,8 +80,12 @@ copy). Two boundary rules in `tools/arch/boundaries.test.ts` enforce it — prot
 shrinking list. This is what lets a plugin define its wire contract without editing core, which is
 the precondition for third-party plugins.
 
-The renderer calls the thin client in `packages/client-core` through `window.acorn.nodeFetch` and
-stream methods.
+The renderer reaches the host through one seam, `packages/client-core/src/platform/`, which groups
+what a host provides — node transport, fleet membership, plugin custody, and the native extras — into
+separate nullable capabilities. The thin client in `packages/client-core` calls the transport group;
+nothing else in the client may read the injected `window.acorn` global, and `boundaries.test.ts` fails
+any file outside the seam that does. The Electron preload is the only implementation today; a web
+client implements the transport group and omits the desktop extras.
 Electron main supplies the Node endpoint, pinned HTTPS agent, and bearer token. The renderer never
 holds a token or certificate and cannot open a direct network connection under the app CSP.
 

@@ -66,13 +66,14 @@ contextBridge.exposeInMainWorld('acorn', {
     openDataFolder: () => ipcRenderer.send('acorn:open-data-folder'),
     quit: () => ipcRenderer.send('acorn:force-quit'),
   },
-  // The terminal residue: ONLY the native folder picker (dialog.showOpenDialog — a true Electron
-  // capability), plus the renderer's desktop-mode marker.
-  terminal: {
-    folderPath: {
-      // Native folder picker (onboarding / project mapping). Returns the chosen absolute path or null.
-      pick: () => ipcRenderer.invoke('term:folderPath:pick'),
-    },
+  // The native folder picker (dialog.showOpenDialog — a true Electron capability), for onboarding and
+  // project mapping. Returns the chosen absolute path or null.
+  //
+  // It used to live under a `terminal` key, and the renderer read that key's PRESENCE as "this node runs
+  // terminals" — which hid the whole terminal/agents/workflows block from every non-Electron client for
+  // no reason (docs/future/node-first/platform-seam.md). It is a folder dialog. It is named after one.
+  folderPath: {
+    pick: () => ipcRenderer.invoke('term:folderPath:pick'),
   },
   // Browser-preview surface (docs/panes.md): a main-owned WebContentsView per task. The
   // renderer drives lifecycle/chrome over IPC and positions the native view over the pane's host rect;

@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/solid-query'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { del, get, set } from 'idb-keyval'
 import type { NodeConnectionState, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
-import { acornGlobal } from '../capabilities'
+import { fleetBridge, nodeTransport } from '../platform'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
 // cache per node (docs/architecture-overview.md § Fleet semantics, docs/data-layer.md § Client cache).
@@ -62,19 +62,19 @@ let subscribed = false
 // Idempotent, never torn down: the push stream's lifetime is the renderer's.
 function subscribeStatuses(): void {
   if (subscribed) return
-  const onNodeStatus = acornGlobal()?.onNodeStatus
-  if (!onNodeStatus) return
+  const transport = nodeTransport()
+  if (!transport) return
   subscribed = true
-  onNodeStatus((status) => setStatuses((current) => ({ ...current, [status.nodeId]: status })))
+  transport.onStatus((status) => setStatuses((current) => ({ ...current, [status.nodeId]: status })))
 }
 
 // Re-read membership from main. Called at boot (activeNode.ts) and after every owner-initiated
 // mutation, because main is the authority and the renderer's copy is only a projection.
 export async function refreshFleet(): Promise<void> {
-  const fleetList = acornGlobal()?.fleetList
-  if (!fleetList) return
+  const bridge = fleetBridge()
+  if (!bridge) return
   subscribeStatuses()
-  const fleet = await fleetList()
+  const fleet = await bridge.list()
   setNodes(fleet.nodes)
   setStatuses(Object.fromEntries(fleet.statuses.map((status) => [status.nodeId, status])))
 }

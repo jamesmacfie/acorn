@@ -20,6 +20,7 @@ import { isTerminalTarget } from '@acorn/client-core/lib/isTypingTarget.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { desktopExtras } from '@acorn/client-core/platform/index.ts'
 import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
 import NodeChip from '@acorn/client-core/node/NodeChip.tsx'
 import { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
@@ -143,15 +144,15 @@ export default function App() {
     onCleanup(() => { offQuit(); offSessions(); offDirty() })
   })
   onMount(() => {
-    const off = window.acorn?.onWillQuit?.(() => confirmWillEvent({
+    const off = desktopExtras()?.onWillQuit(() => confirmWillEvent({
       kind: 'app:quit', payload: {}, title: 'Quit acorn', actionLabel: 'Quit',
     }))
     if (off) onCleanup(off)
   })
 
   // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
-  // badge can show agent-working activity. No-op when the terminal bridge is absent (plain browser
-  // via dev:node) — the terminal is always on when the bridge exists (capabilities()).
+  // badge can show agent-working activity. No-op when the node does not run the terminal plugin
+  // (capabilities()); the surfaces are ordinary HTTP+WS, so the hosting shell has no say in it.
   onMount(() => {
     if (!capabilities().terminal) return
     onCleanup(initSessions())

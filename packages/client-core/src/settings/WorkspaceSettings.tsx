@@ -1,6 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { taskBridge } from '../tasks/taskBridge'
 import { projectsOptions, workspacesKey } from '../queries'
 import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon } from '../workspaces/mutations'
 import type { Workspace } from '@acorn/protocol/api.ts'
@@ -153,7 +152,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
 
       <WorkspaceExternalProjects workspace={props.workspace} />
 
-      <Show when={taskBridge() && (projects.data ?? []).some((project) => project.workspaceId === props.workspace.id)}>
+      <Show when={(projects.data ?? []).some((project) => project.workspaceId === props.workspace.id)}>
         <div class="settings-field">
           <span class="settings-label">Project settings</span>
           <span class="muted settings-hint">

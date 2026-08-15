@@ -20,9 +20,9 @@ import { taskBridge } from './taskBridge'
 // Create from a seed (docs/workspaces-and-tasks.md). Callers invalidate tasksKey after.
 export const createTask = async (seed: TaskSeed) => {
   const task = await postJson<Task>(tasksRoute, seed)
-  // Desktop: let main run the repo's setup script now if it's configured to run on task creation
-  // (no-op otherwise). Fire-and-forget so task creation isn't blocked on git/worktree.
-  void taskBridge()?.task.onCreated(task.id)
+  // Let the node run the repo's setup script now if it's configured to run on task creation (no-op
+  // otherwise). Fire-and-forget so task creation isn't blocked on git/worktree.
+  void taskBridge().task.onCreated(task.id)
   return task
 }
 

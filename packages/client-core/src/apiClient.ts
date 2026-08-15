@@ -1,6 +1,6 @@
 import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
-import { acornGlobal } from './capabilities'
+import { nodeTransport } from './platform'
 import { activeNodeId } from './node/activeNode'
 import { nodeState } from './node/fleet'
 
@@ -69,11 +69,10 @@ const isWritable = (nodeId: string): boolean => {
 
 // The one place a request leaves the renderer.
 async function send(path: string, options: SendOptions = {}): Promise<ApiResponse> {
-  const bridge = acornGlobal()
-  const nodeFetch = bridge?.nodeFetch
+  const transport = nodeTransport()
   const nodeId = options.nodeId ?? activeNodeId()
 
-  if (!nodeFetch || !nodeId) {
+  if (!transport || !nodeId) {
     // No broker: the renderer is running in a plain browser served directly by a node (`dev:node`),
     // or in a unit test that stubs global fetch. Same-origin, so whatever auth that origin accepts
     // applies — there is no device token on this path by definition.
@@ -106,10 +105,10 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   const requestId = nextRequestId()
   // Abort has to be forwarded explicitly: the AbortSignal itself cannot cross contextBridge, so main
   // holds the controller and the renderer names the request to cancel.
-  const onAbort = () => bridge?.nodeAbort?.(requestId)
+  const onAbort = () => transport.abort(requestId)
   options.signal?.addEventListener('abort', onAbort, { once: true })
   try {
-    const res = await nodeFetch(nodeId, {
+    const res = await transport.fetch(nodeId, {
       requestId,
       path,
       method: options.method ?? 'GET',

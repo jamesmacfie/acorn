@@ -29,7 +29,7 @@ export function taskStatusesChanged(
 }
 
 export const refreshTaskStatuses = latestOnly(
-  async () => taskBridge()?.task.statuses() ?? [],
+  async () => taskBridge().task.statuses(),
   (list) => setStatuses((current) =>
     taskStatusesChanged(current, list) ? Object.fromEntries(list.map((status) => [status.taskId, status])) : current),
 )

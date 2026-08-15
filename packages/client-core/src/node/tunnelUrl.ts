@@ -1,4 +1,4 @@
-import { acornGlobal } from '../capabilities'
+import { fleetBridge } from '../platform'
 import { activeNodeId } from './activeNode'
 import { nodes } from './fleet'
 
@@ -50,13 +50,13 @@ export async function tunnelUrl(taskId: string, url: string | null): Promise<str
   // A real host is already reachable from here, and tunnelling it would be the general proxy docs/api-reference.md
   // rules out.
   if (!target) return url
-  const open = acornGlobal()?.nodeTunnelOpen
-  if (!open) {
+  const bridge = fleetBridge()
+  if (!bridge) {
     console.warn('[tunnel] this build cannot tunnel, so a remote loopback preview is unavailable')
     return null
   }
   try {
-    const { port } = await open({ nodeId, taskId, port: target.port })
+    const { port } = await bridge.tunnelOpen({ nodeId, taskId, port: target.port })
     return `http://127.0.0.1:${port}${target.rest}`
   } catch (error) {
     console.warn('[tunnel] could not open a preview tunnel:', error)
@@ -72,5 +72,5 @@ export async function tunnelUrl(taskId: string, url: string | null): Promise<str
 // a live pipe belonging to a different machine.
 export const closeTunnelsForTask = (taskId: string): void => {
   const nodeId = activeNodeId()
-  acornGlobal()?.nodeTunnelClose?.(nodeId ? { nodeId, taskId } : { taskId })
+  fleetBridge()?.tunnelClose(nodeId ? { nodeId, taskId } : { taskId })
 }

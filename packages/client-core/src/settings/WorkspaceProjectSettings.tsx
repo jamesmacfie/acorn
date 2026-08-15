@@ -11,12 +11,13 @@ import { Alert, Checkbox } from '../ui/primitives'
 // All project-level config for one folder project, collapsed behind a native <details> so a workspace
 // with several projects isn't an overwhelming wall of fields. Reads/writes the project row through
 // the project bridge; local signals override the fetched row while typing (null = use row).
-// Desktop-only — the runtime lives in the main process. Gated on a mapped checkout, like run targets.
+// Gated on a mapped checkout, like run targets: the scripts run on the NODE, so the hosting client is
+// irrelevant. (Was labelled desktop-only, from when every route here was a preload bridge.)
 export function ProjectConfig(props: { projectId: string; name: string }) {
   const api = taskBridge()
   const [row, { refetch }] = createResource(
     () => props.projectId,
-    () => api?.project.get(props.projectId) ?? null,
+    () => api.project.get(props.projectId),
   )
   const [setup, setSetup] = createSignal<string | null>(null)
   const [teardown, setTeardown] = createSignal<string | null>(null)
@@ -43,7 +44,6 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   const previewMode = (): PreviewMode | '' => config()?.previewMode ?? ''
 
   const save = async (patch: ProjectConfigPatch) => {
-    if (!api) return
     setErr('')
     await api.project.config(props.projectId, patch)
     await refetch()
@@ -380,14 +380,13 @@ function RepoRunTargets(props: { projectId: string }) {
   const api = taskBridge()
   const [row, { refetch }] = createResource(
     () => props.projectId,
-    () => api?.project.get(props.projectId) ?? null,
+    () => api.project.get(props.projectId),
   )
   const [text, setText] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
   const value = () => text() ?? row()?.config.runTargets ?? ''
 
   const save = async () => {
-    if (!api) return
     setErr('')
     try {
       await api.project.runTargets(props.projectId, value())
