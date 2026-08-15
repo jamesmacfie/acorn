@@ -4,9 +4,10 @@ import { ownsRoute } from '../chrome/data'
 // Which declared surfaces the HOST draws, and whether their routes are ones this device will fetch
 // (docs/third-party/monaco.md).
 //
-// A plain module rather than lines inside register.tsx, because the decision below is the trust gate
-// for a whole class of surface and register.tsx cannot be imported by a test — the suite here is
-// node-environment with no JSX transform, deliberately.
+// A plain module rather than lines inside register.ts, because the decision below is the trust gate
+// for a whole class of surface and deserves to be named and tested as one. It was extracted when
+// register.tsx could not be imported by a test at all; that file is now `.ts` and has its own suite,
+// which makes this a choice about naming rather than a workaround — and the choice still holds.
 
 /**
  * Does this surface's rectangle contain any plugin code?
@@ -28,7 +29,7 @@ export const isHostOwnedSurface = (surface: PluginFrameSurface): boolean =>
  * Throws when it declares one the host may not serve. The node confined these routes when it parsed
  * the manifest — but the manifest reached this device as a ROSTER ROW, which is bytes a node sent, so
  * the check is repeated here for the reason chrome/data.ts states at length. Throwing rather than
- * returning null is what puts the surface through register.tsx's per-surface catch: one bad surface is
+ * returning null is what puts the surface through register.ts's per-surface catch: one bad surface is
  * skipped and logged, and the rest of the plugin still works.
  */
 export function documentRegionFor(pluginId: string, surface: PluginFrameSurface): PluginDocumentRegion | null {

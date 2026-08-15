@@ -187,6 +187,13 @@ export function _seedPluginDistribution(
   setActiveBundles(resolveActiveBundles(candidatesFrom(seeded), { apiVersion: PLUGIN_API_MAJOR }))
 }
 
+// Test seam, for the half of the boot pass above that `_seedPluginDistribution` does not stand in for:
+// the queue the trust dialog drains. What is worth asserting about an ANSWER is which entry it removes
+// and — when the host could not store it — that it removes none.
+export function _seedPendingTrust(requests: readonly PluginTrustRequest[]): void {
+  setPendingTrust(requests)
+}
+
 // Test seam. The signals are module-level because the registries they feed are, and a suite that
 // asserts on one run must not inherit the previous one's fleet.
 export function _resetPluginDistribution(): void {

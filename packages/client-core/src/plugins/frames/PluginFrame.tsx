@@ -1,22 +1,15 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { prefsKey } from '@acorn/protocol/api.ts'
 import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
-import { sendRaw } from '../../apiClient'
-import { toast } from '../../notifications/toast'
-import { clientEvents, consumePaneIntent, openPane } from '../../registries/clientEvents'
-import { executeCommand } from '../../registries/commands'
-import { openContentTarget, parseInAppTarget } from '../../registries/contentLinks'
-import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../../registries/keybindings'
-import { saveJsonPref } from '../../settings/savePref'
-import { activeTaskId } from '../../tasks/tasks'
+import { clientEvents, consumePaneIntent } from '../../registries/clientEvents'
 import { watchAppearance } from '../../ui/appearance'
 import { FRAME_TOKENS } from '../../ui/tokenAxes'
-import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, postSurfaceAction, type FrameBinding, type FrameServices } from './broker'
-import { isSubscribable } from './channels'
+import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, postSurfaceAction } from './broker'
+import { createFrameServices, type PluginFrameProps } from './frameServices'
 
 export { SUBSCRIBABLE_CHANNELS } from './channels'
+export type { PluginFrameProps } from './frameServices'
 
 const PLUGIN_FRAME_SCHEME = 'app-plugin'
 const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${hash}`
@@ -36,36 +29,6 @@ const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${
 // served CSP stops matching, the frame's own module script becomes a cross-origin fetch on a scheme with
 // no CORS (so the document renders blank), and frame-local storage disappears. What the attribute still
 // buys with both tokens is real: no popups, no top-level navigation, no form submission, no downloads.
-
-export type PluginFrameProps = {
-  // What the host resolved: which plugin, which surface, which bundle, and what it is looking at.
-  binding: FrameBinding
-  hash: string
-  // Reference-panel surfaces only: which external item the panel was opened for.
-  refId?: string
-  // Project-scoped pane surfaces only: which item the URL addresses. A task-scoped pane gets the same
-  // thing as a retained pane intent, because its selection lives in the task's layout state; a
-  // project-scoped one has no such store, so the URL is the selection and it arrives as a prop the host
-  // updates. Both feed the same two channels — whatever is set when the frame connects rides in
-  // `context`, and every change after that is a `select` message rather than a remount.
-  item?: string
-  // Importer surfaces only. The host owns the modal chrome and the post-import refresh; the frame only
-  // says when it is done.
-  onImported?: () => void
-  onClose?: () => void
-  // A webview's visible pixels are host-owned. Its sandboxed client bundle remains mounted offscreen
-  // solely as the typed controller that can issue the four allowed verbs.
-  controllerOnly?: boolean
-  // Composed panes only (`document-over-frame`): the sibling host editor's document, as an accessor
-  // because the editor may not exist yet when this frame mounts. Read per bridge call rather than
-  // captured, so a frame that connected first still reaches the document once it appears.
-  document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
-  webview?: {
-    navigate(url: string): Promise<boolean>
-    command(action: 'back' | 'forward' | 'reload'): Promise<boolean>
-    subscribe(listener: (channel: 'webview:navigated' | 'webview:blocked', payload: unknown) => void): () => void
-  }
-}
 
 const currentAxes = (): { theme: string; style: string } => ({
   // Both axes default to an ATTRIBUTE-LESS state: `light` and `terminal` have no [data-theme]/[data-style]
@@ -106,114 +69,15 @@ export default function PluginFrame(props: PluginFrameProps) {
   // inside the frame's document makes this element the shell document's activeElement.
   let frameEl: HTMLIFrameElement | undefined
 
-  // Rebuilt per frame rather than shared: every effect below closes over THIS frame's binding, which is
-  // what pins its node and forbids the importer verbs on a pane.
-  const services = (): FrameServices => ({
-    fetch: async (method, path, body, signal) => {
-      const result = await sendRaw(path, {
-        method,
-        // Pinned. The frame named a path and nothing else; which node it reaches is the host's to decide,
-        // so there is no argument a plugin could pass to address a different one.
-        nodeId: props.binding.nodeId,
-        signal,
-        ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
-      })
-      return result
-    },
-    subscribe: (channel, listener) => {
-      // Second half of the check the broker starts: it verifies the manifest declared the channel, this
-      // verifies the shell has one. Subscribing never creates a channel.
-      if (!isSubscribable(channel)) throw new Error(`${channel} is not a channel a plugin frame can subscribe to`)
-      return clientEvents.on(channel, (payload) => listener(payload))
-    },
-    // Prefs are a flat string map on the wire, and `saveJsonPref` is what wrote this one — so reading it
-    // back means parsing. A value that is not JSON is a value some other writer put there under this key,
-    // which is not this plugin's state and is reported as absent rather than handed over as a string.
-    stateGet: (key) => {
-      const raw = qc.getQueryData<Record<string, string>>(prefsKey)?.[key]
-      if (raw === undefined) return undefined
-      try {
-        return JSON.parse(raw) as unknown
-      } catch {
-        return undefined
-      }
-    },
-    stateSet: async (key, value) => void (await saveJsonPref(qc, key, value)),
-    // Into the shared transient stack, not the notification inbox. `bridge.ui.toast('Copied to the
-    // clipboard')` used to leave a permanent bell entry — the frames and the shell now share one
-    // stack and one look, which is what the API always claimed.
-    toast: (title, detail) => toast(detail ? `${title} — ${detail}` : title),
-    copy: (text) => void navigator.clipboard.writeText(text),
-    openPane: (paneId) => {
-      // A pane is opened in a task's layout, so a frame with no task has nothing to open into.
-      const taskId = props.binding.taskId
-      if (taskId) openPane(taskId, paneId)
-    },
-    // A link inside a frame's own rendered content. The frame handed over a URL and nothing else; where
-    // it goes is decided here, on the host's side of the port, with the same two-rung ladder every shell
-    // surface uses (registries/contentLinks.ts) and the same external fall-through the descriptor
-    // `openUrl` verb takes (chrome/actions.ts). There is no third path: a frame cannot navigate the shell
-    // to an address of its choosing, only offer a URL and let the host recognise it or not.
-    //
-    // Which rung is PREFERRED comes from the surface, which is why this lives here and not in the broker:
-    // this side knows what the frame is. A link clicked inside a reference panel wants to swap that
-    // panel's subject — the reader is looking sideways and asked to look sideways again, and pushing a
-    // pane behind an overlay they would then have to dismiss is not what they meant. Every other surface
-    // is a pane or a modal sitting in a task, where the pane is the richer destination and the one those
-    // surfaces have always used. Identical reasoning to registries/refPanelHost.tsx and github's PR
-    // conversation, and the frame is not consulted in either case.
-    openUrl: (url) => {
-      const target = parseInAppTarget(url)
-      // The BOUND task, never `activeTaskId()`, even though the shell's own content handlers use the
-      // ambient one. A frame the host did not give a task is not looking at one: a project-scoped surface
-      // and a ref panel both sit beside or over something that is not a task layout, while a task may well
-      // still be selected in the rail behind them. Reading it here would let a link clicked on a project
-      // page push a pane into a background task's PERSISTED layout, where the reader is not and will not
-      // see it. With no bound task the pane rung is simply unavailable, and the URL falls to the browser.
-      const presentation = {
-        taskId: props.binding.taskId,
-        ...(props.binding.target === 'refPanel' ? { prefer: 'refPanel' as const } : {}),
-      }
-      if (target && openContentTarget(target, presentation) !== 'external') return
-      // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
-      // the URL to `shell.openExternal` behind the scheme allowlist — so this opens in the owner's
-      // browser and never in-app, and there is no second policy to keep in step
-      // (apps/desktop/src/app/main/electron.ts, docs/electron.md § navigation policy).
-      window.open(url, '_blank', 'noopener,noreferrer')
-    },
+  // The bridge's fourteen effects, built from this frame's props (./frameServices.ts). Kept out of
+  // this file so they can be unit-tested: the repo's client suites run in bare Node with no Solid
+  // transform, so nothing in a `.tsx` file can be reached by one.
+  const services = () => createFrameServices(props, {
+    qc,
+    // Only this component holds the element to compare against, which is why the check is passed in
+    // rather than implemented over there: a click or keypress inside the frame's document makes this
+    // element the shell document's activeElement.
     frameHasFocus: () => frameEl !== undefined && document.activeElement === frameEl,
-    importerDone: () => props.onImported?.(),
-    importerClose: () => props.onClose?.(),
-    // Present only for a composed pane, and its absence IS the permission check the broker applies —
-    // there is no scope to declare, because the grant is structural. The indirection through the
-    // accessor is what makes the two regions' mount order a non-issue: the frame can connect before the
-    // editor has loaded its document, and its first `document.read()` still lands on the real thing.
-    ...(props.document
-      ? {
-        document: {
-          read: () => props.document?.()?.read() ?? '',
-          write: (text: string) => props.document?.()?.write(text),
-          flush: async () => void (await props.document?.()?.flush()),
-        },
-      }
-      : {}),
-    webviewNavigate: (url) => props.webview?.navigate(url) ?? Promise.resolve(false),
-    webviewCommand: (action) => props.webview?.command(action) ?? Promise.resolve(false),
-    keydown: (chord) => {
-      const frameBinding = resolveFrameKeybinding(
-        chord,
-        resolveKeybindings(keybindingRegistry.entries(), qc.getQueryData<Record<string, string>>(prefsKey) ?? {}),
-        {
-          pluginId: props.binding.pluginId,
-          surface: props.binding.surface,
-          taskActive: !!props.binding.taskId && activeTaskId() === props.binding.taskId,
-        },
-      )
-      if (!frameBinding) return
-      void executeCommand(frameBinding.command).catch((error) => {
-        console.error(`[command:${frameBinding.command}]`, error)
-      })
-    },
   })
 
   // A rail-source row that opened this pane. Retained by openPane until the pane consumes it, so a

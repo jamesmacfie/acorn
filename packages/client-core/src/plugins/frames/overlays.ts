@@ -8,7 +8,7 @@ import { createSignal } from 'solid-js'
 // palettes behave.
 //
 // Kept out of the registries folder and JSX-free deliberately: the verb that opens an overlay lives in
-// plugins/chrome/actions.ts and the surface that renders one in plugins/frames/register.tsx, and both
+// plugins/chrome/actions.ts and the surface that renders one in plugins/frames/register.ts, and both
 // have unit tests that run in a bare Node environment with no Solid transform (registries/slots.ts
 // states the same split).
 const [current, setCurrent] = createSignal<{ pluginId: string; surface: string } | null>(null)

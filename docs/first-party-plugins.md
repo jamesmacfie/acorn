@@ -32,7 +32,7 @@ The test is *embedded in a render tree*, not *rendered by another plugin*. A **r
 case worth being careful about: it used to look like the strongest counter-example on this page —
 github's `PullDetail` rendered linear's panel beside a PR, which sounds like B — and it was not, because
 the panel is a rectangle the host places. So `refPanel` is one of the frame targets and a loaded plugin
-contributes one as a sandboxed frame (`packages/client-core/src/plugins/frames/register.tsx`). Linear
+contributes one as a sandboxed frame (`packages/client-core/src/plugins/frames/register.ts`). Linear
 ships that way, so this is observed rather than argued.
 
 The argument is now stronger than "not B", because github does not render the panel at all. It calls

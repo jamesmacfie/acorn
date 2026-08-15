@@ -1,14 +1,11 @@
 # Architecture deepening plans
 
-What remains from the August 2026 architecture review of the plugin runtime. The review produced
-seven plans; **plans 1–5 landed** (commit `b732c69c`, including the fixes from its own review) and
-their files are deleted — the code and its comments are the record now. One plan remains open:
+What came out of the August 2026 architecture review of the plugin runtime. The review produced seven
+plans; **all of them are now landed or decided** and their files are deleted — the code and its
+comments are the record. Nothing here is open work. Keep the file for the section below, which exists
+so nothing gets re-suggested.
 
-- **[Move frame wiring decisions out of .tsx](./06-frame-wiring-out-of-tsx.md)** — the test suite
-  can't render components, so the file extension decides coverage, and all four documented bugs in
-  this stack were in the untested `.tsx` half. Self-contained; pick it up, land it, delete it.
-
-A few words the doc uses with a specific meaning:
+A few words the review used with a specific meaning:
 
 - **Module** — a file or small cluster of files with one job.
 - **Interface** — everything a caller has to know to use a module. **Deep** means a small interface
@@ -35,6 +32,21 @@ A few words the doc uses with a specific meaning:
   there is the decision record. Deliberately NOT built: deriving `FrameServices`/the SDK from the
   vocabulary — don't re-propose the derivation unless a second consumer of the vocabulary appears
   (a second host shell, say).
+- **6 — frame wiring out of `.tsx`.** The file extension was deciding test coverage: the client
+  suites run in bare Node with no Solid transform, so `frames/register.tsx` (nine registration
+  branches) and `PluginFrame.tsx` (fourteen host services) could not be reached by a test, and all
+  four defects this stack has shipped were in that half. Fixed by moving the decisions, not by adding
+  jsdom: `frames/register.ts` is now a `.ts` file using the `lazy` + `createComponent` pattern its
+  sibling `chrome/register.ts` already used, with the two surfaces that need real host markup
+  (`PluginRefPanel.tsx`, `PluginOverlay.tsx`) as their own components; `frames/frameServices.ts`
+  holds the service implementations that used to sit inside PluginFrame; `plugins/trustModel.ts`
+  holds the tier diff and `decide`. Three new suites, 51 tests, no new test infrastructure.
+
+  Deliberately NOT built: the descriptor/plan indirection the plan sketched (`registerPlan.ts`
+  returning contribution descriptors for a `.tsx` shell to instantiate). Converting the file
+  outright is a smaller diff and covers all nine branches rather than only the decisions, and the
+  sibling proves the shape works. Also still not built: jsdom or a Solid test renderer — that is a
+  separate decision with its own costs and nothing here needed it.
 - **The plugin-api client barrel** (was plan 7) is a watch item, not a work item: 173 exports of
   pure re-export is a namespace, not a contract. The ratchet now lives in the comment at the top of
   `packages/plugin-api/src/surface.test.ts` — additions get the new-dependency question; curation

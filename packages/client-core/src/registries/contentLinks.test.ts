@@ -217,7 +217,7 @@ describe('the host ladder', () => {
   it('refuses a panel for a provider this device has none for, and says so', () => {
     // The other half of the ownership check: a target may name any provider, and only a provider with a
     // REGISTERED panel gets one. A panel may only be registered under its own plugin's name
-    // (registries/plugin.ts § declaredProvider, and the manifest twin in plugins/frames/register.tsx), so
+    // (registries/plugin.ts § declaredProvider, and the manifest twin in plugins/frames/register.ts), so
     // naming a stranger here can never produce a panel.
     const stranger = { kind: 'board.card', providerId: 'not-installed', item: 'ENG-42' }
     expect(openContentTarget(stranger, { taskId: 'task-1', prefer: 'refPanel' })).toBe('external')

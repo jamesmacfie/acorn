@@ -5,7 +5,7 @@ import { activeBundles, bundleAccepted, installedByNode } from './distribution'
 // Who may contribute, and what they declared. The two questions both registration passes have to
 // answer before either can draw anything.
 //
-// They used to answer them separately: `eligible()` was written out in frames/register.tsx and again
+// They used to answer them separately: `eligible()` was written out in frames/register.ts and again
 // in chrome/register.ts, and the task-pane predicate was byte-identical copy-paste in both. That
 // predicate is not cosmetic — it feeds the `openPane` allowlist, the list deciding which pane ids a
 // sandboxed frame may ask the host to open — so it was a security check maintained in two places,

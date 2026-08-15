@@ -10,7 +10,7 @@ import { activeTaskId } from '../tasks/tasks'
 //
 // It draws NO chrome of its own — no backdrop, no header, no dismiss button — because a panel already
 // brings all three. A manifest-declared panel is an iframe that cannot `Portal` out of the box it is put
-// in, so plugins/frames/register.tsx wraps it in the host's overlay classes on this side of the port and
+// in, so plugins/frames/register.ts wraps it in the host's overlay classes on this side of the port and
 // owns the close affordance (the bridge's close verb is gated to importer surfaces); a first-party panel
 // component draws its own. Adding a second wrapper here would letterbox one and double-frame the other.
 //
