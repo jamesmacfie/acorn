@@ -1,0 +1,34 @@
+{
+  "name": "acorn-plugin-sdk",
+  "version": "0.1.0",
+  "description": "The frame bridge for acorn plugins: connect, mountFrame, and the typed surface a sandboxed plugin frame talks to the shell through.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/sdk.d.ts",
+      "default": "./dist/sdk.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "acorn",
+    "acorn-plugin"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "vite build && cp src/public.ts dist/sdk.d.ts",
+    "prepack": "pnpm build",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@acorn/plugin-api": "workspace:*",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}

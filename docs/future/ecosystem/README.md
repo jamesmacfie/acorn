@@ -28,8 +28,13 @@ node-side ownership of user compositions (`docs/state.md`).
 
 What remains is exactly three programs plus one map:
 
-1. **The front door** — `@acorn/plugin-api` still only resolves inside this workspace. Publishing
-   it is the whole of what blocks a genuinely external author. (`dx.md`)
+1. **The front door** — one thing left. `npm create acorn-plugin` and `acorn-plugin-sdk` both ship
+   (`packages/create-acorn-plugin`, `packages/plugin-sdk`), so an author with no checkout gets the
+   whole no-bundler profile in one command, or the typed bridge if they run a bundler. What is
+   published and what acorn promises about it is `docs/plugins.md § What is published`. Left: the
+   **folder install** — a packaged acorn still refuses the directory the scaffold just wrote
+   (`allowLocalPath` is dev-build-only), which is what strands a stranger today. It is a
+   trust-boundary change, not packaging. (`work-plan.md § Phase 1`.)
 2. **Rung-2 containment** — the long pole, and the hard gate on anything discovery-shaped. A
    loaded plugin's node half still runs in-process, disclosed rather than contained.
    (`blockers.md`)
@@ -48,8 +53,35 @@ the compiled tier, consulted whenever a move is considered.
 | `blockers.md` | The gates still standing between today and strangers installing plugins — each with its designed answer and owning doc. |
 | `shell-vision.md` | The tension between "acorn as shell" and the permanent tier line, and the stance adopted. |
 | `work-plan.md` | The remaining sequenced work with dependencies, pointing at the owning design docs. |
-| `dx.md` | What "world-class plugin DX" still requires, and the differentiator. |
 | `references-survey.md` | What the projects in `references/` do, which ones acorn can replace, and the five capabilities that recur across all of them. |
+
+`dx.md` was here and is gone: everything it asked for shipped. The bar it set is below; the
+differentiator it argued is in `shell-vision.md`; the residue it asked people to watch is enforced in
+code rather than described in prose — the scaffold's drift lock
+(`packages/create-acorn-plugin/index.test.ts`), the published declaration's
+(`packages/plugin-sdk/src/contract.test.ts`), the testkit deep-import ceiling (`MAX_DEEP_IMPORTS` in
+`tools/arch/boundaries.test.ts`), the three `// prune candidate` markers in
+`packages/plugin-api/src/client/index.ts`, and the unverified-chrome list in `docs/future/live-qa.md`.
+
+## The bar for plugin DX
+
+A stranger with no checkout of this repo can go from "I want a pane that shows X" to a working,
+installable plugin in an afternoon, and from there to something they'd publish in a weekend — without
+reading acorn's source. Concretely: install one package, follow one guide, get errors that name
+themselves, test without the host, and iterate without restarts.
+
+Everything in that sentence holds today except the last step of installing on a build an external
+author actually has, which is gap 1 above. What clears it: one authoring document
+(`docs/plugin-authoring.md`) and one command (`npm create acorn-plugin`); a reload-shaped loop with a
+dev grant that keeps trust prompts out of iteration; an agent taught by `plugin_authoring` from the
+live schema rather than from memory, with `plugin_request` turning its installs into human approvals;
+failures that name themselves (roster `reason`/`stage`, the attention inbox, labelled frame
+placeholders); a real context from `@acorn/plugin-api/testkit`; a pinned API surface; and host-owned
+storage.
+
+Deliberately not built: a JSON Schema for `acorn-plugin.json`. The install error already names the
+offending field paths and `plugin_authoring` serves the live vocabulary from the Zod schema — a second
+schema would be a second source of truth for the one failure mode the first two already catch.
 
 ## Drift warning — read this before building
 

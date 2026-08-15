@@ -48,21 +48,31 @@ update-consent flow it would ride — per-(plugin, hash) device trust with a per
 update — is shipped. Work plan: design signing first, then discovery as a listing over signed
 packages, and only after rung 2.
 
-## 3. External authors cannot build a plugin
+## 3. External authors cannot install on a build they have
 
-**What.** `@acorn/plugin-api` (snapshot-pinned surface, `PLUGIN_API_MAJOR` gate) is a workspace
-dependency. `docs/extensibility.md § Plugins get building blocks` records that it is "not yet
-resolvable for a genuinely external" plugin — an accepted intermediate state. Everything else an
-external author needs now exists: the authoring contract (`docs/plugin-authoring.md`), failures
-that name themselves on the roster row, `@acorn/plugin-api/testkit`, and a reload-shaped loop.
+**Was**: "external authors cannot build a plugin", and that half is done. `npm create acorn-plugin`
+writes the whole no-bundler profile (`packages/create-acorn-plugin`); `acorn-plugin-sdk` publishes
+the frame bridge for anyone running a bundler (`packages/plugin-sdk`); the compatibility promise is
+written down in `docs/plugins.md § What is published`, along with why the other seven facade
+entrypoints are not published and never will be. With the authoring contract, roster rows that name
+their own failure, the testkit and a reload-shaped loop already in place, building one is no longer
+the gate.
 
-**Why it gates.** Until the facade installs from npm, third-party DX is not a polish question —
-the front door is closed. No amount of marketplace work matters before this.
+**What.** Installing is. A local-path install is symlinked in place and gated on `allowLocalPath`,
+which is `!app.isPackaged` under the desktop and `NODE_ENV !== 'production'` standalone. So the last
+step of the authoring guide fails on every build an external author actually has: they can write a
+plugin and not install it.
 
-**The designed answer.** Packaging work with one design decision attached: the compat promise
-("your plugin keeps loading within a major"). The `PLUGIN_API_MAJOR` gate already exists and the
-surface snapshot refuses to shed a name unless that major moves, so the promise is mostly already
-enforced — it just isn't publishable yet. The remaining bar and residue are in `dx.md`.
+**Why it gates.** It is the whole remaining distance between "an afternoon" and "an afternoon, on a
+machine that is not a dev checkout". Nothing downstream — discovery, a marketplace — is worth
+anything while the local case does not close.
+
+**The designed answer.** Generalize the local path into "point acorn at a folder of plugins" as a
+first-class install source on the same trust flow (`work-plan.md § Phase 1`). Costed there as a
+trust-boundary decision rather than an installer change: `allowLocalPath` is dev-only on purpose, and
+widening it means saying what a symlinked, in-place-editable, unsandboxed node half may be on a
+released build. It does not need rung 2 first — the bytes are the owner's own, chosen by absolute
+path — but the reasoning belongs beside it in `docs/security.md`.
 
 ## What is deliberately not on this list
 

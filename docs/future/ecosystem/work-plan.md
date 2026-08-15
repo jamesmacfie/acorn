@@ -16,16 +16,27 @@ independently useful), put containment before discovery so acorn never has a win
 strangers can find plugins whose node halves run uncontained, and keep distribution last because
 everything before it makes distribution worth having.
 
-## Phase 1 — publish the front door (owning doc: `dx.md`)
+## Phase 1 — the folder install (owned here)
 
-Make `@acorn/plugin-api` installable from outside the workspace. Packaging work plus one real
-decision: the compat promise ("your plugin keeps loading within a major" — the surface snapshot
-and `PLUGIN_API_MAJOR` already enforce it). Also in this phase, small and user-facing: generalize
-the local-path install (`allowLocalPath`, today dev-build-only) into "point acorn at a folder of
-plugins" as a first-class install source, riding the same trust flow.
+Most of this phase shipped. The scaffold is `npm create acorn-plugin`
+(`packages/create-acorn-plugin`); the publishable half of the facade is `acorn-plugin-sdk`
+(`packages/plugin-sdk`), unscoped so it needed no npm organisation, with the compatibility promise
+written down in `docs/plugins.md § What is published`. The seven entrypoints that were *not*
+published never will be, and that section says why. `dx.md`, which owned this phase, is gone with it.
 
-Deliverable: an external author with no checkout of this repo can `npm install` the facade, follow
-`docs/plugin-authoring.md`, and install from a folder.
+What is left is the one thing that actually strands a stranger today, and it was never packaging.
+Generalize the local-path source (`allowLocalPath`, today dev-build-only) into "point acorn at a
+folder of plugins" as a first-class install source, riding the same trust flow. A **packaged** acorn
+refuses the directory the scaffold just wrote, so the authoring guide's last step fails on every
+build an external author actually has.
+
+It is small and user-facing, and blocked on nothing — but read it as a **trust-boundary** change,
+not a config flag. `allowLocalPath` is dev-build-only on purpose, and widening it means deciding
+what a symlinked, in-place-editable, unsandboxed node half is allowed to be on a released build
+(`docs/security.md`). Start there, not in the installer.
+
+Deliverable: an external author with no checkout of this repo can scaffold, follow
+`docs/plugin-authoring.md`, and install from a folder on a released build.
 
 ## Phase 2 — rung-2 containment (owning doc: `docs/security.md § The containment ladder`)
 

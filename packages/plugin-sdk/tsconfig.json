@@ -1,0 +1,9 @@
+{
+  // No @types packages: the frame SDK runs in a sandboxed iframe, so DOM (from the base `lib`) is all
+  // it may assume. Pulling in node types here is how a `process.env` read reaches a published bundle.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"]
+}
