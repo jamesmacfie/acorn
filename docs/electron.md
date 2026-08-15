@@ -56,6 +56,13 @@ bytes, stream frames/status, fleet operations, lifecycle actions, folder selecti
 desktop capabilities. It never exposes raw `ipcRenderer`, a Node token, a certificate, a database
 handle, a process object, or a `webContents` ID.
 
+That surface is the *implementation* of the platform seam, and the renderer never reads it directly:
+`packages/client-core/src/platform/` is the only module allowed to touch the global, enforced by
+`boundaries.test.ts`. Presence of a preload key is therefore never a product capability. The folder
+picker in particular is a folder picker — it used to sit under a `terminal` key whose presence gated
+the whole terminal/agents/run-targets/workflows block, which are ordinary `/v2` + WebSocket surfaces
+(`docs/future/node-first/platform-seam.md`).
+
 ## The plugin frame origin
 
 There is a second privileged scheme, `app-plugin://<sha256>`, one origin per third-party plugin bundle

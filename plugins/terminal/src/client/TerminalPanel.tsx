@@ -60,7 +60,6 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   })
 
   onMount(async () => {
-    if (!api) return
     const def = prefs.data?.[PrefKeys.terminalRailDefault]
     const willAutoLaunch = !!def && def !== 'empty' && !!ws()
     if (willAutoLaunch) setLaunching(true)
@@ -194,7 +193,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // task's lazy worktree from it and cwds the session there (docs/workspaces-and-tasks.md).
   async function spawn(profileId: string) {
     const taskId = ws()?.id
-    if (!api || !taskId) return
+    if (!taskId) return
     const title = titleFor(profileId, ws())
     setBusy(true)
     setPendingTitle(title)
@@ -215,14 +214,13 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   async function startProfile(profileId: string) {
     setError(null)
     const w = ws()
-    if (!api || !w) return
+    if (!w) return
     await spawn(profileId)
   }
 
   // One click closes the tab: remove() kills a running session first, then drops it.
   // Closing the last tab closes the whole drawer.
   async function closeTab(s: TerminalSession) {
-    if (!api) return
     await api.remove(s.id)
     await refreshSessions()
     if (visibleSessions().length === 0) props.onClose()
@@ -235,82 +233,80 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
           <SplitHandle axis="y" drag={drawerDrag} class="terminal-resize" />
         </Show>
         <header class="terminal-tabs">
-          <Show when={api} fallback={<Alert class="terminal-unavailable">Terminal service unavailable</Alert>}>
-            {/* Was a hand-rolled strip: the ✕ was mouse-only, there were no arrow keys and no
-                tablist roles, and the pending shimmer had an unguarded keyframe. */}
-            <DocumentTabs
-              class="terminal-tabstrip"
-              idPrefix="terminal"
-              ariaLabel="Terminal sessions"
-              active={activeId() ?? ''}
-              onActivate={setActiveId}
-              onClose={(id) => {
-                const session = visibleSessions().find((candidate) => candidate.id === id)
-                if (session) void closeTab(session)
-              }}
-              tabs={[
-                ...visibleSessions().map((session) => ({
-                  id: session.id,
-                  label: session.title,
-                  status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
-                  title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
-                })),
-                // The launching session has no id yet, so it cannot be activated or closed — it is a
-                // placeholder tab that the real session replaces.
-                ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
-              ]}
-            />
-            <div class="terminal-actions">
-              {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
-                  click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
-                  roles. Menu brings all of it. */}
-              <Menu
-                  class="terminal-menu"
-                  ariaLabel="New session"
-                  trigger={({ toggle, open }) => (
-                    <button
-                      type="button"
-                      class="terminal-new"
-                      disabled={busy() || !ws()}
-                      title={ws() ? 'New session' : 'Select a task first'}
-                      aria-haspopup="menu"
-                      aria-expanded={open()}
-                      onClick={toggle}
-                    >
-                      +
-                    </button>
-                  )}
-                >
-                  {(menu) => (
-                    <For each={profiles()}>
-                      {(p) => (
-                        <Menu.Item
-                          context={menu}
-                          disabled={!p.available}
-                          title={!p.available ? `${p.label} not found on PATH` : p.tmuxMissing ? 'tmux not found on PATH — this session will not survive an app restart' : undefined}
-                          onSelect={() => void startProfile(p.id)}
-                          trailing={
-                            <>
-                              <Show when={!p.available}>not found</Show>
-                              {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still
-                                  works, but the durable backend silently fell back to node-pty. */}
-                              <Show when={p.available && p.tmuxMissing}>tmux missing — won't survive restart</Show>
-                            </>
-                          }
-                        >
-                          {p.label}
-                        </Menu.Item>
-                      )}
-                    </For>
-                  )}
-              </Menu>
-              <Show when={activeRunning()}>
-                <button type="button" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api!.interrupt(activeId()!)}>
-                  ^C
-                </button>
-              </Show>
-            </div>
-          </Show>
+          {/* Was a hand-rolled strip: the ✕ was mouse-only, there were no arrow keys and no
+              tablist roles, and the pending shimmer had an unguarded keyframe. */}
+          <DocumentTabs
+            class="terminal-tabstrip"
+            idPrefix="terminal"
+            ariaLabel="Terminal sessions"
+            active={activeId() ?? ''}
+            onActivate={setActiveId}
+            onClose={(id) => {
+              const session = visibleSessions().find((candidate) => candidate.id === id)
+              if (session) void closeTab(session)
+            }}
+            tabs={[
+              ...visibleSessions().map((session) => ({
+                id: session.id,
+                label: session.title,
+                status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
+                title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
+              })),
+              // The launching session has no id yet, so it cannot be activated or closed — it is a
+              // placeholder tab that the real session replaces.
+              ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
+            ]}
+          />
+          <div class="terminal-actions">
+            {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
+                click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
+                roles. Menu brings all of it. */}
+            <Menu
+                class="terminal-menu"
+                ariaLabel="New session"
+                trigger={({ toggle, open }) => (
+                  <button
+                    type="button"
+                    class="terminal-new"
+                    disabled={busy() || !ws()}
+                    title={ws() ? 'New session' : 'Select a task first'}
+                    aria-haspopup="menu"
+                    aria-expanded={open()}
+                    onClick={toggle}
+                  >
+                    +
+                  </button>
+                )}
+              >
+                {(menu) => (
+                  <For each={profiles()}>
+                    {(p) => (
+                      <Menu.Item
+                        context={menu}
+                        disabled={!p.available}
+                        title={!p.available ? `${p.label} not found on PATH` : p.tmuxMissing ? 'tmux not found on PATH — this session will not survive an app restart' : undefined}
+                        onSelect={() => void startProfile(p.id)}
+                        trailing={
+                          <>
+                            <Show when={!p.available}>not found</Show>
+                            {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still
+                                works, but the durable backend silently fell back to node-pty. */}
+                            <Show when={p.available && p.tmuxMissing}>tmux missing — won't survive restart</Show>
+                          </>
+                        }
+                      >
+                        {p.label}
+                      </Menu.Item>
+                    )}
+                  </For>
+                )}
+            </Menu>
+            <Show when={activeRunning()}>
+              <button type="button" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api.interrupt(activeId()!)}>
+                ^C
+              </button>
+            </Show>
+          </div>
           <button type="button" class="terminal-close" onClick={props.onClose} title="Close drawer (sessions keep running)" aria-label="Close">
             ✕
           </button>

@@ -1,4 +1,5 @@
 import { onCleanup, onMount } from 'solid-js'
+import { desktopExtras } from '../platform'
 
 // Cmd/Ctrl+W → close the focused thing *inside* a surface. Main suppresses the window-close
 // accelerator and pings the renderer (see electron.ts / preload); each subscriber acts only when
@@ -7,7 +8,7 @@ import { onCleanup, onMount } from 'solid-js'
 // refs are assigned after mount.
 export function onClosePaneWithin(el: () => HTMLElement | undefined, fn: () => void): void {
   onMount(() => {
-    const off = window.acorn?.onClosePane?.(() => {
+    const off = desktopExtras()?.onClosePane(() => {
       if (!el()?.contains(document.activeElement)) return
       fn()
     })

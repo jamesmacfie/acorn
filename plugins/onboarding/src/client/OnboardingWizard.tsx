@@ -1,14 +1,15 @@
 import { createMemo, createSignal, For, Index, lazy, Show, Suspense } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
+  canPickFolder,
   createProject,
   createWorkspace,
   nodeReady,
   patchProject,
+  pickFolder,
   type Project,
   projectsKey,
   projectsOptions,
-  taskBridge,
   workspacesKey,
   workspacesOptions,
 } from '@acorn/plugin-api/client'
@@ -43,7 +44,6 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
-  const bridge = taskBridge()
 
   const [step, setStep] = createSignal<Step>('welcome')
   const [trail, setTrail] = createSignal<Step[]>([])
@@ -99,8 +99,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   }
 
   async function openFolder() {
-    if (!bridge) return
-    const path = await bridge.folderPath.pick()
+    const path = await pickFolder()
     if (!path) return
     setBusy(true)
     setError('')
@@ -193,7 +192,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                 up as they're detected.
               </p>
               <div class="wizard-cards">
-                <Card class="wizard-card" interactive disabled={!bridge || busy()} onActivate={() => void openFolder()}>
+                <Card class="wizard-card" interactive disabled={!canPickFolder() || busy()} onActivate={() => void openFolder()}>
                   <span class="wizard-card-title">Open a folder</span>
                   <span class="wizard-card-desc">Point acorn at any folder. Plain folders work fine.</span>
                   <span class="wizard-card-tag">recommended</span>
@@ -204,7 +203,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                   <span class="wizard-card-tag">optional · anytime in settings</span>
                 </Card>
               </div>
-              <Show when={!bridge}>
+              <Show when={!canPickFolder()}>
                 <p class="wizard-hint">Choosing a folder needs the desktop app.</p>
               </Show>
               <Show when={error()}><Alert>{error()}</Alert></Show>

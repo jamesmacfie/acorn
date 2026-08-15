@@ -1,6 +1,6 @@
 import { createEffect, createResource, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import type { PluginFrameSurface } from '@acorn/protocol/api.ts'
-import { acornGlobal } from '../../capabilities'
+import { pluginWebviews } from '../../platform'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { displayHost, pluginWebviewKey, resolvePluginWebviewUrl } from './webviewModel'
@@ -15,7 +15,7 @@ export type PluginWebviewProps = {
 
 export default function PluginWebview(props: PluginWebviewProps) {
   let host!: HTMLDivElement
-  const native = acornGlobal()?.webview
+  const native = pluginWebviews()
   const key = () => pluginWebviewKey(props.binding)
   const [home] = createResource(
     () => [props.pluginId, props.surface, props.binding] as const,

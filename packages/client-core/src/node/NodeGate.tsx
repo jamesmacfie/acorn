@@ -1,6 +1,6 @@
 import { createSignal, Match, Show, Switch } from 'solid-js'
 import Acorn from '../Acorn'
-import { acornGlobal } from '../capabilities'
+import { recoveryActions } from '../platform'
 import { nodeReadiness, selectActiveNode } from './activeNode'
 
 export default function NodeGate() {
@@ -26,7 +26,7 @@ export default function NodeGate() {
             <button type="button" class="ui-btn" aria-expanded={showReason()} onClick={() => setShowReason((v) => !v)}>
               Diagnostics
             </button>
-            <Show when={acornGlobal()?.recovery}>
+            <Show when={recoveryActions()}>
               {(recovery) => (
                 <>
                   <button type="button" class="ui-btn" onClick={() => recovery().openDataFolder()}>Open data folder</button>

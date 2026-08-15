@@ -151,6 +151,13 @@ export { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/node/tunnelUr
 export { contextSnapshot } from '@acorn/client-core/agent/contextSnapshot.ts'
 export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from '@acorn/client-core/agent/reference.ts'
 
+// ── The platform seam ─────────────────────────────────────────────────────────────────────────
+// What the HOST provides, as opposed to what the node provides (docs/future/node-first/platform-seam.md).
+// A plugin gets the two groups it has a legitimate use for — the native folder dialog and the host-owned
+// preview view — and nothing else: transport, fleet and plugin custody are core's business.
+export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/platform/index.ts'
+export type { PreviewState, PreviewViews } from '@acorn/client-core/platform/index.ts'
+
 // ── Capabilities, prefs, persisted state ──────────────────────────────────────────────────────
 // prune candidate: `capabilities` is the node's capability read model. A plugin should be asking
 // ctx what it may do rather than reading the shared signal.

@@ -6,19 +6,18 @@ export function PreviewTaskPane(props: { task: Task }) {
   const api = taskBridge()
   const [config] = createResource(
     () => props.task.projectId,
-    async () => api ? (await api.project.get(props.task.projectId))?.config ?? null : null,
+    async () => (await api.project.get(props.task.projectId))?.config ?? null,
   )
   const [targets] = createResource(
     () => props.task.id,
     async (taskId) => {
-      if (!api) return []
       const result = await runApi.targets(taskId)
       return 'targets' in result ? result.targets : []
     },
   )
   const [runUrl] = createResource(
     () => ({ id: props.task.id, running: (targets() ?? []).map((target) => `${target.id}:${target.running}`).join(',') }),
-    async ({ id }) => (api ? ((await runApi.defaultUrl(id)) ?? null) : null),
+    async ({ id }) => (await runApi.defaultUrl(id)) ?? null,
   )
   const [scriptUrl] = createResource(
     () => {
@@ -28,7 +27,6 @@ export function PreviewTaskPane(props: { task: Task }) {
         : null
     },
     async ({ taskId, script }) => {
-      if (!api) return null
       const result = await api.previewUrl(taskId, script)
       return result.ok ? (result.url ?? null) : null
     },

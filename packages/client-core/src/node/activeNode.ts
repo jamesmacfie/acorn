@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { acornGlobal } from '../capabilities'
+import { fleetBridge } from '../platform'
 import { clientEvents } from '../registries/clientEvents'
 import { homeNode, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 
@@ -40,11 +40,11 @@ export const nodeReady = (): boolean => nodeReadiness().kind === 'ready'
 // Pick the node this window talks to. Called once before the first render, and again by the recovery
 // screen's Retry — which is what makes `starting` a state the user can actually observe.
 export async function selectActiveNode(): Promise<void> {
-  const fleetList = acornGlobal()?.fleetList
+  const bridge = fleetBridge()
   // No broker at all: the renderer is being served by a node directly (`dev:node` in a browser), so
   // the origin already IS the node and apiClient's same-origin fallback covers it. Nothing to select,
   // and gating the shell on a selection would leave that mode staring at the recovery screen forever.
-  if (!fleetList) {
+  if (!bridge) {
     setNodeReadiness({ kind: 'ready' })
     return
   }

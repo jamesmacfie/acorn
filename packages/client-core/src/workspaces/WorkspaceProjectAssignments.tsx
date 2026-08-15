@@ -4,7 +4,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Project, Workspace } from '@acorn/protocol/api.ts'
 import { projectsKey, projectsOptions, tasksKey, tasksOptions, workspacesKey, workspacesOptions } from '../queries'
 import { createProject, createWorkspace, deleteProject, deleteWorkspace, patchProject, renameWorkspace } from './mutations'
-import { taskBridge } from '../tasks/taskBridge'
+import { canPickFolder, pickFolder } from '../platform'
 import { projectImporterRegistry } from '../registries/projectImporters'
 import { Alert, Button, Input, Select } from '../ui/primitives'
 import Icon from '../ui/Icon'
@@ -28,7 +28,6 @@ export default function WorkspaceProjectAssignments() {
   const projects = createQuery(() => projectsOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
-  const api = taskBridge()
   const [newWorkspace, setNewWorkspace] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -76,15 +75,13 @@ export default function WorkspaceProjectAssignments() {
   }
 
   async function addFolder() {
-    if (!api) return
-    const path = await api.folderPath.pick()
+    const path = await pickFolder()
     if (!path) return
     await guard(() => createProject({ path }), 'Could not add folder.')
   }
 
   async function mapFolder(id: string) {
-    if (!api) return
-    const path = await api.folderPath.pick()
+    const path = await pickFolder()
     if (!path) return
     await guard(() => patchProject(id, { path }), 'Could not map folder.')
   }
@@ -141,7 +138,7 @@ export default function WorkspaceProjectAssignments() {
       <div class="onboarding-listhead">
         <span class="muted">Projects</span>
         <div class="onboarding-actions">
-          <Show when={api}>
+          <Show when={canPickFolder()}>
             <Button onClick={() => void addFolder()}>Add folder…</Button>
           </Show>
           <For each={projectImporterRegistry.entries()}>
@@ -198,7 +195,6 @@ export default function WorkspaceProjectAssignments() {
                 <ProjectRows
                   rows={group.projects}
                   workspaces={workspaces.data ?? []}
-                  hasBridge={!!api}
                   busy={busy()}
                   onRename={renameInPlace}
                   onMove={move}
@@ -221,7 +217,6 @@ export default function WorkspaceProjectAssignments() {
             <ProjectRows
               rows={orphans()}
               workspaces={workspaces.data ?? []}
-              hasBridge={!!api}
               busy={busy()}
               onRename={renameInPlace}
               onMove={move}
@@ -315,7 +310,6 @@ export default function WorkspaceProjectAssignments() {
 function ProjectRows(props: {
   rows: Project[]
   workspaces: Workspace[]
-  hasBridge: boolean
   busy: boolean
   onRename: (field: HTMLInputElement, current: string, save: (name: string) => Promise<unknown>) => Promise<void>
   onMove: (project: Project, workspaceId: string) => void
@@ -378,7 +372,7 @@ function ProjectRows(props: {
             <option value={NEW_WORKSPACE}>New workspace…</option>
           </Select>
           <span class="ws-row-actions">
-            <Show when={props.hasBridge}>
+            <Show when={canPickFolder()}>
               <Button size="sm" disabled={project().hidden} onClick={() => props.onMapFolder(project().id)}>
                 {project().path ? 'Change folder' : 'Add folder'}
               </Button>

@@ -113,7 +113,7 @@ export default function ContextPane(props: { task: Task }) {
   async function syncContext() {
     setMsg('')
     const t = targetSessionFor(props.task.id)
-    if (!t || !api) return setMsg('No running agent session.')
+    if (!t) return setMsg('No running agent session.')
     await refreshContext() // fresh inventory, one fetch
     const current = ctx()
     if (!current) return

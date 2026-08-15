@@ -16,8 +16,12 @@ function installBridge(): Bridge {
   const sent: { nodeId: string; frame: unknown }[] = []
   const frameHandlers: ((nodeId: string, frame: unknown) => void)[] = []
   const statusHandlers: ((status: NodeStatus) => void)[] = []
+  // `nodeFetch` is what makes the host's transport EXIST as far as platform/index.ts is concerned — it is
+  // the "there is a broker" discriminator — so a fake that pushes frames has to answer requests too, even
+  // if this suite never sends one.
   const acorn = {
     desktop: true,
+    nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
     nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {
       frameHandlers.push(cb)

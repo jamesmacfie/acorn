@@ -81,7 +81,7 @@ export default function TabRail() {
   // not the terminal plugin's client: core must not import plugins (core/boundaries.test.ts).
   const [prefixRow] = createResource(
     () => (draft()?.mode === 'new' ? newProject() : undefined),
-    (id) => id ? (taskBridge()?.project.get(id) ?? null) : null,
+    (id) => id ? taskBridge().project.get(id) : null,
   )
   const branchPrefix = () => prefixRow()?.config.branchPrefix ?? null
 
@@ -245,7 +245,7 @@ export default function TabRail() {
 
   async function archive(w: Task) {
     if (capabilities().terminal) {
-      const res = await taskBridge()!.task.archive(w.id)
+      const res = await taskBridge().task.archive(w.id)
       if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
     } else {
       await archiveTask(w.id)

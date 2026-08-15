@@ -31,7 +31,8 @@ export default function TaskView(props: {
   onToggleTerminal: () => void
   onOpenTerminal: () => void
 }) {
-  // The desktop probe, on the capability rather than on a PTY accessor's null return. `terminalSessions` is
+  // "Does this NODE run terminals", from the node's plugin roster — not "is this Electron", which is what
+  // it used to mean and why the whole run-target/agent block vanished off-desktop. `terminalSessions` is
   // terminal's CONTRACT surface (create + list), not its renderer client — the shell has no business holding
   // write/attach/kill/resize, which is what importing client/terminalClient handed it.
   const hasEngine = () => capabilities().terminal
@@ -170,7 +171,10 @@ export default function TaskView(props: {
     if (archiving()) return
     const archivedTaskId = props.task.id
     const next = nextTask()
-    if (bridge) {
+    // The guarded teardown (stop sessions → teardown script → remove worktree) is served through the
+    // node's TASK_SESSIONS bridge, which the terminal plugin fills; without it the route 503s, so a node
+    // that does not run terminals gets the plain status flip instead.
+    if (hasEngine()) {
       setArchiving(true)
       try {
         const result = await bridge.task.archive(archivedTaskId, {

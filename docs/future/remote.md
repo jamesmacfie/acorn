@@ -121,19 +121,18 @@ and (c) could carry pairing handshakes ("enter this code on your node"). Notes:
 
 ## Preparation items (cheap now, expensive later)
 
-Items 2 and 3 are reflected in the shipped system (`docs/plugins.md`); item 1 is **not yet true**
-— a 2026-08-15 survey found 44 direct `window.acorn` reaches across 14 modules with no arch rule,
-and `docs/future/node-first/platform-seam.md` now owns closing that gap. Everything else here
-waits.
+All three are reflected in the shipped system. Item 1 was **not** true when this file first claimed
+it — a 2026-08-15 survey found the seam existed as a TypeScript type and nothing else — and it landed
+that day (`docs/future/node-first/platform-seam.md`). Everything else here waits.
 
-1. **Platform adapter seam in client-core.** Everything that touches `window.acorn` (apiClient's
-   nodeFetch, stream attach, plugin cache access, trust prompts) goes behind one narrow
-   interface with the Electron implementation as its only member. This is the load-bearing prep:
-   retrofitting after more surface accretes is the expensive version. Two facts pinned for the
-   eventual web implementation: the device bearer rides the WS *upgrade header* today, which a
-   browser cannot set, so the node needs a second auth carrier; and `nodeFetch` buffers whole
-   responses (streaming cannot cross IPC), so the seam's transport type must allow a streaming
-   implementation.
+1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/platform/`.)
+   Everything that touches `window.acorn` (apiClient's nodeFetch, stream attach, plugin cache access,
+   trust prompts) is behind capability-grouped interfaces with the Electron preload as their only
+   implementation, and `boundaries.test.ts` fails any file outside the seam that reads the global.
+   Two facts pinned for the eventual web implementation: the device bearer rides the WS *upgrade
+   header* today, which a browser cannot set, so the node needs a second auth carrier; and `nodeFetch`
+   buffers whole responses (streaming cannot cross IPC), so a web transport is free to return a
+   streaming response — the type is per-implementation and does not impose the desktop's limit.
 2. **`formFactor` on frame surfaces** in the plugin manifest, default `["desktop"]`. One field,
    added while the schema is young. Descriptors need nothing. (Shipped — `pluginContract.ts`.)
 3. **Keep the sandbox bridge scheme-agnostic.** The MessageChannel bridge and SDK must not

@@ -14,7 +14,7 @@
 // registered by the plugins that own them.
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
-import { acornGlobal } from './capabilities'
+import { nodeTransport } from './platform'
 import { activeNodeId } from './node/activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
 
@@ -48,15 +48,15 @@ function rawSend(frame: WsClientFrame): void {
   if (!nodeId) return
   connect()
   // No local queue: main holds one, so a frame sent before its socket is open is still delivered.
-  acornGlobal()?.nodeSend?.(nodeId, frame)
+  nodeTransport()?.send(nodeId, frame)
 }
 
 // Subscribe to the broker's push channels. Idempotent and never torn down: this module is a singleton
 // whose lifetime is the renderer's.
 function connect(): void {
   if (bridged) return
-  const bridge = acornGlobal()
-  if (!bridge?.onNodeFrame) return
+  const transport = nodeTransport()
+  if (!transport) return
   bridged = true
 
   // The nodeId is a FILTER, not decoration. Main opens a socket to every paired node and pushes every
@@ -70,11 +70,11 @@ function connect(): void {
   // Dropping rather than routing is right for now: only the active node's surfaces are subscribed, so a
   // frame from any other node has no consumer. A fleet-wide live surface would need a nodeId in the
   // subscription key, not a wider filter here.
-  bridge.onNodeFrame((nodeId, raw) => {
+  transport.onFrame((nodeId, raw) => {
     if (nodeId !== activeNodeId()) return
     dispatch(raw)
   })
-  bridge.onNodeStatus?.((status) => {
+  transport.onStatus((status) => {
     if (status.state !== 'online') return
     if (!everOnline.has(status.nodeId)) {
       everOnline.add(status.nodeId)

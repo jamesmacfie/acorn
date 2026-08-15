@@ -2,8 +2,7 @@
 // session commands, the WebSocket for every stream (PTY input/output/status, workflow notices).
 //
 // PTY verbs only. Task lifecycle, per-repo checkout/config, preview URLs and agent delivery are
-// platform concerns and live in core/client/tasks/taskBridge.ts; the `window.acorn` global itself is
-// declared in core/client/capabilities.ts, which is what reads it to answer "is this desktop?".
+// platform concerns and live in client-core/tasks/taskBridge.ts.
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../contract/routes'
 import { readJson, writeJson, wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite } from '@acorn/plugin-api/client'
@@ -29,10 +28,11 @@ export type TerminalApi = {
 const post = <T>(url: string, body?: unknown) =>
   writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
 
-// Returns null off-desktop (no bridge) on the same probe as taskBridge(), so every consumer's
-// `if (!api)` desktop guard is unchanged.
-export const terminalApi = (): TerminalApi | null => {
-  if (!window.acorn?.terminal) return null
+// Always available: every verb here is an HTTP route or a WebSocket frame against the node. It used to
+// return null unless Electron's preload exposed a native folder picker, which is neither a PTY nor
+// anything this file has an opinion about (docs/future/node-first/platform-seam.md). Whether the node
+// runs terminals at all is `capabilities().terminal`, read from the node's plugin roster.
+export const terminalApi = (): TerminalApi => {
   return {
     list: () => readJson<TerminalSession[]>(terminalSessionsRoute),
     profiles: () => readJson<TerminalProfile[]>(terminalProfilesRoute),
