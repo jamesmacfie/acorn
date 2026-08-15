@@ -69,7 +69,11 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
         // makes the pin trustworthy — reading it over the very connection being authenticated proves
         // nothing. It is the value the owner compares against the code shown on the node.
         fingerprint: c.env.NODE_FINGERPRINT,
-        ...(authenticated ? { nodeId: c.env.NODE_ID, appVersion: c.env.APP_VERSION } : {}),
+        // `appVersion` used to ride along here and no client ever read it. Dropped rather than kept
+        // against a future reader: this is the one response that must stay readable by every client
+        // forever, so the bar for a field on it is a consumer, not a plausible use. Adding it back is
+        // one line and always safe — the schema is additive-forever (protocol/node.ts).
+        ...(authenticated ? { nodeId: c.env.NODE_ID } : {}),
       }
       return c.json(info)
     })

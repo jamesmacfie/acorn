@@ -2,7 +2,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { openDataRoot, type DataRoot } from './dataRoot'
 
 const dirs: string[] = []
@@ -45,8 +44,11 @@ describe('openDataRoot', () => {
     expect(second.nodeId).toBe(first.nodeId)
 
     const identity = JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))
-    expect(identity.protocolVersion).toBe(NODE_PROTOCOL_VERSION)
     expect(identity.createdAt).toBeGreaterThan(0)
+    // Deliberately absent. It was written once here and read by nothing, and it went stale the moment
+    // the binary serving this root moved on (docs/api-reference.md § Versioning). The live answer is the
+    // running binary's NODE_PROTOCOL_VERSION, reported at GET /v2/node.
+    expect(identity).not.toHaveProperty('protocolVersion')
   })
 
   it('creates the root, logs dir and identity file with private permissions', () => {

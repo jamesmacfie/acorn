@@ -1,5 +1,10 @@
 # The client↔node compatibility contract
 
+> **Shipped 2026-08-15, ahead of its deadline.** The contract now lives in
+> `docs/api-reference.md § Versioning`, which is the doc to read and to change; this file is kept as
+> the reasoning behind it, not as a plan. All five rules and every item under "the work, concretely"
+> landed, with two deviations noted at the bottom.
+
 From the node-first session (2026-08-15). Nothing here is scheduled — but this is the one file in
 the folder with a deadline: **everything below must land before the first standalone node is
 released** (`docs/future/bundle.md`'s pipeline). Today the client and node ship together, so any
@@ -91,3 +96,26 @@ Whether `NODE_PROTOCOL_VERSION` is still `2` and still compared with `===` only 
 `nodePairing.ts`; whether `incompatible`/`protocol_mismatch` grew a producer in the meantime;
 whether the standalone handshake gained a version field; and whether `api-reference.md` gained
 the Versioning section (if so, reconcile rather than rewrite).
+
+## What shipped, and the two judgement calls
+
+Everything in "the work, concretely" landed. Where the implementation chose between options the
+brief left open:
+
+- **`appVersion` was deleted, not given a use.** The brief offered either. Deleting won because the
+  pre-auth identity response is the one surface that must stay readable by every client forever, so
+  the bar for a field on it is a consumer rather than a plausible use — and adding a settings-row
+  renderer would have been UI this repo cannot verify in a test. Putting it back is one line, and
+  always safe, because the schema is additive-forever.
+- **`nodeIdentitySchema` was loosened too**, which the brief did not ask for. Retiring
+  `protocolVersion` from a `strictObject` would have made every existing `node.json` unparseable and
+  every existing data root unopenable. The same reasoning that makes the wire tolerant applies to a
+  file written by one version of acorn and read by all the later ones.
+
+The broker probes on reconnect as well as on upsert, which is what makes the gate useful: a node
+that upgrades restarts, which drops the socket, so the reconnect is where its new major arrives. A
+probe that cannot get a clear answer opens the socket anyway — an asleep laptop must not land in a
+sticky, security-shaped state.
+
+One thing this did NOT fix, found while in here: three comments cite
+`docs/api-reference.md § Pairing`, which still does not exist.

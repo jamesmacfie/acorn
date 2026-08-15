@@ -85,10 +85,13 @@ describe('GET /v2/node', () => {
     expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT })
   })
 
-  it('adds the node identity and app version once authenticated', async () => {
+  it('adds the node identity once authenticated, and nothing else', async () => {
     const { deviceToken } = await pairDevice()
     const info = (await (await send('/v2/node', { token: deviceToken })).json()) as NodeInfo
-    expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, nodeId: NODE_ID, appVersion: '9.9.9-test' })
+    // `toEqual`, not `toMatchObject`, and that is the assertion: this response must stay readable by
+    // every client forever (docs/api-reference.md § Versioning), so the bar for a field on it is a
+    // consumer. `appVersion` used to ride along here with no reader anywhere and was dropped.
+    expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, nodeId: NODE_ID })
   })
 })
 

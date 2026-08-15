@@ -32,8 +32,20 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
   if (url.protocol !== 'https:') throw new Error('A node endpoint must be https — the pin is the identity.')
 
   const { body, certPem, fingerprint } = await unverifiedGet(url)
-  const parsedInfo = nodeInfoSchema.safeParse(JSON.parse(body))
+  const payload: unknown = JSON.parse(body)
+  const parsedInfo = nodeInfoSchema.safeParse(payload)
   if (!parsedInfo.success) {
+    // Two very different failures wore one message here. `nodeInfoSchema` is additive-forever now, so
+    // a NEWER node still parses — but a future major that reshaped this response would not, and telling
+    // its owner "this is not an acorn node" sends them to check the URL instead of the version.
+    //
+    // So: if the body announces a protocol at all, it is an acorn node and the answer is the version.
+    // Read straight off the payload rather than through a second schema — the whole point is that this
+    // is the case where our schema does not fit what came back.
+    const claimed = (payload as { protocolVersion?: unknown } | null)?.protocolVersion
+    if (typeof claimed === 'number') {
+      throw new Error(`${endpoint} speaks acorn protocol ${claimed}; this app speaks ${NODE_PROTOCOL_VERSION}. Upgrade whichever is older.`)
+    }
     throw new Error(`${endpoint} did not answer like an acorn node.`)
   }
   const info = parsedInfo.data

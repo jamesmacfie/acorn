@@ -3,6 +3,7 @@ import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { nodes, nodeStatus } from '../node/fleet'
 import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../node/fleetActions'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
+import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
 import { Alert } from '../ui/primitives'
@@ -227,8 +228,8 @@ export default function NodesSettings() {
                   <code class="node-fingerprint node-fingerprint-hex">{probed().fingerprint}</code>
                   <Show when={!probed().compatible}>
                     <Alert>
-                      This node speaks protocol v{probed().protocolVersion}; this client speaks a different major version.
-                      Update one of them before pairing.
+                      This node speaks protocol v{probed().protocolVersion}; this app speaks v{NODE_PROTOCOL_VERSION}.
+                      Upgrade whichever is older before pairing.
                     </Alert>
                   </Show>
                   <div class="node-step-actions">

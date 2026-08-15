@@ -9,6 +9,7 @@ import { WebSocketServer } from 'ws'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { WS_PATH } from '@acorn/protocol/ws.ts'
+import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { ensureCert } from '@acorn/node-core/main/tls.ts'
 import { NodeBroker } from './nodeBroker'
 
@@ -90,9 +91,10 @@ const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_00
   }
 }
 
-// Select by path, never by index. upsert() opens the WebSocket immediately, so the /ws upgrade is
-// usually the FIRST request the server sees — indexing into `received` silently asserts against the
-// upgrade instead of the call under test (and passes, because the upgrade carries the same bearer).
+// Select by path, never by index. upsert() probes `/v2/node` and then opens the WebSocket, so the call
+// under test is never the first request the server sees — indexing into `received` silently asserts
+// against the probe or the upgrade instead (and used to pass, because the upgrade carries the same
+// bearer).
 const requestTo = (path: string): Received => {
   const match = received.find((r) => r.path === path)
   if (!match) throw new Error(`no request to ${path}; saw ${received.map((r) => r.path).join(', ')}`)
@@ -429,5 +431,83 @@ describe('broker WebSocket', () => {
     const seen = attempts
     await new Promise((r) => setTimeout(r, 300))
     expect(attempts).toBe(seen) // no further retries
+  })
+})
+
+// The version gate (docs/api-reference.md § Versioning). Before this, `incompatible` and
+// `protocol_mismatch` were declared in the protocol and produced by nothing: a node that upgraded past
+// the client kept connecting, and the mismatch surfaced as an undefined deep inside a component.
+describe('broker protocol version', () => {
+  const nodeInfo = (protocolVersion: number) => ({
+    status: 200,
+    body: JSON.stringify({ protocolVersion, fingerprint: 'f'.repeat(64) }),
+    headers: { 'content-type': 'application/json' },
+  })
+
+  it('refuses a node speaking a different major, and never opens the socket', async () => {
+    const { origin, server } = await listen(false)
+    let upgrades = 0
+    server.on('upgrade', (_req, socket) => {
+      upgrades += 1
+      socket.end()
+    })
+    respond = (path) => (path === '/v2/node' ? nodeInfo(NODE_PROTOCOL_VERSION + 1) : { status: 200, body: '{}' })
+
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+    await waitFor(() => statuses.some((s) => s.state === 'incompatible'), 'the incompatible transition')
+    expect(statuses.at(-1)?.error?.code).toBe('protocol_mismatch')
+    // The point of gating BEFORE the socket: a client that cannot speak the protocol should not be
+    // interpreting frames from it.
+    await new Promise((r) => setTimeout(r, 200))
+    expect(upgrades).toBe(0)
+    // Sticky like `revoked` — retrying cannot change a version, so it must not churn.
+    expect(statuses.at(-1)?.state).toBe('incompatible')
+  })
+
+  it('connects normally to a node speaking this major', async () => {
+    const { origin, server } = await listen(false)
+    new WebSocketServer({ server, path: WS_PATH })
+    respond = (path) => (path === '/v2/node' ? nodeInfo(NODE_PROTOCOL_VERSION) : { status: 200, body: '{}' })
+
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+    await waitFor(() => statuses.some((s) => s.state === 'online'), 'the online transition')
+    expect(statuses.some((s) => s.state === 'incompatible')).toBe(false)
+  })
+
+  it('treats an unanswerable probe as offline, not incompatible', async () => {
+    // A node that is merely asleep must not land in a sticky security-shaped state. Anything that is not
+    // a definite, parseable, different major opens the socket and takes the ordinary reconnect path.
+    const { origin, server } = await listen(false)
+    new WebSocketServer({ server, path: WS_PATH })
+    respond = (path) => (path === '/v2/node' ? { status: 500, body: 'nope' } : { status: 200, body: '{}' })
+
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+    await waitFor(() => statuses.some((s) => s.state === 'online'), 'the online transition despite no version')
+    expect(statuses.some((s) => s.state === 'incompatible')).toBe(false)
+  })
+
+  it('notices a major that changed while the app was running', async () => {
+    // The case a pairing-time-only check misses entirely: a node upgrades, which restarts it, which drops
+    // the socket — so the reconnect is where the new version arrives.
+    const { origin, server } = await listen(false)
+    const wss = new WebSocketServer({ server, path: WS_PATH })
+    let major = NODE_PROTOCOL_VERSION
+    respond = (path) => (path === '/v2/node' ? nodeInfo(major) : { status: 200, body: '{}' })
+
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    await waitFor(() => statuses.some((s) => s.state === 'online'), 'the first connection')
+
+    major = NODE_PROTOCOL_VERSION + 1
+    for (const client of wss.clients) client.close()
+
+    await waitFor(() => statuses.some((s) => s.state === 'incompatible'), 'the incompatible transition on reconnect', 10_000)
+    expect(statuses.at(-1)?.error?.code).toBe('protocol_mismatch')
   })
 })

@@ -178,6 +178,13 @@ const raise = (res: ApiResponse, fallback: string): never => {
 
 type ReadOptions = { signal?: AbortSignal; nodeId?: string }
 
+// A cast, not a parse, and that is now a stated rule rather than an accident
+// (docs/api-reference.md § Versioning): within a protocol major every change is additive, so a read
+// tolerates fields it does not know about. What it buys is that a NEWER node can serve an older client.
+//
+// The direction that is not covered: a field this client requires and the node no longer sends arrives
+// as `undefined` and fails somewhere deep in a component, not here. That is precisely why removing or
+// renaming a field is a major bump rather than something the boundary can absorb.
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await send(url, { signal: options.signal, nodeId: options.nodeId })
   if (!res.ok) raise(res, `${url} ${res.status}`)

@@ -24,8 +24,12 @@ exclusive `node.lock`.
   active-identity
 ```
 
-`node.json` stores the stable Node ID, certificate metadata, and preferred last-bound port. A root
-  is opened by `openDataRoot`, which creates the identity, takes the lock, and refuses an incompatible
+`node.json` stores the stable Node ID, its creation time, the preferred last-bound port, and the
+  operator's `advertiseHost` answer. No certificate material — that is `tls/` — and no protocol
+  version: it used to carry one, written at first boot, read by nothing, and stale the moment the
+  binary serving the root moved on (`docs/api-reference.md § Versioning`). Its schema ignores unknown
+  keys precisely so a field can be retired without stranding roots that still have it. A root is
+  opened by `openDataRoot`, which creates the identity, takes the lock, and refuses an incompatible
   root. Database upgrades are applied by the owning migration chain; backups are explicit archives and
   never mutate their source data.
 

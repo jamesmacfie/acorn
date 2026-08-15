@@ -12,8 +12,9 @@ whose node halves run uncontained. Distribution goes last because everything bef
 distribution worth having.
 
 Cross-cutting preconditions from the node-first review (`docs/future/node-first/`): the
-client↔node version contract (`version-skew.md`) must land **before phase 5 releases anything**,
-because the freedom to break the wire ends at the first standalone download; the platform-seam
+client↔node version contract (`version-skew.md`) had to land **before phase 5 releases anything**,
+because the freedom to break the wire ends at the first standalone download — it shipped on
+2026-08-15 and the contract is now `docs/api-reference.md § Versioning`; the platform-seam
 ratchet and the state-ownership rule are cheap and should land before the phases that build on
 them (web-facing work and dashboards respectively).
 
