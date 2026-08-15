@@ -8,10 +8,11 @@ import { wsChannelPrefixes } from '@acorn/client-core/wsChannels.ts'
 //
 // Importing activate.ts is what boots the graph; the assertion is on what claimed a prefix.
 describe('registered ws channel prefixes', () => {
-  it('are exactly the four the app expects', async () => {
+  it('are exactly the five the app expects', async () => {
     await import('../../src/app/client/activate')
-    // term and workflow are core's (client-core/wsClient.ts): term is transport on both ends, and
-    // workflow:notice feeds core's notification pipeline. docker and agent are their plugins'.
-    expect(wsChannelPrefixes()).toEqual(['agent', 'docker', 'term', 'workflow'])
+    // term, workflow and plugins are core's (client-core/wsClient.ts): term is transport on both ends,
+    // workflow:notice feeds core's notification pipeline, and plugins:changed is the node telling the
+    // shell its plugin set moved. docker and agent are their plugins'.
+    expect(wsChannelPrefixes()).toEqual(['agent', 'docker', 'plugins', 'term', 'workflow'])
   })
 })

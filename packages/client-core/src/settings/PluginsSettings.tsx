@@ -1,5 +1,7 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { NodePluginRow, NodePluginState, PluginInstallSource } from '@acorn/protocol/api.ts'
+import { sendReferenceToAgent } from '../agent/reference'
 import { activeNodeId } from '../node/activeNode'
 import { nodes } from '../node/fleet'
 import { restartLocalNode } from '../node/fleetActions'
@@ -10,10 +12,23 @@ import {
   uninstallNodePlugin,
   updateNodePlugin,
 } from '../node/nodePlugins'
-import { readPluginHostState } from '../plugins/host'
+import { readPluginHostState, setPluginDevGrant } from '../plugins/host'
 import { syncPluginDistribution } from '../plugins/distribution'
-import { Alert, Button, Checkbox, Input, Select } from '../ui/primitives'
+import { Alert, Button, Checkbox, Field, Input, Select } from '../ui/primitives'
+import { activeTaskId } from '../tasks/tasks'
 import { nextDisabledList, pluginPending } from './pluginToggle'
+import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
+import { prefsOptions } from '../queries'
+import { PrefKeys } from '../persistence/prefKeys'
+import { savePref } from './savePref'
+import {
+  CORE_SLOT_PROVIDER,
+  exclusiveSlotChoices,
+  exclusiveSlotFailed,
+  exclusiveSlotOffers,
+  withExclusiveSlotChoice,
+  type CoreExclusiveSlot,
+} from '../registries/exclusiveSlots'
 import './settings.css'
 
 // Settings → Plugins (docs/ui-design.md § New surfaces: "the list of plugins with enable/disable toggles
@@ -56,6 +71,24 @@ export function buildInstallSource(kind: SourceKind, raw: string): PluginInstall
     : { npm: name, ...(suffix ? { version: suffix } : {}) }
 }
 
+// The seeded prompt behind "Create a plugin". Two sentences of process and one blank line for the owner
+// to finish the thought in, which is all bb's equivalent is — the teaching is not in this text, it is in
+// the `plugin_authoring` tool this text tells the agent to call (node-core/server/agentTools/
+// pluginAuthoring.ts, whose test asserts this file still names it).
+//
+// Scoped down, deliberately, and worth being plain about: this does NOT open a new task. `TaskSeed` has
+// no prompt field and Settings has no project in scope, so "open a task with this prompt" would mean a
+// protocol field, a column and a create-modal seed path — new plumbing for an entry point. What exists
+// already is `sendReferenceToAgent`, the "drop this text into the task's agent composer as a draft" seam
+// the editor and changes panes use, and it degrades honestly when there is no session to drop into.
+export const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
+
+Call the \`plugin_authoring\` tool first. It returns the authoring contract and this node's own manifest
+vocabulary, and an answer from memory will be wrong. Then write the package and ask me for it with
+\`plugin_request\` using \`dev: true\`, so I approve once and you can iterate.
+
+What it should do: `
+
 export default function PluginsSettings() {
   const [target, setTarget] = createSignal<string | null>(null)
   const nodeId = () => target() ?? activeNodeId()
@@ -81,14 +114,30 @@ export default function PluginsSettings() {
   const required = createMemo(() => rows().filter((row) => row.required))
   const restartRequired = () => state()?.restartRequired === true
 
-  // The device's own answer, which the node knows nothing about: it served the bundle, and this
-  // machine declined to run it (plugins/distribution.ts). Read once per mount rather than kept live —
-  // a decision only changes through the trust dialog, which is modal over this page.
-  const [acks] = createResource(async () => (await readPluginHostState()).acks)
+  // The device's own answers, which the node knows nothing about: it served the bundle, and this
+  // machine declined to run it — or put it into development mode (plugins/distribution.ts,
+  // docs/security.md § The dev grant). Refetched after the one control on this page that changes them.
+  const [custody, { refetch: refetchCustody }] = createResource(async () => await readPluginHostState())
   const blockedHere = (row: NodePluginRow): boolean => {
     const hash = row.installed?.client?.hash
-    return !!hash && (acks() ?? []).some((ack) => ack.pluginId === row.name && ack.hash === hash && ack.decision === 'rejected')
+    return !!hash && (custody()?.acks ?? []).some((ack) => ack.pluginId === row.name && ack.hash === hash && ack.decision === 'rejected')
   }
+  // A plugin in development on THIS device, against THIS node. Both halves matter: the same plugin may be
+  // a plain install on the owner's other laptop, and a bundle offered under this name by a different node
+  // is not covered by the grant.
+  const devGrant = (row: NodePluginRow) =>
+    (custody()?.devGrants ?? []).find((grant) => grant.pluginId === row.name && grant.nodeId === nodeId())
+
+  // Ending development mode is one act with two halves (main/pluginTrustStore.ts): the grant goes, and so
+  // does every bundle it auto-trusted. What is left is whatever the owner answered by hand, so the current
+  // bundle is undecided again and the normal per-hash prompt asks about it on the next distribution pass —
+  // which is exactly what promoting a plugin to a normal install has to mean.
+  const endDevMode = (row: NodePluginRow) =>
+    run(async () => {
+      await setPluginDevGrant({ pluginId: row.name, nodeId: nodeId() ?? '', grant: false })
+      await refetchCustody()
+      await syncPluginDistribution()
+    })
 
   const run = async (work: () => Promise<void>) => {
     setError('')
@@ -122,6 +171,17 @@ export default function PluginsSettings() {
     await refetch()
     await syncPluginDistribution()
   }
+
+  // The agent writes the package; the owner still installs it. So this button reaches an agent, never the
+  // install route — the whole point of the approval split is that nothing on the agent's side of it can
+  // put code on the node.
+  const createPlugin = () =>
+    run(async () => {
+      const taskId = activeTaskId()
+      if (!taskId) throw new Error('Open a task first — the prompt is delivered to that task’s agent.')
+      const result = await sendReferenceToAgent(taskId, PLUGIN_STARTER_PROMPT)
+      if (!result.ok) throw new Error(result.reason ?? 'That task has no agent session to send to.')
+    })
 
   const install = () =>
     run(async () => {
@@ -181,6 +241,19 @@ export default function PluginsSettings() {
 
       <Show when={error()}><Alert>{error()}</Alert></Show>
 
+      {/* The other way a plugin gets here: the agent writes one. It lands as a DRAFT in the task's agent
+          composer — the owner reads it, finishes the sentence and sends — because a settings button that
+          silently starts an agent turn is a button nobody presses twice. */}
+      <div class="plugin-authoring">
+        <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void createPlugin()}>
+          Create a plugin
+        </Button>
+        <span class="muted">
+          Drafts a prompt in the current task's agent. It writes the package and asks you to install it;
+          it cannot install anything itself.
+        </span>
+      </div>
+
       {/* The install form. Deliberately plain: there is no browse-and-discover surface and there is not
           going to be one soon, because any listing acorn could offer would be unreviewed
           (docs/plugins.md § Non-goals). Someone who installs a plugin here already decided to
@@ -237,6 +310,22 @@ export default function PluginsSettings() {
                     <Show when={installed().source}>
                       {(source) => <span class="plugin-source muted">{source()}</span>}
                     </Show>
+                  </>
+                )}
+              </Show>
+              {/* Development mode, stated in full rather than as a decoration. The security story here
+                  rests entirely on the owner being able to SEE this and end it: the moment a dev-mode
+                  plugin looks like a normal install, the trust story has rotted (docs/security.md § The
+                  dev grant). */}
+              <Show when={devGrant(row)}>
+                {(grant) => (
+                  <>
+                    <span class="plugin-dev" role="status" title={grant().path}>
+                      in development — bundle changes are auto-trusted
+                    </span>
+                    <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void endDevMode(row)}>
+                      End dev mode
+                    </Button>
                   </>
                 )}
               </Show>
@@ -316,6 +405,65 @@ export default function PluginsSettings() {
           so a node without them would start and then fail at the first task.
         </p>
       </Show>
+
+      <ReplacedSurfaces />
     </div>
   )
 }
+
+// The arbitration for the exclusive slots (registries/exclusiveSlots.ts).
+//
+// HERE rather than in Appearance, and the difference is what the choice is ABOUT. Appearance is two axes
+// the app owns — colour and shape — and every option in it exists whether or not anything is installed.
+// This picker has options only because packages are installed, its options are named after them, and the
+// person who wants to change it back is a person looking for the plugin that did it. That is this page.
+//
+// Hidden entirely when nobody has offered, because a select with one option is a control that cannot do
+// anything, and a permanent row saying "no plugin replaces your task list" is chrome earning nothing.
+function ReplacedSurfaces() {
+  const qc = useQueryClient()
+  const prefs = createQuery(() => prefsOptions(true))
+  const stored = () => prefs.data?.[PrefKeys.exclusiveSlots]
+  const choice = (slot: CoreExclusiveSlot) => exclusiveSlotChoices(stored())[slot] ?? CORE_SLOT_PROVIDER
+  const rows = () =>
+    CORE_EXCLUSIVE_SLOTS.map((slot) => ({ slot, offers: exclusiveSlotOffers(slot) })).filter((row) => row.offers.length)
+
+  return (
+    <Show when={rows().length}>
+      {/* A plain div rather than a nested `.settings-section`: this page's root already is one, and the
+          rows below are fields, not a second page. */}
+      <div>
+        <p class="muted">
+          Some plugins offer to draw one of acorn's own surfaces. Nothing is replaced until you pick it
+          here, and acorn draws its own again if that plugin is turned off or its surface fails.
+        </p>
+        <For each={rows()}>
+          {(row) => (
+            <Field label={CORE_SLOT_LABEL[row.slot]}>
+              <Select
+                value={choice(row.slot)}
+                onChange={(event) =>
+                  void savePref(qc, PrefKeys.exclusiveSlots, withExclusiveSlotChoice(stored(), row.slot, event.currentTarget.value))}
+              >
+                <option value={CORE_SLOT_PROVIDER}>acorn's own</option>
+                <For each={row.offers}>
+                  {(offer) => <option value={offer.pluginId}>{offer.label} ({offer.pluginId})</option>}
+                </For>
+              </Select>
+              {/* Stated rather than hidden. A replacement that fell back is the one situation where the
+                  setting and the screen disagree, and an owner staring at their old task list with this
+                  select still naming a plugin has no other way to find out why. */}
+              <Show when={choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))}>
+                <span class="plugin-failed" role="status">that surface failed — acorn's own is showing</span>
+              </Show>
+            </Field>
+          )}
+        </For>
+      </div>
+    </Show>
+  )
+}
+
+// Core's own name for each designated surface. Core's, not the plugin's: the label beside the picker has
+// to say which of ACORN's surfaces is being replaced, and a plugin's own label is already the option text.
+const CORE_SLOT_LABEL: Record<CoreExclusiveSlot, string> = { 'rail.taskList': 'Task list in the rail' }

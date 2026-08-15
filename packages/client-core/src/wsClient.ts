@@ -19,11 +19,20 @@ import { activeNodeId } from './node/activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
 
 type OutputCb = (m: ServerMsg) => void
-type NoticeCb = (n: { taskId: string; kind: 'gate' | 'run-done' | 'repo-config-trust'; title: string; action?: 'review-config' }) => void
+// Exported because subscribers outside this package (the terminal plugin's client) used to keep a
+// hand-written twin of it, which drifted the moment a fourth kind was added. One declaration, imported.
+export type WorkflowNotice = {
+  taskId: string
+  kind: 'gate' | 'run-done' | 'repo-config-trust' | 'plugin-request'
+  title: string
+  action?: 'review-config' | 'review-plugin-request'
+}
+type NoticeCb = (n: WorkflowNotice) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<() => void>()
+const pluginsSubs = new Set<() => void>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
 const reconnectSubs = new Set<() => void>()
@@ -120,6 +129,13 @@ registerWsChannel('workflow', (frame) => {
   if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
 })
 
+// Core's third prefix, and it is core's for the same reason `workflow:` is: the plugin ROSTER is the
+// node's own state, not any one plugin's. Content-free like `term:status` — the subscriber re-reads the
+// roster route (plugins/reload.ts).
+registerWsChannel('plugins', (frame) => {
+  if (frame.channel === 'plugins:changed') pluginsSubs.forEach((cb) => cb())
+})
+
 
 // Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
 // queries stale so whatever is on screen refetches.
@@ -142,6 +158,7 @@ export function _resetWsClient(): void {
   everOnline.clear()
   outputSubs.clear()
   statusSubs.clear()
+  pluginsSubs.clear()
   noticeSubs.clear()
   stepEventSubs.clear()
   reconnectSubs.clear()
@@ -179,6 +196,15 @@ export function wsOnStatus(cb: () => void): () => void {
   statusSubs.add(cb)
   connect()
   return () => void statusSubs.delete(cb)
+}
+
+// "This node's plugin set changed" — a reload swapped a plugin's node half (docs/plugins.md § The dev
+// loop). A subscriber, not a direct call into the plugin layer, because plugins/chrome already imports
+// this module and the reverse edge would be a cycle.
+export function wsOnPluginsChanged(cb: () => void): () => void {
+  pluginsSubs.add(cb)
+  connect()
+  return () => void pluginsSubs.delete(cb)
 }
 
 export function wsOnNotice(cb: NoticeCb): () => void {

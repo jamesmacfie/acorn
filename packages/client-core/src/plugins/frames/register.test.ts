@@ -23,6 +23,7 @@ const { uiSlotRegistry } = await import('../../registries/slots')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
 const { surfaceFailures } = await import('../surfaceFailures')
 const { openPluginOverlay, closePluginOverlay } = await import('./overlays')
+const { exclusiveSlotOffers, exclusiveSlotRegistry, resolveExclusiveSlot } = await import('../../registries/exclusiveSlots')
 const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = await import('./register')
 
 // The frame host pass (docs/plugins.md § Frame contribution kind).
@@ -107,6 +108,31 @@ describe('syncFrameContributions', () => {
       importers: ['board-importer'],
       slots: ['board-picker'],
     })
+  })
+
+  it('a coreSlot surface registers an OFFER, and replaces nothing until the owner picks it', () => {
+    // The exclusive slot (registries/exclusiveSlots.ts owns the arbitration and its own test). What this
+    // one pins is the wiring: the target lands in its own registry rather than in `panes`, so a
+    // replacement never appears in the pane switcher — and registering it changes nothing on screen.
+    seedTrusted(row('board', {
+      frames: [surface({ target: 'coreSlot', id: 'board-rail', coreSlot: 'rail.taskList' })],
+    }))
+    syncFrameContributions()
+    expect(ids().panes).toEqual([])
+    expect(exclusiveSlotOffers('rail.taskList').map((entry) => entry.pluginId)).toEqual(['board'])
+    expect(resolveExclusiveSlot('rail.taskList', undefined)).toBeNull()
+    expect(resolveExclusiveSlot('rail.taskList', 'board')?.pluginId).toBe('board')
+  })
+
+  it('refuses a coreSlot surface naming a core surface this shell has no host for', () => {
+    // Version skew: a newer node describing a designated surface this client cannot draw. Refused rather
+    // than coerced into the one that does exist, so the failure is visible to its author.
+    seedTrusted(row('board', {
+      frames: [surface({ target: 'coreSlot', id: 'board-rail', coreSlot: 'sidebar.future' })],
+    }))
+    syncFrameContributions()
+    expect(exclusiveSlotRegistry.entries()).toEqual([])
+    expect(surfaceFailures().map((entry) => entry.surface)).toContain('board-rail')
   })
 
   it('registers nothing at all until this device has accepted the exact bytes', () => {

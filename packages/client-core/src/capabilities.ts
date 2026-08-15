@@ -12,7 +12,7 @@ import { disabledNodePlugins } from './node/nodePlugins'
 // Those two were one probe until 2026-08-15, and the probe was the wrong one: `terminal` meant "the
 // preload exposes a native folder picker", so the entire terminal/agents/workflows block was hidden
 // from anything that was not Electron, and it stayed visible on a desktop whose node had the terminal
-// plugin turned off. docs/future/node-first/platform-seam.md § The fix, item 3.
+// plugin turned off. git history: docs/future/node-first/platform-seam.md § The fix, item 3.
 //
 // Reach for `desktop` sparingly. It is right for the folder picker and the preview pane; it is wrong
 // for anything whose implementation is an HTTP route.

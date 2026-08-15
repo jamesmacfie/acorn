@@ -43,6 +43,15 @@ export const PrefKeys = {
   // fact about this installation of the app — a second machine paired with the same node has never seen
   // the warning and should get it.
   diskWarningAcked: 'disk_warning_acked',
+  // Which plugin, if any, the owner picked to draw each designated core surface
+  // (registries/exclusiveSlots.ts). A JSON `{ slot: pluginId }` map in ONE key rather than a key per
+  // slot, the same shape `disk_warning_acked` takes: the designated list is short, and a key per member
+  // would need a registration and an eviction rule for a value that is one string.
+  //
+  // The DEVICE's, like `theme` and `style` beside it. Which list a person looks at is a property of the
+  // screen they are looking at, and the plugin behind the choice may not even be installed on the other
+  // machine paired with the same node.
+  exclusiveSlots: 'exclusive_slots',
 } as const
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]

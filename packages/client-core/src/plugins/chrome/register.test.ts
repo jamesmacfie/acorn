@@ -20,7 +20,8 @@ const { keybindingRegistry } = await import('../../registries/keybindings')
 const { contentLinkRegistry, parseInAppTarget } = await import('../../registries/contentLinks')
 const { refResolverRegistry } = await import('../../registries/refResolvers')
 const { sourceRegistry } = await import('../../registries/sources')
-const { taskSlotRegistry } = await import('../../registries/slots')
+const { taskSlotRegistry, uiSlotRegistry } = await import('../../registries/slots')
+const { contextMenuItems, contextMenuRegistry } = await import('../../registries/contextMenus')
 const { orphanedPluginOverrideIds } = await import('../../settings/shortcutSettingsModel')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
 const { _resetChromeContributions, syncChromeContributions, usableEmptyState } = await import('./register')
@@ -54,7 +55,14 @@ const row = (name: string, over: Partial<NodePluginRow> = {}, declared: Partial<
 
 const CHROME: Partial<PluginContributions> = {
   sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v2/p/board/rail-items' }],
-  slots: [{ id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge' }],
+  slots: [
+    { id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge' },
+    { id: 'board-status', slot: 'topbar', data: '/v2/p/board/status' },
+  ],
+  contextMenus: [{
+    id: 'board-open', location: 'task.row', label: 'Open the board card', order: 500,
+    action: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+  }],
   palette: [{ id: 'board.new', title: 'Board: new card', action: { verb: 'runNodeAction', path: '/v2/p/board/new' } }],
   attention: [{ id: 'board-stuck', order: 500, items: '/v2/p/board/attention' }],
   nodeStats: [{ id: 'board-count', order: 500, label: ['card stuck', 'cards stuck'], data: '/v2/p/board/stat' }],
@@ -70,6 +78,8 @@ const CHROME: Partial<PluginContributions> = {
 const ids = () => ({
   sources: sourceRegistry.entries().map((entry) => entry.id),
   slots: taskSlotRegistry.entries().map((entry) => entry.id),
+  shellSlots: uiSlotRegistry.entries().map((entry) => entry.id),
+  contextMenus: contextMenuRegistry.entries().map((entry) => entry.id),
   commands: commandRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
   keybindings: keybindingRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
   attention: attentionRegistry.entries().map((entry) => entry.id),
@@ -98,6 +108,8 @@ describe('syncChromeContributions', () => {
     expect(ids()).toEqual({
       sources: ['board'],
       slots: ['board-footer'],
+      shellSlots: ['board-status'],
+      contextMenus: ['plugin:board:board-open'],
       commands: ['plugin.board.board.new'],
       keybindings: [],
       attention: ['board-stuck'],
@@ -216,10 +228,98 @@ describe('syncChromeContributions', () => {
     _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
     syncChromeContributions()
     // The registries throw on a duplicate id, so a pass that failed to dispose would not merely
-    // double the list — it would take the plugin's chrome away entirely.
+    // double the list — it would take the plugin's chrome away entirely. The reload path calls this
+    // on every `plugins:changed`, so a leaked registration shows up here as a missing contribution.
     syncChromeContributions()
     expect(ids().sources).toEqual(['board'])
     expect(ids().attention).toEqual(['board-stuck'])
+    expect(ids().shellSlots).toEqual(['board-status'])
+    expect(ids().contextMenus).toEqual(['plugin:board:board-open'])
+  })
+
+  it('routes each manifest slot name to its own registry and skips one it does not know', () => {
+    // `footer` is a TASK slot and `topbar` a SHELL one. A roster row is bytes a node sent, so a slot
+    // name from a newer schema is dropped rather than defaulted into whichever registry is handy.
+    const slots: Partial<PluginContributions> = {
+      slots: [
+        { id: 'board-footer', slot: 'footer', data: '/v2/p/board/badge' },
+        { id: 'board-status', slot: 'topbar', data: '/v2/p/board/status' },
+        { id: 'board-drawer', slot: 'drawer' as never, data: '/v2/p/board/drawer' },
+      ],
+    }
+    _seedPluginDistribution([['node-a', [row('board', {}, slots)]]])
+    syncChromeContributions()
+    expect(ids().slots).toEqual(['board-footer'])
+    expect(ids().shellSlots).toEqual(['board-status'])
+    expect(uiSlotRegistry.get('board-status')?.slot).toBe('topbar.right')
+  })
+
+  it('gates a topbar chip on the plugin running on the node being looked at', () => {
+    _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+    syncChromeContributions()
+    const chip = uiSlotRegistry.get('board-status')!
+    expect(chip.when!({} as never)).toBe(true)
+    setActiveNode('node-b')
+    expect(chip.when!({} as never)).toBe(false)
+  })
+
+  describe('context menus', () => {
+    const target = {
+      location: 'task.row' as const,
+      id: 'task-42', title: 'Ship it', origin: 'github', projectId: 'p1', pinned: false, branch: 'me/ship',
+    }
+
+    it('offers the row on the declared location, namespaced by its owner', () => {
+      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
+      syncChromeContributions()
+      expect(contextMenuItems('task.row', target).map((entry) => entry.label)).toEqual(['Open the board card'])
+    })
+
+    it('drops a row whose action this device cannot honour, keeping the rest of the chrome', () => {
+      // Same rule a command and an empty state get: the pane was never declared, so the row could only
+      // fail. The plugin keeps its other contributions.
+      const bad: Partial<PluginContributions> = {
+        ...CHROME,
+        contextMenus: [{
+          id: 'board-open', location: 'task.row', label: 'Open', order: 500,
+          action: { verb: 'openPane', pane: 'never-declared' },
+        }],
+      }
+      _seedPluginDistribution([['node-a', [row('board', {}, bad)]]])
+      syncChromeContributions()
+      expect(ids().contextMenus).toEqual([])
+      expect(ids().sources).toEqual(['board'])
+    })
+
+    it('drops a row naming a location or a fact this shell does not have', () => {
+      const bad: Partial<PluginContributions> = {
+        ...CHROME,
+        contextMenus: [
+          { id: 'from-the-future', location: 'file.row', label: 'Open', order: 500, action: { verb: 'runNodeAction', path: '/v2/p/board/open' } },
+          { id: 'bad-when', location: 'task.row', label: 'Open', order: 500, when: { branch: 'main' }, action: { verb: 'runNodeAction', path: '/v2/p/board/open' } },
+        ],
+      }
+      _seedPluginDistribution([['node-a', [row('board', {}, bad)]]])
+      syncChromeContributions()
+      expect(ids().contextMenus).toEqual([])
+      expect(ids().nodeStats).toEqual(['board-count'])
+    })
+
+    it('hides the row on a node that does not run the plugin', () => {
+      _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
+      syncChromeContributions()
+      expect(contextMenuItems('task.row', target)).toHaveLength(1)
+      setActiveNode('node-b')
+      expect(contextMenuItems('task.row', target)).toEqual([])
+    })
+
+    it('contributes nothing for a plugin whose bundle this device has not accepted', () => {
+      const withBundle = row('board', {}, CHROME)
+      withBundle.installed!.client = { hash: HASH, bytes: 12 }
+      _seedPluginDistribution([['node-a', [withBundle]]])
+      syncChromeContributions()
+      expect(ids().contextMenus).toEqual([])
+    })
   })
 
   it('contributes nothing for a plugin whose bundle this device has not accepted', () => {
@@ -452,7 +552,7 @@ describe('syncChromeContributions', () => {
 
     _seedPluginDistribution([['node-a', []]])
     syncChromeContributions()
-    expect(ids()).toEqual({ sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [], refResolvers: [] })
+    expect(ids()).toEqual({ sources: [], slots: [], shellSlots: [], contextMenus: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [], refResolvers: [] })
     expect(orphanedPluginOverrideIds(overrides, keybindingRegistry.entries())).toEqual([overrideId])
   })
 })

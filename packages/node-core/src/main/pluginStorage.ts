@@ -56,6 +56,15 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
   // foreign keys — main/sqlite.ts keeps enforcement off, matching what better-sqlite3 did, so no
   // plugin gets enforcement it was never written against.
   const db = drizzleOverSqlite(sqlite)
+  // Reload: registration rollback and SCHEMA rollback are different promises, and only the first is made.
+  //
+  // A live reload (server/plugin/host.ts § reload) runs the candidate's init while the previous instance
+  // is still serving, so a dev-loop iteration that adds a migration applies it here, mid-process, against
+  // a second handle on the same file. If the candidate's init then throws, the host puts every
+  // REGISTRATION back the way it was — and cannot un-migrate. There is no down-migration anywhere in this
+  // system and adding one for the dev loop would be a schema-versioning project, so the honest position is
+  // that the author iterating on the plugin owns the data they just changed the shape of. If that ever
+  // needs to be stronger, the cheap version is a file copy taken before the candidate opens.
   migrate(db, { migrationsFolder: options.migrationsFolder })
   for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
     if (existsSync(path)) chmodSync(path, 0o600)

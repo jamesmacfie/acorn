@@ -66,7 +66,9 @@ The Node exposes one Hono application:
 - `/v2/node` and `/v2/pair` are the two pre-auth pairing routes;
 - `/v2/core/*` contains core-owned workspaces, projects, tasks, worktrees, integrations, settings,
   security, backup, audit, agent-tool, and task-context routes;
-- `/v2/p/<plugin>/*` contains plugin-contributed routes;
+- `/v2/p/<plugin>/*` contains plugin-contributed routes. A built-in's router is mounted when the app
+  is built; a loaded plugin's fetch handler is resolved from the route registry per REQUEST, so a
+  plugin reloaded in place serves its new handler without a restart (docs/plugins.md § The dev loop);
 - `/v2/events` is the authenticated WebSocket for invalidation events, PTY/process streams, Docker
   streams, workflow notices, agent events, and preview tunnels.
 
@@ -164,6 +166,14 @@ table-owning plugin owns its own SQLite file and migration chain. Plugins do not
 databases or use cross-file foreign keys; cross-plugin references are IDs resolved through typed
 CoreServices or capability contracts.
 
+The same line holds in the UI. A plugin's surface can be extended by another plugin only where its own
+manifest declares an extension point, and what crosses is a host-validated descriptor fetched from the
+contributor's own route — never a component, a callback, or DOM access into another realm
+([plugins.md](./plugins.md) § Cooperative extension points). A plugin may also offer to draw one of
+core's designated surfaces, which the user arbitrates in settings and which falls back to core's own
+implementation on absence or failure. Neither is reachable from a plugin frame: both registries are
+populated host-side from manifests the device read, and the frame bridge gained no message kind.
+
 The shared on-disk blob cache stores immutable patch bodies, file bodies, attachments, and artifacts
 by content hash. Worktrees and blobs are not included in backups. Backup snapshots core and plugin
 databases with credentials and device rows scrubbed; restore is a manual operation into a fresh data
@@ -202,6 +212,8 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - [extensibility.md](./extensibility.md) — **why** the plugin system is shaped the way it is, the
   decisions behind it, and where it is going. Read before changing a plugin seam.
 - [plugins.md](./plugins.md), [agent-tools.md](./agent-tools.md) — extension and tool boundaries.
+- [plugin-authoring.md](./plugin-authoring.md) — the no-build-step authoring contract for a loaded
+  plugin written by hand, with a worked example.
 - [first-party-plugins.md](./first-party-plugins.md) — every shipped plugin, and which of them are
   first-party because they must be rather than because they were written first.
 - [third-party/](./third-party/) — review findings from moving Rollbar out of the binary and onto

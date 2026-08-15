@@ -27,6 +27,9 @@ import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 import { completeTaskArchive } from '../tasks/archiveLifecycle'
 import { TaskSlotHost } from '../registries/uiSlots'
+import ExclusiveSlotHost from '../plugins/ExclusiveSlotHost'
+import { registerContextMenuItems, type TaskRowTarget } from '../registries/contextMenus'
+import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../registries/contextMenuHost'
 import Icon from '../ui/Icon'
 import IconPicker from '../ui/IconPicker'
 import './tabrail.css'
@@ -49,6 +52,10 @@ export default function TabRail() {
   const prefs = createQuery(() => prefsOptions(true))
   const [menuId, setMenuId] = createSignal<string | null>(null)
   const [dragId, setDragId] = createSignal<string | null>(null)
+  // The right-click door onto the same row actions. One menu for the whole list rather than one per
+  // row, and the row it belongs to travels in the signal — the same reason `menuId` is rail state.
+  const [rowMenu, setRowMenu] = createSignal<ContextMenuOpening | null>(null)
+  let rowMenuReturnFocus: HTMLElement | undefined
 
   // Rail order (docs/panes.md): pin-to-top + drag-reorder in a dedicated pref — never
   // tasks.sort. The pure model lives in railOrder.ts.
@@ -139,7 +146,49 @@ export default function TabRail() {
     navigate(pathForTask(w))
   }
 
+  // What a right-click on a task row is ABOUT, in the host's own vocabulary
+  // (registries/contextMenus.ts). Flat scalars, because a contributed `when` is a map of literals
+  // compared against these fields — `origin`, `projectId` and `pinned` are the three a contribution
+  // may match on, and `id`/`title` are the payload the action receives rather than a predicate.
+  const rowTarget = (w: Task): TaskRowTarget => ({
+    location: 'task.row',
+    id: w.id,
+    title: w.title,
+    origin: w.origin,
+    projectId: w.projectId,
+    pinned: isPinned(railOrder(), w.id),
+    branch: w.branch,
+  })
+  const taskById = (id: string) => (query.data ?? []).find((task) => task.id === id)
+
   onMount(() => {
+    // Core's own row actions, registered rather than written inline — this registry's first consumers.
+    // The point of moving them is the contract: a menu contribution is a label, an order, a predicate
+    // over the target and one action, and that is only true if core's items fit it too. Pin and Unpin
+    // are two contributions with opposite `when`s rather than one row with a computed label, which is
+    // the shape a manifest can express.
+    const rowActions = registerContextMenuItems([
+      {
+        id: 'task.pin', location: 'task.row', label: 'Pin to top', icon: 'pin', order: 10,
+        when: (target) => !target.pinned,
+        run: (target) => void saveOrder(pinTask(railOrder(), target.id)),
+      },
+      {
+        id: 'task.unpin', location: 'task.row', label: 'Unpin', icon: 'pin-off', order: 10,
+        when: (target) => target.pinned,
+        run: (target) => void saveOrder(unpinTask(railOrder(), target.id)),
+      },
+      {
+        id: 'task.rename', location: 'task.row', label: 'Rename', icon: 'square-pen', order: 20,
+        // Re-read from the query rather than closed over: a contribution receives the flat target, and
+        // the modal wants the whole row. The task can have gone away between the click and the read.
+        run: (target) => { const task = taskById(target.id); if (task) openRename(task) },
+      },
+      {
+        id: 'task.archive', location: 'task.row', label: 'Archive', icon: 'archive', order: 30, tone: 'danger',
+        run: (target) => { const task = taskById(target.id); if (task) void openArchive(task) },
+      },
+    ])
     const numbered = Array.from({ length: 9 }, (_, index) => ({
       id: `task.activate.${index + 1}`,
       title: `Activate task ${index + 1}`,
@@ -149,6 +198,9 @@ export default function TabRail() {
         const task = visibleTasks()[index]
         if (!task) return
         setMenuId(null)
+        // The right-click menu closes on any pointerdown, so this is the one path that can leave it
+        // open: a chord navigating away underneath it.
+        setRowMenu(null)
         activateTaskSignals(task)
         navigate(pathForTask(task))
       },
@@ -165,7 +217,7 @@ export default function TabRail() {
         active: () => visibleTasks().length > index,
       })),
     ])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    onCleanup(() => { bindings.dispose(); commands.dispose(); rowActions.dispose() })
   })
 
   function openNew() {
@@ -280,6 +332,11 @@ export default function TabRail() {
         </For>
       </div>
       <div class="tabrail-sep" />
+      {/* The one designated core surface a plugin may offer to replace (registries/exclusiveSlots.ts).
+          Registering an offer seizes nothing: unless the owner picked a provider in Settings -> Plugins,
+          and that provider is installed, enabled here and has not thrown, the list below is what draws.
+          `core` is a getter so the subtree and its queries cost nothing while a replacement is up. */}
+      <ExclusiveSlotHost slot="rail.taskList" core={() => (
       <div class="tabrail-list">
         <For each={visibleTasks()}>
           {(w) => {
@@ -311,6 +368,15 @@ export default function TabRail() {
             <div
               class="tabrail-item"
               draggable={true}
+              // The second door onto the row's actions. `contextmenu` is also what the platform
+              // dispatches for Shift+F10 and the menu key, so this is the keyboard path too — and the
+              // button menu beside it still offers the identical list, from the identical registry.
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setMenuId(null)
+                rowMenuReturnFocus = e.currentTarget.querySelector<HTMLElement>('.tabrail-task') ?? undefined
+                setRowMenu({ at: { x: e.clientX, y: e.clientY }, target: rowTarget(w) })
+              }}
               onDragStart={(e) => {
                 setDragId(w.id)
                 e.dataTransfer?.setData('text/plain', w.id)
@@ -363,14 +429,9 @@ export default function TabRail() {
                     <Menu.Label>{w.title}</Menu.Label>
                     <Menu.Label>{w.branch ?? 'Project folder'}</Menu.Label>
                     <Menu.Separator />
-                    <Menu.Item
-                      context={menu}
-                      onSelect={() => void saveOrder(isPinned(railOrder(), w.id) ? unpinTask(railOrder(), w.id) : pinTask(railOrder(), w.id))}
-                    >
-                      {isPinned(railOrder(), w.id) ? 'Unpin' : 'Pin to top'}
-                    </Menu.Item>
-                    <Menu.Item context={menu} onSelect={() => openRename(w)}>Rename</Menu.Item>
-                    <Menu.Item context={menu} tone="danger" onSelect={() => openArchive(w)}>Archive</Menu.Item>
+                    {/* The rows come from the registry, core's own included, so this menu and the
+                        right-click one can never offer different things. */}
+                    <ContextMenuItems context={menu} location="task.row" target={rowTarget(w)} />
                   </>
                 )}
               </Menu>
@@ -393,6 +454,16 @@ export default function TabRail() {
           }}
         </For>
       </div>
+      )} />
+      {/* One right-click menu for the whole list. Focus goes back to the row's own button on dismiss,
+          which is what keeps this usable from the keyboard rather than a mouse-only affordance. */}
+      <ContextMenuHost
+        location="task.row"
+        ariaLabel={rowMenu() ? `Actions for ${rowMenu()!.target.title}` : 'Task actions'}
+        opening={rowMenu}
+        onClose={() => setRowMenu(null)}
+        returnFocus={() => rowMenuReturnFocus}
+      />
       <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
         +
       </button>

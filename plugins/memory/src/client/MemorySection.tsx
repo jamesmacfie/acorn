@@ -2,6 +2,7 @@ import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import { toast, type Task } from '@acorn/plugin-api/client'
 import { memoryApi, type MemoryType } from './memoryClient'
 import { Alert, Textarea } from '@acorn/plugin-api/ui'
+import './memory-section.css'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
@@ -75,16 +76,16 @@ export default function MemorySection(props: {
     <>
       <Show when={proposalError()}><Alert>{proposalError()}</Alert></Show>
       <Show when={(proposals() ?? []).length}>
-        <div class="context-tray-proposals">
+        <div class="memory-proposals">
           <span class="muted">Memory proposals (auto-generated — review before they land):</span>
           <For each={proposals() ?? []}>
             {(p) => (
               <>
-                <div class="context-tray-proposal">
+                <div class="memory-proposal">
                   <span class="context-tray-kind">{p.type}</span>
                   <span class="context-tray-label" title={p.body}>{p.name}</span>
                   <input
-                    class="ui-input context-tray-proposal-desc"
+                    class="ui-input memory-proposal-desc"
                     type="text"
                     value={propEdits()[p.id] ?? p.description}
                     onInput={(e) => setPropEdits((prev) => ({ ...prev, [p.id]: e.currentTarget.value }))}
@@ -95,8 +96,8 @@ export default function MemorySection(props: {
                 {/* Verification flags (structural `flags`, docs/notes-and-memory.md): shown as warning badges
                     beside the proposal, never folded into the description text. */}
                 <Show when={p.flags.length}>
-                  <div class="context-tray-proposal-flags">
-                    <For each={p.flags}>{(f) => <span class="context-tray-proposal-flag">⚠ {f}</span>}</For>
+                  <div class="memory-proposal-flags">
+                    <For each={p.flags}>{(f) => <span class="memory-proposal-flag">⚠ {f}</span>}</For>
                   </div>
                 </Show>
               </>
@@ -105,14 +106,14 @@ export default function MemorySection(props: {
         </div>
       </Show>
       <Show when={memoryApi()}>
-        <div class="context-tray-actions">
+        <div class="memory-section-actions">
           <button type="button" class="ui-btn" onClick={() => setMemFormOpen(!memFormOpen())}>+ memory</button>
           <Show when={memMsg()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
         </div>
       </Show>
       <Show when={memFormOpen()}>
         <form
-          class="context-tray-memform"
+          class="memory-section-form"
           onSubmit={(e) => {
             e.preventDefault()
             void addMemory()
@@ -130,7 +131,7 @@ export default function MemorySection(props: {
           </div>
           <input class="ui-input" type="text" placeholder="one-line description" value={memDesc()} onInput={(e) => setMemDesc(e.currentTarget.value)} />
           <Textarea mono rows="3" placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(e) => setMemBody(e.currentTarget.value)} />
-          <div class="context-tray-actions">
+          <div class="memory-section-actions">
             <button type="submit" class="ui-btn" disabled={!memName().trim() || !memDesc().trim()}>Save memory</button>
           </div>
         </form>

@@ -83,3 +83,27 @@ export function pluginRouteContributions(): readonly RouteContribution[] {
 export function removePluginRoutes(plugin: string): void {
   registry.remove(plugin)
 }
+
+/** Which fetch-shaped contribution should serve `path`, resolved at REQUEST time.
+ *
+ * createApp() used to iterate the registry once and capture `contribution.fetch` in a mount-time
+ * closure, which quietly made the mount table a boot snapshot: a reload replaced the registry's entry
+ * and every request still reached the previous instance's handler. The app now mounts one dispatcher
+ * over the whole plugin namespace and asks here per request, so this registry is the single source of
+ * truth about who serves what — and a prefix that only exists after a reload is reachable, as is a
+ * plugin that contributed no routes at all when the app was built.
+ *
+ * Longest prefix wins, so a plugin owning both '' and '/tasks' gets the specific handler for
+ * '/tasks/…'. That keeps registration order irrelevant, which is what `register` above promises. */
+export function resolvePluginFetch(plugin: string, path: string): { mount: string; fetch: PluginFetchHandler } | null {
+  let best: { mount: string; fetch: PluginFetchHandler } | null = null
+  for (const contribution of registry.list()) {
+    if (contribution.plugin !== plugin || !contribution.fetch) continue
+    const mount = routeMountPath(contribution)
+    // A segment boundary, never a bare startsWith: '/v2/p/a/tasks' must not be served by a '/task'
+    // prefix, and the bare mount itself has to match because a plugin may own its whole namespace.
+    if (path !== mount && !path.startsWith(`${mount}/`)) continue
+    if (!best || mount.length > best.mount.length) best = { mount, fetch: contribution.fetch }
+  }
+  return best
+}

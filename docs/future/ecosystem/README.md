@@ -1,12 +1,9 @@
 # Ecosystem: acorn as a shell over third-party plugins
 
-Design notes from the ecosystem-feasibility session (2026-08-14). Nothing here is scheduled; this
-folder records the assessment so a future project starts from conclusions instead of re-deriving
-them. It is the umbrella over four folders that already hold the detailed designs —
-`docs/future/user-extensions/`, `docs/future/dashboards/`, `docs/future/architecture/`, and
-`docs/future/node-first/` (the 2026-08-15 simplicity/maintainability review toward this same end
-goal, with cross-cutting preconditions the phases below inherit) — plus `docs/extensibility.md`
-and `docs/security.md`. Where this folder disagrees with any of those, those win.
+Design notes from the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16 to what is
+still ahead. Nothing here is scheduled. It is the umbrella over the remaining design material —
+`docs/future/dashboards/` and `docs/future/compiled-tier.md` — plus `docs/extensibility.md` and
+`docs/security.md`. Where this folder disagrees with any of those, those win.
 
 ## The end goal being assessed
 
@@ -17,66 +14,48 @@ compose their own experience — dashboards, plugins, plugins talking to each ot
 authors get developer experience good enough that building a quality acorn plugin is an afternoon,
 not a week.
 
-## The verdict, in plain words
+## Where this stands (2026-08-16)
 
-This is feasible, and most of the design work is already done and written down. Nothing in acorn's
-architecture fundamentally blocks it. What stands in the way is four deliberate decisions, each
-with a recorded rationale and a designed answer:
+Much of the original assessment has shipped. The agent-authored dev loop is real: the authoring
+contract is `docs/plugin-authoring.md`; a loaded plugin hot-reloads in place
+(`POST /v2/core/plugins/:id/reload`, candidate-then-commit, a `plugins:changed` event the client
+re-syncs on); the agent raises installs through an approval-mediated tool and iterates under a
+per-(plugin, node) dev grant; plugin themes, declarative chrome, context menus, cooperative
+extension points and exclusive slots are manifest vocabulary (`docs/plugins.md`,
+`docs/ui-design.md § Plugin themes`). The node-first review's contracts also landed: the
+client↔node version contract (`docs/api-reference.md § Versioning`), the platform seam, and
+node-side ownership of user compositions (`docs/state.md`).
 
-1. A plugin's node half runs inside the node process with the node's full access. The permission
-   system describes what a plugin asks for; it does not stop a plugin taking more. Fine for
-   plugins you wrote. Not fine for a marketplace. The fix (one child process per plugin) is
-   designed in `docs/security.md` as "rung 2" and was deliberately kept a refactor, not a
-   redesign.
-2. Plugin packages are not signed, and there is no discovery surface. Hash pinning and audited
-   installs exist; signing and a marketplace do not.
-3. Nothing reloads. Installing or updating a plugin needs a node restart and a renderer reload.
-   The fix is designed in `docs/future/user-extensions/agent-authored-plugins.md` and is smaller
-   than it looks.
-4. An external author cannot build a plugin today, because `@acorn/plugin-api` only resolves
-   inside this workspace. That is now the whole of this gate: the eight developer-experience
-   findings that sat behind it were implemented in August 2026, and the behavior they produced is
-   documented in `docs/plugins.md`, `docs/testing.md`, `docs/data-layer.md` and
-   `docs/local-development.md`. What is left over is small and named in `dx.md`.
+What remains is exactly three programs plus one map:
 
-The one place the vision collides with a decision this repo defends well is the "permanent"
-first-party tier: streams, in-shell components, and Electron-main code stay first-party, and the
-Monaco finding proved heavyweight surfaces get *host-owned surfaces plugins borrow*, not a wider
-sandbox. So the honest end state is not a thin shell. It is a fat, opinionated core — security,
-transport, trust, the workspace/task model, a few host-owned surfaces — with everything
-integration-shaped, data-shaped, and workflow-shaped as plugins. That is most of the vision, and
-it is the part users care about. `shell-vision.md` records this stance and why.
-
-## Recommended build order
-
-1. **The agent-authored dev loop** — the five items in `docs/future/user-extensions/README.md`
-   (authoring profile, reload path, approval-mediated install, dev trust grant, agent
-   enablement). This delivers "point at a folder and iterate" and the self-modification loop.
-2. **Developer experience, in parallel** — mostly done. The eight review findings (failure
-   visibility first) shipped; what remains of this item is making `@acorn/plugin-api` installable
-   from outside the workspace, plus the residue the review left behind. (`dx.md`)
-3. **Rung-2 containment** — the long pole, and the gate on anything marketplace-shaped. Ship it
-   before any discovery surface exists. (`blockers.md`)
-4. **Dashboards phases 1–3** — per `docs/future/dashboards/README.md`. Independent of the above;
+1. **The front door** — `@acorn/plugin-api` still only resolves inside this workspace. Publishing
+   it is the whole of what blocks a genuinely external author. (`dx.md`)
+2. **Rung-2 containment** — the long pole, and the hard gate on anything discovery-shaped. A
+   loaded plugin's node half still runs in-process, disclosed rather than contained.
+   (`blockers.md`)
+3. **Dashboards** — phases 1–3 of `docs/future/dashboards/README.md`. Independent of the above;
    this is where plugin composition becomes visible to users.
-5. **Distribution, last** — signing, the remaining `docs/future/bundle.md` release work so a
-   remote node is a download, then discovery. `docs/extensibility.md` already says ecosystem work
-   goes last; this folder agrees and says what "last" contains. (`work-plan.md`)
+4. **Distribution, last** — signing, the `docs/future/bundle.md` release work so a remote node is
+   a download, then discovery over signed packages. (`work-plan.md`)
+
+`docs/future/compiled-tier.md` is not a phase — it is the standing per-plugin map for shrinking
+the compiled tier, consulted whenever a move is considered.
 
 ## The files
 
 | File | What it holds |
 | --- | --- |
-| `blockers.md` | The four gates between today and strangers installing plugins — each with its designed answer and owning doc. |
+| `blockers.md` | The gates still standing between today and strangers installing plugins — each with its designed answer and owning doc. |
 | `shell-vision.md` | The tension between "acorn as shell" and the permanent tier line, and the stance adopted. |
-| `work-plan.md` | The sequenced work with dependencies, sized honestly, pointing at the owning design docs. |
-| `dx.md` | What "world-class plugin DX" requires, what exists, what is missing, and the differentiator. |
+| `work-plan.md` | The remaining sequenced work with dependencies, pointing at the owning design docs. |
+| `dx.md` | What "world-class plugin DX" still requires, and the differentiator. |
 | `references-survey.md` | What the projects in `references/` do, which ones acorn can replace, and the five capabilities that recur across all of them. |
 
 ## Drift warning — read this before building
 
-Every behavioral claim in this folder was verified against the tree and the owning docs on
-**2026-08-14**. The codebase will drift before this is built; `references/` may move or be
+Behavioral claims here were verified against the tree on **2026-08-14** and re-checked
+**2026-08-16**. The codebase will drift before the rest is built; `references/` may move or be
 deleted. Treat the *decisions and orderings* here as durable and the *paths* as hints. The owning
-docs for current behavior are `docs/plugins.md`, `docs/security.md`, `docs/extensibility.md`, and
-`docs/third-party/README.md` — where this folder disagrees with those, those win.
+docs for current behavior are `docs/plugins.md`, `docs/plugin-authoring.md`, `docs/security.md`,
+`docs/extensibility.md`, and `docs/third-party/README.md` — where this folder disagrees with
+those, those win.

@@ -61,7 +61,7 @@ That surface is the *implementation* of the platform seam, and the renderer neve
 `boundaries.test.ts`. Presence of a preload key is therefore never a product capability. The folder
 picker in particular is a folder picker — it used to sit under a `terminal` key whose presence gated
 the whole terminal/agents/run-targets/workflows block, which are ordinary `/v2` + WebSocket surfaces
-(`docs/future/node-first/platform-seam.md`).
+(`git history: docs/future/node-first/platform-seam.md`).
 
 ## The plugin frame origin
 

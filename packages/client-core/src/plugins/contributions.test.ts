@@ -132,6 +132,35 @@ describe('eligiblePlugins', () => {
     expect(entry).toMatchObject({ trusted: true, hash: HASH })
     expect(hasWithheldCode(entry)).toBe(false)
   })
+
+  it('withdraws trust when a reload moves the winning hash to bytes nobody accepted', () => {
+    // The reload path re-pins `activeBundles` when the node says its plugin set changed
+    // (plugins/reload.ts), and this is the reason that cannot be a silent activation: consent was given
+    // to a HASH, so the new bundle arrives untrusted and its code-bearing surfaces are withheld until
+    // the owner answers the prompt the distribution pass queues for it.
+    _seedPluginDistribution([['node-a', [row('board', { client: { hash: HASH, bytes: 12 } })]]], [`board ${HASH}`])
+    expect(eligiblePlugins()[0]).toMatchObject({ trusted: true })
+
+    _seedPluginDistribution([['node-a', [row('board', { client: { hash: HASH_B, bytes: 12 } })]]], [`board ${HASH}`])
+    const entry = eligiblePlugins()[0]!
+    expect(entry).toMatchObject({ hash: HASH_B, trusted: false })
+    expect(hasWithheldCode(entry)).toBe(true)
+  })
+
+  it('is the same answer for a dev grant: an acceptance is an acceptance, and losing it withholds code', () => {
+    // The dev grant does not change eligibility, and that is the design (docs/security.md § The dev
+    // grant). It writes an ordinary accepted acknowledgement in main as the bytes land, so the new hash
+    // arrives here already trusted and no prompt is queued for it — and ending dev mode DELETES those
+    // acknowledgements, which is what makes "revoke" mean something on this side of the seam.
+    _seedPluginDistribution([['node-a', [row('board', { client: { hash: HASH_B, bytes: 12 } })]]], [`board ${HASH_B}`])
+    expect(eligiblePlugins()[0]).toMatchObject({ hash: HASH_B, trusted: true })
+
+    // After the revoke: the grant dropped every ack it wrote, so the same bundle is undecided again.
+    _seedPluginDistribution([['node-a', [row('board', { client: { hash: HASH_B, bytes: 12 } })]]], [])
+    const revoked = eligiblePlugins()[0]!
+    expect(revoked).toMatchObject({ hash: HASH_B, trusted: false })
+    expect(hasWithheldCode(revoked)).toBe(true)
+  })
 })
 
 describe('isTaskPane', () => {

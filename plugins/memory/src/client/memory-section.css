@@ -1,0 +1,34 @@
+/* The memory plugin's own markup, moved out of plugins/context.
+ *
+ * These rules used to live in `plugins/context/src/client/context-tray.css` while only
+ * `plugins/memory/src/client/MemorySection.tsx` wore them — a plugin styling another plugin's guest,
+ * which the CSS ownership rule in tools/arch/boundaries.test.ts tracks as a shrinking baseline. Moving
+ * them here is the whole fix: the classes are memory's, so they carry memory's name.
+ *
+ * What did NOT move, and why the coupling is not gone: `.context-tray-kind` and `.context-tray-label`
+ * are context's own vocabulary, worn by ContextPane as well as by this section. Those two are a real
+ * shared contract between a host and its guest, and renaming them would be a rename rather than a fix.
+ * The cooperative extension point (docs/plugins.md) is the seam that would remove them, and this
+ * section cannot use it: it renders editable inputs, a select, a textarea and a two-button gate per
+ * proposal, which is UI, not a descriptor.
+ *
+ * Geometry only, every value a token — the same rule every plugin stylesheet in this repo follows. */
+
+.memory-section-actions { display: flex; gap: var(--space-4); margin-top: var(--space-3); }
+
+/* Inline add-memory form (docs/notes-and-memory.md). */
+.memory-section-form { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--chrome-divider); }
+
+/* Auto-generated memory proposals (docs/notes-and-memory.md — the human gate). */
+.memory-proposals { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--chrome-divider); font-size: var(--fs-sm); }
+.memory-proposal { display: flex; align-items: center; gap: var(--space-4); }
+.memory-proposal-desc { flex: 1; min-width: 0; }
+/* Structural verification flags under a proposal row (never folded into the description). */
+.memory-proposal-flags { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-left: var(--space-4); }
+.memory-proposal-flag {
+  font-size: var(--fs-sm);
+  color: var(--warn);
+  border: var(--control-bw) solid var(--warn);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-4);
+}

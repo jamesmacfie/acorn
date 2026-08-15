@@ -9,7 +9,8 @@ import { pluginState, type PluginsBridge } from './pluginState'
 const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
 const NO_CONTRIBUTIONS = {
   frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [],
-  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [],
+  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],
+  contextMenus: [], extensionPoints: [], extensions: [],
 }
 const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
@@ -50,6 +51,7 @@ const bridge = (situation: Situation): PluginsBridge => {
     install: async () => ({ id: '', version: '', state: 'installed-restart-required' }),
     update: async () => ({ id: '', fromVersion: '', toVersion: '', state: 'installed-restart-required' }),
     uninstall: () => ({ restartRequired: true, dataPurged: false }),
+    reload: async () => ({ id: '', version: '', state: 'reloaded' }),
   }
 }
 

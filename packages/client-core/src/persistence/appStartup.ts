@@ -6,6 +6,9 @@ import type { Project } from '../queries'
 import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../tasks/tasks'
 import { defaultSourceId } from '../registries/sources'
 import { isProjectPath, projectIdFromPath, projectPath } from '../registries/corePaths'
+// Also the module that seeds the built-in twelve into the theme registry, which is what makes
+// `resolveTheme` able to answer at all before Settings → Appearance has ever been opened.
+import { resolveTheme } from '../settings/themes'
 import { PrefKeys } from './prefKeys'
 import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'
 import { createStartupRestore } from './startupRestore'
@@ -19,14 +22,19 @@ const stringCodec = {
 
 const legacyScalar = (key: string) => (prefs: Readonly<Record<string, string>>) => ({ '': prefs[key] ?? '' })
 
+// Every read goes through `resolveTheme` (settings/themes.ts), which falls back to the built-in
+// default when the stored id names a theme that is not registered right now — a plugin theme whose
+// package is disabled, gone, or on a node this window cannot reach. It reads the theme registry, so
+// this function is reactive: the effect below re-runs and the plugin's theme reappears the moment the
+// chrome pass registers it. The stored pref is never rewritten.
 function applyTheme(prefs: Readonly<Record<string, string>>): () => void {
   const follow = (prefs[PrefKeys.themeFollowSystem] ?? (prefs[PrefKeys.theme] ? 'false' : 'true')) === 'true'
   if (!follow) {
-    document.documentElement.dataset.theme = prefs[PrefKeys.theme] ?? 'light'
+    document.documentElement.dataset.theme = resolveTheme(prefs[PrefKeys.theme], 'light')
     return () => {}
   }
-  const light = prefs[PrefKeys.themeLight] ?? 'light'
-  const dark = prefs[PrefKeys.themeDark] ?? 'dark'
+  const light = resolveTheme(prefs[PrefKeys.themeLight], 'light')
+  const dark = resolveTheme(prefs[PrefKeys.themeDark], 'dark')
   const media = matchMedia('(prefers-color-scheme: dark)')
   const update = () => {
     document.documentElement.dataset.theme = media.matches ? dark : light

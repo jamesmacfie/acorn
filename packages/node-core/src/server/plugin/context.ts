@@ -18,7 +18,7 @@ import { registerRoute } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
-import type { CapabilityRegistry } from './capabilities'
+import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
 import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
 import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
@@ -58,6 +58,28 @@ export type PluginContextOptions = {
   // guard, so the host records these per plugin and takes them back on re-init or on a contained
   // failure. A caller that passes nothing (a test) simply keeps no undo record.
   onWsRegistration?: (undo: () => void) => void
+  // The CANDIDATE registration set (server/plugin/host.ts § reload). When present, every registration
+  // this context hands the plugin is buffered here as a thunk instead of reaching the module-singleton
+  // registries, and the host replays it only once it has decided to commit.
+  //
+  // It exists because all six registries reject a duplicate — tool names, provider ids, capability ids —
+  // and on a reload the PREVIOUS instance's registrations are still in them. Running the candidate's
+  // init straight at the live registries would throw on the plugin's own name, which would make
+  // "if init throws, the previous registrations stay fully live" unreachable rather than merely untested.
+  pending?: (() => void)[]
+}
+
+// How a revoked context announces itself. A leaked handle failing loudly here is the whole point: the
+// alternative is a previous instance quietly registering routes nothing serves, or writing through a
+// database handle the host has already closed.
+const revokers = new WeakMap<NodePluginContext, () => void>()
+
+/** Invalidate a context the host has replaced. Called on the PREVIOUS instance's context after a reload
+ * commits (server/plugin/host.ts); every registration, broadcast and `storage.open()` reached through it
+ * throws from then on. `core` and `capabilities.get` are deliberately still live — they are host services
+ * that did not go anywhere, and wrapping them would mean proxying two large surfaces to catch nothing. */
+export function revokePluginContext(ctx: NodePluginContext): void {
+  revokers.get(ctx)?.()
 }
 
 export function buildPluginContext(options: PluginContextOptions): NodePluginContext {
@@ -66,7 +88,8 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
   // Everything below that differs between the two tiers keys off this one value.
   const permissions = options.loaded?.permissions
   const recordWs = options.onWsRegistration ?? (() => {})
-  return {
+  const pending = options.pending
+  const ctx: NodePluginContext = {
     name: plugin,
     routes: {
       // Absent for a loaded plugin: handing the host a live Hono instance from another realm is
@@ -145,4 +168,65 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
       error: (...args: unknown[]) => console.error(`[plugin:${plugin}]`, ...args),
     },
   }
+
+  // ── Buffering and revocation, both for reload (server/plugin/host.ts) ───────────────────────────
+  //
+  // One post-pass rather than a wrapper at each of the ten registration sites, because every site above
+  // is contextually typed by NodePluginContext and wrapping them inline would cost every parameter an
+  // explicit annotation to buy nothing.
+  //
+  // `routes`, `tools`, `contextSections` and `providers` are pure registrations, so they buffer into the
+  // candidate set when there is one. `events` and `storage` are not registrations — a broadcast has to go
+  // out when it is sent and `storage.open()` has to return a handle — so those are only revoked. That is
+  // exact rather than convenient for the tier reload touches: `events.channel`/`streams` are the only
+  // registrations on `events` and both are absent for a loaded plugin.
+  let revoked = false
+  const guard = <A extends unknown[], R>(fn: (...args: A) => R, buffer: boolean): ((...args: A) => R) =>
+    (...args: A): R => {
+      if (revoked) {
+        throw new Error(`Plugin '${plugin}' used a context from a previous load; that instance was replaced by a reload.`)
+      }
+      if (!buffer || !pending) return fn(...args)
+      pending.push(() => void fn(...args))
+      return undefined as R
+    }
+
+  for (const group of ['routes', 'tools', 'contextSections', 'providers', 'events', 'storage'] as const) {
+    // Absent for the members a tier does not get (`undefined as never`), which is why this is a
+    // typeof check per member rather than a list of names.
+    const members = ctx[group] as Record<string, unknown> | undefined
+    if (!members) continue
+    const buffer = group !== 'events' && group !== 'storage'
+    for (const [key, value] of Object.entries(members)) {
+      if (typeof value === 'function') members[key] = guard(value as (...args: unknown[]) => unknown, buffer)
+    }
+  }
+
+  // `capabilities` is the one registration that hands the plugin something back, so it cannot go through
+  // the loop above: the Disposable has to work both before the replay (cancel the pending registration)
+  // and after it (dispose the real one). `get`/`require`/`ids` are reads and stay exactly as they are.
+  if (pending) {
+    const scoped = ctx.capabilities
+    ctx.capabilities = {
+      get: (id) => scoped.get(id),
+      require: (id) => scoped.require(id),
+      ids: () => scoped.ids(),
+      provide: (id, impl) => {
+        let real: Disposable | null = null
+        let cancelled = false
+        pending.push(() => {
+          if (!cancelled) real = scoped.provide(id, impl)
+        })
+        return {
+          dispose: () => {
+            cancelled = true
+            real?.dispose()
+          },
+        }
+      },
+    }
+  }
+
+  revokers.set(ctx, () => void (revoked = true))
+  return ctx
 }

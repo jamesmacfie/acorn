@@ -79,6 +79,13 @@ describe('the route table covers every core route', () => {
       api.coreDeviceRoute(ID),
       api.corePluginsRoute,
       api.corePluginBundleRoute(ID),
+      api.corePluginInstallRoute,
+      api.corePluginUpdateRoute(ID),
+      api.corePluginReloadRoute(ID),
+      api.corePluginRoute(ID),
+      // The sharpest of the family since approval-mediated install: an agent raises a request precisely
+      // because it cannot install, and a frame that could POST the answer would close that loop for it.
+      api.corePluginRequestRoute(ID),
       api.prefsRoute,
       api.agentToolsCatalogRoute,
       api.rendererAgentToolRoute(ID, 'tool'),

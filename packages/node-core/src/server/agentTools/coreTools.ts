@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import { assembleContext, parseInclude } from './contextSections.ts'
+import { pluginAuthoringTool } from './pluginAuthoring.ts'
+import { pluginRequestTool } from './pluginRequests.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from './registry.ts'
 import type { AppDatabase } from '../db/index.ts'
+import { broadcastPluginApprovalNotice } from '../../main/notify.ts'
 import { loadTask, projectForTask } from '../../main/taskWorktree.ts'
 
 // The owner id for the core-owned contributions. Registration is idempotent across service boots.
@@ -89,6 +92,15 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       },
     },
 
+    // ── Extending acorn itself ─────────────────────────────────────────────────────────────────────
+    //
+    // How to write one (read tier). Importing the module also registers the matching `plugin-authoring`
+    // context section, which is opt-in — a task not writing a plugin assembles it never.
+    pluginAuthoringTool(),
+    // The only tool that can put third-party code on this node, and it does so by ASKING: it raises a
+    // request and rings the owner's bell. The install is performed by a device over the device-gated
+    // install route (agentTools/pluginRequests.ts says why that split is the whole design).
+    pluginRequestTool(broadcastPluginApprovalNotice),
   ]
 }
 

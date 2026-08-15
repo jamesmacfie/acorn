@@ -1,6 +1,7 @@
-import type { Context } from 'hono'
+import type { Context, Next } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
+import { resolvePluginFetch } from '../routeRegistry'
 import { pluginRequestContext } from './requestContext'
 import type { PluginFetchHandler } from './types'
 
@@ -23,4 +24,22 @@ export async function servePluginFetch(
     ...(raw.method === 'GET' || raw.method === 'HEAD' ? {} : { body: raw.body, duplex: 'half' }),
   } as RequestInit)
   return args.fetch(forwarded, pluginRequestContext(c, args.pluginId))
+}
+
+/** The one handler createApp mounts over `/v2/p/:plugin` and `/v2/p/:plugin/*` for every fetch-shaped
+ * contribution there will ever be.
+ *
+ * A handler rather than a mount per contribution, because a reload replaces a plugin's entries in the
+ * route registry while the app's mount table stays as it was built at boot: closing over
+ * `contribution.fetch` made every request reach the PREVIOUS instance
+ * (routeRegistry.ts § resolvePluginFetch).
+ *
+ * Falls through with `next()` when no plugin claims the path, which is what makes it invisible: built-in
+ * routers and the provider routes are registered earlier and answer first, and an unclaimed path reaches
+ * the app's own 404 exactly as it did before. */
+export const dispatchPluginFetch = async (c: Context<AppEnv>, next: Next): Promise<Response | void> => {
+  const pluginId = c.req.param('plugin')
+  const match = pluginId ? resolvePluginFetch(pluginId, c.req.path) : null
+  if (!match || !pluginId) return next()
+  return servePluginFetch(c, { pluginId, mount: match.mount, fetch: match.fetch })
 }

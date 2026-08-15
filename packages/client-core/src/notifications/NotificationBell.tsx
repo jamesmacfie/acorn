@@ -9,6 +9,7 @@ import { Alert } from '../ui/primitives'
 import Popover from '../ui/Popover'
 import './notifications.css'
 import { openRepoConfigTrust } from '../configTrust/configTrust'
+import { openPluginApproval } from '../plugins/approval'
 
 const relTime = (at: number): string => {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000))
@@ -114,6 +115,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       close()
                       props.onSelectTask(n.taskId)
                       if (n.action === 'review-config') openRepoConfigTrust(n.taskId)
+                      if (n.action === 'review-plugin-request') openPluginApproval(n.taskId)
                       openNoticeTarget(n)
                     }}
                   >

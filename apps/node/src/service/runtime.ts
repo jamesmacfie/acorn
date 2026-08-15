@@ -223,6 +223,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         loadFailures: () => graph.failures,
         disabled,
         setDisabled: (names) => disabledPlugins.set(names),
+        reloadHost: plugins,
         // A packaged app is not a development build. The standalone root has no such flag and reads
         // NODE_ENV instead; that is the one deliberate difference between the two.
         allowLocalPathInstalls: !config.isPackaged,

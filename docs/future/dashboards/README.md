@@ -5,8 +5,8 @@ records the analysis so a future project starts from conclusions instead of re-d
 research passes ground it: one mapped acorn's shipped contribution and data machinery off the tree
 (`current-state.md`), one surveyed seven external systems that solved the same problem
 (`prior-art.md`). The owning docs for current behavior are `docs/plugins.md`,
-`docs/extensibility.md`, `docs/data-layer.md`, and `docs/future/user-extensions/` — where this
-folder disagrees with those, those win.
+`docs/extensibility.md`, and `docs/data-layer.md` — where this folder disagrees with those, those
+win.
 
 ## The end goal
 
@@ -94,5 +94,4 @@ Every file path, route, constant, and behavioral claim in this folder was verifi
 tree on **2026-08-12**. The codebase will drift before this is built. Treat the *mechanisms,
 measurements, and decisions* recorded here as durable and the *paths* as hints. Files 3–6 carry a
 short "verify before building" list naming the seams most likely to have moved. Where this folder
-disagrees with `docs/plugins.md`, `docs/extensibility.md`, `docs/data-layer.md`, or
-`docs/future/user-extensions/`, those win.
+disagrees with `docs/plugins.md`, `docs/extensibility.md`, or `docs/data-layer.md`, those win.

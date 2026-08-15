@@ -1,9 +1,9 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import type { PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import type { PluginCache, PutResult } from './pluginCache'
-import type { PluginAck, PluginTrustStore } from './pluginTrustStore'
+import type { PluginAck, PluginDevGrant, PluginTrustStore } from './pluginTrustStore'
 
 // The renderer's projection of the bundle cache and the trust store. Thin like nodeBrokerIpc.ts:
 // every decision lives in pluginCache.ts / pluginTrustStore.ts, which are Electron-free and therefore
@@ -22,6 +22,17 @@ import type { PluginAck, PluginTrustStore } from './pluginTrustStore'
 export const PLUGINS_STATE = 'acorn:plugins-state'
 export const PLUGINS_CACHE_PUT = 'acorn:plugins-cache-put'
 export const PLUGINS_TRUST_RECORD = 'acorn:plugins-trust-record'
+export const PLUGINS_DEV_GRANT = 'acorn:plugins-dev-grant'
+
+// Enter or leave development mode for one plugin on one node (main/pluginTrustStore.ts). One channel for
+// both directions because they are one switch, and because the revoke half must never be harder to reach
+// than the grant half.
+const devGrantSchema = z.strictObject({
+  pluginId: z.string().min(1),
+  nodeId: z.string().min(1),
+  path: z.string().min(1).max(1024).optional(),
+  grant: z.boolean(),
+})
 
 const putSchema = z.strictObject({
   nodeId: z.string().min(1),
@@ -64,6 +75,14 @@ const disclosureSchema = z.object({
     label: z.string().min(1).max(80),
     chords: z.array(z.string().min(1).max(64)).min(1).max(32),
   })).max(32) as z.ZodType<PluginKeyClaimGrant[]>,
+  // Defaulted, not required: a node running a manifest schema that predates the cooperative seam sends
+  // a disclosure with no such field, and refusing it would put us back in the loop this schema was split
+  // up to escape — a decision that cannot be recorded is a prompt that re-queues forever.
+  extensions: z.array(z.strictObject({
+    kind: z.enum(['hosts', 'extends', 'replaces']),
+    target: z.string().min(1).max(130),
+    label: z.string().min(1).max(80),
+  })).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
 })
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
@@ -71,12 +90,14 @@ const NO_DISCLOSURE = {
   permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
   webviews: [],
   keyClaims: [],
+  extensions: [],
 } satisfies z.infer<typeof disclosureSchema>
 
 export type PluginsState = {
   // hash → what we hold. The renderer diffs a node's listing against this to decide what to fetch.
   cached: Record<string, { pluginId: string; version: string; bytes: number }>
   acks: PluginAck[]
+  devGrants: PluginDevGrant[]
 }
 
 export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): () => void {
@@ -87,11 +108,27 @@ export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): 
       Object.entries(cache.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes }]),
     ),
     acks: trust.list(),
+    // Read by Settings → Plugins to badge a plugin in development and to offer the control that ends it.
+    // The badge is not decoration: a dev-mode plugin whose behaviour is indistinguishable from a normal
+    // install is a trust story that has rotted (docs/security.md § The dev grant).
+    devGrants: trust.listDevGrants(),
   }))
 
   ipcMain.handle(PLUGINS_CACHE_PUT, async (_event, raw: unknown): Promise<PutResult> => {
     const { nodeId, pluginId, hash, version } = putSchema.parse(raw)
-    return cache.putFromNode(nodeId, pluginId, { hash, version })
+    const result = await cache.putFromNode(nodeId, pluginId, { hash, version })
+    // The dev grant's whole effect, and it lives HERE rather than in the renderer for the same reason
+    // the hash does: the acknowledgement is written beside the bytes main verified, by the process that
+    // holds the grant. `recordDevAccept` is a no-op without one, so a renderer that asked for a bundle
+    // main has no grant for gets exactly the prompt it would have got anyway.
+    if ('hash' in result) trust.recordDevAccept({ pluginId, nodeId, hash: result.hash, version })
+    return result
+  })
+
+  ipcMain.handle(PLUGINS_DEV_GRANT, async (_event, raw: unknown): Promise<void> => {
+    const { pluginId, nodeId, path, grant } = devGrantSchema.parse(raw)
+    if (!grant) return trust.revokeDev(pluginId, nodeId)
+    trust.grantDev({ pluginId, nodeId, ...(path ? { path } : {}), grantedAt: Date.now() })
   })
 
   ipcMain.handle(PLUGINS_TRUST_RECORD, async (_event, raw: unknown): Promise<void> => {
@@ -123,6 +160,6 @@ export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): 
   })
 
   return () => {
-    for (const channel of [PLUGINS_STATE, PLUGINS_CACHE_PUT, PLUGINS_TRUST_RECORD]) ipcMain.removeHandler(channel)
+    for (const channel of [PLUGINS_STATE, PLUGINS_CACHE_PUT, PLUGINS_TRUST_RECORD, PLUGINS_DEV_GRANT]) ipcMain.removeHandler(channel)
   }
 }

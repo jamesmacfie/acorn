@@ -37,7 +37,10 @@ export type PluginBridgeHello = { acornBridge: typeof PLUGIN_BRIDGE_VERSION }
 export type PluginFrameContext = {
   // The contribution id this frame is rendering, as declared in the manifest.
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay'
+  // `coreSlot` is a rectangle drawn where one of acorn's own surfaces normally is, and the frame is
+  // told so for the same reason every other target is: it may want to lay out differently. It grants
+  // nothing — the bridge's allowlist is keyed on SCOPES, never on this field.
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot'
   nodeId: string
   taskId?: string
   projectId?: string

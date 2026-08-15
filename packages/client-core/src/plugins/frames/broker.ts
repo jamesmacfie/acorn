@@ -33,7 +33,7 @@ export type FrameBinding = {
   pluginId: string
   // The contribution id this frame renders, and which registry it landed in.
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot'
   nodeId: string
   taskId?: string
   projectId?: string

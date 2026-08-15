@@ -14,7 +14,7 @@ import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
-import { buildPluginContext, type LoadedPluginBinding } from './context'
+import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
 import type { NodePlugin, NodePluginContext, PluginStorage } from './types'
 
 // What each plugin claimed on the WS hub, so a re-init can take it back. The hub's slots are module
@@ -71,13 +71,31 @@ export type PluginRosterEntry = {
 
 export type PluginFailure = { name: string; error: string; at: number; stage: 'init' | 'ready' }
 
+// The new instance, as the caller took it off disk. The host does no filesystem work of its own — the
+// loader owns importing a bundle and confining its migrations chain (main/pluginReload.ts drives both).
+export type PluginReloadRequest = { plugin: NodePlugin; binding: LoadedPluginBinding }
+export type PluginReloadOutcome = { ok: true } | { ok: false; error: string }
+
 export type PluginHostResult = {
   enabled: readonly string[]
   skipped: readonly string[]
   // Loaded plugins whose init or ready threw. Their registrations were rolled back and boot
   // continued; built-ins are never in here, because a built-in throwing still fails the boot.
   failed: readonly PluginFailure[]
+  // Mutable in place, deliberately: `reload` below changes a row's outcome in a running process, and the
+  // PLUGIN_STATE bridge holds this array by reference (`roster: () => plugins.roster`).
   roster: readonly PluginRosterEntry[]
+  /** Swap one LOADED plugin's node half in a running process — candidate-then-commit
+   * (docs/plugins.md § The dev loop).
+   *
+   * The candidate's `init` runs against a buffered registration set (server/plugin/context.ts § pending),
+   * so a throw leaves the previous instance registered, serving, and holding its database — the failure
+   * lands as status detail on the roster row and nothing else moves. Only on success is the previous
+   * instance cleared, disposed, its handle closed and its context revoked.
+   *
+   * Loaded plugins only. A built-in is compiled into this binary and keeps restart-required semantics;
+   * there is no second copy of it on disk to swap in. */
+  reload(name: string, next: PluginReloadRequest): Promise<PluginReloadOutcome>
   // Release every initialized plugin, newest first, and close the `ctx.storage` database each one
   // opened — all of it before the data root lock is dropped. Never rejects: one plugin failing to close
   // must not stop the rest, and teardown is already best-effort.
@@ -97,6 +115,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   const started: NodePlugin[] = []
   // Kept so the ready pass below hands each plugin the SAME context its init got.
   const contexts = new Map<string, NodePluginContext>()
+  // The loaded bindings, seeded from the boot options and REPLACED by a successful reload: after a swap
+  // the running instance's permissions and migrations chain are the new manifest's, not the boot one's.
+  // Membership is also the answer to "may this name be reloaded at all".
+  const loadedBindings = new Map(options.loaded ?? [])
 
   // Every database handed out through `ctx.storage`, so the host can close what it opened. Per CALL,
   // not a module singleton: a second startServiceRuntime in one process gets its own handles, exactly
@@ -245,7 +267,150 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   })
 
-  return { enabled, skipped, failed, roster, dispose: () => disposeStarted(started, closeStorage) }
+  // The roster row is where a reload's outcome is reported, because it is already the one thing the
+  // settings page and the attention bell read. Written in place: the bridge holds `roster` by reference.
+  const markFailed = (name: string, stage: 'init' | 'ready', error: string): void => {
+    const row = roster.find((entry) => entry.name === name)
+    if (!row) return
+    row.state = 'failed'
+    row.failedAt = Date.now()
+    row.reason = error
+    row.stage = stage
+  }
+  const markActive = (name: string): void => {
+    const row = roster.find((entry) => entry.name === name)
+    if (!row) return
+    row.state = 'active'
+    delete row.failedAt
+    delete row.reason
+    delete row.stage
+  }
+  const forget = (name: string): void => {
+    const index = started.findIndex((plugin) => plugin.name === name)
+    if (index >= 0) started.splice(index, 1)
+    const position = enabled.indexOf(name)
+    if (position >= 0) enabled.splice(position, 1)
+    contexts.delete(name)
+  }
+
+  const reload = async (name: string, next: PluginReloadRequest): Promise<PluginReloadOutcome> => {
+    // Loaded plugins only, and this map is the one flag that says so (see PluginHostOptions.loaded). A
+    // plugin whose init was CONTAINED at boot is still in it, which is what makes "write broken code,
+    // reload, fix it, reload again" the normal path rather than a special case.
+    if (!loadedBindings.has(name)) {
+      return { ok: false, error: `'${name}' is not a plugin this node loaded from disk, so it cannot be reloaded. Built-ins need a restart.` }
+    }
+    if (disabled.has(name)) return { ok: false, error: `'${name}' is turned off on this node.` }
+
+    // Everything the candidate registers is buffered here rather than written to the registries the
+    // previous instance is still in (server/plugin/context.ts § pending). Its database is the one thing
+    // it opens for real — and that is the recorded ceiling: registration rollback and SCHEMA rollback are
+    // different promises, and only the first is made (main/pluginStorage.ts § Reload).
+    const pending: (() => void)[] = []
+    const candidateWsUndos: (() => void)[] = []
+    // A box rather than a `let`, because every write happens inside the closure below and the failure
+    // paths would otherwise be narrowed to `null` by control flow that cannot see them.
+    const candidate: { db: PluginDatabase | null; committed: boolean } = { db: null, committed: false }
+    const candidateCtx = buildPluginContext({
+      plugin: name,
+      capabilities: options.capabilities,
+      core: options.core,
+      loaded: next.binding,
+      storage: {
+        open: () => {
+          candidate.db ??= next.binding.storage.open()
+          // Once committed, the handle belongs to the host's map so `dispose()` and the next reload can
+          // close it; before that it is the candidate's alone, closed by the failure path below.
+          if (candidate.committed) opened.set(name, candidate.db)
+          return candidate.db
+        },
+      },
+      onWsRegistration: (undo) => void candidateWsUndos.push(undo),
+      pending,
+    })
+
+    try {
+      await next.plugin.init(candidateCtx)
+    } catch (error) {
+      // Nothing to roll back. The buffer was never replayed, so the previous instance is still registered
+      // and still serving; the candidate's database handle is the only thing it really opened.
+      try {
+        candidate.db?.close()
+      } catch {
+        // Already closed by a dispose the failing init got far enough to arrange.
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[plugin:${name}] reload init failed; the previous instance is still serving:`, error)
+      markFailed(name, 'init', message)
+      return { ok: false, error: message }
+    }
+
+    // ── Commit ──────────────────────────────────────────────────────────────────────────────────────
+    // Order matters: stop serving through the previous instance BEFORE its dispose runs, close its
+    // database only AFTER (agents flushes, workflows aborts and database drains through that handle), and
+    // revoke its context last so a leaked reference fails loudly from here on.
+    clearRegistrations(name)
+    const previous = started.find((plugin) => plugin.name === name)
+    if (previous) {
+      try {
+        await previous.dispose?.()
+      } catch (error) {
+        console.warn(`[plugin:${name}] dispose during reload failed:`, error)
+      }
+    }
+    closeStorage(name)
+    const previousCtx = contexts.get(name)
+    if (previousCtx) revokePluginContext(previousCtx)
+
+    candidate.committed = true
+    try {
+      for (const apply of pending) apply()
+    } catch (error) {
+      // A registration that is INVALID — two tools sharing a name, a provider that fails its shape check —
+      // can only be found here, because the registries are what validate it and the candidate never
+      // touched them. The plugin ends up unregistered and marked failed, exactly like a contained boot
+      // failure; what candidate-then-commit protects is init THROWING, which is the failure a dev loop
+      // actually produces. Narrowing this window further would mean a validate-only pass in six
+      // registries, which is a lot of surface to keep honest for a bundle that is broken either way.
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[plugin:${name}] reload could not register the new instance's contributions:`, error)
+      clearRegistrations(name)
+      for (const undo of candidateWsUndos.reverse()) undo()
+      closeStorage(name)
+      try {
+        candidate.db?.close()
+      } catch {
+        // closeStorage already got it when the candidate's handle had reached the map.
+      }
+      forget(name)
+      markFailed(name, 'init', message)
+      return { ok: false, error: message }
+    }
+
+    const index = started.findIndex((plugin) => plugin.name === name)
+    if (index >= 0) started[index] = next.plugin
+    else started.push(next.plugin)
+    if (!enabled.includes(name)) enabled.push(name)
+    contexts.set(name, candidateCtx)
+    loadedBindings.set(name, next.binding)
+    if (candidate.db) opened.set(name, candidate.db)
+
+    if (next.plugin.ready) {
+      try {
+        await next.plugin.ready(candidateCtx)
+      } catch (error) {
+        // Contained exactly as a ready failure at boot is, through the same rollback.
+        await contain(next.plugin, 'ready', error)
+        forget(name)
+        markFailed(name, 'ready', error instanceof Error ? error.message : String(error))
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    }
+    markActive(name)
+    return { ok: true }
+  }
+
+  return { enabled, skipped, failed, roster, reload, dispose: () => disposeStarted(started, closeStorage) }
 }
 
 // Everything one plugin contributed to the module-singleton registries, undone.

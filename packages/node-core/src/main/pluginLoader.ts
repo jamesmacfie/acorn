@@ -260,10 +260,27 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
   return { installed, failures: stamped(failures) }
 }
 
+// Bumped per re-import so two reloads inside one millisecond still get distinct URLs.
+let importGeneration = 0
+
 export async function loadExternalPlugins(
   dataRoot: string,
-  options: { builtins: readonly string[] },
+  options: {
+    builtins: readonly string[]
+    /** Plugin ids whose entry module must be EVALUATED AGAIN rather than served from Node's module
+     * cache (main/pluginReload.ts). Empty at boot, one id on a reload.
+     *
+     * The technique is a generation stamp on the file URL, and its ceiling is exactly one module deep:
+     * `import('…/index.js?load=7')` is a new key, but a relative specifier inside that module resolves
+     * against the URL's PATH — the query is not inherited — so `./chunk.js` comes back from the cache
+     * with the code it had at boot. A plugin whose edit lands in a non-entry file therefore needs a
+     * restart. Single-file node halves (the authoring profile) are unaffected, and the honest fix for
+     * the rest is a `module.register` resolve hook stamping the whole subgraph, which is a loader hook
+     * this repo does not have and does not need yet. Stated in docs/plugins.md § The dev loop. */
+    reimport?: readonly string[]
+  },
 ): Promise<PluginLoadResult> {
+  const reimport = new Set(options.reimport ?? [])
   // Boot is the one moment nothing is mid-install, so it is where an interrupted one gets cleaned up.
   sweepDebris(dataRoot)
 
@@ -308,7 +325,12 @@ export async function loadExternalPlugins(
     let mod: unknown
     try {
       // pathToFileURL, never the bare path: `import('C:\\...')` is not a valid specifier on Windows.
-      mod = await import(pathToFileURL(entrypoint).href)
+      const url = pathToFileURL(entrypoint)
+      // Node caches an ES module permanently by resolved URL, so a second import of the same path hands
+      // back the FIRST load's module object. See the `reimport` option above for what this does and does
+      // not invalidate.
+      if (reimport.has(manifest.id)) url.searchParams.set('load', `${Date.now()}-${(importGeneration += 1)}`)
+      mod = await import(url.href)
     } catch (error) {
       failures.push({ id: manifest.id, dir, reason: `could not import ${manifest.node}: ${String(error)}` })
       continue

@@ -342,12 +342,29 @@ export type {
   PluginSlotDescriptor,
   PluginSourceDescriptor,
   PluginSourceEmptyState,
+  PluginThemeDescriptor,
 } from './pluginContract.ts'
 
 // The two grants the DEVICE derives from a manifest's frame surfaces and records against a trust
 // decision. Not manifest shapes: they are what the owner consented to, one row per surface.
 export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
 export type PluginKeyClaimGrant = { surface: string; label: string; chords: string[] }
+
+// The third: what this package's manifest says about OTHER packages and about core's own surfaces
+// (@acorn/protocol/extensionPoints.ts). One shape for all three kinds rather than three arrays, because
+// they are one question an owner asks once — "what does this reach that is not its own?" — and because a
+// trust record with three near-identical lists is three places for one of them to be forgotten.
+//
+//   hosts     this package opens one of its surfaces to other packages' rows.
+//   extends   this package puts its rows inside another package's surface. `target` names that package.
+//   replaces  this package offers to draw one of core's own surfaces. An OFFER: nothing is replaced
+//             until the owner picks it in settings.
+export type PluginExtensionGrant = {
+  kind: 'hosts' | 'extends' | 'replaces'
+  // A point reference, or a designated core slot id. Never free text.
+  target: string
+  label: string
+}
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
 // serves: the host is the one rendering these, so the shape is its contract and not the plugin's
@@ -441,7 +458,34 @@ export type InstalledPluginRow = {
   // Epoch millis.
   installedAt?: number
 }
-export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean }
+// An install the AGENT asked for and the OWNER has not answered yet (docs/plugins.md § Approval-mediated
+// install). Raised by the `plugin_request` agent tool, which cannot install anything: the record is inert
+// until a device reads it here and performs the install over the device-gated install route with its own
+// principal. A prompt-injected agent can produce this row and nothing else.
+export type PluginApprovalRequest = {
+  requestId: string
+  // The task whose agent asked. The notification pipeline is task-scoped, and it is also the answer to
+  // "who asked for this" when the audit row is read back.
+  taskId: string
+  action: 'install' | 'update' | 'uninstall'
+  // Present for an install, exactly as the agent gave it. Nothing has been fetched at this point — see
+  // docs/plugins.md § What the owner can know before the download.
+  source?: PluginInstallSource
+  // Present for an update or an uninstall.
+  pluginId?: string
+  // The agent asked for dev mode: on approval the device records a per-(plugin, node) grant that
+  // auto-trusts future bundles of this plugin until the owner ends it (docs/security.md § The dev grant).
+  dev: boolean
+  purgeData?: boolean
+  // UNTRUSTED DISPLAY TEXT written by an agent that may be reading hostile content. Capped by the tool's
+  // input schema; render it as text, never as markup, and never let it stand in for reading the request.
+  reason?: string
+  requestedAt: number
+}
+
+// `requests` is optional so a node that predates approval-mediated install still parses, and so this
+// response type can gain the field without a query-key bump (docs/caching.md).
+export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests?: PluginApprovalRequest[] }
 
 // Where a plugin package is fetched from (docs/plugins.md
 // installer). `path` is a plugin author's dogfood loop and is refused outside a development build.
@@ -457,10 +501,21 @@ export type PluginInstallResult = { id: string; version: string; state: 'install
 export type PluginUpdateResult = { id: string; fromVersion: string; toVersion: string; state: 'installed-restart-required' }
 export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
 
+// The one exception to the line above, and only for a plugin the node LOADED from disk: a reload swaps
+// its node half in the running process (docs/plugins.md § The dev loop). `failed` is a 200, not an error:
+// candidate-then-commit means a failed reload changed nothing, the previous instance is still serving,
+// and `reason` is the same text the roster row now carries.
+export type PluginReloadResult = { id: string; version: string; state: 'reloaded' | 'failed'; reason?: string }
+
 export const corePluginsRoute = '/v2/core/plugins'
 export const corePluginInstallRoute = '/v2/core/plugins/install'
 export const corePluginRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}`
 export const corePluginUpdateRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/update`
+export const corePluginReloadRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/reload`
+// The owner's answer to one agent-raised approval request. Device-only like the rest of this family, and
+// permanently unmappable from a plugin frame: an approval a frame could post would turn the request/decision
+// split back into an install route the agent can reach (client-core/plugins/frames/scopes.ts).
+export const corePluginRequestRoute = (requestId: string) => `/v2/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
 // task-scoped internal token cannot reach it (server/index.ts mounts requireDevice over both forms).
 export const corePluginBundleRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/client.js`

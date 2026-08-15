@@ -16,6 +16,7 @@ import { sourceRouteContributions } from '@acorn/client-core/registries/sources.
 import { projectSurfaceRoutes } from '@acorn/client-core/registries/projectSurfaces.ts'
 import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
 import { syncPluginContributions } from '@acorn/client-core/plugins/syncContributions.ts'
+import { watchPluginChanges } from '@acorn/client-core/plugins/reload.ts'
 
 const noop = () => null
 
@@ -50,6 +51,10 @@ await applyNodePlugins(activeNodeId() ?? undefined)
 // the same roster rows, and a plugin that ships descriptors but no client bundle has nothing else to
 // wait for.
 void syncPluginDistribution().then(syncPluginContributions)
+
+// …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`, and the
+// shell re-runs the two passes above rather than waiting for a restart (docs/plugins.md § The dev loop).
+watchPluginChanges()
 
 render(
   () => (

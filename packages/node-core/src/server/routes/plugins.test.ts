@@ -7,6 +7,7 @@ import type { AppEnv } from '../middleware/auth'
 import { requireDevice } from '../middleware/requireUser'
 import type { PluginRosterEntry } from '../plugin/host'
 import { setRouteTestCapability } from '../bridge'
+import { _resetPluginRequests, raisePluginRequest } from '../agentTools/pluginRequests'
 import { PLUGIN_STATE } from '../plugin/pluginState'
 import { plugins } from './plugins'
 
@@ -23,7 +24,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
-  contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [] },
+  contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
   ...over,
@@ -48,7 +49,7 @@ type WireOptions = {
 const wire = (initial: readonly string[], options: WireOptions = {}) => {
   let saved = [...initial]
   const installed = options.installed ?? []
-  const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[] } = { install: [], update: [], uninstall: [] }
+  const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[] } = { install: [], update: [], uninstall: [], reload: [] }
   setRouteTestCapability(PLUGIN_STATE, {
     roster: () => options.roster ?? ROSTER,
     installed: () => installed,
@@ -74,6 +75,15 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
     uninstall: (id, opts) => {
       calls.uninstall.push({ id, opts })
       return { restartRequired: true, dataPurged: opts.purgeData === true }
+    },
+    reload: async (id) => {
+      calls.reload.push({ id })
+      // The bridge's refusal for a name this node did not load from disk, which the route turns into a 400.
+      if (id === 'terminal') throw new Error(`'terminal' is not a plugin this node loaded from disk.`)
+      // 'broken' stands for a candidate whose init threw: a 200 that reports the previous instance is
+      // still the one serving.
+      if (id === 'broken') return { id, version: '1.0.0', state: 'failed', reason: 'init exploded' }
+      return { id, version: '1.1.0', state: 'reloaded' }
     },
   })
   return Object.assign(() => saved, { calls })
@@ -212,7 +222,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       permissions: NO_PERMISSIONS,
       // Passed through untouched for the device to register surfaces from
       // (docs/plugins.md); the node neither reads nor renders it.
-      contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [] },
+      contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -238,7 +248,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
         version: '1.0.0',
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
-        contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [] },
+        contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [] },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },
     })
@@ -386,7 +396,20 @@ describe('the device gate over /v2/core/plugins', () => {
     expect((await gated({ kind: 'device', userId: 'james', deviceId: 'd1' }).fetch(request('GET'))).status).toBe(200)
   })
 
-  it('403s a task-scoped agent on install, update and uninstall', async () => {
+  it('403s a task-scoped agent answering its own approval request', async () => {
+    // The whole point of the request/decision split. An agent raises a request precisely because it
+    // cannot install; if it could also POST the approval, the split would be theatre.
+    wire([])
+    _resetPluginRequests()
+    const raised = raisePluginRequest({ taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' } })
+    const attempt = at(`/requests/${raised.request.requestId}`, 'POST', { decision: 'approved' })
+    const agent = gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
+    expect((await agent.fetch(attempt.clone())).status).toBe(403)
+    // And the ungated router would have answered — so the 403 is the gate, not the handler.
+    expect((await asTaskAgent().fetch(attempt)).status).toBe(200)
+  })
+
+  it('403s a task-scoped agent on install, update, uninstall and reload', async () => {
     // The sharpest case in this file. A prompt-injected agent that could POST here would make the node
     // fetch and run arbitrary code with the node's own access (docs/security.md).
     wire([], { installed: [installedEntry('sparkline')] })
@@ -395,6 +418,9 @@ describe('the device gate over /v2/core/plugins', () => {
       at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }, KEY),
       at('/sparkline/update', 'POST', {}, KEY),
       at('/sparkline', 'DELETE', {}, KEY),
+      // Reload is the sharpest of the four: it is how a prompt-injected agent would make code already on
+      // the node run again on its own timing, with no bytes arriving to notice.
+      at('/sparkline/reload', 'POST', undefined, KEY),
     ]
     for (const attempt of attempts) expect((await agent.fetch(attempt.clone())).status, attempt.url).toBe(403)
     // And the ungated router would have answered — so the 403 is the gate, not the handler.
@@ -522,6 +548,84 @@ describe('the install, update and uninstall routes', () => {
     const res = await asDevice().fetch(at('/ntfy', 'DELETE', { purgeData: true }, KEY))
     expect(await res.json()).toEqual({ restartRequired: true, dataPurged: true })
     expect(bridge.calls.uninstall).toEqual([{ id: 'ntfy', opts: { purgeData: true } }])
+  })
+
+  it('reloads a loaded plugin in place, reporting the version now running', async () => {
+    const bridge = wire([], { installed: [installedEntry('ntfy')] })
+    const res = await asDevice().fetch(at('/ntfy/reload', 'POST', undefined, KEY))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 'ntfy', version: '1.1.0', state: 'reloaded' })
+    expect(bridge.calls.reload).toEqual([{ id: 'ntfy' }])
+  })
+
+  it('answers 200 with state failed when the new code did not start', async () => {
+    // Candidate-then-commit means a failed reload changed nothing: the previous instance is still
+    // serving, so this is a report and not a request error. A 500 would say the opposite.
+    wire([], { installed: [installedEntry('broken')] })
+    const res = await asDevice().fetch(at('/broken/reload', 'POST', undefined, KEY))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ state: 'failed', reason: 'init exploded' })
+  })
+
+  it('400s a reload of a built-in, which has no disk copy to swap in', async () => {
+    wire([])
+    const res = await asDevice().fetch(at('/terminal/reload', 'POST', undefined, KEY))
+    expect(res.status).toBe(400)
+    expect(JSON.stringify(await res.json())).toContain('not a plugin this node loaded from disk')
+  })
+
+  it('demands an Idempotency-Key on a reload too', async () => {
+    // A retried reload would run the candidate init twice, and a plugin's init is not obliged to be
+    // idempotent — so it carries the same requirement as the three mutations above.
+    wire([], { installed: [installedEntry('ntfy')] })
+    expect((await asDevice().fetch(at('/ntfy/reload', 'POST'))).status).toBe(400)
+  })
+
+  it('answers the agent-raised approval queue on the roster route', async () => {
+    // The queue rides the roster rather than getting a GET of its own: same device-only mount, same
+    // reconcile. A request the owner has not answered is the ONLY thing an agent can put here.
+    wire([])
+    _resetPluginRequests()
+    raisePluginRequest({ taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' }, reason: 'so I can iterate' })
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.requests).toMatchObject([{ taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' }, reason: 'so I can iterate' }])
+  })
+
+  it('records the owner’s answer and drops the request from the queue', async () => {
+    wire([])
+    _resetPluginRequests()
+    const raised = raisePluginRequest({ taskId: 't1', action: 'uninstall', dev: false, pluginId: 'ntfy' })
+    const res = await asDevice().fetch(at(`/requests/${raised.request.requestId}`, 'POST', { decision: 'approved', message: 'gone' }))
+    expect(res.status).toBe(200)
+    const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
+    expect(state.requests).toEqual([])
+  })
+
+  it('404s a second answer, and an id that never existed', async () => {
+    wire([])
+    _resetPluginRequests()
+    const raised = raisePluginRequest({ taskId: 't1', action: 'uninstall', dev: false, pluginId: 'ntfy' })
+    const path = `/requests/${raised.request.requestId}`
+    expect((await asDevice().fetch(at(path, 'POST', { decision: 'denied' }))).status).toBe(200)
+    expect((await asDevice().fetch(at(path, 'POST', { decision: 'approved' }))).status).toBe(404)
+    expect((await asDevice().fetch(at('/requests/nope', 'POST', { decision: 'approved' }))).status).toBe(404)
+  })
+
+  it('rejects a malformed decision', async () => {
+    wire([])
+    _resetPluginRequests()
+    const raised = raisePluginRequest({ taskId: 't1', action: 'uninstall', dev: false, pluginId: 'ntfy' })
+    const path = `/requests/${raised.request.requestId}`
+    for (const body of [{}, { decision: 'maybe' }, { decision: 'approved', extra: 1 }, { decision: 'approved', message: '' }]) {
+      expect((await asDevice().fetch(at(path, 'POST', body))).status, JSON.stringify(body)).toBe(400)
+    }
+  })
+
+  it('needs no bridge to answer a request, so a node with no plugin host can still say no', async () => {
+    setRouteTestCapability(PLUGIN_STATE, null)
+    _resetPluginRequests()
+    const raised = raisePluginRequest({ taskId: 't1', action: 'install', dev: false, source: { npm: 'x' } })
+    expect((await asDevice().fetch(at(`/requests/${raised.request.requestId}`, 'POST', { decision: 'denied' }))).status).toBe(200)
   })
 
   it('503s every mutation when there is no bridge', async () => {

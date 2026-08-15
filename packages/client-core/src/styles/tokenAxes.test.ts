@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import {
   BRIDGE_TOKENS,
+  DERIVED_THEME_TOKENS,
   FRAME_TOKENS,
   INVARIANT_TOKENS,
+  SELF_DESCRIPTION_TOKENS,
   STYLE_TOKENS,
   THEME_TOKENS,
   Z_ORDER_INVARIANTS,
@@ -67,13 +70,11 @@ describe('token axes are complete', () => {
   it('declares every primitive palette token in every named theme block', () => {
     // Derived tokens (--danger, --surface-sunken, …) are declared once on :root as var()
     // references, so they follow each theme automatically and must NOT be restated per block.
-    const derived = new Set([
-      '--danger', '--danger-fg', '--success', '--success-fg', '--surface-sunken',
-      '--accent-fg', '--state-ok', '--state-warn', '--state-bad',
-      '--find-hit-bg', '--find-current-bg', '--scrim-color',
-      '--is-dark', '--color-scheme', '--syntax-fg',
-    ])
+    // The split is DATA now rather than a list written out here (ui/tokenAxes.ts), because a
+    // plugin-contributed theme is validated against the same primitives.
+    const derived = new Set<string>([...DERIVED_THEME_TOKENS, ...SELF_DESCRIPTION_TOKENS])
     const primitives = [...theme].filter((t) => !derived.has(t))
+    expect(primitives).toEqual([...THEME_PALETTE_TOKENS])
     const blocks = declaredByBlock(sheet('tokens-theme.css'))
 
     for (const [selector, declared] of blocks) {
@@ -81,6 +82,20 @@ describe('token axes are complete', () => {
       if (selector.includes('"dark"')) continue // the dark mapping block aliases --dark-* wholesale
       const missing = primitives.filter((t) => !declared.has(t))
       expect(missing, `${selector} is missing palette tokens`).toEqual([])
+    }
+  })
+
+  it('keeps the derived tokens derived — declared on bare :root, never inside a theme block', () => {
+    // The other half of the split above, and the one a plugin theme depends on: the host refuses a
+    // manifest that names a derived token, and that refusal is only correct while these are genuinely
+    // one-place var() references. Restating `--danger` in a theme block would make the refusal a lie.
+    const blocks = declaredByBlock(sheet('tokens-theme.css'))
+    const root = blocks.get(':root') ?? new Set()
+    expect([...DERIVED_THEME_TOKENS].filter((t) => !root.has(t))).toEqual([])
+    for (const [selector, declared] of blocks) {
+      if (!selector.includes('[data-theme=')) continue
+      const stray = [...DERIVED_THEME_TOKENS].filter((t) => declared.has(t))
+      expect(stray, `${selector} restates a derived token`).toEqual([])
     }
   })
 })

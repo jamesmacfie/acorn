@@ -2,7 +2,7 @@ import { For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../queries'
 import { savePref } from './savePref'
-import { THEMES } from './themes'
+import { resolveTheme, THEMES } from './themes'
 import { STYLES } from './uiStyles'
 import { Checkbox, Field, Select } from '../ui/primitives'
 import { PrefKeys } from '../persistence/prefKeys'
@@ -22,9 +22,13 @@ export default function AppearanceSettings() {
   const style = () => prefs.data?.[PrefKeys.style] ?? 'terminal'
   // Default to following the OS until the user has explicitly picked a theme.
   const followSystem = () => (prefs.data?.[PrefKeys.themeFollowSystem] ?? (prefs.data?.[PrefKeys.theme] ? 'false' : 'true')) === 'true'
-  const theme = () => prefs.data?.[PrefKeys.theme] ?? 'light'
-  const lightTheme = () => prefs.data?.[PrefKeys.themeLight] ?? 'light'
-  const darkTheme = () => prefs.data?.[PrefKeys.themeDark] ?? 'dark'
+  // Through `resolveTheme`, so the picker shows the theme that is ON SCREEN. A plugin theme whose
+  // package is disabled or unreachable is not in the option list, and a Select whose value matches no
+  // option renders its first one — which would show "Light" for a stored id the shell is already
+  // falling back on anyway. Reading the fallback is honest; the stored pref is untouched either way.
+  const theme = () => resolveTheme(prefs.data?.[PrefKeys.theme], 'light')
+  const lightTheme = () => resolveTheme(prefs.data?.[PrefKeys.themeLight], 'light')
+  const darkTheme = () => resolveTheme(prefs.data?.[PrefKeys.themeDark], 'dark')
 
   const themeOptions = () => <For each={THEMES()}>{([value, label]) => <option value={value}>{label}</option>}</For>
 

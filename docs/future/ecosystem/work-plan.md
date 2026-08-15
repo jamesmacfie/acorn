@@ -1,85 +1,55 @@
 # The sequenced work
 
-Design notes from the ecosystem-feasibility session (2026-08-14). Nothing here is scheduled. This
-is the ordering and the dependency argument; the designs themselves live in the owning folders and
-are not repeated here. A developer or agent picking up any phase should read the owning doc first
-and treat this file as the map.
+From the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16 to what is still ahead.
+Nothing here is scheduled. This is the ordering and the dependency argument; the designs live in
+the owning docs and are not repeated here. A developer or agent picking up any phase should read
+the owning doc first and treat this file as the map.
 
-The ordering principle: ship the loop for *your own* plugins first (cheap, no new attack surface,
-proves the seams), fix the front door for authors in parallel (additive, independently useful),
-and put containment before discovery so acorn never has a window where strangers can find plugins
-whose node halves run uncontained. Distribution goes last because everything before it makes
-distribution worth having.
+Already shipped and removed from this plan: the agent-authored dev loop (authoring contract,
+reload, approval-mediated install, dev trust grant, agent enablement — `docs/plugin-authoring.md`,
+`docs/plugins.md`), plugin themes and the new chrome/extension vocabulary, and the node-first
+preconditions (the client↔node version contract in `docs/api-reference.md § Versioning`, the
+platform seam, node-side compositions in `docs/state.md`).
 
-Cross-cutting preconditions from the node-first review (`docs/future/node-first/`): the
-client↔node version contract (`version-skew.md`) had to land **before phase 5 releases anything**,
-because the freedom to break the wire ends at the first standalone download — it shipped on
-2026-08-15 and the contract is now `docs/api-reference.md § Versioning`; the platform-seam
-ratchet and the state-ownership rule are cheap and should land before the phases that build on
-them (web-facing work and dashboards respectively).
+The ordering principle for what remains: fix the front door for authors first (additive,
+independently useful), put containment before discovery so acorn never has a window where
+strangers can find plugins whose node halves run uncontained, and keep distribution last because
+everything before it makes distribution worth having.
 
-## Phase 1 — the dev loop (owning doc: `docs/future/user-extensions/`)
+## Phase 1 — publish the front door (owning doc: `dx.md`)
 
-The five items of `user-extensions/README.md § Recommended build order`, which front-loads the
-pieces with no security surface:
+Make `@acorn/plugin-api` installable from outside the workspace. Packaging work plus one real
+decision: the compat promise ("your plugin keeps loading within a major" — the surface snapshot
+and `PLUGIN_API_MAJOR` already enforce it). Also in this phase, small and user-facing: generalize
+the local-path install (`allowLocalPath`, today dev-build-only) into "point acorn at a folder of
+plugins" as a first-class install source, riding the same trust flow.
 
-1. The no-bundler authoring profile (a documented contract, no code).
-2. The reload path — node-side candidate-then-commit re-init, the "plugins changed" event,
-   client re-resolve + re-sync. The biggest lift of this phase.
-3. Approval-mediated install — the agent's install request rides the existing high-risk
-   agent-tool permission flow; the device performs the install.
-4. The dev trust grant — per-(pluginId, device) while dev mode lasts, replacing per-hash prompts.
-5. Agent enablement — the authoring skill, generated API types from the running node, the seeded
-   "Create a plugin" prompt.
+Deliverable: an external author with no checkout of this repo can `npm install` the facade, follow
+`docs/plugin-authoring.md`, and install from a folder.
 
-**Also in this phase, small and user-facing:** generalize the local-path install
-(`allowLocalPath`, today dev-build-only) into "point acorn at a folder of plugins" as a
-first-class install source, riding the same trust flow. It is the folder half of the end goal and
-it is a small delta on shipped machinery.
-
-Deliverable: a user or their agent iterates on a plugin against a live node with one approval per
-plugin, and "my plugins live in this folder" works.
-
-## Phase 2 — developer experience (owning docs: `docs/plugins.md`, `docs/testing.md`; mostly done)
-
-The eight review findings shipped in August 2026, in roughly their suggested order: failure
-visibility first, then boilerplate, the dev loop, the testkit, the loadability tests, then plugin
-storage, the golden lists and the facade prune. `docs/plugins.md`, `docs/testing.md`,
-`docs/data-layer.md` and `docs/local-development.md` are where that behavior is written down; the
-residue those eight left behind is listed in `dx.md § Verify before building`.
-
-What remains of this phase is the one thing the review did not cover because it is packaging rather
-than a finding: **make `@acorn/plugin-api` installable from outside the workspace** (see `dx.md`).
-Scaffolding and authoring guides stay deliberately last per `docs/extensibility.md`.
-
-Deliverable: an external author can `npm install` the facade and build against the documented
-profile. The other half — failures that name themselves, and testing without rebuilding the host —
-is already true inside the workspace.
-
-## Phase 3 — rung-2 containment (owning doc: `docs/security.md § The containment ladder`)
+## Phase 2 — rung-2 containment (owning doc: `docs/security.md § The containment ladder`)
 
 One child process per plugin node half, plugin-scoped token, fs jail, ctx-as-RPC. The six design
 rules that keep this a refactor are already enforced; the work is still the long pole of the whole
-program. Sub-steps worth staging: process supervision and lifecycle first (reusing the phase-1
-reload semantics), then the RPC ctx, then the fs/network jail.
-
-Interaction to respect: if rung 2 lands before phase 1's dev trust grant is heavily used, dev mode
-inherits its containment — `agent-authored-plugins.md § 4` names this ordering as desirable.
+program. Sub-steps worth staging: process supervision and lifecycle first (the reload path's
+candidate-then-commit semantics are the shape to reuse), then the RPC ctx, then the fs/network
+jail. Dev-mode plugins inherit the containment when it lands, which retroactively strengthens the
+dev trust grant.
 
 Deliverable: "declared" becomes "enforced" for plugin node halves; the permission UI's language
 can finally strengthen.
 
-## Phase 4 — dashboards (owning doc: `docs/future/dashboards/`)
+## Phase 3 — dashboards (owning doc: `docs/future/dashboards/`)
 
 Phases 1–3 of that folder's build order: the typed-collection contract proven on GitHub + Linear,
-Home as a composable panel grid, then mapping/derived views/kanban. Independent of phases 1–3
+Home as a composable panel grid, then mapping/derived views/kanban. Independent of phases 1–2
 here; can start any time. It is the most visible form of "plugins composing without knowing each
-other."
+other".
 
 Deliverable: the user-composed todo board across two providers — the folder's own motivating
 scenario.
 
-## Phase 5 — distribution (owning docs: `docs/security.md § Supply chain`, `docs/future/bundle.md`)
+## Phase 4 — distribution (owning docs: `docs/security.md § Supply chain`, `docs/future/bundle.md`)
 
 In order:
 
@@ -89,11 +59,17 @@ In order:
    CI release matrix, Windows `openssl`, macOS signing. A remote node becomes a download instead
    of a tarball ritual. (The app's own Developer-ID/notarization question is the same knot.)
 3. **Discovery** — an unreviewed listing over signed packages, honest about being unreviewed,
-   riding the shipped per-(plugin, hash) trust and permission-diff consent. Hard-gated on phase 3;
+   riding the shipped per-(plugin, hash) trust and permission-diff consent. Hard-gated on phase 2;
    do not ship discovery over uncontained node halves.
 
 Deliverable: a stranger finds a plugin, installs it from the listing onto a desktop or remote
 node, and the trust story told in the prompt is true.
+
+## Threaded through, not a phase
+
+`docs/future/compiled-tier.md` — which compiled plugin moves next, what blocks it, what gets
+deleted when it goes. Consult it whenever a move is proposed; moves stay opportunistic
+(`docs/extensibility.md § Unexercised seams rot`).
 
 ## What is deliberately absent
 
@@ -105,7 +81,6 @@ node, and the trust story told in the prompt is true.
 ## Verify before building
 
 Each owning doc carries its own verify-before-building list — use those. Cross-cutting checks for
-this file: whether rung 2 shipped out of order (re-derive the phase 3/phase 1 interaction);
-whether `allowLocalPath` is still dev-gated (phase 1's folder-install item assumes it); whether
-ecosystem-last is still the recorded stance in `docs/extensibility.md`; and whether phase 2 has
-shrunk to the packaging item alone, or the facade has been published and phase 2 is closed.
+this file: whether rung 2 shipped out of order; whether `allowLocalPath` is still dev-gated
+(phase 1's folder-install item assumes it); whether ecosystem-last is still the recorded stance in
+`docs/extensibility.md`; and whether the facade has been published (phase 1 closed).

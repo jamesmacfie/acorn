@@ -138,5 +138,6 @@ ledger (`ui/adoption.test.ts`), and frame CSS distribution via
 - All of `Card`/`Table`/`EmptyState`/`StatusDot`/`Meter` shipped; only `skeleton` did not. Build on
   them, don't duplicate.
 - Whether the closed verb set gained verbs (each new verb widens what a panel row action can do).
-- Whether `docs/future/user-extensions/extension-points.md`'s cooperative extension points landed
-  (plugin-hosted placements in `placements.md` share their constraint-vocabulary design).
+  Note it grew deliberately since this was written: context menus, cooperative extension points
+  and exclusive slots are now manifest vocabulary (`docs/plugins.md`) — plugin-hosted placements
+  in `placements.md` must ride the shipped extension-point contract.

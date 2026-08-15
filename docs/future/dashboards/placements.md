@@ -19,16 +19,17 @@ composes panels and where they render was always host-side.
 Scope key for persisted placements: `(surface, ownerId, projectId?)` — e.g.
 `(home, —, —)`, `(pane, paneId, —)`, `(plugin-region, pluginId:regionId, projectId)`. Persistence
 is per-user-per-node **in the owning node's prefs store, not on the device**
-(`docs/future/node-first/state-ownership.md`), referencing panel definitions by id
+(`docs/state.md § Scope rules`), referencing panel definitions by id
 (`composition.md § The persisted model`).
 
 ## Plugin-hosted regions: the cooperative extension point, inverted
 
-`docs/future/user-extensions/extension-points.md § 3` designs two-sided, declarative,
-host-mediated extension: plugin A declares a point it hosts, plugin B contributes descriptors into
-it. A plugin-hosted dashboard region is the same shape with **the user in the contributor's
-seat**: the plugin's manifest declares "I host a dashboard region", and the user's panels are the
-contributions.
+Cooperative extension points have since shipped (`docs/plugins.md § Cooperative extension
+points`): two-sided, declarative, host-mediated — plugin A declares a point it hosts, plugin B
+contributes descriptors into it. A plugin-hosted dashboard region is the same shape with **the
+user in the contributor's seat**: the plugin's manifest declares "I host a dashboard region", and
+the user's panels are the contributions. Build it as one of those points, not a parallel
+mechanism.
 
 The declaration carries a **constraint vocabulary**:
 
@@ -83,9 +84,9 @@ one level up.
 ## Verify before building
 
 - Whether Home is still a source and what `FleetHome` became — the default placement builds there.
-- Whether the cooperative extension points from `extension-points.md § 3` shipped — if so, the
-  plugin-hosted region should *be* one of those points (user-as-contributor), not a parallel
-  mechanism.
+- The shipped extension-point contract (`docs/plugins.md § Cooperative extension points`) — the
+  plugin-hosted region must ride it, and its constraint vocabulary should extend that declaration
+  shape rather than invent a sibling.
 - The frame `layout` template vocabulary (`pluginManifest.ts`, `plugins/frames/`) — the
   host-drawn-region rule assumes reserving regions via layout templates is still the pattern.
 - The pane registration path (`registries/panes.ts`) and whether pane ids as persisted layout

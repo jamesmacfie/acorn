@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { pluginKeyClaimGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import { pluginExtensionGrants, pluginKeyClaimGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { resolveInRoot } from '@acorn/node-core/main/core/filesystem/confinement.ts'
 import { readPluginManifest } from '@acorn/node-core/main/pluginManifest.ts'
 import type { PluginCache } from './pluginCache'
@@ -62,6 +62,7 @@ export function trustBundledClientPlugins(
         permissions: manifest.permissions,
         webviews: pluginWebviewGrants(manifest.contributions),
         keyClaims: pluginKeyClaimGrants(manifest.contributions),
+        extensions: pluginExtensionGrants(id, manifest.contributions),
         decision: 'accepted',
         decidedAt: Date.now(),
       })

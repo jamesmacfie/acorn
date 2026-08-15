@@ -6,10 +6,10 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
-// The platform seam: the renderer's ONE door to whatever is hosting it (docs/future/node-first/platform-seam.md).
+// The platform seam: the renderer's ONE door to whatever is hosting it (git history: docs/future/node-first/platform-seam.md).
 //
 // Everything product-shaped is `/v2` + one WebSocket against a node, so almost nothing in the client
 // needs this file. What is left are the things a host has to provide because a page cannot: reaching a
@@ -65,6 +65,10 @@ export type PluginCustody = {
   state(): Promise<PluginHostState>
   cachePut(request: { nodeId: string; pluginId: string; hash: string; version: string }): Promise<PluginPutResult>
   trustRecord(request: PluginTrustDecision): Promise<void>
+  // Enter or leave development mode for one plugin on one node (docs/security.md § The dev grant). The
+  // host stores the grant and applies it when a bundle arrives; nothing in the renderer can turn a
+  // bundle into an accepted one, with or without a grant.
+  devGrant(request: PluginDevGrantRequest): Promise<void>
 }
 
 // Native actions with no in-page equivalent. Absent everywhere but a desktop shell; every consumer
@@ -125,6 +129,11 @@ export type PluginTrustDecision = {
   permissions: NodePluginPermissions
   webviews: PluginWebviewGrant[]
   keyClaims: PluginKeyClaimGrant[]
+  // What this manifest says about surfaces that are not its own, in both directions
+  // (@acorn/protocol/extensionPoints.ts). Required here and defaulted in the store's schema, exactly as
+  // `webviews` and `keyClaims` are: an acknowledgement written before the cooperative seam existed reads
+  // back as the empty list, which is what was true of it.
+  extensions: PluginExtensionGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = PluginTrustDecision & {
@@ -134,9 +143,15 @@ export type PluginAckRecord = PluginTrustDecision & {
   // requested that the owner had already seen.
   partial?: true
 }
+// Which plugins this device is currently developing, and against which node. Keyed on the pair rather
+// than on the plugin id alone: fleet resolution picks a winner across every paired node, so a grant
+// keyed on the name would auto-trust a bundle a different node started offering under it.
+export type PluginDevGrant = { pluginId: string; nodeId: string; path?: string; grantedAt: number }
+export type PluginDevGrantRequest = { pluginId: string; nodeId: string; path?: string; grant: boolean }
 export type PluginHostState = {
   cached: Record<string, { pluginId: string; version: string; bytes: number }>
   acks: PluginAckRecord[]
+  devGrants: PluginDevGrant[]
 }
 export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' }
 

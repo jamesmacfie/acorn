@@ -15,6 +15,7 @@ It imports no feature implementation.
 | `⌘⇧T` | Toggle terminal drawer |
 | `⌘1`–`⌘9` | Activate the corresponding visible task |
 | `⌘,` | Open Settings |
+| `Shift+F10` / menu key | Open the context menu for the focused row (the platform fires `contextmenu`; the shell does not bind this itself) |
 | `Escape` | Close the topmost overlay or cancel the current action |
 
 The exact platform modifier is handled by the keyboard layer. Inputs, editors, terminals, and
@@ -31,6 +32,14 @@ commands are registered by their owning plugin. A loaded plugin's manifest `comm
 promoted into the same command registry: one command supplies both its optional palette row and any
 keybinding target. The legacy manifest `palette` array is a compatibility alias for a command with
 `palette: true`; it never produces a second row.
+
+Context-menu rows share the commands' ceiling without sharing their registry. A menu row is a label, an
+order, a predicate over what is under the cursor, and one verb from the same closed context-free set a
+command takes — so a right-click can do exactly what a command can do and nothing more. They stay a
+separate registry (`registries/contextMenus.ts`) because a command is global and a menu row is about
+one thing: the row needs a target and a predicate over it, and neither has any meaning in the palette.
+Core's own row actions register there too, which is what keeps the contract honest — see
+`docs/ui-design.md § Menus and right-click`.
 
 User-configured shortcuts outrank defaults. Among defaults, first-party bindings win, then loaded
 plugins in lockfile installation order with plugin id as the stable tiebreak. A losing binding is

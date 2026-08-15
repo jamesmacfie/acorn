@@ -1,11 +1,14 @@
 import { routeCapability } from '../bridge'
+import { pendingPluginRequests } from '../agentTools/pluginRequests'
 import type { PluginRosterEntry } from './host'
 import type { InstalledPluginInfo, PluginLoadFailure } from '../../main/pluginLoader'
 import type {
   InstalledPluginRow,
   NodePluginRow,
+  PluginApprovalRequest,
   PluginInstallResult,
   PluginInstallSource,
+  PluginReloadResult,
   PluginUninstallResult,
   PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
@@ -57,6 +60,11 @@ export type PluginsBridge = {
   install(source: PluginInstallSource, options: { allowDowngrade?: boolean }): Promise<PluginInstallResult>
   update(id: string, options: { allowDowngrade?: boolean }): Promise<PluginUpdateResult>
   uninstall(id: string, options: { purgeData?: boolean }): PluginUninstallResult
+  // The one mutation that changes what is running WITHOUT a restart, and only for a loaded plugin
+  // (main/pluginReload.ts). It throws for a name this node did not load from disk; a plugin whose new
+  // code fails to start resolves with `state: 'failed'`, because that is not an error in the request —
+  // the previous instance is still serving and nothing was lost.
+  reload(id: string): Promise<PluginReloadResult>
 }
 
 export const PLUGIN_STATE = routeCapability<PluginsBridge>('core.pluginStateRoute')
@@ -93,7 +101,7 @@ const trimReason = (reason: string | undefined): { reason?: string } => {
 
 // The running plugin set, plus the pending one. They differ exactly when a toggle has been saved and
 // the node has not restarted, which is the state the UI has to render.
-export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; restartRequired: boolean } => {
+export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; restartRequired: boolean; requests: PluginApprovalRequest[] } => {
   const pending = new Set(bridge.disabled())
   const loadFailed = new Map(bridge.loadFailures().map((failure) => [failure.id, failure]))
   const installed = new Map(bridge.installed().map((entry) => [entry.id, entry]))
@@ -209,5 +217,8 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   // toggle in both directions — a plugin just turned off but still serving, one turned back on that has
   // not loaded — and, since phase 5, every way the install directory can disagree with this process.
   const restartRequired = rows.some((row) => !row.disabled !== row.running || row.state === 'pending-restart')
-  return { plugins: rows, restartRequired }
+  // The agent-raised approval queue rides the roster rather than getting a GET of its own: it is read by
+  // the same device-only mount, refreshed by the same `plugins:changed` reconcile, and a second route
+  // would be a second thing to remember to gate (docs/plugins.md § Approval-mediated install).
+  return { plugins: rows, restartRequired, requests: pendingPluginRequests() }
 }

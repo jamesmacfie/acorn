@@ -19,6 +19,7 @@ const ack = (over: Partial<PluginAck> = {}): PluginAck => ({
   permissions: NONE,
   webviews: [],
   keyClaims: [],
+  extensions: [],
   decision: 'accepted',
   decidedAt: 1_700_000_000_000,
   ...over,

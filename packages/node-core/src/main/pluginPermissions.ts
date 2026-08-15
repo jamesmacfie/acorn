@@ -50,6 +50,19 @@ const SIMPLE_FACETS = {
   identity: 'identity',
 } as const satisfies Record<string, keyof CoreServices>
 
+// The whole `permissions.node.core` vocabulary, in one exported list because the agent-facing
+// authoring projection (server/agentTools/pluginAuthoring.ts) has to be able to answer "what may I
+// declare" from the running node rather than from a list someone copied. Derived from SIMPLE_FACETS so
+// a facet added above is in it for free; the four spelled out here are the ones scopeCore handles
+// itself, and pluginAuthoring.test.ts asserts each of them still grants something.
+export const NODE_CORE_FACETS = [
+  ...Object.keys(SIMPLE_FACETS),
+  'prefs',
+  'projects:read',
+  'projects:config',
+  'projects:write',
+] as const
+
 const pick = <T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> =>
   Object.fromEntries(keys.map((key) => [key, source[key]])) as Pick<T, K>
 

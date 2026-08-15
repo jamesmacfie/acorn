@@ -14,8 +14,11 @@
 // and that node may be running a version of this schema that predates a field.
 import { z } from 'zod'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from './contentLinkPattern.ts'
+import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from './contextMenus.ts'
+import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, parseExtensionPointRef } from './extensionPoints.ts'
 import { isNormalizedChord, isPluginKeyClaim, isPluginShortcutChord, isReservedPluginKeyClaim } from './keybindings.ts'
 import { LANGUAGE_IDS } from './languageIds.ts'
+import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from './themeTokens.ts'
 import { normalizeWebviewHost, WEBVIEW_HOST_MAX_COUNT, WEBVIEW_HOST_MAX_LENGTH } from './webview.ts'
 
 // Same shape as the route registry's and the plugin database factory's id rules, plus a length
@@ -157,7 +160,13 @@ const frameSurface = z.object({
   // HOST places (backdrop, box, close affordance), which is the same argument that makes `refPanel` a
   // frame target: the frame draws its contents, not its own position. It has no click site of its own,
   // so the only way to open one is the `openOverlay` verb below.
-  target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview', 'overlay']),
+  //
+  // `coreSlot` is the exclusive-slot target: a rectangle drawn where one of core's OWN surfaces normally
+  // is (@acorn/protocol/extensionPoints.ts holds the designated list). It is a separate target rather
+  // than a property of `pane` because it lands in a different registry and obeys a different rule —
+  // registering one SEIZES NOTHING. The user picks the provider in settings, and core is what a slot
+  // falls back to when nobody is chosen, when the chosen plugin is gone, or when its surface throws.
+  target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview', 'overlay', 'coreSlot']),
   // TASK or PROJECT, and `pane` only. A pane has always meant "a rectangle in a task's layout", which is
   // why that is the default: every manifest written before this field parses and behaves identically.
   //
@@ -187,6 +196,9 @@ const frameSurface = z.object({
   providerId: z.string().min(1).max(64).optional(),
   // `settings` only.
   group: z.enum(['general', 'workspace']).optional(),
+  // `coreSlot` only, and required there. Which of core's designated surfaces this offers to stand in
+  // for; an unknown one is a parse error rather than a surface that installs and never appears.
+  coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS).optional(),
   // `webview` only. The URL may be static or resolved from the plugin's own node route; the declared
   // hosts are the grant the device records and Electron enforces across redirects.
   url: z.string().min(1).max(2_048).optional(),
@@ -318,14 +330,127 @@ const sourceDescriptor = z.object({
 const slotDescriptor = z.object({
   id: z.string().min(1).max(64),
   // Enumerated host slots, so an unknown one is a parse error rather than a contribution that
-  // silently never appears. `footer` is the task footer — the slot `docker-footer-badge` already
-  // occupies, which is the precedent the phase doc names.
-  slot: z.enum(['footer']),
+  // silently never appears — and the enum is short because A SLOT OPENED IS HARD TO CLOSE. What is
+  // here, and the argument for everything that is not:
+  //
+  //   footer  the TASK footer, the slot `docker-footer-badge` already occupies.
+  //   topbar  the topbar's right end, beside the node chip and the notification bell. This is the
+  //           status-bar of the app, and a status chip is the thing this descriptor already draws.
+  //
+  // REFUSED, on the record, so the next reader does not have to re-derive it:
+  //
+  //   `topbar.left` and `task.switcher.extra` are members of the client's `UiSlotId` union with NO
+  //     `SlotHost` anywhere in the tree. A manifest naming one would parse and never appear.
+  //   `overlay` is the full-window layer that holds the config-trust gate, the plugin-trust dialog
+  //     and the command palette. A contribution there draws OVER the shell, including over the very
+  //     prompts that ask an owner whether to trust this package. Never, at any tier.
+  //   `drawer` is a rectangle with real UI inside it, which is what a frame is for; its slot context
+  //     also carries shell callbacks (`toggleTerminal`, `closeTerminal`, the active task) that a
+  //     descriptor has no way to receive.
+  //   `tabrail.task-row` is per-TASK, and this descriptor's `data` is one node-scoped route with no
+  //     task in it. Opening it would mean either a badge that says the same thing on every row or one
+  //     fetch per visible row per plugin per tick, and neither is worth a slot.
+  slot: z.enum(['footer', 'topbar']),
   icon: z.string().min(1).max(64).optional(),
   // GET → PluginSlotBadge | null, where null hides the badge.
   data: pluginRoute,
   onClick: contextFreeAction.optional(),
   refresh,
+})
+
+// A row on a host-drawn context menu (@acorn/protocol/contextMenus.ts holds the location vocabulary
+// and the fact list a `when` may name).
+//
+// The descriptor tier's answer to "let a plugin add a right-click action", and the shape is chosen so
+// that a menu item can do EXACTLY what a command can do and nothing more: `contextFreeAction`, the
+// same narrow union a command and a slot badge take. It is the narrow one rather than the full
+// `chromeAction` even though a context menu obviously has a click site, because the thing under the
+// cursor is a CORE resource — a task row — and the two verbs missing from this union both need
+// something only a rail source has: `createTask` needs the host's promotion callback over a
+// `PluginRailItem`, and `navigate` needs a project-scoped surface of this plugin's own to address.
+//
+// What the verb DOES receive is the target's id, as the item id every other click site supplies. So a
+// `runNodeAction` learns which task the owner right-clicked and then chose this item on — a deliberate
+// act, the same disclosure a rail row click already makes.
+const contextMenuDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  location: z.enum(CONTEXT_MENU_LOCATIONS),
+  label: z.string().min(1).max(60),
+  // A Lucide name or a `brand:` mark, resolved client-side, exactly as a source's `glyph` is.
+  icon: z.string().min(1).max(64).optional(),
+  order: z.number().int().min(0).max(100_000).default(500),
+  // All-must-equal over the location's own facts. Bounded on both sides: a handful of facts exist, and
+  // a value is a literal rather than a pattern.
+  when: z.record(z.string().min(1).max(32), z.union([z.string().max(64), z.boolean()])).optional(),
+  action: contextFreeAction,
+}).superRefine((descriptor, ctx) => {
+  // Both fields are on the same object, so this rule can live here rather than in the manifest-level
+  // refinement. A `when` naming a fact the host never supplies can never match, which is the "installs
+  // and does nothing" failure that is worse than a parse error because it looks like it worked.
+  for (const fact of unknownWhenFacts(descriptor.location, descriptor.when ?? {})) {
+    ctx.addIssue({ code: 'custom', path: ['when', fact], message: `'${descriptor.location}' has no fact named '${fact}'` })
+  }
+})
+
+// ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ───────────────────────
+//
+// The gap this closes: plugin B could not add anything INSIDE plugin A's surfaces, even when A would
+// welcome it. The only way to do it was for A to import B, which is the coupling the registries were
+// built to remove.
+//
+// TWO-SIDED, DECLARATIVE, HOST-MEDIATED, and every word of that is load-bearing.
+//
+//   two-sided     A declares the point it hosts, B declares the contribution. A opted in. There is no
+//                 uncooperative extension, and there is no way to write one with these keys.
+//   declarative   what crosses is a DESCRIPTOR — an id, a label, an icon, an order — and a verb from the
+//                 closed set. Never a component, never a callback, never code. It is the same rule the
+//                 first-party-plugins doc gives for why in-realm composition is banned, applied one level
+//                 up: a plugin's realm is not somewhere another plugin's code may run.
+//   host-mediated the host fetches B's items from B's own node route, stamps the provenance, and draws
+//                 the pixels with its own components inside the strip A's layout reserved. A never
+//                 receives B's data and B never touches A's document.
+//
+// A ships NO CODE to be extendable beyond declaring the point. That is what makes the seam worth having:
+// the cost of opening a surface is one manifest entry.
+
+const extensionPointDescriptor = z.object({
+  // Namespaced by the host into `<pluginId>:<id>`, which is the only name anyone else may use.
+  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'extension point id must be lower-case alphanumeric with dashes'),
+  // What the owner is opening, in the owner's words. Shown at trust time to BOTH sides — the plugin
+  // opening the point and the plugin filling it — because "this plugin extends that plugin" is a fact
+  // both owners are entitled to see before anything runs.
+  label: z.string().min(1).max(80),
+  location: z.enum(EXTENSION_POINT_LOCATIONS),
+  // A surface THIS manifest declares, checked below. A point floating free of a surface would be a
+  // declaration with nowhere to draw.
+  surface: z.string().min(1).max(64),
+})
+
+const extensionDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  // `<ownerPluginId>:<pointId>`. Naming the owner out loud is the disclosure: an owner reading this
+  // manifest at install time can see which package this one reaches into.
+  point: z.string().min(1).max(130),
+  // The group heading the host draws above these rows. The plugin id rides beside it at render time and
+  // is stamped by the host, so this label cannot be used to pass the items off as somebody else's.
+  label: z.string().min(1).max(80),
+  order: z.number().int().min(0).max(100_000).default(500),
+  // GET → PluginExtensionItems, on this plugin's OWN namespace (confined below). The `refResolvers`
+  // pattern: the data lives on the node, the node is always running, and the host draws it.
+  items: pluginRoute,
+  // Declared ONCE here rather than per item, exactly as a rail source's `onSelect` is, so the node can
+  // check it against this plugin's own declared surfaces at parse time. The clicked row's id rides along
+  // as the item. `contextFreeAction`, because the click site is inside ANOTHER plugin's pane: there is no
+  // rail row to promote and no project of this plugin's to navigate within.
+  onSelect: contextFreeAction.optional(),
+  refresh,
+}).superRefine((descriptor, ctx) => {
+  // Both halves are on the same object, so this rule lives here rather than in the manifest-level
+  // refinement. A `point` that is not `<owner>:<point>` can never resolve, which is the "installs and
+  // does nothing" failure that is worse than a parse error because it looks like it worked.
+  if (!parseExtensionPointRef(descriptor.point)) {
+    ctx.addIssue({ code: 'custom', path: ['point'], message: `'${descriptor.point}' is not an extension point reference — use '<pluginId>:<pointId>'` })
+  }
 })
 
 const paletteDescriptor = z.object({
@@ -474,6 +599,42 @@ const refResolverDescriptor = z.object({
   resolve: pluginRoute,
 })
 
+// A COLOUR theme: a map of theme-token values the host validates and then generates a
+// `:root[data-theme="plugin:<pluginId>:<id>"]` block from itself (docs/ui-design.md § Appearance).
+//
+// No plugin-authored CSS reaches the shell, and that is the whole design rather than a precaution. A
+// raw stylesheet — which is what the obvious version of this feature accepts — can restyle anything,
+// so it would need an allowlist parser and would still be one clever selector away from breaking the
+// chrome. A map of named tokens cannot express anything but colour, so the worst a hostile or merely
+// wrong theme can do is look bad.
+//
+// `z.strictObject` over the palette does four jobs at once, which is why the shape is an object rather
+// than a `z.record`: every required token must be present, an unknown key is refused, a DERIVED token
+// (`--danger`, `--surface-sunken`, …) is refused because it is not a member — restating one on a theme
+// block would break the `var()` derivation it exists for — and each value goes through the colour
+// check. All four are parse-time, so an author learns at install rather than by seeing no theme.
+//
+// The three self-description tokens (`--is-dark`, `--color-scheme`, `--syntax-fg`) are NOT declarable.
+// They are not colours, and the host writes all three from `dark` below — a theme states what it IS
+// and the host states what follows.
+const themeDescriptor = z.object({
+  // Namespaced by the host into `plugin:<pluginId>:<id>`; the alphabet is bounded because the result is
+  // written into a CSS attribute selector.
+  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'theme id must be lower-case alphanumeric with dashes'),
+  label: z.string().min(1).max(80),
+  // Drives `--is-dark`, `--color-scheme` and `--syntax-fg`, which is everything in the app that asks a
+  // theme whether it is dark: the terminal and editor bridges read `--is-dark`, and the diff and check
+  // logs pick their syntax palette off `--syntax-fg`.
+  dark: z.boolean().default(false),
+  tokens: z.strictObject(Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [
+    name,
+    z.string().min(1).max(THEME_COLOR_VALUE_MAX).refine(
+      isThemeColorValue,
+      'must be a hex colour or a flat colour function — #1e1e2e, rgba(0, 0, 0, 0.42), oklch(0.7 0.15 250)',
+    ),
+  ]))),
+})
+
 // `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` is
 // still a loose object even now that phase 4's keys are named: a manifest written for a newer acorn
 // should contribute less on an older one rather than fail to parse.
@@ -496,6 +657,18 @@ const contributions = z.looseObject({
   // Four. A plugin with more than a handful of resolvable item kinds is describing a whole product
   // surface, and the vocabulary a resolver answers in is deliberately one shape for all of them.
   refResolvers: z.array(refResolverDescriptor).max(4).default([]),
+  // Eight, matching `sources`. Each entry is a full palette the owner can read at install time, and a
+  // package offering more than a handful of them is a gallery rather than a plugin with a look.
+  themes: z.array(themeDescriptor).max(8).default([]),
+  // Eight across every location, not eight per location. A context menu is a short list someone reads
+  // while holding a mouse button down; a plugin that wants nine rows on it wants a pane.
+  contextMenus: z.array(contextMenuDescriptor).max(8).default([]),
+  // Four, the same ceiling as attention and nodeStats. A package offering more than a handful of places
+  // for other packages to appear inside it is describing a platform, and acorn is the platform here.
+  extensionPoints: z.array(extensionPointDescriptor).max(4).default([]),
+  // Eight, matching `sources`. A plugin reaching into more than a handful of other plugins' surfaces is
+  // decorating the app rather than integrating with it.
+  extensions: z.array(extensionDescriptor).max(8).default([]),
 }).prefault({})
 
 
@@ -571,6 +744,11 @@ export const isProjectPaneSurface = (frame: { target: string; scope?: string }):
 /** A full-screen picker the host places. Not a pane — it belongs to no task's layout. */
 export const isOverlaySurface = (frame: { target: string }): boolean => frame.target === 'overlay'
 
+/** A replacement for a designated CORE surface. Not a pane and not an overlay: it has no layout key, no
+ *  click site of its own and no verb that opens it — the user's arbitration is the only thing that ever
+ *  puts one on screen (@acorn/protocol/extensionPoints.ts). */
+export const isCoreSlotSurface = (frame: { target: string }): boolean => frame.target === 'coreSlot'
+
 // ── The wire projection (docs/plugins.md) ─────────────────────────────────────────────────────────
 //
 // What a plugin's manifest DECLARED, as it reaches a device inside a roster row. Not what is enforced:
@@ -606,10 +784,14 @@ export type PluginDocumentRegion = Omit<z.infer<typeof documentRegion>, 'languag
   completions?: PluginDocumentCompletions
 }
 export type PluginPaneLayout = Omit<z.infer<typeof paneLayout>, 'document'> & { document: PluginDocumentRegion }
-export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'layout'> & {
+export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'layout' | 'coreSlot'> & {
   scope?: 'task' | 'project'
   claimsKeys?: string[]
   layout?: PluginPaneLayout
+  // WIDER than the parse: the client re-checks the slot name against its own designated list before it
+  // registers a provider, so believing the narrow union here would only mean a reader that cannot check
+  // the value it is about to check.
+  coreSlot?: string
 }
 export type PluginChromeAction = z.infer<typeof chromeAction>
 // The verbs that need nothing from their click site. `createTask` depends on a selected rail row and
@@ -628,6 +810,26 @@ export type PluginContentLinkDescriptor = z.infer<typeof contentLinkDescriptor>
 export type PluginClientRouteDescriptor = z.infer<typeof clientRouteDescriptor>
 export type PluginAgentContextDescriptor = z.infer<typeof agentContextDescriptor>
 export type PluginRefResolverDescriptor = z.infer<typeof refResolverDescriptor>
+// `tokens` is WIDER than the parse, by the rule stated above: the client re-checks every name and
+// every value before it writes one into a stylesheet, so believing the narrow per-token key type here
+// would only mean a reader that cannot iterate the map it is about to validate.
+export type PluginThemeDescriptor = Omit<z.infer<typeof themeDescriptor>, 'tokens'> & {
+  tokens: Record<string, string>
+}
+// `location` is WIDER than the parse, by the rule stated above: the client re-checks the location and
+// every `when` key against its own copy of the vocabulary before it registers anything, so believing
+// the narrow union here would only mean a reader that cannot check the value it is about to check.
+export type PluginContextMenuDescriptor = Omit<z.infer<typeof contextMenuDescriptor>, 'location'> & {
+  location: string
+}
+// `location` is WIDER than the parse, by the rule stated above, and for the reason the context-menu
+// descriptor gives one type up: the client re-checks it against its own copy of the vocabulary before it
+// registers anything, so believing the narrow union here would only mean a reader that cannot check the
+// value it is about to check.
+export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointDescriptor>, 'location'> & {
+  location: string
+}
+export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
 
 // Still loose on the wire as well as in the schema: a client that does not know a future sibling key
 // should contribute less rather than fail to parse. Every list but `frames` is optional for the same
@@ -647,4 +849,8 @@ export type PluginContributions = {
   agentContexts?: PluginAgentContextDescriptor[]
   refResolvers?: PluginRefResolverDescriptor[]
   routes?: PluginClientRouteDescriptor[]
+  themes?: PluginThemeDescriptor[]
+  contextMenus?: PluginContextMenuDescriptor[]
+  extensionPoints?: PluginExtensionPointDescriptor[]
+  extensions?: PluginExtensionDescriptor[]
 } & Record<string, unknown>

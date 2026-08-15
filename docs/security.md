@@ -102,6 +102,16 @@ The threats this closes, and the ones it does not:
   cannot masquerade under a previously accepted hash.
 - **Downgrade** — resolution prefers the highest version whose plugin-API major this client speaks. A
   Node offering an older bundle adds a candidate; it cannot evict a newer accepted one.
+- **CSS injection through a contributed theme** — a `themes` entry is the only manifest field whose
+  content ends up inside the shell's own stylesheet, so it is validated at both ends and the values are
+  refused rather than escaped. A token value must match a hex literal or a flat colour function whose
+  argument alphabet excludes `(`, `)`, `;`, `{`, `}`, `<`, `\`, quotes and every control character;
+  the token NAMES are host constants matched by set membership, and the generated selector is rebuilt
+  from a bounded id alphabet rather than from any string a manifest supplied. A value that cannot close
+  a declaration, close a block, open a nested function or open a tag has nothing left to sanitise —
+  which is the same argument brand marks make for shipping path data instead of an SVG document, and
+  the reason the host generates the theme block rather than accepting a stylesheet
+  (`docs/ui-design.md § Plugin themes`).
 - **Not closed: the Node half.** A loaded plugin's node code runs in the Node's process, disclosed and
   acknowledged — the same trust class as an editor extension. Its declared `node` permissions shape
   the context it is handed; they are not enforced against a bundle that imports `node:fs` directly.
@@ -112,6 +122,59 @@ The only way a package reaches a Node's install directory is the owner-authentic
 (`POST /v2/core/plugins/install`, device principal only, audited). Nothing is distributed to a device
 until a Node's owner has installed it, and nothing runs on a device until that device has separately
 acknowledged the exact bundle bytes.
+
+**An agent can ask for an install; it cannot perform one.** The `plugin_request` agent tool raises a
+request and rings the owner's bell. It holds no credential that can install code — a task-scoped internal
+token is refused by every route in the `/v2/core/plugins/*` family, and the module implementing the tool
+imports no installer, no data root and no filesystem, which a test pins so a later convenience import
+fails the build rather than the boundary. On approval **the device** performs the install with its own
+principal. The owner decides in the shell's own chrome, which a plugin frame cannot draw over, and the
+answer route is permanently unmappable from a frame for the same reason the install route is: a frame that
+could post an approval would answer the question that exists because an agent must not install.
+
+Because the installer only validates a manifest after fetching, the approval is two screens: the agent's
+ask (action, source, its stated reason) gates the *fetch*, and a second screen shows the real manifest read
+back off disk before anything runs — install never starts a plugin — with a No that uninstalls it again.
+`docs/plugins.md § What the owner can know before the download` records why that ordering was chosen over
+downloading first.
+
+### The dev grant
+
+Per-hash consent is right for distribution and wrong for iteration, so a plugin the owner is actively
+developing can be put into **development mode**: a grant stored per `(pluginId, nodeId)` on the device,
+beside the acknowledgements, that auto-accepts future bundles of that plugin from that node. The node half
+of the key is not in the design note and is deliberate — fleet resolution picks a winner across every
+paired node, so a grant keyed on the plugin name alone would auto-trust a bundle a *different* node started
+serving under it.
+
+The grant writes ordinary accepted acknowledgements, in Electron main, beside the hash main computed
+itself; nothing in the renderer can turn a bundle into an accepted one with or without a grant. Each such
+row is marked `dev` so revocation can find it, and `partial` because nobody read a disclosure — so it can
+never become the baseline of a later "what changed" diff.
+
+**The honest cost, stated so it is weighed rather than discovered: while a plugin is in dev mode, the node
+half the agent writes runs with the Node's own access on next load, without a per-save human read.** That
+is exactly the risk the owner accepted by entering dev mode, and it is bounded to plugins they chose — but
+it is the same in-process access described under "Node-half plugin security" below, arriving without a
+prompt. If rung 2 (out-of-process node halves) ships first, dev mode inherits its containment, which is a
+good reason to watch that ordering.
+
+Three things keep it bounded:
+
+- **Visible.** Settings → Plugins badges the row *in development — bundle changes are auto-trusted*. The
+  moment dev-mode behaviour is indistinguishable from a normal install, the trust story has rotted.
+- **Revocable, and revocation means something.** Ending dev mode drops the grant *and* every
+  acknowledgement it wrote. What survives is whatever the owner answered by hand, so with nothing left the
+  current bundle is undecided again and the normal per-hash prompt fires on the next distribution pass —
+  which is what "promoting out of dev mode re-enters per-hash trust at the current bundle" means. Revoking
+  and promoting are one operation.
+- **Auditable.** Every approval that entered dev mode is a `plugins.request.decided` row on the Node's
+  audit trail, carrying the action, the decision, the dev flag and the task whose agent asked.
+
+Dev mode widens nothing in a packaged build. Local-path (symlink) installs are still gated on
+`!app.isPackaged`, so the in-place directory a dev loop needs is unavailable there; the grant itself is a
+device-side trust decision and still applies to a remotely-sourced plugin, where it means "future versions
+of this one do not re-prompt" and each iteration is still an explicit update.
 
 Frame key capture is also manifest-bounded. A frame already sees key events delivered to its own
 document, but it may suppress shell forwarding only for modified chords listed in `claimsKeys`; those
@@ -420,6 +483,8 @@ here as the checklist reviewers should hold PRs against:
 | Project config scripts (`setup_script`, `dev_script`, …) | Readable through `core.projects.config()` and writable via the core config route; the Node executes them | Separate `projects:config` read grant; config `PUT`s permanently unmapped on the phase-3 bridge; project config trust ack on the node side | Rung 1 (node facet); phase 3 (frames); rung 2 (node half) |
 | Project folder paths | `core.projects.checkouts()` lists every mapped codebase | Split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 1 (disclosure), rung 2 (enforced) |
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |
+| Install on an agent's say-so | Prompt-injected agent asking for a hostile package | Request/decision split: the tool cannot install, the device does, the owner decides in shell chrome | Shipped |
+| A plugin in dev mode | Its node half runs unread on every reload | Bounded to one (plugin, node) the owner chose; badged, revocable, audited. Not closed until rung 2 | Shipped (disclosure) |
 
 ## Host-owned webviews and browser automation
 
@@ -455,5 +520,6 @@ and can dominate archive size. Restore is a documented manual operation into a f
 
 The append-only core `audit` table retains security-relevant decisions for 90 days. Producers include
 pairing-window changes, device pair/revoke, config-trust acknowledgement, secret create/replace/delete,
-plugin toggles, and backup. The Settings → Security surface reads it. The trail is
+plugin toggles, plugin install/update/uninstall/reload, the owner's answer to an agent-raised plugin
+request, and backup. The Settings → Security surface reads it. The trail is
 not tamper-evident against someone who already controls the database file.

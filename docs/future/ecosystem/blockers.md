@@ -1,9 +1,11 @@
-# The four gates, and what answers each
+# The gates, and what answers each
 
-Design notes from the ecosystem-feasibility session (2026-08-14). Nothing here is scheduled. Each
-gate below is a deliberate decision with recorded rationale — not a gap someone forgot — which
-means each is reversed by a decision plus its designed answer, not by rearchitecture. Ordered by
-how hard they gate the end goal.
+From the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16. The session found four
+gates; **the reload gate is gone** — a loaded plugin now hot-swaps in place
+(`docs/plugins.md § Reloading one plugin without a restart`), so what was gate 3 no longer exists.
+Each remaining gate is a deliberate decision with recorded rationale — not a gap someone forgot —
+which means each is reversed by a decision plus its designed answer, not by rearchitecture.
+Ordered by how hard they gate the end goal.
 
 ## 1. The node half is disclosed, not contained
 
@@ -13,23 +15,23 @@ bundle shares the process and can `import('node:fs')`, open `core.sqlite`, or mo
 `docs/security.md § Node-half plugin security` says this plainly, and every permission UI is
 required to say *declared*, never *enforced*.
 
-**Why it gates everything marketplace-shaped.** For plugins the user authored (the
-user-extensions dev loop), disclosure is the accepted deal — the human entered dev mode for that
-plugin on that device. For a stranger's plugin found through discovery, disclosure-only means the
-install prompt *is* the security model. That is bb's trade, and
-`docs/future/user-extensions/README.md` refuses it on the record. Shipping discovery before
-containment converts an honest, documented weakness into a liability.
+**Why it gates everything marketplace-shaped.** For plugins the user authored (the shipped dev
+loop, `docs/plugin-authoring.md`), disclosure is the accepted deal — the human entered dev mode
+for that plugin on that node. For a stranger's plugin found through discovery, disclosure-only
+means the install prompt *is* the security model. That is bb's trade, refused on the record.
+Shipping discovery before containment converts an honest, documented weakness into a liability.
 
 **The designed answer.** `docs/security.md § The containment ladder`, rung 2: one child process
 per plugin, a plugin-scoped token, a `--permission` fs jail, `ctx` becomes RPC. Rung 3 adds OS
 sandboxing for network egress. Six design rules already enforced today were chosen specifically so
 rung 2 stays a refactor: fetch-shaped route handlers, async-only ctx, structured-clone-safe
-capabilities, no general secret read path, and friends. This is the single biggest lift in the
-whole program and the hard precondition for gate 2's discovery half.
+capabilities, no general secret read path, and friends. The reload path's candidate-then-commit
+lifecycle is the supervision shape to reuse. This is the single biggest lift in the whole program
+and the hard precondition for gate 2's discovery half.
 
 ## 2. No signing, no discovery
 
-**What.** Installs are hash-pinned (the phase-5 lockfile records source, resolved version, archive
+**What.** Installs are hash-pinned (the lockfile records source, resolved version, archive
 sha256, entrypoint hashes) and audited, but packages are not signed and provenance is a
 recommendation. `docs/security.md § Supply chain` names sigstore-style signing as future work.
 There is no marketplace, and `docs/extensibility.md` is deliberate about what one could be:
@@ -46,43 +48,21 @@ update-consent flow it would ride — per-(plugin, hash) device trust with a per
 update — is shipped. Work plan: design signing first, then discovery as a listing over signed
 packages, and only after rung 2.
 
-## 3. Nothing reloads
+## 3. External authors cannot build a plugin
 
-**What.** Every install/update/uninstall returns `installed-restart-required`; contribution sync
-runs at boot and on trust decisions only; `activeBundles` is resolved once per session. A remote
-node needs an operator to restart it. Inventoried in
-`docs/future/user-extensions/current-state.md § The change model`.
-
-**Why it gates.** It makes the dev loop restart-shaped (a prompt and two restarts per iteration),
-and it makes plugin management on a *remote* node genuinely painful — "restart the node" is not a
-button when the node is on another machine.
-
-**The designed answer.** `docs/future/user-extensions/agent-authored-plugins.md § 2`: one new
-"plugins changed" event from the node; the client re-resolves bundles and re-runs the two syncs
-that already exist; node-side candidate-then-commit re-init built on the host's shipped
-`clearRegistrations()`/`contain()` seams; the ESM cache defeated with a generation query
-parameter. Client-side, acorn is better placed than bb: plugin UI is an iframe keyed by bundle
-hash on a content-addressed scheme, so a swap is loading a different URL — nothing leaks. Scope
-stays dev-mode plugins; store installs keep restart-required semantics deliberately.
-
-## 4. External authors cannot build a plugin
-
-**What.** `@acorn/plugin-api` (eight entrypoints, snapshot-pinned surface) is a workspace
+**What.** `@acorn/plugin-api` (snapshot-pinned surface, `PLUGIN_API_MAJOR` gate) is a workspace
 dependency. `docs/extensibility.md § Plugins get building blocks` records that it is "not yet
-resolvable for a genuinely external" plugin — an accepted intermediate state. The eight
-developer-experience findings that used to sit around it are done: failures name themselves on the
-roster row and in the attention inbox, `pnpm dev:plugin` watches and rebuilds, development builds no
-longer ask about their own bundled packages at boot, plugin tests take a real context from
-`@acorn/plugin-api/testkit`, and the copied host mechanics moved behind the host or a one-line
-re-export. `docs/plugins.md`, `docs/testing.md` and `docs/data-layer.md` own that behavior now.
+resolvable for a genuinely external" plugin — an accepted intermediate state. Everything else an
+external author needs now exists: the authoring contract (`docs/plugin-authoring.md`), failures
+that name themselves on the roster row, `@acorn/plugin-api/testkit`, and a reload-shaped loop.
 
-**Why it gates.** Until the facade installs from npm, third-party DX is not a polish question — the
-front door is closed. No amount of marketplace work matters before this.
+**Why it gates.** Until the facade installs from npm, third-party DX is not a polish question —
+the front door is closed. No amount of marketplace work matters before this.
 
-**The designed answer.** What is left is packaging work with one design decision attached (what
-version/compat contract to promise — the `PLUGIN_API_MAJOR` gate already exists, and the surface
-snapshot now refuses to shed a name unless that major moves). The authoring-experience bar and the
-residue the DX work left behind are in `dx.md`.
+**The designed answer.** Packaging work with one design decision attached: the compat promise
+("your plugin keeps loading within a major"). The `PLUGIN_API_MAJOR` gate already exists and the
+surface snapshot refuses to shed a name unless that major moves, so the promise is mostly already
+enforced — it just isn't publishable yet. The remaining bar and residue are in `dx.md`.
 
 ## What is deliberately not on this list
 
@@ -91,15 +71,15 @@ residue the DX work left behind are in `dx.md`.
   sandbox. That is a boundary, not a blocker — see `shell-vision.md`.
 - **The closed action-verb set and descriptor vocabulary.** Rollbar's rail losing its filters was
   found honestly and answered with "move exploration into the frame." Growing the verb set is a
-  per-verb decision, not a program.
-- **Plugin-to-plugin interop.** Capabilities, content links, ref resolvers, and the designed
-  cooperative extension points (`docs/future/user-extensions/extension-points.md § 3`) cover it
-  host-mediated. bb-style uncooperative extension is refused on the record and stays refused.
+  per-verb decision, not a program — and it just grew deliberately (context menus, extension
+  points, exclusive slots), which is the model: one designed addition at a time.
+- **Plugin-to-plugin interop.** Capabilities, content links, ref resolvers, and the now-shipped
+  cooperative extension points (`docs/plugins.md § Cooperative extension points`) cover it
+  host-mediated. bb-style uncooperative extension is refused on the record and stays refused
+  (`docs/plugins.md § There is no uncooperative extension`).
 
 ## Verify before building
 
-Whether rung 2 has shipped (changes gates 1 and 3's risk text); whether the lockfile still pins
-hashes and the installer still refuses downgrades; whether `activeBundles` is still
-session-pinned and contribution sync still boot-only; whether `@acorn/plugin-api` became
-publishable in the meantime; and whether gate 4 still has anything in it beyond that packaging
-work (`dx.md` names the residue).
+Whether rung 2 has shipped (changes gate 1's risk text and the dev-grant note); whether the
+lockfile still pins hashes and the installer still refuses downgrades; and whether
+`@acorn/plugin-api` became publishable in the meantime (gate 3 closed).

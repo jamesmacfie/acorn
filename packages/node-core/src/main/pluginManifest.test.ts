@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import { pluginManifestSchema } from './pluginManifest'
 
 // The declarative-chrome half of the manifest (docs/plugins.md).
@@ -642,5 +643,260 @@ describe('plugin commands and keybindings', () => {
     for (const chord of ['meta+k', 'meta+,', 'meta+1', 'meta+9', 'escape']) {
       expect(messages(manifest({ frames: [{ ...PANE, claimsKeys: [chord] }] }))).toContain(`${chord} is reserved by acorn and cannot be claimed`)
     }
+  })
+})
+
+describe('themes', () => {
+  // The parse-time half of "a plugin theme cannot break the app" (docs/ui-design.md § Appearance).
+  // The client re-checks all of it before generating CSS, because a roster row is bytes a node sent —
+  // but this is where an AUTHOR finds out, so each rule is pinned at the door it is enforced at.
+  const palette = Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [name, '#123456']))
+  const theme = (over: Record<string, unknown> = {}) => ({ id: 'nightfall', label: 'Nightfall', tokens: palette, ...over })
+
+  it('accepts a complete palette and defaults the dark flag', () => {
+    expect(manifest({ themes: [theme({ dark: true })] }).success).toBe(true)
+    const parsed = manifest({ themes: [theme()] })
+    expect(parsed.success && parsed.data.contributions.themes[0]!.dark).toBe(false)
+  })
+
+  it('requires every palette token, so a theme can never be half a palette', () => {
+    const partial = { ...palette }
+    delete partial['--hunk-text']
+    expect(manifest({ themes: [theme({ tokens: partial })] }).success).toBe(false)
+  })
+
+  it('refuses unknown, derived, self-description and cross-axis token names', () => {
+    // Derived tokens are `var()` references declared once on :root; the self-description three are
+    // written by the host from `dark`; `--radius` belongs to the other axis entirely. All four kinds
+    // of overreach are the same refusal, because the map is a strict object over one closed list.
+    for (const name of ['--made-up', '--danger', '--surface-sunken', '--is-dark', '--syntax-fg', '--radius']) {
+      expect(manifest({ themes: [theme({ tokens: { ...palette, [name]: '#fff' } })] }).success, name).toBe(false)
+    }
+  })
+
+  it('refuses a value that is not a colour, including one that could escape the block', () => {
+    for (const value of ['red', 'inherit', 'var(--bg)', 'url(https://evil.example/x)', '#fff; } :root { --bg: red', '#fff\n}']) {
+      expect(manifest({ themes: [theme({ tokens: { ...palette, '--bg': value } })] }).success, value).toBe(false)
+    }
+  })
+
+  it('accepts hex and flat colour functions', () => {
+    for (const value of ['#fff', '#ffffff', '#ffffffcc', 'rgba(0, 0, 0, 0.42)', 'oklch(0.7 0.15 250)', 'hsl(210 100% 50%)']) {
+      expect(manifest({ themes: [theme({ tokens: { ...palette, '--bg': value } })] }).success, value).toBe(true)
+    }
+  })
+
+  it('bounds the id to what can go inside a CSS attribute selector', () => {
+    for (const id of ['Nightfall', 'night fall', 'night"fall', '-night']) {
+      expect(manifest({ themes: [theme({ id })] }).success, id).toBe(false)
+    }
+  })
+
+  it('counts a theme id in the one-id-per-contribution rule', () => {
+    expect(messages(manifest({ themes: [theme(), theme()] }))).toContain("duplicate contribution id 'nightfall'")
+  })
+})
+
+describe('slots', () => {
+  const slot = (over: Record<string, unknown> = {}) =>
+    ({ id: 'board-badge', slot: 'footer', data: '/v2/p/board/badge', ...over })
+
+  it('accepts the two host slots that have a host to draw them', () => {
+    expect(manifest({ slots: [slot()] }).success).toBe(true)
+    expect(manifest({ slots: [slot({ id: 'board-chip', slot: 'topbar' })] }).success).toBe(true)
+  })
+
+  it('refuses every client slot id that is not one of them', () => {
+    // Each of these is a real member of the client's own slot union, and each is refused for its own
+    // reason (@acorn/protocol/pluginContract.ts § slotDescriptor). A parse error is the point: a
+    // manifest naming one would otherwise install and never appear.
+    for (const name of ['overlay', 'drawer', 'topbar.left', 'topbar.right', 'task.footer', 'tabrail.task-row']) {
+      expect(manifest({ slots: [slot({ slot: name })] }).success, name).toBe(false)
+    }
+  })
+
+  it('confines a slot’s data route and its click verb to the plugin’s own namespace', () => {
+    expect(messages(manifest({ slots: [slot({ data: '/v2/core/tasks' })] })))
+      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ slots: [slot({ onClick: { verb: 'runNodeAction', path: '/v2/p/other/go' } })] })))
+      .toContain('route must be inside /v2/p/board/')
+  })
+})
+
+describe('context menus', () => {
+  // The declarative right-click contribution. Two things are worth pinning at this door: the closed
+  // location vocabulary, and that a `when` may only name facts the location actually supplies —
+  // because a predicate that can never match is a contribution that installs and does nothing.
+  const menu = (over: Record<string, unknown> = {}) => ({
+    id: 'open-card',
+    location: 'task.row',
+    label: 'Open the board card',
+    action: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+    ...over,
+  })
+
+  it('accepts a row on a declared location and defaults its order', () => {
+    const parsed = manifest({ contextMenus: [menu()] })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.contributions.contextMenus[0]!.order).toBe(500)
+  })
+
+  it('refuses a location the host does not draw', () => {
+    for (const location of ['file.row', 'task.footer', 'TASK.ROW', '']) {
+      expect(manifest({ contextMenus: [menu({ location })] }).success, location).toBe(false)
+    }
+  })
+
+  it('refuses a `when` naming a fact the location does not have', () => {
+    expect(manifest({ contextMenus: [menu({ when: { origin: 'github', pinned: true, projectId: 'p1' } })] }).success).toBe(true)
+    expect(messages(manifest({ contextMenus: [menu({ when: { branch: 'main' } })] })))
+      .toContain("'task.row' has no fact named 'branch'")
+    // The identity fields are on the target and still not facts: a menu row keyed to one task id is
+    // not an extension point.
+    expect(messages(manifest({ contextMenus: [menu({ when: { id: 't1' } })] })))
+      .toContain("'task.row' has no fact named 'id'")
+  })
+
+  it('takes the context-free verb set only, and confines its route', () => {
+    // The two verbs missing from this union need something a right-clicked CORE row cannot supply:
+    // `createTask` the host's promotion callback over a rail item, `navigate` a project-scoped surface
+    // of this plugin's own.
+    expect(manifest({ contextMenus: [menu({ action: { verb: 'createTask' } })] }).success).toBe(false)
+    expect(manifest({ contextMenus: [menu({ action: { verb: 'navigate', surface: 'board' } })] }).success).toBe(false)
+    expect(manifest({ contextMenus: [menu({ action: { verb: 'teleport' } })] }).success).toBe(false)
+    expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'runNodeAction', path: '/v2/core/tasks' } })] })))
+      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ contextMenus: [menu({ action: { verb: 'openPane', pane: 'ghost' } })] })))
+      .toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
+  })
+
+  it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
+    expect(manifest({ contextMenus: Array.from({ length: 8 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(true)
+    expect(manifest({ contextMenus: Array.from({ length: 9 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(false)
+    expect(messages(manifest({ contextMenus: [menu(), menu()] }))).toContain("duplicate contribution id 'open-card'")
+  })
+})
+
+// ── Cooperative cross-plugin extension, and the exclusive slot ─────────────────────────────────────
+//
+// Two manifest keys and one frame target, and every rule below turns the same failure into a parse
+// error: a declaration that installs, looks fine, and can never do anything. That failure is worse than
+// a rejection here because it looks like it worked — and with two manifests involved it would be
+// debugged from the WRONG one, since the author of the guest sees nothing but an empty strip.
+
+describe('extension points', () => {
+  const point = (over: Record<string, unknown> = {}) =>
+    ({ id: 'card-links', label: 'Linked items', location: 'pane.footer', surface: 'board', ...over })
+
+  it('accepts a point hung off a pane this manifest declares', () => {
+    expect(manifest({ frames: [PANE], extensionPoints: [point()] }).success).toBe(true)
+  })
+
+  it('refuses a point on a surface this manifest does not declare', () => {
+    expect(messages(manifest({ frames: [PANE], extensionPoints: [point({ surface: 'ghost' })] })))
+      .toContain("extension point names 'ghost', which this manifest does not declare as a pane surface")
+    // A settings page, importer, overlay, refPanel or webview is chrome the host already draws around a
+    // frame; there is nowhere in one to reserve a strip.
+    expect(manifest({
+      frames: [{ target: 'settings', id: 'board-settings', label: 'Board' }],
+      extensionPoints: [point({ surface: 'board-settings' })],
+    }).success).toBe(false)
+  })
+
+  it('refuses a location this acorn has no host for', () => {
+    expect(manifest({ frames: [PANE], extensionPoints: [point({ location: 'pane.header' })] }).success).toBe(false)
+  })
+
+  it('refuses two points at the same place on the same surface', () => {
+    expect(messages(manifest({
+      frames: [PANE],
+      extensionPoints: [point(), point({ id: 'other' })],
+    }))).toContain("'board' already has an extension point at 'pane.footer'")
+  })
+})
+
+describe('extensions', () => {
+  const extension = (over: Record<string, unknown> = {}) =>
+    ({ id: 'board-issues', point: 'tracker:card-links', label: 'Issues', items: '/v2/p/board/issues', ...over })
+
+  it('accepts a contribution naming another plugin’s point, and defaults its order', () => {
+    const parsed = manifest({ extensions: [extension()] })
+    expect(parsed.success && parsed.data.contributions.extensions[0]!.order).toBe(500)
+  })
+
+  it('refuses a point reference that is not one', () => {
+    // An unqualified name can never resolve — a point's public id is minted by the host from the OWNER's
+    // plugin id, so a contribution that does not name the owner is naming nothing.
+    for (const point of ['card-links', 'tracker:', ':card-links', 'Tracker:Card-Links', 'a:b:c']) {
+      expect(manifest({ extensions: [extension({ point })] }).success, point).toBe(false)
+    }
+  })
+
+  it('confines the items route to this plugin’s own namespace', () => {
+    // This is "reading another plugin's routes", refused at the earliest possible moment. The point
+    // owner's namespace is exactly the one a hostile contribution would name.
+    expect(messages(manifest({ extensions: [extension({ items: '/v2/p/tracker/cards' })] })))
+      .toContain('route must be inside /v2/p/board/')
+    expect(messages(manifest({ extensions: [extension({ items: '/v2/core/tasks' })] })))
+      .toContain('route must be inside /v2/p/board/')
+  })
+
+  it('takes the context-free verb set only, checked against this manifest’s own surfaces', () => {
+    // The click site is inside ANOTHER plugin's pane: there is no rail row to promote and no project of
+    // this plugin's to navigate within.
+    expect(manifest({ extensions: [extension({ onSelect: { verb: 'createTask' } })] }).success).toBe(false)
+    expect(messages(manifest({ extensions: [extension({ onSelect: { verb: 'openPane', pane: 'ghost' } })] })))
+      .toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
+    expect(manifest({
+      frames: [PANE],
+      extensions: [extension({ onSelect: { verb: 'openPane', pane: 'board' } })],
+    }).success).toBe(true)
+  })
+
+  it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
+    expect(manifest({ extensions: Array.from({ length: 8 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
+    expect(manifest({ extensions: Array.from({ length: 9 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
+    expect(messages(manifest({ extensions: [extension(), extension()] }))).toContain("duplicate contribution id 'board-issues'")
+  })
+})
+
+describe('the exclusive slot', () => {
+  const coreSlot = (over: Record<string, unknown> = {}) =>
+    ({ target: 'coreSlot', id: 'board-rail', label: 'Board task list', coreSlot: 'rail.taskList', ...over })
+
+  const withBundle = (contributions: Record<string, unknown>) =>
+    pluginManifestSchema.safeParse({
+      id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', client: './dist/client.js', contributions,
+    })
+
+  it('accepts a replacement for a designated core surface', () => {
+    expect(withBundle({ frames: [coreSlot()] }).success).toBe(true)
+  })
+
+  it('refuses a core surface this acorn has not designated', () => {
+    expect(withBundle({ frames: [coreSlot({ coreSlot: 'topbar' })] }).success).toBe(false)
+    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: undefined })] })))
+      .toContain('a coreSlot surface must name which core surface it replaces')
+  })
+
+  it('needs a client bundle, because the host mounts one here', () => {
+    // Without one there is nothing to draw in core's place — and the trust queue holds BUNDLES, so a
+    // bundle-less package offering to replace a core surface would never reach the prompt disclosing it.
+    expect(messages(manifest({ frames: [coreSlot()] })))
+      .toContain('a coreSlot surface needs a client bundle; declare `client` in the manifest')
+  })
+
+  it('refuses `coreSlot` on anything that is not a coreSlot surface', () => {
+    expect(messages(manifest({ frames: [{ ...PANE, coreSlot: 'rail.taskList' }] })))
+      .toContain('coreSlot is only valid on a coreSlot surface')
+  })
+
+  it('is not a pane, so no verb can name it', () => {
+    // `openPane` opens into a task's layout and a core surface belongs to no task. A verb that could
+    // name one would be an offer that can only fail.
+    expect(withBundle({
+      frames: [coreSlot()],
+      commands: [{ id: 'go', title: 'Go', action: { verb: 'openPane', pane: 'board-rail' } }],
+    }).success).toBe(false)
   })
 })
