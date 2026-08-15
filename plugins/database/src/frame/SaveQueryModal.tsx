@@ -13,7 +13,7 @@ import { saveQuery } from './databaseClient'
 // honest cost of the move, and it is small: a frame confined to the bottom region of a composed pane can
 // only overlay THAT region, so this now covers the grid rather than the whole pane. The escape hatch if
 // it ever grates is the `overlay` frame target, which is heavier — take it when the cramped modal is a
-// real problem, not pre-emptively (docs/future/monaco.md § document-over-frame, concretely).
+// real problem, not pre-emptively (docs/third-party/monaco.md § document-over-frame, concretely).
 export default function SaveQueryModal(props: {
   taskId: string
   sql: string

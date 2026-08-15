@@ -249,7 +249,7 @@ Roughly in order of how much they matter:
 2. **The editor plugin's move, the last one.** The migration candidates are done being candidates.
    http moved first with tables; database followed over the **document surface** — the host owns one
    editor and lends it through a vendor-neutral contract (`docs/plugins.md § Document surfaces`,
-   design record `future/monaco.md`). That surface exists because a Monaco frame measurably cannot be
+   design record `third-party/monaco.md`). That surface exists because a Monaco frame measurably cannot be
    served: 7.93 MiB against an 8.00 MiB cap with a stub UI, and its language-service workers denied
    outright by the one-file origin and a CSP with no `worker-src`
    (docs/third-party/editor.md § Monaco in a frame) — the first surface class the sandbox demonstrably
@@ -277,6 +277,6 @@ Roughly in order of how much they matter:
 - `third-party/` — the review record from the first migration out of the binary.
 - `future/remote.md` — web, mobile, and remote access.
 - `future/terminal.md` — a terminal client and how plugin UI would render there.
-- `future/monaco.md` — a host-owned document surface: the concrete instance of terminal.md's
+- `third-party/monaco.md` — a host-owned document surface: the concrete instance of terminal.md's
   "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
   that remains.

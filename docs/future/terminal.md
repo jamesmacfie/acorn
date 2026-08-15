@@ -8,8 +8,7 @@ third non-desktop surface, and it shares more with those two than it first appea
 ## The question
 
 Could a plugin's UI render in a terminal? The frame tier currently assumes a DOM: a sandboxed
-iframe, CSS tokens over the bridge, and (once finding 04 in `docs/third-party/` lands) a Solid
-component tree. A terminal has none of that. The tempting framings are "translate the frame to
+iframe, CSS tokens over the bridge, and a Solid component tree. A terminal has none of that. The tempting framings are "translate the frame to
 cells automatically" and "make plugins write UI in an abstraction that renders anywhere." Both
 are wrong, and the analysis below says why. The right framing: **a terminal surface is a separate,
 optional render target that a plugin opts into — possibly with a completely different shape than
@@ -36,7 +35,7 @@ Three shipped decisions carry most of the weight:
    needs no trust prompt on a terminal client for the same reason it needs none anywhere else.
 
 3. **The Rollbar frame already splits model from view.** `plugins/rollbar/src/frame/model.ts` is
-   pure state with its own tests; `app.ts` is the DOM. The finding-04 Solid rewrite keeps
+   pure state with its own tests; `app.tsx` is the view. The Solid rewrite of the frames kept
    `model.ts` unchanged. That split is exactly what a second render target needs — the model is
    reused, the view is swapped — and it should graduate from an accident of one plugin to written
    authoring guidance.
@@ -97,14 +96,14 @@ Three candidates were considered:
   the bridge; the host renders it. Consistent look and host-controlled focus — but this is
   "grow descriptors into a UI framework," the thing the descriptor design deliberately rejected.
   Rejected here for the same reason.
-- **(c) Solid universal renderer.** Once frames are Solid (finding 04), plugin components compiled
+- **(c) Solid universal renderer.** Frames are Solid now, so plugin components compiled
   with `generate: "universal"` could target a host-supplied terminal renderer. Elegant on paper —
   one component tree, two targets — but acorn's UI kit is CSS-class DOM components, not portable
   nodes, so "same UI on both surfaces" is mostly illusion. The genuinely reusable layer is the
   model, not the view.
 
 **Decision, if this is built: (a), with (c) as the ergonomic default toolkit on top.** That is the
-frame decision from finding 04 restated for cells: support Solid (via an OpenTUI-style reconciler)
+shipped frame decision restated for cells: support Solid (via an OpenTUI-style reconciler)
 well, keep the contract framework-agnostic, and say in the authoring guidance that other
 frameworks work. "Inside its own frame a plugin bundles whatever framework it likes" — the frame
 is just a rectangle of cells now.

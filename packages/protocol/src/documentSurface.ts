@@ -1,5 +1,5 @@
 // The wire between a host-owned document surface and the plugin routes behind it
-// (docs/future/monaco.md).
+// (docs/third-party/monaco.md).
 //
 // Here rather than beside the editor, and that placement is the contract in miniature: these are the
 // only shapes a plugin author has to know to declare a document surface, and BOTH ends read them —

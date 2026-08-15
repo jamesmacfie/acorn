@@ -35,7 +35,7 @@ Use the persistence scope that owns the state:
 | Fleet membership and token custody | desktop installation; token in main, membership in fleet store |
 | Appearance and shortcuts | device |
 | Query cache | Node |
-| Task layout and last source | Node + task |
+| Task layout and last source | device, keyed by Node + task (stored in device prefs today; `docs/future/node-first/state-ownership.md` proposes moving layouts to the owning Node) |
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text | client + current task |
 | Provider data and task mutations | owning Node |

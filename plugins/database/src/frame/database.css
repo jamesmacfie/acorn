@@ -1,5 +1,5 @@
 /* The Database pane's FRAME half — the region below the host's SQL editor and its drag handle
-   (docs/future/monaco.md § document-over-frame, concretely).
+   (docs/third-party/monaco.md § document-over-frame, concretely).
 
    Tokens only, and they are the host's: the SDK pushes the shell's resolved theme + style tokens onto
    this document's `:root` on connect and on every appearance change, so `var(--accent)` here is the same

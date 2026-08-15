@@ -10,7 +10,13 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 // the contract. Regenerate with `UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`, and say
 // in the commit message why the surface moved.
 //
-// ADDING A NAME IS FREE. REMOVING ONE IS A MAJOR BUMP. That is not advice, it is the rule this file
+// ADDING A NAME IS FREE — mechanically. Each name is still a compatibility promise the moment
+// third-party plugins exist, so an addition to `client`/`node` should face the same question a new
+// dependency gets: does a third-party plugin NEED this, or is it convenient for a first-party one
+// that could import deeper? (The 2026-08 architecture review flagged the client barrel's 173 exports
+// as accumulated, not chosen — read every snapshot diff with that in mind.)
+//
+// REMOVING A NAME IS A MAJOR BUMP. That is not advice, it is the rule this file
 // enforces, because `PLUGIN_API_MAJOR` is compared by EXACT STRING MATCH at three places — plugin load
 // (main/pluginLoader.ts), install (main/pluginInstaller.ts) and client bundle resolution
 // (client-core/plugins/resolveBundles.ts). A plugin built against a surface that has since lost a name

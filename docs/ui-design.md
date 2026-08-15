@@ -76,7 +76,8 @@ Because both feeders end at the same registry, a plugin moving from compiled-in 
 no glyph string anywhere. Path data rather than a component is what makes that true: a loaded
 plugin's client bundle runs in a sandboxed iframe on its own origin, and a function cannot cross a
 MessagePort — and a rail source's logo has to draw whether or not that plugin's frame is mounted.
-`docs/future/icons.md` records the alternatives this rules out.
+The retired design note (`docs/future/icons.md`, in git history) records the alternatives this
+rules out.
 
 ## Two-column panes
 

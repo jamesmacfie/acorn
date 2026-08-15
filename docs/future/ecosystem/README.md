@@ -2,10 +2,11 @@
 
 Design notes from the ecosystem-feasibility session (2026-08-14). Nothing here is scheduled; this
 folder records the assessment so a future project starts from conclusions instead of re-deriving
-them. It is the umbrella over three folders that already hold the detailed designs —
-`docs/future/user-extensions/`, `docs/future/dashboards/`, and `docs/future/architecture/` — plus
-`docs/extensibility.md` and `docs/security.md`. Where this folder disagrees with any of those,
-those win.
+them. It is the umbrella over four folders that already hold the detailed designs —
+`docs/future/user-extensions/`, `docs/future/dashboards/`, `docs/future/architecture/`, and
+`docs/future/node-first/` (the 2026-08-15 simplicity/maintainability review toward this same end
+goal, with cross-cutting preconditions the phases below inherit) — plus `docs/extensibility.md`
+and `docs/security.md`. Where this folder disagrees with any of those, those win.
 
 ## The end goal being assessed
 

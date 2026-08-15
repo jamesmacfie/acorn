@@ -1,7 +1,7 @@
 import type { PluginCompletionItem } from '@acorn/protocol/documentSurface.ts'
 import type { DbCatalogTable } from '../shared/database'
 
-// Table/column completions for the query editor (docs/future/monaco.md § Language smarts).
+// Table/column completions for the query editor (docs/third-party/monaco.md § Language smarts).
 //
 // THE HOST NEVER LEARNS SQL. It POSTs `{ text, position }` to the route this file backs and maps the
 // items straight onto its editor; every line below — what counts as a keyword, what `alias.` means,

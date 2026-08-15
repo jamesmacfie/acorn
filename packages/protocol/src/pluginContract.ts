@@ -48,7 +48,7 @@ const nodePermissions = z.object({
 // and CSS `@import` — an allowlist parser and a new trust boundary, for a logo. A `d` string has
 // none of that reachable from its grammar, so the check below is the whole check. The renderer
 // (client-core/ui/Icon.tsx) fills it with `currentColor`, which is why this shape themes and a
-// data-URI `<img>` would not. docs/future/icons.md records the alternatives.
+// data-URI `<img>` would not. The retired docs/future/icons.md (git history) records the alternatives.
 const PATH_D_RE = /^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\s+-]+$/
 
 const brandMark = z.object({
@@ -83,7 +83,7 @@ const webviewHost = z.string().min(1).max(WEBVIEW_HOST_MAX_LENGTH).superRefine((
 // a document region names two of them.
 const pluginRoute = z.string().min(1).max(256)
 
-// ── Host-owned document surfaces (docs/future/monaco.md) ──────────────────────────────────────────
+// ── Host-owned document surfaces (docs/third-party/monaco.md) ──────────────────────────────────────────
 //
 // The one class of surface the sandbox provably cannot serve. A Monaco frame measures 7.93 MiB
 // against an 8.00 MiB cap with a stub UI, and its language-service workers cannot be delivered at all:

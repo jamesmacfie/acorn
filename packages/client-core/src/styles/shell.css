@@ -91,7 +91,7 @@
 .pr-list-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 0; }
 
 /* Host-owned document surface: the editor a loaded plugin DECLARES instead of bundling
-   (docs/future/monaco.md). Core CSS rather than a plugin stylesheet on purpose — the plugin ships no
+   (docs/third-party/monaco.md). Core CSS rather than a plugin stylesheet on purpose — the plugin ships no
    code for this pane, so it has nowhere to put a rule. Same flex-column shape as .pane-right: Monaco
    is absolutely positioned inside its host and needs a definite box to fill. */
 .document-surface { display: flex; flex-direction: column; overflow: hidden; }

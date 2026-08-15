@@ -159,7 +159,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json(await bridge.remove(id(c), p.data.schema, p.data.name, p.data.pk))
     })
 
-    // ── The document surface (docs/future/monaco.md) ───────────────────────────────────────────────
+    // ── The document surface (docs/third-party/monaco.md) ───────────────────────────────────────────────
     //
     // Two routes and a language id is the ENTIRE declaration behind the query editor now. The host owns
     // the editor, its theme, its workers, the dirty model, the autosave debounce, ⌘S, the flush before

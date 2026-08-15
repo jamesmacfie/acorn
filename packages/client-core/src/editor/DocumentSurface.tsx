@@ -27,7 +27,7 @@ import { MONACO_THEME, watchMonacoTheme } from './theme'
 import { Alert } from '../ui/primitives'
 
 // A host-owned document surface: the host draws the editor, the plugin supplies the document
-// (docs/future/monaco.md).
+// (docs/third-party/monaco.md).
 //
 // This is the whole point of the design, so it is worth being blunt about what is where. The plugin
 // declared a language id and two routes and that is ALL it declared. Everything else on this screen —

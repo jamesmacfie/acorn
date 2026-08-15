@@ -11,6 +11,12 @@ and put containment before discovery so acorn never has a window where strangers
 whose node halves run uncontained. Distribution goes last because everything before it makes
 distribution worth having.
 
+Cross-cutting preconditions from the node-first review (`docs/future/node-first/`): the
+client↔node version contract (`version-skew.md`) must land **before phase 5 releases anything**,
+because the freedom to break the wire ends at the first standalone download; the platform-seam
+ratchet and the state-ownership rule are cheap and should land before the phases that build on
+them (web-facing work and dashboards respectively).
+
 ## Phase 1 — the dev loop (owning doc: `docs/future/user-extensions/`)
 
 The five items of `user-extensions/README.md § Recommended build order`, which front-loads the

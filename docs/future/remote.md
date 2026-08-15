@@ -28,7 +28,7 @@ HTTPS and a device bearer. A browser IS the client — it must hold a session. T
 web auth: httpOnly-cookie or bearer sessions, CSRF protection, rate limiting, lockout, session
 revocation. A web session should be modeled as a **device row** — the existing device-token
 model extends naturally, giving revocation UI ("this browser session") for free. The public
-automation API work (docs/next/api: bearer tokens, registry, rate limits) is the down payment.
+automation API work (docs/api-reference.md: bearer tokens, registry, rate limits) is the down payment.
 
 Token custody on web is strictly worse than Electron main custody, and no design fixes that
 fully:
@@ -47,8 +47,8 @@ Today the Node "serves no web assets"; for web it serves the renderer bundle. Th
 inverts the plugin trust model: on desktop the app comes from us and plugin bundles come from a
 possibly-hostile node, so bytes-hash prompts are the consent surface. On web, the WHOLE app
 comes from the node — trusting the node is the ballgame, and per-bundle prompts mostly protect
-plugin-vs-plugin blast radius. When web becomes real, `docs/security.md` and
-`phase-2-distribution-trust.md` need a section stating this inversion; the per-device trust
+plugin-vs-plugin blast radius. When web becomes real, `docs/security.md` needs a section stating
+this inversion; the per-device trust
 store also moves server-side (per-user acknowledgements on the node) because per-browser
 localStorage acks are weak and evictable.
 
@@ -96,7 +96,7 @@ not justified by the use case. Two mobile-specific facts that shape the design:
 - **Descriptors render on mobile for free.** Declarative chrome (sources, badges, attention
   items, palette rows) is form-factor-neutral by construction — the host renders it natively, so
   the mobile shell reuses the same contributions in a mobile layout. Third-party frame surfaces
-  are desktop-shaped; the manifest's `formFactor` field (noted in phase-3) lets a plugin opt a
+  are desktop-shaped; the manifest's `formFactor` field (since shipped in the manifest schema) lets a plugin opt a
   surface into mobile explicitly rather than rendering an unusable desktop pane in a phone
   viewport.
 
@@ -121,15 +121,21 @@ and (c) could carry pairing handshakes ("enter this code on your node"). Notes:
 
 ## Preparation items (cheap now, expensive later)
 
-These three are reflected in the shipped system (`docs/plugins.md`); everything else here waits.
+Items 2 and 3 are reflected in the shipped system (`docs/plugins.md`); item 1 is **not yet true**
+— a 2026-08-15 survey found 44 direct `window.acorn` reaches across 14 modules with no arch rule,
+and `docs/future/node-first/platform-seam.md` now owns closing that gap. Everything else here
+waits.
 
 1. **Platform adapter seam in client-core.** Everything that touches `window.acorn` (apiClient's
    nodeFetch, stream attach, plugin cache access, trust prompts) goes behind one narrow
    interface with the Electron implementation as its only member. This is the load-bearing prep:
-   retrofitting after more surface accretes is the expensive version. (Noted in phase-2 and
-   phase-3.)
+   retrofitting after more surface accretes is the expensive version. Two facts pinned for the
+   eventual web implementation: the device bearer rides the WS *upgrade header* today, which a
+   browser cannot set, so the node needs a second auth carrier; and `nodeFetch` buffers whole
+   responses (streaming cannot cross IPC), so the seam's transport type must allow a streaming
+   implementation.
 2. **`formFactor` on frame surfaces** in the plugin manifest, default `["desktop"]`. One field,
-   added while the schema is young. Descriptors need nothing. (Noted in phase-3.)
+   added while the schema is young. Descriptors need nothing. (Shipped — `pluginContract.ts`.)
 3. **Keep the sandbox bridge scheme-agnostic.** The MessageChannel bridge and SDK must not
    hardcode `app-plugin://` — on web the same isolation is a sandboxed iframe with an opaque
-   origin and CSP headers. (Noted in phase-3.)
+   origin and CSP headers. (Held today — `frames/sdk.ts` names no origin.)

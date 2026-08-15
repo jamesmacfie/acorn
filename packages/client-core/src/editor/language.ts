@@ -1,6 +1,6 @@
 // Canonical language id -> Monaco language id.
 //
-// One direction, one map, no abstraction layer (docs/future/monaco.md § Naming: "neutral contract,
+// One direction, one map, no abstraction layer (docs/third-party/monaco.md § Naming: "neutral contract,
 // un-neutral implementation"). The published vocabulary is @acorn/protocol/languageIds.ts; this is
 // the half that knows what Monaco calls things, and the shiki half sits beside the highlighter.
 //

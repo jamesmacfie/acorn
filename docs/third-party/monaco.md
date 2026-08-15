@@ -2,10 +2,12 @@
 
 Design notes from the http-migration session (2026-08-11), when measuring Monaco against the plugin
 frame contract ended two migrations; extended the same day when the composed-pane question was worked
-through and decided. Companion to [terminal.md](./terminal.md) and [remote.md](./remote.md): this is
+through and decided. Companion to [terminal.md](../future/terminal.md) and [remote.md](../future/remote.md): this is
 the concrete instance of the "one host-owned template" conclusion those two reach in the abstract.
+It began life in `docs/future/` as a design to build; with steps 1–6 shipped it lives here as the
+design record of the document surface, beside the migration record it belongs to.
 
-Unlike the other files in this folder, this one is **intended to be built**. The decision on the
+The decision on the
 record is that the seam gets set up for third-party plugins even while the only consumers are
 first-party, on the grounds that a contract retrofitted around existing callers is worse than one
 designed before them. What that costs, and every decision a developer needs before starting, are

@@ -2,7 +2,7 @@ import type { PluginDocumentRegion, PluginFrameSurface } from '@acorn/protocol/a
 import { ownsRoute } from '../chrome/data'
 
 // Which declared surfaces the HOST draws, and whether their routes are ones this device will fetch
-// (docs/future/monaco.md).
+// (docs/third-party/monaco.md).
 //
 // A plain module rather than lines inside register.tsx, because the decision below is the trust gate
 // for a whole class of surface and register.tsx cannot be imported by a test — the suite here is

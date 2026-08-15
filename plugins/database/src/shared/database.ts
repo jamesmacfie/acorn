@@ -20,7 +20,7 @@ export type DbWriteResult = { ok: true; rowCount: number } | { ok: false; error:
 export type DbPk = Record<string, DbCell>
 
 // The introspected catalog, structured rather than the CREATE-TABLE text `schema` returns. It backs
-// table/column completions (docs/future/monaco.md § Language smarts), which need to look names up by
+// table/column completions (docs/third-party/monaco.md § Language smarts), which need to look names up by
 // table rather than read prose.
 export type DbCatalogTable = { schema: string; name: string; columns: { name: string; dataType: string }[] }
 export type DbCatalogResult = { tables: DbCatalogTable[] } | { error: string }

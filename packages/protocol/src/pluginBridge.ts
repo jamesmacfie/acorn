@@ -96,7 +96,7 @@ export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'importer.done' }
   | { id: number; kind: 'ui'; op: 'importer.close' }
 
-// The document a composed pane shares with its frame (docs/future/monaco.md § Communication between
+// The document a composed pane shares with its frame (docs/third-party/monaco.md § Communication between
 // regions). Valid only from a frame whose pane declares a `document-over-frame` layout; every other
 // surface is denied, because there is no document on the other side of the port to touch.
 //

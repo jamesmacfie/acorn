@@ -146,7 +146,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       })
     case 'pane':
       // A host-owned document surface: no iframe, no plugin code in this pane at all
-      // (docs/future/monaco.md). The host draws the editor and the plugin supplies the document
+      // (docs/third-party/monaco.md). The host draws the editor and the plugin supplies the document
       // through two of its own routes, which is why this branch comes before everything else the
       // `pane` case does — there is no bundle to mount and no bridge to open.
       //

@@ -146,7 +146,7 @@ describe('webview surfaces', () => {
 
 describe('document surfaces', () => {
   // The host draws the editor and the plugin supplies the document, because a Monaco frame cannot be
-  // served at all (docs/future/monaco.md). What is worth pinning is the same class of rule as every
+  // served at all (docs/third-party/monaco.md). What is worth pinning is the same class of rule as every
   // other cross-field check here: a plugin may not name a route outside its own namespace, and a
   // surface that parses and can never do anything is refused rather than shipped.
   const layout = (document: Record<string, unknown>) => ({ ...PANE, layout: { template: 'document', document } })

@@ -18,8 +18,9 @@ composes panels and where they render was always host-side.
 
 Scope key for persisted placements: `(surface, ownerId, projectId?)` — e.g.
 `(home, —, —)`, `(pane, paneId, —)`, `(plugin-region, pluginId:regionId, projectId)`. Persistence
-is per-user-per-node, referencing panel definitions by id (`composition.md § The persisted
-model`).
+is per-user-per-node **in the owning node's prefs store, not on the device**
+(`docs/future/node-first/state-ownership.md`), referencing panel definitions by id
+(`composition.md § The persisted model`).
 
 ## Plugin-hosted regions: the cooperative extension point, inverted
 

@@ -496,7 +496,7 @@ kinds of contribution come out of one manifest:
   templates to address: a whole-pane declaration would have meant something different once a second
   template arrived, and changing that later would change what already-published manifests mean.
   `frame-beside-document` is the next entry and lands with its consumer, the editor plugin. The design
-  record is `docs/future/monaco.md`.
+  record is `docs/third-party/monaco.md`.
 
   ### `document-over-frame`
 

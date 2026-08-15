@@ -19,8 +19,8 @@ profile, same era. One is `.ts`, one is `.tsx`:
 
 | | `chrome/register.ts` | `frames/register.tsx` |
 |---|---|---|
-| Size | 358 lines | 411 lines |
-| Unit tests | **457 lines, 25 tests** | **zero** |
+| Size | 358 lines | 419 lines |
+| Unit tests | **458 lines, 25 tests** | **zero** |
 
 The frames file even exports `_resetFrameContributions` — a test seam, documented as mirroring the
 chrome one — **with no callers**. The scaffolding for tests exists; the tests can't.
@@ -77,7 +77,8 @@ components; it should not decide anything worth testing.
    way `chrome/register.test.ts` already tests its sibling — that suite is the template, and
    `_resetFrameContributions` finally gets its caller.
 2. **Extract `frames/frameServices.ts`.** A builder: `{ queryClient, binding, callbacks } → FrameServices`
-   — the 14 implementations currently inlined in `PluginFrame.tsx:97-207`, including the two spots
+   — the implementations currently inlined in `PluginFrame.tsx` (the `services()` literal, ~line
+   111 onward), including the two spots
    that hand-parse the raw prefs cache. `PluginFrame.tsx` keeps the component shell: the iframe,
    the port handshake, lifecycle. Test the services with fake callbacks, the same pattern
    `broker.test.ts` already uses from the other side of the seam.
@@ -105,7 +106,7 @@ wrong extension.
 ## Files
 
 - `packages/client-core/src/plugins/frames/register.tsx` — splits into plan + shell
-- `packages/client-core/src/plugins/frames/PluginFrame.tsx` — `services()` (from line 97) moves out
+- `packages/client-core/src/plugins/frames/PluginFrame.tsx` — `services()` (~line 111) moves out
 - `packages/client-core/src/plugins/PluginTrustDialog.tsx` — the tier memo and `decide()` move out
 - `packages/client-core/src/plugins/frames/documentSurfaces.ts` — the precedent to imitate
 - `packages/client-core/src/plugins/chrome/register.test.ts` — the template for the new tests
