@@ -10,7 +10,7 @@ import { formatDate, relativeTime } from './model'
 //
 // Three things the compiled panel owned are gone from here, and all three moved OUT rather than being
 // lost. The right-anchored drawer chrome belongs to whoever opened the panel, because a frame cannot
-// Portal past its iframe (client-core/plugins/frames/register.tsx). The ticket switcher for a task
+// Portal past its iframe (client-core/plugins/frames/register.ts). The ticket switcher for a task
 // linking several tickets is the app shell's business, so it sits in app.tsx beside the task read. And
 // where a link in rendered content goes is a policy question with two answers — re-point this view, or
 // hand the URL to the host — so it arrives as `onContentClick` from app.tsx, which holds both.

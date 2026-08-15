@@ -41,7 +41,7 @@ export type RefPanelContribution = {
   // The provider whose items this panel renders. Bound to the registering plugin's own name by the client
   // plugin host (registries/plugin.ts § declaredProvider), so a plugin cannot claim another's items.
   providerId: string
-  // Per-node presence, the same predicate the pane registry takes (plugins/frames/register.tsx). A panel
+  // Per-node presence, the same predicate the pane registry takes (plugins/frames/register.ts). A panel
   // whose plugin is installed but stopped on the node being looked at is not a destination, and without
   // this the click that named it was still CLAIMED — `openRefPanel` said yes, the shell put a target in
   // its single slot, and `RefPanelHost` re-resolved to nothing and drew an empty overlay. Degrading at

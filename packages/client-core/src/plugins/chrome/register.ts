@@ -35,7 +35,7 @@ import { contentLinkRegistry } from '../../registries/contentLinks'
 import { refResolverRegistry } from '../../registries/refResolvers'
 
 // Turning accepted manifests into NATIVE shell contributions — the descriptor half of what
-// plugins/frames/register.tsx does for rectangles (docs/plugins.md).
+// plugins/frames/register.ts does for rectangles (docs/plugins.md).
 //
 // Same shape as that file, deliberately: one module-level map of per-plugin disposables, a
 // dispose-then-register pass so a re-run replaces a plugin's whole contribution set rather than
@@ -126,7 +126,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   const frames = contributions.frames ?? []
   const surfaceIds = new Set(frames.map((surface) => surface.id))
-  // Classified once, in ../contributions.ts, because plugins/frames/register.tsx feeds the same
+  // Classified once, in ../contributions.ts, because plugins/frames/register.ts feeds the same
   // `openPane` allowlist from the same declaration.
   const surfaces = declaredSurfaces(contributions)
   const taskPanes = surfaces.panes

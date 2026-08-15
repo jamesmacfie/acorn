@@ -2,18 +2,8 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '../node/fleet'
 import Icon from '../ui/Icon'
 import { createDismissable } from '../ui/dismissable'
-import { noteBundleAccepted, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
-import {
-  keyClaimGrants,
-  keyClaimPermissionLines,
-  nodePermissionLines,
-  type PermissionLine,
-  uiPermissionLines,
-  webviewGrants,
-  webviewPermissionLines,
-} from './permissions'
-import { syncPluginContributions } from './syncContributions'
-import { recordPluginTrust } from './host'
+import { pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
+import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
 import { Alert, Kbd } from '../ui/primitives'
 
@@ -34,10 +24,6 @@ import { Alert, Kbd } from '../ui/primitives'
 // heading, and the groups may never be rendered as one list: a strong claim must not lend
 // credibility to a weaker one sitting next to it.
 
-type TierKey = 'enforced' | 'declared' | 'web'
-
-const TIER_LABEL: Record<TierKey, string> = { enforced: 'Enforced', declared: 'Declared', web: 'Web pages' }
-
 export default function PluginTrustDialog() {
   const [saving, setSaving] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -45,39 +31,7 @@ export default function PluginTrustDialog() {
   const request = (): PluginTrustRequest | undefined => pendingTrust()[0]
   const nodeLabel = (nodeId: string) => nodes().find((node) => node.nodeId === nodeId)?.label ?? nodeId
 
-  // Every declared line, decorated with the tier that owns it and — on an update — whether the
-  // version the owner last approved had it. The diff runs over the grant KEY, never the sentence, so
-  // a copy edit is a copy edit rather than a fleet-wide "asks for more" (plugins/permissions.ts).
-  const tiers = createMemo(() => {
-    const current = request()
-    const installed = current?.row.installed
-    if (!installed) return []
-    const previous = current?.previous
-    const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
-      {
-        key: 'enforced',
-        now: [...uiPermissionLines(installed.permissions), ...keyClaimPermissionLines(keyClaimGrants(installed.contributions))],
-        was: previous ? [...uiPermissionLines(previous.permissions), ...keyClaimPermissionLines(previous.keyClaims ?? [])] : null,
-      },
-      {
-        key: 'declared',
-        now: nodePermissionLines(installed.permissions),
-        was: previous ? nodePermissionLines(previous.permissions) : null,
-      },
-      {
-        key: 'web',
-        now: webviewPermissionLines(webviewGrants(installed.contributions)),
-        was: previous ? webviewPermissionLines(previous.webviews ?? []) : null,
-      },
-    ]
-    return groups.map(({ key, now, was }) => {
-      const before = was ? new Set(was.map((entry) => entry.key)) : null
-      return {
-        key,
-        lines: now.map((entry) => ({ ...entry, tier: key, added: before ? !before.has(entry.key) : false })),
-      }
-    })
-  })
+  const tiers = createMemo(() => trustTiers(request()))
 
   const has = (key: TierKey) => tiers().some((tier) => tier.key === key && tier.lines.length > 0)
   // What an update is actually about. Leading with it is the reason an update re-prompts at all.
@@ -91,30 +45,11 @@ export default function PluginTrustDialog() {
 
   const decide = async (decision: 'accepted' | 'rejected') => {
     const current = request()
-    if (!current?.row.installed) return
+    if (!current) return
     setSaving(true)
     setError('')
     try {
-      await recordPluginTrust({
-        pluginId: current.row.name,
-        hash: current.hash,
-        nodeId: current.nodeId,
-        version: current.row.installed.version,
-        permissions: current.row.installed.permissions,
-        webviews: webviewGrants(current.row.installed.contributions),
-        keyClaims: keyClaimGrants(current.row.installed.contributions),
-        decision,
-      })
-      resolvePendingTrust(current.row.name, current.hash)
-      // An acceptance is what lets the plugin's surfaces exist at all (frames/register.tsx gates on it), so
-      // register them now rather than at the next boot. A rejection needs no counterpart: nothing was
-      // registered to take away.
-      if (decision === 'accepted') {
-        noteBundleAccepted(current.row.name, current.hash)
-        // Both passes, because a bundle-bearing plugin's chrome is gated on the same acceptance as its
-        // rectangles — so it appears with the rest of its surfaces rather than at the next boot.
-        syncPluginContributions()
-      }
+      await recordTrustDecision(current, decision)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision.')
     } finally {

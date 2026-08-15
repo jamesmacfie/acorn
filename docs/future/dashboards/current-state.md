@@ -13,7 +13,7 @@ Loaded plugins never touch a client registry: the manifest (parsed with Zod in
 `packages/node-core/src/main/pluginManifest.ts` — the authoritative contribution vocabulary) ships
 in the roster (`GET /v2/core/plugins`), and the device turns rows into contributions
 (`packages/client-core/src/plugins/chrome/register.ts` for descriptors,
-`plugins/frames/register.tsx` for iframes). Actions everywhere come from a **closed verb set**
+`plugins/frames/register.ts` for iframes). Actions everywhere come from a **closed verb set**
 (`PluginChromeAction`, `packages/protocol/src/api.ts:374-391`): `openPane`, `navigate`,
 `runNodeAction`, `createTask`, `openUrl`, `openOverlay`, `surfaceAction`.
 

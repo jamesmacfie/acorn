@@ -64,7 +64,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   const params = useParams()
   const queryClient = useQueryClient()
   // Captured at creation, not read per render. A node switch swaps the QueryClient provider this panel
-  // sits under, which remounts it — the same reasoning plugins/frames/register.tsx gives for reading
+  // sits under, which remounts it — the same reasoning plugins/frames/register.ts gives for reading
   // `activeNodeId()` at frame construction.
   const nodeId = activeNodeId() ?? ''
 

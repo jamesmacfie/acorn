@@ -102,7 +102,7 @@ const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) 
 // belong in this static ownership ledger. `refPanels` is expected to be an empty array, and the key is worth
 // keeping rather than dropping: the registry's only entry was linear's, and linear is a loaded package now,
 // so its panel reaches this registry through the manifest adapter in
-// client-core/plugins/frames/register.tsx. A compiled panel reappearing there is a real change.
+// client-core/plugins/frames/register.ts. A compiled panel reappearing there is a real change.
 //
 // Derived, but not therefore toothless, and the distinction matters because a snapshot you can regenerate
 // looks like one you can launder a regression past. What regeneration CANNOT hide:

@@ -35,7 +35,7 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 // No `database` pane at 70 either, and for a different reason than search's: it left the compiled graph
 // entirely. It is a loaded package whose pane is a `document-over-frame` layout — the host draws the SQL
 // editor, the plugin's frame draws the grid — so it reaches the registry through the manifest adapter in
-// client-core/plugins/frames/register.tsx. ⌘⏎ went with it, as a surface-scoped keybinding.
+// client-core/plugins/frames/register.ts. ⌘⏎ went with it, as a surface-scoped keybinding.
 //
 // Core Home is the stable default; Fleet is additive and gated on a second node. Provider browse sources
 // remain optional contributions.

@@ -76,7 +76,7 @@ join the same array as built-ins, and a loaded plugin with a built-in's id shado
 The plugin's client JS never touches a registry directly: the node's roster
 (`GET /v2/core/plugins`) carries the manifest + bundle hash, and the device turns that into
 contributions (`packages/client-core/src/plugins/chrome/register.ts` for descriptors,
-`plugins/frames/register.tsx` for iframe rectangles).
+`plugins/frames/register.ts` for iframe rectangles).
 
 ## Installer and trust
 

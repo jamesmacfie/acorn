@@ -3,8 +3,9 @@ import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type Pl
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, isTaskPane } from './contributions'
 import { _resetPluginDistribution, _seedPluginDistribution } from './distribution'
 
-// The questions that used to be answered twice, once in each register module. They are plain `.ts`
-// now, so the node-env suite reaches them — unlike frames/register.tsx, which no test can render.
+// The questions that used to be answered twice, once in each register module. Both callers are plain
+// `.ts` and have their own suites now (chrome/register.test.ts, frames/register.test.ts); this one
+// pins the shared answer they both start from.
 
 const HASH = 'a'.repeat(64)
 const HASH_B = 'b'.repeat(64)
@@ -68,7 +69,7 @@ describe('eligiblePlugins', () => {
       'node-a',
       [row('board', {}, [surface({ id: 'docs', target: 'webview', hosts: ['docs.example.com'], url: 'https://docs.example.com' })])],
     ]])
-    // frames/register.tsx registers a non-host-owned surface only when this is true.
+    // frames/register.ts registers a non-host-owned surface only when this is true.
     expect(eligiblePlugins()[0]!.trusted).toBe(false)
   })
 
