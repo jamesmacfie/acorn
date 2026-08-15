@@ -24,12 +24,14 @@
 //     exactly what this plugin does, and the declaration is honest disclosure rather than an
 //     over-declaration. Contrast rollbar/linear's `secrets: false`, the opposite case, where the plugin
 //     genuinely never touches the host service.
-//   core: ['tasks', 'projects:read', 'projects:config', 'fs'] — `tasks.load` to validate a task and
+//   core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models'] — `tasks.load` to validate a task and
 //     resolve its project, `tasks.root` for the worktree the script runs in, `projects.byId` for the
 //     checkout path, `projects.config` for the connection script, the schema mode/value and the schema
 //     notes, and `projects.assertConfigTrusted` before running any of it — cloning a repo must not be
 //     enough to run its commands. `fs.resolveInRoot` confines the `file`-mode schema path to the
-//     worktree. The brief listed `prefs`; nothing reads or writes one, so it is not here.
+//     worktree. `models` is the AI generate feature: `models.available` for the connection dropdown and
+//     `models.generateText` for the SQL itself — core still resolves the provider key, this plugin only
+//     ever sees ids and labels. The brief listed `prefs`; nothing reads or writes one, so it is not here.
 //   secrets: false — the brief sketched `true`. It is wrong, and the reason is the nicest property this
 //     plugin has: the connection URL is resolved per connect and NEVER PERSISTED, so there is no
 //     credential at rest for the host secret service to hold. Postgres credentials live in the reader's
@@ -55,7 +57,7 @@ export default {
   permissions: {
     api: ['core.tasks:read'],
     events: [],
-    node: { core: ['tasks', 'projects:read', 'projects:config', 'fs'], capabilities: [], secrets: false, exec: true, net: [] },
+    node: { core: ['tasks', 'projects:read', 'projects:config', 'fs', 'models'], capabilities: [], secrets: false, exec: true, net: [] },
   },
   contributions: {
     frames: [{
