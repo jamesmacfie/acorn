@@ -1,11 +1,12 @@
 # Schedules: periodic work, owned by the node
 
-**Phase 1 is built** — the engine, the three tables, the policies, the core routes and the settings
-surface all ship, and [`docs/schedules.md`](../../schedules.md) owns what exists. Phases 2–4 below are
-still design. One scheduler in the node process, three parties allowed to put work on it — core,
-plugins, and the user — and a budgeted vocabulary for saying *when*. This folder is the design and
-the build order; nothing here is speculative machinery, every piece is pulled in by a named use
-case below.
+**All four phases are built.** [`docs/schedules.md`](../../schedules.md) owns what exists; this
+folder is the design record it was built from, kept for its arguments and for the deviations noted
+inline in each file. Two things remain live in here rather than historical: the deferred
+`core:backup` schedule and its recorded blocker (`engine.md § migration` — how many backups should a
+node keep?), and the reserved `agent-run` target kind, gated on a headless agent runtime
+(`targets.md`). One scheduler in the node process, three parties allowed to put work on it — core,
+plugins, and the user — and a budgeted vocabulary for saying *when*.
 
 **This work precedes the dashboard upgrade.** The accepted dashboard redesign
 (`docs/future/dashboards/README.md`) needs measure history, and measure history sampled only while
@@ -110,7 +111,7 @@ Named so the budget arguments below have referents; the first two are why this f
 | 1 ✅ | The engine: tables, registry, tick loop, policies (catch-up, jitter, backoff, timeout, concurrency), boot wiring, core routes, settings surface | `engine.md` |
 | 2 ✅ | Declarations: the manifest descriptor + trust projection, `ctx.schedules` node-side, override model, lifecycle rules | `declarations.md` |
 | 3 ✅ | Targets: `collection-sample` (with its two prerequisite seams: the node-side collection read registry and the shared measure pipeline), `plugin-run`, `node-action` with creation-time consent | `targets.md` |
-| 4 | Migrate the invisible intervals onto rows (backup, audit pruning, usage collection) — deletion of bespoke timers, not new features | `engine.md § migration` |
+| 4 ✅ | Migrate the invisible intervals onto rows (backup, audit pruning, usage collection) — deletion of bespoke timers, not new features | `engine.md § migration` |
 
 Phase 3 unblocks the dashboards work outright: `../dashboards/measure-history.md`'s **store and its
 feeder are built** — `core:sample-measures` accrues samples with no client open — so the remaining

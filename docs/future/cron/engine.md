@@ -140,9 +140,22 @@ delete — all existing primitives.
 
 ## Migration of the invisible intervals (phase 4)
 
-Audit pruning is done (it was phase 1's one core schedule). The remaining surface was re-verified
-against the tree after phase 3, and it is **smaller and differently shaped** than this section first
-assumed:
+**Built.** [`docs/schedules.md`](../../schedules.md) owns the result. What actually shipped, and the
+one item this section did not know about:
+
+- **`core:idempotency-sweep`** (daily, 03:05) — *not in the list below, and the real find.*
+  `IDEMPOTENCY.cleanupExpired()` was a boot-time call in both composition roots, with a comment
+  arguing that "a periodic sweeper would be machinery for a table that holds 24 hours of one owner's
+  mutations". That argument was correct when the alternative was a bespoke timer and is spent now —
+  it is the audit prune's argument verbatim, and it had the same consequence: a node that runs for
+  months reclaims nothing, ever. Both boot calls are deleted.
+- **`agents:usage-refresh`** (every 30 minutes, **declared disabled**) — the item below, built as
+  described, with one decision the section could not have made. See the note under it.
+- **Backup: deferred, deliberately.** Nothing registered. See below.
+- **The `setInterval` sweep was re-run and the survivors are exactly the five named below**, plus
+  client-side polling, which is not this system. No calendar-shaped work runs off a bespoke timer.
+
+The rest of this section is the analysis it was built from:
 
 - **Backup has no timer to delete.** `main/backup.ts` is route-triggered only (`POST
   /v2/core/backup`); nothing runs it periodically today. Phase 4's backup item is therefore an
@@ -151,12 +164,31 @@ assumed:
   destination — the route writes to a caller-chosen path, and a scheduled run has no caller — so
   decide a default (beside the data root) before registering it, or defer the item until someone
   wants unattended backups at all. Do not invent retention for backup archives without being asked.
+
+  **Deferred, and here is the reasoning so it does not have to be redone.** A weekly `core:backup`
+  needs a destination, and `suggestBackupPath()` already produces a dated path in the node's HOME —
+  so the destination is not the blocker. Retention is. A weekly archive of every database this node
+  owns, written forever to a fixed directory, is unbounded disk growth; the only alternatives are
+  inventing a retention policy (which this file forbids without being asked) or leaving the owner to
+  discover it. Neither is a decision to make on someone's behalf. **The thing to ask before building
+  it: how many backups should a node keep?** Everything else is one `scheduler.register` block.
 - **The agent-usage collector is the agents plugin's own refresh route**
   (`plugins/agents` § `POST /v2/p/agents/usage/refresh`). The migration is exactly use case 6 and
   is now one phase-2 registration: the plugin declares a schedule (its node half via
   `ctx.schedules.register`, or the manifest key) that hits its own route on its own cadence. No new
   machinery; whoever picks this up should check what currently drives refreshes (a client-side
   trigger keeps working — the schedule just makes the data fresh with no client open).
+
+  **Built, and declared `enabled: false`.** Checking what drives refreshes today answered the
+  question this item did not ask. The only thing refreshing the probes is the usage panel being on
+  screen (`client/usageStore.ts` polls every five minutes while a consumer is mounted), and the
+  snapshot is an **in-process cache** — nothing reads it while no client is open. Refreshing also
+  spawns the two provider CLIs. So on by default this would be child processes every half hour,
+  forever, on a laptop, warming a value for nobody: strictly more background work than it removed,
+  which is the opposite of what phase 4 is for. Off by default it is a visible, pausable, retunable
+  row the owner turns on if they want their numbers already fresh when they open the panel — which
+  is the entire difference between a schedule and an invisible interval, and the thing the migration
+  was actually for. The client's own poll is untouched.
 - **The surviving `setInterval`s are not calendar work and stay.** The WS-hub sweep, the tunnel
   sweep, the MCP keepalive, the node broker's timer and the terminal idle watch are housekeeping
   tied to live connections and sessions — their lifetime is the object's, not the clock's, and a

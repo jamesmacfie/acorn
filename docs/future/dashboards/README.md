@@ -41,7 +41,7 @@ nothing else may be reordered.
 
 | Phase | What | File | Why it is first |
 | --- | --- | --- | --- |
-| pre | The scheduler: engine, declarations, the `collection-sample` target and its two seams | [`../cron/`](../cron/README.md) | The node-side sampler is what makes measure history gapless; without it, trend charts are holes. |
+| pre ✅ | The scheduler: engine, declarations, the `collection-sample` target and its two seams — all four cron phases are built | [`../cron/`](../cron/README.md) | The node-side sampler is what makes measure history gapless; it accrues samples today with no client open. |
 | 0 | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. |
 | 1 | Grid gesture + panel chrome restyle | `ux-refresh.md` | Pure presentation; touches no data. Parallel-safe with phase 0 and the cron work. |
 | 2 | The panel wizard; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. |
