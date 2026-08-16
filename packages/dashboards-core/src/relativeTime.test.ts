@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatRelativeTime } from './formatRelativeTime'
+import { formatRelativeTime } from './relativeTime'
 
 describe('formatRelativeTime', () => {
   const now = Date.UTC(2026, 5, 23, 12)

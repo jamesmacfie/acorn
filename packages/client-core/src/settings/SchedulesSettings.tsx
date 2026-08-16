@@ -1,18 +1,29 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { schedulesRoute, scheduleRoute, scheduleRunNowRoute, scheduleRunsRoute } from '@acorn/protocol/api.ts'
 import {
+  scheduleConfirmRoute,
+  schedulesRoute,
+  scheduleRoute,
+  scheduleRunNowRoute,
+  scheduleRunsRoute,
+  scheduleTargetsRoute,
+  type ToolRisk,
+} from '@acorn/protocol/api.ts'
+import {
+  type Cadence,
   describeCadence,
   type ScheduleRow,
   type ScheduleRun,
   type ScheduleStatus,
   type SchedulesResponse,
+  type ScheduleTargetOption,
+  type ScheduleTargetsResponse,
 } from '@acorn/protocol/schedules.ts'
 import { readJson, sendJson, writeJson } from '../apiClient'
 import { formatRelativeTime } from '../lib/formatRelativeTime'
 import { activeNodeId } from '../node/activeNode'
 import { nodes } from '../node/fleet'
-import { Alert, Badge, Button, Checkbox, ConfirmButton, Row, Select, StatusDot } from '../ui/primitives'
+import { Alert, Badge, Button, Checkbox, ConfirmButton, Input, Row, Select, StatusDot } from '../ui/primitives'
 import './settings.css'
 
 // Settings → Schedules (docs/schedules.md): every piece of periodic work this node owns, in one list,
@@ -22,12 +33,35 @@ import './settings.css'
 // schedule is a promise one machine makes. Rolling two nodes' schedules into one list would imply a
 // fleet-wide scheduler, which is exactly the thing the design refuses.
 //
-// Three verbs and no wizard. There is deliberately no "new schedule" form yet: nothing on this node can
-// run a user-created target, so a form here would be a create button that always fails. It arrives with
-// the targets (docs/schedules.md § Targets), and the list already renders a user row inert if one
-// exists — a row written by a newer version says so rather than disappearing.
+// The creation form is deliberately four fields and no wizard: pick a thing this node can run, name it,
+// say when. The list of things is what RESOLVES on the node right now (`/schedules/targets`), so there
+// is no invalid choice to validate after the fact — the same "unrepresentable rather than validated"
+// posture the panel editor takes.
+//
+// ARMING. A target carries a declared risk tier, and creating a schedule against it shows that tier and
+// makes the person accept it explicitly. That confirmation is host-drawn from the node's answer and
+// cannot be talked out of asking — and it is taken HERE, once, because 3am cannot answer a confirmation
+// strip. The accepted tier is stamped onto the row and rendered on it forever, which is what makes
+// one-time consent honest. If the tier later rises, runs fail closed and this surface offers the re-arm.
 
 const OWNER_TONE = { core: 'neutral', plugin: 'accent', user: 'add' } as const
+
+/** What the arming strip says about each tier, in the register a person would use. The vocabulary is
+ *  `ToolRisk` — the same three the agent-tool permission surface already projects — so a person meets
+ *  one scale for "how dangerous is this", not two. */
+const RISK_COPY: Record<ToolRisk, string> = {
+  read: 'only reads. It will run unattended from now on.',
+  write: 'changes data on this machine. It will run unattended, with nobody to confirm it.',
+  execute: 'runs commands on this machine. It will run unattended, with nobody to confirm it.',
+}
+
+/** The three cadences the creation form offers, spelled as the vocabulary rather than as a parser.
+ *  Retuning to anything else is the row's own cadence control; this is the set worth a first choice. */
+const CADENCE_CHOICES = [
+  { id: 'hourly', label: 'Every hour', cadence: { every: 3600 } satisfies Cadence },
+  { id: 'daily', label: 'Every day at 09:00', cadence: { daily: '09:00' } satisfies Cadence },
+  { id: 'weekly', label: 'Every Monday at 09:00', cadence: { weekly: { day: 1, at: '09:00' } } satisfies Cadence },
+] as const
 
 const STATUS_TONE: Record<ScheduleStatus, 'ok' | 'bad' | 'warn' | 'muted'> = {
   ok: 'ok',
@@ -62,6 +96,14 @@ export default function SchedulesSettings() {
     queryFn: () => readJson<SchedulesResponse>(schedulesRoute, { nodeId: nodeId() ?? undefined }),
     // The list is a clock face: next-run times drift out of date just by sitting there.
     refetchInterval: 30_000,
+  }))
+
+  // What this node can run, for the picker. Separate from the list because it answers a different
+  // question — "what COULD be scheduled" rather than "what IS" — and because it changes only when a
+  // plugin comes or goes, so it has no business on the list's 30-second clock.
+  const targets = createQuery(() => ({
+    queryKey: ['schedule-targets', nodeId()],
+    queryFn: () => readJson<ScheduleTargetsResponse>(scheduleTargetsRoute, { nodeId: nodeId() ?? undefined }),
   }))
 
   const runs = createQuery(() => ({
@@ -109,6 +151,39 @@ export default function SchedulesSettings() {
   const remove = (row: ScheduleRow) =>
     act(row.key, () => sendJson(scheduleRoute(row.key), { method: 'DELETE', nodeId: nodeId() ?? undefined }))
 
+  // Re-take consent after a tier rise. No tier is sent: the node re-stamps from its own registry, so
+  // what the owner accepts is always the tier the strip above just showed them.
+  const reconfirm = (row: ScheduleRow) =>
+    act(row.key, () => sendJson(scheduleConfirmRoute(row.key), { method: 'POST', nodeId: nodeId() ?? undefined }))
+
+  // ── The creation form ─────────────────────────────────────────────────────────────────────────
+  const [chosen, setChosen] = createSignal('')
+  const [newName, setNewName] = createSignal('')
+  const [cadenceId, setCadenceId] = createSignal<string>(CADENCE_CHOICES[0].id)
+  const options = () => targets.data?.targets ?? []
+  const optionKey = (option: ScheduleTargetOption) => `${option.pluginId}:${option.actionId}`
+  const selected = () => options().find((option) => optionKey(option) === chosen())
+
+  const create = async (): Promise<void> => {
+    const option = selected()
+    if (!option) return
+    await act('create', () =>
+      sendJson(schedulesRoute, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: newName().trim() || option.name,
+          kind: option.kind,
+          target: { pluginId: option.pluginId, actionId: option.actionId },
+          cadence: (CADENCE_CHOICES.find((choice) => choice.id === cadenceId()) ?? CADENCE_CHOICES[0]).cadence,
+        }),
+        nodeId: nodeId() ?? undefined,
+      }),
+    )
+    setChosen('')
+    setNewName('')
+  }
+
   return (
     <div class="settings-section">
       <Show when={nodes().length > 1}>
@@ -142,6 +217,64 @@ export default function SchedulesSettings() {
 
       <Show when={schedules.isSuccess && rows().length === 0}>
         <p class="muted">This node has no schedules.</p>
+      </Show>
+
+      {/* Only rendered when there is something to offer. An empty picker is a create button that
+          always fails, and saying "nothing here can be scheduled" is the more useful sentence. */}
+      <Show
+        when={targets.isSuccess && options().length > 0}
+        fallback={<Show when={targets.isSuccess}><p class="muted">Nothing installed on this node offers an action you can put on a schedule.</p></Show>}
+      >
+        <h3 class="settings-heading">New schedule</h3>
+        <label class="settings-field">
+          <span>Action</span>
+          <Select value={chosen()} onChange={(event) => setChosen(event.currentTarget.value)}>
+            <option value="">Pick something to run…</option>
+            <For each={options()}>
+              {(option) => <option value={optionKey(option)}>{option.name} · {option.pluginId}</option>}
+            </For>
+          </Select>
+        </label>
+
+        {/* The arming strip. Host-drawn from the node's declared tier, shown BEFORE the create button
+            exists, and impossible to skip — accepting it is what the create posts. */}
+        <Show when={selected()}>
+          {(option) => (
+            <>
+              <Alert tone="warn">
+                <strong>{option().pluginId}</strong>’s “{option().name}” {RISK_COPY[option().risk]}{' '}
+                You are agreeing to this once, now — a scheduled run never asks again.
+              </Alert>
+              <label class="settings-field">
+                <span>Name</span>
+                <Input
+                  value={newName()}
+                  placeholder={option().name}
+                  onInput={(event) => setNewName(event.currentTarget.value)}
+                />
+              </label>
+              <label class="settings-field">
+                <span>When</span>
+                <Select value={cadenceId()} onChange={(event) => setCadenceId(event.currentTarget.value)}>
+                  <For each={CADENCE_CHOICES}>{(choice) => <option value={choice.id}>{choice.label}</option>}</For>
+                </Select>
+              </label>
+              <Row
+                variant="stacked"
+                trailing={
+                  <Button size="sm" disabled={busy() === 'create'} onClick={() => void create()}>
+                    Accept and schedule
+                  </Button>
+                }
+              >
+                <span class="muted">
+                  Runs {describeCadence((CADENCE_CHOICES.find((choice) => choice.id === cadenceId()) ?? CADENCE_CHOICES[0]).cadence)},
+                  at the <Badge size="xs" tone="warn">{option().risk}</Badge> tier.
+                </span>
+              </Row>
+            </>
+          )}
+        </Show>
       </Show>
 
       <For each={rows()}>
@@ -196,6 +329,24 @@ export default function SchedulesSettings() {
                   </span>
                 </Show>
                 <Show when={row.lastError}>{(message) => <span class="settings-error">{message()}</span>}</Show>
+                {/* The re-arm. A schedule whose target now declares MORE than the tier stamped on it
+                    fails closed on every run, and stays that way until someone agrees to the new one —
+                    which is the same act as creating it, so it gets the same host-drawn strip. */}
+                <Show when={row.owner === 'user' && row.lastStatus === 'skipped' && row.lastError?.startsWith('risk changed')}>
+                  <Row
+                    variant="stacked"
+                    trailing={
+                      <Button size="sm" disabled={busy() === row.key} onClick={() => void reconfirm(row)}>
+                        Accept the new tier
+                      </Button>
+                    }
+                  >
+                    <span class="muted">
+                      You agreed to <Badge size="xs" tone="warn">{row.risk}</Badge> when you made this. It now
+                      asks for more, so nothing has run since.
+                    </span>
+                  </Row>
+                </Show>
                 <Show when={row.backoffUntil !== undefined && row.backoffUntil > now ? row.backoffUntil : undefined}>
                   {(until) => <span class="muted">Backed off after repeated failures — next attempt {formatWhen(until(), now)}.</span>}
                 </Show>

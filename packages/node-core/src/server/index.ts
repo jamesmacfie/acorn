@@ -12,6 +12,7 @@ import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
 import { plugins } from './routes/plugins'
+import { dashboards } from './routes/dashboards'
 import { schedules } from './routes/schedules'
 import { harness } from './routes/harness'
 import { agentTools, agentToolsCatalog } from './routes/agentTools'
@@ -97,6 +98,7 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
+    .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // /history — the measure series a stat's trend is drawn from
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)

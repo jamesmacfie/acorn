@@ -10,9 +10,11 @@
 // and the rollback of everything registered here all stay in host.ts, because they are decisions about
 // a SET of plugins and this is one plugin's surface.
 import type { CoreServices } from '../../main/core'
-import type { NodePermissions, PluginScheduleDescriptor } from '../../main/pluginManifest'
+import type { NodePermissions, PluginCollectionDescriptor, PluginCommandDescriptor, PluginScheduleDescriptor } from '../../main/pluginManifest'
 import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
 import { registerAgentTool } from '../agentTools/registry'
+import { registerCollectionRead } from '../collections/registry'
+import { registerNodeAction } from '../nodeActions/registry'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
@@ -37,6 +39,14 @@ export type LoadedPluginBinding = {
   // for the same reason `permissions` is: the host is the one that binds a manifest's claims to a plugin
   // id, and the loader is the one place that read the file.
   schedules?: readonly PluginScheduleDescriptor[]
+  // And what it declared as collections, for the same reason and by the same route: the node-side
+  // read registry is synthesised from these `items` paths (../collections/registry.ts), so a loaded
+  // plugin's panels can be sampled without a client and without the plugin shipping node code.
+  collections?: readonly PluginCollectionDescriptor[]
+  // And its commands, of which the host reads exactly one thing: which are `runNodeAction`, so a
+  // person can put one on a schedule (../nodeActions/registry.ts). The rest of a command — its
+  // palette entry, its keybinding, its category — is the CLIENT's business and never reaches here.
+  commands?: readonly PluginCommandDescriptor[]
 }
 
 export type PluginContextOptions = {
@@ -135,6 +145,20 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
         recordUndo(() => handle.dispose())
       },
     },
+    // Owner-bound like routes and tools, and for the sharper version of the same reason: this pointer
+    // is what the measure sampler dispatches through, so a collection filed under a stranger's name
+    // would have the node reading one plugin's route under another's badge. The route itself is
+    // re-confined on every call (../collections/registry.ts), which is the belt to this brace.
+    collections: {
+      register: (collection) => registerCollectionRead({ ...collection, pluginId: plugin }),
+    },
+    // Owner-bound for the sharpest version of the reason yet: this is the list a person picks a
+    // scheduled action from, and the tier beside each entry is what the confirmation they accept is
+    // drawn from. A plugin filing one under a stranger's name would be borrowing that plugin's
+    // reputation for its own route.
+    nodeActions: {
+      register: (action) => registerNodeAction({ ...action, pluginId: plugin }),
+    },
     // asContextSection is where core's database handle is DROPPED rather than merely left unused: core's
     // own `issues` section keeps it, a plugin-registered one can never see it, and neither side has to be
     // trusted to remember.
@@ -222,7 +246,7 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
       return undefined as R
     }
 
-  for (const group of ['routes', 'tools', 'schedules', 'contextSections', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'contextSections', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a
     // typeof check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined

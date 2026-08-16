@@ -85,6 +85,16 @@ copy). Two boundary rules in `tools/arch/boundaries.test.ts` enforce it — prot
 shrinking list. This is what lets a plugin define its wire contract without editing core, which is
 the precondition for third-party plugins.
 
+`packages/dashboards-core` is the second package both runtimes import, and the only other one. It
+holds the pure dashboard pipeline — the panel model and its codec, shaping, cross-source mapping,
+layout, chart and cell arithmetic — with no Solid, no registries and no fetch, and it exists because
+the node's measure sampler must compute a panel's number with the SAME functions the renderer draws
+it with (`docs/schedules.md`). Two implementations of "this panel's measure" would agree until the
+day one changed, and the point of recording history is that a stored number means what the number on
+screen means. Client-core re-exports every module it moved, so the components there still say
+`./model`; the node imports it directly. Like protocol it declares no DOM and no node types, which
+is what keeps the standalone node's graph clean.
+
 The renderer reaches the host through one seam, `packages/client-core/src/platform/`, which groups
 what a host provides — node transport, fleet membership, plugin custody, and the native extras — into
 separate nullable capabilities. The thin client in `packages/client-core` calls the transport group;

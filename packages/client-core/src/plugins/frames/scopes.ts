@@ -118,6 +118,10 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v2/core/schedules/${SEG}`), scopes: {} },
   { path: shape(`/v2/core/schedules/${SEG}/run`), scopes: {} },
   { path: shape(`/v2/core/schedules/${SEG}/runs`), scopes: {} },
+  // Re-taking consent after a target's risk tier rose. Sharper than its siblings, not softer: a frame
+  // that could POST this would be re-arming a confirmation on the owner's behalf, which is the exact
+  // act the arming rule exists to keep in a human's hands.
+  { path: shape(`/v2/core/schedules/${SEG}/confirm`), scopes: {} },
   { path: shape('/v2/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v2/core/devices/${SEG}`), scopes: {} },
   { path: shape('/v2/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },
@@ -137,6 +141,10 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v2/core/plugins/requests/${SEG}`), scopes: {} },
   { path: shape(`/v2/core/plugins/${SEG}`), scopes: {}, note: 'Uninstall, including the option to delete another plugin’s data.' },
   { path: shape('/v2/core/prefs'), scopes: {}, note: 'Every preference on the node, including other plugins’ persisted state. Frames get their own namespaced `state` verb instead.' },
+  // The measure series behind a stat's trend. Denied for the same reason `prefs` is: a panel is composed
+  // over whatever collections its owner chose, so one plugin's frame reading a panel's history is one
+  // plugin reading a number derived from another's rows. The panels themselves are drawn by the host.
+  { path: shape('/v2/core/dashboards/history'), scopes: {}, note: 'A panel’s measure may be derived from another plugin’s collection.' },
   { path: shape('/v2/core/agent-tools'), scopes: {}, note: 'Agent tool catalog and permissions.' },
   { path: shape(`/v2/core/tasks/${SEG}/renderer-tools/${SEG}`), scopes: {}, note: 'The renderer’s own agent-tool call surface.' },
   { path: shape(`/v2/core/tasks/${SEG}/run`), scopes: {}, note: 'Run targets are commands.' },

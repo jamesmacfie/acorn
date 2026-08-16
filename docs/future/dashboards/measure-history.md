@@ -1,9 +1,23 @@
 # Measure history: the store, and the stat that earns a trend
 
-**Unbuilt.** The store and its feeder ride the scheduler: sampling is the `collection-sample`
-target in [`docs/future/cron/targets.md`](../cron/targets.md), so this file waits on that folder's
-phases 1–3 (`README.md § build order`). The display half (delta, sparkline) is dashboards phase 3
-and waits on the store accruing samples.
+**The store and its feeder are BUILT; the display half is not.** `dashboard_measure_samples`,
+`core:sample-measures`, `core:compact-history` and `GET /v2/core/dashboards/history` all ship — see
+[`docs/schedules.md`](../../schedules.md) — so a placed panel with `view.trend: 'history'` accrues
+hourly samples today with no client open. The three `PanelView` keys (`trend`, `compare`, `good`)
+parse and round-trip. What remains is § Display: the sparkline, the delta, and the editor offering
+`trend` at all. Nothing draws a sample yet.
+
+Two places the build differs from the text below:
+
+- **Panel deletion goes through compaction, not `removePanel`.** A series whose panel no longer
+  appears in the prefs blob is dropped by `core:compact-history`, which needs no route and no
+  client-side coordination. Unplacing still deletes nothing. A pass that could not read the blob
+  skips the sweep entirely — "could not read" must never be treated as "no panels exist".
+- **`sort` and `limit` are OUT of the signature**, alongside the view kind and the three display
+  keys. A limit does bound the rows an aggregate runs over, so this is a judgement rather than an
+  oversight: shaping-for-reading should not reset a fortnight of history, and a stat with a limit is
+  rare enough that the trade lands this way. Move it in the day a real panel needs it — the visible
+  reset is the honest outcome either way.
 
 *Design history, one line: an earlier revision of this file had clients sampling opportunistically
 while panels rendered, with a PUT route and last-write-wins buckets to make multiple clients

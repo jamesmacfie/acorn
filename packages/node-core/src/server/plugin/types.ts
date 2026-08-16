@@ -8,6 +8,8 @@ import type { PluginDatabase } from '../../main/pluginStorage'
 import type { ConnectionProviderContribution, IntegrationProviderContribution } from '../integrations/types'
 import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
+import type { CollectionReadRegistration } from '../collections/registry'
+import type { NodeActionRegistration } from '../nodeActions/registry'
 import type { PluginContextSection } from '../agentTools/contextSections'
 import type { AppEnv, Principal } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
@@ -136,6 +138,31 @@ export type PluginSchedule = {
   run(signal: AbortSignal): Promise<string | void>
 }
 
+// Where this plugin's collections can be READ from the node, with no client attached
+// (docs/future/cron/targets.md § seam 1). NOT a second way to declare a collection: the client-side
+// registration is still what makes one appear in a panel editor, and this is the pointer that lets
+// the measure sampler ask the same route the same question.
+//
+// One line per collection, naming the route constant the plugin's shared contract module already
+// exports to both sides. A loaded plugin registers nothing here — the host synthesises its entries
+// from the manifest's `collections` descriptors, which already carry `items`.
+export type PluginCollectionRegistry = {
+  register(collection: CollectionReadRegistration): void
+}
+
+// Which of this plugin's chrome actions a USER may put on a schedule (docs/schedules.md § Targets).
+//
+// NOT a way to declare an action: the client-side registration is still what puts it in the palette
+// or on a row. This is the pointer plus the risk tier, so the node can offer it in the schedule
+// picker and arm the right confirmation when someone schedules it. Registering nothing simply means
+// none of this plugin's actions can be scheduled, which is the correct default for most of them.
+//
+// A loaded plugin registers nothing here: the host synthesises its entries from manifest COMMANDS
+// whose verb is `runNodeAction`.
+export type PluginNodeActionRegistry = {
+  register(action: NodeActionRegistration): void
+}
+
 export type PluginContextSectionRegistry = {
   // A plugin contributes one task-context section. Core owns assembly, ordering, budgets, and output
   // format; the section receives no core database handle and declares only its own data source.
@@ -216,6 +243,12 @@ export type NodePluginContext = {
   // in front of the owner at install — and the host registers those through this same seam, so there is
   // one registration path and not two.
   schedules: PluginScheduleRegistry
+  // Both tiers, same as schedules: a loaded plugin's entries are synthesised from its manifest and a
+  // compiled one registers its own, and nothing downstream can tell which feeder answered.
+  collections: PluginCollectionRegistry
+  // Both tiers, same as the two above. Empty for most plugins: an action is only listed here when its
+  // author means "a person may reasonably want this to happen on a timer".
+  nodeActions: PluginNodeActionRegistry
   contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities

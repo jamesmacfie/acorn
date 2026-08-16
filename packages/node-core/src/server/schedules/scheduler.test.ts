@@ -295,7 +295,7 @@ describe('scheduler', () => {
     scheduler.register({ key: 'core:sample', name: 'Sample', cadence: { every: 60 }, run: async () => {} })
     scheduler.registerTarget({
       kind: 'noop',
-      risk: 'read',
+      risk: () => 'read',
       parse: (target) => target,
       run: async () => 'did nothing',
     })

@@ -574,6 +574,13 @@ export const schedulesRoute = '/v2/core/schedules'
 export const scheduleRoute = (key: string) => `${schedulesRoute}/${encodeURIComponent(key)}`
 export const scheduleRunNowRoute = (key: string) => `${scheduleRoute(key)}/run`
 export const scheduleRunsRoute = (key: string) => `${scheduleRoute(key)}/runs`
+/** What this node can actually run, for the creation picker. Only what resolves is offered, so a
+ *  schedule can never be created against something that does not exist. */
+export const scheduleTargetsRoute = `${schedulesRoute}/targets`
+/** Re-take consent after a target's declared risk tier rose. The client cannot NAME a tier here — it
+ *  posts nothing and the node re-stamps from the registry — so accepting is always accepting the tier
+ *  the host just showed, which is what makes the confirmation impossible to talk out of asking. */
+export const scheduleConfirmRoute = (key: string) => `${scheduleRoute(key)}/confirm`
 
 // Workspaces (named groups of Projects) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'

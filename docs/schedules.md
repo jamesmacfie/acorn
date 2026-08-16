@@ -44,8 +44,13 @@ owner's pause or its run history — both are waiting when the plugin returns.
 
 - `core:audit-prune` — daily at 03:20 node-local. The 90-day audit sweep, which used to be a boot-time
   call in both composition roots and therefore never ran on a node left up for a month.
+- `core:sample-measures` — hourly, jittered. One pass over every dashboard panel that asked for a
+  history trend, recording one number apiece (§ Targets, and `docs/future/dashboards/measure-history.md`).
+- `core:compact-history` — daily at 03:40. Measure history's own retention.
 
-No plugin in the tree declares one yet, and no user target kinds exist; the latter is phase 3.
+The last two are only declared when the composition root passes `env` to `createScheduler`, which both
+Node hosts do; a scheduler built without one (a test) declares just the audit prune. No plugin in the
+tree declares a schedule yet.
 
 ### How a plugin declares one
 
@@ -150,6 +155,69 @@ Node-local time for the calendar forms, because the node is the owner's machine 
 Runs execute in-process and failures are contained per run: the run row and `lastError` are the blast
 radius, never a crashed node.
 
+## Targets: what a user schedule may do
+
+A user row names a **kind** and a kind-shaped **target**. The vocabulary is closed and unknown kinds
+survive inert — a row created by a newer build lists, never runs, and says so.
+
+| Kind | What runs |
+| --- | --- |
+| `node-action` | a plugin action the owner scheduled, dispatched as a POST to that plugin's own route |
+| `agent-run` | **reserved, unbuilt** — gated on a headless agent runtime existing at all |
+
+`collection-sample` is deliberately **not** a user kind. Measure sampling is one core schedule over
+every history-trend panel, not a row per panel, so turning a trend on in the panel editor never conjures
+a hidden schedule — the next `core:sample-measures` pass simply picks the panel up.
+
+### `node-action`
+
+The target is `{ pluginId, actionId, params }`. What runs is the same `runNodeAction` path a click
+takes — the plugin's own confined route, POSTed in process with the params as the body — so a scheduled
+fire and a clicked one are indistinguishable to the handler. The schedule owns only *when*.
+
+What can be scheduled comes from a node-side registry with two feeders, the same shape schedules and
+collections have:
+
+- **compiled**: `ctx.nodeActions.register({ actionId, name, path, risk })` in the plugin's node init.
+- **loaded**: synthesised from manifest **commands** whose verb is `runNodeAction`. No new descriptor
+  kind — the plugin wire contract did not grow.
+
+An action that declares no tier is treated as `execute`, the strongest. That is a deliberate repair
+rather than a default: a chrome action descriptor has no `risk` field today, and "nobody has said what
+this does" is not an argument for arming the weakest confirmation.
+
+### Consent, and the two ways it fails closed
+
+Consent is taken **at creation, whole**. The creation flow reads the target's declared tier, draws the
+confirmation that tier would get on a click — host-drawn, naming the plugin, impossible to skip — and
+the accepted tier is **stamped onto the row** (`user_schedules.risk`). Runs never prompt after that: an
+unattended prompt is either ignored (the schedule silently does nothing) or auto-accepted (a lie about
+consent). The stamp renders on the settings row for the schedule's whole life.
+
+- **The tier rises.** A plugin update declaring `execute` where it said `write` invalidates the stamp.
+  The run is `skipped` with "risk changed — re-confirm to resume", and the settings row offers the
+  re-arm. Stamped consent covers the tier it stamped, nothing higher.
+- **The target stops resolving.** Plugin gone, disabled, action renamed: `skipped` with the reason. The
+  row survives inert and reattaches by itself if the action returns.
+
+Both are recorded as `skipped`, not as errors — no backoff, no red row. A schedule failing closed is
+behaving correctly, and backing it off exponentially would punish the owner for someone else's edit.
+A target says so by throwing `ScheduleSkipped`.
+
+## Reading a collection from the node
+
+The measure sampler needs to read a collection with no client attached, which needed a registry the
+node did not have: `(pluginId, collectionId)` → the route that answers
+(`server/collections/registry.ts`). Every collection was always ultimately a node route — a loaded
+plugin's `items` is one, and a compiled plugin's client-side `fetch` is a thin wrapper over one — so
+this is the missing map and nothing more. Two feeders again: manifest `collections` descriptors for the
+loaded tier, `ctx.collections.register({ collectionId, items })` for the compiled one.
+
+Answers take the same parse the client path takes (`pluginCollectionResponseSchema`) and are dropped
+whole on failure; provenance is host-stamped; caps hold. **A sampling read never forces revalidation** —
+it serves whatever the plugin's route serves, at its mirror's age. A plugin that wants fresher
+unattended data declares its own refresh schedule and pays for it from its own rate budget.
+
 ## Observability
 
 Every run writes a row. `schedule_runs` is a ring of the 20 most recent per schedule, trimmed on write,
@@ -164,7 +232,9 @@ unattended, so declaring one is node administration and a task-scoped agent must
 | --- | --- |
 | `GET /v2/core/schedules` | the merged view plus the global pause flag |
 | `PATCH /v2/core/schedules` | the global pause switch |
+| `GET /v2/core/schedules/targets` | what this node can run, for the creation picker |
 | `POST /v2/core/schedules` | create a user schedule |
+| `POST /v2/core/schedules/:key/confirm` | re-take consent after a target's tier rose |
 | `PATCH /v2/core/schedules/:key` | pause/resume, retune cadence (clamped), rename (user rows only) |
 | `DELETE /v2/core/schedules/:key` | user rows only — declared schedules are paused, not deleted |
 | `POST /v2/core/schedules/:key/run` | run now (subject to serialization and the cap, not to backoff) |
@@ -173,6 +243,10 @@ unattended, so declaring one is node administration and a task-scoped agent must
 Creating is the one non-tolerant edge: a create names a target that must resolve **now**, and the risk
 tier is read off that target and stamped onto the row. That stamp is the consent record — consent is
 taken once, at creation, because 3am cannot answer a confirmation strip.
+
+`confirm` takes **no body**. The node re-stamps from its own registry, so a client can only ever accept
+the tier the host just showed; letting it post a tier would make the confirmation something a client
+could quietly widen, which is the one property the arming rule exists to prevent.
 
 Plugin frames cannot reach any of these (`client-core/plugins/frames/scopes.ts`): reading the list
 enumerates what the machine does unwatched, and creating one is a way to make code run later.
@@ -185,11 +259,17 @@ run ring behind a disclosure, and the verbs: pause/resume, run now, and delete f
 schedule shows its error inline; a backed-off one says when it will try again. A risky user schedule
 carries its tier badge permanently.
 
-There is deliberately no "new schedule" form yet: nothing on this node can run a user-created target,
-so a form would be a create button that always fails. It arrives with phase 3.
+The creation form is four fields and no wizard: pick an action, see its tier and accept it, name it, say
+when. The picker offers only what resolves on that node right now, so there is no invalid choice to
+validate after the fact — and when nothing offers a schedulable action the form is replaced by a
+sentence saying so rather than a create button that always fails. A row whose tier has risen shows the
+re-arm inline.
 
 ## Not built yet
 
-Phases 3–4 of `docs/future/cron/`: the user target kinds (`collection-sample`, `plugin-run`,
-`node-action`) and the migration of the remaining bespoke timers (`main/backup.ts`, the agent-usage
-collector).
+- **Phase 4 of `docs/future/cron/`**: migrating the remaining bespoke timers (`main/backup.ts`, the
+  agent-usage collector) onto rows.
+- **`agent-run`**, named in the vocabulary and gated on a headless agent runtime.
+- **The display half of measure history** — sparkline and delta
+  (`docs/future/dashboards/measure-history.md § Display`). The store accrues samples today; nothing
+  draws them yet.

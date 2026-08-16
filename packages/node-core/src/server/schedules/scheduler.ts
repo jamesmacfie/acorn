@@ -46,12 +46,29 @@ export type DeclaredSchedule = {
  *  inert rather than fail: the row is created by a later version of this node and read by this one. */
 export type ScheduleTarget = {
   kind: string
-  /** The tier stamped onto the row at creation — the consent record, taken once. */
-  risk?: ToolRisk
+  /** The tier stamped onto the row at creation — the consent record, taken once, over the PARSED
+   *  target. A function rather than a constant because a tier belongs to the thing being scheduled
+   *  and not to the kind: two `node-action` schedules can point at a read and at an execute, and one
+   *  tier for the whole vocabulary would either over-warn about every one of them or under-warn about
+   *  the dangerous ones. Absent, or returning undefined, stamps nothing. */
+  risk?(target: unknown): ToolRisk | undefined
   /** Validate a proposed target. `null` refuses the CREATE, which is the one non-tolerant edge here. */
   parse(target: unknown): unknown | null
-  run(target: unknown, signal: AbortSignal): Promise<string | void>
+  /** Throw `ScheduleSkipped` to record a run that deliberately did nothing — a target that no longer
+   *  resolves, or one whose declared risk has risen past the consent stamped on the row. That is a
+   *  different fact from a failure: it must not start a backoff, and it must not read as broken. */
+  run(target: unknown, signal: AbortSignal, consent: ScheduleConsent): Promise<string | void>
 }
+
+/** What the row remembers about the one time the owner was asked. Handed to every run because a
+ *  target cannot see its own row, and checking that the stamp still covers the target's CURRENT
+ *  declared tier is the whole of "consent is taken once and honoured forever". */
+export type ScheduleConsent = { risk?: ToolRisk }
+
+/** "I ran, and deliberately did nothing." Recorded as `skipped` with the message as the reason, and
+ *  pointedly NOT as an error: a schedule failing closed on a risk change is behaving correctly, and
+ *  backing it off exponentially would punish the owner for the plugin author's edit. */
+export class ScheduleSkipped extends Error {}
 
 export type Clock = {
   now(): number
@@ -230,7 +247,7 @@ export class Scheduler {
       kind: input.kind,
       target: JSON.stringify(parsed),
       cadence: JSON.stringify(cadence),
-      risk: target.risk ?? null,
+      risk: target.risk?.(parsed) ?? null,
       createdAt: this.#clock.now(),
     })
     await this.#sync()
@@ -258,6 +275,24 @@ export class Scheduler {
     // interval it slept through — catch-up-once applies, and the tick loop is where that happens.
     if (Object.keys(patch).length > 0) await this.#writeState(key, { ...patch, nextRunAt: patch.nextRunAt ?? entry.state.nextRunAt })
     this.#arm()
+    return this.#row(key)
+  }
+
+  /** Re-take consent for a user schedule whose target now declares a higher tier, by re-stamping the
+   *  row from the registry's CURRENT answer.
+   *
+   *  Deliberately takes no tier from the caller. The client's part is to show what the host says and
+   *  relay that the owner accepted it; letting it post a tier would make the confirmation something a
+   *  client could quietly widen, which is the one property the arming rule exists to prevent. */
+  async confirm(key: string): Promise<ScheduleRow> {
+    if (keyOwner(key).owner !== 'user') throw new BridgeError(409, 'conflict', 'Only a schedule you created carries a consent stamp.')
+    const row = (await this.#db.select().from(schema.userSchedules).where(eq(schema.userSchedules.id, key.slice(5))))[0]
+    if (!row) throw new BridgeError(404, 'not_found', 'No such schedule.')
+    const target = this.#targets.get(row.kind)
+    if (!target) throw new BridgeError(409, 'conflict', `This node has nothing that can run a '${row.kind}' schedule.`)
+    const parsed = target.parse(safeJson(row.target))
+    if (parsed === null) throw new BridgeError(409, 'conflict', 'That schedule points at something this node cannot resolve right now.')
+    await this.#db.update(schema.userSchedules).set({ risk: target.risk?.(parsed) ?? null }).where(eq(schema.userSchedules.id, key.slice(5)))
     return this.#row(key)
   }
 
@@ -358,9 +393,12 @@ export class Scheduler {
       ])
       if (typeof result === 'string' && result) detail = detail ? `${detail}; ${result}` : result
     } catch (error) {
-      status = timeout.aborted ? 'timeout' : 'error'
+      // A deliberate no-op is not a failure. It resumes on the normal cadence — no backoff, no red
+      // row — because the reason (a plugin gone, a risk tier raised) is a thing the owner fixes, not
+      // a thing retrying more slowly would help with.
+      status = error instanceof ScheduleSkipped ? 'skipped' : timeout.aborted ? 'timeout' : 'error'
       detail = oneLine(error)
-      console.warn(`[schedules] ${entry.key} ${status}: ${detail}`)
+      if (status !== 'skipped') console.warn(`[schedules] ${entry.key} ${status}: ${detail}`)
     }
     const finishedAt = this.#clock.now()
     await this.#recordRun(entry.key, { startedAt, finishedAt, status, detail })
@@ -371,8 +409,16 @@ export class Scheduler {
    *  a VISIBLE backoff, because a silent retry loop is how rate limits die. */
   async #afterRun(entry: Entry, status: ScheduleStatus, finishedAt: number, detail?: string): Promise<Partial<StateRow>> {
     const normal = nextRunAt(entry.cadence, finishedAt, this.#clock.random)
-    if (status === 'ok') {
-      return { nextRunAt: normal, lastRunAt: finishedAt, lastStatus: status, lastError: null, backoffUntil: null }
+    // A skip takes the ok path for TIMING and keeps its reason visible: the row says why it did
+    // nothing, and the next run is the one the cadence would have produced anyway.
+    if (status === 'ok' || status === 'skipped') {
+      return {
+        nextRunAt: normal,
+        lastRunAt: finishedAt,
+        lastStatus: status,
+        lastError: status === 'skipped' ? (detail ?? null) : null,
+        backoffUntil: null,
+      }
     }
     const failures = await this.#consecutiveFailures(entry.key)
     // Never EARLIER than the cadence would have fired anyway: a failing daily job must not start
@@ -493,7 +539,9 @@ export class Scheduler {
         registered: target !== undefined,
         timeoutMs: DEFAULT_TIMEOUT_MS,
         ...(row.risk ? { risk: row.risk as ToolRisk } : {}),
-        ...(target ? { run: (signal: AbortSignal) => target.run(safeJson(row.target), signal) } : {}),
+        ...(target
+          ? { run: (signal: AbortSignal) => target.run(safeJson(row.target), signal, { ...(row.risk ? { risk: row.risk as ToolRisk } : {}) }) }
+          : {}),
       }))
     }
 

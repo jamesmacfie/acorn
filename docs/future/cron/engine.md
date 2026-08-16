@@ -140,11 +140,30 @@ delete — all existing primitives.
 
 ## Migration of the invisible intervals (phase 4)
 
-Audit pruning is done (it was phase 1's one core schedule). The rest still stands: the periodic work
-already hiding in the codebase moves onto rows and the bespoke timers get **deleted**: backup
-(`main/backup.ts`), the agent-usage collection interval. Each becomes a core- or plugin-declared schedule, visible and pausable like
-everything else. The acceptance test for this phase is negative: `grep setInterval` over node code
-finds scheduler internals and nothing else.
+Audit pruning is done (it was phase 1's one core schedule). The remaining surface was re-verified
+against the tree after phase 3, and it is **smaller and differently shaped** than this section first
+assumed:
+
+- **Backup has no timer to delete.** `main/backup.ts` is route-triggered only (`POST
+  /v2/core/backup`); nothing runs it periodically today. Phase 4's backup item is therefore an
+  *addition*, not a migration: a `core:backup` schedule (weekly, say, and pausable like everything
+  else) that runs the same backup function into a node-owned destination. The open question is the
+  destination — the route writes to a caller-chosen path, and a scheduled run has no caller — so
+  decide a default (beside the data root) before registering it, or defer the item until someone
+  wants unattended backups at all. Do not invent retention for backup archives without being asked.
+- **The agent-usage collector is the agents plugin's own refresh route**
+  (`plugins/agents` § `POST /v2/p/agents/usage/refresh`). The migration is exactly use case 6 and
+  is now one phase-2 registration: the plugin declares a schedule (its node half via
+  `ctx.schedules.register`, or the manifest key) that hits its own route on its own cadence. No new
+  machinery; whoever picks this up should check what currently drives refreshes (a client-side
+  trigger keeps working — the schedule just makes the data fresh with no client open).
+- **The surviving `setInterval`s are not calendar work and stay.** The WS-hub sweep, the tunnel
+  sweep, the MCP keepalive, the node broker's timer and the terminal idle watch are housekeeping
+  tied to live connections and sessions — their lifetime is the object's, not the clock's, and a
+  schedule row for "sweep this map while it exists" would be noise in the settings list. The
+  original acceptance test ("`grep setInterval` finds scheduler internals and nothing else") was
+  too strong; the honest version: **no *calendar-shaped* work runs off a bespoke timer** — anything
+  with a cadence a person might want to see, pause or retune is a row.
 
 ## Done when
 

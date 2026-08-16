@@ -214,7 +214,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // before the PLUGINS, so a manifest-declared or code-declared schedule has somewhere to land, and
     // therefore well before the listener binds; STARTED after it, because a catch-up run may call this
     // node's own routes.
-    scheduler = createScheduler(db)
+    scheduler = createScheduler(db, { env: runtime })
     schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
     const plugins = await initPlugins(
       graph.plugins,

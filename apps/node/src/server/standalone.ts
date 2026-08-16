@@ -111,7 +111,7 @@ const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, 
 // The node's one scheduler, built and provided BEFORE the plugins so a manifest-declared or
 // code-declared schedule has somewhere to land; its lifetime is the process's, so it belongs to whoever
 // owns teardown. Started after the listener binds, because a catch-up run may call this node's own routes.
-const scheduler = createScheduler(runtime.DB)
+const scheduler = createScheduler(runtime.DB, { env: runtime })
 const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
 const plugins = await initPlugins(graph.plugins, { capabilities, core, env: runtime, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
 const pluginStateCapability = capabilities.provide(

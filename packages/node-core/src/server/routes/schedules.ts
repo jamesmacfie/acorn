@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { cadenceSchema } from '@acorn/protocol/schedules.ts'
+import { cadenceSchema, type ScheduleTargetOption, type ScheduleTargetsResponse } from '@acorn/protocol/schedules.ts'
+import { nodeActions, riskOf } from '../nodeActions/registry'
 import { viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
@@ -49,8 +50,28 @@ export const schedules = new Hono<AppEnv>()
     if (!body.success) return respondError(c, 400, 'bad_request', ['A schedule needs a name, a target kind, its target, and a cadence.'])
     return viaBridge(c, SCHEDULER, (scheduler) => scheduler.create(body.data))
   })
+  // What the creation flow may offer, and nothing else. Read straight off the node-side registry
+  // rather than through the scheduler bridge: this is a question about what CAN be scheduled, which
+  // the registry answers, and routing it through the scheduler would mean the scheduler holding a
+  // catalogue it never reads.
+  //
+  // Declared BEFORE '/:key/runs' — Hono matches in registration order, and `targets` would otherwise
+  // be read as a key.
+  .get('/targets', (c) => {
+    const targets: ScheduleTargetOption[] = nodeActions().map((action) => ({
+      kind: 'node-action',
+      pluginId: action.pluginId,
+      actionId: action.actionId,
+      name: action.name,
+      risk: riskOf(action),
+    }))
+    return c.json({ targets } satisfies ScheduleTargetsResponse)
+  })
   .get('/:key/runs', (c) => viaBridge(c, SCHEDULER, (scheduler) => scheduler.runs(c.req.param('key'))))
   .post('/:key/run', (c) => viaBridge(c, SCHEDULER, (scheduler) => scheduler.runNow(c.req.param('key'))))
+  // Re-arm after a tier rise. No body: the node re-stamps from the registry, so a client can only ever
+  // accept the tier the host just showed it.
+  .post('/:key/confirm', (c) => viaBridge(c, SCHEDULER, (scheduler) => scheduler.confirm(c.req.param('key'))))
   .patch('/:key', async (c) => {
     const body = patchBody.safeParse(await c.req.json().catch(() => null))
     if (!body.success) return respondError(c, 400, 'bad_request', ['Send some combination of enabled, cadence and name.'])

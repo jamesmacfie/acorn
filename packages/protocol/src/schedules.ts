@@ -77,6 +77,25 @@ export type SchedulesResponse = {
   schedules: ScheduleRow[]
 }
 
+/** One thing a person may put on a schedule, as the creation flow sees it (docs/schedules.md § Targets).
+ *
+ *  The list is what RESOLVES on this node right now, which is the whole promise the picker makes: a
+ *  schedule can never be created against something this node cannot run, so there is nothing for the
+ *  creation form to validate after the fact.
+ *
+ *  `risk` is the tier the host draws the arming confirmation from and stamps onto the row. It is never
+ *  absent — an action that declares nothing is reported as `execute`, the strongest, because the
+ *  direction that cannot be wrong in a way that matters is the safe one. */
+export type ScheduleTargetOption = {
+  kind: 'node-action'
+  pluginId: string
+  actionId: string
+  name: string
+  risk: ToolRisk
+}
+
+export type ScheduleTargetsResponse = { targets: ScheduleTargetOption[] }
+
 /** Clamp a cadence into the allowed range rather than rejecting it (see cadenceSchema above). */
 export function clampCadence(cadence: Cadence, floorSeconds = CADENCE_MIN_SECONDS): Cadence {
   if (!('every' in cadence)) return cadence

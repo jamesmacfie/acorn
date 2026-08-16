@@ -380,6 +380,14 @@ here runs in node with no Solid plugin — a component in this repo cannot be te
 can be wrong live where they can be. The same rule puts every scale, tick and rect in
 `dashboards/chart.ts` and `dashboards/layout.ts`.
 
+**Where those modules actually live.** Everything pure in that list moved to
+`packages/dashboards-core`, because the node's measure sampler has to compute a panel's number with
+the same functions the renderer draws it with (`docs/schedules.md`), and a client package cannot
+enter the node's graph. `client-core/src/dashboards/*.ts` are one-line re-exports, so every path
+named in this document still resolves and every component here still says `./model`. Only `editor.ts`,
+`data.ts`, `persist.ts` and the components stayed: they read registries, signals or the query client,
+which is exactly the line the new package draws.
+
 ## Persistence
 
 Panel definitions and placements are one JSON blob in the **owning node's per-user prefs**, as the
@@ -388,6 +396,18 @@ describes that node's resources, so it follows the resource
 ([state.md § Scope rules](./state.md)) and every client paired with that node renders the board its
 owner built. The device's query cache stays the offline read fallback, as for every other node-backed
 read.
+
+**The definition codec is shared with the node**, in `@acorn/dashboards-core/definition.ts`: the
+measure sampler reads the same blob the clients write and has to parse it through the same parser
+rather than a second one that agrees today. `persist.ts` keeps the store, the slice registration and
+the *geometry* codec — a rect is a rendering concern the node has no use for.
+
+`PanelView` also carries three optional stat keys, parsed exactly like the chart keys and dropped when
+malformed: `trend` (`'history' | 'activity'`), `compare` (`'day' | 'week'`) and `good`
+(`'up' | 'down'`). `trend: 'history'` is what the node's sampler selects a panel on. The honest ceiling
+is the chart keys' own — an old client that writes the blob drops them, the panel survives as a plain
+stat, and the series simply stops accruing until a newer client writes them back. Nothing draws them
+yet (`docs/future/dashboards/measure-history.md § Display`).
 
 **Placements reference panel definitions by id; they never embed them.** Embedding panel config
 inside a "home dashboard" blob works right up until panels need to live in a second place, and then
