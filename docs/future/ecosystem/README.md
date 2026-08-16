@@ -38,8 +38,9 @@ What remains is exactly three programs plus one map:
 1. **Rung-2 containment** — the long pole, and the hard gate on anything discovery-shaped. A
    loaded plugin's node half still runs in-process, disclosed rather than contained.
    (`blockers.md`)
-2. **Dashboards** — phases 1–3 of `docs/future/dashboards/README.md`. Independent of the above;
-   this is where plugin composition becomes visible to users.
+2. **Dashboards** — shipped (`docs/dashboards.md`); the remaining backlog is
+   `docs/future/dashboards/`. Independent of the above; this is where plugin composition becomes
+   visible to users.
 3. **Distribution, last** — signing, the `docs/future/bundle.md` release work so a remote node is
    a download, then discovery over signed packages. (`work-plan.md`)
 

@@ -17,8 +17,8 @@ import {
 } from './model'
 import { groupableFields } from './shaping'
 
-// The derivations behind the GENERATED editor (docs/future/dashboards/composition.md § The generated
-// editor). The schema does triple duty — validation, the persisted shape, and the editor — and no
+// The derivations behind the GENERATED editor (docs/dashboards.md § The generated editor).
+// The schema does triple duty — validation, the persisted shape, and the editor — and no
 // panel settings UI is hand-written, because a hand-written editor drifts from its schema.
 //
 // The editor is composed of SELECTORS: typed, data-aware inputs that each know the schema they draw

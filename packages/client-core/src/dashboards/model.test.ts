@@ -32,7 +32,17 @@ describe('views are derived from the schema', () => {
     expect(viewsForSchema(withoutEnum)).not.toContain('board')
     expect(isDrawnViewKind('board')).toBe(true)
     // A kind from a client that draws more than this one. Retained by the codec, inert at render.
-    expect(isDrawnViewKind('chart')).toBe(false)
+    expect(isDrawnViewKind('sankey-diagram')).toBe(false)
+  })
+
+  it('gates chart on an axis to draw against, which a text-only collection has not got', () => {
+    // An enum is a category axis and a datetime is a time axis; numbers alone are values with
+    // nowhere to sit (chart.ts § chartShapesFor holds the same predicate, and chart.test.ts pins
+    // the two together).
+    expect(viewSupportedBy('chart', withEnum)).toBe(true)
+    expect(viewSupportedBy('chart', withoutEnum)).toBe(false)
+    expect(viewSupportedBy('chart', { fields: [{ id: 'at', name: 'At', type: 'datetime' }] })).toBe(true)
+    expect(viewSupportedBy('chart', { fields: [{ id: 'n', name: 'N', type: 'number' }] })).toBe(false)
   })
 })
 

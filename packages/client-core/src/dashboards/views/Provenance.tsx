@@ -4,7 +4,7 @@ import { brandMarkRegistry } from '../../ui/brandMarks'
 import Icon from '../../ui/Icon'
 
 // WHICH SOURCE THIS ROW CAME FROM, on a panel that unions more than one
-// (docs/future/dashboards/composition.md § The motivating scenario).
+// (docs/dashboards.md § The mapping layer, and cross-source panels).
 //
 // Drawn from the HOST'S STAMP — `row.pluginId`, bound when the response was parsed and never read off
 // the response body (plugins/chrome/data.ts § readCollection). That is the whole point of the stamp:

@@ -12,7 +12,7 @@ import './home.css'
 // The core home is deliberately provider-neutral. It is the stable landing source when no optional
 // integration is connected; provider plugins contribute their own browse sources beside it.
 //
-// It is also the default panel placement (docs/future/dashboards/placements.md). ADDITIVE, and that
+// It is also the default panel placement (docs/dashboards.md § On Home). ADDITIVE, and that
 // is a decision rather than a layout accident: the active-task list is what people open this screen
 // for, so panels go BELOW it and a person who never composes one sees the page they saw before plus
 // one ghost button. An empty grid on a surface nobody asked to turn into a dashboard would be a

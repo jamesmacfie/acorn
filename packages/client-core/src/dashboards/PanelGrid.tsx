@@ -1,21 +1,50 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
 import { collectionContributions } from '../registries/collections'
 import { Button, SectionHeader } from '../ui/primitives'
+import { createArmedConfirm } from '../ui/confirm'
 import Icon from '../ui/Icon'
 import { Menu } from '../ui/Menu'
-import { panelMoveTarget } from './compose'
-import type { PanelDefinition } from './model'
+import {
+  applyMove,
+  applyResize,
+  COLS,
+  sizeFor,
+  type PanelLayout,
+  type Rect,
+} from './layout'
+import type { PanelDefinition, PanelId } from './model'
 import Panel from './Panel'
 import PanelEditor from './PanelEditor'
-import { panelsAt, placePanel, removePanel, savePanel, type PlacementScope } from './persist'
+import {
+  layoutAt,
+  panelDefinition,
+  panelsAt,
+  placePanel,
+  removePanel,
+  savePanel,
+  setLayoutAt,
+  unplacePanel,
+  type PlacementScope,
+} from './persist'
 import './dashboards.css'
 
-// One PLACEMENT (docs/future/dashboards/placements.md): the grid of panels a person put somewhere,
-// plus the chrome for putting one there and taking it away. Panel itself is placement-agnostic and
-// owns a panel's frame, freshness and body; this owns the arrangement, and nothing else.
+// One PLACEMENT (docs/dashboards.md § Placements): the grid of panels a person put somewhere, plus
+// the chrome for putting one there, arranging it and taking it away. Panel itself is
+// placement-agnostic and owns a panel's frame, freshness and body; this owns the arrangement.
 //
-// It takes a scope rather than assuming home because `panelsAt` / `placePanel` already do — a task
+// It takes a scope rather than assuming home because `panelsAt` / `layoutAt` already do — a task
 // pane or a plugin-reserved region is this component with a different scope, not a second one.
+//
+// ALL LAYOUT ARITHMETIC IS IN `layout.ts`. This file turns pixels into a candidate rect and renders
+// what the pure functions answer; it decides nothing about where a panel lands. THE PREVIEW DURING A
+// GESTURE IS THE REAL LAYOUT ALGORITHM RUNNING ON THE CANDIDATE POSITION, not a separate visual
+// effect — release persists exactly what was on screen, so there is no commit computation that could
+// disagree with the preview, and cancel is free because nothing was written.
+//
+// EVERY POINTER GESTURE HAS A KEYBOARD EQUIVALENT DRIVEN THROUGH THE SAME FUNCTIONS. That was a
+// commitment made when reorder shipped as menu items: drag lands ON TOP of the accessible path,
+// never instead of it. Move up / move down survive, reinterpreted onto geometry, and "Move / resize"
+// is the arrow-key form of the drag.
 //
 // TWO THINGS IT DELIBERATELY DOES NOT DO:
 //
@@ -27,23 +56,268 @@ import './dashboards.css'
 //   picker is worse than no button, so the affordance is gated on there being something to add.
 //   Panels already placed still render — a plugin going away must not take a composition with it.
 
+/** Below this the cells are too small to mean anything, so the grid collapses to one column. */
+const MIN_CELL_PX = 44
+
+/** Pixels of movement before a drag arms, so a sloppy click on the title is still a click. */
+const DRAG_THRESHOLD_PX = 4
+
+type GestureKind = 'move' | 'resize' | 'keyboard'
+
+type Gesture = {
+  id: PanelId
+  kind: GestureKind
+  /** `apply`'s output for the current candidate. This is what renders. */
+  layout: PanelLayout
+  /** How far the dragged panel is from the cell it currently occupies, so it tracks the pointer
+   *  between snaps instead of jumping a whole cell at a time. */
+  offset?: { x: number; y: number }
+}
+
+const ARROWS: Record<string, readonly [number, number]> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+}
+
 export default function PanelGrid(props: { scope: PlacementScope }) {
   // One signal for both entry points, because there is one editor: the wrapper distinguishes "open,
   // editing nothing yet" from "closed", which a bare `PanelDefinition | undefined` cannot.
   const [editing, setEditing] = createSignal<{ panel?: PanelDefinition } | undefined>()
+  const [gesture, setGesture] = createSignal<Gesture | undefined>()
+  const [cell, setCell] = createSignal(MIN_CELL_PX)
+  const [pitch, setPitch] = createSignal(MIN_CELL_PX)
+  const [collapsed, setCollapsed] = createSignal(false)
+  const [announcement, setAnnouncement] = createSignal('')
+  const confirmDelete = createArmedConfirm()
+
   const panels = () => panelsAt(props.scope)
   const collections = () => collectionContributions()
+  const committed = createMemo(() => layoutAt(props.scope))
+  /** What the grid draws: the live candidate while a gesture is running, else what is stored. */
+  const layout = (): PanelLayout => gesture()?.layout ?? committed()
+  const sizeOf = (id: PanelId) => sizeFor(panelDefinition(id)?.view.kind ?? 'list')
 
-  const move = (id: string, index: number, delta: -1 | 1) => {
-    const target = panelMoveTarget(index, delta, panels().length)
-    if (target === undefined) return
-    placePanel(props.scope, id, target)
+  let gridEl: HTMLDivElement | undefined
+  const slots = new Map<PanelId, HTMLDivElement>()
+
+  // ── Measurement ─────────────────────────────────────────────────────────────────────────────
+  //
+  // The one pixel measurement in the whole feature, and it exists to make cells SQUARE — which is
+  // what makes the overlay read as graph paper and "3 wide, 2 tall" mean something visually. The
+  // browser owns every other pixel via CSS grid.
+  //
+  // The gap is read off the RESOLVED `column-gap` rather than by token name: the grid and the
+  // overlay then agree to the pixel whatever a style pack sets, and nothing here joins the
+  // JS-reads-a-token list (ui/tokenAxes.ts § BRIDGE_TOKENS).
+  //
+  // The accepted consequence: panel heights breathe with window width. If that proves annoying the
+  // knob is one line — clamp `size` to a range — and the persisted model does not change.
+  const measure = () => {
+    const el = gridEl
+    if (!el) return
+    const width = el.clientWidth
+    if (!width) return
+    const gap = Number.parseFloat(getComputedStyle(el).columnGap) || 0
+    const size = Math.max(1, (width - (COLS - 1) * gap) / COLS)
+    setCell(size)
+    setPitch(size + gap)
+    setCollapsed(size < MIN_CELL_PX)
   }
 
-  // Move-up/move-down in the overflow menu, and no drag. Reorder by menu is keyboard- and
-  // screen-reader-operable by construction, where drag needs a parallel keyboard path built anyway
-  // to be usable at all. Upgrade path: pointer drag ON TOP of this, never instead of it.
-  const chrome = (definition: PanelDefinition, index: () => number) => (
+  onMount(() => {
+    measure()
+    if (typeof ResizeObserver === 'undefined' || !gridEl) return
+    const observer = new ResizeObserver(measure)
+    observer.observe(gridEl)
+    onCleanup(() => observer.disconnect())
+  })
+
+  // ── Pointer gestures ────────────────────────────────────────────────────────────────────────
+  //
+  // Pointer events with capture, not HTML5 drag-and-drop: the house mechanic (ui/split.ts) is
+  // already pointer-capture with rAF coalescing and user-select suppression, and HTML5 DnD brings a
+  // ghost image we would fight, no `pointercancel`, and worse coordinates. `createSplitDrag` itself
+  // is not extended — its own comment says its three call sites are delta-in-pixels, and this one is
+  // rect-in-cells.
+
+  // A gesture that outlives its component would keep arranging panels that no longer exist.
+  let release: (() => void) | undefined
+  onCleanup(() => release?.())
+
+  const begin = (
+    id: PanelId,
+    kind: 'move' | 'resize',
+    event: PointerEvent,
+    candidateFor: (start: Rect, dx: number, dy: number, step: number) => Rect,
+  ) => {
+    if (collapsed()) return
+    const start = committed().rects[id]
+    if (!start) return
+    if (event.currentTarget instanceof HTMLElement) event.currentTarget.setPointerCapture(event.pointerId)
+
+    const originX = event.clientX
+    const originY = event.clientY
+    const previousUserSelect = document.body.style.userSelect
+    let armed = kind === 'resize'
+    let frame = 0
+    let latest: PanelLayout | undefined
+
+    const move = (pointer: PointerEvent) => {
+      const dx = pointer.clientX - originX
+      const dy = pointer.clientY - originY
+      if (!armed && Math.abs(dx) < DRAG_THRESHOLD_PX && Math.abs(dy) < DRAG_THRESHOLD_PX) return
+      if (!armed) {
+        armed = true
+        document.body.style.userSelect = 'none'
+      }
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const step = pitch()
+        const next = kind === 'move'
+          ? applyMove(committed(), id, candidateFor(start, dx, dy, step), sizeOf)
+          : applyResize(committed(), id, candidateFor(start, dx, dy, step), sizeOf)
+        latest = next
+        const landed = next.rects[id] ?? start
+        setGesture({
+          id,
+          kind,
+          layout: next,
+          // Only a move floats under the pointer; a resize stays in its cells and grows.
+          ...(kind === 'move'
+            ? { offset: { x: dx - (landed.x - start.x) * step, y: dy - (landed.y - start.y) * step } }
+            : {}),
+        })
+      })
+    }
+
+    const end = (commit: boolean) => {
+      cancelAnimationFrame(frame)
+      document.body.style.userSelect = previousUserSelect
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', cancel)
+      window.removeEventListener('keydown', escape)
+      release = undefined
+      // Nothing was written during the gesture, so a cancel costs nothing to honour.
+      if (commit && latest) setLayoutAt(props.scope, latest)
+      setGesture(undefined)
+    }
+    const up = () => end(true)
+    const cancel = () => end(false)
+    const escape = (key: KeyboardEvent) => {
+      if (key.key !== 'Escape') return
+      key.preventDefault()
+      end(false)
+    }
+
+    release = cancel
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('keydown', escape)
+  }
+
+  const beginDrag = (id: PanelId, event: PointerEvent) => {
+    // The header minus its buttons: the title span and the slack around it.
+    if (event.target instanceof Element && event.target.closest('button, a, input, select')) return
+    begin(id, 'move', event, (start, dx, dy, step) => ({
+      ...start,
+      x: start.x + Math.round(dx / step),
+      y: start.y + Math.round(dy / step),
+    }))
+  }
+
+  const beginResize = (id: PanelId, edge: 'e' | 's' | 'se', event: PointerEvent) => {
+    event.preventDefault()
+    begin(id, 'resize', event, (start, dx, dy, step) => ({
+      ...start,
+      w: edge === 's' ? start.w : start.w + Math.round(dx / step),
+      h: edge === 'e' ? start.h : start.h + Math.round(dy / step),
+    }))
+  }
+
+  // ── Keyboard layout mode ────────────────────────────────────────────────────────────────────
+
+  const announce = (id: PanelId, next: PanelLayout) => {
+    const rect = next.rects[id]
+    if (rect) setAnnouncement(`Row ${rect.y + 1}, column ${rect.x + 1}, ${rect.w} wide, ${rect.h} tall`)
+  }
+
+  const keyboardGesture = () => {
+    const active = gesture()
+    return active?.kind === 'keyboard' ? active : undefined
+  }
+
+  const enterLayoutMode = (id: PanelId) => {
+    const start = committed()
+    setGesture({ id, kind: 'keyboard', layout: start })
+    announce(id, start)
+    // The overlay appearing is the same signal it is mid-drag: a gesture is live.
+    queueMicrotask(() => slots.get(id)?.focus())
+  }
+
+  const onSlotKeyDown = (id: PanelId, event: KeyboardEvent) => {
+    const active = keyboardGesture()
+    if (!active || active.id !== id) return
+    const step = ARROWS[event.key]
+    if (step) {
+      event.preventDefault()
+      const rect = active.layout.rects[id]
+      if (!rect) return
+      // Every nudge runs the same `apply` a drag frame does, so pushes and compaction happen exactly
+      // as they do under the pointer.
+      const next = event.shiftKey
+        ? applyResize(active.layout, id, { ...rect, w: rect.w + step[0], h: rect.h + step[1] }, sizeOf)
+        : applyMove(active.layout, id, { ...rect, x: rect.x + step[0], y: rect.y + step[1] }, sizeOf)
+      setGesture({ ...active, layout: next })
+      announce(id, next)
+      return
+    }
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      event.preventDefault()
+      const commit = event.key === 'Enter'
+      setGesture(undefined)
+      setAnnouncement('')
+      if (commit) setLayoutAt(props.scope, active.layout)
+    }
+  }
+
+  /** Blur commits, same as pointer-up: leaving the panel is not a cancel. */
+  const onSlotBlur = (id: PanelId) => {
+    const active = keyboardGesture()
+    if (!active || active.id !== id) return
+    setGesture(undefined)
+    setAnnouncement('')
+    setLayoutAt(props.scope, active.layout)
+  }
+
+  // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
+  //
+  // Move up / move down survive because they are the path that works with no pointer at all. On a
+  // one-column window they behave exactly as they did before geometry existed, which is the
+  // continuity that matters; on a wide one they swap toward the neighbour in reading order.
+
+  const moveTo = (id: PanelId, delta: -1 | 1) => {
+    const current = committed()
+    const order = panels().map((entry) => entry.id)
+    const index = order.indexOf(id)
+    const neighbour = current.rects[order[index + delta] ?? '']
+    const rect = current.rects[id]
+    if (!neighbour || !rect) return
+    setLayoutAt(props.scope, applyMove(current, id, { ...rect, x: neighbour.x, y: neighbour.y }, sizeOf))
+  }
+
+  const canMove = (id: PanelId, delta: -1 | 1) => {
+    const order = panels().map((entry) => entry.id)
+    const index = order.indexOf(id)
+    return index >= 0 && index + delta >= 0 && index + delta < order.length
+  }
+
+  // ── Chrome ──────────────────────────────────────────────────────────────────────────────────
+
+  const chrome = (definition: PanelDefinition) => (
     <Menu
       ariaLabel={`${definition.title} panel actions`}
       placement="bottom-end"
@@ -58,30 +332,43 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
           {/* The same generated editor the add flow opens, handed the panel it is editing. */}
           <Menu.Item context={menu} onSelect={() => setEditing({ panel: definition })}>Edit</Menu.Item>
           <Menu.Separator />
+          <Show when={!collapsed()}>
+            <Menu.Item context={menu} onSelect={() => enterLayoutMode(definition.id)}>Move / resize</Menu.Item>
+          </Show>
           <Menu.Item
             context={menu}
-            disabled={panelMoveTarget(index(), -1, panels().length) === undefined}
-            onSelect={() => move(definition.id, index(), -1)}
+            disabled={!canMove(definition.id, -1)}
+            onSelect={() => moveTo(definition.id, -1)}
           >
             Move up
           </Menu.Item>
           <Menu.Item
             context={menu}
-            disabled={panelMoveTarget(index(), 1, panels().length) === undefined}
-            onSelect={() => move(definition.id, index(), 1)}
+            disabled={!canMove(definition.id, 1)}
+            onSelect={() => moveTo(definition.id, 1)}
           >
             Move down
           </Menu.Item>
           <Menu.Separator />
-          {/* `removePanel` rather than `unplacePanel`: home is the only placement this build draws,
-              so an unplaced panel would be unreachable rather than filed. When a second placement
-              lands this becomes "Remove from here" beside a delete.
-
-              Still no confirmation, and the editor has since made a definition worth more
-              than it was — filters, a sort, a projection. The ceiling is one misclick costing a
-              minute of re-composing. Upgrade path: `createArmedConfirm` (ui/confirm.ts), which is
-              already what every other destructive row in the app uses. */}
-          <Menu.Item context={menu} tone="danger" onSelect={() => removePanel(definition.id)}>Remove</Menu.Item>
+          {/* REMOVE AND DELETE ARE TWO DIFFERENT THINGS now that a panel can be placed in more than
+              one surface (docs/dashboards.md § Placements). Taking a board off Home must not destroy
+              the definition the same board renders from in a task pane. */}
+          <Menu.Item context={menu} onSelect={() => unplacePanel(props.scope, definition.id)}>
+            Remove from here
+          </Menu.Item>
+          {/* Armed, because the editor has made a definition genuinely expensive to recompose —
+              filters, a sort, a projection, a whole mapping matrix — and one misclick used to cost
+              all of it. The idiom every other destructive row in the app uses. */}
+          <Menu.Item
+            context={menu}
+            tone="danger"
+            closeOnSelect={confirmDelete.armed() === definition.id}
+            onSelect={() => {
+              if (confirmDelete.request(definition.id)) removePanel(definition.id)
+            }}
+          >
+            {confirmDelete.armed() === definition.id ? 'Delete — press again' : 'Delete panel'}
+          </Menu.Item>
         </>
       )}
     </Menu>
@@ -93,6 +380,37 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
     </Button>
   )
 
+  // ── Rendering ───────────────────────────────────────────────────────────────────────────────
+  //
+  // CSS grid does the pixel math: 12 columns, rows one square cell tall, each panel at an explicit
+  // `grid-area` from its rect. The collapsed state simply stops emitting the areas, so the browser
+  // stacks them in document order — which `placements` is kept sorted to on every commit.
+
+  const areaStyle = (id: PanelId): JSX.CSSProperties => {
+    const rect = layout().rects[id]
+    if (collapsed() || !rect) return {}
+    return { 'grid-area': `${rect.y + 1} / ${rect.x + 1} / span ${rect.h} / span ${rect.w}` }
+  }
+
+  const slotStyle = (id: PanelId): JSX.CSSProperties => {
+    const active = gesture()
+    const offset = active?.id === id ? active.offset : undefined
+    return {
+      ...areaStyle(id),
+      ...(offset ? { transform: `translate(${offset.x}px, ${offset.y}px)` } : {}),
+    }
+  }
+
+  const handle = (id: PanelId, edge: 'e' | 's' | 'se') => (
+    <div
+      class={`dash-resize dash-resize-${edge}`}
+      // Not a button: it is a grabbable edge, and the keyboard path to the same outcome is the
+      // menu's layout mode rather than nine tab stops per panel.
+      aria-hidden="true"
+      onPointerDown={(event) => beginResize(id, edge, event)}
+    />
+  )
+
   return (
     <Show when={panels().length || collections().length}>
       <section class="dash-placement">
@@ -102,13 +420,60 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
           <SectionHeader level="group" actions={<Show when={collections().length}>{addButton()}</Show>}>
             Panels
           </SectionHeader>
-          <div class="dash-grid">
+          <div
+            class="dash-grid"
+            ref={gridEl}
+            style={{ '--dash-cell': `${cell()}px`, '--dash-pitch': `${pitch()}px` }}
+            {...(collapsed() ? { 'data-collapsed': '' } : {})}
+          >
+            {/* Visible ONLY while a gesture is live — it appears on arm and vanishes on release,
+                iOS-widget style. Nothing about the layout is discoverable chrome until a gesture
+                makes it relevant. */}
+            <Show when={gesture()}>
+              <div class="dash-grid-overlay" aria-hidden="true" />
+            </Show>
             <For each={panels()}>
-              {(definition, index) => (
-                <Panel definition={definition} actions={chrome(definition, index)} />
+              {(definition) => (
+                <div
+                  class="dash-slot"
+                  ref={(el) => {
+                    slots.set(definition.id, el)
+                    onCleanup(() => slots.delete(definition.id))
+                  }}
+                  style={slotStyle(definition.id)}
+                  tabindex={-1}
+                  {...(gesture()?.id === definition.id ? { 'data-gesture': gesture()!.kind } : {})}
+                  {...(keyboardGesture()?.id === definition.id
+                    ? {
+                      'aria-roledescription': 'movable panel',
+                      'aria-label': `${definition.title}. Arrows move, shift and arrows resize, Enter to finish, Escape to cancel.`,
+                    }
+                    : {})}
+                  onKeyDown={(event) => onSlotKeyDown(definition.id, event)}
+                  onBlur={() => onSlotBlur(definition.id)}
+                >
+                  <Panel
+                    definition={definition}
+                    actions={chrome(definition)}
+                    headProps={collapsed()
+                      ? {}
+                      : { onPointerDown: (event: PointerEvent) => beginDrag(definition.id, event) }}
+                  />
+                  <Show when={!collapsed()}>
+                    {handle(definition.id, 'e')}
+                    {handle(definition.id, 's')}
+                    {handle(definition.id, 'se')}
+                  </Show>
+                </div>
               )}
             </For>
+            {/* The candidate cells, under the panel that is floating above them. Same dashed
+                language as the overlay, so a drag reads as one thing. */}
+            <Show when={gesture()?.kind === 'move'}>
+              <div class="dash-placeholder" aria-hidden="true" style={areaStyle(gesture()!.id)} />
+            </Show>
           </div>
+          <div class="dash-live" aria-live="polite">{announcement()}</div>
         </Show>
 
         <Show when={editing()}>
@@ -120,7 +485,8 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
               onSave={(panel) => {
                 savePanel(panel)
                 // Placed only when it is not already here. An edit that re-placed the panel would
-                // silently move it to the end of the grid every time somebody changed its title.
+                // silently move it to the end of the grid every time somebody changed its title —
+                // and now would also throw away its rect.
                 if (!panels().some((entry) => entry.id === panel.id)) placePanel(props.scope, panel.id)
               }}
             />

@@ -5,7 +5,7 @@ import type {
 } from '@acorn/protocol/collections.ts'
 import { Registry } from './registry'
 
-// A typed set of records a panel can be composed over (docs/future/dashboards/data-contract.md).
+// A typed set of records a panel can be composed over (docs/dashboards.md § Collections).
 //
 // Two feeders, one registry, exactly as `nodeStats` and `attention` have: a COMPILED plugin registers
 // through `ctx.collections` with a fetch of its own, and a LOADED plugin declares `collections` in its

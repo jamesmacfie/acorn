@@ -298,7 +298,7 @@ describe('value mapping onto the user’s own columns', () => {
 
   it('keeps a reserved writeValue when the values under it are emptied', () => {
     // Read-only today; the shape has to survive being edited or it is not reserved at all
-    // (composition.md § Write-back).
+    // (docs/future/dashboards/write-back.md).
     const reserved: PanelMapping = {
       columns: todoColumns,
       bySource: { 'github:pulls-mine': { c4: { values: ['ready'], writeValue: 'merged' } } },
@@ -337,6 +337,73 @@ describe('the value-mapping suggestion', () => {
     const cold: PanelSourcePage = { query: linearQuery, schema: { fields: [] }, rows: [] }
     expect(statusValuesOf(cold, undefined)).toEqual([])
     expect(statusValuesOf(linear, undefined).map((value) => value.label)).toEqual(['Todo', 'In progress', 'Done'])
+  })
+})
+
+describe('the fields the user invented', () => {
+  // The exact case the role ceiling was recorded against: github's `repo` and linear's `identifier`
+  // are both text, both useful on a mixed board, and neither carries a role.
+  const withRef: PanelMapping = {
+    ...todoBoard,
+    extraFields: [{ id: 'ref', label: 'Ref', type: 'text' }],
+    fields: {
+      'github:pulls-mine': { ref: 'repo' },
+      'linear:issues-mine': { ref: 'identifier' },
+    },
+  }
+
+  it('engages the mapping layer even over one source', () => {
+    expect(isMapped([githubQuery], { extraFields: [{ id: 'ref', label: 'Ref', type: 'text' }] })).toBe(true)
+    expect(isMapped([githubQuery], {})).toBe(false)
+  })
+
+  it('appears in the panel schema after the five roles, with the type the user chose', () => {
+    const fields = panelSchema(sources, withRef).fields
+    expect(fields.map((field) => field.id)).toEqual(['title', 'status', 'assignee', 'updated', 'url', 'ref'])
+    expect(fields.find((field) => field.id === 'ref')).toEqual({ id: 'ref', name: 'Ref', type: 'text' })
+  })
+
+  it('is populated per source from the field each one was pointed at', () => {
+    const rows = unionRows(sources, withRef)
+    expect(rows.map((entry) => entry.values.ref)).toEqual(['acme/app', 'acme/app', 'ENG-7', 'ENG-9'])
+  })
+
+  it('has no role to fall back on, so an unanswered source leaves it empty rather than guessing', () => {
+    const guessless: PanelMapping = { ...withRef, fields: { 'github:pulls-mine': { ref: 'repo' } } }
+    expect(sourceFieldFor(linear, 'ref', guessless)).toBeUndefined()
+    expect(unionRows(sources, guessless).map((entry) => entry.values.ref))
+      .toEqual(['acme/app', 'acme/app', undefined, undefined])
+  })
+
+  it('offers only source fields of its declared type, the same rule a role field gets', () => {
+    expect(candidateFieldsFor(github, 'ref', withRef).map((field) => field.id)).toEqual(['title', 'repo'])
+    const dated: PanelMapping = { extraFields: [{ id: 'when', label: 'When', type: 'datetime' }] }
+    expect(candidateFieldsFor(github, 'when', dated).map((field) => field.id)).toEqual(['updated'])
+  })
+
+  it('offers nothing for a field id nothing declares, rather than every field', () => {
+    expect(candidateFieldsFor(github, 'ghost', withRef)).toEqual([])
+  })
+
+  it('sorts and filters through the ordinary shaping layer, with no second path', () => {
+    const rows = shapeRows(unionRows(sources, withRef), panelSchema(sources, withRef), {
+      filters: [{ field: 'ref', op: 'contains', value: 'ENG' }],
+    })
+    expect(ids(rows)).toEqual(['linear:issues-mine:ENG-7', 'linear:issues-mine:ENG-9'])
+  })
+
+  it('drops its per-source answers when the field itself is removed', () => {
+    const pruned = pruneMapping({ ...withRef, extraFields: [] }, [githubQuery, linearQuery])
+    expect(pruned?.extraFields).toBeUndefined()
+    expect(pruned?.fields).toBeUndefined()
+  })
+
+  it('drops a definition with no id or no label — the pair IS the field', () => {
+    const pruned = pruneMapping(
+      { extraFields: [{ id: 'ok', label: 'Ok', type: 'text' }, { id: '', label: 'x', type: 'text' }] },
+      [githubQuery],
+    )
+    expect(pruned?.extraFields).toEqual([{ id: 'ok', label: 'Ok', type: 'text' }])
   })
 })
 

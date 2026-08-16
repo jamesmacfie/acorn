@@ -23,6 +23,12 @@ describe('no phantom tokens', () => {
       // rather than a computed width or a grid template is what keeps the SHAPE in the stylesheet
       // where a style pack can reach it.
       '--meter-value', '--kv-extra-cols',
+      // The dashboard grid's measured square-cell size and its cell-to-cell pitch, written inline by
+      // PanelGrid's ResizeObserver. They carry a MEASUREMENT, not a design decision — the shape
+      // (twelve columns, the gap, the overlay's lattice) all stays in dashboards.css, which is what
+      // keeps a style pack in charge of it. Declared there too as a pre-measure fallback, but on
+      // `.dash-grid` rather than `:root`, which this scanner does not read.
+      '--dash-cell', '--dash-pitch',
     ])
 
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]

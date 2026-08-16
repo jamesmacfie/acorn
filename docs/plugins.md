@@ -963,9 +963,12 @@ kinds of contribution come out of one manifest:
     contribution whose route answered — the same rule as `refResolvers`' `providerId`, for the same
     reason. A mixed board routes clicks on that stamp.
   - **A row action takes the context-free verb set only.** A panel row has no rail row to promote and
-    no routed project to substitute, so `createTask` and `navigate` are not in the union. There is no
-    `risk`/`confirm` key yet, which is why v1 ships no destructive row action; the growth path is an
-    additive optional field on that action, with the *host* rendering the confirmation.
+    no routed project to substitute, so `createTask` and `navigate` are not in the union. An action
+    may declare an optional `risk` tier — `read` | `write` | `execute`, the same vocabulary an agent
+    tool uses — and anything above `read` is armed: the *host* draws the confirmation from the tier
+    and dispatches nothing until it is accepted. Never a new verb, and never plugin-drawn
+    confirmation UI, because a plugin that could draw its own dialog could draw a reassuring one over
+    a destructive call.
 
   A collection may also declare `params`: up to eight named inputs, each `text` or `enum`. The host
   renders one control per param in the panel editor and appends the values to the route as query

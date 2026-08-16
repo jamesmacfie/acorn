@@ -7,7 +7,7 @@ import type { PanelView } from '../model'
 
 /** What every view is handed. Rows arrive already shaped and fields already projected — the shaping
  *  layer runs once per panel, not once per view, which is what lets a person flip between views
- *  without losing their filters (composition.md § The four layers). */
+ *  without losing their filters (docs/dashboards.md § Panels). */
 export type PanelViewProps = {
   view: PanelView
   schema: PluginCollectionSchema

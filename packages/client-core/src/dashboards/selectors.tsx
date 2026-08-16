@@ -1,15 +1,17 @@
 import { For, Match, Show, Switch } from 'solid-js'
-import type {
-  PluginCollectionCell,
-  PluginCollectionField,
-  PluginCollectionParam,
+import {
+  COLLECTION_FIELD_TYPES,
+  type PluginCollectionCell,
+  type PluginCollectionField,
+  type PluginCollectionFieldType,
+  type PluginCollectionParam,
 } from '@acorn/protocol/collections.ts'
 import { Checkbox, Input, Select } from '../ui/primitives'
 import { operatorLabel, operatorsForField } from './editor'
 import type { PanelFilterOp, PanelMappingColumnDef, PanelTone } from './model'
 
 // SELECTORS: the typed, data-aware config inputs the generated editor is composed from
-// (docs/future/dashboards/composition.md § The generated editor). Each one knows the schema it draws
+// (docs/dashboards.md § The generated editor). Each one knows the schema it draws
 // from, so the editor's choices are valid BY CONSTRUCTION — there is no control here that can
 // produce an invalid panel and then complain about it.
 //
@@ -138,7 +140,7 @@ export function ValueInput(props: {
 }
 
 /** "Map these values onto those" — the selector the design names for the mapping step
- *  (composition.md § The generated editor), and the reason the whole matrix is one control repeated
+ *  (docs/dashboards.md § The generated editor), and the reason the whole matrix is one control repeated
  *  rather than a bespoke drag surface.
  *
  *  The empty option is a REAL destination, not a null state: a value that lands in no column goes
@@ -190,6 +192,39 @@ const TONE_LABELS: Record<PanelTone, string> = {
   ok: 'Good',
   warn: 'Attention',
   bad: 'Bad',
+}
+
+/** The TYPE of a field the user invented (model.ts § PanelFieldDef).
+ *
+ *  The wire's own seven, not a reduced set: an invented field renders, sorts, filters and groups
+ *  through exactly the same machinery a declared one does, so narrowing the choice here would create
+ *  a second class of field for no reason. It is the one place in the editor where a person picks a
+ *  field TYPE rather than a field — because there is no source to read it from. */
+export function FieldTypeSelect(props: {
+  value: PluginCollectionFieldType
+  onChange: (type: PluginCollectionFieldType) => void
+  ariaLabel: string
+}) {
+  return (
+    <Select
+      size="sm"
+      aria-label={props.ariaLabel}
+      value={props.value}
+      onChange={(event) => props.onChange(event.currentTarget.value as PluginCollectionFieldType)}
+    >
+      <For each={COLLECTION_FIELD_TYPES}>{(type) => <option value={type}>{FIELD_TYPE_LABELS[type]}</option>}</For>
+    </Select>
+  )
+}
+
+const FIELD_TYPE_LABELS: Record<PluginCollectionFieldType, string> = {
+  text: 'Text',
+  number: 'Number',
+  boolean: 'Yes / no',
+  datetime: 'Date',
+  enum: 'Status',
+  person: 'Person',
+  link: 'Link',
 }
 
 /** A collection's declared param. The host renders the input and hands the value back OPAQUELY — the

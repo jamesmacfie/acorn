@@ -111,7 +111,7 @@ describe('retargeting and re-operating a filter', () => {
 
 describe('the view and group-by selectors', () => {
   it('offers board only where there is something with finite values to group by', () => {
-    expect(viewsFor({ schema })).toEqual(['stat', 'list', 'table', 'board'])
+    expect(viewsFor({ schema })).toEqual(['stat', 'list', 'table', 'board', 'chart'])
     expect(viewsFor({ schema: { fields: [field('title')] } })).toEqual(['stat', 'list', 'table'])
     // A response-only collection that has never been read promises nothing.
     expect(viewsFor(undefined)).toEqual(['stat', 'list', 'table'])
@@ -123,7 +123,7 @@ describe('the view and group-by selectors', () => {
     // meaningful — so until the last page is read out of the node's cache there is no board and no
     // filter to offer. With it, the editor sees exactly what the panel sees.
     expect(schemaOf(undefined, schema)).toEqual(schema)
-    expect(viewsFor(undefined, schema)).toEqual(['stat', 'list', 'table', 'board'])
+    expect(viewsFor(undefined, schema)).toEqual(['stat', 'list', 'table', 'board', 'chart'])
     // An empty answer is not an answer: fall back to whatever was declared.
     expect(schemaOf({ schema }, { fields: [] })).toEqual(schema)
     expect(schemaOf(undefined, { fields: [] }).fields).toEqual([])

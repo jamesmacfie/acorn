@@ -6,6 +6,7 @@ import {
   emptyDashboards,
   hydrateDashboards,
   HOME_PLACEMENT,
+  layoutAt,
   panelsAt,
   parseDashboards,
   parsePanelDefinition,
@@ -13,6 +14,7 @@ import {
   placementScopeKey,
   removePanel,
   savePanel,
+  setLayoutAt,
   unplacePanel,
 } from './persist'
 
@@ -52,6 +54,7 @@ describe('codec', () => {
         }),
       },
       placements: { home: ['p1'] },
+      layouts: { home: { p1: { x: 6, y: 2, w: 6, h: 4 } } },
     }
     expect(parseDashboards(JSON.stringify(dashboardsSlice.codec.serialize(state)))).toEqual(state)
   })
@@ -131,6 +134,26 @@ describe('codec', () => {
     })
   })
 
+  it('round-trips the fields the user invented, and drops one it could not render', () => {
+    const parsed = parsePanelDefinition({
+      ...panel('p1'),
+      mapping: {
+        extraFields: [
+          { id: 'ref', label: 'Ref', type: 'text' },
+          // Every view dispatches on the type, so one this build does not draw is not a field.
+          { id: 'weird', label: 'Weird', type: 'duration' },
+          { id: 'nameless', type: 'text' },
+          'nope',
+        ],
+        fields: { 'github:pulls-mine': { ref: 'repo' } },
+      },
+    })
+    expect(parsed?.mapping).toEqual({
+      extraFields: [{ id: 'ref', label: 'Ref', type: 'text' }],
+      fields: { 'github:pulls-mine': { ref: 'repo' } },
+    })
+  })
+
   it('keeps no mapping at all when there is nothing in it', () => {
     expect(parsePanelDefinition({ ...panel('p1'), mapping: {} })?.mapping).toBeUndefined()
     expect(parsePanelDefinition({ ...panel('p1'), mapping: 'nope' })?.mapping).toBeUndefined()
@@ -150,6 +173,143 @@ describe('codec', () => {
       shaping: { filters: [{ field: 'a', op: 'sideways' }, { field: 'b', op: 'eq', value: 1 }], sort: 'nope', limit: -4 },
     })
     expect(parsed?.shaping).toEqual({ filters: [{ field: 'b', op: 'eq', value: 1 }] })
+  })
+})
+
+describe('the geometry codec', () => {
+  it('an old blob with no layouts key parses, which is the whole migration', () => {
+    const parsed = parseDashboards({ panels: { p1: panel('p1') }, placements: { home: ['p1'] } })
+    expect(parsed.layouts).toEqual({})
+  })
+
+  it('drops a malformed rect rather than repairing it into place', () => {
+    const parsed = parseDashboards({
+      panels: {},
+      placements: {},
+      layouts: { home: { ok: { x: 0, y: 0, w: 6, h: 4 }, partial: { x: 0, y: 0, w: 6 }, junk: 'nope', nan: { x: 0, y: 0, w: NaN, h: 2 } } },
+    })
+    expect(parsed.layouts.home).toEqual({ ok: { x: 0, y: 0, w: 6, h: 4 } })
+  })
+
+  it('clamps a rect into the columns and floors it to whole cells', () => {
+    const parsed = parseDashboards({
+      panels: {},
+      placements: {},
+      layouts: { home: { a: { x: 10.6, y: -3, w: 99, h: 2.9 } } },
+    })
+    // Width loses first, then x follows it: a rect wider than the grid must not be pushed off the
+    // left edge to make room for itself.
+    expect(parsed.layouts.home.a).toEqual({ x: 0, y: 0, w: 12, h: 2 })
+  })
+
+  it('retains a rect for a panel that is not placed in that scope', () => {
+    // Same class of thing as an unknown pane id. It costs bytes; dropping it would make a
+    // partially-written blob destructive.
+    const parsed = parseDashboards({
+      panels: { p1: panel('p1') },
+      placements: { home: ['p1'] },
+      layouts: { home: { p1: { x: 0, y: 0, w: 6, h: 4 }, elsewhere: { x: 6, y: 0, w: 6, h: 4 } } },
+    })
+    expect(Object.keys(parsed.layouts.home)).toEqual(['p1', 'elsewhere'])
+  })
+
+  it('keeps geometry per (scope, panel), so one panel in two places has two rects', () => {
+    const parsed = parseDashboards({
+      panels: { p1: panel('p1') },
+      placements: { home: ['p1'], 'pane/pr': ['p1'] },
+      layouts: { home: { p1: { x: 0, y: 0, w: 12, h: 4 } }, 'pane/pr': { p1: { x: 0, y: 0, w: 4, h: 8 } } },
+    })
+    expect(parsed.layouts.home.p1.w).toBe(12)
+    expect(parsed.layouts['pane/pr'].p1.w).toBe(4)
+  })
+})
+
+describe('the arranged layout', () => {
+  it('auto-places every panel of an old blob, in order', () => {
+    hydrateDashboards({
+      panels: { a: panel('a'), b: panel('b') },
+      placements: { home: ['a', 'b'] },
+      layouts: {},
+    })
+    const layout = layoutAt(HOME_PLACEMENT)
+    expect(layout.rects.a).toEqual({ x: 0, y: 0, w: 4, h: 4 })
+    expect(layout.rects.b).toEqual({ x: 4, y: 0, w: 4, h: 4 })
+  })
+
+  it('sizes a panel by its view kind, so a board arrives full width', () => {
+    hydrateDashboards({
+      panels: { a: panel('a', { view: { kind: 'board' } }) },
+      placements: { home: ['a'] },
+      layouts: {},
+    })
+    expect(layoutAt(HOME_PLACEMENT).rects.a).toEqual({ x: 0, y: 0, w: 12, h: 4 })
+  })
+
+  it('auto-places only the panel that has no rect', () => {
+    hydrateDashboards({
+      panels: { a: panel('a'), b: panel('b') },
+      placements: { home: ['a', 'b'] },
+      layouts: { home: { a: { x: 0, y: 0, w: 8, h: 3 } } },
+    })
+    const layout = layoutAt(HOME_PLACEMENT)
+    expect(layout.rects.a).toEqual({ x: 0, y: 0, w: 8, h: 3 })
+    expect(layout.rects.b).toEqual({ x: 8, y: 0, w: 4, h: 4 })
+  })
+
+  it('ignores a retained rect whose panel is not placed here', () => {
+    hydrateDashboards({
+      panels: { a: panel('a') },
+      placements: { home: ['a'] },
+      layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 }, ghost: { x: 4, y: 0, w: 8, h: 4 } } },
+    })
+    expect(Object.keys(layoutAt(HOME_PLACEMENT).rects)).toEqual(['a'])
+  })
+
+  it('reading it never rewrites the stored blob', () => {
+    const stored = { home: { a: { x: 3, y: 9, w: 4, h: 4 } } }
+    hydrateDashboards({ panels: { a: panel('a') }, placements: { home: ['a'] }, layouts: stored })
+    // Gravity moved it for the render; nothing was written back. A client that only LOOKS at a board
+    // must not be the one that changes it for every other client paired with the node.
+    expect(layoutAt(HOME_PLACEMENT).rects.a).toEqual({ x: 3, y: 0, w: 4, h: 4 })
+    expect(dashboards().layouts).toEqual(stored)
+  })
+})
+
+describe('committing a gesture', () => {
+  it('writes the rects and rewrites the placement to reading order', () => {
+    hydrateDashboards({
+      panels: { a: panel('a'), b: panel('b') },
+      placements: { home: ['a', 'b'] },
+      layouts: {},
+    })
+    setLayoutAt(HOME_PLACEMENT, {
+      order: ['a', 'b'],
+      rects: { a: { x: 0, y: 4, w: 6, h: 4 }, b: { x: 0, y: 0, w: 6, h: 4 } },
+    })
+    // `b` is now the top row, so it is first — which is what an old client with no rects renders,
+    // and what a screen reader reads.
+    expect(dashboards().placements.home).toEqual(['b', 'a'])
+    expect(dashboards().layouts.home.a).toEqual({ x: 0, y: 4, w: 6, h: 4 })
+  })
+
+  it('leaves the geometry of every other scope alone', () => {
+    hydrateDashboards({
+      panels: { a: panel('a') },
+      placements: { home: ['a'], 'pane/pr': ['a'] },
+      layouts: { 'pane/pr': { a: { x: 0, y: 0, w: 4, h: 8 } } },
+    })
+    setLayoutAt(HOME_PLACEMENT, { order: ['a'], rects: { a: { x: 6, y: 0, w: 6, h: 2 } } })
+    expect(dashboards().layouts['pane/pr'].a).toEqual({ x: 0, y: 0, w: 4, h: 8 })
+  })
+
+  it('deleting a panel takes its geometry with it', () => {
+    hydrateDashboards({
+      panels: { a: panel('a') },
+      placements: { home: ['a'] },
+      layouts: { home: { a: { x: 0, y: 0, w: 6, h: 4 } } },
+    })
+    removePanel('a')
+    expect(dashboards().layouts.home).toEqual({})
   })
 })
 
@@ -182,7 +342,7 @@ describe('the store', () => {
   })
 
   it('skips a placed id with no definition rather than rendering a hole', () => {
-    hydrateDashboards({ panels: {}, placements: { home: ['ghost'] } })
+    hydrateDashboards({ ...emptyDashboards(), placements: { home: ['ghost'] } })
     expect(panelsAt(HOME_PLACEMENT)).toEqual([])
   })
 

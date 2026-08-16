@@ -4,9 +4,15 @@ import type {
   PluginCollectionRow,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
-import { panelSourceKey, type PanelMapping, type PanelMappingColumn, type PanelQuery } from './model'
+import {
+  panelSourceKey,
+  type PanelFieldDef,
+  type PanelMapping,
+  type PanelMappingColumn,
+  type PanelQuery,
+} from './model'
 
-// THE MAPPING LAYER (docs/future/dashboards/composition.md § The four layers) — the layer that sits
+// THE MAPPING LAYER (docs/dashboards.md § The mapping layer, and cross-source panels) — the layer that sits
 // between queries and shaping, is owned by the host, and is entirely declarative.
 //
 // It exists for one scenario: a personal todo board whose columns are the user's own invention,
@@ -19,7 +25,7 @@ import { panelSourceKey, type PanelMapping, type PanelMappingColumn, type PanelQ
 // Three sub-layers, in the order they apply to a row:
 //
 //   FIELD MAPPING   per source, which of its fields feeds each panel-local field. Pre-filled from
-//                   the declared ROLES — which is the only reason roles exist (data-contract.md).
+//                   the declared ROLES — which is the only reason roles exist (docs/dashboards.md § The two vocabularies).
 //   VALUE MAPPING   per source, which of its enum values land in each of the panel's columns.
 //   DERIVED ENUM    the columns themselves: ids and labels the user invented, belonging to no plugin.
 //
@@ -40,9 +46,10 @@ export type PanelSourcePage = {
 // about, so it is the only thing the host can align without asking. github's `repo` and linear's
 // `identifier` are both text and both useful, and neither has a panel-local home.
 //
-// Five panel fields, fixed. The upgrade path is a user-invented panel field with a per-
-// source picker — the same matrix this file already renders, one row longer — the day someone wants
-// a mixed board column that no role describes.
+// Five ROLE fields, fixed — and beside them, however many the user invented (`mapping.extraFields`,
+// model.ts § PanelFieldDef). The roles are what the host can align WITHOUT ASKING; an invented field
+// is the same matrix one row longer, with the person answering the question the role would have
+// answered. Nothing about the wire changed to allow it.
 
 const ROLE_FIELDS = [
   { id: 'title', name: 'Title', type: 'text', role: 'title' },
@@ -59,14 +66,27 @@ export const PANEL_FIELDS: readonly PluginCollectionField[] = ROLE_FIELDS
 /** The panel-local field the derived enum lives on, and therefore what a mapped board groups by. */
 export const PANEL_STATUS_FIELD_ID = 'status'
 
+const asField = (definition: PanelFieldDef): PluginCollectionField =>
+  ({ id: definition.id, name: definition.label, type: definition.type })
+
+/** THE panel-local vocabulary for a given mapping: the five roles, then whatever the user invented,
+ *  in the order they declared it. Everything downstream — the schema, the union, the editor's matrix
+ *  — walks this one list, so an invented field is never a special case anywhere. */
+export const panelFieldsFor = (mapping: PanelMapping | undefined): PluginCollectionField[] =>
+  [...ROLE_FIELDS, ...(mapping?.extraFields ?? []).map(asField)]
+
+/** An invented field's id is never a role's, so `undefined` here IS "this is one of the five". */
+const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): PanelFieldDef | undefined =>
+  mapping?.extraFields?.find((definition) => definition.id === panelFieldId)
+
 /** Does this panel use the mapping layer at all?
  *
- *  Two triggers, both explicit: more than one source (there is nothing to union otherwise), or
- *  declared columns (the user invented an enum even over one source). A single-collection panel with
- *  neither takes the untouched pre-mapping path — its rows and its schema pass through verbatim,
- *  which is what keeps the common case as simple as it was. */
+ *  Three triggers, all explicit: more than one source (there is nothing to union otherwise), declared
+ *  columns (the user invented an enum even over one source), or an invented field (same argument). A
+ *  single-collection panel with none of them takes the untouched pre-mapping path — its rows and its
+ *  schema pass through verbatim, which is what keeps the common case as simple as it was. */
 export const isMapped = (queries: readonly PanelQuery[], mapping: PanelMapping | undefined): boolean =>
-  queries.length > 1 || !!mapping?.columns?.length
+  queries.length > 1 || !!mapping?.columns?.length || !!mapping?.extraFields?.length
 
 // ── Field mapping ─────────────────────────────────────────────────────────────────────────────
 
@@ -84,11 +104,15 @@ export function sourceFieldFor(
   const declared = mapping?.fields?.[panelSourceKey(source.query)]?.[panelFieldId]
   if (declared !== undefined) return declared || undefined
   const role = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.role
+  // An invented field has no role, so there is nothing to fall back to and an unanswered one is
+  // simply unmapped for that source. The pre-fill is the payoff of the role vocabulary and an
+  // invented field is precisely the case where the host has no opinion to offer.
+  if (!role) return undefined
   return source.schema.fields.find((field) => field.role === role)?.id
 }
 
 /** The suggestion the host shows its work for. "Both of these collections have a status-role enum,
- *  here is a mapping" is the entire argument for the role vocabulary existing (data-contract.md), and
+ *  here is a mapping" is the entire argument for the role vocabulary existing (docs/dashboards.md § The two vocabularies), and
  *  this is where it is cashed.
  *
  *  Only fields the user has not already answered for are filled, so pressing it twice is harmless and
@@ -120,9 +144,11 @@ export function suggestFieldMapping(
 export const candidateFieldsFor = (
   source: PanelSourcePage,
   panelFieldId: string,
+  mapping?: PanelMapping | undefined,
 ): PluginCollectionField[] => {
   const type = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.type
-  return source.schema.fields.filter((field) => field.type === type)
+    ?? extraField(mapping, panelFieldId)?.type
+  return type ? source.schema.fields.filter((field) => field.type === type) : []
 }
 
 // ── Value mapping ─────────────────────────────────────────────────────────────────────────────
@@ -226,7 +252,7 @@ export function panelSchema(
   mapping: PanelMapping | undefined,
 ): PluginCollectionSchema {
   if (!isMapped(sources.map((source) => source.query), mapping)) return sources[0]?.schema ?? EMPTY_SCHEMA
-  const fields = PANEL_FIELDS.flatMap((field): PluginCollectionField[] => {
+  const fields = panelFieldsFor(mapping).flatMap((field): PluginCollectionField[] => {
     if (!sources.some((source) => sourceFieldFor(source, field.id, mapping))) return []
     if (field.id !== PANEL_STATUS_FIELD_ID) return [field]
     const columns = mapping?.columns ?? []
@@ -307,6 +333,11 @@ export function pruneMapping(
   const keys = new Set(queries.map(panelSourceKey))
   const columns = (mapping.columns ?? []).filter((column) => column.id && column.label)
   const columnIds = new Set(columns.map((column) => column.id))
+  const extraFields = (mapping.extraFields ?? []).filter((field) => field.id && field.label)
+  // The five roles plus whatever survived above: anything else a `fields` entry names is a field the
+  // person deleted, and keeping it would bring the old mapping back the day they invented a field
+  // with the same id.
+  const fieldIds = new Set([...PANEL_FIELDS.map((field) => field.id), ...extraFields.map((field) => field.id)])
 
   const bySource: Record<string, Record<string, PanelMappingColumn>> = {}
   for (const [key, entries] of Object.entries(mapping.bySource ?? {})) {
@@ -320,13 +351,16 @@ export function pruneMapping(
 
   const fields: Record<string, Record<string, string>> = {}
   for (const [key, entries] of Object.entries(mapping.fields ?? {})) {
-    if (keys.has(key) && Object.keys(entries).length) fields[key] = entries
+    if (!keys.has(key)) continue
+    const kept = Object.fromEntries(Object.entries(entries).filter(([fieldId]) => fieldIds.has(fieldId)))
+    if (Object.keys(kept).length) fields[key] = kept
   }
 
   const next: PanelMapping = {
     ...(columns.length ? { columns } : {}),
     ...(Object.keys(bySource).length ? { bySource } : {}),
     ...(Object.keys(fields).length ? { fields } : {}),
+    ...(extraFields.length ? { extraFields } : {}),
     ...(mapping.unmapped === 'hidden' ? { unmapped: 'hidden' as const } : {}),
   }
   // A panel that is not mapped has no use for any of it: the field mapping the editor pre-filled on

@@ -7,7 +7,9 @@ import { directPreferenceSlices } from '@acorn/client-core/persistence/preferenc
 import { purgeRetiredLocalStorage } from '@acorn/client-core/persistence/legacyStorage.ts'
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
 import { coreStateSlices } from '@acorn/client-core/persistence/stateSlices.ts'
+import { dashboardPaneContribution } from '@acorn/client-core/dashboards/DashboardPane.tsx'
 import { noticeKindRegistry } from '@acorn/client-core/registries/notices.ts'
+import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
 import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
 import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
@@ -29,6 +31,11 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 // ctx.persistedState — the app no longer holds a list of four plugin slices it does not own.
 for (const slice of [...coreStateSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
 pollerRegistry.register(taskStatusPollerContribution)
+// Core's own pane: a dashboard placement beside a task. Registered here rather than by a plugin
+// because the composition layer is host-owned — a plugin that shipped it would own a surface whose
+// contents belong to the user (docs/future/dashboards/refused.md § No per-plugin "dashboard"
+// contribution kind).
+paneRegistry.register(dashboardPaneContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)

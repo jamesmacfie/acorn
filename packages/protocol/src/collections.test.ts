@@ -10,7 +10,7 @@ import {
 import type { PluginCommandAction } from './pluginContract.ts'
 
 // What a loaded plugin's collection route may answer. The vocabularies are the design
-// (docs/future/dashboards/data-contract.md), so what is worth pinning is their SIZE and the two rules
+// (docs/dashboards.md § The two vocabularies), so what is worth pinning is their SIZE and the two rules
 // that make a row safe to render beside a stranger's: identity is required, and provenance is absent.
 
 const page = (over: Record<string, unknown> = {}) => pluginCollectionResponseSchema.safeParse({
@@ -86,12 +86,32 @@ describe('rows', () => {
     expect(page({ rows: [{ id: 'x', values: {}, action: { verb: 'navigate', surface: 'linear-issue' } }] }).success).toBe(false)
   })
 
+  it('takes a declared risk tier, and refuses one outside the closed set', () => {
+    // The tier is what the HOST renders its confirmation from. A plugin says how dangerous the thing
+    // is; it has no way to say what is asked, or to say nothing is.
+    const risky = (risk: unknown) =>
+      page({ rows: [{ id: 'x', values: {}, action: { verb: 'runNodeAction', path: '/plugin/b/delete', risk } }] })
+    expect(risky('execute').success).toBe(true)
+    expect(risky('write').success).toBe(true)
+    expect(risky('read').success).toBe(true)
+    expect(risky('nuclear').success).toBe(false)
+  })
+
+  it('leaves an action with no tier exactly as it was, which is every action shipped so far', () => {
+    const result = page({ rows: [{ id: 'x', values: {}, action: { verb: 'openUrl', url: 'https://github.test/p/1' } }] })
+    expect(result.success && result.data.rows[0].action).toEqual({ verb: 'openUrl', url: 'https://github.test/p/1' })
+  })
+
   it('keeps the row action union identical to the manifest context-free set', () => {
     // collections.ts re-spells `contextFreeAction` rather than importing it, because pluginContract.ts
     // imports this module for its descriptor and a value import back would be a module cycle. These two
     // assignments are the pin: either side gaining or losing a verb stops one of them compiling.
     // The path is nothing but a bounded string at this tier — confinement to the plugin's own
     // namespace is the node's parse-time job, and this package may not spell that prefix at all.
+    //
+    // `risk` is deliberately NOT on the manifest side and does not break the pin, because it is
+    // optional: a row's action is DATA a response chose per row, and how dangerous one row's action
+    // is cannot be a static declaration about the command.
     const fromManifest: PluginCommandAction = { verb: 'runNodeAction', path: '/plugin/board/act' }
     const fromRow: PluginCollectionRowAction = fromManifest
     const backAgain: PluginCommandAction = fromRow

@@ -165,11 +165,18 @@ export function ContextMenu(props: {
 }
 
 /** One action. `onSelect` fires and the menu closes — a menu item that leaves the menu open is
- *  almost always a checkbox in disguise, and none exist here yet. */
+ *  almost always a checkbox in disguise.
+ *
+ *  The one exception, and the reason `closeOnSelect` exists: ARM-TO-CONFIRM. An item whose first
+ *  press arms and whose second commits has to survive its own first press, because the confirmation
+ *  IS the item's changed label (`createArmedConfirm`, ui/confirm.ts). Closing the menu under it
+ *  would leave the armed state on a surface nobody can see. */
 Menu.Item = (props: {
   context: MenuContext
   onSelect: () => void
   disabled?: boolean
+  /** Default true. */
+  closeOnSelect?: boolean
   tone?: 'neutral' | 'danger'
   leading?: JSX.Element
   trailing?: JSX.Element
@@ -186,7 +193,7 @@ Menu.Item = (props: {
     disabled={props.disabled}
     title={props.title}
     onClick={() => {
-      props.context.close()
+      if (props.closeOnSelect !== false) props.context.close()
       props.onSelect()
     }}
   >
