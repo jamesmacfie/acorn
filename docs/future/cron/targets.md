@@ -1,8 +1,37 @@
 # Targets: what a schedule may do
 
-**Phase 3** (`README.md § build order`). A schedule row names a **kind** and a kind-shaped
-**target**. The kind vocabulary is closed and budgeted like every vocabulary here; unknown kinds in
-user rows survive inert (`engine.md § storage`).
+**Phase 3 is built.** [`docs/schedules.md § Targets`](../../schedules.md) owns what exists; this file
+is the design it was built from, kept for the arguments. Four deviations, each with its reason:
+
+1. **`node-action` needed a registry the design assumed already existed.** The design read the risk
+   tier off "the action". Nothing declares one: a `runNodeAction` chrome action has no `risk` field
+   (only a collection ROW action does), and a compiled plugin registers its chrome client-side where
+   the node cannot see it — so the picker would have been empty and untiered. The answer is
+   `ctx.nodeActions.register(...)` node-side, one line per action, mirroring the collection seam this
+   phase built anyway; loaded plugins are synthesised from manifest commands whose verb is
+   `runNodeAction`. **The wire contract did not grow**, which is the invariant that mattered. An
+   undeclared tier reads as `execute`.
+2. **A target's risk is per-instance, not per-kind.** Phase 1's `ScheduleTarget.risk` was one tier for
+   the whole vocabulary, which would either over-warn about every `node-action` or under-warn about
+   the dangerous ones. It is now a function of the parsed target, and `run` receives the row's stamp
+   so it can check the stamp still covers the current tier.
+3. **Failing closed needed a way to say "skipped".** The engine had `error`/`timeout`/`skipped`, but
+   only overlap could produce a skip. A target now throws `ScheduleSkipped`, which records the reason
+   without a backoff — a schedule refusing to run past its consent is behaving correctly.
+4. **`collection-sample` is not a user kind and has no registered target.** It is one core schedule
+   over every history-trend panel, exactly as this file describes, so nothing needed to be registered
+   in the target vocabulary at all. `plugin-run` likewise: it is the phase-2 manifest path and needed
+   nothing here.
+
+Deleting a panel deletes its history through **compaction's orphan sweep** rather than a route:
+`core:compact-history` drops series whose panel no longer appears in the prefs blob. A read that
+cannot see the blob skips the sweep entirely, because "I could not read it" must never be treated as
+"no panels exist".
+
+---
+
+A schedule row names a **kind** and a kind-shaped **target**. The kind vocabulary is closed and
+budgeted like every vocabulary here; unknown kinds in user rows survive inert (`engine.md § storage`).
 
 ## What phases 1–2 already built for this (start here)
 

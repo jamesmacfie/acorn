@@ -1,4 +1,4 @@
-import { blob, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { blob, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const syncState = sqliteTable(
   'sync_state',
@@ -306,6 +306,42 @@ export const scheduleRuns = sqliteTable(
     detail: text('detail'), // one line; e.g. '14 panels sampled' or the error
   },
   (t) => [primaryKey({ columns: [t.key, t.startedAt] })],
+)
+
+// --- Measure history: what a panel's number WAS (docs/future/dashboards/measure-history.md) ---
+//
+// The collections wire carries CURRENT ROWS ONLY. "6 open now" is derivable; "▲ 2 vs last week" is
+// not, and neither is a sparkline — there is no history anywhere in the system. Rather than growing
+// the plugin contract with a time-series obligation every provider would inherit forever (most
+// cannot answer it: GitHub does not serve "how many PRs were open last Tuesday"), the HOST records
+// what it already knows, on a schedule. Sampling is machinery over existing reads, invisible to
+// every plugin.
+//
+// Its OWN TABLE, not the `core.dashboards` prefs slice, for three reasons each sufficient: the slice
+// has a 64KB cap and this is unbounded-ish time series; every sample would rewrite and re-sync the
+// whole blob; and old clients round-trip slices by re-writing what they parsed, which would make any
+// old client a history-eraser. History is DATA WITH A RETENTION POLICY, not preferences.
+//
+// Machine-scoped like every newer app-state table. One sample per hour bucket per panel — the
+// primary key makes finer granularity unrepresentable rather than merely discouraged.
+export const dashboardMeasureSamples = sqliteTable(
+  'dashboard_measure_samples',
+  {
+    panelId: text('panel_id').notNull(),
+    // A hash of the parts of the definition that change what the measure MEANS — queries, mapping,
+    // filters, aggregate, field (@acorn/dashboards-core/signature.ts). A panel whose meaning changed
+    // must not keep its old trend: a filter added yesterday makes last week's samples a lie. The
+    // sampler computes it each pass and deletes the series when it differs, so drift is never
+    // papered over — the UI consequence is a trend that visibly restarts, which is honest.
+    signature: text('signature').notNull(),
+    // UTC hour start, epoch ms.
+    bucket: integer('bucket').notNull(),
+    value: real('value').notNull(),
+    // When the node LOOKED. Deliberately not the value's age, which is the plugin mirror's and is
+    // recorded nowhere: sampling never forces revalidation, so a sample is "what this node knew".
+    recordedAt: integer('recorded_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.panelId, t.bucket] })],
 )
 
 export const audit = sqliteTable(

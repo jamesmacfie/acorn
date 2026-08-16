@@ -16,6 +16,8 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
 import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
+import { clearCollectionReads } from '../collections/registry'
+import { clearNodeActions } from '../nodeActions/registry'
 import { runPluginScheduleRoute } from './scheduleRun'
 import type { NodePlugin, NodePluginContext, PluginStorage } from './types'
 
@@ -195,6 +197,38 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
+  // The same move for collections (../collections/registry.ts): a loaded plugin's manifest already
+  // declares an `items` route per collection, and the node-side read registry is exactly a map from
+  // `(pluginId, collectionId)` to it. Synthesised here rather than in the loader so both feeders land
+  // through `ctx.collections` — one registration path, one owner binding, one rollback.
+  //
+  // No env needed, unlike schedules: registering a POINTER costs nothing, and the env is only reached
+  // for when a read actually happens.
+  const registerManifestCollections = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
+    for (const descriptor of binding?.collections ?? []) {
+      ctx.collections.register({
+        collectionId: descriptor.id,
+        items: descriptor.items,
+        ...(descriptor.params ? { params: descriptor.params } : {}),
+      })
+    }
+  }
+
+  // A loaded plugin's schedulable actions, synthesised from the manifest's COMMANDS — the ones whose
+  // verb is `runNodeAction`, which is the only verb that means anything with nobody watching. The
+  // rest of the vocabulary opens a pane, navigates, or shows an overlay: all of them need a surface,
+  // and a schedule has none.
+  //
+  // No tier is declared on a command descriptor, so `riskOf` pins these to `execute` — the strongest
+  // confirmation, which is the direction that cannot be wrong in a way that matters. The day the
+  // descriptor grows a `risk` field, this is the one line that reads it.
+  const registerManifestNodeActions = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
+    for (const command of binding?.commands ?? []) {
+      if (command.action.verb !== 'runNodeAction') continue
+      ctx.nodeActions.register({ actionId: command.id, name: command.title, path: command.action.path })
+    }
+  }
+
   // Roll a contained plugin back to the state it was in before init: undo everything it registered,
   // let it release whatever it opened, and record why. Boot continues — that is the entire point of
   // the contained path, and the difference between "one installed plugin is broken" and "this node
@@ -237,6 +271,8 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       onUndo: (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]),
     })
     registerManifestSchedules(ctx, plugin.name, loaded)
+    registerManifestCollections(ctx, loaded)
+    registerManifestNodeActions(ctx, loaded)
     // A failing init still fails the boot — every plugin here is first-party code in the same binary, so
     // a node that cannot assemble should say so rather than run degraded. But the plugins that ALREADY
     // initialized have to be torn down first, and that is not cosmetic: each holds a WAL-mode SQLite
@@ -371,6 +407,8 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // Buffered like everything else the candidate registers: the previous instance's schedules are
       // still on the scheduler under the same keys, and registering now would throw on the duplicate.
       registerManifestSchedules(candidateCtx, name, next.binding)
+      registerManifestCollections(candidateCtx, next.binding)
+      registerManifestNodeActions(candidateCtx, next.binding)
       await next.plugin.init(candidateCtx)
     } catch (error) {
       // Nothing to roll back. The buffer was never replayed, so the previous instance is still registered
@@ -478,6 +516,11 @@ export function clearRegistrations(name: string): void {
   for (const undo of undoRegistrations.get(name) ?? []) undo()
   undoRegistrations.delete(name)
   removeAgentTools(name)
+  // A collection read is a POINTER at a route this call just removed, so it has to go with it — a
+  // survivor would have the sampler dispatching at a namespace nothing serves and recording that as
+  // an unavailable source forever.
+  clearCollectionReads(name)
+  clearNodeActions(name)
   removeContextSections(name)
   // Model adapters first: an adapter is validated against a registered connection provider, so
   // removing the provider first would strand it.

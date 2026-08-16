@@ -52,7 +52,13 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
     plugins: [...builtins.filter((plugin) => !shadowed.has(plugin.name)), ...loaded.map((entry) => entry.plugin)],
     loaded: new Map(loaded.map((entry) => [
       entry.manifest.id,
-      { permissions: entry.manifest.permissions.node, storage: entry.storage, schedules: entry.manifest.contributions.schedules },
+      {
+        permissions: entry.manifest.permissions.node,
+        storage: entry.storage,
+        schedules: entry.manifest.contributions.schedules,
+        collections: entry.manifest.contributions.collections,
+        commands: entry.manifest.contributions.commands,
+      },
     ])),
     installed,
     failures,

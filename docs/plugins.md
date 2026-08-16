@@ -1032,6 +1032,23 @@ kinds of contribution come out of one manifest:
   **rebuilt** before the node sees it. Reconciliation will not do it, and the symptom is a plugin that
   reloads fine and schedules nothing.
 
+  Two smaller node-side registries follow the same two-feeders shape, and both exist so that something
+  can happen while nobody is watching (`docs/schedules.md`):
+
+  - **`ctx.collections.register({ collectionId, items })`** — where this plugin's collection can be
+    read *from the node*. Not a second way to declare a collection: the client-side registration is
+    still what puts one in a panel editor, and this is the pointer the measure sampler dispatches
+    through. A loaded plugin registers nothing here; the host synthesises its entries from the
+    manifest's `collections` descriptors, which already carry `items`.
+  - **`ctx.nodeActions.register({ actionId, name, path, risk })`** — which of this plugin's actions a
+    person may put on a schedule, and how dangerous each one is. A loaded plugin's are synthesised
+    from its manifest **commands** whose verb is `runNodeAction`. Registering nothing means none of
+    this plugin's actions can be scheduled, which is the right default for most of them; an action
+    that declares no `risk` is treated as `execute`, so the omission fails safe rather than quiet.
+
+  Both are owner-bound by the host and cleared with everything else a plugin registered, and both
+  re-check route confinement on every call rather than only at registration.
+
   A `themes` entry is the descriptor tier taken to its limit: a **colour** theme with no route, no
   bundle and no CSS, declared as a map of the 22 palette tokens plus a `dark` flag. The host validates
   the map and generates the `:root[data-theme="plugin:<id>:<theme>"]` block itself, so nothing a plugin

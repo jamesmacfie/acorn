@@ -1,0 +1,10 @@
+{
+  // No DOM and no node types, for the same reason protocol has none: both runtimes import this
+  // package. The node's measure sampler (node-core/server/dashboards) and the renderer's panels read
+  // the SAME functions, so anything reaching for `window` or `node:` here would break one of them.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"]
+}

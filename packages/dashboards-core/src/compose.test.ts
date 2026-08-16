@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import type { PluginCollectionSchema } from '@acorn/protocol/collections.ts'
-import type { CollectionContribution } from '../registries/collections'
 import {
   collectionsForPicker,
   defaultPanelTitle,
@@ -12,13 +11,14 @@ import {
 // with no Solid plugin — so a green suite says nothing about what Home looks like. What it does say
 // is that the arithmetic and the derivations behind the menu and the picker are right.
 
-const collection = (pluginId: string, collectionId: string, name: string, schema?: PluginCollectionSchema): CollectionContribution => ({
+// The registry's contribution shape, minus the `fetch` this package has no business knowing about.
+// compose.ts reads four strings and an optional schema; that is what a fixture has to supply.
+const collection = (pluginId: string, collectionId: string, name: string, schema?: PluginCollectionSchema) => ({
   id: `${pluginId}:${collectionId}`,
   pluginId,
   collectionId,
   name,
   ...(schema ? { schema } : {}),
-  fetch: async () => ({ schema: { fields: [] }, rows: [] }),
 })
 
 describe('which views a collection may be given', () => {

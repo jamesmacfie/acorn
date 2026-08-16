@@ -1,6 +1,7 @@
 import { type NodePlugin, pullRequestSection } from '@acorn/plugin-api/node'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/actions'
+import { PULLS_COLLECTION_ID, pullsCollectionRoute } from '../contract/collections'
 import { collections } from '../server/routes/collections'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/import'
@@ -83,6 +84,15 @@ export const githubPlugin = (): NodePlugin => {
       // over (server/routes/collections.ts). Its own prefix rather than `/repos`, because a collection
       // spans every mirrored repository and is not addressed by one.
       ctx.routes.register(collections(store), { prefix: '/collections' })
+      // The COMPILED feeder for node-side collection reads (docs/future/cron/targets.md § seam 1).
+      // The client half of this registration ships a `fetch` that reads the same route over HTTP; this
+      // is the pointer that lets the measure sampler read it in-process with no client attached. Both
+      // name the one route constant the contract module exports, so they cannot drift apart.
+      ctx.collections.register({
+        collectionId: PULLS_COLLECTION_ID,
+        items: pullsCollectionRoute,
+        params: [{ id: 'repo', name: 'Repository', type: 'text' }],
+      })
       // The device-flow connect writes CORE's `integrations` row through core's own connectProvider.
       // It does not bind the machine identity: core mints that owner at boot. It touches none of this
       // plugin's tables, so it takes no handle.

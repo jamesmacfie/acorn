@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acorn/dashboards-core": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@solidjs/router": "^0.16.1",
     "@tanstack/query-async-storage-persister": "^5.101.0",
