@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { consumePaneIntent, evictPendingIntents } from './clientEvents'
 import {
   contentLinkRegistry,
+  inAppPathFor,
   learnRefPrefixes,
   openContentTarget,
+  openInAppUrl,
   openPluginContentTarget,
   parseInAppTarget,
   scanContentRefs,
@@ -12,7 +14,9 @@ import {
 import { paneRegistry } from './panes'
 import { activeRefPanel, closeRefPanel, refPanelRegistry } from './refPanels'
 import type { Disposable } from './registry'
+import { sourceRegistry } from './sources'
 import { setTaskLookup } from '../tasks/taskLookup'
+import { selectedSource, setSelectedSource } from '../tasks/tasks'
 import type { Task } from '../queries'
 
 // The pane has to be REGISTERED for a target to resolve into it, so the suite registers one. Before that
@@ -252,6 +256,187 @@ describe('the host ladder', () => {
     setTaskLookup(() => undefined)
     stoppedPanel.dispose()
     stopped.dispose()
+  })
+
+  // The third destination: a target whose plugin has a project-scoped ROUTE rather than a pane or a
+  // panel. It is what makes a dashboard row for a pull request open acorn's PR view instead of the
+  // browser, and the null case is the one that has to keep working — an untracked repo must still leave.
+  it('resolves a route for a target whose plugin declares one, and null for one it cannot place', () => {
+    const tracked = contentLinkRegistry.register({
+      id: 'test.pull-request',
+      parse: (href) => {
+        const match = /^https:\/\/example\.com\/([^/]+)\/pull\/(\d+)/.exec(href)
+        return match ? { kind: 'pr', repo: match[1], number: match[2] } : null
+      },
+      path: (target) => (target.repo === 'known' ? `/p/project-1/pulls/${String(target.number)}` : null),
+    })
+
+    expect(inAppPathFor('https://example.com/known/pull/9')).toBe('/p/project-1/pulls/9')
+    expect(inAppPathFor('https://example.com/stranger/pull/9')).toBeNull()
+    // Claimed by a recogniser that declares no route at all, and an href nobody claims.
+    expect(inAppPathFor('https://example.com/nope')).toBeNull()
+
+    tracked.dispose()
+  })
+
+  // THE REGRESSION THIS SUITE EXISTS FOR. `openInAppUrl` first asked only about `path`, which is one
+  // provider's rung, so a provider that had shipped a reference panel instead still lost every click to
+  // the browser. Each case below is a provider declaring a DIFFERENT one of the three, and none of them
+  // knows about the others.
+  describe('openInAppUrl', () => {
+    // THE RANKING. A provider that declared all three destinations, clicked from two surfaces that want
+    // different things — which is the whole argument for `prefer` existing. The route used to be tried
+    // first unconditionally, so a reader mid-review clicking a link got the surface pulled out from under
+    // them, and a dashboard row asking to GO somewhere got a glance panel instead.
+    it('honours the surface’s preference over every other rung', () => {
+      const panel = refPanelRegistry.register({ id: 'triple-ref', providerId: 'triple', component: () => null })
+      const source = sourceRegistry.register({
+        id: 'triple-source', order: 10, label: 'Triple', glyph: 'circle', component: () => null,
+        routes: [{ id: 'triple.detail', path: '/p/:projectId/triple/:item', order: 10 }],
+      })
+      const claimed = contentLinkRegistry.register({
+        id: 'test.triple',
+        providerId: 'triple',
+        parse: (href) => (href === 'https://example.com/t/ENG-1' ? { kind: 'issue', item: 'ENG-1', pane: 'board' } : null),
+        path: () => '/p/project-1/triple/ENG-1',
+      })
+      const navigated: string[] = []
+      const navigate = (to: string) => void navigated.push(to)
+
+      // A dashboard row: take me there.
+      expect(openInAppUrl('https://example.com/t/ENG-1', { taskId: 'task-1', prefer: 'route', navigate })).toBe(true)
+      expect(navigated).toEqual(['/p/project-1/triple/ENG-1'])
+      expect(activeRefPanel()).toBeNull()
+      expect(consumePaneIntent('task-1', 'board')).toBeUndefined()
+
+      // A reader inside a panel: let me glance, and do not move me.
+      expect(openInAppUrl('https://example.com/t/ENG-1', { taskId: 'task-1', prefer: 'refPanel', navigate })).toBe(true)
+      expect(activeRefPanel()).toEqual({ providerId: 'triple', displayId: 'ENG-1' })
+      expect(navigated).toHaveLength(1)
+
+      // Nobody asked: the historical order, pane first, and the route is not taken.
+      closeRefPanel()
+      expect(openInAppUrl('https://example.com/t/ENG-1', { taskId: 'task-1', navigate })).toBe(true)
+      expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'ENG-1' })
+      expect(navigated).toHaveLength(1)
+
+      claimed.dispose()
+      source.dispose()
+      panel.dispose()
+      setSelectedSource(null)
+    })
+
+    // A preference is a preference, not a demand. Every rung can be unavailable, and the fallback order
+    // is what stops a surface having to know which of the three a provider actually installed.
+    it('falls to the next rung when the preferred one is unavailable', () => {
+      const claimed = contentLinkRegistry.register({
+        id: 'test.route-only',
+        parse: (href) => (href === 'https://example.com/r-only' ? { kind: 'issue' } : null),
+        path: () => '/p/project-1/pulls/9',
+      })
+
+      // Asked for the panel; the provider has none and no pane, so the route takes it.
+      const navigated: string[] = []
+      expect(openInAppUrl('https://example.com/r-only', { prefer: 'refPanel', navigate: (to) => void navigated.push(to) })).toBe(true)
+      expect(navigated).toEqual(['/p/project-1/pulls/9'])
+
+      // Asked for the route with no navigator in scope: that rung is unreachable, and with nothing else
+      // declared the caller is told to open the browser.
+      expect(openInAppUrl('https://example.com/r-only', { prefer: 'route' })).toBe(false)
+
+      claimed.dispose()
+      setSelectedSource(null)
+    })
+
+    it('takes the route when the provider declared one', () => {
+      const navigated: string[] = []
+      const routed = contentLinkRegistry.register({
+        id: 'test.routed',
+        parse: (href) => (href === 'https://example.com/r' ? { kind: 'routed' } : null),
+        path: () => '/p/project-1/pulls/9',
+      })
+
+      expect(openInAppUrl('https://example.com/r', { navigate: (to) => navigated.push(to) })).toBe(true)
+      expect(navigated).toEqual(['/p/project-1/pulls/9'])
+      // No navigator in scope — the route is unreachable, so it is not a destination and the caller
+      // must still be told to open the browser.
+      expect(openInAppUrl('https://example.com/r')).toBe(false)
+
+      routed.dispose()
+    })
+
+    // Navigating is only HALF of arriving. The shell draws from the rail selection rather than from the
+    // location, so a route taken while another source is selected moved the URL and left the previous
+    // surface on screen — a click that did nothing at all, which is exactly how this shipped once.
+    it('selects the rail source that owns the route before navigating', () => {
+      setSelectedSource('home')
+      const source = sourceRegistry.register({
+        id: 'pulls-source', order: 10, label: 'Pulls', glyph: 'git-pull-request', component: () => null,
+        routes: [{ id: 'pulls.detail', path: '/p/:projectId/pulls/:number', order: 10 }],
+      })
+      const routed = contentLinkRegistry.register({
+        id: 'test.routed-source',
+        parse: (href) => (href === 'https://example.com/s' ? { kind: 'routed' } : null),
+        path: () => '/p/project-1/pulls/9',
+      })
+
+      expect(openInAppUrl('https://example.com/s', { navigate: () => {} })).toBe(true)
+      expect(selectedSource()).toBe('pulls-source')
+
+      routed.dispose()
+      source.dispose()
+      setSelectedSource(null)
+    })
+
+    it('leaves the rail alone for a path no source claims', () => {
+      setSelectedSource('home')
+      const routed = contentLinkRegistry.register({
+        id: 'test.routed-core',
+        parse: (href) => (href === 'https://example.com/c' ? { kind: 'routed' } : null),
+        // A core route. Core's own paths are not rail sources, and hijacking the rail for one would be
+        // a worse bug than the one this branch fixes.
+        path: () => '/settings/projects',
+      })
+
+      expect(openInAppUrl('https://example.com/c', { navigate: () => {} })).toBe(true)
+      expect(selectedSource()).toBe('home')
+
+      routed.dispose()
+      setSelectedSource(null)
+    })
+
+    it('falls to the provider’s reference panel when it declared a panel and no route', () => {
+      const panel = refPanelRegistry.register({ id: 'panelled-ref', providerId: 'panelled', component: () => null })
+      const claimed = contentLinkRegistry.register({
+        id: 'test.panelled',
+        providerId: 'panelled',
+        parse: (href) => (href === 'https://example.com/i/ENG-1' ? { kind: 'issue', item: 'ENG-1' } : null),
+      })
+
+      // A navigator is present and irrelevant: there is no route to take, and the panel needs neither
+      // it nor a task. This is the case a dashboard row for a Linear ticket hits.
+      expect(openInAppUrl('https://example.com/i/ENG-1', { prefer: 'refPanel', navigate: () => {} })).toBe(true)
+      expect(activeRefPanel()).toEqual({ providerId: 'panelled', displayId: 'ENG-1' })
+
+      claimed.dispose()
+      panel.dispose()
+    })
+
+    it('leaves a URL with no in-app destination to the browser', () => {
+      // Recognised, and nowhere to put it: no route, no panel registered for the provider, no task for
+      // a pane. A false here is what keeps the real URL opening.
+      const orphan = contentLinkRegistry.register({
+        id: 'test.orphan',
+        providerId: 'nobody',
+        parse: (href) => (href === 'https://example.com/o' ? { kind: 'issue', item: 'X-1' } : null),
+      })
+
+      expect(openInAppUrl('https://example.com/o', { prefer: 'refPanel', navigate: () => {} })).toBe(false)
+      expect(openInAppUrl('https://example.com/unclaimed')).toBe(false)
+      expect(activeRefPanel()).toBeNull()
+
+      orphan.dispose()
+    })
   })
 
   it('reports external when neither rung can take the target', () => {

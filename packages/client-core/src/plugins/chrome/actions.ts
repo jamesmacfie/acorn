@@ -3,6 +3,7 @@ import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
 import { clientEvents, openPane } from '../../registries/clientEvents'
+import { openInAppUrl } from '../../registries/contentLinks'
 import { projectSurfacePath } from '../../registries/projectSurfaces'
 import { activeTaskId } from '../../tasks/tasks'
 import { openPluginOverlay } from '../frames/overlays'
@@ -32,6 +33,10 @@ export type ChromeActionContext = {
   // The id of the command being run, for `surfaceAction` — which delivers that id to the plugin's own
   // frame. Supplied only by the command caller, which is the only click site that has one.
   commandId?: string
+  // Where an `openUrl` should land, when this click site has an opinion. Only a dashboard row does today:
+  // it is a jumping-off point rather than a place you are working, so it wants the full surface and not a
+  // panel over the top of a list you were about to leave anyway.
+  prefer?: 'route' | 'pane' | 'refPanel'
 }
 
 const toast = (pluginId: string, title: string, detail?: string): void =>
@@ -119,6 +124,21 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       // setWindowOpenHandler, which hands the URL to `openExternal` — so this opens in the owner's
       // browser and never in-app (apps/desktop/src/app/main/electron.ts).
       if (!isPluginOpenableUrl(action.url)) return toast(context.pluginId, 'refused a non-https URL')
+      // A URL acorn has its OWN surface for stays inside acorn. A dashboard row for one of my pull
+      // requests names github.com because that is the durable identity of the thing, not because the
+      // browser is where the owner wanted to end up. Which destination it gets is entirely the owning
+      // plugin's declaration (registries/contentLinks.ts § openInAppUrl); this only asks, and a URL
+      // nobody claims falls through to the browser exactly as before.
+      //
+      // The CLICK SITE chooses, never this switch and never the plugin. A dashboard row is somewhere you
+      // leave FROM, so it asks for the route; a badge or a command sits beside work in progress and asks
+      // for the glance. `refPanel` is the default because that is every caller that has not thought about
+      // it, and moving a reader who did not ask to be moved is the worse mistake.
+      if (openInAppUrl(action.url, {
+        taskId: activeTaskId(),
+        prefer: context.prefer ?? 'refPanel',
+        ...(context.navigate ? { navigate: context.navigate } : {}),
+      })) return
       window.open(action.url, '_blank', 'noopener,noreferrer')
   }
 }

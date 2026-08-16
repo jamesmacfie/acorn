@@ -4,7 +4,7 @@ import { sendRaw } from '../../apiClient'
 import { toast } from '../../notifications/toast'
 import { clientEvents, openPane } from '../../registries/clientEvents'
 import { executeCommand } from '../../registries/commands'
-import { openContentTarget, parseInAppTarget } from '../../registries/contentLinks'
+import { openInAppUrl } from '../../registries/contentLinks'
 import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../../registries/keybindings'
 import { saveJsonPref } from '../../settings/savePref'
 import { activeTaskId } from '../../tasks/tasks'
@@ -58,6 +58,9 @@ export type FrameServiceHost = {
   // Whether input focus is currently inside this frame's document. Supplied by the component that owns
   // the iframe element, because only it holds the element to compare `document.activeElement` against.
   frameHasFocus(): boolean
+  // The shell's navigator, for the route rung of a link clicked inside a frame. Supplied by the component
+  // because `useNavigate` is only callable while one is being set up.
+  navigate(to: string): void
 }
 
 /**
@@ -108,10 +111,11 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       if (taskId) openPane(taskId, paneId)
     },
     // A link inside a frame's own rendered content. The frame handed over a URL and nothing else; where
-    // it goes is decided here, on the host's side of the port, with the same two-rung ladder every shell
-    // surface uses (registries/contentLinks.ts) and the same external fall-through the descriptor
-    // `openUrl` verb takes (chrome/actions.ts). There is no third path: a frame cannot navigate the shell
-    // to an address of its choosing, only offer a URL and let the host recognise it or not.
+    // it goes is decided here, on the host's side of the port, with the same ladder every shell surface
+    // uses (registries/contentLinks.ts) and the same external fall-through the descriptor `openUrl` verb
+    // takes (chrome/actions.ts). There is no third path: a frame cannot navigate the shell to an address
+    // of its choosing, only offer a URL and let the host recognise it or not — including the route rung,
+    // where the destination comes from the OWNING plugin's recogniser and never from this frame.
     //
     // Which rung is PREFERRED comes from the surface, which is why this lives here and not in the broker:
     // this side knows what the frame is. A link clicked inside a reference panel wants to swap that
@@ -121,18 +125,21 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     // surfaces have always used. Identical reasoning to registries/refPanelHost.tsx and github's PR
     // conversation, and the frame is not consulted in either case.
     openUrl: (url) => {
-      const target = parseInAppTarget(url)
       // The BOUND task, never `activeTaskId()`, even though the shell's own content handlers use the
       // ambient one. A frame the host did not give a task is not looking at one: a project-scoped surface
       // and a ref panel both sit beside or over something that is not a task layout, while a task may well
       // still be selected in the rail behind them. Reading it here would let a link clicked on a project
       // page push a pane into a background task's PERSISTED layout, where the reader is not and will not
       // see it. With no bound task the pane rung is simply unavailable, and the URL falls to the browser.
-      const presentation = {
+      // `openInAppUrl` rather than `openContentTarget`, so the plugin's own route is a destination here
+      // too. It is the LAST one tried for a frame — the surfaces below either asked for the panel or said
+      // nothing — which is what makes a github link clicked inside a Linear issue open github's panel
+      // beside it rather than replacing the issue the reader is in the middle of.
+      if (openInAppUrl(url, {
         taskId: props.binding.taskId,
+        navigate: host.navigate,
         ...(props.binding.target === 'refPanel' ? { prefer: 'refPanel' as const } : {}),
-      }
-      if (target && openContentTarget(target, presentation) !== 'external') return
+      })) return
       // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
       // the URL to `shell.openExternal` behind the scheme allowlist — so this opens in the owner's
       // browser and never in-app, and there is no second policy to keep in step

@@ -40,7 +40,11 @@ describe('plugin-api entrypoints load in a node environment', () => {
   // Anti-vacuity, and the reason to derive the list: an exports map that stopped parsing, or a
   // BROWSER_REALM that quietly swallowed the whole package, would make every assertion below vacuous.
   it('covers every entrypoint that is not deliberately browser-realm', () => {
-    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './ui/diff', './ui/sdk'])
+    // `./testkit/client` is node-safe too, and deliberately: it is the CLIENT half of the test seam, but
+    // the suites that import it are bare-node `*.test.ts` like every other plugin suite, so a component
+    // finding its way onto that barrel would make it unloadable by the tests it exists for. Its own header
+    // states the rule; this is the check.
+    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/sdk'])
     expect([...BROWSER_REALM].every((entry) => entry in PKG.exports)).toBe(true)
   })
 

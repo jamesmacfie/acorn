@@ -77,23 +77,34 @@ export type { PollerContribution } from '@acorn/client-core/registries/pollers.t
 // provider has no panel installed here — which is why `refPanelFor` ("does a panel exist?") came off this
 // surface: the answer already arrives with the attempt, and nothing was asking it in advance.
 export { closeRefPanel, openRefPanel } from '@acorn/client-core/registries/refPanels.ts'
+// The props a first-party reference panel receives. The registry value itself stays off this surface —
+// a plugin registers through `ctx.refPanels`, which binds the provider to the plugin's own name.
+export type { RefPanelProps, RefPanelTarget } from '@acorn/client-core/registries/refPanels.ts'
 // The registry value, not just the props type: first-run onboarding hosts whichever importers are
 // registered rather than importing another plugin's component.
 export { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
 export type { ProjectImporterProps } from '@acorn/client-core/registries/projectImporters.ts'
 export type { IntegrationFlowContribution } from '@acorn/client-core/registries/integrationFlows.ts'
 export { registerCommands } from '@acorn/client-core/registries/commands.ts'
+// `openInAppUrl` is the whole "does acorn have somewhere of its own for this URL" question, for a plugin
+// SURFACE that holds one — github's reference panel offering the pull request it is showing. A plugin still
+// never names a destination: it hands over a URL and the recogniser registry answers.
 export {
   contentLinkRegistry,
   handlePluginContentLinkClick,
   learnRefPrefixes,
   linkifyRefs,
+  openInAppUrl,
   parseInAppTarget,
   REF_LINK_CLASS,
   scanContentRefs,
   splitRefTokens,
 } from '@acorn/client-core/registries/contentLinks.ts'
-export type { ContentLinkContribution } from '@acorn/client-core/registries/contentLinks.ts'
+export type { ContentLinkContribution, InAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
+// The project list from module-level code, for a content-link `path` resolver — the one caller that
+// holds no component scope and still has to ask which repos acorn tracks. Reader only: `setProjectsLookup`
+// is the composition root's and is deliberately not on this surface.
+export { allProjects } from '@acorn/client-core/projects/projectLookup.ts'
 // Batch enrichment for another plugin's items, addressed by provider. The query options only: a plugin
 // CONSUMES resolutions, it does not contribute a resolver from client code (that is a manifest row), so
 // neither the registry lookup nor the contribution type belongs on this surface.

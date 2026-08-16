@@ -5,6 +5,7 @@ client: CHECK_TONE
 client: ClientPlugin
 client: ContentLinkContribution
 client: FAILED_STATUSES
+client: InAppTarget
 client: IntegrationFlowContribution
 client: PaletteItem
 client: PaletteRowSource
@@ -22,6 +23,8 @@ client: ProjectImporterProps
 client: ProjectPatch
 client: ProjectSeed
 client: REF_LINK_CLASS
+client: RefPanelProps
+client: RefPanelTarget
 client: SourceContribution
 client: SourceRouteContribution
 client: Task
@@ -39,6 +42,7 @@ client: agentContextContributions
 client: agentSessionsFor
 client: agentToolRendererRegistry
 client: agentToolTone
+client: allProjects
 client: brandMarkRegistry
 client: bytesOf
 client: canPickFolder
@@ -84,6 +88,7 @@ client: nodeReady
 client: nodes
 client: onClosePaneWithin
 client: onScopeEvicted
+client: openInAppUrl
 client: openPane
 client: openRefPanel
 client: openRepoConfigTrust
@@ -314,6 +319,7 @@ ui/editor: watchMonacoTheme
 ui/host: Acorn
 ui/host: Concern
 ui/host: PaletteSurface
+ui/host: RefPanelTaskLink
 ui/host: registerKeybindings
 ui/host: registerWillHandler
 ui/sdk: AcornBridge

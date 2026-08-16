@@ -35,7 +35,9 @@
     "contextSections": [
       "memory.section"
     ],
-    "refPanels": [],
+    "refPanels": [
+      "github-pull"
+    ],
     "paletteRows": [
       "terminal.run",
       "workflows.defs"
@@ -140,6 +142,9 @@
       ],
       "slots": [
         "overlay/palette.pull-files"
+      ],
+      "refPanels": [
+        "github-pull"
       ],
       "persistedState": [
         "github.pr-filters"

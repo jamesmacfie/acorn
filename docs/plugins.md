@@ -813,19 +813,31 @@ kinds of contribution come out of one manifest:
   business making on a plugin's behalf. It is deliberately no richer than a sentence and a button; the
   field exists because a rail that cannot say what empty *means* pushes sources into showing a wrong
   list instead of an empty one, which is exactly what Linear did. A `contentLinks` entry uses a
-  bounded `https://` host/path grammar and delivers one captured path segment to one of **two**
+  bounded `https://` host/path grammar and delivers one captured path segment to one of **three**
   destinations: an optional **task-scoped** `openPane` from the same manifest, which receives it as a
-  `plugin:select` intent in the active task; or the plugin's own **reference panel**, shown over
-  whatever the reader was looking at. A link must have at least one of the two, or the manifest is
+  `plugin:select` intent in the active task; the plugin's own **reference panel**, shown over
+  whatever the reader was looking at; or the plugin's own **route**, which takes the reader there —
+  declared as a `path` resolver on a compiled recogniser, since only the owning plugin can turn a URL
+  into one of its addresses (`plugins/github/src/client/contentLinks.ts` resolves owner/name to a
+  project). Taking a route also selects the rail source that owns it, because the shell renders from
+  the rail rather than from the location. A link must have at least one of the two, or the manifest is
   rejected — a recogniser that matches URLs and can never open anything looks installed and is not.
   Which destination a click gets is the *clicking surface's* call and not the manifest's, because it
   depends on where the link was: a pull-request conversation asks for the panel so the reader keeps
-  their place, a note takes the pane. Either is a preference, and the host falls back to the other
-  when it is unavailable. The panel is never *named* — it is addressed by provider, the host stamps
+  their place, a note takes the pane, a dashboard row asks to be taken to the route. Each is a
+  *preference*, and the host falls through the remaining two in a fixed order when the asked-for one is
+  unavailable, so no surface has to know which destinations a given provider actually installed. The panel is never *named* — it is addressed by provider, the host stamps
   the plugin id onto every recogniser it registers, and a `refPanel`'s provider must already be the
   plugin itself, so a manifest cannot point a link at another plugin's panel. Likewise a target naming
   anything that is not a registered task pane resolves to nothing rather than pushing an unrenderable
   pane id into a task's persisted layout. A `routes` entry gives a project-scoped surface a URL. Its
+  A source may also declare **`tracksRef`** — "does this task already track this external item?" — which
+  is `taskPath` read backwards and exists for the same reason. `task.links` is not the only way a task can
+  be attached to an external item: a github-pr task records its pull request as `pullNumber` on the task
+  row, and its links hold the *Linear* tickets found in the PR body. The host asks links first, since that
+  is provider-agnostic and covers everything that seeds them, then asks every source for its own second
+  spelling. A source that has only one way of recording the relationship implements nothing.
+
   `path` is confined at parse time to the prefix the host mints from the plugin id —
   `/p/:projectId/x/<plugin-id>/` — so it cannot claim core's `/p/:projectId`, `/p/:projectId/new`, or
   another plugin's path, and a collision is a manifest error rather than a race between two loads. It

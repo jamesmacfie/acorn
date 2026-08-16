@@ -149,7 +149,16 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   // a real SQLite database and core's tables. It is test-only either way (the rule below fails a
   // production file that imports any testkit/), so this classification is about keeping the client/node
   // rule truthful rather than about who may import it.
-  if (pkg.name === '@acorn/plugin-api') return ['node', 'testkit'].includes(segment(pkg, file)) ? 'node' : 'client'
+  //
+  // Except `testkit/client.ts`, which is the test seam for CLIENT plugin code — the fixtures a content-link
+  // resolver or a panel test needs. It is classified by the half it serves, exactly like the production
+  // entrypoints one directory over, because the alternative was a client-side plugin test deep-importing
+  // client-core and being written into a baseline that is only supposed to shrink.
+  if (pkg.name === '@acorn/plugin-api') {
+    const seg = segment(pkg, file)
+    if (seg === 'testkit') return file.endsWith('/client.ts') ? 'client' : 'node'
+    return seg === 'node' ? 'node' : 'client'
+  }
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
   if (seg === 'server' || seg === 'main' || seg === 'service' || seg === 'mcp' || seg === 'wiring') return 'node'

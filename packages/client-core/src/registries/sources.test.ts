@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultSourceId, sourceRegistry, sourceRouteContributions, taskPathFromSources, type SourceContribution } from './sources'
+import { defaultSourceId, sourceRegistry, sourceRouteContributions, taskPathFromSources, taskTracksRef, type SourceContribution } from './sources'
 import type { Task } from '../queries'
 
 const source = (id: string, order: number, isDefault?: boolean): SourceContribution => ({
@@ -70,6 +70,48 @@ describe('task paths', () => {
       expect(taskPathFromSources(task('task-1'))).toBeUndefined()
     } finally {
       declines.dispose()
+    }
+  })
+})
+
+// "Is there already a task for this?" — the question a reference panel asks before offering to create
+// one, and the question that got a wrong answer the first time it was asked.
+describe('taskTracksRef', () => {
+  const linked = (links: Task['links']): Task => ({ id: 'task-1', links } as Task)
+
+  it('matches a task whose links name the same provider and identifier', () => {
+    expect(taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), { providerId: 'linear', displayId: 'ENG-42' })).toBe(true)
+    expect(taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), { providerId: 'linear', displayId: 'ENG-43' })).toBe(false)
+    // Same identifier, different provider. `ENG-42` is not a globally unique name and never was.
+    expect(taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), { providerId: 'board', displayId: 'ENG-42' })).toBe(false)
+  })
+
+  it('compares the connection only when both sides carry one', () => {
+    const task = linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }])
+    // A panel target from a scanned PR body has no connection — a body says `ENG-42`, not which of
+    // several connected Linears owns it — so requiring one would find nothing for the commonest case.
+    expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-42' })).toBe(true)
+    expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-42', connectionId: 'c1' })).toBe(true)
+    expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-42', connectionId: 'c2' })).toBe(false)
+  })
+
+  // THE BUG THIS FUNCTION EXISTS FOR. A link-only check is not enough, because a task can record an
+  // external item somewhere other than `links` — a github-pr task keeps its PR as `pullNumber` on the
+  // row, and its links hold the LINEAR tickets found in the PR body. Matching links alone found nothing
+  // and the panel offered to create a task that already existed.
+  it('asks each source for its own second spelling of the same relationship', () => {
+    const task = { id: 'task-1', links: [], pullNumber: 42 } as unknown as Task
+    const github = sourceRegistry.register({
+      id: 'test.github', order: 1, glyph: 'x', label: 'GitHub',
+      tracksRef: (t, ref) => ref.providerId === 'github' && ref.displayId === `runn/acorn#${t.pullNumber}`,
+    })
+    try {
+      expect(taskTracksRef(task, { providerId: 'github', displayId: 'runn/acorn#42' })).toBe(true)
+      expect(taskTracksRef(task, { providerId: 'github', displayId: 'runn/acorn#99' })).toBe(false)
+      // A source that declines leaves the answer where the host's own link check left it.
+      expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-1' })).toBe(false)
+    } finally {
+      github.dispose()
     }
   })
 })

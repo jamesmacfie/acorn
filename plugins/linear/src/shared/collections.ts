@@ -78,9 +78,15 @@ const rowFor = (issue: LinearProjectIssue): PluginCollectionRowBody => ({
     updated: issue.updatedAt,
     url: issue.url,
   },
-  // Linear's detail pane needs a routed project and this row has none, so the row leaves the app — the
-  // same trade the ref panel's fall-through makes. `openUrl` is in the context-free verb set precisely
-  // because it needs nothing from its click site.
+  // Linear's detail pane needs a routed project and this row has none, which is why the verb is
+  // `openUrl`: it is in the context-free set precisely because it needs nothing from its click site.
+  //
+  // That no longer means the click LEAVES the app, and this file did not change to get that. The host
+  // resolves the URL against the recognisers before opening a browser
+  // (client-core/registries/contentLinks.ts § openInAppUrl), and the two `contentLinks` rows in
+  // acorn-plugin.config.mjs already claim exactly this shape — so a ticket clicked on a dashboard opens
+  // `linear-ref` over whatever the reader was looking at, which is the right size for a glance and needs
+  // neither a task nor a project. linear.app is still where it goes if the panel is not installed here.
   action: { verb: 'openUrl', url: issue.url },
 })
 

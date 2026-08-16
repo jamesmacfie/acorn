@@ -11,10 +11,13 @@
 // exactly one provider because github was the one holding it.
 import {
   activeTaskId,
+  allProjects,
   type ContentLinkContribution,
   handlePluginContentLinkClick,
-  parseInAppTarget,
+  type InAppTarget,
 } from '@acorn/plugin-api/client'
+import { formatPullRef } from '../contract/pullRef'
+import { githubBrowsePath } from './routes'
 
 const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
 const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$/i
@@ -24,11 +27,15 @@ const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'm
 
 // Registered from client/index.ts through ctx.contribute, like every other contribution.
 //
-// Neither declares a `providerId`, and the omission is deliberate rather than an oversight now that the
-// field exists: it is what makes a link resolve into the OWNING plugin's reference panel, and github has no
-// panel — a pull request is a whole review surface, not a card you glance at. So these two targets reach the
-// project route below and nothing else. If github ever grows one, adding `providerId: 'github'` here is the
-// entire change on this side.
+// The PR recogniser declares `providerId: 'github'`, and for a while it deliberately did not. The old
+// argument was that a pull request is a whole review surface rather than a card you glance at, which is
+// true of REVIEWING one and beside the point for the question a panel answers: someone reading a Linear
+// ticket that mentions `Runn-Fast/runn#8811` wants to know what it is, not to review it. ./PullRefPanel.tsx
+// shows deliberately less than the pane and offers the pane as the next step. The old comment promised
+// that adding this field would be the entire change on this side, and it was.
+//
+// The REPO recogniser still declares none, and that part was never about panels: a repository is a list,
+// its list is the browse route below, and there is nothing glance-sized to put in an overlay.
 //
 // This used to be a module-scope loop guarded by `if (!contentLinkRegistry.entries().length)`, which
 // worked only while github was also the module that DEFINED the registry and so was guaranteed to
@@ -39,9 +46,17 @@ const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'm
 export const githubContentLinkContributions: ContentLinkContribution[] = [
   {
     id: 'github.pull-request',
+    providerId: 'github',
     parse: (href) => {
       const match = GH_PR_RE.exec(href)
-      return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3] } : null
+      // `item` is what makes the PANEL rung reachable — the host looks a reference panel up by provider
+      // and hands it `item` as the `displayId`. Spelled `owner/repo#number`, the same identity the pulls
+      // collection gives its rows, so a row, a URL and the panel cannot disagree about what they name.
+      return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3], item: formatPullRef(match[1], match[2], match[3]) } : null
+    },
+    path: (target) => {
+      const projectId = projectIdFor(target)
+      return projectId ? `${githubBrowsePath(projectId)}/${encodeURIComponent(str(target.number))}` : null
     },
   },
   {
@@ -50,48 +65,47 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
       const match = GH_REPO_RE.exec(href)
       return match && !GH_RESERVED.has(match[1].toLowerCase()) ? { kind: 'repo', owner: match[1], repo: match[2] } : null
     },
+    path: (target) => {
+      const projectId = projectIdFor(target)
+      return projectId ? githubBrowsePath(projectId) : null
+    },
   },
 ]
 
-// A delegated click handler for a PR content container. What is left here is only what is github's:
-// owner/name → project resolution, which needs the project query this pane already holds.
+const str = (value: unknown): string => (typeof value === 'string' ? value : '')
+
+// owner/name → the project acorn tracks it as, which is the whole of what makes a github.com URL
+// addressable in here. Null is the ORDINARY answer for a repo acorn does not track, and it has to stay
+// null: the fall-through documented in `makeContentLinkHandler` below is the same decision, and this
+// resolver is the second caller of it rather than a new judgement.
 //
-// Everything general — which recogniser claims the href, whether the matched item lands in a task pane
-// or the provider's reference panel, and the bare `CRA-404` anchors the host linkified into GitHub's
-// body HTML — is `handlePluginContentLinkClick`. The last of those was github's until the host learned
-// to mint the anchors itself (client-core/registries/contentLinks.ts § linkifyRefs); what it took with
-// it was the assumption that a bare id is a LINEAR id, which is why the branch here could never have
-// served a second provider.
+// CASE-INSENSITIVELY, which is the entire bug this once had. A GitHub owner and repo name are
+// case-insensitive to GitHub — `Runn-Fast/runn` and `runn-fast/runn` are one repository — and the two
+// sides of this comparison get their casing from different places: the URL carries GitHub's canonical
+// spelling (`repos.owner` in the plugin's own mirror is `Runn-Fast`), while `projects.github_owner` is
+// stored folded. An `===` here matched neither the dashboard row nor a PR link in a body, and failed
+// the way a missing project does — silently, out to the browser — so nothing pointed at the casing.
+const eq = (a: unknown, b: unknown): boolean => str(a).toLowerCase() === str(b).toLowerCase()
+
+const projectIdFor = (target: InAppTarget): string | null =>
+  allProjects().find((project) => eq(project.github?.owner, target.owner) && eq(project.github?.name, target.repo))?.id ?? null
+
+// A delegated click handler for a PR content container. It is now one host call, and everything this
+// function used to do itself has gone up into that call rather than been deleted.
 //
-// `prefer: 'refPanel'` is the request that made the move worth making. A reader half-way through a diff who
-// clicks a ticket wants to glance at it, not to have the pane under them swapped, and the panel stays over
-// the page either way (client-core/registries/refPanelHost.tsx). It is a preference: when the provider has
-// no panel installed here, the host still tries its task pane.
-export function makeContentLinkHandler(
-  navigate: (to: string) => void,
-  projectIdForGithub?: (owner: string, repo: string) => string | null | undefined,
-) {
+// It used to hold two rungs of its own. The bare `CRA-404` anchors went first, when the host learned to
+// mint them itself (client-core § linkifyRefs); what they took with them was the assumption that a bare id
+// is a LINEAR id, which is why that branch could never have served a second provider. The owner/name →
+// project → navigate rung went second, once the host's ladder grew a `route` destination — the resolution
+// stayed here, where it belongs, as the `path` on github's own recogniser above, and only the NAVIGATING
+// left. The deliberate fall-through for a repo acorn does not track survives as `projectIdFor` returning
+// null; it is still the case that a URL with no in-app home must open the real github.com one.
+//
+// `prefer: 'refPanel'` is the whole of what is left, and it is the one thing genuinely local: a reader
+// half-way through a diff who clicks a ticket wants to glance at it, not to have the surface under them
+// replaced. It is a preference, so a provider with no panel installed still gets its pane or its route.
+export function makeContentLinkHandler(navigate: (to: string) => void) {
   return (e: MouseEvent) => {
-    // Handled, and `preventDefault` already called. A false covers both "not a link the host knows" and
-    // "recognised, but nowhere in-app to put it" — the two branches below are the only ones this plugin
-    // adds before the browser gets the click.
-    if (handlePluginContentLinkClick(e, { taskId: activeTaskId(), prefer: 'refPanel' })) return
-    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-    const href = ((e.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null)?.getAttribute('href')
-    if (!href) return
-    const target = parseInAppTarget(href)
-    if (!target) return
-    const str = (value: unknown): string => (typeof value === 'string' ? value : '')
-    if (target.kind !== 'pr' && target.kind !== 'repo') return
-    const projectId = projectIdForGithub?.(str(target.owner), str(target.repo))
-    // A DELIBERATE PRODUCT DECISION, not an unfinished branch: a GitHub URL for a repo acorn does not
-    // track has no in-app destination, so the real github.com URL opens. owner/name alone stopped being a
-    // valid app route at the project cutover, and inventing a destination — importing the repo, or a
-    // read-only view of a project that does not exist — is separate work. Do not "fix" this to swallow
-    // the click.
-    if (!projectId) return
-    const suffix = target.kind === 'pr' ? `/${encodeURIComponent(str(target.number))}` : ''
-    navigate(`/p/${encodeURIComponent(projectId)}/pulls${suffix}`)
-    e.preventDefault()
+    handlePluginContentLinkClick(e, { taskId: activeTaskId(), prefer: 'refPanel', navigate })
   }
 }

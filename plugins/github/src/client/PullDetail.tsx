@@ -101,10 +101,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
   // shows its reference panel (any provider's, not just Linear's — see contentLinks.ts); GitHub PRs/repos
   // resolve through the current project's GitHub facet before entering the project-keyed SPA route.
   const navigate = useNavigate()
-  const onContentClick = makeContentLinkHandler(
-    navigate,
-    (owner, repo) => projects.data?.find((project) => project.github?.owner === owner && project.github?.name === repo)?.id,
-  )
+  const onContentClick = makeContentLinkHandler(navigate)
   // Which bare `CRA-404`-shaped tokens are safe to linkify here, and for whom. Learned from the refs
   // already CONFIRMED in this PR by their full URLs, so the prefix was witnessed rather than guessed —
   // the host owns both halves now, and it works for any provider whose links appear in a body.

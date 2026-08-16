@@ -172,6 +172,49 @@ which is why v1 ships no destructive row action at all; the growth path is an ad
 on that action with the **host** rendering the confirmation, never a new verb and never plugin-drawn
 confirmation UI.
 
+`openUrl` is not automatically a trip to the browser. Before opening one, the dispatcher asks the
+content-link registry whether the URL names something acorn has its own surface for
+(`registries/contentLinks.ts` § `openInAppUrl`). The URL stays the row's identity and the plugin
+still declares the same verb; only the destination is resolved late, by whoever owns the pattern.
+
+There are three destinations and a provider gets whichever it declared, in this order:
+
+| Declared | Destination | Who has it |
+| --- | --- | --- |
+| `path` on the recogniser | the plugin's own route | github — `/p/:projectId/pulls/:number` |
+| `providerId` + a `refPanel` frame | the reference panel, over the page | linear — `linear-ref` |
+| `openPane` on a manifest content link | a task pane, when a task is open | linear — `linear` |
+
+So a pull request row opens acorn's PR view and a Linear ticket row opens the ticket panel over the
+dashboard, and **neither plugin has any dashboard-specific code** — both had already declared these
+for content links in rendered prose, and the row click now asks the same registry. A plugin that
+ships any one of the three gets panel rows resolving for free.
+
+**The clicking surface ranks them, not the target.** A dashboard row asks for `route`: a panel row is
+a jumping-off point, and you are looking at the list precisely in order to leave it. A surface you are
+working *inside* asks for `refPanel` — a PR conversation, a reference panel, a plugin frame — because
+swapping what a reader is part-way through is the worse mistake. A caller that states nothing gets the
+historical order, pane then panel then route, so nobody is moved who did not ask to be.
+
+That ranking is the whole reason `prefer` exists. When it first shipped, a route was tried *first and
+unconditionally*, which is two wrong answers in one line: a dashboard row for a Linear ticket got a
+glance panel when the reader was asking to go there, and a GitHub link clicked inside a Linear issue
+would have torn the surface away from someone mid-sentence. The target cannot know where the reader
+is, and it was deciding anyway. Every rung stays a *preference*, because any of them can be
+unavailable — no task means no pane, no installed plugin means no panel, no navigator or no declared
+`path` means no route — so a surface never has to know which of the three a provider actually shipped.
+
+Taking a route also **selects the rail source that owns it** (`registries/sources.ts` §
+`sourceIdForPath`). The shell draws from the rail selection, not from the location — every
+contributed route mounts as a `noop` and the surface comes off the rail — so navigating from a
+dashboard to another source's route without that step moves the address bar and leaves the dashboard
+on screen. A path no source claims leaves the rail alone; core's own routes are not rail sources.
+
+A URL nothing claims, or one for a repo this install does not track, opens externally exactly as
+before — that fall-through is deliberate and is the same one a content link in a PR body takes. The
+`link`-typed cell follows the same rule for a plain left click and keeps the real `href`, so
+copy-link and modified clicks still give the browser.
+
 A loaded plugin's answer is parsed with `pluginCollectionResponseSchema` and dropped **whole** if it
 fails, logged against the offending plugin, with the panel rendering an empty page. Not per-row
 sanitising: a half-parsed collection renders some rows and silently drops the rest, so a person reads
