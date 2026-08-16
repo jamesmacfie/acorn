@@ -75,6 +75,18 @@ export type SourceContribution<Item = unknown> = {
   // This replaces core reaching into the route registry for `kind: 'detail'`. The knowledge that a task
   // with a pull number belongs at a PR URL is GitHub's, and it now lives in GitHub.
   taskPath?: (task: Task) => string | undefined
+  // The INVERSE of `taskPath`, and the same knowledge read the other way: does this task already track
+  // the thing a reference panel is showing?
+  //
+  // It exists because `task.links` is not the only way a task can be attached to an external item, and
+  // assuming it was is a bug that shipped. A github-pr task records its pull request as `pullNumber` on
+  // the task row — its `links` hold the LINEAR tickets found in the PR body — so a link-only check finds
+  // nothing for a PR and offers to create a task that already exists. Only the owning source knows the
+  // other spelling, which is exactly the argument `taskPath` already makes one field up.
+  //
+  // Host-owned link matching still runs first and covers every provider that seeds links, so a source
+  // only implements this when it has a second way of recording the same relationship.
+  tracksRef?: (task: Task, ref: { providerId?: string; displayId: string }) => boolean
   promotion?: SourcePromotion<Item>
   // There is deliberately NO `emptyState` here, unlike the descriptor twin (@acorn/protocol/api.ts §
   // PluginSourceEmptyState). A descriptor source has no component of its own — the host draws its list
@@ -101,6 +113,30 @@ export const sourceRouteContributions = (): SourceRouteContribution[] => sourceR
   .flatMap((source) => source.routes ?? [])
   .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
+// Which rail source OWNS a path, by the routes it declared.
+//
+// The shell draws from `selectedSource()`, not from the location — every contributed route is mounted as
+// a `noop` component and App picks the surface off the rail (apps/desktop § the source Switch). So
+// navigating to a source's route while a DIFFERENT source is selected changes the address bar and
+// nothing else, which is a click that appears to do nothing. Every existing caller happened to already
+// be inside the owning source — github's PR list navigating to its own detail — so the gap only showed
+// once something outside a source started minting these paths (a dashboard row's in-app link).
+//
+// ponytail: segment-count + `:param` matching, not the router's grammar. Contributed patterns are plain
+// `/p/:projectId/…` forms today; if one ever needs optional or splat segments, ask the router to match
+// instead of growing this.
+const matchesRoute = (pattern: string, path: string): boolean => {
+  const expected = pattern.split('/').filter(Boolean)
+  const actual = path.split('/').filter(Boolean)
+  return expected.length === actual.length
+    && expected.every((segment, index) => (segment.startsWith(':') ? !!actual[index] : segment === actual[index]))
+}
+
+export function sourceIdForPath(path: string): string | undefined {
+  const clean = path.split(/[?#]/)[0]
+  return sourceRegistry.entries().find((source) => source.routes?.some((route) => matchesRoute(route.path, clean)))?.id
+}
+
 // Ask every source whether it owns this task's URL. Registry order decides a tie, so two sources that both
 // claim a task resolve deterministically rather than by whichever plugin loaded first.
 export function taskPathFromSources(task: Task): string | undefined {
@@ -109,4 +145,18 @@ export function taskPathFromSources(task: Task): string | undefined {
     if (path) return path
   }
   return undefined
+}
+
+/** Does this task already track this external reference? Host-owned link matching first — it is
+ *  provider-agnostic and covers everything that seeds `links` — then each source's own second spelling. */
+export function taskTracksRef(task: Task, ref: { providerId?: string; displayId: string; connectionId?: string }): boolean {
+  // A link names a connection and a panel target usually does not: a PR body says `ENG-42`, not which of
+  // several connected Linears owns it. So the connection is compared only when BOTH sides have one, which
+  // is the same looseness every other identifier match in this area accepts — and the same reason two
+  // connected workspaces sharing a team prefix stays a known ambiguity rather than a solved one.
+  const linked = task.links.some((link) =>
+    link.providerId === ref.providerId
+    && link.identifier === ref.displayId
+    && (!ref.connectionId || link.connectionId === ref.connectionId))
+  return linked || sourceRegistry.entries().some((source) => source.tracksRef?.(task, ref) === true)
 }

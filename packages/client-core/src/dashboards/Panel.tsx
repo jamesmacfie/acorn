@@ -1,4 +1,5 @@
 import { For, Match, Show, Switch, type JSX } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import type { PluginCollectionRow } from '@acorn/protocol/collections.ts'
 import { activeNodeId } from '../node/activeNode'
 import { FRESHNESS_LABELS } from '../node/freshness'
@@ -36,6 +37,7 @@ export type PanelProps = {
 export default function Panel(props: PanelProps) {
   const data = createPanelData(() => props.definition)
   const nodeId = activeNodeId() ?? ''
+  const navigate = useNavigate()
 
   // The row's own declared verb, through the host's dispatcher — the same closed set a rail row's
   // click runs, and the same refusals. A view never acts on its own, and there is no second path.
@@ -43,7 +45,17 @@ export default function Panel(props: PanelProps) {
     if (!row.action) return
     // `pluginId` is the HOST's stamp on the row, never a field the plugin sent, so a collection
     // cannot route its clicks into a stranger's pane (plugins/chrome/data.ts § readCollection).
-    runChromeAction(row.action, { pluginId: row.pluginId, nodeId })
+    //
+    // `navigate` is what lets an `openUrl` row land on acorn's own surface for that item instead of in
+    // the browser — the dispatcher asks the recogniser registry, and a URL with no in-app route still
+    // opens externally. A panel row genuinely has no task and no routed project, which is why the row
+    // declares `openUrl` in the first place; resolving the project from the URL is the missing step.
+    //
+    // `prefer: 'route'` is the dashboard saying what it IS. A panel row is a jumping-off point — you are
+    // looking at a list precisely in order to leave it — so the full surface is the destination and a
+    // glance panel over a list you were abandoning would be the wrong shape. Surfaces you are working
+    // INSIDE ask for the opposite, and get it (plugins/github § makeContentLinkHandler).
+    runChromeAction(row.action, { pluginId: row.pluginId, nodeId, navigate, prefer: 'route' })
   }
 
   /** The sources whose collection this device can actually resolve. A panel is inert only when NONE

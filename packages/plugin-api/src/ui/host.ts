@@ -14,3 +14,9 @@ export { default as Acorn } from '@acorn/client-core/Acorn.tsx'
 // The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a
 // sandboxed frame cannot open one.
 export { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'
+// The host's own "open or create a task for this reference" control, for a first-party reference panel to
+// place in its own chrome. HOST-drawn deliberately: creating a task is a core write that makes a worktree,
+// and a plugin drawing it itself would have to hold `core.tasks:write` for its whole life to earn one
+// button (client-core/registries/RefPanelTaskLink.tsx). Host-only for the ordinary reason too — it reads
+// the shell's task and project queries and navigates.
+export { default as RefPanelTaskLink } from '@acorn/client-core/registries/RefPanelTaskLink.tsx'

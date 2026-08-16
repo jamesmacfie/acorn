@@ -1,5 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
+import { useNavigate } from '@solidjs/router'
 import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
 import { clientEvents, consumePaneIntent } from '../../registries/clientEvents'
@@ -69,6 +70,10 @@ export default function PluginFrame(props: PluginFrameProps) {
   // inside the frame's document makes this element the shell document's activeElement.
   let frameEl: HTMLIFrameElement | undefined
 
+  // For the route rung of a link a frame hands over. Taken here because `useNavigate` is only callable
+  // while a component is being set up, and the services are a plain function on purpose.
+  const navigate = useNavigate()
+
   // The bridge's fourteen effects, built from this frame's props (./frameServices.ts). Kept out of
   // this file so they can be unit-tested: the repo's client suites run in bare Node with no Solid
   // transform, so nothing in a `.tsx` file can be reached by one.
@@ -78,6 +83,7 @@ export default function PluginFrame(props: PluginFrameProps) {
     // rather than implemented over there: a click or keypress inside the frame's document makes this
     // element the shell document's activeElement.
     frameHasFocus: () => frameEl !== undefined && document.activeElement === frameEl,
+    navigate,
   })
 
   // A rail-source row that opened this pane. Retained by openPane until the pane consumes it, so a

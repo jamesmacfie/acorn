@@ -49,11 +49,16 @@
 .plugin-overlay-body { flex: 1; min-height: 0; }
 
 /* Padded body for simple form modals (matches the Integrations settings spacing). */
+/* The body is what scrolls: .overlay caps at 70vh and hides its own overflow, so a form taller than
+   that (the panel editor) would be silently clipped with its actions unreachable. min-height:0 is
+   the load-bearing half — a flex child refuses to shrink below its content without it. */
 .overlay-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   padding: var(--pane-pad);
+  min-height: 0;
+  overflow-y: auto;
 }
 .overlay-body .muted { margin: 0; }
 .will-concerns { display: flex; flex-direction: column; gap: var(--space-4); margin: 0 0 var(--space-8); padding: 0; list-style: none; }

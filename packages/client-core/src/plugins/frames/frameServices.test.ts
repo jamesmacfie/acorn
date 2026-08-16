@@ -11,11 +11,13 @@ vi.mock('../../apiClient', () => ({
   writeJson: vi.fn(),
 }))
 
-const parseInAppTarget = vi.fn((_url: string) => null as unknown)
-const openContentTarget = vi.fn((..._args: unknown[]) => 'pane' as string)
+// The host ladder, as ONE call now. It used to be `parseInAppTarget` then `openContentTarget`, and the
+// frame side had to hold the target in between; `openInAppUrl` owns the whole question, including the
+// route rung this surface previously had no way to reach.
+const openInAppUrl = vi.fn((..._args: unknown[]) => false)
+
 vi.mock('../../registries/contentLinks', () => ({
-  parseInAppTarget: (url: string) => parseInAppTarget(url),
-  openContentTarget: (...args: unknown[]) => openContentTarget(...args),
+  openInAppUrl: (...args: unknown[]) => openInAppUrl(...args),
 }))
 
 const openPane = vi.fn()
@@ -55,10 +57,12 @@ const binding = (over: Partial<FrameBinding> = {}): FrameBinding => ({
 const queryClient = (prefs: Record<string, string> = {}): QueryClient =>
   ({ getQueryData: (key: unknown) => (JSON.stringify(key) === JSON.stringify(prefsKey) ? prefs : undefined) }) as unknown as QueryClient
 
+export const navigated: string[] = []
+
 const build = (props: Partial<PluginFrameProps> = {}, over: { prefs?: Record<string, string>; focus?: boolean } = {}) =>
   createFrameServices(
     { binding: binding(), hash: 'a'.repeat(64), ...props },
-    { qc: queryClient(over.prefs), frameHasFocus: () => over.focus ?? false },
+    { qc: queryClient(over.prefs), frameHasFocus: () => over.focus ?? false, navigate: (to) => void navigated.push(to) },
   )
 
 const windowOpen = vi.fn()
@@ -68,10 +72,8 @@ beforeEach(() => {
   openPane.mockClear()
   toast.mockClear()
   saveJsonPref.mockClear()
-  parseInAppTarget.mockReset()
-  parseInAppTarget.mockReturnValue(null)
-  openContentTarget.mockReset()
-  openContentTarget.mockReturnValue('pane')
+  openInAppUrl.mockReset()
+  openInAppUrl.mockReturnValue(false)
   windowOpen.mockClear()
   vi.stubGlobal('window', { open: windowOpen })
 })
@@ -157,32 +159,42 @@ describe('openUrl', () => {
   })
 
   it('keeps an in-app target in-app', () => {
-    parseInAppTarget.mockReturnValue({ kind: 'board.card', item: 'ENG-1' })
+    openInAppUrl.mockReturnValue(true)
     build({ binding: binding({ taskId: 'task-1' }) }).openUrl('https://board.example/cards/ENG-1')
-    expect(openContentTarget).toHaveBeenCalledWith({ kind: 'board.card', item: 'ENG-1' }, { taskId: 'task-1' })
+    expect(openInAppUrl).toHaveBeenCalledWith('https://board.example/cards/ENG-1', expect.objectContaining({ taskId: 'task-1' }))
     expect(windowOpen).not.toHaveBeenCalled()
   })
 
-  it('prefers the reference panel from inside one, and the pane from everywhere else', () => {
+  it('prefers the reference panel from inside one, and states nothing from everywhere else', () => {
     // The reader is looking sideways and asked to look sideways again; pushing a pane behind an overlay
     // they would then have to dismiss is not what they meant. Which rung wins comes from the SURFACE,
     // which is why the frame is never consulted.
-    parseInAppTarget.mockReturnValue({ kind: 'linear.issue', item: 'ENG-1' })
+    //
+    // Stating NOTHING is the meaningful half of the second case. A pane or a project surface takes the
+    // host's default order — pane, then panel, then route — rather than asking to be moved, so a link
+    // clicked inside one cannot navigate the shell out from under the reader.
+    openInAppUrl.mockReturnValue(true)
     build({ binding: binding({ target: 'refPanel', taskId: 'task-1' }) }).openUrl('https://linear.app/x/ENG-1')
-    expect(openContentTarget).toHaveBeenCalledWith(expect.anything(), { taskId: 'task-1', prefer: 'refPanel' })
+    expect(openInAppUrl).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ taskId: 'task-1', prefer: 'refPanel' }))
 
     build({ binding: binding({ taskId: 'task-1' }) }).openUrl('https://linear.app/x/ENG-1')
-    expect(openContentTarget).toHaveBeenLastCalledWith(expect.anything(), { taskId: 'task-1' })
+    expect(openInAppUrl.mock.lastCall?.[1]).not.toHaveProperty('prefer')
+  })
+
+  it('offers the shell navigator, so a frame’s link can reach a plugin route', () => {
+    // The rung that made this surface reachable at all. The frame still names only a URL — where it goes
+    // is the recogniser's answer, and the navigator is the host's.
+    openInAppUrl.mockReturnValue(true)
+    build().openUrl('https://github.com/runn/acorn/pull/9')
+    expect(typeof (openInAppUrl.mock.lastCall?.[1] as { navigate?: unknown }).navigate).toBe('function')
   })
 
   it('never pushes a pane into a task the frame is not bound to', () => {
     // A project surface and a ref panel both sit beside something that is not a task layout, while a
     // task may well still be selected in the rail behind them. Reading the ambient one here would put a
     // pane into a background task's PERSISTED layout, where the reader is not and will not see it.
-    parseInAppTarget.mockReturnValue({ kind: 'board.card', item: 'ENG-1' })
-    openContentTarget.mockReturnValue('external')
     build().openUrl('https://board.example/cards/ENG-1')
-    expect(openContentTarget).toHaveBeenCalledWith(expect.anything(), { taskId: undefined })
+    expect(openInAppUrl).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ taskId: undefined }))
     expect(windowOpen).toHaveBeenCalled()
   })
 })

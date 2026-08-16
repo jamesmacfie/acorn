@@ -2,6 +2,7 @@ import { lazy } from 'solid-js'
 import { type ClientPlugin, contentLinkRegistry, readJson, setSelectedSource } from '@acorn/plugin-api/client'
 import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
 import { PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
+import { pullRefMatchesTask } from '../contract/pullRef'
 import { prFiltersSlice } from './pullList/filterSlice'
 import { prPaneContribution } from './pullDetail/PrPane'
 import { pullFilePaletteSlotContribution } from './slotContribution'
@@ -11,6 +12,9 @@ import { githubBrowsePath, githubRouteContributions } from './routes'
 import GithubImporter from './GithubImporter'
 
 const GithubBrowse = lazy(() => import('./GithubBrowse'))
+// Lazy for the same reason every other surface here is: a panel nobody has opened should not be in the
+// first paint's bundle.
+const PullRefPanel = lazy(() => import('./PullRefPanel'))
 
 export const githubClientPlugin: ClientPlugin = {
   name: 'github',
@@ -18,6 +22,9 @@ export const githubClientPlugin: ClientPlugin = {
   init: (ctx) => {
     // github.com PR and repo URLs, resolved in-app instead of opening a browser.
     for (const contribution of githubContentLinkContributions) ctx.contribute(contentLinkRegistry, contribution)
+    // The glance-sized half of a pull request, for a reader who is in the middle of something else. The
+    // `providerId` is what a recognised PR URL resolves through, and the host binds it to this plugin.
+    ctx.refPanels.register({ id: 'github-pull', providerId: 'github', component: PullRefPanel })
     // The PR rail is provider-owned and only appears once GitHub is connected. Core home remains the
     // default landing source, so a disabled/disconnected provider never becomes the startup view.
     //
@@ -31,6 +38,12 @@ export const githubClientPlugin: ClientPlugin = {
       // for whatever owned `kind: 'detail'` — which was only ever this plugin, by luck of being the only
       // one with routes. The claim belongs here, where the shape of a PR URL is already known.
       taskPath: (task) => (task.pullNumber != null && task.github ? `${githubBrowsePath(task.projectId)}/${task.pullNumber}` : undefined),
+      // The same knowledge read backwards, for "is there already a task for this PR" (registries/sources.ts
+      // § tracksRef). A github-pr task records its pull request as `pullNumber` on the task ROW — its
+      // `links` hold the Linear tickets found in the PR body — so the host's link matching cannot see it
+      // and would have offered to create a duplicate.
+      tracksRef: (task, ref) => ref.providerId === 'github' && task.pullNumber != null && !!task.github
+        && pullRefMatchesTask(ref.displayId, task.github, task.pullNumber),
     })
     ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: 'brand:github', component: GithubImporter })
     ctx.commands.register({

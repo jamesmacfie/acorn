@@ -1,5 +1,8 @@
 import { createMemo, Match, Switch } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import type { PluginCollectionCell, PluginCollectionField } from '@acorn/protocol/collections.ts'
+import { openInAppUrl } from '../../registries/contentLinks'
+import { activeTaskId } from '../../tasks/tasks'
 import { StatusDot } from '../../ui/primitives'
 import { formatCell, type FormattedCell } from '../format'
 
@@ -9,6 +12,7 @@ import { formatCell, type FormattedCell } from '../format'
 
 export default function Cell(props: { field: PluginCollectionField; value: PluginCollectionCell | undefined }) {
   const cell = createMemo(() => formatCell(props.field, props.value))
+  const navigate = useNavigate()
   // Narrows the union for `Match`, which cannot do it from a `kind ===` comparison on its own.
   const of = <K extends FormattedCell['kind']>(kind: K) => (): Extract<FormattedCell, { kind: K }> | undefined => {
     const value = cell()
@@ -40,7 +44,14 @@ export default function Cell(props: { field: PluginCollectionField; value: Plugi
             target="_blank"
             rel="noopener noreferrer"
             // The row around this one has its own declared action; a link click is not that click.
-            onClick={(event) => event.stopPropagation()}
+            // The href stays the real external URL — it is what a middle-click, a copy-link and a
+            // modified click should all give — and only a plain left click is taken, and only when the
+            // URL names something acorn has a surface for (registries/contentLinks.ts § openInAppUrl).
+            onClick={(event) => {
+              event.stopPropagation()
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+              if (openInAppUrl(value().url, { taskId: activeTaskId(), prefer: 'route', navigate })) event.preventDefault()
+            }}
           >
             {value().text}
           </a>

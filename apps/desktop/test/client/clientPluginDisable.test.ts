@@ -101,10 +101,12 @@ const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) 
 //
 // `panes` and `sources` are docs/ui-design.md contracts in their own right, so `full` doubles as the parity
 // assertion for the compiled graph. Loaded packages are covered through their manifest adapters and do not
-// belong in this static ownership ledger. `refPanels` is expected to be an empty array, and the key is worth
-// keeping rather than dropping: the registry's only entry was linear's, and linear is a loaded package now,
-// so its panel reaches this registry through the manifest adapter in
-// client-core/plugins/frames/register.ts. A compiled panel reappearing there is a real change.
+// belong in this static ownership ledger. `refPanels` held exactly one compiled entry when this was
+// written — none — and the note here said that a compiled panel reappearing would be a real change. It
+// did: `github-pull` is github's own pull-request panel, so a PR link clicked inside someone else's
+// content can be glanced at instead of leaving the app. Linear's panel is still absent from this ledger
+// and still correct, because linear is a loaded package and its panel reaches the registry through the
+// manifest adapter in client-core/plugins/frames/register.ts rather than through a compiled roster line.
 //
 // Derived, but not therefore toothless, and the distinction matters because a snapshot you can regenerate
 // looks like one you can launder a regression past. What regeneration CANNOT hide:

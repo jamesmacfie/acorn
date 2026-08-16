@@ -3,6 +3,7 @@ import type {
   PluginCollectionRowBody,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
+import { formatPullRef } from './pullRef'
 
 // GitHub's open pull requests, expressed as a COLLECTION (@acorn/protocol/collections.ts): a typed set
 // of records the host draws with its own components, so the same rows can sit on a board beside another
@@ -89,8 +90,10 @@ export const pullsCollectionPage = (rows: readonly PullCollectionSource[]): Plug
   rows: rows.map((row): PluginCollectionRowBody => {
     const url = `https://github.com/${row.owner}/${row.repo}/pull/${row.number}`
     return {
-      // Stable across refreshes and unique across repositories, which a bare PR number is not.
-      id: `${row.owner}/${row.repo}#${row.number}`,
+      // Stable across refreshes and unique across repositories, which a bare PR number is not. Spelled
+      // by ./pullRef.ts, which is the one owner of this identity — a recognised URL and the reference
+      // panel resolve to the same string through the same helper.
+      id: formatPullRef(row.owner, row.repo, row.number),
       values: {
         title: row.title,
         repo: `${row.owner}/${row.repo}`,
@@ -104,6 +107,13 @@ export const pullsCollectionPage = (rows: readonly PullCollectionSource[]): Plug
       // `openUrl` and not `openPane`: a row on a dashboard has no task, and the PR pane belongs to one.
       // The verb set is the manifest's context-free union, so a click can do exactly what a command can
       // do and nothing more.
+      //
+      // It does NOT follow that the click leaves acorn. The URL is this PR's durable identity, and the
+      // host resolves it late against the content-link recognisers — github's own `github.pull-request`
+      // declares the route (client/contentLinks.ts § path), so a tracked repo lands on `/p/:projectId/
+      // pulls/:number` and only an untracked one reaches github.com. Which is why this stays a URL
+      // rather than becoming a routed verb: the row cannot know the project, and by the time someone
+      // clicks, the client can look it up.
       action: { verb: 'openUrl', url },
     }
   }),

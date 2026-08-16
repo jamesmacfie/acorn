@@ -2,6 +2,7 @@ import { Portal } from 'solid-js/web'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { Button, Toolbar } from '../../ui/primitives'
+import RefPanelTaskLink from '../../registries/RefPanelTaskLink'
 
 // The host's chrome around a plugin reference panel — the backdrop, the box, the title and the
 // dismiss affordance (docs/plugins.md § Frame contribution kind).
@@ -41,6 +42,12 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
           <Button variant="bare" class="integrations-panel-close" onClick={props.onClose} aria-label="Close">✕</Button>
         </header>
         <PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />
+        {/* Host-drawn, below the frame rather than inside it. Creating a task is a core write that makes a
+            worktree, and a plugin that drew this itself would need `core.tasks:write` for its whole life
+            to earn one button — ../../registries/RefPanelTaskLink.tsx has the argument in full. */}
+        {/* `pluginId` IS the provider here, not an approximation: a refPanel frame declares `providerId`
+            in its manifest and registries/plugin.ts throws when a plugin names one that is not its own. */}
+        <RefPanelTaskLink target={{ providerId: props.binding.pluginId, displayId: props.displayId }} />
       </aside>
     </Portal>
   )
