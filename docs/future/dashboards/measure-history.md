@@ -147,6 +147,18 @@ no further back than 2× the window. No qualifying sample → **no delta drawn**
 absence is a fact, and it is not zero). Delta = current live measure − baseline, rendered signed
 ("▲ 2 vs last week"), coloured by `good` when set, neutral otherwise.
 
+**The comparison is point-to-point, never window-vs-window — on the record.** "Vs last week" is one
+indexed lookback (`bucket <= now − 7d, order by bucket desc, limit 1`), not an aggregation of last
+week: window aggregates ("average of this week vs average of last") drag in bucket alignment,
+partial-window handling, timezone edges and per-panel aggregation config — a metrics product's
+problems, refused with the rest of them below. Point-to-point is also the precedent: Datadog's
+Query Value "change" mode and Grafana's stat-plus-`timeShift` both compare the current value to the
+value one window ago. Sampling cadence and comparison window never conflict, because the window is
+a *point looked up*, not a *span sliced*: both offered windows fall inside the 14-day hourly
+retention tier, so the baseline always resolves within an hour of its target — noise on a daily or
+weekly comparison. The sparkline is decoupled from cadence the same way: 14 last-value-per-day
+points, whatever the sampler's clock does.
+
 ### Sparkline mark (spec shared with `charts.md`)
 
 Reuses `chart.ts` line arithmetic at small size: last 14 daily points (history tier: last value per
