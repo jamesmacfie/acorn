@@ -11,6 +11,7 @@ const ShortcutsSettings = lazy(() => import('@acorn/client-core/settings/Shortcu
 const NodesSettings = lazy(() => import('@acorn/client-core/settings/NodesSettings.tsx'))
 const PluginsSettings = lazy(() => import('@acorn/client-core/settings/PluginsSettings.tsx'))
 const SecuritySettings = lazy(() => import('@acorn/client-core/settings/SecuritySettings.tsx'))
+const SchedulesSettings = lazy(() => import('@acorn/client-core/settings/SchedulesSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/settings/StyleGallery.tsx'))
 
 export const settingsPageContributions: SettingsContribution[] = [
@@ -41,6 +42,9 @@ export const settingsPageContributions: SettingsContribution[] = [
   // security.md § Audit says the trail is "owner-readable in Settings"; this is that, plus the
   // disk-encryption posture § On-disk asks the app to surface.
   { id: 'security', label: 'Security', group: 'general', order: 90, component: () => <SecuritySettings /> },
+  // With the other three per-node administration pages, and sharing their node picker: a schedule is a
+  // promise ONE machine makes (docs/schedules.md).
+  { id: 'schedules', label: 'Schedules', group: 'general', order: 95, component: () => <SchedulesSettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
     ? [{ id: 'gallery', label: 'Style gallery', group: 'general' as const, order: 999, component: () => <StyleGallery /> }]

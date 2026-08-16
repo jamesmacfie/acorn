@@ -21,7 +21,7 @@ describe('composition graph parity', () => {
     expect(graph.plugins.map((plugin) => plugin.name)).toEqual(nodePluginNames())
     expect(graph.loaded.size).toBe(0)
     expect(graph.drainOrder).toEqual(NODE_DRAIN_ORDER)
-    expect(NODE_DRAIN_ORDER).toEqual(['listener', 'reconciliation', 'plugin state', 'plugins', 'sqlite', 'data root'])
+    expect(NODE_DRAIN_ORDER).toEqual(['listener', 'reconciliation', 'schedules', 'plugin state', 'plugins', 'sqlite', 'data root'])
   })
 })
 

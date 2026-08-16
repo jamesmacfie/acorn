@@ -558,6 +558,15 @@ export type BackupResult = { path: string; bytes: number; files: string[]; exclu
 export type BackupSuggestion = { suggestedPath: string }
 export const coreBackupRoute = '/v2/core/backup'
 
+// Schedules: periodic work owned by the node (docs/schedules.md). The row and cadence types live in
+// ./schedules.ts, which needs zod for the cadence parser this module deliberately does not carry.
+//
+// A key contains a colon ('core:audit-prune'), so every builder below encodes it.
+export const schedulesRoute = '/v2/core/schedules'
+export const scheduleRoute = (key: string) => `${schedulesRoute}/${encodeURIComponent(key)}`
+export const scheduleRunNowRoute = (key: string) => `${scheduleRoute(key)}/run`
+export const scheduleRunsRoute = (key: string) => `${scheduleRoute(key)}/runs`
+
 // Workspaces (named groups of Projects) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`

@@ -12,6 +12,7 @@ import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
 import { plugins } from './routes/plugins'
+import { schedules } from './routes/schedules'
 import { harness } from './routes/harness'
 import { agentTools, agentToolsCatalog } from './routes/agentTools'
 import { taskContext } from './routes/taskContext'
@@ -71,6 +72,11 @@ export function createApp() {
     // reconnaissance for anything running in a task.
     .use(`${CORE_NAMESPACE}/security`, requireDevice)
     .use(`${CORE_NAMESPACE}/security/*`, requireDevice)
+    // Schedules, same class again: a schedule is code this node runs unattended, so creating one is a
+    // persistence primitive and pausing one can silence the node's own housekeeping. Both path forms,
+    // like every sibling above.
+    .use(`${CORE_NAMESPACE}/schedules`, requireDevice)
+    .use(`${CORE_NAMESPACE}/schedules/*`, requireDevice)
     // Backup reads every database this node owns and writes them to a path of the caller's choosing.
     // Even with the credentials scrubbed out, that is an exfiltration primitive in an agent's hands.
     .use(`${CORE_NAMESPACE}/backup`, requireDevice)
@@ -94,6 +100,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)
+    .route(`${CORE_NAMESPACE}/schedules`, schedules) // Settings → Schedules: periodic work owned by the node (docs/schedules.md)
     .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer.md § Backup: core + plugin databases, minus credentials
     .route(`${CORE_NAMESPACE}/projects`, projects)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)

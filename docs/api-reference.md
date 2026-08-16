@@ -107,9 +107,17 @@ namespace.
 | `GET` | `/v2/core/security` | Read Node security posture |
 | `GET` | `/v2/core/backup` | Suggest a destination path for a backup |
 | `POST` | `/v2/core/backup` | Create a credential-scrubbed database archive |
+| `GET` | `/v2/core/schedules` | List every schedule on this node, plus the global pause flag |
+| `PATCH` | `/v2/core/schedules` | Pause or resume the whole loop |
+| `POST` | `/v2/core/schedules` | Create a user schedule against a registered target kind |
+| `PATCH` | `/v2/core/schedules/:key` | Pause/resume, retune the cadence, rename (user rows only) |
+| `DELETE` | `/v2/core/schedules/:key` | Delete a user schedule — declared ones are paused, not deleted |
+| `POST` | `/v2/core/schedules/:key/run` | Run one now |
+| `GET` | `/v2/core/schedules/:key/runs` | The recent-run ring, newest first |
 
 These routes are device-only. Backup uses Node filesystem paths, so an internal task token must not
-reach it. `GET /v2/core/plugins` also carries `requests` — the queue of installs an agent has asked for
+reach it. Schedules are the same class for a different reason: a schedule is code the node runs
+unattended, so declaring one is a way to make code run later (docs/schedules.md). `GET /v2/core/plugins` also carries `requests` — the queue of installs an agent has asked for
 and the owner has not answered — and the decision route is what closes one. A task-scoped agent can raise a
 request through the `plugin_request` tool and can reach neither route, which is the whole point
 (docs/plugins.md § Approval-mediated install). What it *can* read is the authoring contract, through the

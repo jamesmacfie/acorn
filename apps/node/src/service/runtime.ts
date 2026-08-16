@@ -15,7 +15,7 @@ import { buildPluginStateBridge, effectiveDisabled } from '../server/pluginState
 import { closeListener, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
-import { pruneAudit } from '@acorn/node-core/server/audit.ts'
+import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/main/mcpRegister.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
 import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/index.ts'
@@ -79,6 +79,8 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   let stopped = false
   let dbClosed = false
   let pluginStateCapability: { dispose(): void } | null = null
+  let scheduler: ReturnType<typeof createScheduler> | null = null
+  let schedulerCapability: { dispose(): void } | null = null
 
   stateChanged('migrating')
   let dataRoot: DataRoot
@@ -132,6 +134,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     const outcome = await drainNode({
       listener: async () => { if (server) await closeListener(server) },
       reconciliation: async () => { if (reconcileTask) await reconcileTask },
+      schedules: async () => {
+        schedulerCapability?.dispose()
+        schedulerCapability = null
+        await scheduler?.stop()
+      },
       pluginState: async () => {
         pluginStateCapability?.dispose()
         pluginStateCapability = null
@@ -154,10 +161,8 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // Boot is the right moment because it is the one time nothing is mid-request, and a periodic
     // sweeper would be machinery for a table that holds 24 hours of one owner's mutations.
     await runtime.IDEMPOTENCY.cleanupExpired()
-    // Audit retention, for the same reason and at the same moment (docs/data-layer.md § Retention
-    // defaults: 90 days). A timer for one range-delete a day would be machinery this does not need, and
-    // a node nobody restarts is also one nobody is accumulating decisions on.
-    await pruneAudit(runtime.DB).catch((error) => console.warn('[service:boot] audit prune failed:', error))
+    // Audit retention used to be a second boot-time call here. It is a core-declared schedule now
+    // (docs/schedules.md), which is what makes it happen on a node that is left running for a month.
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
@@ -228,6 +233,12 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     )
 
     wireAgentTools({ db })
+    // The node's one scheduler. Built here rather than in makeBindings for the same reason the data
+    // root's lock is: its lifetime is the process's, so it belongs to whoever owns teardown. Created
+    // before the listener binds so a request can never find the capability missing; STARTED after it,
+    // because a catch-up run may call this node's own routes.
+    scheduler = createScheduler(db)
+    schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
     mark('install')
 
     const listener = await startListener(runtime, dataRoot)
@@ -236,6 +247,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     identity = { fingerprint: listener.fingerprint, certPem: listener.certPem }
     apiUrl = endpoint.origin
     stateChanged('listening')
+    await scheduler.start()
     mark('listener-up')
 
     stateChanged('reconciling')

@@ -254,6 +254,60 @@ export const idempotency = sqliteTable(
   (t) => [primaryKey({ columns: [t.deviceId, t.key] }), index('idempotency_expiry_idx').on(t.expiresAt)],
 )
 
+// --- Schedules: periodic work owned by the node (docs/schedules.md) ---
+//
+// Machine-scoped like every newer app-state table. State and DEFINITION split by owner, which is the
+// whole shape of these three: a declared schedule (core, plugin) already has a home for its definition
+// with a lifecycle the host manages, so copying it into a row would mean reconciling two sources of
+// truth on every boot. Storing only state means the plugin's lifecycle IS the schedule's lifecycle for
+// free.
+
+// Run state + owner overrides for DECLARED schedules, whose definitions live in the registry rather
+// than here. A state row whose schedule is no longer registered is RETAINED UNREAD: disabling a plugin
+// must not delete the owner's pause or its run history, both of which should survive the plugin's return.
+//
+// One reserved key, '*', holds the global pause switch in `enabled_override` (0 = paused). A registry
+// key always carries a colon, so it can never collide — and a switch that stops the loop without
+// touching any schedule's row is the "something is wrong and I don't know what yet" lever.
+export const scheduleState = sqliteTable('schedule_state', {
+  key: text('key').primaryKey(), // 'core:<id>' | '<pluginId>:<scheduleId>' | 'user:<uuid>' | '*'
+  enabledOverride: integer('enabled_override'), // null = declared default; 0/1 = the owner's word wins
+  cadenceOverride: text('cadence_override'), // JSON cadence, clamped on read; null = the declared one
+  nextRunAt: integer('next_run_at').notNull(), // epoch ms; the heap is rebuilt from this at boot
+  lastRunAt: integer('last_run_at'),
+  lastStatus: text('last_status'), // 'ok' | 'error' | 'timeout' | 'skipped'
+  lastError: text('last_error'), // one line, human-readable, cleared on ok
+  backoffUntil: integer('backoff_until'),
+})
+
+// USER-created schedules: full definitions, database-truth. `kind`/`target` parse tolerantly and an
+// unknown kind survives inert (the settings list renders "this version cannot run it"), exactly like an
+// unknown panel view kind.
+export const userSchedules = sqliteTable('user_schedules', {
+  id: text('id').primaryKey(), // uuid; the registry key is `user:<id>`
+  name: text('name').notNull(),
+  kind: text('kind').notNull(), // a registered target kind (docs/schedules.md § Targets)
+  target: text('target').notNull(), // JSON, kind-shaped
+  cadence: text('cadence').notNull(), // JSON, clamped on read
+  risk: text('risk'), // ToolRisk, stamped at CREATION from the target's declared tier — the consent record
+  createdAt: integer('created_at').notNull(),
+})
+
+// Ring of recent runs per schedule: the observability floor, because a run that wrote nothing did not
+// happen. Capped at 20 per key on write (delete-oldest), so the table cannot grow unbounded and nobody
+// needs a vacuum job for the job-runner's own bookkeeping.
+export const scheduleRuns = sqliteTable(
+  'schedule_runs',
+  {
+    key: text('key').notNull(),
+    startedAt: integer('started_at').notNull(),
+    finishedAt: integer('finished_at'),
+    status: text('status').notNull(), // 'ok' | 'error' | 'timeout' | 'skipped'
+    detail: text('detail'), // one line; e.g. '14 panels sampled' or the error
+  },
+  (t) => [primaryKey({ columns: [t.key, t.startedAt] })],
+)
+
 export const audit = sqliteTable(
   'audit',
   {
