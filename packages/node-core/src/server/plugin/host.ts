@@ -5,6 +5,7 @@
 // constructed and threaded as deps between calls); here it must NOT be, because a disabled plugin
 // removes a step from the sequence. Cross-plugin needs resolve through the capability registry at
 // CALL time instead, which is why capabilities.get() is documented as late-binding.
+import type { Env } from '../../main/bindings'
 import type { CoreServices } from '../../main/core'
 import { builtinPluginStorage, type PluginDatabase } from '../../main/pluginStorage'
 import { removeAgentTools } from '../agentTools/registry'
@@ -15,11 +16,13 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
 import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
+import { runPluginScheduleRoute } from './scheduleRun'
 import type { NodePlugin, NodePluginContext, PluginStorage } from './types'
 
-// What each plugin claimed on the WS hub, so a re-init can take it back. The hub's slots are module
-// singletons with no duplicate guard, unlike the route and tool registries.
-const wsRegistrations = new Map<string, (() => void)[]>()
+// Undos for what a plugin registered somewhere `clearRegistrations` cannot reach on its own: the WS
+// hub's two slots, which are module singletons with no duplicate guard, and its schedules, which live
+// in the composition root's scheduler rather than in a module registry.
+const undoRegistrations = new Map<string, (() => void)[]>()
 
 // Re-exported from its new home: the loader and the composition root import it from here, and the
 // context shape it feeds moved to context.ts so a test can build the same context the host does.
@@ -45,6 +48,11 @@ export type PluginHostOptions = {
   // It lives in the host's options rather than on NodePlugin because the distinction is the host's
   // to draw. A field on the plugin object would be a value the plugin's own bundle could set.
   loaded?: ReadonlyMap<string, LoadedPluginBinding>
+  // The node's bindings, for the one thing the host does on a plugin's behalf rather than for it:
+  // firing a manifest-declared schedule, which calls one of that plugin's own routes with no request
+  // in sight (server/plugin/scheduleRun.ts). Optional because a suite that never declares a schedule
+  // has nothing to run — a binding that DOES declare one without this is a wiring bug and throws.
+  env?: Env
 }
 
 // One row per plugin the composition root offered, whether or not it ran. Settings → Plugins needs the
@@ -119,6 +127,13 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // the running instance's permissions and migrations chain are the new manifest's, not the boot one's.
   // Membership is also the answer to "may this name be reloaded at all".
   const loadedBindings = new Map(options.loaded ?? [])
+  // A missing env is a composition-root wiring bug, not a plugin's fault, so it is raised HERE — before
+  // anything is started and there is a graph to unwind — rather than from inside the boot loop.
+  const requireEnv = (name: string): Env => {
+    if (!options.env) throw new Error(`Plugin '${name}' declares schedules, but initPlugins was given no env to run them with.`)
+    return options.env
+  }
+  for (const [name, binding] of loadedBindings) if (binding.schedules?.length) requireEnv(name)
 
   // Every database handed out through `ctx.storage`, so the host can close what it opened. Per CALL,
   // not a module singleton: a second startServiceRuntime in one process gets its own handles, exactly
@@ -155,6 +170,28 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     } catch {
       // An older loaded bundle may still close its own handle in dispose, and node:sqlite refuses a
       // second close. Nothing to report: the file is drained either way.
+    }
+  }
+
+  // What a loaded plugin's MANIFEST declared as periodic work, put on the node's scheduler through the
+  // same `ctx.schedules` seam a built-in uses — one registration path, so the lifecycle, the buffering
+  // on reload and the undo are the context's rather than being re-implemented for this feeder.
+  //
+  // Registered BEFORE init, deliberately: the runner resolves the plugin's route when the schedule
+  // FIRES, not now, so ordering against the plugin's own route registration does not matter — and a
+  // contained init failure rolls this back through `clearRegistrations` like everything else.
+  const registerManifestSchedules = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
+    const declared = binding?.schedules ?? []
+    if (declared.length === 0) return
+    const env = requireEnv(name)
+    for (const descriptor of declared) {
+      ctx.schedules.register({
+        scheduleId: descriptor.id,
+        name: descriptor.name,
+        cadence: descriptor.cadence,
+        ...(descriptor.timeout === undefined ? {} : { timeout: descriptor.timeout }),
+        run: (signal) => runPluginScheduleRoute(env, name, descriptor, signal),
+      })
     }
   }
 
@@ -197,8 +234,9 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       core: options.core,
       loaded,
       ...(storage ? { storage } : {}),
-      onWsRegistration: (undo) => wsRegistrations.set(plugin.name, [...(wsRegistrations.get(plugin.name) ?? []), undo]),
+      onUndo: (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]),
     })
+    registerManifestSchedules(ctx, plugin.name, loaded)
     // A failing init still fails the boot — every plugin here is first-party code in the same binary, so
     // a node that cannot assemble should say so rather than run degraded. But the plugins that ALREADY
     // initialized have to be torn down first, and that is not cosmetic: each holds a WAL-mode SQLite
@@ -307,7 +345,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // it opens for real — and that is the recorded ceiling: registration rollback and SCHEMA rollback are
     // different promises, and only the first is made (main/pluginStorage.ts § Reload).
     const pending: (() => void)[] = []
-    const candidateWsUndos: (() => void)[] = []
+    const candidateUndos: (() => void)[] = []
     // A box rather than a `let`, because every write happens inside the closure below and the failure
     // paths would otherwise be narrowed to `null` by control flow that cannot see them.
     const candidate: { db: PluginDatabase | null; committed: boolean } = { db: null, committed: false }
@@ -325,11 +363,14 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
           return candidate.db
         },
       },
-      onWsRegistration: (undo) => void candidateWsUndos.push(undo),
+      onUndo: (undo) => void candidateUndos.push(undo),
       pending,
     })
 
     try {
+      // Buffered like everything else the candidate registers: the previous instance's schedules are
+      // still on the scheduler under the same keys, and registering now would throw on the duplicate.
+      registerManifestSchedules(candidateCtx, name, next.binding)
       await next.plugin.init(candidateCtx)
     } catch (error) {
       // Nothing to roll back. The buffer was never replayed, so the previous instance is still registered
@@ -375,7 +416,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       const message = error instanceof Error ? error.message : String(error)
       console.error(`[plugin:${name}] reload could not register the new instance's contributions:`, error)
       clearRegistrations(name)
-      for (const undo of candidateWsUndos.reverse()) undo()
+      for (const undo of candidateUndos.reverse()) undo()
       closeStorage(name)
       try {
         candidate.db?.close()
@@ -386,6 +427,11 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       markFailed(name, 'init', message)
       return { ok: false, error: message }
     }
+
+    // The committed instance's undos become the HOST's, or the next reload's clearRegistrations would
+    // have nothing to take back and the scheduler would refuse its own plugin's key as a duplicate.
+    // `clearRegistrations` above already dropped the previous instance's entry, so this is a set.
+    if (candidateUndos.length) undoRegistrations.set(name, [...candidateUndos])
 
     const index = started.findIndex((plugin) => plugin.name === name)
     if (index >= 0) started[index] = next.plugin
@@ -429,8 +475,8 @@ export function clearRegistrations(name: string): void {
   removePluginRoutes(name)
   // The WS hub's two module-singleton slots have no duplicate guard, so a stale handler — closed
   // over an already-disposed engine — would keep claiming the prefix silently.
-  for (const undo of wsRegistrations.get(name) ?? []) undo()
-  wsRegistrations.delete(name)
+  for (const undo of undoRegistrations.get(name) ?? []) undo()
+  undoRegistrations.delete(name)
   removeAgentTools(name)
   removeContextSections(name)
   // Model adapters first: an adapter is validated against a registered connection provider, so

@@ -45,6 +45,7 @@ export type {
   PluginKeybindingDescriptor,
   PluginPaneLayout,
   PluginRefResolverDescriptor,
+  PluginScheduleDescriptor,
 } from '@acorn/protocol/pluginContract.ts'
 
 // Cross-field checks, which is why they are here and not on the fields: every one of them needs
@@ -56,7 +57,7 @@ export type {
 // plugin may address its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read
 // core routes, or another plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The RENDERER twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -249,6 +250,16 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   })
   refResolvers.forEach((entry, i) => route(entry.resolve, ['contributions', 'refResolvers', i, 'resolve']))
   collections.forEach((entry, i) => route(entry.items, ['contributions', 'collections', i, 'items']))
+  schedules.forEach((entry, i) => {
+    const at = ['contributions', 'schedules', i] as (string | number)[]
+    route(entry.run, [...at, 'run'])
+    // The same "parses and can never do anything" rule the project-scoped pane and webview checks apply:
+    // only a node half serves `/v2/p/<id>/`, so a schedule declared by a client-only package would fire on
+    // its cadence forever against a 404. An error at install beats a run row that fails every hour.
+    if (!manifest.node) {
+      ctx.addIssue({ code: 'custom', path: at, message: 'a schedule runs a node route; declare `node` in the manifest' })
+    }
+  })
   // ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ──────────────────────
   //
   // A point is a promise that somebody else's rows will appear inside one of THIS manifest's surfaces,
@@ -376,7 +387,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

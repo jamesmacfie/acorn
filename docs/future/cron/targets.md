@@ -4,6 +4,29 @@
 **target**. The kind vocabulary is closed and budgeted like every vocabulary here; unknown kinds in
 user rows survive inert (`engine.md § storage`).
 
+## What phases 1–2 already built for this (start here)
+
+- `Scheduler.registerTarget(ScheduleTarget)` exists and is tested inert-until-registered — a user
+  row with an unregistered kind lists, never runs, and says so. **One wiring gap to close:** the
+  `SCHEDULER` route capability exposes `register` but not `registerTarget`; either extend
+  `SchedulerBridge` or register targets where `createScheduler` builds core's schedules — decide by
+  who owns the target (core targets belong in `createScheduler`; a plugin-owned one would need the
+  bridge).
+- **In-process plugin-route dispatch is a solved problem — copy it, don't reinvent it.**
+  `server/plugin/scheduleRun.ts` is the worked example seam 1 below wants: `resolvePluginFetch` +
+  `buildPluginRequestContext(env, principal, pluginId)` + the node's own
+  `{ kind: 'internal', scope: 'service' }` principal, with route confinement re-checked on every
+  fire. A node-side collection read over a loaded plugin's `items` route is the same call with GET
+  and query params.
+- `buildPluginRequestContext` was extracted exactly so a caller with **no request** gets the same
+  provider runtime and ownership checks a route does (`requestContext.ts`); the credential gate is
+  `principalMayUseProviderCredential`, already admitting the service principal.
+- `PluginHostOptions.env` threads the node's bindings into the plugin host; the sampler will want
+  the same env, not a new channel.
+- `describeCadence` (`@acorn/protocol/schedules.ts`) is the words the settings creation flow renders;
+  the trust-line pattern for grants (`pluginGrants.ts § pluginScheduleGrants`) is the shape to copy
+  if a target kind ever needs disclosure.
+
 | Kind | Owner(s) | What runs |
 | --- | --- | --- |
 | `plugin-run` | plugin | the plugin's own confined route (loaded) or registered handler (compiled) — `declarations.md` |

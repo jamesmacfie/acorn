@@ -1,4 +1,4 @@
-import type { PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from './api'
+import type { PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from './api'
 import { isCoreExclusiveSlot, parseExtensionPointRef, qualifiedExtensionPointId } from './extensionPoints'
 import { isPluginKeyClaim } from './keybindings'
 import { normalizeWebviewHost } from './webview'
@@ -52,6 +52,14 @@ export const pluginExtensionGrants = (pluginId: string, contributions: PluginCon
       ? [{ kind: 'replaces', target: frame.coreSlot, label: frame.label }]
       : []),
 ].sort((a, b) => a.kind.localeCompare(b.kind) || a.target.localeCompare(b.target))
+
+/** What this package will run on its own, and how often. The `run` route is deliberately not part of
+ * the grant: it is the plugin's own route, which it could already reach from any of its surfaces, and
+ * what the owner is being told is WHEN — unattended, with no client open. */
+export const pluginScheduleGrants = (contributions: PluginContributions): PluginScheduleGrant[] =>
+  (contributions.schedules ?? [])
+    .map((schedule) => ({ id: schedule.id, label: schedule.name, cadence: schedule.cadence }))
+    .sort((a, b) => a.id.localeCompare(b.id))
 
 export const pluginKeyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   (contributions.frames ?? [])

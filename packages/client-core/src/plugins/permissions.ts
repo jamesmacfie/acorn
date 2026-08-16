@@ -1,5 +1,6 @@
-import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { pluginExtensionGrants, pluginKeyClaimGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { pluginExtensionGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../tasks/paneShortcuts'
 import { describeChannel, isSubscribable } from './frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
@@ -122,6 +123,26 @@ export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): P
         icon: 'app-window',
       })
     })
+
+export const scheduleGrants = (contributions: PluginContributions): PluginScheduleGrant[] =>
+  pluginScheduleGrants(contributions)
+
+// A `Declared` line, not an `Enforced` one, and for the honest reason: this is the plugin's own node code
+// running, and nothing checks what it does once it starts. What the line adds over the rest of that group
+// is WHEN — with no client open and nobody watching — which is the one thing about a plugin that a person
+// cannot discover by using it.
+//
+// The cadence is part of the key, like a webview's hosts and a key claim's chords: a package that moves
+// from daily to every five minutes has grown its reach, and the update prompt must say so.
+export const schedulePermissionLines = (grants: readonly PluginScheduleGrant[]): PermissionLine[] =>
+  [...grants]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((grant) =>
+      line(`schedule:${grant.id}:${JSON.stringify(grant.cadence)}`, {
+        text: `Run “${grant.label}” on the node ${describeCadence(grant.cadence)}, with nobody watching`,
+        icon: 'clock',
+      }),
+    )
 
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   pluginKeyClaimGrants(contributions)

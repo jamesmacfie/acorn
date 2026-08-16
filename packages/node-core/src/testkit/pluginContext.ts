@@ -90,18 +90,17 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     },
   }
 
-  // The WS hub's two slots are module singletons with no duplicate guard, so an undo is the only way back
-  // (server/plugin/context.ts). `clearRegistrations` does not cover them — the host keeps these separately
-  // and so must this, or a test whose plugin claims a channel prefix leaves it claimed for the whole file.
-  // Only the built-in tier can reach `events.channel`/`streams` at all, which is why it went unnoticed:
-  // terminal is the one plugin in the tree that uses them.
-  const wsUndos: (() => void)[] = []
+  // What `clearRegistrations` cannot reach: the WS hub's two slots, which are module singletons with no
+  // duplicate guard, and any schedule the plugin declared, which lives in a scheduler the host owns
+  // (server/plugin/context.ts). The host keeps these separately and so must this, or a test whose plugin
+  // claims a channel prefix — or registers a schedule — leaves it claimed for the whole file.
+  const undos: (() => void)[] = []
 
   const ctx = buildPluginContext({
     plugin: name,
     capabilities: new CapabilityRegistry(),
     core: services,
-    onWsRegistration: (undo) => void wsUndos.push(undo),
+    onUndo: (undo) => void undos.push(undo),
     // Both tiers, as in production, and `storage` is passed the same way for both — that is the contract
     // (server/plugin/context.ts): the caller derives the handle, the binding carries the loader's raw one.
     // The loaded tier also gets it on the binding, because that is what host.ts derives from.
@@ -122,8 +121,8 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     cleanup: () => {
       clearRegistrations(name)
       // Newest first, like the host's own rollback: the last claim on a slot is the one currently held.
-      for (const undo of wsUndos.reverse()) undo()
-      wsUndos.length = 0
+      for (const undo of undos.reverse()) undo()
+      undos.length = 0
       try {
         opened?.close()
       } catch {

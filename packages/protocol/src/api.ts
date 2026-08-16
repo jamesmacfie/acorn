@@ -6,6 +6,7 @@ import type {
   ProviderErrorCode,
   PublicIntegrationProvider,
 } from './integrations'
+import type { Cadence } from './schedules.ts'
 
 // The one error envelope every route returns — defined in ./errors.ts, re-exported here because
 // `ApiError` is the name 250-odd call sites already know. `error` was a bare string with a sibling
@@ -365,6 +366,13 @@ export type PluginExtensionGrant = {
   target: string
   label: string
 }
+
+// The fourth: periodic work the node will run for this package with no client open
+// (docs/schedules.md). Recorded like the three above rather than merely shown, for the reason stated
+// there — the update prompt's "what is new" mark is a set difference against what the owner last
+// approved, and a grant that is not stored can never read as newly requested. A package that starts
+// running itself every five minutes where it used to run daily has grown its reach.
+export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence }
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
 // serves: the host is the one rendering these, so the shape is its contract and not the plugin's

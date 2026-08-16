@@ -11,6 +11,7 @@ const NO_CONTRIBUTIONS = {
   frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [],
   attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],
   contextMenus: [], extensionPoints: [], extensions: [], collections: [],
+  schedules: [],
 }
 const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
