@@ -1,4 +1,4 @@
-import { createMemo, Match, Switch } from 'solid-js'
+import { createMemo, Match, Show, Switch } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { PluginCollectionCell, PluginCollectionField } from '@acorn/protocol/collections.ts'
 import { openInAppUrl } from '../../registries/contentLinks'
@@ -58,8 +58,20 @@ export default function Cell(props: { field: PluginCollectionField; value: Plugi
         )}
       </Match>
       <Match when={of('number')()}>{(value) => <span class="dash-cell-number">{value().text}</span>}</Match>
-      {/* A name. An avatar wants a resolved account, and `person` is a display string. */}
-      <Match when={of('person')()}>{(value) => <span>{value().name}</span>}</Match>
+      {/* A monogram plus the name. The mark is derived from the name itself (format.ts §
+          personInitials) rather than fetched: `person` is a display string, and a remote avatar
+          guessed from it would be a claim the wire never made. A name with no letters in it drops
+          the mark and renders as plain text. */}
+      <Match when={of('person')()}>
+        {(value) => (
+          <span class="dash-cell-person">
+            <Show when={value().initials}>
+              {(initials) => <span class="dash-cell-avatar" aria-hidden="true">{initials()}</span>}
+            </Show>
+            {value().name}
+          </span>
+        )}
+      </Match>
       <Match when={of('boolean')()}>{(value) => <span>{value().text}</span>}</Match>
       <Match when={of('text')()}>{(value) => <span>{value().text}</span>}</Match>
     </Switch>

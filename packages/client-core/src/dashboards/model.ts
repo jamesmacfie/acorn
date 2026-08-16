@@ -1,7 +1,12 @@
-import type { PluginCollectionCell, PluginCollectionEnumValue, PluginCollectionSchema } from '@acorn/protocol/collections.ts'
+import type {
+  PluginCollectionCell,
+  PluginCollectionEnumValue,
+  PluginCollectionFieldType,
+  PluginCollectionSchema,
+} from '@acorn/protocol/collections.ts'
 
 // The panel definition — what a user composed, independent of where it is placed
-// (docs/future/dashboards/composition.md).
+// (docs/dashboards.md § Panels).
 //
 // A panel has four layers, each owned by a different party: QUERIES (which collections), MAPPING
 // (cross-source alignment), SHAPING (filter/sort/limit/projection) and VIEW (how it draws). All four
@@ -66,7 +71,7 @@ export type PanelShaping = {
   fields?: string[]
   /** The field whose values are the groups — a board's columns. Shaping rather than a view option,
    *  which is what makes flipping a board back to a table and forward again lossless: the grouping
-   *  survives the view the same way the filters do (composition.md § The four layers). */
+   *  survives the view the same way the filters do (docs/dashboards.md § Panels). */
   groupBy?: string
 }
 
@@ -79,10 +84,19 @@ export type PanelAggregate = 'count' | 'sum' | 'avg' | 'min' | 'max'
 export type PanelView = {
   /** One of PANEL_VIEW_KINDS. Anything else renders inert. */
   kind: string
-  /** `stat` only. Defaults to `count`. */
+  /** The MEASURE, shared by `stat` and `chart`. Defaults to `count`, which is why a chart over a
+   *  collection with no number field still draws. Shared rather than duplicated so flipping stat ↔
+   *  chart keeps what the panel is counting — the same layering promise the filters get. */
   aggregate?: PanelAggregate
-  /** `stat` only, and required by every aggregate but `count`. */
+  /** The measure's field. Required by every aggregate but `count`. */
   field?: string
+  /** `chart` only: which of the two shapes. Absent falls back to whatever the schema supports
+   *  (chart.ts § buildChart), so an old definition never draws nothing. */
+  shape?: 'bar' | 'line'
+  /** `chart` only: the category field (bar) or the time field (line). */
+  x?: string
+  /** `chart` only, and optional there: the enum whose values split one line into several. */
+  series?: string
 }
 
 /** One (source, column) cell of the value mapping.
@@ -91,7 +105,7 @@ export type PanelView = {
  *  anything read it: value mappings are many-to-one and therefore NOT invertible — github's `merged`
  *  and `closed` may both land in a `Done` column, so dropping a card on `Done` has no unique answer.
  *  The eventual answer is a designated write-value per (source, column), with drag disabled wherever
- *  none is set (composition.md § Write-back). A lookup has nowhere to put that; this has a field to
+ *  none is set (docs/future/dashboards/write-back.md). A lookup has nowhere to put that; this has a field to
  *  grow, and `writeValue` is that field: nothing writes or reads it in this read-only build, and the
  *  codec carries it across unread so the shape is real rather than promised. */
 export type PanelMappingColumn = {
@@ -104,6 +118,19 @@ export type PanelMappingColumn = {
 /** The user's own derived enum: one column of the board they invented. */
 export type PanelMappingColumnDef = { id: string; label: string; tone?: PanelTone }
 
+/** A panel-local field the USER invented, beyond the five roles.
+ *
+ *  The five roles are the only thing two independently-written collections agree about without being
+ *  asked, which is why the mapped vocabulary starts there — but it is a real ceiling, and this is the
+ *  release valve. github's `repo` and linear's `identifier` are both text and both useful on a mixed
+ *  board, and neither has a role. The user names the field and says, per source, which of its fields
+ *  feeds it: the same matrix the editor already draws, one row longer.
+ *
+ *  The `type` is from the wire's own field vocabulary, so an invented field renders, sorts, filters
+ *  and groups exactly like a declared one — there is no second rendering path. Nothing new crosses
+ *  the wire: this is a client-side composition, invisible to every plugin. */
+export type PanelFieldDef = { id: string; label: string; type: PluginCollectionFieldType }
+
 export type PanelMapping = {
   /** The derived enum's values — the columns a board is keyed by, in the order they are drawn. Absent
    *  means the panel groups on each source's own values, which is honest but reads as two providers'
@@ -113,10 +140,13 @@ export type PanelMapping = {
   bySource?: Record<string, Record<string, PanelMappingColumn>>
   /** Per source, panel-local field id → that source's field id. An empty string is an explicit "this
    *  source has nothing for that field", which is a different answer from an absent key — absent
-   *  falls back to the source's field carrying the matching ROLE, which is the pre-fill. */
+   *  falls back to the source's field carrying the matching ROLE, which is the pre-fill. An INVENTED
+   *  field has no role to fall back to, so for one of those an absent key simply means unmapped. */
   fields?: Record<string, Record<string, string>>
+  /** The panel-local fields the user invented, drawn after the five roles in the order declared. */
+  extraFields?: PanelFieldDef[]
   /** Where a value no column claims goes. Never "nowhere": the design's rule is that an unmapped
-   *  value has a DECLARED destination (composition.md § The motivating scenario). Default catch-all. */
+   *  value has a DECLARED destination (docs/dashboards.md § The mapping layer, and cross-source panels). Default catch-all. */
   unmapped?: 'catch-all' | 'hidden'
 }
 
@@ -144,7 +174,7 @@ export type PanelDefinition = {
 // unrepresentable rather than validated.
 
 /** The views this build draws. */
-export const PANEL_VIEW_KINDS = ['stat', 'list', 'table', 'board'] as const
+export const PANEL_VIEW_KINDS = ['stat', 'list', 'table', 'board', 'chart'] as const
 export type PanelViewKind = (typeof PANEL_VIEW_KINDS)[number]
 
 const VIEW_REQUIRES: Record<PanelViewKind, (schema: PluginCollectionSchema) => boolean> = {
@@ -154,6 +184,11 @@ const VIEW_REQUIRES: Record<PanelViewKind, (schema: PluginCollectionSchema) => b
   table: () => true,
   // Columns ARE the values of a grouped enum, so without one there is nothing to group by.
   board: (schema) => schema.fields.some((field) => field.type === 'enum'),
+  // A bar needs a category axis and a line needs a time axis; a schema with neither has nothing to
+  // draw against, however many numbers it carries (chart.ts § chartShapesFor). Spelled here rather
+  // than imported so the model keeps no dependency on the chart module — `chartShapesFor` is the
+  // same predicate, and chart.test.ts holds the two together.
+  chart: (schema) => schema.fields.some((field) => field.type === 'enum' || field.type === 'datetime'),
 }
 
 export const viewSupportedBy = (kind: PanelViewKind, schema: PluginCollectionSchema): boolean =>
@@ -161,7 +196,7 @@ export const viewSupportedBy = (kind: PanelViewKind, schema: PluginCollectionSch
 
 /** What a panel editor may offer for this schema — and nothing else, which is the whole promise: a
  *  collection with no enum field is never offered a board, so a panel that cannot draw is
- *  unrepresentable rather than validated (composition.md § The generated editor). */
+ *  unrepresentable rather than validated (docs/dashboards.md § The generated editor). */
 export const viewsForSchema = (schema: PluginCollectionSchema): PanelViewKind[] =>
   PANEL_VIEW_KINDS.filter((kind) => viewSupportedBy(kind, schema))
 

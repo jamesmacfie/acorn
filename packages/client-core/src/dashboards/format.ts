@@ -21,10 +21,34 @@ export type FormattedCell =
   | { kind: 'boolean'; value: boolean; text: string }
   | { kind: 'datetime'; absolute: string; relative: string }
   | { kind: 'enum'; label: string; tone: PanelTone }
-  | { kind: 'person'; name: string }
+  | { kind: 'person'; name: string; initials: string }
   | { kind: 'link'; url: string; text: string }
 
 const EMPTY: FormattedCell = { kind: 'empty' }
+
+/** Up to two letters from a display name, for the `person` monogram.
+ *
+ *  A MONOGRAM RATHER THAN A FETCHED IMAGE, and that is the whole design of the avatar. `person` is a
+ *  display string on the wire, not a resolved account: turning "Ada Lovelace" into a github avatar
+ *  URL would be a guess rendered as fact, and it would be wrong for every provider whose people are
+ *  not github users. A monogram is derived from the same string the label shows, so it can add
+ *  scannability without adding a claim — and it needs no network, no wire change, and no argument
+ *  about the field vocabulary (docs/future/dashboards/refused.md § No new field type without a
+ *  fight).
+ *
+ *  Empty for a value with no letters or digits in it at all, which is what makes the name-only
+ *  fallback a real branch rather than a circle with nothing in it. */
+export function personInitials(name: string): string {
+  // An address is one identity, not three words: the domain would put a "C" from ".com" on the mark.
+  // A LEADING `@` is a handle rather than an address, so it is stripped instead of split on — the
+  // difference is whether there is anything in front of it.
+  const at = name.indexOf('@')
+  const local = at > 0 ? name.slice(0, at) : name.replace(/^@+/, '')
+  const words = local.split(/[\s._-]+/).filter(Boolean)
+  const letters = words.flatMap((word) => [...word].find((glyph) => /[\p{L}\p{N}]/u.test(glyph)) ?? [])
+  if (!letters.length) return ''
+  return (letters.length > 1 ? letters[0] + letters[letters.length - 1] : letters[0]).toUpperCase()
+}
 
 /** `%` reads wrong with a space and every other unit reads wrong without one. */
 const withUnit = (text: string, unit: string | undefined): string =>
@@ -65,10 +89,10 @@ export function formatCell(
       // know its values ahead of the data — it just cannot be pre-toned or pre-ordered.
       return { kind: 'enum', label: declared?.label ?? id, tone: declared?.tone ?? 'muted' }
     }
-    case 'person':
-      // A name. The avatar wants an identity the wire does not carry: `person` is a display string,
-      // not a resolved account, and inventing a gravatar from it would be a guess rendered as fact.
-      return { kind: 'person', name: String(value) }
+    case 'person': {
+      const name = String(value)
+      return { kind: 'person', name, initials: personInitials(name) }
+    }
     case 'link': {
       const url = String(value)
       // Host-mediated: the same check `openUrl` applies before handing a plugin's URL to the

@@ -14,7 +14,7 @@ import { panelSchema, unionRows, type PanelSourcePage } from './mapping'
 import { panelRefreshSeconds, type PanelDefinition, type PanelQuery } from './model'
 import { shapeRows, visibleFields } from './shaping'
 
-// One panel's data (docs/future/dashboards/data-contract.md § Freshness).
+// One panel's data (docs/dashboards.md § Freshness).
 //
 // Fetched through the fan-out pinned to one node, exactly as a descriptor's rail list is
 // (plugins/chrome/ChromeSourcePanel.tsx). That is not ceremony: it is the only reader in the client
@@ -57,6 +57,33 @@ export const cachedCollectionPage = (
   // `clientFor` MINTS a cache and an IndexedDB persister for whatever it is handed, so an unset node
   // id would quietly create one for the empty string rather than answer "nothing cached".
   nodeId ? clientFor(nodeId).client.getQueryData<PluginCollectionPage>(collectionQueryKey(query)) : undefined
+
+/** Whether a query-cache event is about a collection page. Exported for its own test: every other
+ *  query on the node — repos, tasks, rail rows — ticking here would rerun the editor's derivations
+ *  for nothing, and a predicate that quietly stopped matching would be invisible. */
+export const isCollectionCacheKey = (key: readonly unknown[]): boolean => key[0] === 'collection'
+
+/** A revision that ticks whenever a collection page lands in this node's cache.
+ *
+ *  `getQueryData` is a SNAPSHOT, and that is a real gap rather than a nicety: the panel editor reads
+ *  the answered schema out of the cache, and a collection that describes itself in its response has
+ *  nothing there until a panel over it has drawn once. Without this, a first answer arriving WHILE
+ *  the editor is open — because the panel was just placed, or another panel over the same collection
+ *  fetched — leaves the form cold until it is closed and reopened.
+ *
+ *  Deliberately NOT the editor issuing its own fetch. Whether an editor may RUN a collection to
+ *  learn its shape is the question run-once-and-pin answers properly, with a person pressing the
+ *  button (docs/future/dashboards/dynamic-collections.md); it must not be answered a second time by
+ *  a side effect. */
+export function createCollectionCacheRevision(nodeId: string): Accessor<number> {
+  const [revision, setRevision] = createSignal(0)
+  if (!nodeId) return revision
+  const unsubscribe = clientFor(nodeId).client.getQueryCache().subscribe((event) => {
+    if (isCollectionCacheKey(event.query.queryKey)) setRevision((value) => value + 1)
+  })
+  onCleanup(unsubscribe)
+  return revision
+}
 
 /** One source's read, as the panel's chrome sees it. */
 export type PanelSourceState = {

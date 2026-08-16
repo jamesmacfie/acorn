@@ -7,8 +7,9 @@ import { CollapsibleSection } from '../ui/CollapsibleSection'
 import Icon from '../ui/Icon'
 import { Modal } from '../ui/Modal'
 import Picker from '../ui/Picker'
+import { chartAxisFields, chartShapesFor, defaultChartAxis, defaultChartView, type ChartShape } from './chart'
 import { collectionsForPicker, defaultPanelTitle } from './compose'
-import { cachedCollectionPage } from './data'
+import { cachedCollectionPage, createCollectionCacheRevision } from './data'
 import {
   defaultFilterFor,
   defaultGroupBy,
@@ -27,13 +28,13 @@ import {
   isMapped,
   mappedColumnId,
   newColumnId,
+  panelFieldsFor,
   panelSchema,
   sourceFieldFor,
   statusValuesOf,
   suggestFieldMapping,
   suggestValueMapping,
   withMappedValue,
-  PANEL_FIELDS,
   type PanelSourcePage,
 } from './mapping'
 import {
@@ -41,6 +42,7 @@ import {
   panelSourceKey,
   type PanelAggregate,
   type PanelDefinition,
+  type PanelFieldDef,
   type PanelFilter,
   type PanelMapping,
   type PanelQuery,
@@ -50,11 +52,11 @@ import {
   type PanelView,
   type PanelViewKind,
 } from './model'
-import { ColumnSelect, FieldSelect, OperatorSelect, ParamInput, ToneSelect, ValueInput } from './selectors'
+import { ColumnSelect, FieldSelect, FieldTypeSelect, OperatorSelect, ParamInput, ToneSelect, ValueInput } from './selectors'
 import { groupableFields } from './shaping'
 import './dashboards.css'
 
-// THE panel editor (docs/future/dashboards/composition.md § The generated editor) — one component
+// THE panel editor (docs/dashboards.md § The generated editor) — one component
 // for both entry points, because "add" and "edit" are the same question asked of a panel that does
 // not exist yet.
 //
@@ -75,7 +77,15 @@ import './dashboards.css'
 // re-creates its row and the input loses focus mid-word. `<Index>` keys by position, which is what a
 // positional list is.
 
-const VIEW_LABELS: Record<PanelViewKind, string> = { stat: 'Stat', list: 'List', table: 'Table', board: 'Board' }
+const VIEW_LABELS: Record<PanelViewKind, string> = {
+  stat: 'Stat',
+  list: 'List',
+  table: 'Table',
+  board: 'Board',
+  chart: 'Chart',
+}
+
+const SHAPE_LABELS: Record<ChartShape, string> = { bar: 'Bar', line: 'Line' }
 
 const AGGREGATES: readonly { value: PanelAggregate; label: string }[] = [
   { value: 'count', label: 'Count of rows' },
@@ -119,15 +129,19 @@ export default function PanelEditor(props: {
   // response has nothing here until a panel over it has actually drawn once — which the notice below
   // says out loud rather than presenting an empty form.
   //
-  // Read once, not tracked. `getQueryData` is not reactive, so a source whose first answer
-  // lands WHILE this modal is open stays cold until it is reopened. The ceiling is one extra
-  // open/close; a subscription to another node's QueryClient for the lifetime of a modal is not worth
-  // it. Upgrade path: `queryClient.getQueryCache().subscribe` behind a signal.
-  const pages = createMemo((): PanelSourcePage[] => queries().map((query) => ({
-    query,
-    schema: schemaOf(entryFor(query), cachedCollectionPage(query, nodeId)?.schema),
-    rows: [],
-  })))
+  // REACTIVE, via a cache subscription (data.ts § createCollectionCacheRevision), because
+  // `getQueryData` is only a snapshot: an answer landing while this modal is open — the panel was
+  // just placed, or a sibling panel over the same collection fetched — has to fill the gated
+  // sections in place rather than waiting for a reopen.
+  const cacheRevision = createCollectionCacheRevision(nodeId)
+  const pages = createMemo((): PanelSourcePage[] => {
+    cacheRevision()
+    return queries().map((query) => ({
+      query,
+      schema: schemaOf(entryFor(query), cachedCollectionPage(query, nodeId)?.schema),
+      rows: [],
+    }))
+  })
 
   const schema = createMemo(() => panelSchema(pages(), mapping()))
   const mapped = createMemo(() => isMapped(queries(), mapping()))
@@ -167,7 +181,7 @@ export default function PanelEditor(props: {
       setShaping({})
       setLimitText('')
     }
-    // THE ROLE PRE-FILL, and the only reason the role vocabulary exists (data-contract.md): the host
+    // THE ROLE PRE-FILL, and the only reason the role vocabulary exists (docs/dashboards.md § The two vocabularies): the host
     // proposes "your title is that source's title, your status is its status" and writes the proposal
     // into the config, where the Fields matrix below shows exactly what it decided. It never guesses
     // silently and it never overwrites an answer the person already gave.
@@ -231,6 +245,44 @@ export default function PanelEditor(props: {
       fields: { ...(current.fields ?? {}), [key]: { ...(current.fields?.[key] ?? {}), [panelFieldId]: sourceFieldId } },
     }))
 
+  // ── The user's own panel fields ─────────────────────────────────────────────────────────────
+
+  const extraFields = () => mapping().extraFields ?? []
+
+  const addField = () => setMapping((current) => ({
+    ...current,
+    extraFields: [
+      ...(current.extraFields ?? []),
+      // `text` because it is the type every collection has some of, and the two cases that motivated
+      // invented fields — a repo name, an issue identifier — are both text.
+      { id: newColumnId(), label: `Field ${(current.extraFields?.length ?? 0) + 1}`, type: 'text' as const },
+    ],
+  }))
+
+  const editField = (index: number, change: Partial<PanelFieldDef>) => setMapping((current) => ({
+    ...current,
+    extraFields: (current.extraFields ?? []).map((field, at) => (at === index ? { ...field, ...change } : field)),
+  }))
+
+  const removeField = (index: number) => setMapping((current) => {
+    const removed = current.extraFields?.[index]
+    const extra = (current.extraFields ?? []).filter((_, at) => at !== index)
+    // Its per-source answers go with it. `pruneMapping` would drop them on save anyway; doing it
+    // here as well means the matrix on screen is the mapping that will be stored.
+    const fields = Object.fromEntries(
+      Object.entries(current.fields ?? {}).flatMap(([key, entries]) => {
+        const { [removed?.id ?? '']: _gone, ...kept } = entries
+        return Object.keys(kept).length ? [[key, kept] as const] : []
+      }),
+    )
+    const next: PanelMapping = { ...current }
+    if (extra.length) next.extraFields = extra
+    else delete next.extraFields
+    if (Object.keys(fields).length) next.fields = fields
+    else delete next.fields
+    return next
+  })
+
   const setUnmapped = (destination: 'catch-all' | 'hidden') => setMapping((current) => {
     const next: PanelMapping = { ...current }
     if (destination === 'hidden') next.unmapped = 'hidden'
@@ -272,7 +324,22 @@ export default function PanelEditor(props: {
     // A board with no group-by has no columns, so choosing the view IS choosing a grouping. It is
     // written into shaping rather than held by the view, so switching to a table and back keeps it.
     if (kind === 'board' && !fieldById(shaping().groupBy)) patch({ groupBy: defaultGroupBy(schema()) })
+    // The type-inferred chart: pre-pick the axes from what the schema declares, so a person gets a
+    // sensible chart in two clicks and then adjusts. Only when the panel names no shape yet —
+    // re-choosing `chart` must not overwrite the axes somebody already set.
+    if (kind === 'chart' && !view().shape) setView((current) => ({ ...current, ...defaultChartView(schema(), shaping()) }))
   }
+
+  const shapes = createMemo(() => chartShapesFor(schema()))
+  /** The shape the panel will actually draw: its own, if this schema still supports it. */
+  const shape = (): ChartShape => {
+    const wanted = view().shape
+    return wanted && shapes().includes(wanted) ? wanted : shapes()[0] ?? 'bar'
+  }
+  const chooseShape = (next: ChartShape) =>
+    // A bar's category axis and a line's time axis are different fields, so the old `x` cannot be
+    // carried across — it is re-inferred for the shape that is now selected.
+    setView((current) => ({ ...current, shape: next, x: defaultChartAxis(schema(), next, shaping()) }))
 
   /** Everything but `count` is an aggregate OVER a field, so choosing one chooses a field too. */
   const chooseAggregate = (aggregate: PanelAggregate) => setView((current) => ({
@@ -414,7 +481,48 @@ export default function PanelEditor(props: {
             </Field>
           </Show>
 
-          <Show when={view().kind === 'stat'}>
+          {/* The chart's own two decisions. The SHAPE picker only lists shapes the schema can
+              support, and the axis picker only lists fields of the type that shape needs — the same
+              gate as the view list, one level down, so a chart that cannot draw is unrepresentable
+              rather than validated. The measure below is shared with `stat`. */}
+          <Show when={view().kind === 'chart'}>
+            <div class="dash-editor-pair">
+              <Field label="Shape">
+                <SegmentedControl<ChartShape>
+                  ariaLabel="Chart shape"
+                  size="sm"
+                  value={shape()}
+                  onChange={chooseShape}
+                  options={shapes().map((entry) => ({ value: entry, label: SHAPE_LABELS[entry] }))}
+                />
+              </Field>
+              <Field label={shape() === 'line' ? 'Over' : 'By'}>
+                <FieldSelect
+                  fields={chartAxisFields(schema(), shape())}
+                  value={view().x}
+                  ariaLabel={shape() === 'line' ? 'Time axis' : 'Category axis'}
+                  onChange={(id) => setView((current) => ({ ...current, x: id }))}
+                />
+              </Field>
+            </div>
+            {/* Optional, and only on a line: splitting a bar chart by a second enum is a grouped bar
+                chart, which is a third shape and therefore a decision rather than a knob. */}
+            <Show when={shape() === 'line' && groupable().length}>
+              <Field label="Split into series" hint="One line per value. Leave empty for a single line.">
+                <FieldSelect
+                  fields={groupable()}
+                  value={view().series}
+                  ariaLabel="Series"
+                  emptyLabel="No split"
+                  onChange={(id) => setView((current) => ({ ...current, series: id || undefined }))}
+                />
+              </Field>
+            </Show>
+          </Show>
+
+          {/* One measure, two views: a stat draws it as a number and a chart draws it as a height,
+              so flipping between them keeps what the panel is counting. */}
+          <Show when={view().kind === 'stat' || view().kind === 'chart'}>
             <div class="dash-editor-pair">
               <Field label="Measure">
                 <Select size="sm" aria-label="Aggregate" value={view().aggregate ?? 'count'} onChange={(event) => chooseAggregate(event.currentTarget.value as PanelAggregate)}>
@@ -535,15 +643,60 @@ export default function PanelEditor(props: {
             {/* Folded, because the role pre-fill is right almost always and a matrix nobody needs to
                 touch should not be the first thing they see. */}
             <CollapsibleSection level="sub" label="Fields" persistKey="dashboards.field-mapping">
+              {/* THE ROLE CEILING'S RELEASE VALVE (model.ts § PanelFieldDef). The five roles are what
+                  the host can align without asking; anything else — github's repo, linear's
+                  identifier — the person names here and then answers for, per source, in the same
+                  matrix below. */}
+              <SectionHeader
+                level="sub"
+                actions={(
+                  <Button size="xs" variant="ghost" onClick={addField}>
+                    <Icon name="plus" /> Add field
+                  </Button>
+                )}
+              >
+                Your own fields
+              </SectionHeader>
+              <Show
+                when={extraFields().length}
+                fallback={(
+                  <span class="dash-editor-note muted">
+                    A panel's fields are the five roles two collections can be counted on to share.
+                    Add one of your own for anything else you want to line up.
+                  </span>
+                )}
+              >
+                <ul class="dash-editor-fields">
+                  <Index each={extraFields()}>
+                    {(field, index) => (
+                      <li class="dash-editor-row">
+                        <Input
+                          size="sm"
+                          aria-label="Field name"
+                          value={field().label}
+                          onInput={(event) => editField(index, { label: event.currentTarget.value })}
+                        />
+                        <FieldTypeSelect
+                          ariaLabel={`${field().label} type`}
+                          value={field().type}
+                          onChange={(type) => editField(index, { type })}
+                        />
+                        {removeButton('Remove field', () => removeField(index))}
+                      </li>
+                    )}
+                  </Index>
+                </ul>
+              </Show>
+
               <Index each={pages()}>
                 {(page) => (
                   <>
                     <SectionHeader level="sub">{nameOf(page().query)}</SectionHeader>
-                    <Index each={PANEL_FIELDS}>
+                    <Index each={panelFieldsFor(mapping())}>
                       {(field) => (
                         <Field label={field().name} layout="row">
                           <FieldSelect
-                            fields={candidateFieldsFor(page(), field().id)}
+                            fields={candidateFieldsFor(page(), field().id, mapping())}
                             value={sourceFieldFor(page(), field().id, mapping())}
                             ariaLabel={`${field().name} from ${nameOf(page().query)}`}
                             emptyLabel="None"

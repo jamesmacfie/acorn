@@ -3,14 +3,15 @@
 
    Deliberately thin. The frame is `.ui-card`, the rows are `.ui-row`, the table is `.ui-table` and
    the empty states are `.ui-empty` — everything here is the space BETWEEN those, so a panel over a
-   third-party plugin's collection restyles with every appearance pack for free. No new tokens: a
-   panel that needed one would be asserting a shape the packs do not already have a rung for. */
+   third-party plugin's collection restyles with every appearance pack for free. No new APPEARANCE
+   tokens: a panel that needed one would be asserting a shape the packs do not already have a rung
+   for. The two `--dash-*` properties below are a measurement PanelGrid writes in, not a design
+   decision — the shape stays here, where a pack can reach it. */
 
 /* ── Placement ───────────────────────────────────────────────────────────────────────────── */
 
-/* One placement's worth of panels (dashboards/PanelGrid.tsx). The card grid is `.fleet-cards`'
-   recipe with a wider floor — a node card holds five facts, a panel holds a table — and the same
-   auto-fill so the column count follows the surface rather than a breakpoint list. */
+/* One placement's worth of panels (dashboards/PanelGrid.tsx): the section heading, the add button
+   and the grid, stacked. The grid's own geometry is below. */
 .dash-placement {
   display: flex;
   flex-direction: column;
@@ -24,27 +25,189 @@
   display: flex;
 }
 
+/* The task-pane placement (dashboards/DashboardPane.tsx). Nothing but the pane's own padding and a
+   scroll — the grid inside is the same component Home draws, at a different scope. */
+.dash-pane {
+  height: 100%;
+  overflow: auto;
+  padding: var(--pane-pad-y) var(--pane-pad);
+  min-width: 0;
+}
+
+/* ── The grid ────────────────────────────────────────────────────────────────────────────── */
+
+/* Twelve columns, square cells, each panel at an explicit `grid-area` from its rect
+   (dashboards/layout.ts). The browser owns every pixel except the cell HEIGHT, which is the one
+   ResizeObserver measurement PanelGrid makes — a square cell is what makes the drag overlay read as
+   graph paper and "3 wide, 2 tall" mean something visually.
+
+   `--dash-cell` and `--dash-pitch` are overwritten inline by that measurement. The values here are
+   the pre-measure fallback, so the first paint is a plausible grid rather than a stack of
+   zero-height rows. */
 .dash-grid {
+  --dash-cell: var(--row-h);
+  --dash-pitch: var(--row-h);
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: var(--dash-cell);
   gap: var(--space-3);
   min-width: 0;
 }
 
+/* Too narrow for cells to mean anything: one column in reading order, heights content-driven as
+   they were before geometry existed. PURELY PRESENTATIONAL — nothing in storage changes and the
+   component stops emitting grid areas, so widening the window restores the arrangement exactly.
+   Gestures disarm here; move up / move down still work. */
+.dash-grid[data-collapsed] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: auto;
+}
+
+.dash-slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.dash-slot > .dash-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The dragged panel leaves the flow visually: raised, shadowed, and translated under the pointer
+   while its placeholder holds the cells it would land in. */
+.dash-slot[data-gesture='move'] {
+  z-index: var(--z-float);
+  box-shadow: var(--shadow-3);
+}
+.dash-slot[data-gesture='resize'] {
+  z-index: var(--z-float);
+}
+.dash-slot[data-gesture='keyboard'] > .dash-panel {
+  outline: var(--focus-ring-w) var(--focus-ring-style) var(--ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* The candidate cells, in the same dashed language as the overlay so a drag reads as one thing. */
+.dash-placeholder {
+  border: var(--control-bw) dashed var(--border-strong);
+  border-radius: var(--radius-surface);
+  background: var(--bg-subtle);
+  min-width: 0;
+}
+
+/* The cell lattice, drawn ONLY while a gesture is live — it appears on arm and vanishes on release,
+   iOS-widget style. Two repeating gradients rather than an SVG pattern: no asset, and the same
+   `--dash-pitch` arithmetic as the grid, so panel edges sit exactly on drawn lines.
+
+   The colour is the plain border token at low emphasis rather than the `--divider` recipe: packs
+   zero that width (tokens-style.css), and a lattice with no lines is not a lattice. Some packs will
+   still make it barely there, which is correct — this is scaffolding, not content. */
+.dash-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-base);
+  pointer-events: none;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(to right, var(--border) 0 var(--bw), transparent var(--bw) var(--dash-pitch)),
+    repeating-linear-gradient(to bottom, var(--border) 0 var(--bw), transparent var(--bw) var(--dash-pitch));
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+
+/* Invisible until the panel is hovered or focused within: nothing about the layout is discoverable
+   chrome until a gesture makes it relevant. No `n`/`w` handles — with gravity on, resizing from the
+   top or left is a move plus a resize and earns its complexity nowhere. */
+.dash-resize {
+  position: absolute;
+  opacity: 0;
+  touch-action: none;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.dash-slot:hover .dash-resize,
+.dash-slot:focus-within .dash-resize {
+  opacity: 1;
+}
+.dash-resize::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
+}
+.dash-resize-e {
+  inset-block: var(--space-4);
+  inset-inline-end: calc(var(--space-1) * -1);
+  width: var(--space-1);
+  cursor: ew-resize;
+}
+.dash-resize-s {
+  inset-inline: var(--space-4);
+  inset-block-end: calc(var(--space-1) * -1);
+  height: var(--space-1);
+  cursor: ns-resize;
+}
+.dash-resize-se {
+  inset-block-end: calc(var(--space-1) * -1);
+  inset-inline-end: calc(var(--space-1) * -1);
+  width: var(--space-2);
+  height: var(--space-2);
+  cursor: nwse-resize;
+}
+
+/* The keyboard path's running commentary. Off-screen rather than `display: none`, which screen
+   readers skip entirely. */
+.dash-live {
+  position: absolute;
+  width: var(--space-1);
+  height: var(--space-1);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A pack that asks for stillness gets it: positions still update live, they just do not animate. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-grid-overlay,
+  .dash-resize {
+    transition: none;
+  }
+}
+
 /* ── Panel ───────────────────────────────────────────────────────────────────────────────── */
 
+/* Fills its rect. Before geometry existed a panel was content-sized and the grid row followed it;
+   now the row is `h` square cells tall and the panel fills it, which is what gives the body
+   something to scroll inside. In the collapsed one-column state the row is auto and this is inert. */
 .dash-panel {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
+/* Also the placement's DRAG SURFACE (dashboards/PanelGrid.tsx) — the body is deliberately not, so a
+   press inside a board stays free for a future card gesture. The cursor is the whole affordance. */
 .dash-panel-head {
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
   min-width: 0;
+  touch-action: none;
+}
+.dash-grid:not([data-collapsed]) .dash-panel-head {
+  cursor: grab;
+}
+.dash-grid:not([data-collapsed]) .dash-slot[data-gesture='move'] .dash-panel-head {
+  cursor: grabbing;
+}
+/* The buttons in the header are not the drag surface, and their own cursor says so. */
+.dash-panel-head button {
+  cursor: pointer;
 }
 .dash-panel-title {
   flex: 1;
@@ -59,10 +222,14 @@
   white-space: nowrap;
 }
 
-/* Scrolls itself rather than growing the surface: a placement decides how tall a panel is, and a
-   500-row collection must not decide it instead. */
+/* Scrolls itself rather than growing the surface: the RECT decides how tall a panel is, and a
+   500-row collection must not decide it instead. A table taller than its panel scrolls inside it,
+   which is what every surveyed dashboard does, and the row cap in the wire contract
+   (@acorn/protocol/collections.ts) bounds the worst case. */
 .dash-panel-body {
+  flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -168,6 +335,8 @@
   gap: var(--space-3);
   overflow-x: auto;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .dash-board-column {
@@ -175,6 +344,7 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+  min-height: 0;
 }
 
 .dash-board-column-head {
@@ -197,15 +367,17 @@
   font-variant-numeric: var(--tabular);
 }
 
-/* Each column scrolls on its own, so one long column cannot push the others out of view. The cap is
-   what makes that true — without a height there is nothing to scroll inside. */
+/* Each column scrolls on its own, so one long column cannot push the others out of view. The panel's
+   own rect is what makes that true now — before geometry existed this needed a hard pixel cap,
+   because a content-sized panel had no height to scroll inside. */
 .dash-board-cards {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  max-height: 400px;
   overflow-y: auto;
   min-width: 0;
+  min-height: 0;
 }
 
 /* A declared column with nothing in it still draws, so it needs something to be. */
@@ -247,13 +419,92 @@
   color: var(--text-muted);
 }
 
+/* ── Chart ───────────────────────────────────────────────────────────────────────────────── */
+
+/* Hand-rolled SVG over `dashboards/chart.ts`'s output — no charting dependency for two shapes with
+   no zoom and no brush. The viewBox scales uniformly to whatever rect the panel has, so the
+   component makes no measurement; the trade is that an extreme aspect ratio letterboxes rather than
+   stretching, which is the right way round because stretching distorts the type with it.
+
+   EVERY COLOUR IS A TONE. A mark carries `data-tone` from the plugin's declared enum value or from
+   the ordinal ramp, and the five below are the same five StatusDot uses (primitives.css) — so a
+   chart restyles with the appearance pack and no chart token had to be classified in tokenAxes.ts. */
+.dash-chart {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+}
+
+.dash-chart-grid,
+.dash-chart-axis {
+  stroke: var(--border);
+  stroke-width: var(--bw);
+  fill: none;
+}
+.dash-chart-axis {
+  stroke: var(--border-strong);
+}
+
+.dash-chart-tick {
+  fill: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: var(--tabular);
+}
+
+.dash-chart-bar {
+  fill: var(--text-faint);
+}
+.dash-chart-line {
+  fill: none;
+  stroke: var(--text-faint);
+  stroke-width: var(--bw-strong);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dash-chart-point {
+  fill: var(--text-faint);
+}
+
+.dash-chart-bar[data-tone='ok'], .dash-chart-point[data-tone='ok'] { fill: var(--state-ok); }
+.dash-chart-bar[data-tone='warn'], .dash-chart-point[data-tone='warn'] { fill: var(--state-warn); }
+.dash-chart-bar[data-tone='bad'], .dash-chart-point[data-tone='bad'] { fill: var(--state-bad); }
+.dash-chart-bar[data-tone='accent'], .dash-chart-point[data-tone='accent'] { fill: var(--accent); }
+.dash-chart-bar[data-tone='muted'], .dash-chart-point[data-tone='muted'] { fill: var(--text-faint); }
+
+.dash-chart-line[data-tone='ok'] { stroke: var(--state-ok); }
+.dash-chart-line[data-tone='warn'] { stroke: var(--state-warn); }
+.dash-chart-line[data-tone='bad'] { stroke: var(--state-bad); }
+.dash-chart-line[data-tone='accent'] { stroke: var(--accent); }
+.dash-chart-line[data-tone='muted'] { stroke: var(--text-faint); }
+
 /* ── Cells ───────────────────────────────────────────────────────────────────────────────── */
 
-.dash-cell-enum {
+.dash-cell-enum,
+.dash-cell-person {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   white-space: nowrap;
+}
+
+/* A monogram, not a photograph — the mark is the initials of the same display string beside it
+   (dashboards/format.ts § personInitials), because the wire carries a name and not an account. Sized
+   off `--avatar-sm` so it matches the avatars everywhere else in the app under every density pack. */
+.dash-cell-avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
+  border-radius: var(--radius-circle);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
 }
 .dash-cell-time,
 .dash-cell-number {

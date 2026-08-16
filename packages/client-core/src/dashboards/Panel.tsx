@@ -1,6 +1,6 @@
-import { For, Match, Show, Switch, type JSX } from 'solid-js'
+import { createSignal, For, Match, Show, Switch, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import type { PluginCollectionRow } from '@acorn/protocol/collections.ts'
+import type { PluginCollectionRow, PluginCollectionRowAction } from '@acorn/protocol/collections.ts'
 import { activeNodeId } from '../node/activeNode'
 import { FRESHNESS_LABELS } from '../node/freshness'
 import { runChromeAction } from '../plugins/chrome/actions'
@@ -9,12 +9,13 @@ import Icon from '../ui/Icon'
 import { createPanelData } from './data'
 import type { PanelDefinition } from './model'
 import BoardView from './views/BoardView'
+import ChartView from './views/ChartView'
 import ListView from './views/ListView'
 import StatView from './views/StatView'
 import TableView from './views/TableView'
 import './dashboards.css'
 
-// ONE panel, wherever it is placed (docs/future/dashboards/placements.md). Placement-agnostic on
+// ONE panel, wherever it is placed (docs/dashboards.md § Placements). Placement-agnostic on
 // purpose: the surface owns the grid and the add/remove chrome, this owns a panel's own frame,
 // freshness and body, so a task pane or a plugin-reserved region is a container away.
 //
@@ -32,16 +33,30 @@ export type PanelProps = {
   definition: PanelDefinition
   /** Surface chrome — a remove button, a drag handle. The panel does not know what it is placed in. */
   actions?: JSX.Element
+  /** Spread onto the header. The HEADER is the placement's drag surface and the body is not: the
+   *  body scrolls, selects and clicks, and a drag starting on a row would fight the row's own
+   *  action. It also keeps a press inside a board body free for a future card gesture
+   *  (docs/future/dashboards/write-back.md) — the two must never be ambiguous.
+   *
+   *  Opaque here on purpose. The panel does not know whether its surface offers dragging. */
+  headProps?: JSX.HTMLAttributes<HTMLDivElement>
+}
+
+/** What the host says before dispatching a risky row action. The plugin declares a TIER, never a
+ *  sentence — a plugin that could write the prompt could write a reassuring one over a destructive
+ *  call. `read` is not risky and never reaches here. */
+const RISK_PROMPT: Record<string, string> = {
+  write: 'change something',
+  execute: 'run something',
 }
 
 export default function Panel(props: PanelProps) {
   const data = createPanelData(() => props.definition)
   const nodeId = activeNodeId() ?? ''
   const navigate = useNavigate()
+  const [pending, setPending] = createSignal<PluginCollectionRow | undefined>()
 
-  // The row's own declared verb, through the host's dispatcher — the same closed set a rail row's
-  // click runs, and the same refusals. A view never acts on its own, and there is no second path.
-  const activate = (row: PluginCollectionRow): void => {
+  const dispatch = (row: PluginCollectionRow): void => {
     if (!row.action) return
     // `pluginId` is the HOST's stamp on the row, never a field the plugin sent, so a collection
     // cannot route its clicks into a stranger's pane (plugins/chrome/data.ts § readCollection).
@@ -56,6 +71,30 @@ export default function Panel(props: PanelProps) {
     // glance panel over a list you were abandoning would be the wrong shape. Surfaces you are working
     // INSIDE ask for the opposite, and get it (plugins/github § makeContentLinkHandler).
     runChromeAction(row.action, { pluginId: row.pluginId, nodeId, navigate, prefer: 'route' })
+  }
+
+  const riskOf = (action: PluginCollectionRowAction | undefined): string | undefined =>
+    action?.risk && action.risk !== 'read' ? action.risk : undefined
+
+  // The row's own declared verb, through the host's dispatcher — the same closed set a rail row's
+  // click runs, and the same refusals. A view never acts on its own, and there is no second path.
+  //
+  // THE CONFIRMATION IS THE HOST'S, drawn from the declared tier and drawn HERE rather than in a
+  // view, so no view and no plugin can route around it. An action with no tier behaves exactly as it
+  // always did — which is every action any plugin ships today.
+  const activate = (row: PluginCollectionRow): void => {
+    if (!row.action) return
+    if (riskOf(row.action)) {
+      setPending(row)
+      return
+    }
+    dispatch(row)
+  }
+
+  const confirmPending = () => {
+    const row = pending()
+    setPending(undefined)
+    if (row) dispatch(row)
   }
 
   /** The sources whose collection this device can actually resolve. A panel is inert only when NONE
@@ -75,7 +114,7 @@ export default function Panel(props: PanelProps) {
 
   return (
     <Card class="dash-panel" pad="sm">
-      <div class="dash-panel-head">
+      <div class="dash-panel-head" {...props.headProps}>
         <span class="dash-panel-title">{props.definition.title}</span>
         <span class="dash-panel-meta">
           {/* Only when it is not live. A badge that always says "Live" is furniture. */}
@@ -110,6 +149,23 @@ export default function Panel(props: PanelProps) {
           {/* PARTIAL AVAILABILITY IS DATA. One source that could not be read is a banner naming that
               source; the others keep rendering. A mixed panel that blanked because linear was slow
               would be the fleet machinery's mistake made one tier down (node/fanout.ts). */}
+          {/* The armed step for a risky row action. A strip rather than a modal because the row it
+              is about is still on screen behind it, and an explicit Continue rather than a second
+              click on the row because "press it again" is the wrong shape for something that
+              destroys. Nothing is dispatched until this button is pressed. */}
+          <Show when={pending()}>
+            {(row) => (
+              <Alert tone="warn" actions={(
+                <>
+                  <Button size="xs" variant="bare" onClick={() => setPending(undefined)}>Cancel</Button>
+                  <Button size="xs" variant="solid" tone="danger" onClick={confirmPending}>Continue</Button>
+                </>
+              )}
+              >
+                This asks {row().pluginId} to {RISK_PROMPT[riskOf(row().action) ?? ''] ?? 'act'}.
+              </Alert>
+            )}
+          </Show>
           <For each={data.unavailable()}>
             {(entry) => <Alert tone="warn">{entry.label} unavailable — {entry.reason}</Alert>}
           </For>
@@ -143,6 +199,7 @@ export default function Panel(props: PanelProps) {
               <Match when={props.definition.view.kind === 'list'}><ListView {...viewProps()} /></Match>
               <Match when={props.definition.view.kind === 'table'}><TableView {...viewProps()} /></Match>
               <Match when={props.definition.view.kind === 'board'}><BoardView {...viewProps()} /></Match>
+              <Match when={props.definition.view.kind === 'chart'}><ChartView {...viewProps()} /></Match>
             </Switch>
           </Show>
         </Show>

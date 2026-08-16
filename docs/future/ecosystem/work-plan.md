@@ -30,10 +30,10 @@ Startable today, in any order:
 - **Phase 2's first sub-step** — process supervision and lifecycle, reusing the reload path's
   candidate-then-commit shape. Nothing gates it, it is independently useful, and it is the critical
   path for anything discovery-shaped.
-- **Phase 3's first step** — the typed-collection contract, proven on GitHub PRs and Linear issues.
-  Genuinely independent of phase 2, so taking it costs the containment track nothing. Read the drift
-  warning first: `docs/future/dashboards/` was verified against the tree on **2026-08-12** and files
-  3–6 each carry their own verify-before-building list. Budget a re-verify pass, not a rewrite.
+- **Phase 3's remaining backlog** — the typed-collection contract, the panel grid and cross-source
+  mapping all shipped (owning doc: `docs/dashboards.md`). What is left is the deliverables in
+  `docs/future/dashboards/` — new placements, dynamic collections, board-drag write-back —
+  each independent of phase 2, each with its own verify-before-building list.
 - **The signing design doc** — it does not exist, and writing it is not gated on phase 2.
 - **`bundle.md` steps 2–4** — the Linux node-pty prebuild in CI, the CI matrix and release upload for
   Linux and Windows, then the Windows `openssl` problem. Do that last one before anyone downloads a
@@ -81,15 +81,15 @@ dev trust grant.
 Deliverable: "declared" becomes "enforced" for plugin node halves; the permission UI's language
 can finally strengthen.
 
-## Phase 3 — dashboards (owning doc: `docs/future/dashboards/`)
+## Phase 3 — dashboards (owning doc: `docs/dashboards.md`)
 
-Phases 1–3 of that folder's build order: the typed-collection contract proven on GitHub + Linear,
-Home as a composable panel grid, then mapping/derived views/kanban. Independent of phases 1–2
-here; can start any time. It is the most visible form of "plugins composing without knowing each
+**Shipped (2026-08-16)**: the typed-collection contract proven on GitHub + Linear, Home as a
+composable panel grid, mapping/derived views/kanban — the user-composed todo board across two
+providers works end to end. It is the most visible form of "plugins composing without knowing each
 other".
 
-Deliverable: the user-composed todo board across two providers — the folder's own motivating
-scenario.
+What remains is the backlog in `docs/future/dashboards/` (new placements, dynamic
+collections, board-drag write-back), independent of phases 1–2 here.
 
 ## Phase 4 — distribution (owning docs: `docs/security.md § Supply chain`, `docs/future/bundle.md`)
 

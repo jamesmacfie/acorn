@@ -1,8 +1,8 @@
 # What is refused, on the record
 
-Design notes from the dashboards session (2026-08-12). Nothing here is scheduled. Each refusal
+The guardrails on the backlog (`README.md`): what dashboards deliberately do not do. Each refusal
 carries its reasoning and what would have to change to revisit it — so a future session argues
-with the reasoning, not with silence.
+with the reasoning, not with silence. First recorded 2026-08-12; all of it still holds.
 
 ## No plugin-shipped panel components, no widget toolkit in the wire format
 
@@ -10,35 +10,38 @@ The master/detail refusal (`docs/plugins.md § Document surfaces`, which now car
 below on the record) holds: the host will not render a plugin's
 bespoke UI from data, because that means eternally versioning a widget toolkit in the wire format.
 Dashboards clear the bar only because the host renders *its own* generic views over a record
-schema (`README.md § The tension`). When a plugin needs UI the field-type vocabulary can't
-express, the overflow path is a **frame pane** — the escape hatch is planned, not fought
-(`prior-art.md`, the VS Code lesson). Revisit only if the descriptor-vs-frame doctrine itself
-changes.
+schema — the distinction is recorded beside the refusal itself in `docs/plugins.md`. When a plugin
+needs UI the field-type vocabulary can't express, the overflow path is a **frame pane** — the
+escape hatch is planned, not fought (the VS Code lesson from the prior-art survey, now in git
+history). Revisit only if the descriptor-vs-frame doctrine itself changes.
 
 ## No new field type without a fight
 
-The field-type and role vocabularies are closed and budgeted (`data-contract.md`): Grafana ended a
+The field-type and role vocabularies are closed and budgeted
+(`docs/dashboards.md § The two vocabularies, and the budget`): Grafana ended a
 decade with eight field types. Every addition is rendered for every provider forever. The default
 answer to "we need a richer type" is a frame pane; the second answer is composing existing types;
 adding a type is the last answer and a protocol version event.
 
-## No write-back in v1
+## No board-drag write-back yet
 
 Dragging a kanban card is a mutation, and value mappings are many-to-one, so the inverse is
-ambiguous (`composition.md § Write-back`). Shipping read-only first is not a cut corner — it
+ambiguous (`write-back.md`). Shipping read-only first is not a cut corner — it
 avoids designing a per-field mutation contract and its trust story under time pressure. The
 mapping config's persisted shape reserves room (per-(source, column) records that can grow a
 `writeValue`). Revisit when the read-only surface has real usage and the mutation contract can be
-designed against observed boards. Distinct from this: verb-shaped mutations via `runNodeAction`
-are *not* refused and work in v1; their missing confirmation semantics are a reserved additive
-seam on the action descriptor — see `data-contract.md § Reserved seam: destructive and confirmed
-actions`.
+designed against observed boards.
+
+Distinct from this, and no longer refused: verb-shaped mutations via `runNodeAction` work, and their
+confirmation semantics shipped on 2026-08-16 as an additive optional `risk` tier on the action, with
+the **host** drawing the confirmation. That was always the reserved seam; it is now the built one, and
+the board-drag design above reuses it rather than inventing a second prompt.
 
 ## No cross-collection joins
 
 A panel unions collections and maps fields; it does not join them ("show each PR with its linked
 Linear issue" as one row). Joins need key relationships the contract doesn't express, and
-Notion-family systems ship successfully without them (`prior-art.md`). The existing
+Notion-family systems ship successfully without them. The existing
 `contentLinks`/`refResolvers` machinery already covers the adjacent need (linked references
 resolved and rendered on demand). Revisit if union + mapping demonstrably fails the todo-board
 class of use cases — and then consider a declared relation-by-role before a general join.
@@ -47,7 +50,8 @@ class of use cases — and then consider a declared relation-by-role before a ge
 
 `PluginRailItems` is sanitized field-by-field rather than schema-parsed; that pattern is not
 repeated. Collections get real Zod schemas in `@acorn/protocol` from day one
-(`data-contract.md § Validation stance`) — the `agentContexts`/`refResolvers` template. This is a
+(`docs/dashboards.md § Provenance, and what a row may not claim`) — the
+`agentContexts`/`refResolvers` template. This is a
 deliberate, argued exception to "reads are not validated": a loaded plugin's response is untrusted
 wire rendered under the host's chrome, exactly the boundary where all four existing exceptions
 sit.
@@ -56,7 +60,7 @@ sit.
 
 Panel and dashboard definitions are host-owned config in core persistence — never in a frame's
 `state.get/set` prefs namespace, never writable through the bridge, and host panels never render
-inside a frame document (`placements.md § The host-drawn-region rule`). A frame that could edit
+inside a frame document (`placements.md § Plugin-hosted regions`). A frame that could edit
 panel definitions could point the host's chrome at routes of its choosing; the composition layer
 stays entirely on the host side of the trust boundary. Revisit never; widen the placement
 constraint vocabulary instead.

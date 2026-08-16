@@ -3,7 +3,7 @@ import { z } from 'zod'
 // ── What a plugin's collection route may answer ────────────────────────────────────────────────────
 //
 // A COLLECTION is a plugin-declared, typed set of records — "my open pull requests", "issues assigned
-// to me" — that the host renders with its own components (docs/future/dashboards/data-contract.md).
+// to me" — that the host renders with its own components (docs/dashboards.md § Collections).
 // It is the descriptor tier grown one size: from `nodeStats`' one integer with a label to a table of
 // them. Declared in the manifest under `contributions.collections`, fetched and parsed by the host,
 // addressed everywhere as `(pluginId, collectionId)` and by nothing else.
@@ -120,16 +120,29 @@ const cellValue = z.union([z.string().max(MAX_COLLECTION_CELL_CHARS), z.number()
 // collections.test.ts imports both types and assigns each to the other, so the day the two drift the
 // build says so.
 //
-// NO `risk` or `confirm` key in v1, which is why v1 ships no destructive row action at all. The growth
-// path is an additive optional field HERE, on a versioned schema, with the HOST rendering the
-// confirmation from the declared tier — never a new verb, and never plugin-drawn confirmation UI. The
-// precedent is `ToolRisk` on an agent tool (node-core/server/agentTools/registry.ts).
+// The RISK TIER, and the shape it is deliberately in. It is an ADDITIVE OPTIONAL field on the
+// versioned schema — v1 shipped without it and therefore shipped no destructive row action at all,
+// because an action that destroys something must not exist before arm-to-confirm does.
+//
+// The load-bearing part is who draws the confirmation: THE HOST DOES, from the declared tier. Never
+// a new verb ("deleteThing"), and never plugin-drawn confirmation UI — a plugin that could draw its
+// own dialog could also draw a reassuring one over a destructive call. A plugin declares how
+// dangerous the thing is; the host decides what to ask and cannot be talked out of asking.
+//
+// The vocabulary is `ToolRisk` verbatim (api.ts), the tier an agent tool declares and the permission
+// UI already projects. Re-spelled rather than imported for the same reason `contextFreeAction` is: a
+// value import from api.ts would be a module cycle, and collections.test.ts assigns each type to the
+// other so the day the two drift the build says so.
+const rowRisk = z.enum(['read', 'write', 'execute'])
+
+const withRisk = <T extends z.ZodRawShape>(shape: T) => z.object({ ...shape, risk: rowRisk.optional() })
+
 const collectionRowAction = z.discriminatedUnion('verb', [
-  z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
-  z.object({ verb: z.literal('runNodeAction'), path: z.string().min(1).max(256) }),
-  z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
-  z.object({ verb: z.literal('openOverlay'), overlay: z.string().min(1).max(64) }),
-  z.object({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
+  withRisk({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
+  withRisk({ verb: z.literal('runNodeAction'), path: z.string().min(1).max(256) }),
+  withRisk({ verb: z.literal('openUrl'), url: z.string().url() }),
+  withRisk({ verb: z.literal('openOverlay'), overlay: z.string().min(1).max(64) }),
+  withRisk({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
 ])
 
 const collectionRow = z.object({
@@ -164,6 +177,8 @@ export type PluginCollectionSchema = z.infer<typeof collectionSchema>
 export type PluginCollectionParam = z.infer<typeof collectionParam>
 export type PluginCollectionCell = z.infer<typeof cellValue>
 export type PluginCollectionRowAction = z.infer<typeof collectionRowAction>
+/** The tier a row action may declare, and what the host's confirmation is rendered from. */
+export type PluginCollectionRowRisk = z.infer<typeof rowRisk>
 export type PluginCollectionRowBody = z.infer<typeof collectionRow>
 export type PluginCollectionResponse = z.infer<typeof pluginCollectionResponseSchema>
 

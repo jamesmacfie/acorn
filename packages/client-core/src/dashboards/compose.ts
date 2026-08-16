@@ -2,8 +2,8 @@ import type { PluginCollectionSchema } from '@acorn/protocol/collections.ts'
 import type { CollectionContribution } from '../registries/collections'
 import { viewsForSchema, type PanelViewKind } from './model'
 
-// The derivations behind the add/remove/reorder chrome (docs/future/dashboards/placements.md § Home
-// dashboard). Everything here is pure and takes its inputs as arguments rather than reading the
+// The derivations behind the add/remove/reorder chrome (docs/dashboards.md § On Home).
+// Everything here is pure and takes its inputs as arguments rather than reading the
 // registry or the store, because the components that use it cannot be rendered in a test — vitest
 // runs in node with no Solid plugin — so this is where the parts that can actually be wrong live.
 
@@ -22,7 +22,7 @@ export const viewsForCollection = (entry: Pick<CollectionContribution, 'schema'>
 
 /** The view to preselect when a collection is chosen, keeping the current one if it survives the
  *  swap. Never returns a kind the schema cannot support — the editor offers no invalid choice, so
- *  there is nothing to validate later (composition.md § The generated editor). */
+ *  there is nothing to validate later (docs/dashboards.md § The generated editor). */
 export const viewForCollection = (entry: Pick<CollectionContribution, 'schema'>, current: PanelViewKind | undefined): PanelViewKind => {
   const offered = viewsForCollection(entry)
   return current && offered.includes(current) ? current : (offered[0] ?? 'list')
@@ -56,16 +56,4 @@ export function defaultPanelTitle<T extends CollectionRef>(entry: T, entries: re
     candidate.name === entry.name
     && (candidate.pluginId !== entry.pluginId || candidate.collectionId !== entry.collectionId))
   return ambiguous ? `${entry.name} (${entry.pluginId})` : entry.name
-}
-
-/** Where a panel at `index` lands when moved by one, or `undefined` when the move does nothing.
- *
- *  The index is the one to hand `placePanel`, and it is `index + delta` in BOTH directions only
- *  because `placePanel` removes the panel before inserting: moving down past a neighbour in the
- *  shortened list is the same number as swapping with it in the original. Computing a "target slot"
- *  against the original list instead is the off-by-one this function exists to hold still. */
-export const panelMoveTarget = (index: number, delta: -1 | 1, count: number): number | undefined => {
-  if (!Number.isInteger(index) || index < 0 || index >= count) return undefined
-  const target = index + delta
-  return target < 0 || target >= count ? undefined : target
 }

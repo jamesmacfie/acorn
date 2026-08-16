@@ -1,8 +1,11 @@
 import { createSignal } from 'solid-js'
 import { PrefKeys } from '../persistence/prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from '../persistence/persistedState'
+import { COLLECTION_FIELD_TYPES, type PluginCollectionFieldType } from '@acorn/protocol/collections.ts'
+import { COLS, normalize, readingOrder, sizeFor, type PanelLayout, type Rect } from './layout'
 import type {
   PanelDefinition,
+  PanelFieldDef,
   PanelFilter,
   PanelFilterOp,
   PanelId,
@@ -16,7 +19,7 @@ import type {
   PanelView,
 } from './model'
 
-// The persisted dashboard model (docs/future/dashboards/composition.md § The persisted model).
+// The persisted dashboard model (docs/dashboards.md § Persistence).
 //
 // Three decisions, all of them the expensive-later kind:
 //
@@ -62,9 +65,26 @@ export type DashboardState = {
   panels: Record<PanelId, PanelDefinition>
   /** Placement scope key → the panels placed there, in render order. */
   placements: Record<string, PanelId[]>
+  /** Placement scope key → panel id → its rect on that surface (layout.ts).
+   *
+   *  A SIBLING KEY rather than turning the `placements` entries into `{ id, x, y, w, h }` objects,
+   *  which would be tidier. These blobs are node-owned and shared by every client paired with the
+   *  node (docs/state.md), and the shipped parser keeps only STRING entries from a placement array —
+   *  object entries would parse to an empty placement and the board would vanish on an old client. A
+   *  sibling key is invisible to an old parser: it renders the order-only grid it always did.
+   *
+   *  THE HONEST CEILING, on the record: an old client that WRITES the slice serialises only what it
+   *  parsed, so a write from one drops `layouts` — geometry resets to auto-placement while the
+   *  panels, their definitions and their order all survive. Losing arrangement and keeping
+   *  composition is the right way round, and it is the best available under the slice model, which
+   *  does not round-trip unknown top-level keys.
+   *
+   *  Geometry is per (scope, panel), never on the definition: the same panel placed on Home and in a
+   *  task pane has two rects. That is the Perses layouts-reference-panels split already in force. */
+  layouts: Record<string, Record<PanelId, Rect>>
 }
 
-export const emptyDashboards = (): DashboardState => ({ panels: {}, placements: {} })
+export const emptyDashboards = (): DashboardState => ({ panels: {}, placements: {}, layouts: {} })
 
 // ── Codec ─────────────────────────────────────────────────────────────────────────────────────
 //
@@ -169,9 +189,23 @@ const parseColumn = (raw: unknown): PanelMappingColumnDef | undefined => {
   return { id, label, ...(tone ? { tone } : {}) }
 }
 
+const FIELD_TYPES: readonly PluginCollectionFieldType[] = COLLECTION_FIELD_TYPES
+
+const parseFieldDef = (raw: unknown): PanelFieldDef | undefined => {
+  if (!isRecord(raw)) return undefined
+  const id = str(raw.id)
+  const label = str(raw.label)
+  // The pair IS the field, same rule as a column — and the type has to be one this build renders,
+  // because every view dispatches on it.
+  const type = FIELD_TYPES.find((candidate) => candidate === raw.type)
+  if (!id || !label || !type) return undefined
+  return { id, label, type }
+}
+
 const parseMapping = (raw: unknown): PanelMapping | undefined => {
   if (!isRecord(raw)) return undefined
   const columns = list(raw.columns, parseColumn)
+  const extraFields = list(raw.extraFields, parseFieldDef)
 
   const bySource: Record<string, Record<string, PanelMappingColumn>> = {}
   if (isRecord(raw.bySource)) {
@@ -202,6 +236,7 @@ const parseMapping = (raw: unknown): PanelMapping | undefined => {
     ...(columns.length ? { columns } : {}),
     ...(Object.keys(bySource).length ? { bySource } : {}),
     ...(Object.keys(fields).length ? { fields } : {}),
+    ...(extraFields.length ? { extraFields } : {}),
     ...(raw.unmapped === 'hidden' ? { unmapped: 'hidden' as const } : {}),
   }
   return Object.keys(mapping).length ? mapping : undefined
@@ -215,10 +250,20 @@ const parseView = (raw: unknown): PanelView => {
   const kind = str(raw.kind) ?? 'list'
   const aggregate = str(raw.aggregate)
   const field = str(raw.field)
+  // The chart keys, tolerantly. Same additive posture as every other key in this slice: an old
+  // client that WRITES the blob drops them and the chart falls back to its inferred defaults — the
+  // panel itself survives, and an old client RENDERING a `chart` panel already shows "view
+  // unavailable" rather than coercing it to something it can draw.
+  const shape = raw.shape === 'bar' || raw.shape === 'line' ? raw.shape : undefined
+  const x = str(raw.x)
+  const series = str(raw.series)
   return {
     kind,
     ...(aggregate ? { aggregate: aggregate as PanelView['aggregate'] } : {}),
     ...(field ? { field } : {}),
+    ...(shape ? { shape } : {}),
+    ...(x ? { x } : {}),
+    ...(series ? { series } : {}),
   }
 }
 
@@ -237,6 +282,40 @@ export function parsePanelDefinition(raw: unknown): PanelDefinition | undefined 
     shaping: parseShaping(raw.shaping),
     view: parseView(raw.view),
     ...(typeof raw.refresh === 'number' && Number.isFinite(raw.refresh) ? { refresh: raw.refresh } : {}),
+  }
+}
+
+// ── The geometry codec ────────────────────────────────────────────────────────────────────────
+//
+// A rect is one more thing the codec TOLERATES THE ABSENCE OF, not a new validity requirement. Three
+// rules, and between them they mean no blob can produce an unrenderable grid:
+//
+//   A malformed rect is DROPPED, not repaired into place. The panel it belonged to just becomes
+//   rect-less, which is a case with a defined answer already.
+//
+//   A placed panel with no rect is AUTO-PLACED at render time (layout.ts § firstFit). That one rule
+//   is simultaneously the migration for every existing blob, the old-client-write recovery, and the
+//   new-panel default.
+//
+//   An entry naming a panel that is not placed in that scope is RETAINED UNREAD — the unknown-id rule
+//   again. It costs bytes, not correctness, and dropping it would make a partially-written blob
+//   destructive.
+//
+// No version bump: the change is additive, both directions degrade as described, and the shape still
+// parses under the old parser — which is what the slice version is a statement about.
+
+const parseRect = (raw: unknown): Rect | undefined => {
+  if (!isRecord(raw)) return undefined
+  const numbers = [raw.x, raw.y, raw.w, raw.h]
+  if (!numbers.every((value) => typeof value === 'number' && Number.isFinite(value))) return undefined
+  // Only the grid-wide bounds here. The per-view-kind minimums are applied by `normalize`, not by
+  // the codec, so lowering one later is a behaviour change rather than a migration.
+  const w = Math.max(1, Math.min(COLS, Math.floor(raw.w as number)))
+  return {
+    w,
+    h: Math.max(1, Math.floor(raw.h as number)),
+    x: Math.max(0, Math.min(COLS - w, Math.floor(raw.x as number))),
+    y: Math.max(0, Math.floor(raw.y as number)),
   }
 }
 
@@ -261,7 +340,19 @@ export function parseDashboards(raw: unknown): DashboardState {
       placements[key] = entry.filter((id): id is string => typeof id === 'string' && id.length > 0)
     }
   }
-  return { panels, placements }
+  const layouts: Record<string, Record<PanelId, Rect>> = {}
+  if (isRecord(value.layouts)) {
+    for (const [key, entry] of Object.entries(value.layouts)) {
+      if (!isRecord(entry)) continue
+      const rects: Record<PanelId, Rect> = {}
+      for (const [id, candidate] of Object.entries(entry)) {
+        const rect = parseRect(candidate)
+        if (rect) rects[id] = rect
+      }
+      if (Object.keys(rects).length) layouts[key] = rects
+    }
+  }
+  return { panels, placements, layouts }
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────────────────────
@@ -283,18 +374,59 @@ export const panelsAt = (scope: PlacementScope): PanelDefinition[] => {
   })
 }
 
+/** The arranged geometry of a scope, ready to render: every placed panel has a rect, nothing
+ *  overlaps, and everything has floated up.
+ *
+ *  `normalize` runs on the way OUT rather than on the way in, so the persisted blob is never
+ *  rewritten just because it was read — a client that only looks at a board must not be the one that
+ *  changes it for every other client paired with the node. */
+export const layoutAt = (scope: PlacementScope): PanelLayout => {
+  const state = dashboards()
+  const key = placementScopeKey(scope)
+  const order = (state.placements[key] ?? []).filter((id) => state.panels[id])
+  const stored = state.layouts[key] ?? {}
+  // Only the rects of panels actually placed here. A retained entry for a panel that has since been
+  // unplaced is carried in storage but must not occupy space in the grid.
+  const rects = Object.fromEntries(order.flatMap((id) => (stored[id] ? [[id, stored[id]] as const] : [])))
+  return normalize({ order, rects }, (id) => sizeFor(state.panels[id]?.view.kind ?? 'list'))
+}
+
+/** Commit a gesture. Writes the rects and rewrites `placements` to READING ORDER, which is what
+ *  keeps an old client's order-only render sensible, the narrow-window collapse well-defined, and
+ *  document order matching visual order for a screen reader. */
+export const setLayoutAt = (scope: PlacementScope, layout: PanelLayout): void =>
+  void setDashboards((state) => {
+    const key = placementScopeKey(scope)
+    const ordered = readingOrder(layout)
+    // Retained entries for panels not placed here survive: dropping them would make a
+    // partially-written blob destructive, and `layoutAt` already ignores them.
+    const rects = { ...(state.layouts[key] ?? {}), ...layout.rects }
+    return {
+      ...state,
+      placements: { ...state.placements, [key]: ordered },
+      layouts: { ...state.layouts, [key]: rects },
+    }
+  })
+
 export const savePanel = (panel: PanelDefinition): void =>
   void setDashboards((state) => ({ ...state, panels: { ...state.panels, [panel.id]: panel } }))
 
-/** Deletes the definition AND every reference to it. A placement pointing at nothing is the one
- *  dangling case that is a bug rather than a version skew, so it is not left behind. */
+/** Deletes the definition AND every reference to it, geometry included. A placement pointing at
+ *  nothing is the one dangling case that is a bug rather than a version skew, so it is not left
+ *  behind — and a rect for a definition that no longer exists can never be read again. */
 export const removePanel = (id: PanelId): void =>
   void setDashboards((state) => {
     const { [id]: _removed, ...panels } = state.panels
     const placements = Object.fromEntries(
       Object.entries(state.placements).map(([key, ids]) => [key, ids.filter((candidate) => candidate !== id)]),
     )
-    return { panels, placements }
+    const layouts = Object.fromEntries(
+      Object.entries(state.layouts).map(([key, rects]) => {
+        const { [id]: _gone, ...kept } = rects
+        return [key, kept] as const
+      }),
+    )
+    return { panels, placements, layouts }
   })
 
 /** Place a panel, or move one already placed. `index` is where it lands; past the end appends. */

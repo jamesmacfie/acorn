@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PluginCollectionField } from '@acorn/protocol/collections.ts'
-import { cellText, formatCell } from './format'
+import { cellText, formatCell, personInitials } from './format'
 
 const field = (over: Partial<PluginCollectionField> & Pick<PluginCollectionField, 'type'>): PluginCollectionField =>
   ({ id: 'f', name: 'F', ...over })
@@ -50,7 +50,38 @@ describe('formatCell', () => {
     expect(formatCell(field({ type: 'boolean' }), true)).toEqual({ kind: 'boolean', value: true, text: 'Yes' })
     // `false` is an answer, not an absence — "Auto-merge: No" is worth a cell.
     expect(formatCell(field({ type: 'boolean' }), false)).toEqual({ kind: 'boolean', value: false, text: 'No' })
-    expect(formatCell(field({ type: 'person' }), 'jamesmacfie')).toEqual({ kind: 'person', name: 'jamesmacfie' })
+    expect(formatCell(field({ type: 'person' }), 'jamesmacfie'))
+      .toEqual({ kind: 'person', name: 'jamesmacfie', initials: 'J' })
+  })
+})
+
+describe('personInitials', () => {
+  it('takes the first and last words of a name', () => {
+    expect(personInitials('Ada Lovelace')).toBe('AL')
+    expect(personInitials('Ada Byron King Lovelace')).toBe('AL')
+    expect(personInitials('grace')).toBe('G')
+  })
+
+  it('reads an address as one identity rather than three words', () => {
+    // Splitting on the dots would put a "C" from ".com" on the mark.
+    expect(personInitials('ada@example.com')).toBe('A')
+    expect(personInitials('ada.lovelace@example.com')).toBe('AL')
+  })
+
+  it('treats the separators a handle actually uses as word breaks', () => {
+    expect(personInitials('ada_lovelace')).toBe('AL')
+    expect(personInitials('ada-lovelace')).toBe('AL')
+  })
+
+  it('answers empty where there is nothing to draw, which is what the name-only fallback needs', () => {
+    expect(personInitials('')).toBe('')
+    expect(personInitials('   ')).toBe('')
+    expect(personInitials('--')).toBe('')
+  })
+
+  it('skips leading punctuation rather than putting it on the mark', () => {
+    expect(personInitials('@ada')).toBe('A')
+    expect(personInitials('(ada) lovelace')).toBe('AL')
   })
 })
 

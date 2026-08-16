@@ -6,8 +6,9 @@ import Provenance from './Provenance'
 import type { PanelViewProps } from './props'
 
 // The board view — and there is deliberately almost nothing here, because A KANBAN IS NOT A
-// COMPONENT: it is group-by over a field with finite values (composition.md § Views are derived from
-// schema). The columns come out of `boardColumns`, the order within a column is whatever the panel's
+// COMPONENT: it is group-by over a field with finite values (docs/dashboards.md § Views are
+// derived, not chosen from a menu). The columns come out of `boardColumns`, the order within a
+// column is whatever the panel's
 // sort already produced, and the rows are whatever its filters already kept. There is no per-column
 // sort and no per-column filter in this file because there is nothing left for them to do.
 //
