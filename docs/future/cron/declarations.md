@@ -1,5 +1,9 @@
 # Declarations: how a plugin says "I have periodic work"
 
+**SHIPPED.** Behaviour is owned by [`docs/schedules.md § How a plugin declares one`](../../schedules.md)
+and [`docs/plugins.md § Descriptors`](../../plugins.md); what follows is the design as written, kept for
+its arguments. Three things landed differently, all noted inline below.
+
 **Phase 2** (`README.md § build order`). Two feeders, one registry, indistinguishable downstream —
 the collections pattern (`docs/dashboards.md § Declaring one`), applied to schedules.
 
@@ -119,6 +123,24 @@ user's **overrides** — pause, cadence retune within clamps — plus run state.
 Nothing in this table is new policy — it is the dashboards unknown-ids rule and the descriptor
 lifecycle, restated for this kind. If an implementation finds itself writing schedule-specific
 lifecycle code, it has diverged.
+
+## What shipped differently
+
+- **One registration path, not two.** `ctx.schedules.register` is present for BOTH tiers, and the host
+  registers a loaded plugin's manifest descriptors through it, minting the route-calling runner itself
+  (`node-core/server/plugin/host.ts § registerManifestSchedules`). The alternative — a second, host-only
+  path for the manifest feeder — would have re-implemented the reload buffering and the undo record that
+  the context already owns. It does mean a loaded plugin's own node code can register a schedule without
+  a manifest line, which this file's trust section already answers: it is disclosure, not a fence, and
+  that code could `setInterval` regardless.
+- **The run is dispatched in process, not over loopback HTTP.** The listener is TLS with a self-signed
+  certificate and its origin belongs to the composition root, so a self-call would mean teaching the
+  scheduler about certificates to reach a handler in the same heap. `resolvePluginFetch` plus a request
+  context built from the node's own `'service'` principal reproduces the HTTP path exactly, from the same
+  two functions the route uses (`node-core/server/plugin/scheduleRun.ts`).
+- **A manifest declaring `schedules` must declare `node`.** Not in this design; added for the reason the
+  webview/`client` rule exists — only a node half serves `/v2/p/<id>/`, so a client-only package's
+  schedule would fire forever against a 404.
 
 ## Done when
 

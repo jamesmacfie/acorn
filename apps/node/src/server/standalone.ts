@@ -108,7 +108,12 @@ const unavailableBrowser: BrowserDesktopCapability = {
 // The standalone and Electron roots activate the same plugin list, through the same builder. Their
 // behavior differs only where the available runtime bridge does — here, the preview browser.
 const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser }))
-const plugins = await initPlugins(graph.plugins, { capabilities, core, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
+// The node's one scheduler, built and provided BEFORE the plugins so a manifest-declared or
+// code-declared schedule has somewhere to land; its lifetime is the process's, so it belongs to whoever
+// owns teardown. Started after the listener binds, because a catch-up run may call this node's own routes.
+const scheduler = createScheduler(runtime.DB)
+const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
+const plugins = await initPlugins(graph.plugins, { capabilities, core, env: runtime, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
 const pluginStateCapability = capabilities.provide(
   PLUGIN_STATE,
   buildPluginStateBridge({
@@ -125,12 +130,6 @@ const pluginStateCapability = capabilities.provide(
 // Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
 // functions over the database; neither needs a window.
 wireAgentTools({ db: runtime.DB })
-
-// The node's one scheduler, built and provided here for the same reason the supervised root builds it
-// there: its lifetime is the process's, so it belongs to whoever owns teardown. Started after the
-// listener binds, because a catch-up run may call this node's own routes.
-const scheduler = createScheduler(runtime.DB)
-const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
 
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
 // listen failure now exits non-zero with its reason instead of leaving a process alive that answers

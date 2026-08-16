@@ -17,7 +17,7 @@ import { Alert } from '../ui/primitives'
 import { closePluginApproval, describePluginRequest, pluginApprovalTask, pluginRequestOutcomeMessage } from './approval'
 import { syncPluginDistribution } from './distribution'
 import { setPluginDevGrant } from './host'
-import { nodePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
+import { nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
 import './plugin-trust.css'
 
 // The owner's side of an agent's install request (docs/plugins.md § Approval-mediated install).
@@ -76,6 +76,9 @@ export default function PluginApprovalDialog() {
     if (!installed) return []
     return [
       ...nodePermissionLines(installed.permissions),
+      // The node half is what this screen exists for, and a schedule is the part of it that acts with
+      // nobody here — so it belongs on the one disclosure a node-only package ever gets.
+      ...schedulePermissionLines(scheduleGrants(installed.contributions)),
       ...uiPermissionLines(installed.permissions),
       ...webviewPermissionLines(webviewGrants(installed.contributions)),
     ]

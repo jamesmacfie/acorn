@@ -798,7 +798,7 @@ kinds of contribution come out of one manifest:
   attention items, node stats, context-menu rows (`contextMenus`),
   restricted URL recognizers (`contentLinks`), renderer routes (`routes`), agent-context entries
   (`agentContexts`), batch reference resolvers (`refResolvers`), typed record sets (`collections`),
-  and colour themes (`themes`).
+  periodic node-side work (`schedules`), and colour themes (`themes`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
   mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
@@ -987,6 +987,50 @@ kinds of contribution come out of one manifest:
   Everything the host does with the answer — panels, the views it derives, the cross-source mapping
   layer, per-panel refresh, and where compositions are persisted — is
   [dashboards.md](./dashboards.md). A plugin needs none of it to provide a collection.
+
+  A `schedules` entry is the one descriptor that acts **when nobody is watching**. It names a route in
+  the plugin's own namespace, a cadence from the vocabulary in [schedules.md](./schedules.md), and an
+  optional timeout in seconds; the node's one scheduler POSTs `{ scheduleId }` to that route on that
+  cadence with no client open, and ignores the answer beyond ok/error — a schedule is not a data
+  channel. At most four, because a package with more than a handful of distinct periodic jobs is
+  describing a daemon and the daemon here is the node.
+
+  ```json
+  {
+    "contributions": {
+      "schedules": [{
+        "id": "refresh-mirror",
+        "name": "Refresh issue mirror",
+        "run": "/v2/p/linear/schedules/refresh-mirror",
+        "cadence": { "every": 600 },
+        "timeout": 120
+      }]
+    }
+  }
+  ```
+
+  A manifest declaring one must declare a `node` half — only a node half serves that namespace, so a
+  client-only package's schedule would fire forever against a 404, and that is a parse error rather
+  than a run row that fails every hour. The cadence floor for a plugin is 300 seconds and is enforced
+  on read from the registry key, not restated in the manifest: below that a schedule is a poll, and
+  polling is a client's job for a person who is present.
+
+  It joins the trust dialog's **Declared** group — "Run *Refresh issue mirror* on the node every 10
+  minutes, with nobody watching" — and is recorded with the decision, so a version that moves from
+  daily to every five minutes reads as newly requested. Disclosure, not new capability: the run route
+  is one the plugin already owns and could already reach from any of its surfaces. What changes is
+  *when*, and that is exactly what the line says.
+
+  A compiled plugin has no manifest to declare from, so it registers node-side instead, in `init`:
+  `ctx.schedules.register({ scheduleId, name, cadence, timeout?, run })`, where `run` takes the run's
+  `AbortSignal`. Both feeders land on the same registry under the same `<pluginId>:<scheduleId>` key,
+  and the host owns removal — declaring the schedule *is* the lifecycle, so a `setInterval` in plugin
+  node code is a review flag. The lifecycle table (what survives a disable, an uninstall, a manifest
+  that drops an id) is in [schedules.md](./schedules.md).
+
+  One trap worth naming: a manifest-declared schedule on a dev-installed package needs the package
+  **rebuilt** before the node sees it. Reconciliation will not do it, and the symptom is a plugin that
+  reloads fine and schedules nothing.
 
   A `themes` entry is the descriptor tier taken to its limit: a **colour** theme with no route, no
   bundle and no CSS, declared as a map of the 22 palette tokens plus a `dark` flag. The host validates

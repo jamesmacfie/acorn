@@ -10,7 +10,7 @@
 // and the rollback of everything registered here all stay in host.ts, because they are decisions about
 // a SET of plugins and this is one plugin's surface.
 import type { CoreServices } from '../../main/core'
-import type { NodePermissions } from '../../main/pluginManifest'
+import type { NodePermissions, PluginScheduleDescriptor } from '../../main/pluginManifest'
 import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
@@ -18,6 +18,7 @@ import { registerRoute } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
+import { SCHEDULER } from '../schedules'
 import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
 import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
@@ -32,6 +33,10 @@ import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotic
 export type LoadedPluginBinding = {
   permissions: NodePermissions
   storage: PluginStorage
+  // What the manifest declared as periodic work. Carried on the binding rather than read back off disk,
+  // for the same reason `permissions` is: the host is the one that binds a manifest's claims to a plugin
+  // id, and the loader is the one place that read the file.
+  schedules?: readonly PluginScheduleDescriptor[]
 }
 
 export type PluginContextOptions = {
@@ -54,10 +59,12 @@ export type PluginContextOptions = {
   // does not need it — the caller never reads `migrationsModule` for a loaded plugin (host.ts:112) — so
   // the derivation is the caller's single responsibility and there is one source of truth here.
   storage?: PluginStorage
-  // Where an undo for a WS-hub claim goes. The hub's two slots are module singletons with no duplicate
-  // guard, so the host records these per plugin and takes them back on re-init or on a contained
-  // failure. A caller that passes nothing (a test) simply keeps no undo record.
-  onWsRegistration?: (undo: () => void) => void
+  // Where an undo goes for a registration `clearRegistrations` cannot reach on its own. The WS hub's two
+  // slots are module singletons with no duplicate guard, and a schedule lives in the composition root's
+  // scheduler rather than in a module registry — so for both, the host records the undo per plugin and
+  // takes it back on re-init or on a contained failure. A caller that passes nothing (a test) simply
+  // keeps no undo record.
+  onUndo?: (undo: () => void) => void
   // The CANDIDATE registration set (server/plugin/host.ts § reload). When present, every registration
   // this context hands the plugin is buffered here as a thunk instead of reaching the module-singleton
   // registries, and the host replays it only once it has decided to commit.
@@ -87,7 +94,7 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
   // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from disk.
   // Everything below that differs between the two tiers keys off this one value.
   const permissions = options.loaded?.permissions
-  const recordWs = options.onWsRegistration ?? (() => {})
+  const recordUndo = options.onUndo ?? (() => {})
   const pending = options.pending
   const ctx: NodePluginContext = {
     name: plugin,
@@ -104,6 +111,30 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
     // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under
     // another plugin's name, and cannot remove another plugin's tools.
     tools: { register: (tool) => registerAgentTool(plugin, tool) },
+    // The scheduler is resolved through the capability registry at CALL time rather than threaded into
+    // this function, for the reason host.ts states about cross-plugin needs generally: it is built by the
+    // composition root, which owns its start/stop, and a context built before it exists must still work.
+    //
+    // The key is minted from `plugin`, exactly as every other owner-bound registration is — which is also
+    // what opts the schedule into the plugin cadence floor, because the engine reads the floor off the key
+    // prefix. `timeout` is seconds here and milliseconds there; this is the one place that converts.
+    schedules: {
+      register: (schedule) => {
+        const scheduler = options.capabilities.get(SCHEDULER)
+        if (!scheduler) throw new Error(`Plugin '${plugin}' registered a schedule, but this node has no scheduler.`)
+        const handle = scheduler.register({
+          key: `${plugin}:${schedule.scheduleId}`,
+          name: schedule.name,
+          cadence: schedule.cadence,
+          ...(schedule.enabled === undefined ? {} : { enabled: schedule.enabled }),
+          ...(schedule.timeout === undefined ? {} : { timeoutMs: schedule.timeout * 1000 }),
+          run: schedule.run,
+        })
+        // Dispose removes the DEFINITION and keeps the state row, which is what makes a plugin's
+        // lifecycle non-destructive: its pause and its history are waiting when it comes back.
+        recordUndo(() => handle.dispose())
+      },
+    },
     // asContextSection is where core's database handle is DROPPED rather than merely left unused: core's
     // own `issues` section keeps it, a plugin-registered one can never see it, and neither side has to be
     // trusted to remember.
@@ -153,13 +184,13 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
         ? (undefined as never)
         : (prefix, handler) => {
           registerWsChannelHandler(prefix, handler)
-          recordWs(() => registerWsChannelHandler(prefix, null))
+          recordUndo(() => registerWsChannelHandler(prefix, null))
         },
       streams: permissions
         ? (undefined as never)
         : (handlers) => {
           setStreamHandlers(handlers)
-          recordWs(() => setStreamHandlers(null))
+          recordUndo(() => setStreamHandlers(null))
         },
     },
     log: {
@@ -191,7 +222,7 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
       return undefined as R
     }
 
-  for (const group of ['routes', 'tools', 'contextSections', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'contextSections', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a
     // typeof check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined

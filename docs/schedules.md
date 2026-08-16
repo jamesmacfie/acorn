@@ -29,7 +29,7 @@ database handle.
 | Owner | Declared how | Key |
 | --- | --- | --- |
 | **core** | `scheduler.register(...)` in `server/schedules/index.ts` | `core:<id>` |
-| **plugin** | not built yet — phase 2 (`future/cron/declarations.md`) | `<pluginId>:<scheduleId>` |
+| **plugin** | `schedules` in its manifest, or `ctx.schedules.register(...)` node-side | `<pluginId>:<scheduleId>` |
 | **user** | `POST /v2/core/schedules`, against a registered target kind | `user:<uuid>` |
 
 Declared schedules are **registry-truth**: the code is the definition, and the database stores only the
@@ -45,7 +45,67 @@ owner's pause or its run history — both are waiting when the plugin returns.
 - `core:audit-prune` — daily at 03:20 node-local. The 90-day audit sweep, which used to be a boot-time
   call in both composition roots and therefore never ran on a node left up for a month.
 
-No plugin schedules and no user target kinds exist yet; those are phases 2 and 3.
+No plugin in the tree declares one yet, and no user target kinds exist; the latter is phase 3.
+
+### How a plugin declares one
+
+Two feeders, one registry, indistinguishable downstream — the collections pattern applied to schedules.
+
+A **loaded** plugin declares it in its manifest, because a manifest is also what the owner is shown at
+install (`docs/plugins.md § Descriptors`): an id, a name, a `run` route confined to the plugin's own
+`/v2/p/<id>/` namespace, a cadence and an optional timeout in seconds. The node POSTs `{ scheduleId }`
+to that route on the cadence, in process, as its own `'service'` principal — the same request context an
+HTTP-served route gets, built from the same function — and ignores the answer beyond ok/error. A non-2xx
+is a failed run, which means backoff and a visible error, not a crashed node. Confinement is checked at
+manifest parse *and* again on every fire.
+
+A **compiled** plugin has no manifest, so it registers in `init`:
+
+```ts
+ctx.schedules.register({
+  scheduleId: 'refresh-pull-mirror',
+  name: 'Refresh pull request mirror',
+  cadence: { every: 3600 },
+  timeout: 120,                       // seconds here; the engine's DeclaredSchedule is milliseconds
+  run: async (signal: AbortSignal) => { await refreshPullMirror(signal) },
+})
+```
+
+The host binds `pluginId` from the registering plugin in both cases — a schedule cannot be filed under a
+stranger's name — mints the `<pluginId>:<scheduleId>` key, and ties removal to the plugin's teardown.
+Declaring the schedule **is** the lifecycle; a `setInterval` in plugin node code is a review flag.
+
+At most four per plugin. The 300s interval floor comes from the key prefix, on read, like every other
+clamp.
+
+#### The override model
+
+The registry — manifest or code — is the **definition**; `scheduleState` holds the owner's overrides
+plus the run state. A pause beats the declared default, and a cadence retune beats the declared cadence
+(clamped again on read); a plugin cannot un-pause itself by re-declaring. Everything else — name, route
+or handler, timeout — is definition-owned. Someone who wants a schedule to *do something else* wants a
+schedule of their own, not an edited plugin one.
+
+#### Lifecycle
+
+| Event | Effect |
+| --- | --- |
+| Plugin disabled / uninstalled | Its schedules leave the registry and stop firing. Their `scheduleState` rows — pause, backoff, history — are **retained unread**. |
+| Plugin returns | Definitions re-register; retained state reattaches by key. A pause survives the round trip. |
+| Manifest drops a schedule id | Same as disabled, for that id: state retained, nothing fires. |
+| Manifest changes cadence | The new declared cadence applies unless a retune exists — the owner's word keeps winning. |
+| Plugin reloaded (dev loop) | The candidate's schedules are buffered like every other registration and swapped in only on commit; a failed reload leaves the previous instance's firing. |
+
+None of that is schedule-specific policy. It is the engine's retain-the-state-row rule and the host's
+registration lifecycle, restated for this kind.
+
+#### Trust
+
+A schedule joins the **Declared** group of the trust dialog and of the agent-install review screen, and
+is recorded with the decision so an update that changes a cadence reads as newly requested. It is
+disclosure, not new capability: the run route is one the plugin already owns and could already reach
+from any of its surfaces. What changes is that it runs with **no client open**, which is worth a line of
+ink at trust time.
 
 ## Cadence
 
@@ -130,6 +190,6 @@ so a form would be a create button that always fails. It arrives with phase 3.
 
 ## Not built yet
 
-Phases 2–4 of `docs/future/cron/`: the plugin manifest descriptor and `ctx.schedules`, the target kinds
-(`collection-sample`, `plugin-run`, `node-action`), and the migration of the remaining bespoke timers
-(`main/backup.ts`, the agent-usage collector).
+Phases 3–4 of `docs/future/cron/`: the user target kinds (`collection-sample`, `plugin-run`,
+`node-action`) and the migration of the remaining bespoke timers (`main/backup.ts`, the agent-usage
+collector).

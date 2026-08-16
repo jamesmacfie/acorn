@@ -21,6 +21,13 @@ const PANE = { target: 'pane', id: 'board', label: 'Board' }
 
 // A webview needs a client bundle to steer it, so every webview case declares one. `manifest()` stays
 // bundle-less because most surfaces do not need one.
+// A schedule runs a node route, so every schedule case declares a node half — the same reason the
+// webview cases declare a client one.
+const nodeManifest = (contributions: Record<string, unknown>) =>
+  pluginManifestSchema.safeParse({
+    id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', node: './dist/node.js', contributions,
+  })
+
 const webviewManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
     id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', client: './dist/client.js', contributions,
@@ -471,6 +478,45 @@ describe('chrome descriptors', () => {
     expect(messages(manifest({
       frames: [PANE],
       collections: [{ id: 'board', name: 'Board cards', items: '/v2/p/board/collections/cards' }],
+    }))).toEqual([`duplicate contribution id 'board'`])
+  })
+
+  it('carries a schedule, confines its run route and insists there is a node half to serve it', () => {
+    const good = nodeManifest({
+      schedules: [{ id: 'refresh', name: 'Refresh the mirror', run: '/v2/p/board/schedules/refresh', cadence: { every: 600 }, timeout: 120 }],
+    })
+    expect(good.success && good.data.contributions.schedules[0]?.cadence).toEqual({ every: 600 })
+
+    // The whole grammar, reused rather than re-declared — a schedule says when in the same three forms
+    // core's own do.
+    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { daily: '03:30' } }] }).success).toBe(true)
+    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { weekly: { day: 1, at: '09:00' } } }] }).success).toBe(true)
+    expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { cron: '* * * * *' } }] }).success).toBe(false)
+
+    // Confinement is what stops a schedule being a way to make the node POST to core's routes, or to
+    // another plugin's, unattended and on a timer.
+    expect(messages(nodeManifest({
+      schedules: [{ id: 's', name: 'S', run: '/v2/p/linear/sync', cadence: { every: 600 } }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(nodeManifest({
+      schedules: [{ id: 's', name: 'S', run: '/v2/core/tasks', cadence: { every: 600 } }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+
+    // Only a node half serves that namespace, so a client-only package declaring one would fire forever
+    // against a 404.
+    expect(messages(manifest({
+      schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { every: 600 } }],
+    }))).toEqual(['a schedule runs a node route; declare `node` in the manifest'])
+  })
+
+  it('caps schedules at four and refuses an id another contribution kind already took', () => {
+    const five = Array.from({ length: 5 }, (_, i) => ({ id: `s${i}`, name: 'S', run: '/v2/p/board/s', cadence: { every: 600 } }))
+    expect(nodeManifest({ schedules: five }).success).toBe(false)
+    expect(nodeManifest({ schedules: five.slice(0, 4) }).success).toBe(true)
+
+    expect(messages(nodeManifest({
+      frames: [PANE],
+      schedules: [{ id: 'board', name: 'S', run: '/v2/p/board/s', cadence: { every: 600 } }],
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 

@@ -6,7 +6,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // The platform seam: the renderer's ONE door to whatever is hosting it (git history: docs/future/node-first/platform-seam.md).
@@ -134,6 +134,9 @@ export type PluginTrustDecision = {
   // `webviews` and `keyClaims` are: an acknowledgement written before the cooperative seam existed reads
   // back as the empty list, which is what was true of it.
   extensions: PluginExtensionGrant[]
+  // What this package will run on its own, and how often (docs/schedules.md). Required here and
+  // defaulted in the store's schema, exactly as the three above are.
+  schedules: PluginScheduleGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = PluginTrustDecision & {

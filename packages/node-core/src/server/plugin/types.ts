@@ -2,6 +2,7 @@
 // registration/disposal records; cross-plugin behavior is resolved through typed capabilities,
 // provider registries and contracts, and clients are told about change through broadcasts.
 import type { Hono } from 'hono'
+import type { Cadence } from '@acorn/protocol/schedules.ts'
 import type { CoreServices } from '../../main/core'
 import type { PluginDatabase } from '../../main/pluginStorage'
 import type { ConnectionProviderContribution, IntegrationProviderContribution } from '../integrations/types'
@@ -105,6 +106,36 @@ export type PluginToolRegistry = {
   register(tool: AgentToolContribution): void
 }
 
+// Periodic work the node runs for this plugin (docs/schedules.md). Node-side, because that is where a
+// schedule runs: a client closes, hides and sleeps, and a schedule is a promise to run when nobody is
+// looking.
+//
+// Declaring one IS the lifecycle. The host mints the `<pluginId>:<scheduleId>` registry key, ties the
+// removal to this plugin's teardown, and keeps the state row (pause, cadence retune, run history) across
+// a disable/re-enable — so a plugin never manages its own timer. Any `setInterval` in plugin node code
+// after this is a review flag.
+export type PluginScheduleRegistry = {
+  register(schedule: PluginSchedule): void
+}
+
+export type PluginSchedule = {
+  // Unique within this plugin. The host prefixes it; a plugin cannot file a schedule under a stranger's
+  // name any more than it can mount a route under one.
+  scheduleId: string
+  // What the settings list and the trust dialog call it.
+  name: string
+  // Clamped on read to the plugin floor (300s for an interval), which the key prefix selects.
+  cadence: Cadence
+  // SECONDS, capped at 300 — the manifest descriptor's unit, not the engine's milliseconds. Absent means
+  // the engine default (60s).
+  timeout?: number
+  // The declared default. The owner's pause/resume overrides it and outlives a reload.
+  enabled?: boolean
+  // Timeout and node shutdown both arrive as the signal; the return value is ignored beyond a one-line
+  // detail for the run row, and failure is reported by throwing.
+  run(signal: AbortSignal): Promise<string | void>
+}
+
 export type PluginContextSectionRegistry = {
   // A plugin contributes one task-context section. Core owns assembly, ordering, budgets, and output
   // format; the section receives no core database handle and declares only its own data source.
@@ -181,6 +212,10 @@ export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
   tools: PluginToolRegistry
+  // Both tiers. A loaded plugin normally declares its schedules in its manifest — that is what puts them
+  // in front of the owner at install — and the host registers those through this same seam, so there is
+  // one registration path and not two.
+  schedules: PluginScheduleRegistry
   contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities

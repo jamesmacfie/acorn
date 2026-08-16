@@ -209,13 +209,20 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
     const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser }))
+    // The node's one scheduler. Built here rather than in makeBindings for the same reason the data
+    // root's lock is: its lifetime is the process's, so it belongs to whoever owns teardown. Created
+    // before the PLUGINS, so a manifest-declared or code-declared schedule has somewhere to land, and
+    // therefore well before the listener binds; STARTED after it, because a catch-up run may call this
+    // node's own routes.
+    scheduler = createScheduler(db)
+    schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
     const plugins = await initPlugins(
       graph.plugins,
       // The persisted per-node list UNION the start config's. The file is the owner's setting, and it is
       // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
       // file. The start config stays an override for tests and `dev:node`, which want to pin a list
       // without writing into a data root.
-      { capabilities, core, dataDir: config.dataDir, disabled: disabled(), loaded: graph.loaded },
+      { capabilities, core, env: runtime, dataDir: config.dataDir, disabled: disabled(), loaded: graph.loaded },
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
@@ -233,12 +240,6 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     )
 
     wireAgentTools({ db })
-    // The node's one scheduler. Built here rather than in makeBindings for the same reason the data
-    // root's lock is: its lifetime is the process's, so it belongs to whoever owns teardown. Created
-    // before the listener binds so a request can never find the capability missing; STARTED after it,
-    // because a catch-up run may call this node's own routes.
-    scheduler = createScheduler(db)
-    schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
     mark('install')
 
     const listener = await startListener(runtime, dataRoot)

@@ -19,6 +19,7 @@ import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from './contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, parseExtensionPointRef } from './extensionPoints.ts'
 import { isNormalizedChord, isPluginKeyClaim, isPluginShortcutChord, isReservedPluginKeyClaim } from './keybindings.ts'
 import { LANGUAGE_IDS } from './languageIds.ts'
+import { cadenceSchema } from './schedules.ts'
 import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from './themeTokens.ts'
 import { normalizeWebviewHost, WEBVIEW_HOST_MAX_COUNT, WEBVIEW_HOST_MAX_LENGTH } from './webview.ts'
 
@@ -624,6 +625,30 @@ const collectionDescriptor = z.object({
   refresh,
 })
 
+// Periodic work the NODE runs for this plugin, with no client open (docs/schedules.md).
+//
+// The pair to `ctx.schedules.register` on the node plugin context: two feeders, one registry,
+// indistinguishable downstream. A manifest is how the loaded tier declares one, because a manifest is
+// also how the owner is told about it — a schedule is the one contribution that acts while nobody is
+// watching, and that is worth a line in the trust dialog even though it is disclosure rather than a new
+// capability (the run route is a route the plugin already owns and could already reach).
+const scheduleDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(80),
+  // POST { scheduleId } → anything. Confined to the plugin's own route namespace at manifest parse and
+  // re-checked on the node before each run — verbatim the `items` rule, and the prefix itself is not
+  // spelled in this package for the reason ID_RE gives above. The response is ignored beyond ok/error:
+  // a schedule is not a data channel.
+  run: pluginRoute,
+  // The cadence vocabulary, reused rather than re-declared. The plugin FLOOR (300s) is not spelled here
+  // because it is enforced where every other clamp is — on read, from the key's owner prefix
+  // (node-core/server/schedules/scheduler.ts § floorFor). Declaring under a plugin key IS opting into it.
+  cadence: cadenceSchema,
+  // SECONDS, and the one unit trap in this feature: the engine's DeclaredSchedule.timeoutMs is
+  // milliseconds and the host converts. Absent means the engine default (60s).
+  timeout: z.number().int().min(1).max(300).optional(),
+})
+
 // A COLOUR theme: a map of theme-token values the host validates and then generates a
 // `:root[data-theme="plugin:<pluginId>:<id>"]` block from itself (docs/ui-design.md § Appearance).
 //
@@ -699,6 +724,9 @@ const contributions = z.looseObject({
   // record types honestly has several — "my PRs", "PRs awaiting my review", "repos I own" are three
   // questions, not one integration describing an app.
   collections: z.array(collectionDescriptor).max(8).default([]),
+  // Four. A plugin with more than a handful of distinct periodic jobs is describing a daemon, and the
+  // daemon here is the node.
+  schedules: z.array(scheduleDescriptor).max(4).default([]),
 }).prefault({})
 
 
@@ -861,6 +889,7 @@ export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointD
 }
 export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
 export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>
+export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
 
 // Still loose on the wire as well as in the schema: a client that does not know a future sibling key
 // should contribute less rather than fail to parse. Every list but `frames` is optional for the same
@@ -885,4 +914,5 @@ export type PluginContributions = {
   extensionPoints?: PluginExtensionPointDescriptor[]
   extensions?: PluginExtensionDescriptor[]
   collections?: PluginCollectionDescriptor[]
+  schedules?: PluginScheduleDescriptor[]
 } & Record<string, unknown>

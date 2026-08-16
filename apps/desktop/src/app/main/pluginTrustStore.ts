@@ -1,8 +1,9 @@
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
+import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 
 // This device's decisions about which plugin bundles it will run
 // (docs/plugins.md).
@@ -43,6 +44,14 @@ const extensionGrantSchema = z.strictObject({
   label: z.string().min(1).max(80),
 }) as z.ZodType<PluginExtensionGrant>
 
+// The cadence is the whole grant beside the name, so it is parsed rather than kept as an opaque blob: a
+// snapshot that cannot be compared is a snapshot the update prompt cannot diff.
+const scheduleGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  cadence: cadenceSchema,
+}) as z.ZodType<PluginScheduleGrant>
+
 const ackSchema = z.strictObject({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -62,6 +71,9 @@ const ackSchema = z.strictObject({
   // acknowledgement says the previously accepted bundle reached into nothing outside itself, which is
   // exactly what was true of it.
   extensions: z.array(extensionGrantSchema).max(32).default([]),
+  // Default keeps acknowledgements written before schedules existed readable. An old acknowledgement
+  // says the previously accepted bundle ran nothing on its own, which is what was true of it.
+  schedules: z.array(scheduleGrantSchema).max(4).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure that came with the decision could not be fully parsed — a node running a
@@ -196,6 +208,7 @@ export class PluginTrustStore {
       webviews: [],
       keyClaims: [],
       extensions: [],
+      schedules: [],
       decision: 'accepted',
       decidedAt: Date.now(),
       partial: true,

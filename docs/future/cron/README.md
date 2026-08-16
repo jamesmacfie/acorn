@@ -108,7 +108,7 @@ Named so the budget arguments below have referents; the first two are why this f
 | Phase | What | File |
 | --- | --- | --- |
 | 1 ✅ | The engine: tables, registry, tick loop, policies (catch-up, jitter, backoff, timeout, concurrency), boot wiring, core routes, settings surface | `engine.md` |
-| 2 | Declarations: the manifest descriptor + trust projection, `ctx.schedules` node-side, override model, lifecycle rules | `declarations.md` |
+| 2 ✅ | Declarations: the manifest descriptor + trust projection, `ctx.schedules` node-side, override model, lifecycle rules | `declarations.md` |
 | 3 | Targets: `collection-sample` (with its two prerequisite seams: the node-side collection read registry and the shared measure pipeline), `plugin-run`, `node-action` with creation-time consent | `targets.md` |
 | 4 | Migrate the invisible intervals onto rows (backup, audit pruning, usage collection) — deletion of bespoke timers, not new features | `engine.md § migration` |
 

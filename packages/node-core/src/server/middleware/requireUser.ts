@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { respondError } from '../respond'
-import type { AppEnv } from './auth'
+import type { AppEnv, Principal } from './auth'
 
 // The single authentication gate for /v2 routes. Mounted once in createApp() over `/v2/*`
 // (after authMiddleware), it replaces the per-route inline guards. It gates on the resolved
@@ -37,11 +37,13 @@ export const requireDevice = createMiddleware<AppEnv>(async (c, next) => {
   await next()
 })
 
-export const canUseProviderCredential = (c: Context<AppEnv>): boolean => {
-  const principal = c.get('principal')
-  if (!principal) return false
-  return principal.kind === 'device' || principal.scope === 'service'
-}
+// The rule on its own, for the one caller that has a principal but no request: a SCHEDULED plugin run
+// has neither (server/plugin/scheduleRun.ts) and must answer this question the same way a route does.
+export const principalMayUseProviderCredential = (principal: Principal | null | undefined): boolean =>
+  !!principal && (principal.kind === 'device' || principal.scope === 'service')
+
+export const canUseProviderCredential = (c: Context<AppEnv>): boolean =>
+  principalMayUseProviderCredential(c.get('principal'))
 
 // Is this principal entitled to act on `taskId`?
 //

@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
+import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginCache, PutResult } from './pluginCache'
 import type { PluginAck, PluginDevGrant, PluginTrustStore } from './pluginTrustStore'
 
@@ -83,6 +84,13 @@ const disclosureSchema = z.object({
     target: z.string().min(1).max(130),
     label: z.string().min(1).max(80),
   })).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
+  // Defaulted for the same reason `extensions` is: a node whose manifest schema predates schedules sends
+  // a disclosure without the field, and refusing it would put a decision beyond recording.
+  schedules: z.array(z.strictObject({
+    id: z.string().min(1).max(64),
+    label: z.string().min(1).max(80),
+    cadence: cadenceSchema,
+  })).max(4).default([]) as z.ZodType<PluginScheduleGrant[]>,
 })
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
@@ -91,6 +99,7 @@ const NO_DISCLOSURE = {
   webviews: [],
   keyClaims: [],
   extensions: [],
+  schedules: [],
 } satisfies z.infer<typeof disclosureSchema>
 
 export type PluginsState = {

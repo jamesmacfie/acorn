@@ -6,11 +6,16 @@ import { type Clock, Scheduler } from './scheduler'
 export { keyOwner, Scheduler } from './scheduler'
 export type { Clock, CreateScheduleInput, DeclaredSchedule, PatchScheduleInput, ScheduleRunner, ScheduleTarget } from './scheduler'
 
-/** The routes' handle on the one scheduler this process owns. A capability rather than a binding on
- *  c.env for the same reason PLUGIN_STATE is one: the scheduler only exists once the composition root
- *  has built it, and its lifetime (start, drain, stop) belongs to whoever owns teardown — which
- *  makeBindings, having no stop(), is not. */
-export type SchedulerBridge = Pick<Scheduler, 'list' | 'runs' | 'create' | 'patch' | 'remove' | 'runNow' | 'paused' | 'setPaused'>
+/** The handle on the one scheduler this process owns. A capability rather than a binding on c.env for
+ *  the same reason PLUGIN_STATE is one: the scheduler only exists once the composition root has built
+ *  it, and its lifetime (start, drain, stop) belongs to whoever owns teardown — which makeBindings,
+ *  having no stop(), is not.
+ *
+ *  `register` is here for the plugin context, not for a route: `ctx.schedules.register` resolves the
+ *  scheduler through this capability at CALL time rather than being threaded through initPlugins, which
+ *  is the same late binding every other cross-plugin need uses (server/plugin/host.ts). Not `start`,
+ *  `stop` or the constructor — the composition root owns the lifetime and nothing else may. */
+export type SchedulerBridge = Pick<Scheduler, 'list' | 'runs' | 'create' | 'patch' | 'remove' | 'runNow' | 'paused' | 'setPaused' | 'register'>
 export const SCHEDULER = routeCapability<SchedulerBridge>('core.scheduler')
 
 /** Build the node's scheduler and declare core's own periodic work on it. Both Node hosts call this —

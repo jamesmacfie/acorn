@@ -6,6 +6,8 @@ import {
   keyClaimPermissionLines,
   nodePermissionLines,
   type PermissionLine,
+  scheduleGrants,
+  schedulePermissionLines,
   uiPermissionLines,
   webviewGrants,
   webviewPermissionLines,
@@ -68,8 +70,13 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
     },
     {
       key: 'declared',
-      now: nodePermissionLines(installed.permissions),
-      was: previous ? nodePermissionLines(previous.permissions) : null,
+      // Schedules sit here rather than under `Enforced` for the reason the legend gives: the host does
+      // hold the cadence and the route confinement, but what RUNS is the plugin's own node code, and a
+      // claim about that can never be stronger than the group it is in.
+      now: [...nodePermissionLines(installed.permissions), ...schedulePermissionLines(scheduleGrants(installed.contributions))],
+      was: previous
+        ? [...nodePermissionLines(previous.permissions), ...schedulePermissionLines(previous.schedules ?? [])]
+        : null,
     },
     {
       key: 'web',
@@ -109,6 +116,10 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     // never read as newly requested. A plugin that starts reaching into a different package between
     // versions is exactly the change that must not slide past unremarked.
     extensions: extensionGrants(request.row.name, installed.contributions),
+    // Recorded for the same reason as the three above: an unrecorded grant can never read as newly
+    // requested, and "this package now runs itself every five minutes" is exactly the change that must
+    // not slide past the update prompt unremarked.
+    schedules: scheduleGrants(installed.contributions),
     decision,
   })
   resolvePendingTrust(request.row.name, request.hash)
