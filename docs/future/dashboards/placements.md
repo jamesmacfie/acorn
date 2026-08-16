@@ -1,26 +1,34 @@
 # Placements: the two unbuilt surfaces
 
 **Unbuilt.** Panels are placement-agnostic and **placement** — where a panel renders, under whose
-constraints — is the first-class concept; "dashboard" is just the default placement. That model
-shipped: the scope key `(surface, ownerId?, projectId?)` is in `persist.ts` with all three surface
-names in the union (`home` | `pane` | `plugin-region`), segments percent-encoded, `PanelGrid` takes a
-scope rather than assuming home, and `Panel` is placement-agnostic (`docs/dashboards.md §
-Placements`). So each deliverable below is **a renderer and a declaration seam, not a key format** —
-the seam was built in advance on purpose.
+constraints — is the first-class concept; "dashboard" is just the default placement. All of that
+machinery exists: the scope key `(surface, ownerId?, projectId?)` is in `persist.ts` with all three
+surface names already in the union (`home` | `pane` | `plugin-region`), segments percent-encoded,
+`PanelGrid` takes a scope rather than assuming home, `Panel` is placement-agnostic, and `layouts` is
+keyed by scope so geometry for a surface nothing draws yet already has somewhere to live
+(`docs/dashboards.md § Placements`).
 
-The task-pane placement that used to head this file **shipped on 2026-08-16**
-(`dashboards/DashboardPane.tsx`), and it is the proof the seam was worth building: it cost a container
-and one behaviour change, and touched neither the key format nor the panel. Two things it settled that
-the remaining items inherit rather than re-decide:
+So each deliverable below is **a renderer and a declaration seam, not a key format**. The task pane
+is the worked example to copy: a scope constant, a container, and nothing else.
 
-- **Remove split in two** — "Remove from here" (`unplacePanel`) beside an armed "Delete panel" — on
-  every surface, because with a second placement an unplaced panel is no longer unreachable.
-- **Pane placements are keyed by PANE, not by task.** Definitions are per-user-per-node and
+Three rules the existing surfaces already settle. Inherit them; do not re-decide them:
+
+- **A placement's chrome offers "Remove from here" and a separate armed "Delete panel".** Unplacing
+  and destroying are different acts wherever more than one surface exists.
+- **A pane placement is keyed by PANE, not by task.** Definitions are per-user-per-node and
   surface-free, so the same board renders in that pane in every task. Per-task boards are a non-goal:
   a task is ephemeral, and composing a board per task is labour nobody repeats — if someone asks, the
-  answer is the `projectId` segment, not a task segment.
+  answer is the `projectId` segment, not a task segment. A region placement follows the same shape.
+- **The narrow-window collapse is inherited free.** A surface too narrow for twelve cells is simply
+  always collapsed, and its stored geometry returns intact when it is widened.
 
-Two deliverables remain, nearest first. Neither changes the wire contract.
+**Where placements surface in the accepted UX** (`wizard.md`): the wizard's Place step renders
+every surface as a card — Home and the task pane live, unbuilt surfaces present but disabled with
+their gate named — so shipping one of the deliverables below means enabling a card, not designing a
+step. The panel overflow menu's "Move to…" submenu (README § smaller items) is the other seam:
+each new surface is one more row there, current placement checked.
+
+Two deliverables, nearest first. Neither changes the wire contract.
 
 ## 1. Rail-source side panel
 
@@ -39,7 +47,7 @@ placement survives the plugin being disabled, inert.
 ## 2. Plugin-hosted regions
 
 **What**: a plugin's manifest declares "I host a dashboard region" and the **user's panels are the
-contributions**. Cooperative extension points shipped since the original design
+contributions**. Cooperative extension points already exist
 (`docs/plugins.md § Cooperative extension points`): two-sided, declarative, host-mediated. A
 dashboard region is that same shape with the user in the contributor's seat — **build it as one of
 those points, not a parallel mechanism**, and extend that declaration shape rather than inventing a
@@ -71,7 +79,7 @@ document changes.
 
 ## Survival rules — requirements on every new placement
 
-Shipped for Home; each new surface must hold them, not re-derive them:
+Home and the task pane hold these already. Each new surface must hold them too, not re-derive them:
 
 - A placement whose owning plugin is disabled or uninstalled disappears from view; its persisted
   definition survives inert and returns with the plugin.
@@ -81,10 +89,10 @@ Shipped for Home; each new surface must hold them, not re-derive them:
 
 ## Verify before building
 
-- `dashboards/DashboardPane.tsx` — the shipped task pane is the worked example both items copy: a
-  scope constant, a container, and nothing else.
-- The shipped extension-point contract (`docs/plugins.md § Cooperative extension points`) — regions
-  must ride it; check what its declaration shape can already express before adding constraint keys.
+- `dashboards/DashboardPane.tsx` — the worked example both items copy: a scope constant, a
+  container, and nothing else.
+- The extension-point contract (`docs/plugins.md § Cooperative extension points`) — regions must
+  ride it; check what its declaration shape can already express before adding constraint keys.
 - The frame `layout` template vocabulary (`pluginManifest.ts`, `plugins/frames/`) — the
   host-drawn-region rule assumes reserving regions via layout templates is still the pattern.
 - `ChromeSourcePanel` — the side-panel deliverable assumes source panels are still host-rendered

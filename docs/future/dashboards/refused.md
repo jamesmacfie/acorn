@@ -12,8 +12,8 @@ bespoke UI from data, because that means eternally versioning a widget toolkit i
 Dashboards clear the bar only because the host renders *its own* generic views over a record
 schema — the distinction is recorded beside the refusal itself in `docs/plugins.md`. When a plugin
 needs UI the field-type vocabulary can't express, the overflow path is a **frame pane** — the
-escape hatch is planned, not fought (the VS Code lesson from the prior-art survey, now in git
-history). Revisit only if the descriptor-vs-frame doctrine itself changes.
+escape hatch is planned, not fought (the VS Code lesson). Revisit only if the descriptor-vs-frame
+doctrine itself changes.
 
 ## No new field type without a fight
 
@@ -32,10 +32,9 @@ mapping config's persisted shape reserves room (per-(source, column) records tha
 `writeValue`). Revisit when the read-only surface has real usage and the mutation contract can be
 designed against observed boards.
 
-Distinct from this, and no longer refused: verb-shaped mutations via `runNodeAction` work, and their
-confirmation semantics shipped on 2026-08-16 as an additive optional `risk` tier on the action, with
-the **host** drawing the confirmation. That was always the reserved seam; it is now the built one, and
-the board-drag design above reuses it rather than inventing a second prompt.
+Distinct from this and not refused: verb-shaped mutations via `runNodeAction` work today, and an
+action declares an optional `risk` tier that the **host** draws the confirmation from. The board-drag
+design reuses that rather than inventing a second prompt.
 
 ## No cross-collection joins
 
@@ -68,7 +67,7 @@ constraint vocabulary instead.
 ## No per-plugin "dashboard" contribution kind
 
 A plugin does not ship a prebuilt dashboard ("install github, get a PR dashboard") as a distinct
-contribution in v1 — that is Backstage's model, and it forecloses nothing here since a plugin can
-achieve the effect later via defaults. If pre-built starter panels prove wanted, the shape is a
+contribution — that is Backstage's model, and it forecloses nothing here since a plugin can achieve
+the effect via defaults. If pre-built starter panels prove wanted, the shape is a
 plugin-suggested *panel definition* the user accepts into their own composition — suggestions,
 not owned surfaces — so ownership of composed panels stays with the user.

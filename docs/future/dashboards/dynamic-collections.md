@@ -4,33 +4,31 @@
 wanted. Two deliverables in dependency order, both about collections whose schema cannot be known at
 manifest time.
 
-Shipped baseline (`docs/dashboards.md § Self-describing responses`): every response carries its
-schema beside its rows; the manifest `schema` is the optional static case; Linear ships
-response-only. The recorded consequence: **a response-only collection cannot be configured until it
-has been fetched once** — the editor reads the answered schema out of the node's QueryClient
-(`schemaOf` in `dashboards/editor.ts` over `cachedCollectionPage` in `dashboards/data.ts`), issues
-no fetch of its own, and cold offers only the three views that ask nothing of the fields, with a
-notice saying why.
+The baseline they build on (`docs/dashboards.md § Self-describing responses`): every response carries
+its schema beside its rows, the manifest `schema` is the optional static case, and Linear declares
+none. The consequence, which is what these two exist to remove: **a response-only collection cannot
+be configured until it has been fetched once.** The editor reads the answered schema out of the
+node's QueryClient (`schemaOf` in `dashboards/editor.ts` over `cachedCollectionPage` in
+`dashboards/data.ts`), reactively, so an answer landing while it is open fills the gated sections in
+place — but cold it can only offer the three views that ask nothing of the fields, with a notice
+saying why.
 
-The third item that used to head this file — making that read reactive — **shipped on 2026-08-16**
-(`createCollectionCacheRevision` in `dashboards/data.ts`). An answer landing while the editor is open
-now fills the gated sections in place. What it deliberately did NOT do still holds and is the
-precondition for everything below: **the editor issues no fetch of its own.** Whether an editor may
-*run* a collection to learn its shape is exactly the question run-once-and-pin answers properly, with
-a person pressing a button — do not answer it twice with a side effect.
+**The editor issues no fetch of its own, and that is the precondition for everything below.** Whether
+an editor may *run* a collection to learn its shape is exactly the question run-once-and-pin answers
+properly, with a person pressing a button. Do not answer it a second time with a side effect.
 
 ## 1. Run-once-and-pin — the saved-SQL case
 
 **The case.** The database plugin's saved queries as collections: a person writes SQL, whose
-columns cannot be known at build time. Self-describing responses were designed for this and
-shipped; the pinning half did not.
+columns cannot be known at build time. Self-describing responses were designed for exactly this and
+exist; the pinning half does not.
 
-**The flow, as designed**: an explicit **Run** in the setup flow executes the query once; the
+**The flow**: an explicit **Run** in the setup flow executes the query once; the
 schema is taken off the response and **pinned** into the collection definition. The editor then has
 column names, types and kanban eligibility with no live data needed — the cold case above simply
 stops applying to pinned collections.
 
-**Decisions carried from the original design:**
+**Two decisions already made:**
 
 - **The pinned definition lives node-side, owned by the database plugin** beside its saved-query
   concept, exposed as an ordinary collection. Dashboards keep addressing `(pluginId, collectionId)`
@@ -45,6 +43,15 @@ stops applying to pinned collections.
 **Done when**: a saved SQL query appears as a collection, a panel over it can be fully configured
 cold from the pinned schema, and renaming a column in the SQL surfaces a drift notice with re-pin —
 not an empty column.
+
+**Where this lives in the accepted UX** (`wizard.md`): the Run button's seat is the wizard's
+**Data step** — the collection card for a never-run query shows the query text and "Run once to
+discover columns", and cold view cards in the View step carry the `cold-schema` reason until it is
+pressed. Pinning renders the answered fields as chips on the card with a "pinned <date>" mark. The
+drift notice is a warning strip on the affected panel and on the card, naming the change in the
+schema's own terms ("`route` is now `path` (text)") with one action, "Re-pin & review mappings",
+which runs the `normalizePanel` pass described above. None of this changes the flow decided here —
+it names the pixels it gets.
 
 ## 2. The discovery route — gated on 1, not before
 
@@ -64,8 +71,8 @@ Constraints, all inherited from the descriptor conventions rather than invented:
   panels, placements and mappings need nothing.
 
 **Done when**: the database plugin's saved queries show up in the panel editor's collection picker
-without a manifest edit, and disabling the plugin leaves panels over them inert, not deleted (the
-shipped survival rule, unchanged).
+without a manifest edit, and disabling the plugin leaves panels over them inert, not deleted — the
+existing survival rule, unchanged.
 
 ## Verify before building
 

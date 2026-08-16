@@ -1,18 +1,19 @@
 # Dashboards
 
-The home page — and, since the task pane landed, a pane beside a task — is a grid of panels a person
-composed themselves, dragged and resized where they wanted them. A panel draws rows that came from a
-plugin, and it can draw rows from two plugins at once: a board whose columns are the user's own
-invention, fed by GitHub pull requests and Linear issues, with each provider's statuses mapped onto
-those columns.
+The home page, and a pane beside a task, are grids of panels a person composed themselves and
+dragged and resized where they wanted them. A panel draws rows that came from a plugin, and it can
+draw rows from two plugins at once: a board whose columns are the user's own invention, fed by GitHub
+pull requests and Linear issues, with each provider's statuses mapped onto those columns. A panel can
+also be a stat, a list, a table or a chart, and which of those it may be is derived from the data
+rather than picked from a menu.
 
 The invariant the whole feature rests on: **everything user-composed lives host-side against one
 typed contract; plugins are providers of well-described records and get zero say over pixels.**
-Cross-source composition, user-invented statuses and future placements are all client machinery over
-the same node↔client contract, so the contract never grows to chase a use case. The remaining
-backlog — one deliverable per file — and the refusals are
-[`docs/future/dashboards/`](./future/dashboards/README.md); the pre-build design record was retired
-to git history. This file is what shipped.
+Cross-source composition, user-invented statuses, layout geometry, view kinds and placements are all
+client machinery over the same node↔client contract, so the contract never grows to chase a use case.
+
+This file is what the system does. What is left unbuilt — one deliverable per file — and the
+refusals are [`docs/future/dashboards/`](./future/dashboards/README.md).
 
 ## Collections
 
@@ -53,7 +54,7 @@ Seven field types and five roles. Both closed, both versioned with the protocol.
 | `boolean` | check or dash | filter |
 | `datetime` | absolute plus "2h ago"; epoch milliseconds on the wire | sort, before/after |
 | `enum` | toned chip, from the field's declared values | **group-by (kanban)**, filter |
-| `person` | a monogram plus the name — see below | filter, group-by |
+| `person` | a monogram plus the name — see below | filter |
 | `link` | anchor that does not trigger the row's own action | click-through |
 
 An absent cell draws an em dash rather than a blank, because "this row has no value here" is a fact
@@ -159,7 +160,7 @@ says so in a notice rather than showing an empty form.
 That read is **reactive**, through a subscription to the node's query cache
 (`createCollectionCacheRevision`): an answer landing while the editor is open — because the panel was
 just placed, or a sibling panel over the same collection fetched — fills the gated sections in place.
-What the editor still deliberately does not do is **issue a fetch of its own**. Whether an editor may
+What the editor deliberately does not do is **issue a fetch of its own**. Whether an editor may
 *run* a collection to learn its shape is the question run-once-and-pin answers properly, with a person
 pressing a button, and it must not be answered twice. The saved-SQL case this optionality was designed
 for has not shipped; Linear arrived at it first.
@@ -276,14 +277,18 @@ A **panel** is a definition with four layers, each owned by a different party.
 | Layer | Owner | Contents |
 | --- | --- | --- |
 | `queries[]` | plugin (meaning), user (choice) | collection references plus declared params |
-| `mapping` | host, declarative | per source: field mapping, value mapping, the derived enum |
+| `mapping` | host, declarative | per source: field mapping, value mapping, the derived enum, the fields the user invented |
 | `shaping` | host, declarative | filter, sort, group-by, limit, visible-field projection |
-| `view` | host | which view, and its options |
+| `view` | host | which view, plus its measure and, for a chart, its shape and axes |
 
 The layering is what lets a user flip a panel from table to board without losing their filters, and
 swap a source without losing the layout. Shaping runs **client-side over the returned rows as the
 baseline**; declared server-side params are an optimisation a collection may offer, never a
 requirement, which keeps the plugin obligation at "answer with your rows".
+
+**Where a panel is placed is not one of the four**, and that is the split the whole persistence
+section below rests on: a definition is surface-free, and a placement references it by id and owns
+its geometry. The same panel can therefore be on Home and in a task pane at two different sizes.
 
 ### Views are derived, not chosen from a menu
 
@@ -306,13 +311,15 @@ own bucketing, reused whole, declared values in declaration order — and its he
 measure a `stat` draws, so flipping stat ↔ chart keeps what the panel is counting. A `line` takes its
 x from a `datetime` **bucketed by day**, with an optional series split from an enum; the bucket is why
 `count` and a number aggregate go down one path, since a count at an instant is always one. The axes
-are type-inferred on the first click (the `updated`-role datetime, then the field the panel already
-groups by) and adjustable after. Every mark carries a **tone**, not a colour — the plugin's declared
-enum tone where it has one, else the five-value ordinal ramp `StatusDot` already uses — so a chart
-restyles with the appearance pack and no chart token had to be invented. Pie, gauge, scatter and area
-are not there, and will not be until someone arrives with the panel that needs one. The arithmetic —
-buckets, scales, ticks, path data — is pure in `dashboards/chart.ts`; `ChartView.tsx` is SVG over its
-output and decides nothing.
+are type-inferred on the first click — a line takes the `updated`-role datetime, a bar takes whatever
+the panel already groups by and then the `status`-role enum — and adjustable after.
+
+Every mark carries a **tone**, not a colour: the plugin's declared enum tone where it has one, else
+the five-value ordinal ramp `StatusDot` already uses. So a chart restyles with the appearance pack,
+and no chart token had to be invented to make that true. Pie, gauge, scatter and area are not there,
+and will not be until someone arrives with the panel that needs one. The arithmetic — buckets,
+scales, ticks, path data — is pure in `dashboards/chart.ts`; `ChartView.tsx` is SVG over its output
+and decides nothing.
 
 ### The mapping layer, and cross-source panels
 
@@ -356,8 +363,9 @@ failing rather than the protocol being short.
 
 No panel settings UI is hand-written, because a hand-written editor drifts from its schema. One
 component serves both entry points — "add" is the same question asked of a panel that does not exist
-yet — and it edits title, view kind, group-by, filters, sort keys, limit, the visible-field projection
-and its order, the stat aggregate, per-panel refresh, the mapping step, and the collection's declared
+yet — and it edits title, view kind, group-by, filters, sort keys, limit, the visible-field
+projection and its order, the measure a stat or a chart draws, a chart's shape and axes, per-panel
+refresh, the mapping step including the fields the user invented, and the collection's declared
 params.
 
 Its inputs are **selectors**: typed, data-aware controls that each know the schema they draw from —
@@ -366,9 +374,11 @@ drawn by the field's semantic type, map these values onto those columns, pick a 
 split in two. Selectors make a bad choice unofferable; `normalizePanel` drops the stale choices no
 selector can catch, such as a filter over a field that went away when the collection was swapped.
 
-The pure derivations behind the selectors live in `dashboards/editor.ts` and `dashboards/compose.ts`
-rather than inside the components, because vitest here runs in node with no Solid plugin — a component
-in this repo cannot be tested, so the parts that can be wrong live where they can be.
+The pure derivations behind the selectors live in `dashboards/editor.ts`, `dashboards/compose.ts`,
+`dashboards/mapping.ts` and `dashboards/chart.ts` rather than inside the components, because vitest
+here runs in node with no Solid plugin — a component in this repo cannot be tested, so the parts that
+can be wrong live where they can be. The same rule puts every scale, tick and rect in
+`dashboards/chart.ts` and `dashboards/layout.ts`.
 
 ## Persistence
 
@@ -384,14 +394,14 @@ inside a "home dashboard" blob works right up until panels need to live in a sec
 it is a migration. A placement scope key is `(surface, ownerId?, projectId?)` with segments encoded,
 so an owner id that itself contains a separator can never be read as two. `home` and `pane` are drawn
 today; `plugin-region` is named in the key format so a later phase adds a renderer rather than a key
-format. That split paid for itself exactly as intended: adding the task pane needed a container and a
-behaviour change, and touched neither the key format nor the panel.
+format. The split does its job: a new surface is a container and a scope constant, and touches
+neither the key format nor the panel.
 
 **Geometry is a third top-level key, `layouts`, keyed by the same scope then by panel id** — four
 small integers per placed panel. A sibling key rather than turning the placement entries into
-objects, and that is a compatibility decision rather than a tidiness one: the shipped parser keeps
-only *string* entries from a placement array, so object entries would parse to an empty placement and
-the board would vanish on an older client. A sibling key is invisible to an old parser, which renders
+objects, and that is a compatibility decision rather than a tidiness one: the placement parser keeps
+only *string* entries from the array, so object entries would parse to an empty placement and the
+board would vanish on any client older than the change. A sibling key is invisible to an old parser, which renders
 the order-only grid it always did. The honest ceiling, on the record: an old client that *writes* the
 slice serialises only what it parsed, so a write from one drops `layouts` — geometry resets to
 auto-placement while the panels, their definitions and their order all survive. Losing arrangement and
@@ -413,9 +423,10 @@ every other slice: it must never throw on malformed input.
 
 A malformed rect is **dropped, not repaired into place** — the panel it belonged to just becomes
 rect-less, which is a case that already has an answer — and a rect naming a panel not placed in that
-scope is retained unread, because dropping it would make a partially-written blob destructive. None
-of this bumped the slice version: the change is additive, both directions degrade as described, and
-the shape still parses under the old parser, which is what the version is a statement about.
+scope is retained unread, because dropping it would make a partially-written blob destructive.
+Geometry did not bump the slice version: it is additive, both directions degrade as described, and
+the shape parses under a parser that has never heard of it — which is what the version is a statement
+about.
 
 One key is carried across deliberately unread. `writeValue` on a mapping column is the board-drag
 write-back seam; nothing sets it or looks at it yet, and it still round-trips, because a reserved
@@ -435,10 +446,10 @@ that pane in every task. A board per task is a non-goal — a task is ephemeral,
 labour nobody repeats. If per-something boards are ever wanted the answer is the scope's `projectId`
 segment, which the key format already carries, not a task segment.
 
-Because there are now two surfaces, **Remove and Delete are two different things**. "Remove from here"
-unplaces; "Delete panel" destroys the definition and is armed, because the editor has made a
-definition genuinely expensive to recompose — filters, a sort, a projection, a whole mapping matrix —
-and one misclick used to cost all of it.
+With more than one surface, **Remove and Delete are two different things**. "Remove from here"
+unplaces; "Delete panel" destroys the definition and is armed, because the editor makes a definition
+genuinely expensive to recompose — filters, a sort, a projection, a whole mapping matrix — and one
+misclick should not cost all of it.
 
 ### The grid
 
@@ -468,13 +479,13 @@ not needed anything richer:
 separate visual effect: release persists exactly what was on screen, so no commit computation can
 disagree with the preview, and Escape costs nothing because nothing was written. The panel drags by
 its **header** only — the body scrolls, selects and clicks, and leaving it gesture-free is also what
-keeps a future board-card drag unambiguous. The cell lattice appears when a gesture arms and vanishes
+keeps a future board-card drag unambiguous (`docs/future/dashboards/write-back.md`). The cell lattice appears when a gesture arms and vanishes
 when it ends, iOS-widget style; nothing about the layout is discoverable chrome until a gesture makes
 it relevant.
 
-Every pointer gesture has a keyboard equivalent driven through **the same pure functions**, because
-that was the commitment made when reorder shipped as menu items: drag lands *on top of* the accessible
-path, never instead of it. "Move / resize" in the overflow menu puts the panel in layout mode where
+Every pointer gesture has a keyboard equivalent driven through **the same pure functions**: drag
+sits *on top of* the accessible path rather than instead of it, which is the commitment reorder made
+when it was menu items only. "Move / resize" in the overflow menu puts the panel in layout mode where
 arrows move by a cell and Shift+arrows resize, announced through a live region; Enter commits, Escape
 restores. Move up / move down survive too, reinterpreted onto geometry as a swap toward the neighbour
 in reading order.
@@ -482,9 +493,9 @@ in reading order.
 Below roughly twelve 44px cells the grid **collapses to one column in reading order** and the gestures
 disarm. That is purely presentational — nothing in storage changes, so widening the window restores
 the arrangement exactly — and it is what makes a pane-sized placement work at all. `placements` is
-rewritten to reading order, sorted by `(y, x)`, on every commit, which keeps the old-client fallback
-sensible, the collapse well-defined and screen-reader document order matching visual order without a
-separate bookkeeping pass.
+rewritten to reading order, sorted by `(y, x)`, on every commit, which keeps three things true at
+once: a client with no geometry renders a sensible order, the collapse needs no second opinion, and
+screen-reader document order matches visual order without a separate bookkeeping pass.
 
 All of the arithmetic is pure functions in `dashboards/layout.ts`, exhaustively unit-tested;
 `PanelGrid.tsx` turns pixels into a candidate rect and renders the answer, and contains no layout
@@ -497,8 +508,8 @@ Reasoning and revisit conditions for each are in
 planned rather than refused each have a deliverable spec in
 [`docs/future/dashboards/`](./future/dashboards/README.md).
 
-- **Board-drag write-back.** Reading is done; dragging a card between columns is a mutation, and value
-  mappings are many-to-one — GitHub's `merged` and `closed` may both land in `Done`, so dropping a
+- **Board-drag write-back.** Panels are read-only; dragging a card between columns is a mutation, and
+  value mappings are many-to-one — GitHub's `merged` and `closed` may both land in `Done`, so dropping a
   card there has no unique answer. The answer is a designated write-value per (source, column), which
   is why the persisted shape is a record per column rather than a value→column lookup. Verb-shaped
   mutations through `runNodeAction` are not refused and work today, with the risk tier above.
