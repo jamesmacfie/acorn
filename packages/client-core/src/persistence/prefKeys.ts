@@ -52,6 +52,10 @@ export const PrefKeys = {
   // screen they are looking at, and the plugin behind the choice may not even be installed on the other
   // machine paired with the same node.
   exclusiveSlots: 'exclusive_slots',
+  // User-composed panel definitions and where they are placed (dashboards/persist.ts). The NODE's,
+  // not the device's: a panel describes that node's resources, so it follows the resource and every
+  // client paired with the node renders the board its owner built.
+  dashboards: 'dashboards',
 } as const
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]

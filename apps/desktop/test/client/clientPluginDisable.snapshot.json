@@ -65,6 +65,9 @@
       "agents.sessions",
       "memory.proposals"
     ],
+    "collections": [
+      "github:pulls-mine"
+    ],
     "contentLinks": [
       "github.pull-request",
       "github.repository"
@@ -140,6 +143,9 @@
       ],
       "persistedState": [
         "github.pr-filters"
+      ],
+      "collections": [
+        "github:pulls-mine"
       ],
       "contentLinks": [
         "github.pull-request",

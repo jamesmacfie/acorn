@@ -42,8 +42,8 @@ until it can do everything the first can.
 
 If yes, it can be sandboxed. Panes, reference panels, settings pages, importers, overlay pickers, rail
 sources, badges, palette rows, attention items, node stats, content links, commands, keybindings,
-webviews — all of these turned out to be expressible that way, several of them only after someone looked
-properly.
+typed record sets, webviews — all of these turned out to be expressible that way, several of them only
+after someone looked properly.
 
 If no, it needs the shared realm and stays first-party. That is a short list: owning a WebSocket
 stream or channel (the transport itself, not a consumer of it), components the shell renders
@@ -107,6 +107,20 @@ connection, level and environment filters because a descriptor row cannot expres
 response was to move that exploration into the frame and say so — not to grow the action
 vocabulary until it became a UI framework. **The closed verb set stays closed**; every time it is
 widened for one plugin's convenience, every future plugin inherits a larger thing to get wrong.
+
+The furthest that tier goes today is a **collection**: a plugin declares a typed set of records —
+seven semantic field types, five roles — and the host composes user-owned panels over it
+([dashboards.md](./dashboards.md)). It is worth knowing why that is not the failure mode above.
+Widening the verb set trades a bounded vocabulary for one plugin's convenience; a collection widens
+nothing for one plugin, because the host draws its own generic surface and the uniformity across
+providers is what the feature *is* — two plugins' rows can share one board only because neither of
+them draws anything. The same budget discipline applies with the same words: a field type added is a
+rendering rule every provider inherits forever, and the overflow path is a frame pane. Both feeders —
+`contributions.collections` in a manifest and `ctx.collections` from a compiled plugin — land in one
+client registry (`client-core/src/registries/collections.ts`), and nothing downstream can tell which
+supplied a collection. That is the strongest form of the descriptor argument: a stranger's plugin gets
+panels that ship no client bundle, raise no trust prompt, and are pixel-identical to a first-party
+one's under every appearance pack.
 
 ## Plugins may extend each other, and only by invitation
 

@@ -1,11 +1,14 @@
+import { dashboardsSlice } from '../dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../notifications/notifications'
 import { defaultLayout, normalizeLayout, parseTaskLayouts, type TaskLayout } from '../tasks/layout'
 import { hydrateTaskLayout, taskLayouts } from '../tasks/tasks'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
 
-// Core-owned persisted state only: the task layout (core owns panes) and notices (core owns the
-// notification centre). Feature-owned slices live next to the store they bind — see
+// Core-owned persisted state only: the task layout (core owns panes), notices (core owns the
+// notification centre) and the dashboard model (core owns panels). Feature-owned slices live next
+// to the store they bind — the dashboards one does, and is re-exported here rather than redeclared
+// so the composition root keeps registering one list — see
 // plugins/{editor/client/openFilesSlice,github/client/pullList/filterSlice,context/client/selectionSlice}.ts
 // — and each plugin registers its own through `ctx.persistedState` in its client/index.ts. The
 // composition root registers only these and the direct preference slices (app/client/activate.ts).
@@ -61,4 +64,5 @@ const noticesSlice: PersistedStateSlice<Notice[]> = {
 export const coreStateSlices: readonly PersistedStateSlice<unknown>[] = [
   taskLayoutSlice,
   noticesSlice,
+  dashboardsSlice,
 ] as readonly PersistedStateSlice<unknown>[]

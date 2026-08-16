@@ -5,6 +5,7 @@ import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { activeNodeId } from '../../node/activeNode'
 import { agentContextRegistry } from '../../registries/agentContexts'
 import { attentionRegistry, type AttentionItem } from '../../registries/attention'
+import { collectionKey, collectionRegistry, emptyCollectionPage } from '../../registries/collections'
 import { nodeStatRegistry } from '../../registries/nodeStats'
 import { commandRegistry } from '../../registries/commands'
 import { keybindingRegistry } from '../../registries/keybindings'
@@ -24,6 +25,7 @@ import {
   ownsRoute,
   readAgentContextOptions,
   readAttention,
+  readCollection,
   readStat,
   resolveRefs,
   unwatchChrome,
@@ -343,6 +345,32 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       // `0` is hidden on the card, which is the right answer for a node that does not run this plugin.
       fetch: async (nodeId, signal) =>
         pluginEnabledOnNode(nodeId, pluginId) ? readStat(pluginId, descriptor.data, nodeId, signal) : 0,
+    }))
+  }
+
+  for (const descriptor of contributions.collections ?? []) {
+    note(descriptor.refresh)
+    const declared = new Set((descriptor.params ?? []).map((param) => param.id))
+    add('collection', descriptor.id, () => collectionRegistry.register({
+      // The registry id is the host's, minted from the plugin id — the same stamp `ctx.collections`
+      // applies on the compiled side, so a placement addressing `(pluginId, collectionId)` resolves the
+      // same contribution whichever feeder supplied it.
+      id: collectionKey(pluginId, descriptor.id),
+      pluginId,
+      collectionId: descriptor.id,
+      name: descriptor.name,
+      ...(descriptor.params ? { params: descriptor.params } : {}),
+      ...(descriptor.schema ? { schema: descriptor.schema } : {}),
+      ...(descriptor.refresh !== undefined ? { refresh: descriptor.refresh } : {}),
+      // Addressed per node, never against the ambient active node: a node that does not run this
+      // plugin answers with nothing rather than being asked.
+      fetch: async (nodeId, params, signal) => {
+        if (!pluginEnabledOnNode(nodeId, pluginId)) return emptyCollectionPage()
+        // Only what the manifest declared reaches the route. A caller passing an undeclared key would
+        // be inventing a scope the plugin never agreed to answer for.
+        const passed = Object.fromEntries(Object.entries(params).filter(([key]) => declared.has(key)))
+        return readCollection(pluginId, descriptor.id, descriptor.items, nodeId, passed, signal)
+      },
     }))
   }
 

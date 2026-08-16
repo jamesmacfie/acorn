@@ -1,6 +1,7 @@
 import { type NodePlugin, pullRequestSection } from '@acorn/plugin-api/node'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/actions'
+import { collections } from '../server/routes/collections'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/import'
 import { githubProvider } from '../server/provider'
@@ -78,6 +79,10 @@ export const githubPlugin = (): NodePlugin => {
       // and the client's `pinsRoute` moved with it in the same commit — the repo selector is the only
       // caller.
       ctx.routes.register(pins(store), { prefix: '/pins' })
+      // /v2/p/github/collections/* — the mirror projected as typed records a user can compose a panel
+      // over (server/routes/collections.ts). Its own prefix rather than `/repos`, because a collection
+      // spans every mirrored repository and is not addressed by one.
+      ctx.routes.register(collections(store), { prefix: '/collections' })
       // The device-flow connect writes CORE's `integrations` row through core's own connectProvider.
       // It does not bind the machine identity: core mints that owner at boot. It touches none of this
       // plugin's tables, so it takes no handle.

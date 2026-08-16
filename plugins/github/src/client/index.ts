@@ -1,5 +1,7 @@
 import { lazy } from 'solid-js'
-import { type ClientPlugin, contentLinkRegistry, setSelectedSource } from '@acorn/plugin-api/client'
+import { type ClientPlugin, contentLinkRegistry, readJson, setSelectedSource } from '@acorn/plugin-api/client'
+import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
+import { PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
 import { prFiltersSlice } from './pullList/filterSlice'
 import { prPaneContribution } from './pullDetail/PrPane'
 import { pullFilePaletteSlotContribution } from './slotContribution'
@@ -45,6 +47,30 @@ export const githubClientPlugin: ClientPlugin = {
       category: 'Tasks',
       defaultChord: 'meta+0',
       when: 'global',
+    })
+    // The COMPILED feeder for collections (client-core/registries/collections.ts). A loaded plugin
+    // declares this in its manifest and the host synthesises the same contribution over its own reader;
+    // github ships no manifest, so it supplies the fetch itself.
+    //
+    // No schema parse on the way in, and that is the boundary rather than an omission: this response is
+    // this repo's own TypeScript answering this repo's own route, which is the house rule for a read
+    // (docs/architecture-overview.md § wire validation). The parse exists for a LOADED plugin's answer,
+    // which is untrusted wire. Provenance is still stamped rather than read, for the same reason it is
+    // on that path — a row never names its own source, even when the source is us.
+    ctx.collections.register({
+      collectionId: PULLS_COLLECTION_ID,
+      name: 'My pull requests',
+      schema: pullsCollectionSchema,
+      params: [{ id: 'repo', name: 'Repository', type: 'text' }],
+      refresh: 60,
+      fetch: async (nodeId, params, signal) => {
+        const query = params.repo ? `?repo=${encodeURIComponent(params.repo)}` : ''
+        const body = await readJson<PluginCollectionResponse>(`${pullsCollectionRoute}${query}`, { nodeId, signal })
+        return {
+          schema: body.schema,
+          rows: body.rows.map((row) => ({ ...row, pluginId: 'github', collectionId: PULLS_COLLECTION_ID })),
+        }
+      },
     })
     ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)

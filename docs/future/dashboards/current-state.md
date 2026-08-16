@@ -1,11 +1,16 @@
 # acorn's relevant machinery as verified 2026-08-12
 
-Design notes from the dashboards session (2026-08-12). Nothing here is scheduled. This is the
-baseline the design in `data-contract.md` / `composition.md` / `placements.md` extends — what is
-shipped, where it lives, and which parts were *decided* rather than merely unbuilt. The owning
-docs for current behavior are `docs/plugins.md`, `docs/extensibility.md`, and `docs/data-layer.md`;
-where this file drifts from those, those win. Paths and line numbers are hints, not contracts —
-see the drift warning in `README.md`.
+**This is a HISTORICAL SNAPSHOT and is not being updated.** It records what the tree looked like on
+2026-08-12, immediately before dashboards were built, and it is kept because the design in
+`data-contract.md` / `composition.md` / `placements.md` was reasoned against exactly this baseline —
+including several "not built yet" observations that the build then answered. Nothing here should be
+read as a claim about the system today. For that, go to `docs/dashboards.md`, `docs/plugins.md`,
+`docs/extensibility.md`, `docs/data-layer.md` and `docs/state.md`.
+
+Design notes from the dashboards session (2026-08-12). This is the baseline the design in
+`data-contract.md` / `composition.md` / `placements.md` extends — what was shipped, where it lived,
+and which parts were *decided* rather than merely unbuilt. Paths and line numbers are hints, not
+contracts — see the drift warning in `README.md`.
 
 ## The descriptor tier is the foundation
 

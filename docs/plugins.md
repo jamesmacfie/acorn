@@ -701,6 +701,17 @@ kinds of contribution come out of one manifest:
   own with ordinary CSS — and the host rendering a plugin's list *from data* would mean designing and
   eternally versioning a widget toolkit in the wire format. The answer to that stays no.
 
+  `collections` (§ Descriptors) walks close enough to that line to be worth distinguishing on the
+  record, because it did not reverse it. What was refused is reproducing *a plugin's bespoke UI* from
+  data — an unbounded fidelity chase, where every plugin's layout is a new thing the wire format has
+  to be able to say. A collection feeds the host's **own** generic surface, where uniformity across
+  providers is the entire point: two plugins' rows can only share one board if neither of them draws
+  anything, and a frame cannot participate in a board at all. What crosses the wire is a record
+  schema — seven field types, five roles, closed and versioned — not a widget toolkit, and the host
+  renders its own views over it. The guardrail is that budget: when the vocabulary cannot express
+  something, the answer is still a frame pane. The full argument is
+  [dashboards.md](./dashboards.md); the refusals it keeps are in `docs/future/dashboards/refused.md`.
+
   Because a document surface runs no plugin code on the device, it is gated like a **descriptor**
   rather than like a frame: no bytes execute, so there is nothing for a bytes-hash trust prompt to be
   about, and a plugin that ships only document surfaces needs no client bundle at all. The ceiling is
@@ -786,7 +797,8 @@ kinds of contribution come out of one manifest:
 - **Descriptors** — a rail source, a badge in the task footer or the topbar, commands/keybindings,
   attention items, node stats, context-menu rows (`contextMenus`),
   restricted URL recognizers (`contentLinks`), renderer routes (`routes`), agent-context entries
-  (`agentContexts`), batch reference resolvers (`refResolvers`), and colour themes (`themes`).
+  (`agentContexts`), batch reference resolvers (`refResolvers`), typed record sets (`collections`),
+  and colour themes (`themes`).
   These are data, not code: the host renders them with its own components and fetches their content
   from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
   mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
@@ -899,6 +911,67 @@ kinds of contribution come out of one manifest:
   slope this tier has declined more than once. The route spends provider credentials on a cache miss,
   and is already behind `requireProviderAccess` through the provider mount — that gate is the
   authorisation, the identifier cap is the budget, and neither replaces the other.
+
+  A `collections` entry is the descriptor tier grown one size: from a node stat's one integer with a
+  label to a **typed set of records**. The plugin declares what a route answers with — fields with a
+  semantic `type`, an optional `role`, and their display hints — and the host draws the rows with its
+  own components. It is the same argument the rest of this tier makes, at the point where it stops
+  being obvious, so the boundary is worth stating: this does **not** reverse the master/detail refusal
+  below. What was refused is reproducing a plugin's *bespoke* UI from data, an unbounded fidelity
+  chase; a collection feeds the host's *own* generic surface, where uniformity across providers is the
+  entire point — two plugins' rows can only share one board if neither of them draws anything.
+
+  ```json
+  {
+    "contributions": {
+      "collections": [{
+        "id": "issues-mine",
+        "name": "My Linear issues",
+        "items": "/v2/p/linear/collections/issues-mine",
+        "refresh": 600
+      }]
+    }
+  }
+  ```
+
+  The route answers `{ schema: { fields }, rows: [{ id, values, action? }] }`, parsed against
+  `@acorn/protocol/collections.ts`. `(pluginId, collectionId)` is the universal reference and nothing
+  else addresses a collection. Four rules carry the whole design:
+
+  - **The field vocabulary is closed and budgeted**: seven types (`text`, `number`, `boolean`,
+    `datetime`, `enum`, `person`, `link`) and five roles (`title`, `status`, `assignee`, `url`,
+    `updated`). Semantic rather than primitive, because the type is what lets the host render a person
+    as an avatar and *derive* which views a collection supports — only an `enum` can become kanban
+    columns. Every type added is a rendering rule every provider inherits forever; when the vocabulary
+    cannot express something, the answer is a frame pane, not a wider wire format.
+  - **Display hints live on the field, never on a panel** — a `number`'s unit, an `enum`'s declared
+    values with their labels and tones — so they survive a view switch and a cross-source mapping.
+  - **Row identity is required and provenance is host-stamped.** `id` must be stable across refreshes;
+    `pluginId` and `collectionId` are not in the body at all, and the host binds both from the
+    contribution whose route answered — the same rule as `refResolvers`' `providerId`, for the same
+    reason. A mixed board routes clicks on that stamp.
+  - **A row action takes the context-free verb set only.** A panel row has no rail row to promote and
+    no routed project to substitute, so `createTask` and `navigate` are not in the union. There is no
+    `risk`/`confirm` key yet, which is why v1 ships no destructive row action; the growth path is an
+    additive optional field on that action, with the *host* rendering the confirmation.
+
+  A collection may also declare `params`: up to eight named inputs, each `text` or `enum`. The host
+  renders one control per param in the panel editor and appends the values to the route as query
+  parameters; it never interprets them. The plugin owns what `repo` means, and the day it means
+  something else the host does not change.
+
+  The manifest `schema` is optional, because the response carries its own. The declared one is the
+  *static* case — a promise about the route, so an editor can offer views before any data exists — and
+  a collection whose columns cannot be known at build time simply omits it. Linear does: only a Linear
+  workflow state's `type` means the same thing in every workspace, so its rows group by the type and
+  the response labels each group with the workspace's own name for it. A malformed page is dropped
+  whole and logged, never half-parsed: a table missing some of its rows reads as complete and is not.
+  The cost of omitting the schema is real and worth knowing before you do: nothing can be configured
+  over that collection until it has been fetched once.
+
+  Everything the host does with the answer — panels, the views it derives, the cross-source mapping
+  layer, per-panel refresh, and where compositions are persisted — is
+  [dashboards.md](./dashboards.md). A plugin needs none of it to provide a collection.
 
   A `themes` entry is the descriptor tier taken to its limit: a **colour** theme with no route, no
   bundle and no CSS, declared as a map of the 22 palette tokens plus a `dark` flag. The host validates

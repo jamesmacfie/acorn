@@ -122,6 +122,26 @@ export default {
     // identifiers across every connected workspace, ten-minute cache — so declaring it is one row; what
     // changed is that its answer is now the host's shape rather than a Linear-flavoured one.
     refResolvers: [{ id: 'linear-refs', kind: 'linear.issue', resolve: '/v2/p/linear/issues' }],
+    // The viewer's own active issues as typed records a user can compose a panel over
+    // (@acorn/protocol/collections.ts). Scoped to the PERSON, not to a project — which is what makes it
+    // a different question from the rail source above rather than the same one in a second shape.
+    //
+    // NO static `schema`, deliberately. A Linear status is `{ name, type, color }` where only `type`
+    // means the same thing in every workspace and `name` is whatever this workspace called it — so a
+    // schema written here would render every board in vocabulary nobody in that workspace uses. The
+    // response carries its own schema instead and folds the real names in (src/shared/collections.ts).
+    // The cost is that a panel editor can offer no views until the first fetch, which is the trade the
+    // optional field exists for.
+    //
+    // `refresh` is this plugin's, and it is the only TTL a collection route without the sync engine has:
+    // Linear's reads fan out across connections with per-item freshness, so there is no single resource
+    // for `serveThenRevalidate` to hold. Ten minutes, matching LINEAR_ISSUES_STALE_AFTER_MS.
+    collections: [{
+      id: 'issues-mine',
+      name: 'My Linear issues',
+      items: '/v2/p/linear/collections/issues-mine',
+      refresh: 600,
+    }],
     commands: [{
       id: 'open',
       title: 'Linear: open linked issues',

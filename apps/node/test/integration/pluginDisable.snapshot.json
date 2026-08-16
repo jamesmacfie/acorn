@@ -10,6 +10,7 @@
       "editor/tasks",
       "github",
       "github",
+      "github/collections",
       "github/pins",
       "github/repos",
       "github/repos",
@@ -105,6 +106,7 @@
       "routes": [
         "github",
         "github",
+        "github/collections",
         "github/pins",
         "github/repos",
         "github/repos",

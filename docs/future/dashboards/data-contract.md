@@ -1,9 +1,14 @@
 # The data contract: collections, fields, and rows
 
-Design notes from the dashboards session (2026-08-12). Nothing here is scheduled. This file is the
-heart of the folder: the node↔client contract everything else composes over. The design rule it
-serves (`README.md`): the field-type vocabulary is where this succeeds or fails — **small,
-semantic, closed, versioned**. All JSON in this file is illustrative, not normative.
+Design notes from the dashboards session (2026-08-12). This file is the heart of the folder: the
+node↔client contract everything else composes over. The design rule it serves (`README.md`): the
+field-type vocabulary is where this succeeds or fails — **small, semantic, closed, versioned**. All
+JSON in this file is illustrative, not normative.
+
+> This is the design record, not the contract. The contract is
+> `packages/protocol/src/collections.ts`, and the owning docs are
+> [`docs/dashboards.md`](../../dashboards.md) and `docs/plugins.md § Descriptors`. Notes marked
+> **As built:** describe where the system differs from this file, so nothing here is implemented twice.
 
 ## Collections
 
@@ -58,6 +63,13 @@ must earn its place):
 | `link` | clickable, host-mediated open | click-through |
 | `badge` | count pill | glanceable |
 
+**As built: seven, not nine.** `duration` and `badge` were cut, because neither of the two providers
+that proved the contract needed either, and an unused type is a rendering rule nobody has checked.
+Both stay additive later, on a versioned schema, at the cost of arguing for them. The shipped hint
+set is narrower too: `unit` on a `number` and declared `values` (label plus tone) on an `enum`,
+enforced by a refinement so a hint on the wrong type is a parse error rather than a declaration that
+can never do anything. There is no `icon` hint.
+
 Display hints (unit, tone, icon) attach to the **field definition**, never to the panel — the
 Grafana `FieldConfig` lesson: they survive view switches.
 
@@ -96,7 +108,10 @@ plugin needs something the vocabulary can't express, the answer is a frame pane,
   mixed board renders source badges and routes row actions on the host's stamp, so a plugin cannot
   impersonate another's rows.
 - **Row actions come from the closed verb set** (`PluginChromeAction`), so a click can do exactly
-  what a command can do, nothing more. Note that `runNodeAction` already makes verb-shaped
+  what a command can do, nothing more. **As built: the CONTEXT-FREE subset of it** — `openPane`,
+  `runNodeAction`, `openUrl`, `openOverlay`, `surfaceAction`. A panel row has no rail row to promote
+  and no routed project to substitute, so `createTask` and `navigate` would parse and then do
+  nothing. Note that `runNodeAction` already makes verb-shaped
   mutations expressible in v1 ("pick up review", "restart server") — what v1 does not give an
   action is confirmation, optimistic UI, or failure surfacing; it fires, and the panel refetches.
 
@@ -117,6 +132,15 @@ contract and need no wire change at all — see the invariant in `README.md`.)
 Responses carry their schema alongside the rows (Grafana's DataFrame move). The manifest-declared
 schema becomes the *static* case — a promise about what the route returns, used so the panel
 editor can offer views before any data exists. This one decision buys the dynamic case for free:
+
+**As built, and it arrived one phase early with a consequence this file did not predict.** Linear's
+`issues-mine` declares no static schema — only a workflow state's `type` means the same thing in
+every workspace — so it was the first response-only collection rather than a saved SQL query. The
+cost the optionality carries is real: **a response-only collection cannot be configured until it has
+been fetched once.** The editor reads the answered schema out of the node's own QueryClient and
+issues no fetch, so cold it offers the three views that ask nothing of the fields, no filter, no sort
+and no grouping — and says why, rather than showing an empty form. Placing the panel once fills the
+cache. Run-once-and-pin, and with it schema-drift detection, did **not** ship.
 
 - **A query-shaped collection needs no manifest schema.** The motivating case is the database
   plugin: a user writes SQL, whose columns cannot be known at manifest time. The setup flow is
@@ -151,6 +175,19 @@ Two knobs, two owners, both already conventional:
   `chrome/data.ts:64` reserved for "when a refetch cost shows up". Panels fetch through
   `createFleetQuery`-style machinery and inherit cache-as-fallback and the live/stale/offline
   vocabulary.
+
+  **As built, but nothing was split.** Collections are fetched per collection through the ordinary
+  fan-out, each source with its own query key and its own timer, so they never joined the shared
+  chrome revision in the first place and chrome keeps its single revision unchanged. The per-source
+  fetch bought partial availability for free: a source that fails is a banner naming that source with
+  the rest of the panel still rendering.
+
+  **As built: the node half is looser than "plugin-owned TTL" suggests.** Linear declares a `refresh`
+  on the descriptor because its reads fan out per connection with no single resource for
+  `serveThenRevalidate` to hold; GitHub's route deliberately declares no TTL and never drives the
+  mirror, because a panel polls unattended across every repository at once. Both are the plugin
+  deciding, which is the rule — but "a collection route is a `serveThenRevalidate` projection" was
+  true for neither.
 
 ## Validation stance
 

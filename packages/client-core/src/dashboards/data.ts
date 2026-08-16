@@ -1,0 +1,219 @@
+import { createEffect, createMemo, createSignal, mapArray, onCleanup, type Accessor } from 'solid-js'
+import type {
+  PluginCollectionField,
+  PluginCollectionPage,
+  PluginCollectionRow,
+  PluginCollectionSchema,
+} from '@acorn/protocol/collections.ts'
+import { activeNodeId } from '../node/activeNode'
+import { createFleetQuery } from '../node/fanout'
+import { clientFor } from '../node/fleet'
+import type { Freshness } from '../node/freshness'
+import { collectionContribution, emptyCollectionPage, type CollectionContribution } from '../registries/collections'
+import { panelSchema, unionRows, type PanelSourcePage } from './mapping'
+import { panelRefreshSeconds, type PanelDefinition, type PanelQuery } from './model'
+import { shapeRows, visibleFields } from './shaping'
+
+// One panel's data (docs/future/dashboards/data-contract.md § Freshness).
+//
+// Fetched through the fan-out pinned to one node, exactly as a descriptor's rail list is
+// (plugins/chrome/ChromeSourcePanel.tsx). That is not ceremony: it is the only reader in the client
+// that already has a per-node deadline, a cache fallback and the live/stale/offline vocabulary, so a
+// panel on an offline node shows what it last had, badged stale, instead of a spinner with no end.
+//
+// FRESHNESS IS PER PANEL, and this is the first contribution where that is true. Chrome keeps its
+// one shared revision and its one min-refresh timer (plugins/chrome/data.ts) — a handful of tiny
+// reads is not worth splitting — but a panel is a page of rows a person chose to keep on screen, and
+// how often it re-reads is a property of that choice rather than of the app.
+//
+// FETCHING IS PER COLLECTION, AND THE UNION HAPPENS AFTERWARDS. Each source keeps its own query key,
+// its own declared refresh and its own place in the cache, so two panels over the same collection
+// share the read and a slow source does not hold up a fast one. The consequence that matters is
+// PARTIAL AVAILABILITY: one source failing is data, not an error — the panel says which source is
+// missing and renders the rest, which is the fleet machinery's rule one tier down (node/fanout.ts).
+
+/** Private to panels. The fan-out writes through the node's QueryClient, so sharing a key means
+ *  sharing the VALUE'S SHAPE (node/fanout.ts): a collection page is an aggregate nothing else in the
+ *  app holds, so it gets a key of its own. Two panels over the same collection with the same params
+ *  legitimately share it — that is the same shape by construction — and different params do not. */
+export const collectionQueryKey = (query: PanelQuery | undefined): readonly unknown[] => {
+  if (!query) return ['collection', 'unresolved']
+  const params = Object.entries(query.params ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('&')
+  return ['collection', query.pluginId, query.collectionId, params]
+}
+
+/** The last page this node answered for a query, straight out of its own QueryClient.
+ *
+ *  The one reader outside a panel is the EDITOR, and it is why this is exported: a collection that
+ *  declares no static schema describes itself in its answer, so until this returns something there is
+ *  nothing for the editor to offer filters, a grouping or a board over (editor.ts § schemaOf). */
+export const cachedCollectionPage = (
+  query: PanelQuery | undefined,
+  nodeId: string,
+): PluginCollectionPage | undefined =>
+  // `clientFor` MINTS a cache and an IndexedDB persister for whatever it is handed, so an unset node
+  // id would quietly create one for the empty string rather than answer "nothing cached".
+  nodeId ? clientFor(nodeId).client.getQueryData<PluginCollectionPage>(collectionQueryKey(query)) : undefined
+
+/** One source's read, as the panel's chrome sees it. */
+export type PanelSourceState = {
+  query: PanelQuery
+  /** `undefined` when the collection this source names is not registered on this device right now —
+   *  a disabled or uninstalled plugin. */
+  contribution: Accessor<CollectionContribution | undefined>
+  page: Accessor<PluginCollectionPage>
+  /** Response schema once there is one, else the collection's declared static promise. */
+  schema: Accessor<PluginCollectionSchema>
+  /** Whether the node answered for THIS source. */
+  answered: Accessor<boolean>
+  freshness: Accessor<Freshness | undefined>
+  /** Set when the node could not answer for this source and had nothing cached. */
+  reason: Accessor<string | undefined>
+  refreshSeconds: Accessor<number | undefined>
+}
+
+/** A source the panel could not read. Named per SOURCE rather than per node, because on a mixed
+ *  panel "linear is unavailable" is the useful sentence and "this node is unavailable" is false. */
+export type PanelUnavailable = {
+  query: PanelQuery
+  label: string
+  reason: string
+}
+
+export type PanelData = {
+  sources: Accessor<PanelSourceState[]>
+  /** The PANEL-LOCAL schema: one source's own, or the mapped union's (mapping.ts). */
+  schema: Accessor<PluginCollectionSchema>
+  /** Unioned, mapped, then shaped: filtered, sorted, limited. */
+  rows: Accessor<PluginCollectionRow[]>
+  /** Projected, in render order. */
+  fields: Accessor<PluginCollectionField[]>
+  /** Whether ANY source has answered. `false` with nothing unavailable is the loading state. */
+  answered: Accessor<boolean>
+  /** The oldest answer on the panel — a mixed panel is only as live as its stalest source. */
+  freshness: Accessor<Freshness | undefined>
+  unavailable: Accessor<PanelUnavailable[]>
+  /** Seconds, or `undefined` for a panel that only refreshes when asked. The shortest of its
+   *  sources', which is what the panel visibly polls at. */
+  refreshSeconds: Accessor<number | undefined>
+  refresh: () => void
+}
+
+// A mixed panel is as fresh as its worst source. Ordered by how much a reader should distrust what is
+// on screen (node/freshness.ts); `undefined` (nothing answered) never wins over a real answer.
+const FRESHNESS_ORDER: Freshness[] = ['live', 'refreshing', 'disabled', 'stale', 'offline', 'error']
+const worst = (values: readonly (Freshness | undefined)[]): Freshness | undefined => {
+  let out: Freshness | undefined
+  for (const value of values) {
+    if (!value) continue
+    if (!out || FRESHNESS_ORDER.indexOf(value) > FRESHNESS_ORDER.indexOf(out)) out = value
+  }
+  return out
+}
+
+/** One source: its contribution, its own fan-out read against the pinned node, and its own poll.
+ *
+ *  Created inside `mapArray`, which gives each source a root of its own — so adding or removing a
+ *  source in the editor disposes exactly that source's resource and timer rather than tearing down
+ *  the panel's whole read. */
+function createSourceState(
+  query: PanelQuery,
+  nodeId: string,
+  panelRefresh: Accessor<number | undefined>,
+  panelRevision: Accessor<number>,
+): PanelSourceState {
+  const contribution = createMemo(() => collectionContribution(query.pluginId, query.collectionId))
+  const refreshSeconds = createMemo(() => panelRefreshSeconds(panelRefresh(), contribution()?.refresh))
+
+  const [revision, setRevision] = createSignal(0)
+  createEffect(() => {
+    const seconds = refreshSeconds()
+    if (seconds === undefined) return
+    const timer = setInterval(() => {
+      // The rule the poller registry and the chrome revision both apply: a hidden window is not
+      // worth a fetch. A manual refresh is exempt — that one had a person behind it.
+      if (typeof document !== 'undefined' && document.hidden) return
+      setRevision((value) => value + 1)
+    }, seconds * 1_000)
+    onCleanup(() => clearInterval(timer))
+  })
+
+  const [result] = createFleetQuery(
+    (_dep: { revision: number; panel: number; registered: boolean }) => collectionQueryKey(query),
+    async (node, _dep, signal) => {
+      const entry = collectionContribution(query.pluginId, query.collectionId)
+      // Same answer for "no such collection" as for one that answered with nothing: an empty page.
+      // The panel's inert chrome comes from `contribution()`, not from the shape of the data.
+      if (!entry) return emptyCollectionPage()
+      return entry.fetch(node, query.params ?? {}, signal)
+    },
+    // `registered` is in the dep so a plugin that activates after this panel mounted causes a
+    // refetch rather than leaving it inert until something else moves.
+    () => ({ revision: revision(), panel: panelRevision(), registered: !!contribution() }),
+    { nodeIds: [nodeId] },
+  )
+
+  const row = () => result().rows[0]
+  const page = createMemo((): PluginCollectionPage => row()?.data ?? emptyCollectionPage())
+  const schema = createMemo(() => {
+    const answer = page().schema
+    return answer.fields.length ? answer : contribution()?.schema ?? answer
+  })
+
+  return {
+    query,
+    contribution,
+    page,
+    schema,
+    answered: () => !!row(),
+    freshness: () => row()?.freshness,
+    reason: () => result().unavailable[0]?.reason,
+    refreshSeconds,
+  }
+}
+
+export function createPanelData(definition: Accessor<PanelDefinition>): PanelData {
+  // Captured at creation rather than read per render: a node switch swaps the QueryClient provider
+  // this tree sits under, which remounts it (plugins/chrome/ChromeSourcePanel.tsx says the same).
+  const nodeId = activeNodeId() ?? ''
+
+  const [revision, setRevision] = createSignal(0)
+  const refresh = () => void setRevision((value) => value + 1)
+
+  const queries = createMemo(() => definition().queries)
+  const panelRefresh = () => definition().refresh
+  const sources = createMemo(
+    mapArray(queries, (query) => createSourceState(query, nodeId, panelRefresh, revision)),
+  )
+
+  const pages = createMemo((): PanelSourcePage[] =>
+    sources().map((source) => ({ query: source.query, schema: source.schema(), rows: source.page().rows })))
+
+  const schema = createMemo(() => panelSchema(pages(), definition().mapping))
+  const united = createMemo(() => unionRows(pages(), definition().mapping))
+
+  return {
+    sources,
+    schema,
+    rows: createMemo(() => shapeRows(united(), schema(), definition().shaping)),
+    fields: createMemo(() => visibleFields(schema(), definition().shaping)),
+    answered: () => sources().some((source) => source.answered()),
+    freshness: () => worst(sources().map((source) => source.freshness())),
+    // Partial availability is DATA. One source that could not be read leaves the others rendering,
+    // and the panel says which one is missing rather than blanking.
+    unavailable: () => sources().flatMap((source) => {
+      const reason = source.reason()
+      if (!reason) return []
+      const label = source.contribution()?.name ?? source.query.collectionId
+      return [{ query: source.query, label: `${source.query.pluginId} · ${label}`, reason }]
+    }),
+    refreshSeconds: () => {
+      const seconds = sources().flatMap((source) => source.refreshSeconds() ?? [])
+      return seconds.length ? Math.min(...seconds) : undefined
+    },
+    refresh,
+  }
+}

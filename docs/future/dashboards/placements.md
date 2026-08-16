@@ -1,6 +1,6 @@
 # Placements: where panels live
 
-Design notes from the dashboards session (2026-08-12). Nothing here is scheduled. The premise:
+Design notes from the dashboards session (2026-08-12). The premise:
 panels (`composition.md`) are placement-agnostic, and **placement** — where a panel renders, under
 whose constraints — is the first-class concept. "Dashboard" is just the default placement, not the
 unit of design. This is the Perses layouts-reference-panels split (`prior-art.md`), and it is what
@@ -21,6 +21,18 @@ Scope key for persisted placements: `(surface, ownerId, projectId?)` — e.g.
 is per-user-per-node **in the owning node's prefs store, not on the device**
 (`docs/state.md § Scope rules`), referencing panel definitions by id
 (`composition.md § The persisted model`).
+
+> **As built: the Home placement only; the other three are unscheduled work.** The scope-key format
+> landed as designed, with
+> segments percent-encoded so an owner id containing the separator cannot be read as two, and all
+> three surface names are in the union — so `pane` and `plugin-region` need a renderer, not a key
+> format. `PanelGrid` takes a scope rather than assuming home, and `Panel` is placement-agnostic, so
+> a task pane is a container away. Two behaviours the design did not specify, both deliberate: with
+> nothing placed, Home shows no heading and no empty grid, only a ghost button — and not even that
+> when no plugin provides a collection; and Remove **deletes** the definition rather than unplacing
+> it, because while home is the only placement drawn an unplaced panel would be unreachable. That
+> second one is the piece to revisit the day a second placement lands. Owning doc:
+> [`docs/dashboards.md`](../../dashboards.md).
 
 ## Plugin-hosted regions: the cooperative extension point, inverted
 

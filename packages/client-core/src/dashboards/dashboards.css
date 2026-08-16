@@ -1,0 +1,293 @@
+/* User-composed panels (dashboards/Panel.tsx and dashboards/views/).
+   Co-located with the components, per the manifest note in styles.css.
+
+   Deliberately thin. The frame is `.ui-card`, the rows are `.ui-row`, the table is `.ui-table` and
+   the empty states are `.ui-empty` — everything here is the space BETWEEN those, so a panel over a
+   third-party plugin's collection restyles with every appearance pack for free. No new tokens: a
+   panel that needed one would be asserting a shape the packs do not already have a rung for. */
+
+/* ── Placement ───────────────────────────────────────────────────────────────────────────── */
+
+/* One placement's worth of panels (dashboards/PanelGrid.tsx). The card grid is `.fleet-cards`'
+   recipe with a wider floor — a node card holds five facts, a panel holds a table — and the same
+   auto-fill so the column count follows the surface rather than a breakpoint list. */
+.dash-placement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+}
+
+/* With nothing placed, the whole surface is one ghost button. Flex so it sizes to its label instead
+   of stretching across the column it sits in. */
+.dash-placement-add {
+  display: flex;
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* ── Panel ───────────────────────────────────────────────────────────────────────────────── */
+
+.dash-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+}
+
+.dash-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
+}
+.dash-panel-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+}
+.dash-panel-meta {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+/* Scrolls itself rather than growing the surface: a placement decides how tall a panel is, and a
+   500-row collection must not decide it instead. */
+.dash-panel-body {
+  min-width: 0;
+  overflow: auto;
+}
+
+/* ── Panel editor ────────────────────────────────────────────────────────────────────────── */
+
+/* The generated editor (dashboards/PanelEditor.tsx). Nothing bespoke: every control is a shared
+   primitive and everything here is the stacking between them. */
+.dash-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+}
+
+/* Picker's trigger is sized for the topbar, where it sits beside other chrome and is capped. As a
+   form control it is one of several stacked fields, so it takes the field's width like the rest —
+   a 300px button above a full-width input reads as a mistake. */
+.dash-add-picker .repo-picker-button {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* One filter, one sort key: controls that read left to right as a sentence. They wrap rather than
+   scroll, because a filter row narrowed to a phone is still three choices and hiding one of them
+   behind a scrollbar hides the operator. `.ui-input` already carries `flex: 1; min-width: 0`, so
+   the selects share the row without this file saying anything about their widths. */
+.dash-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
+}
+
+/* Two labelled fields abreast. `start`, not `center`: a hint that wraps to two lines under one of
+   them must not shift the other one's control. */
+.dash-editor-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: var(--gap-inline);
+  min-width: 0;
+}
+.dash-editor-pair > .ui-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The chosen collections, above the picker that adds another. A plain stack: each row is a name, its
+   plugin, and a remove button, and the row primitive would be more chrome than a two-word line wants. */
+.dash-editor-sources {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dash-editor-source {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
+}
+
+/* A sentence between controls — the "no columns yet" explanation and a source's name above its
+   inputs. Not a Field hint, because it belongs to a section rather than to one control. */
+.dash-editor-note {
+  font-size: var(--fs-sm);
+}
+
+.dash-editor-fields {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dash-editor-field {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
+}
+.dash-editor-field-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-editor-field[data-hidden] .dash-editor-field-name {
+  text-decoration: line-through;
+}
+
+/* ── Board ───────────────────────────────────────────────────────────────────────────────── */
+
+/* Columns are the values of the grouped field, so their COUNT is data — an auto-flow grid takes
+   whatever number arrives without the component ever computing a width. The board scrolls sideways
+   inside the panel body rather than widening the surface it sits on. */
+.dash-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(200px, 1fr);
+  gap: var(--space-3);
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.dash-board-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.dash-board-column-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.dash-board-column-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+}
+.dash-board-column-count {
+  color: var(--text-muted);
+  font-variant-numeric: var(--tabular);
+}
+
+/* Each column scrolls on its own, so one long column cannot push the others out of view. The cap is
+   what makes that true — without a height there is nothing to scroll inside. */
+.dash-board-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 400px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+/* A declared column with nothing in it still draws, so it needs something to be. */
+.dash-board-empty {
+  color: var(--text-muted);
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  text-align: start;
+}
+/* Flex so a provenance mark sits on the title's baseline row rather than pushing it — on a
+   single-source panel there is nothing beside the title and the rule costs nothing. */
+.dash-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+
+/* Which source a row came from, on a mixed panel (dashboards/views/Provenance.tsx). Muted and
+   `flex: none`, because it is an identifier rather than content: it must not grow, wrap or compete
+   with the title beside it. The mark itself is `currentColor`, so this one rule tones it. */
+.dash-provenance {
+  flex: none;
+  color: var(--text-muted);
+}
+
+/* ── Cells ───────────────────────────────────────────────────────────────────────────────── */
+
+.dash-cell-enum {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.dash-cell-time,
+.dash-cell-number {
+  font-variant-numeric: var(--tabular);
+  white-space: nowrap;
+}
+.dash-cell-link {
+  color: var(--accent);
+}
+
+/* ── List ────────────────────────────────────────────────────────────────────────────────── */
+
+/* The projected fields that are neither the title nor the status, in the row's own meta slot. */
+.dash-list-meta {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.dash-list-meta + .dash-list-meta {
+  margin-left: var(--space-3);
+}
+
+/* ── Stat ────────────────────────────────────────────────────────────────────────────────── */
+
+.dash-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.dash-stat-value {
+  font-size: var(--fs-xl);
+  font-variant-numeric: var(--tabular);
+  line-height: var(--lh-tight);
+}
+.dash-stat-label {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}

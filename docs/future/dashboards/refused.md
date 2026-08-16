@@ -6,7 +6,8 @@ with the reasoning, not with silence.
 
 ## No plugin-shipped panel components, no widget toolkit in the wire format
 
-The master/detail refusal (`docs/plugins.md:283-288`) holds: the host will not render a plugin's
+The master/detail refusal (`docs/plugins.md § Document surfaces`, which now carries the distinction
+below on the record) holds: the host will not render a plugin's
 bespoke UI from data, because that means eternally versioning a widget toolkit in the wire format.
 Dashboards clear the bar only because the host renders *its own* generic views over a record
 schema (`README.md § The tension`). When a plugin needs UI the field-type vocabulary can't
