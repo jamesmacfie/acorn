@@ -429,6 +429,51 @@ describe('chrome descriptors', () => {
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
+  it('carries a collection, confines its route and takes an optional static schema', () => {
+    const good = manifest({
+      collections: [{
+        id: 'cards-mine',
+        name: 'My cards',
+        items: '/v2/p/board/collections/cards-mine',
+        refresh: 300,
+        params: [{ id: 'lane', name: 'Lane', type: 'enum', values: ['doing', 'done'] }],
+        schema: {
+          fields: [
+            { id: 'title', name: 'Title', type: 'text', role: 'title' },
+            { id: 'state', name: 'State', type: 'enum', role: 'status', values: [{ id: 'doing', label: 'Doing', tone: 'accent' }] },
+          ],
+        },
+      }],
+    })
+    expect(good.success).toBe(true)
+    expect(good.success && good.data.contributions.collections[0]?.schema?.fields).toHaveLength(2)
+
+    // A collection with no static schema is the query-shaped case: its columns cannot be known at
+    // manifest time, so the response describes itself instead.
+    expect(manifest({ collections: [{ id: 'q', name: 'Query', items: '/v2/p/board/collections/q' }] }).success).toBe(true)
+
+    // The route is the whole reason confinement exists here: the host fetches it and stamps the answer
+    // with THIS plugin's id, so an unconfined one is how a plugin would put another's rows on a board
+    // under its own badge.
+    expect(messages(manifest({
+      collections: [{ id: 'c', name: 'C', items: '/v2/p/linear/collections/issues-mine' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(manifest({
+      collections: [{ id: 'c', name: 'C', items: '/v2/core/tasks' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+  })
+
+  it('caps collections at eight and refuses an id another contribution kind already took', () => {
+    const nine = Array.from({ length: 9 }, (_, i) => ({ id: `c${i}`, name: 'C', items: '/v2/p/board/collections/c' }))
+    expect(manifest({ collections: nine }).success).toBe(false)
+    expect(manifest({ collections: nine.slice(0, 8) }).success).toBe(true)
+
+    expect(messages(manifest({
+      frames: [PANE],
+      collections: [{ id: 'board', name: 'Board cards', items: '/v2/p/board/collections/cards' }],
+    }))).toEqual([`duplicate contribution id 'board'`])
+  })
+
   it('floors the polling fallback so a descriptor cannot busy-loop a remote node', () => {
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 30 }] }).success).toBe(true)
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 5 }] }).success).toBe(false)

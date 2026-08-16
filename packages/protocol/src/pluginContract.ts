@@ -13,6 +13,7 @@
 // places where an OLDER node's parser had fewer defaults to fill — a roster row is bytes a node sent,
 // and that node may be running a version of this schema that predates a field.
 import { z } from 'zod'
+import { collectionParamsSchema, collectionSchema } from './collections.ts'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from './contentLinkPattern.ts'
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from './contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, parseExtensionPointRef } from './extensionPoints.ts'
@@ -599,6 +600,30 @@ const refResolverDescriptor = z.object({
   resolve: pluginRoute,
 })
 
+// A typed set of records the host draws with its own components — the descriptor tier grown from
+// `nodeStats`' one integer with a label to a table of them (@acorn/protocol/collections.ts holds the
+// response schema and the argument for its size).
+//
+// It clears the master/detail refusal (docs/plugins.md) rather than reversing it. What was refused was
+// reproducing a plugin's BESPOKE UI from data, an unbounded fidelity chase; a collection feeds the
+// host's OWN generic surface, where uniformity across providers is the entire point — a board that
+// mixes two plugins' rows can only exist if neither of them draws anything.
+//
+// `(id, this plugin's id)` is the universal reference. Panels address a collection that way and no
+// other way, which is what lets a placement outlive the plugin being disabled and reinstalled.
+const collectionDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(80),
+  // GET ?<declared params> → { schema, rows }
+  items: pluginRoute,
+  params: collectionParamsSchema.optional(),
+  // The STATIC promise about what `items` returns, so a panel editor can offer views before any data
+  // exists. Optional because a query-shaped collection — a saved SQL statement — cannot know its
+  // columns at manifest time; the response self-describes either way.
+  schema: collectionSchema.optional(),
+  refresh,
+})
+
 // A COLOUR theme: a map of theme-token values the host validates and then generates a
 // `:root[data-theme="plugin:<pluginId>:<id>"]` block from itself (docs/ui-design.md § Appearance).
 //
@@ -669,6 +694,11 @@ const contributions = z.looseObject({
   // Eight, matching `sources`. A plugin reaching into more than a handful of other plugins' surfaces is
   // decorating the app rather than integrating with it.
   extensions: z.array(extensionDescriptor).max(8).default([]),
+  // Eight, matching `sources` and `routes` rather than the four `attention` and `nodeStats` take. A
+  // collection is a saved question over data the plugin already holds, and a plugin with several
+  // record types honestly has several — "my PRs", "PRs awaiting my review", "repos I own" are three
+  // questions, not one integration describing an app.
+  collections: z.array(collectionDescriptor).max(8).default([]),
 }).prefault({})
 
 
@@ -830,6 +860,7 @@ export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointD
   location: string
 }
 export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
+export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>
 
 // Still loose on the wire as well as in the schema: a client that does not know a future sibling key
 // should contribute less rather than fail to parse. Every list but `frames` is optional for the same
@@ -853,4 +884,5 @@ export type PluginContributions = {
   contextMenus?: PluginContextMenuDescriptor[]
   extensionPoints?: PluginExtensionPointDescriptor[]
   extensions?: PluginExtensionDescriptor[]
+  collections?: PluginCollectionDescriptor[]
 } & Record<string, unknown>

@@ -94,6 +94,27 @@ the core rows keyed to the disconnected integration. It intentionally contains o
 plugin database has a foreign key into `integrations`, so there is no plugin-specific cascade
 declaration to execute. Plugin-local rows are independently retained or pruned by their owning plugin.
 
+## Collections: a projection, never a second store
+
+A **collection** is a plugin route that answers with typed records the host draws itself — the data
+side of [dashboards.md](./dashboards.md). It owns no tables and adds no file. It is a read over the
+mirror the plugin already maintains: github's `pulls-mine` is a select over `plugins/github.sqlite`
+joined to its repos, linear's `issues-mine` is the same fan-out over connections its rail source uses.
+A plugin that has nothing mirrored has nothing to expose this way, and that is the intended shape —
+the contribution exists to make an existing read composable, not to justify a new one.
+
+Freshness splits across the two sides, and the split is the point:
+
+- **Node-side TTL is the plugin's**, decided per route with whatever that plugin already uses. Linear
+  declares one on the descriptor because its reads fan out per connection and no single resource
+  exists for `serveThenRevalidate` to hold. GitHub's collection route declares none and never drives
+  the mirror: freshness there stays with the repo-scoped list route a person is waiting on, because a
+  panel polls unattended across every repository at once and revalidating here would multiply one
+  dashboard by the user's repo count against a rate limit the whole plugin shares. The honest cost is
+  rows as old as the last time that repo's PR list was opened.
+- **Client-side refresh is per panel and the user's**, bounded to 30s–86400s. It is the first
+  contribution whose refetch policy is per-contribution rather than the single shared chrome revision.
+
 ## Ownership rules
 
 Provider data is a disposable read model. GitHub, Linear, and Rollbar remain the upstream source of

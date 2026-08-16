@@ -14,6 +14,7 @@ const { MAX_AGENT_CONTEXT_BYTES } = await import('@acorn/protocol/agentContext.t
 const { setActiveNode } = await import('../../node/activeNode')
 const { agentContextRegistry } = await import('../../registries/agentContexts')
 const { attentionRegistry } = await import('../../registries/attention')
+const { collectionRegistry } = await import('../../registries/collections')
 const { nodeStatRegistry } = await import('../../registries/nodeStats')
 const { commandAvailable, commandRegistry, executeCommand } = await import('../../registries/commands')
 const { keybindingRegistry } = await import('../../registries/keybindings')
@@ -73,6 +74,12 @@ const CHROME: Partial<PluginContributions> = {
     capture: '/v2/p/board/context-capture',
   }],
   refResolvers: [{ id: 'board-refs', kind: 'board.card', resolve: '/v2/p/board/refs' }],
+  collections: [{
+    id: 'board-cards',
+    name: 'My cards',
+    items: '/v2/p/board/collections/cards',
+    params: [{ id: 'lane', name: 'Lane', type: 'text' }],
+  }],
 }
 
 const ids = () => ({
@@ -86,6 +93,7 @@ const ids = () => ({
   nodeStats: nodeStatRegistry.entries().map((entry) => entry.id),
   agentContexts: agentContextRegistry.entries().map((entry) => entry.id),
   refResolvers: refResolverRegistry.entries().map((entry) => entry.id),
+  collections: collectionRegistry.entries().map((entry) => entry.id),
 })
 
 beforeEach(() => {
@@ -116,6 +124,8 @@ describe('syncChromeContributions', () => {
       nodeStats: ['board-count'],
       agentContexts: ['board-context'],
       refResolvers: ['board-refs'],
+      // The registry id is the host's, minted from the plugin id — the descriptor only named its half.
+      collections: ['board:board-cards'],
     })
   })
 
@@ -352,7 +362,21 @@ describe('syncChromeContributions', () => {
     expect(await attentionRegistry.get('board-stuck')!.fetch('node-b', signal)).toEqual([])
     // `0` is what Fleet home hides, which is the right answer for "this node does not run it".
     expect(await nodeStatRegistry.get('board-count')!.fetch('node-b', signal)).toBe(0)
+    expect(await collectionRegistry.get('board:board-cards')!.fetch('node-b', {}, signal))
+      .toEqual({ schema: { fields: [] }, rows: [] })
     expect(readJson).not.toHaveBeenCalled()
+  })
+
+  it('passes a collection only the params its manifest declared', async () => {
+    _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
+    syncChromeContributions()
+    readJson.mockResolvedValue({ schema: { fields: [] }, rows: [] })
+    // `project` is what a placement will want to add later, and a plugin that never declared it has
+    // not agreed to answer for it — a caller inventing a scope is how a panel would quietly widen a
+    // route's contract without the manifest saying so.
+    await collectionRegistry.get('board:board-cards')!
+      .fetch('node-a', { lane: 'doing', project: 'p-1' }, new AbortController().signal)
+    expect(readJson.mock.lastCall?.[0]).toBe('/v2/p/board/collections/cards?lane=doing')
   })
 
   it('namespaces attention ids and drops malformed rows without throwing', async () => {
@@ -552,7 +576,7 @@ describe('syncChromeContributions', () => {
 
     _seedPluginDistribution([['node-a', []]])
     syncChromeContributions()
-    expect(ids()).toEqual({ sources: [], slots: [], shellSlots: [], contextMenus: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [], refResolvers: [] })
+    expect(ids()).toEqual({ sources: [], slots: [], shellSlots: [], contextMenus: [], commands: [], keybindings: [], attention: [], nodeStats: [], agentContexts: [], refResolvers: [], collections: [] })
     expect(orphanedPluginOverrideIds(overrides, keybindingRegistry.entries())).toEqual([overrideId])
   })
 })

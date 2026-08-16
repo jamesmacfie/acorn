@@ -11,9 +11,10 @@ Docker/database configuration, saved requests, secrets, devices, plugin enableme
 and audit records.
 
 It is also authoritative for what the owner *composes* about those resources — a task's pane layout,
-a task's open editor files, a repo's PR filters, a task's context selection — held as per-user
-preferences (`GET|PUT /v2/core/prefs`). These follow the resource, so any client that pairs with a
-Node renders that Node's arrangements and the agent can read them.
+a task's open editor files, a repo's PR filters, a task's context selection, the dashboard panels a
+person built over plugin collections — held as per-user preferences (`GET|PUT /v2/core/prefs`). These
+follow the resource, so any client that pairs with a Node renders that Node's arrangements and the
+agent can read them.
 
 Each Node has an independent data root and database set. A Node ID is part of every renderer query,
 selection scope, layout scope, and fleet aggregate input.
@@ -48,6 +49,7 @@ Use the persistence scope that owns the state:
 | Appearance, shortcuts, rail order, notices, trust, tokens | device |
 | Query cache | Node |
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
+| Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
 | Last path, last task, last source | device |
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text | client + current task |
@@ -81,6 +83,18 @@ everything else — including every scoped slice — goes to the owning Node thr
 means Node, deliberately, so a new per-task or per-repo slice is portable by default. The cost is
 honest: editing a layout while its Node is offline stalls the write until reconnect, where
 `localStorage` never stalled. That is the right trade for state that is *about* that Node.
+
+The dashboard model (`core.dashboards`, one `app`-scoped slice, version 1) is the clearest case of
+that rule and worth reading as the worked example
+([dashboards.md § Persistence](./dashboards.md)). A panel is a saved question about a Node's
+resources, so it follows the Node: build a board once and every client paired with that Node draws
+it, and the agent can read it through `/v2` like anything else. Device storage would have made it a
+per-laptop artefact of the machine it happened to be composed on. It is one blob rather than a key
+per panel — the whole model is read together by every surface that draws one — holding panel
+definitions by id and placements by scope key, with placements *referencing* definitions rather than
+embedding them so a second placement is an addition rather than a migration. Unknown ids are retained
+inert on the pane-layout rule: parsing asks "is this shaped like a panel?", never "is that plugin
+installed here?", so a composition is never collateral damage of toggling a plugin off.
 
 A module-level signal is the default for anything ephemeral, and the cost of that default is exactly
 the eviction question above — so a signal keyed by task, workspace or node owes an `onScopeEvicted`

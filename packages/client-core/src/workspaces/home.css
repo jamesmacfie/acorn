@@ -1,0 +1,19 @@
+/* The Home source (workspaces/Home.tsx). Co-located with the component, per the manifest note in
+   styles.css.
+
+   `.home-source` was one of a family of class names Home emitted that nothing ever defined, so the
+   `.panes` three-column shell grid underneath was laying the page out: the heading in the first
+   column, the task list in the second, the third empty. Defining the container is what the sibling
+   surface already does — `.fleet-home` overrides `.panes` the same way (node/nodes.css) — and Home
+   needs it now that it holds a second section whose width is its own business.
+
+   The other `.home-*` names are deliberately still undefined. They belong to the task list, which
+   this change does not touch, and defining them here would be inventing a look for it in a pass
+   that is about panels. */
+.home-source {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--pane-pad);
+  overflow-y: auto;
+}

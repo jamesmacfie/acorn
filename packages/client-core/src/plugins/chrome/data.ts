@@ -16,10 +16,15 @@ import {
   type AgentContextSnapshot,
 } from '@acorn/protocol/agentContext.ts'
 import {
+  pluginCollectionResponseSchema,
+  type PluginCollectionPage,
+} from '@acorn/protocol/collections.ts'
+import {
   MAX_REF_RESOLVE_IDENTIFIERS,
   pluginRefResolutionsSchema,
   type PluginRefResolution,
 } from '@acorn/protocol/refResolvers.ts'
+import { emptyCollectionPage } from '../../registries/collections'
 import { readJson, writeJson } from '../../apiClient'
 import { wsOnStatus } from '../../wsClient'
 import { ownsTaskOrigin } from './ownership'
@@ -371,6 +376,51 @@ export async function resolveRefs(
   // `providerId` is stamped from the plugin whose route answered, never read from the row. A resolver
   // that could name its own provider could put its rows behind a stranger's reference panel.
   return parsed.data.map((row) => ({ ...row, providerId: pluginId }))
+}
+
+// ── Collections ───────────────────────────────────────────────────────────────────────────────────
+//
+// The third parsed descriptor response (@acorn/protocol/collections.ts), and the one with the most to
+// lose: these rows are drawn as the host's own table under the host's own chrome, beside another
+// plugin's rows, so the reader has no way to tell whose answer was malformed.
+
+/** Declared params ride as query parameters, minted here rather than pasted onto the path by a caller,
+ * so a collection route cannot be handed a second `nodeId` or a scope it was not given. A placement
+ * that knows its project puts it through this same record, exactly as the rail does. */
+const collectionItemsPath = (path: string, params: Record<string, string>): string => {
+  const query = new URLSearchParams(params).toString()
+  if (!query) return path
+  return `${path}${path.includes('?') ? '&' : '?'}${query}`
+}
+
+/** One collection's page, parsed and stamped. */
+export async function readCollection(
+  pluginId: string,
+  collectionId: string,
+  path: string,
+  nodeId: string,
+  params: Record<string, string>,
+  signal: AbortSignal,
+): Promise<PluginCollectionPage> {
+  const body = await read<unknown>(pluginId, collectionItemsPath(path, params), nodeId, signal)
+  const parsed = pluginCollectionResponseSchema.safeParse(body)
+  if (!parsed.success) {
+    // All-or-nothing, like the ref resolutions above and unlike the per-row rail sanitiser. A
+    // half-parsed collection is the worst of the three outcomes: it renders SOME rows and silently
+    // drops the rest, so a person reads a complete-looking list that is missing the thing they were
+    // looking for. An empty panel at least says nothing rather than saying something false.
+    drop(pluginId, `collection '${collectionId}'`, body)
+    return emptyCollectionPage()
+  }
+  // Provenance is stamped from the contribution whose route answered, never read from the row — the
+  // same rule `resolveRefs` applies to `providerId`. A mixed board renders source badges and routes row
+  // actions on this stamp, so a row that could name its own plugin could put its items behind a
+  // stranger's badge and its clicks into a stranger's pane. The schema does not carry the two fields at
+  // all, so a body that states them has them stripped before this line ever runs.
+  return {
+    schema: parsed.data.schema,
+    rows: parsed.data.rows.map((row) => ({ ...row, pluginId, collectionId })),
+  }
 }
 
 export async function readStat(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<number> {

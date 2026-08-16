@@ -1,8 +1,13 @@
 # Composition: panels, mapping, and views
 
-Design notes from the dashboards session (2026-08-12). Nothing here is scheduled. This file is the
-host side: how typed collections (`data-contract.md`) become user-composed panels. Nothing in this
-file touches the wire contract — that is the invariant to protect (`README.md`).
+Design notes from the dashboards session (2026-08-12). This file is the host side: how typed
+collections (`data-contract.md`) become user-composed panels. Nothing in this file touches the wire
+contract — that is the invariant to protect (`README.md`), and nothing in the build did either.
+
+> This is the design record. The host side is `packages/client-core/src/dashboards/` and the owning
+> doc is [`docs/dashboards.md`](../../dashboards.md). Everything below exists except charts and
+> write-back, both of which are unscheduled work — see `README.md § Still unscheduled`.
+> Notes marked **As built:** describe where the system differs from this file, so nothing here is implemented twice.
 
 ## The four layers of a panel
 
@@ -24,6 +29,15 @@ collapsing the layers into "any JSON plus a program" (`prior-art.md`).
 Shaping runs **client-side over the returned rows as the baseline**; declared server-side params
 are an optimization a collection may offer, never a requirement. This keeps the plugin obligation
 minimal and the semantics identical everywhere.
+
+**As built, with one ceiling this table does not show.** Once the mapping layer engages — more than one
+source, or user-declared columns — **a panel's fields are the five ROLES and nothing else**. A role is
+the only thing two independently-written collections agree about, so it is the only thing the host can
+align without asking; github's `repo` and linear's `identifier` are both useful and neither has a
+panel-local home. The upgrade path, if someone wants a mixed column no role describes, is a
+user-invented panel field with a per-source picker — the same matrix the editor already draws, one row
+longer. Also shipped differently: **group-by lives in `shaping`, not in the view**, which is what makes
+flipping a board to a table and back keep the grouping the way it keeps the filters.
 
 ## Views are derived from schema, not chosen from a widget menu
 
@@ -95,6 +109,13 @@ construction. Selectors are also where plugin-hosted placement constraints bite
   a collection whose plugin is disabled or gone renders as an inert "source unavailable" panel and
   survives — the pane-layout unknown-ids rule applied here. User compositions are never
   collateral damage of toggling a plugin.
+
+**As built,** it is the `core.dashboards` slice (`dashboards/persist.ts`): one `app`-scoped blob holding
+panels by id and placements by scope key, version 1, codec hand-written and tolerant like every other
+slice. Two extensions of the retain-inert rule the design named only for collections: a **view kind
+this build cannot draw** is also retained and rendered inert rather than coerced, so a definition
+written by a newer client round-trips through an older one; and a mixed panel degrades **per source**
+rather than as a whole, going inert only when nothing resolves.
 
 ## Write-back: deferred, with the constraint recorded
 

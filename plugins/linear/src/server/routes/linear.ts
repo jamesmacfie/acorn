@@ -3,6 +3,7 @@ import {
   ISSUE_ID_QUERY,
   ISSUES_QUERY,
   type LinearNode,
+  myIssuesFilter,
   PROJECT_ISSUES_QUERY,
   projectIssuesFilter,
   issuesFilter,
@@ -40,7 +41,9 @@ import type {
   LinearProjectIssuesResponse,
   LinearRailItemsResponse,
 } from '../../shared/api'
+import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
 import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
+import { LINEAR_ISSUES_COLLECTION_ID, linearIssuesCollection } from '../../shared/collections'
 import { linearRailItem } from '../../shared/rail'
 import { sortLinearIssues } from '../../shared/triage'
 
@@ -204,6 +207,29 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
       }
     }
     return c.json({ items: sortLinearIssues(issues).map(linearRailItem) } satisfies LinearRailItemsResponse)
+  })
+  // The declared COLLECTION's page (@acorn/protocol/collections.ts): the viewer's own active issues,
+  // across every connected workspace, as typed records the host renders itself.
+  //
+  // Same degrade-quietly posture as the rail above and the same partial-success loop — one workspace
+  // failing must not erase another's rows. No `serveThenRevalidate`: these reads fan out across
+  // connections with per-item freshness, which is the reason this whole file sits outside the engine
+  // (see the header). What bounds the call rate is this plugin's own `refresh` on the descriptor, which
+  // is the client-side half of the same TTL that `LINEAR_ISSUES_STALE_AFTER_MS` states for the item cache.
+  .get(`/collections/${LINEAR_ISSUES_COLLECTION_ID}`, async (c) => {
+    const connections = await linearConnections(c)
+    const issues: LinearProjectIssue[] = []
+    for (const { row, key } of connections) {
+      try {
+        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: myIssuesFilter() })
+        if (linearError(res)) continue
+        const { issues: found } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+        issues.push(...found.nodes.map((node) => triageRow(row, node)))
+      } catch {
+        // Partial success is honest: one workspace failing must not erase another's rows.
+      }
+    }
+    return c.json(linearIssuesCollection(sortLinearIssues(issues)) satisfies PluginCollectionResponse)
   })
   // Batch enrichment for referenced tickets: summaries, 10-minute TTL over core's external-item cache.
   // Stale identifiers are resolved across all connections; each result is cached under its connection.

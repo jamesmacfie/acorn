@@ -4,6 +4,7 @@ import { agentToolRendererRegistry } from '@acorn/client-core/registries/agentTo
 import { contextSectionRegistry } from '@acorn/client-core/registries/contextSections.ts'
 import { paletteRowRegistry } from '@acorn/client-core/registries/paletteRows.ts'
 import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
+import { collectionRegistry } from '@acorn/client-core/registries/collections.ts'
 import { nodeStatRegistry } from '@acorn/client-core/registries/nodeStats.ts'
 import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
 import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
@@ -33,6 +34,7 @@ const REGISTRIES = {
   persistedState: persistedStateRegistry,
   nodeStats: nodeStatRegistry,
   attention: attentionRegistry,
+  collections: collectionRegistry,
   contentLinks: contentLinkRegistry,
   projectImporters: projectImporterRegistry,
 } as const

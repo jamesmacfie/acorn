@@ -5,6 +5,7 @@ import { agentToolRendererRegistry, type AgentToolRendererContribution } from '.
 import { contextSectionRegistry, type ContextSectionContribution } from './contextSections'
 import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
 import { attentionRegistry, type AttentionSourceContribution } from './attention'
+import { collectionKey, collectionRegistry, type CollectionRegistration } from './collections'
 import { nodeStatRegistry, type NodeStatContribution } from './nodeStats'
 import { paneRegistry, type PaneContribution } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
@@ -53,6 +54,10 @@ export type ClientPluginContext = {
   // Rows for the attention inbox — states on a node that need the owner, fetched per node
   // (registries/attention.ts).
   attention: ClientContributionPoint<AttentionSourceContribution>
+  // A typed set of records a user can compose a panel over. The compiled feeder; a loaded plugin
+  // declares `collections` in its manifest and the descriptor pass builds the same contribution
+  // (registries/collections.ts). `pluginId` and the registry id are bound here, not declared.
+  collections: ClientContributionPoint<CollectionRegistration>
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
   // Publish a typed capability for another plugin to resolve at call time, mirroring the node's
   // ctx.capabilities.provide. Disposal is the host's, exactly like every registry contribution above:
@@ -130,6 +135,14 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
       record(integrationFlowRegistry.register(entry))
     },
   }
+  // Not `own`: the entry arrives without the two fields the host binds, so there is nothing for the
+  // provider check to look at and nothing for the registry to key on until they are stamped. Same
+  // shape as `ownIntegrationFlow` above, for the same reason — the id is the host's to mint.
+  const ownCollection: ClientContributionPoint<CollectionRegistration> = {
+    register: (entry) => {
+      record(collectionRegistry.register({ ...entry, id: collectionKey(name, entry.collectionId), pluginId: name }))
+    },
+  }
   return {
     name,
     panes: own(paneRegistry),
@@ -152,6 +165,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     persistedState: own(persistedStateRegistry),
     nodeStats: own(nodeStatRegistry),
     attention: own(attentionRegistry),
+    collections: ownCollection,
     // Straight through `own`, so a plugin-published registry gets the identical treatment: ownership checked,
     // disposable recorded. The only difference from the members above is that the registry arrives as an
     // argument instead of being named here.

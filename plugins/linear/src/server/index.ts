@@ -52,6 +52,15 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
   state: { type: { nin: ['completed', 'canceled'] } },
 })
 
+// The same query with a different filter: active issues assigned to whoever owns the credential, across
+// the whole workspace rather than the linked projects. That difference is the difference between the two
+// surfaces — a rail is scoped to the project someone is looking at, a dashboard panel is scoped to the
+// person, and "my issues" is only ever a question about the second.
+export const myIssuesFilter = (): Record<string, unknown> => ({
+  assignee: { isMe: { eq: true } },
+  state: { type: { nin: ['completed', 'canceled'] } },
+})
+
 // The rail's fallback set, for a workspace with no Linear projects linked to it.
 //
 // It exists because of a gap the loaded tier has, not because anyone asked for a second rail mode.

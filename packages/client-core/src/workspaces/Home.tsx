@@ -1,13 +1,22 @@
 import { For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
+import { HOME_PLACEMENT } from '../dashboards/persist'
+import PanelGrid from '../dashboards/PanelGrid'
 import { projectsOptions, tasksOptions, workspacesOptions } from '../queries'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { taskStatus } from '../tasks/taskStatus'
 import { workspaceForProject } from './activeWorkspace'
+import './home.css'
 
 // The core home is deliberately provider-neutral. It is the stable landing source when no optional
 // integration is connected; provider plugins contribute their own browse sources beside it.
+//
+// It is also the default panel placement (docs/future/dashboards/placements.md). ADDITIVE, and that
+// is a decision rather than a layout accident: the active-task list is what people open this screen
+// for, so panels go BELOW it and a person who never composes one sees the page they saw before plus
+// one ghost button. An empty grid on a surface nobody asked to turn into a dashboard would be a
+// regression dressed as a feature.
 export default function Home() {
   const navigate = useNavigate()
   const tasks = createQuery(() => tasksOptions(true))
@@ -44,6 +53,7 @@ export default function Home() {
           </For>
         </ul>
       </Show>
+      <PanelGrid scope={HOME_PLACEMENT} />
     </main>
   )
 }

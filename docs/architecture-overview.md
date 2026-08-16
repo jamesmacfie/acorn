@@ -110,6 +110,15 @@ to `tsc`, because the body starts as `unknown`.
 Deliberately NOT done: response schemas, full request/response codegen, or an OpenAPI pipeline.
 Every consumer is TypeScript in this repo; Zod at the boundary is as far as this needs to go.
 
+The exceptions are all one boundary, and it is the boundary that clause does not cover: a **loaded
+plugin's** answer is not this repo's TypeScript, and the host renders it under its own chrome. Those
+reads get real schemas in `@acorn/protocol` and are parsed on arrival — the manifest itself, agent
+context options and snapshots, batch reference resolutions, and now **collections**
+([dashboards.md](./dashboards.md)), whose rows are drawn as the host's own table beside another
+plugin's. Each parses all-or-nothing rather than sanitising field by field, because a half-accepted
+answer renders as complete and is not. Adding to this list means naming the same argument: untrusted
+wire, host-drawn.
+
 ## Product model
 
 ```text
@@ -206,7 +215,8 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 ## Documentation map
 
 - [features.md](./features.md) — user-visible surfaces.
-- [frontend.md](./frontend.md), [state.md](./state.md), [panes.md](./panes.md) — renderer behavior.
+- [frontend.md](./frontend.md), [state.md](./state.md), [panes.md](./panes.md),
+  [dashboards.md](./dashboards.md) — renderer behavior.
 - [authentication.md](./authentication.md), [security.md](./security.md) — trust boundaries.
 - [api-reference.md](./api-reference.md), [data-layer.md](./data-layer.md), [caching.md](./caching.md) — Node contracts.
 - [extensibility.md](./extensibility.md) — **why** the plugin system is shaped the way it is, the

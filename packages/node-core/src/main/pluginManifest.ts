@@ -38,6 +38,7 @@ export type {
   PluginAgentContextDescriptor,
   PluginChromeAction,
   PluginClientRouteDescriptor,
+  PluginCollectionDescriptor,
   PluginCommandDescriptor,
   PluginDocumentRegion,
   PluginFrameSurface,
@@ -55,7 +56,7 @@ export type {
 // plugin may address its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read
 // core routes, or another plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The RENDERER twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -247,6 +248,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.capture, ['contributions', 'agentContexts', i, 'capture'])
   })
   refResolvers.forEach((entry, i) => route(entry.resolve, ['contributions', 'refResolvers', i, 'resolve']))
+  collections.forEach((entry, i) => route(entry.items, ['contributions', 'collections', i, 'items']))
   // ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ──────────────────────
   //
   // A point is a promise that somebody else's rows will appear inside one of THIS manifest's surfaces,
@@ -374,7 +376,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

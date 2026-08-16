@@ -59,6 +59,7 @@
   "GET /v2/p/editor/tasks/:id/editor/list",
   "GET /v2/p/editor/tasks/:id/editor/read",
   "GET /v2/p/editor/tasks/:id/editor/root",
+  "GET /v2/p/github/collections/pulls-mine",
   "GET /v2/p/github/pins",
   "GET /v2/p/github/repos",
   "GET /v2/p/github/repos/:owner/:repo/actions/jobs/:jobId/logs",
