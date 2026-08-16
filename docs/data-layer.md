@@ -45,10 +45,14 @@ Core owns data shared by multiple features:
 | Provider registry | `integrations` |
 | External item projection | `issues`, `issue_resources`, provider `sync_state` markers |
 | Node preferences | `prefs` |
+| Schedules | `schedule_state`, `user_schedules`, `schedule_runs` |
 
 Core table definitions are in `packages/node-core/src/server/db/schema.ts`. `devices` stores only
 token hashes. `integrations` stores encrypted provider credentials plus non-secret provider metadata.
-`config_acks` stores the exact hash and snapshot of trusted executable repository configuration.
+`config_acks` stores the exact hash and snapshot of trusted executable repository configuration. The
+three schedule tables split state from definition by owner: a schedule declared by core or a plugin
+keeps its definition in the registry and only its overrides and run state in `schedule_state`, while a
+user-created one is a full row in `user_schedules` (`docs/schedules.md`).
 
 ## Plugin databases
 
@@ -177,13 +181,13 @@ Executable configuration recovered without a matching `config_acks` row must be 
 
 ## Retention
 
-Both sweeps run AT BOOT, not on a timer, and there is no scheduler service. A node that is never
-restarted is also one that is never accumulating a backlog worth pruning, and a scheduler for one
-range-delete a day is machinery this does not need (`server/audit.ts` states the same). Older design
-notes listed a `scheduler` on CoreServices; that was written and deleted, and never shipped.
+There is a scheduler now (`docs/schedules.md`), and audit retention moved onto it. The old argument —
+that a node nobody restarts is also one nobody accumulates a backlog on — had it backwards: a node left
+running for a month pruned nothing at all. Idempotency stayed at boot, because expired replay rows read
+as absent already, so that sweep only reclaims space and boot is the one moment nothing is mid-request.
 
 - idempotency rows: 24 hours, cleaned at boot;
-- audit rows: 90 days, pruned at boot;
+- audit rows: 90 days, pruned by the `core:audit-prune` schedule (daily, 03:20 node-local);
 - terminal replay: bounded per session;
 - logs: size/age policy owned by the Node runtime;
 - plugin databases: retained while a plugin is disabled; deletion is explicit;

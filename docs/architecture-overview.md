@@ -46,6 +46,9 @@ The Node owns:
 - PTYs, tmux sessions, child processes, managed agents, workflows, Docker, and Postgres access;
 - provider integrations, encrypted secrets, mirrors, blob storage, audit, backup, and
   reconciliation;
+- the one scheduler: all periodic work, whoever declared it (docs/schedules.md). No client owns a
+  timer that fires work — a panel poll is "I am looking at this", a schedule is "do this whether or
+  not anyone is";
 - the HTTPS listener, authenticated WebSocket, stream/tunnel sockets, and shutdown drain.
 
 Electron main owns:
@@ -65,7 +68,7 @@ The Node exposes one Hono application:
 
 - `/v2/node` and `/v2/pair` are the two pre-auth pairing routes;
 - `/v2/core/*` contains core-owned workspaces, projects, tasks, worktrees, integrations, settings,
-  security, backup, audit, agent-tool, and task-context routes;
+  security, backup, audit, schedule, agent-tool, and task-context routes;
 - `/v2/p/<plugin>/*` contains plugin-contributed routes. A built-in's router is mounted when the app
   is built; a loaded plugin's fetch handler is resolved from the route registry per REQUEST, so a
   plugin reloaded in place serves its new handler without a restart (docs/plugins.md § The dev loop);

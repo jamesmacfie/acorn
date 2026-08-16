@@ -17,7 +17,7 @@ import { nodePlugins, type NodePluginDeps } from './plugins'
 // Both Node hosts assemble the same graph. The Electron app supervises this graph; it does not own a
 // second implementation of it. Keeping this in apps/node preserves the dependency direction: the graph
 // names plugins, while node-core must remain independent of plugins.
-export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
+export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'schedules', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
 
 export type NodeComposition = {
   plugins: NodePlugin[]
@@ -164,6 +164,9 @@ export async function reconcileNode({ db, dataDir, capabilities, mark = () => {}
 export type NodeDrainResources = {
   listener: () => Promise<unknown>
   reconciliation: () => Promise<unknown>
+  // After the listener (so `run now` cannot arrive mid-drain) and before plugins and SQLite, because a
+  // scheduled run holds a database handle and may be calling into a plugin's capability.
+  schedules: () => Promise<unknown>
   pluginState: () => Promise<unknown>
   plugins: () => Promise<unknown>
   sqlite: () => Promise<unknown>
@@ -174,6 +177,7 @@ export function drainNode(resources: NodeDrainResources): Promise<'drained' | 't
   return drainWithDeadline([
     ['listener', resources.listener],
     ['reconciliation', resources.reconciliation],
+    ['schedules', resources.schedules],
     ['plugin state', resources.pluginState],
     ['plugins', resources.plugins],
     ['sqlite', resources.sqlite],

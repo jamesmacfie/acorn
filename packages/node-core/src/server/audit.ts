@@ -96,11 +96,14 @@ export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
 // owner reading a trail that names only GitHub would reasonably conclude nothing else spends a
 // credential. Recorded as a deliberate divergence rather than silently skipped.
 
-// 90-day retention (docs/data-layer.md § Retention defaults), run at boot beside the idempotency cleanup rather
-// than on a timer: a node that is never restarted is also one that is never accumulating a backlog
-// worth pruning, and a scheduler for one range-delete a day is machinery this does not need.
-export async function pruneAudit(db: AppDatabase, now: number = Date.now()): Promise<void> {
-  await db.delete(schema.audit).where(lt(schema.audit.at, now - AUDIT_RETENTION_MS))
+// 90-day retention (docs/data-layer.md § Retention defaults). Now a core-declared schedule
+// (server/schedules/index.ts) rather than a boot-time call: the old argument was that a node nobody
+// restarts is also one nobody accumulates a backlog on, which had it backwards — a node left running
+// for a month pruned nothing at all. Returns the number of rows it removed, which is the one line the
+// run row carries.
+export async function pruneAudit(db: AppDatabase, now: number = Date.now()): Promise<number> {
+  const result = await db.delete(schema.audit).where(lt(schema.audit.at, now - AUDIT_RETENTION_MS))
+  return Number(result.changes ?? 0)
 }
 
 export type AuditRow = {

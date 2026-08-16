@@ -3,6 +3,29 @@
 **Phase 2** (`README.md § build order`). Two feeders, one registry, indistinguishable downstream —
 the collections pattern (`docs/dashboards.md § Declaring one`), applied to schedules.
 
+## What phase 1 already built for this (start here)
+
+The engine shipped (`docs/schedules.md`) and left these seams ready, so phase 2 is key-minting,
+lifecycle binding and trust disclosure — not scheduler work:
+
+- `Scheduler.register(DeclaredSchedule)` in `node-core/server/schedules/scheduler.ts` takes exactly
+  the shape a plugin schedule needs and returns `{ dispose() }`; dispose removes the definition and
+  **keeps the state row**, so the whole lifecycle table below is already the engine's tested
+  behaviour ("retains the state row of a schedule nothing declares, and reattaches when it comes
+  back" in `scheduler.test.ts`). `ctx.schedules.register` is a wrapper that mints the
+  `<pluginId>:<scheduleId>` key from the registering plugin and ties `dispose` to the plugin host's
+  teardown.
+- `keyOwner()` already derives the plugin owner from the key prefix, and the 300s plugin cadence
+  floor is already enforced by key shape (`floorFor` in the same file) — declaring with the right
+  key *is* opting into the plugin clamps.
+- The cadence grammar and its tolerant parser live in `@acorn/protocol/schedules.ts`
+  (`cadenceSchema`, `clampCadence`, `parseCadence`); the manifest descriptor should reuse
+  `cadenceSchema` verbatim rather than re-declaring the union.
+- **One unit trap:** the engine's `DeclaredSchedule.timeoutMs` is milliseconds; the manifest
+  `timeout` below is seconds. The descriptor pass converts; do not let both spell seconds-vs-ms
+  ambiguously.
+- `registerTarget()` exists too but is phase 3's seam, not this one.
+
 ## Loaded plugins: the manifest descriptor
 
 One new contribution kind in `packages/protocol/src/pluginContract.ts`, beside `collections`:

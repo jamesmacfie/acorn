@@ -110,6 +110,14 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v2/core/security'), scopes: {}, note: 'Node security posture; owner surface.' },
   { path: shape('/v2/core/audit'), scopes: {}, note: 'The audit trail must not be readable by the code it audits.' },
   { path: shape('/v2/core/backup'), scopes: {}, note: 'Writes an archive to a path on the Node.' },
+  // Periodic work the node runs unattended (docs/schedules.md). Unmappable in both directions: reading
+  // the list enumerates what this machine does while nobody is watching, and creating or resuming one is
+  // a way to make code run later, which is the same primitive as an install with a delay on it. A plugin
+  // that wants periodic work declares it in its manifest, where the trust dialog discloses it.
+  { path: shape('/v2/core/schedules'), scopes: {}, note: 'Declaring work that runs unattended is an owner decision.' },
+  { path: shape(`/v2/core/schedules/${SEG}`), scopes: {} },
+  { path: shape(`/v2/core/schedules/${SEG}/run`), scopes: {} },
+  { path: shape(`/v2/core/schedules/${SEG}/runs`), scopes: {} },
   { path: shape('/v2/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v2/core/devices/${SEG}`), scopes: {} },
   { path: shape('/v2/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },

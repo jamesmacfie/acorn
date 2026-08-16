@@ -16,7 +16,7 @@ import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/main/adv
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
-import { pruneAudit } from '@acorn/node-core/server/audit.ts'
+import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
@@ -51,8 +51,8 @@ const disabledPlugins = disabledPluginsStore(root.dir)
 // union in here — a standalone node is started by a service manager, not by a client handing it a list.
 const disabled = effectiveDisabled(disabledPlugins)
 await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
-// Audit retention is enforced at boot so the append-only audit table remains bounded.
-await pruneAudit(runtime.DB).catch((error) => console.warn('[node] audit prune failed:', error))
+// Audit retention is a core-declared schedule now (docs/schedules.md), not a boot-time call — a
+// service-managed node runs for months, which is exactly when a boot-only prune never happens.
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
 // Same reporter as the supervised host, before the loader scans the install directory. Two things
@@ -126,11 +126,18 @@ const pluginStateCapability = capabilities.provide(
 // functions over the database; neither needs a window.
 wireAgentTools({ db: runtime.DB })
 
+// The node's one scheduler, built and provided here for the same reason the supervised root builds it
+// there: its lifetime is the process's, so it belongs to whoever owns teardown. Started after the
+// listener binds, because a catch-up run may call this node's own routes.
+const scheduler = createScheduler(runtime.DB)
+const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
+
 // Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
 // listen failure now exits non-zero with its reason instead of leaving a process alive that answers
 // nothing.
 const listener = await startListener(runtime, root)
 apiUrl = listener.endpoint.origin
+await scheduler.start()
 
 // Re-attach sessions, repair worktree state, and sweep workflow/agent records through the same
 // post-listener sequence as the supervised root. The listener is already live because resumed work
@@ -152,6 +159,10 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   const outcome = await drainNode({
     listener: () => closeListener(listener.server),
     reconciliation: async () => await reconcileTask,
+    schedules: async () => {
+      schedulerCapability.dispose()
+      await scheduler.stop()
+    },
     pluginState: async () => pluginStateCapability.dispose(),
     plugins: () => plugins.dispose(),
     sqlite: async () => runtime.DB.close(),

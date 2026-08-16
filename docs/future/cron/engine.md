@@ -1,5 +1,13 @@
 # The engine: storage, tick loop, policies, routes
 
+**Built** — [`docs/schedules.md`](../../schedules.md) is the behaviour doc now; this file is kept as the
+reasoning behind it, plus the phase-4 migration below, which is not done. Three deviations were taken
+during the build and are recorded where they bite: jitter applies to interval cadences only (±5% of a
+day would break `{ daily: '03:30' }`); the composition root is `apps/node`'s two roots rather than
+`main/bootstrap.ts`, which supervises the node rather than being it; and audit pruning moved onto the
+scheduler as part of phase 1 rather than phase 4, because phase 1 needed one real core schedule and that
+was the cheapest honest one.
+
 **Phase 1** (`README.md § build order`). One scheduler instance in the node process, owned by the
 composition root (`main/bootstrap.ts` registers it, owns its teardown — the boot-order rules in
 `docs/architecture-overview.md` apply; signal handlers before the handshake line, as ever). The
@@ -132,9 +140,9 @@ delete — all existing primitives.
 
 ## Migration of the invisible intervals (phase 4)
 
-Once the engine exists, the periodic work already hiding in the codebase moves onto rows and the
-bespoke timers get **deleted**: backup (`main/backup.ts`), audit pruning, the agent-usage
-collection interval. Each becomes a core- or plugin-declared schedule, visible and pausable like
+Audit pruning is done (it was phase 1's one core schedule). The rest still stands: the periodic work
+already hiding in the codebase moves onto rows and the bespoke timers get **deleted**: backup
+(`main/backup.ts`), the agent-usage collection interval. Each becomes a core- or plugin-declared schedule, visible and pausable like
 everything else. The acceptance test for this phase is negative: `grep setInterval` over node code
 finds scheduler internals and nothing else.
 
