@@ -42,9 +42,9 @@ nothing else may be reordered.
 | Phase | What | File | Why it is first |
 | --- | --- | --- | --- |
 | pre | The scheduler: engine, declarations, the `collection-sample` target and its two seams | [`../cron/`](../cron/README.md) | The node-side sampler is what makes measure history gapless; without it, trend charts are holes. |
-| 0 | Model keys + codec + pure derivations; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. |
+| 0 | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. |
 | 1 | Grid gesture + panel chrome restyle | `ux-refresh.md` | Pure presentation; touches no data. Parallel-safe with phase 0 and the cron work. |
-| 2 | The panel wizard | `wizard.md` | Needs phase 0's derivations (`viewAvailability`, picker metadata, size presets). |
+| 2 | The panel wizard; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. |
 | 3 | Stat trend + delta rendering; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. |
 
 ## The work items
@@ -53,6 +53,7 @@ nothing else may be reordered.
 | --- | --- | --- |
 | [`ux-refresh.md`](./ux-refresh.md) | The grid gesture and panel chrome restyle. | None — accepted design, phase 1. |
 | [`wizard.md`](./wizard.md) | Staged panel creation with a live preview, over the same generated editor. | Phase 0 derivations must exist first. |
+| [`tabs.md`](./tabs.md) | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | The `tabs` model key (phase 0) before the bar. |
 | [`measure-history.md`](./measure-history.md) | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | Waits on [`../cron/`](../cron/README.md) phases 1–3. |
 | [`charts.md`](./charts.md) | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | Series-colour decision (phase 0) before any of it renders. |
 | [`placements.md`](./placements.md) | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | Regions must ride the extension-point contract. |
@@ -76,9 +77,10 @@ Each is small, independent, and can ride along with any of the above.
   declare its column count, existing rects survive the change, and Home is untouched.
 - **Drag between placements.** With more than one surface there is somewhere to drag *to*. The answer
   is a menu action ("Move to…") before it is a drag, and `placePanel`/`unplacePanel` already do the
-  work. The accepted design seats it in the panel overflow menu, as a submenu listing surfaces with
-  the current one checked. *Done when* a panel can be moved from Home to a task pane without
-  recomposing it, keeping its definition and taking a fresh rect at the destination.
+  work. The accepted design seats it in the panel overflow menu, as a submenu listing surfaces —
+  and, with `tabs.md`, each Home tab — with the current one checked. *Done when* a panel can be
+  moved from Home to a task pane or another tab without recomposing it, keeping its definition and
+  taking a fresh rect at the destination.
 - **A screen-reader data table inside a chart.** The chart's accessibility floor is a labelled SVG
   with a tooltip per mark, and the full data one view flip away in `table`. *Done when* a chart
   exposes its own rows without the flip, and without a second rendering path for cells.
