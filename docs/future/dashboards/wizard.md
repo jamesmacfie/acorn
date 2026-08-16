@@ -97,9 +97,11 @@ with no number fields offers count only, exactly as today).
 
 **Step 4 — Place.** Title (auto-filled by `defaultPanelTitle` until first keystroke — the existing
 rule), size preset (S/M/L footprint drawn as a 12-cell strip), surface (Home, task pane; future
-surfaces render disabled with their gate named). Commit = `savePanel`, `placePanel(scope, id)`,
-rect = preset width first-fitted via the ordinary `normalize` path. Per-panel refresh stays on this
-step too (it is about the placed, polling panel, not the shape of the data).
+surfaces render disabled with their gate named). When Home has more than one tab (`tabs.md`),
+choosing it offers the tab — defaulting to the one the wizard was launched from — plus "New
+dashboard…" inline. Commit = `savePanel`, `placePanel(scope, id)`, rect = preset width first-fitted
+via the ordinary `normalize` path. Per-panel refresh stays on this step too (it is about the
+placed, polling panel, not the shape of the data).
 
 Steps are navigable back and forth; a step whose prerequisites vanished (source removed in step 1
 after a view chosen in step 2) re-derives rather than blocks — `retainShaping` and view fallback

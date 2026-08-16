@@ -22,6 +22,10 @@ Three rules the existing surfaces already settle. Inherit them; do not re-decide
 - **The narrow-window collapse is inherited free.** A surface too narrow for twelve cells is simply
   always collapsed, and its stored geometry returns intact when it is widened.
 
+The `ownerId` segment now also carries **Home tabs** (`tabs.md`): a tab is the scope
+`home/<tabId>`, the first consumer of that segment on the home surface, and proof the key format
+needed no change to grow a surface a second dimension.
+
 **Where placements surface in the accepted UX** (`wizard.md`): the wizard's Place step renders
 every surface as a card — Home and the task pane live, unbuilt surfaces present but disabled with
 their gate named — so shipping one of the deliverables below means enabling a card, not designing a
