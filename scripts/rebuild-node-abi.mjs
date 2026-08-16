@@ -13,10 +13,23 @@
 // workspace package resolves to the same physical copy, so a package rebuilding it while a sibling's
 // tests are loading it is a race that fails the sibling.
 import { execFileSync } from 'node:child_process'
+import { chmodSync, existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 
 const require = createRequire(import.meta.url)
+
+// node-pty 1.1.0 publishes prebuilds/<platform>-<arch>/spawn-helper as mode 644 and never chmods it
+// in its own install/postinstall, so node-pty's posix_spawnp of the helper dies with EACCES and
+// reports "posix_spawnp failed". The probe below can't catch it — pty.node is N-API and loads fine.
+// The packaged app is unaffected (electron-builder's node-gyp rebuild writes build/Release at 755,
+// which node-pty prefers), so this only ever bites tests. Re-run after every install: the file is
+// hard-linked from the pnpm store, so a fresh install restores the broken mode.
+if (process.platform !== 'win32') {
+  const ptyDir = dirname(require.resolve('node-pty/package.json'))
+  const helper = join(ptyDir, 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper')
+  if (existsSync(helper)) chmodSync(helper, 0o755)
+}
 
 try {
   require('node-pty') // already loadable on this ABI → nothing to do
