@@ -168,7 +168,13 @@ describe('disabling a node plugin', () => {
     dataRoots.push(dataDir)
     const { initPlugins } = await import('@acorn/node-core/server/plugin/host.ts')
     const { CapabilityRegistry } = await import('@acorn/node-core/server/plugin/capabilities.ts')
+    const { Scheduler, SCHEDULER } = await import('@acorn/node-core/server/schedules/index.ts')
     const capabilities = new CapabilityRegistry()
+    // Provided BEFORE the plugins, exactly as both composition roots do it: a plugin declaring periodic
+    // work resolves the scheduler through this capability at registration time, and a graph without one
+    // throws. Never started — this suite asserts on what a boot REGISTERS, and a running loop would mean
+    // a fixture that fires jobs at a temp data root while the assertions run.
+    capabilities.provide(SCHEDULER, new Scheduler(coreDb.db))
     const result = await initPlugins(buildPlugins(dataDir), {
       capabilities,
       core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db, activeIdentity: memoryIdentityStore() }),

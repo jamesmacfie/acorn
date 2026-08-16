@@ -10,6 +10,7 @@ import { createCoreServices, SecretService } from '@acorn/node-core/main/core/in
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
@@ -97,6 +98,15 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 const PLUGIN_ROUTES = 'routeRegistry.snapshot.json'
 
 describe('assembled routes', () => {
+  // A plugin that declares periodic work resolves the scheduler through the capability registry at
+  // registration time, so a graph assembled without one throws — which is what both composition roots
+  // already avoid by providing it before initPlugins. Never started: this suite asserts the MOUNT TABLE,
+  // and a running loop would fire jobs at a temp data root while the assertions run.
+  const schedulerCapable = (capabilities: CapabilityRegistry, db: TestDb['db']): CapabilityRegistry => {
+    capabilities.provide(SCHEDULER, new Scheduler(db))
+    return capabilities
+  }
+
   let core: TestDb
   let dataDir: string
   let plugins: Awaited<ReturnType<typeof initPlugins>>
@@ -130,7 +140,7 @@ describe('assembled routes', () => {
         },
       }),
       {
-        capabilities: new CapabilityRegistry(),
+        capabilities: schedulerCapable(new CapabilityRegistry(), core.db),
         core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
         dataDir,
       },

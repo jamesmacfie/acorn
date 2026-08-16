@@ -49,8 +49,25 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
     run: async () => `${await pruneAudit(db)} entries older than 90 days removed`,
   })
 
+  // Idempotency replay rows (docs/api-reference.md § HTTP conventions), which used to be reclaimed by a
+  // boot-time call in both composition roots. That call carried an argument in its comment — "a periodic
+  // sweeper would be machinery for a table that holds 24 hours of one owner's mutations" — and the
+  // argument was right when the only alternative was a bespoke timer. It is spent now, for the same
+  // reason the audit prune's was: the machinery exists, and a boot-only sweep is exactly nothing on a
+  // node that runs for months, which is the node this project ships. Expired rows already READ as
+  // absent, so this is space, not correctness.
+
   if (options.env) {
     const env = options.env
+
+    scheduler.register({
+      key: 'core:idempotency-sweep',
+      name: 'Reclaim expired replay rows',
+      cadence: { daily: '03:05' },
+      run: async () => {
+        await env.IDEMPOTENCY.cleanupExpired()
+      },
+    })
 
     // The driver (docs/future/dashboards/measure-history.md). ONE schedule for every panel that asked
     // for a history trend, not a row per panel: panel churn must never create or delete schedule rows,

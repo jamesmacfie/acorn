@@ -126,6 +126,35 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing — account-scoped provider usage' })
 
+      // Unattended usage collection (docs/schedules.md; cron use case 6). Until now the only thing that
+      // refreshed the plan probes was the usage panel being on screen — `createAgentUsageStore` polls
+      // every five minutes while a consumer is mounted — so the snapshot was as old as the last time
+      // someone looked at it.
+      //
+      // DECLARED DISABLED, and that is the substantive choice. Refreshing spawns the provider CLIs
+      // (main/usage/claudeUsage.ts, codexUsage.ts) and the snapshot is an in-process cache that nothing
+      // reads while no client is open — so on by default this would be child processes every half hour,
+      // forever, on a laptop, warming a value for nobody. Off by default it is a visible, pausable row
+      // the owner turns on if they want their usage numbers already fresh when they open the panel,
+      // which is the whole difference between a schedule and an invisible interval. The client's own
+      // poll is untouched: that is freshness for a person who is present, and it is not this system.
+      ctx.schedules.register({
+        scheduleId: 'usage-refresh',
+        name: 'Refresh agent plan usage',
+        cadence: { every: 30 * 60 },
+        enabled: false,
+        // The probes shell out to two CLIs; the engine's 60s default would time out a cold `claude`.
+        timeout: 120,
+        run: async () => {
+          const userId = ctx.core.identity.active()
+          // Nothing to collect against: a node with no bound owner has no pricing preferences to cost
+          // the usage with, and inventing an empty owner would cache a snapshot under the wrong key.
+          if (!userId) return 'no owner is bound to this node yet'
+          const snapshot = await ctx.capabilities.require(AGENT_USAGE).read({ userId, force: true })
+          return `${snapshot.providers.filter((provider) => !provider.error).length} of ${snapshot.providers.length} providers answered`
+        },
+      })
+
       // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call
       // time and falls back to its own headless runner when it is absent, so a node with this plugin
       // unavailable still runs non-managed workflow steps.

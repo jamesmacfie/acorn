@@ -181,12 +181,13 @@ Executable configuration recovered without a matching `config_acks` row must be 
 
 ## Retention
 
-There is a scheduler now (`docs/schedules.md`), and audit retention moved onto it. The old argument —
-that a node nobody restarts is also one nobody accumulates a backlog on — had it backwards: a node left
-running for a month pruned nothing at all. Idempotency stayed at boot, because expired replay rows read
-as absent already, so that sweep only reclaims space and boot is the one moment nothing is mid-request.
+There is a scheduler now (`docs/schedules.md`), and both boot-time sweeps moved onto it. The old
+argument — that a node nobody restarts is also one nobody accumulates a backlog on — had it backwards:
+a node left running for a month pruned nothing at all. The idempotency sweep followed the audit prune
+for exactly that reason; expired replay rows already *read* as absent, so it was always space rather
+than correctness, and space is what a long-lived node accumulates.
 
-- idempotency rows: 24 hours, cleaned at boot;
+- idempotency rows: 24 hours, reclaimed by the `core:idempotency-sweep` schedule (daily, 03:05 node-local);
 - audit rows: 90 days, pruned by the `core:audit-prune` schedule (daily, 03:20 node-local);
 - terminal replay: bounded per session;
 - logs: size/age policy owned by the Node runtime;

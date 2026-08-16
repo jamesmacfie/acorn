@@ -50,9 +50,9 @@ const disabledPlugins = disabledPluginsStore(root.dir)
 // while this persisted set controls a standalone process at boot. There is no start-config override to
 // union in here — a standalone node is started by a service manager, not by a client handing it a list.
 const disabled = effectiveDisabled(disabledPlugins)
-await runtime.IDEMPOTENCY.cleanupExpired() // reclaim yesterday's replay rows; see service/runtime.ts
-// Audit retention is a core-declared schedule now (docs/schedules.md), not a boot-time call — a
-// service-managed node runs for months, which is exactly when a boot-only prune never happens.
+// Audit retention and the idempotency sweep are core-declared schedules now (docs/schedules.md), not
+// boot-time calls — a service-managed node runs for months, which is exactly when a boot-only prune
+// never happens.
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
 // Same reporter as the supervised host, before the loader scans the install directory. Two things

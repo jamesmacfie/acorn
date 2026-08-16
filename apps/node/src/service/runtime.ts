@@ -157,12 +157,9 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   }
 
   try {
-    // Expired replay rows read as absent already (auth/idempotency.ts), so this only reclaims space.
-    // Boot is the right moment because it is the one time nothing is mid-request, and a periodic
-    // sweeper would be machinery for a table that holds 24 hours of one owner's mutations.
-    await runtime.IDEMPOTENCY.cleanupExpired()
-    // Audit retention used to be a second boot-time call here. It is a core-declared schedule now
-    // (docs/schedules.md), which is what makes it happen on a node that is left running for a month.
+    // Audit retention and the expired-replay-row sweep both used to be boot-time calls here. Both are
+    // core-declared schedules now (docs/schedules.md), which is what makes them happen on a node that
+    // is left running for a month — the case a boot-only sweep serves exactly never.
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')

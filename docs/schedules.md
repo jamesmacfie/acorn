@@ -44,13 +44,24 @@ owner's pause or its run history — both are waiting when the plugin returns.
 
 - `core:audit-prune` — daily at 03:20 node-local. The 90-day audit sweep, which used to be a boot-time
   call in both composition roots and therefore never ran on a node left up for a month.
+- `core:idempotency-sweep` — daily at 03:05. Reclaims expired replay rows, which was also a boot-time
+  call in both roots and had the same problem: expired rows already *read* as absent, so a node running
+  for months quietly accumulated every mutation it had ever replayed.
 - `core:sample-measures` — hourly, jittered. One pass over every dashboard panel that asked for a
   history trend, recording one number apiece (§ Targets, and `docs/future/dashboards/measure-history.md`).
 - `core:compact-history` — daily at 03:40. Measure history's own retention.
 
-The last two are only declared when the composition root passes `env` to `createScheduler`, which both
-Node hosts do; a scheduler built without one (a test) declares just the audit prune. No plugin in the
-tree declares a schedule yet.
+All but the audit prune are declared only when the composition root passes `env` to `createScheduler`,
+which both Node hosts do; a scheduler built without one (a test) declares just the prune, because the
+other three reach out of the process.
+
+One plugin declares a schedule:
+
+- `agents:usage-refresh` — every 30 minutes, and **off unless you turn it on**. It re-probes the agent
+  CLIs for plan usage so the numbers are already fresh when you open the panel. Off by default because
+  refreshing spawns those CLIs and the snapshot is an in-process cache nothing reads while no client is
+  open — unattended freshness here is a real cost for a value only a person present benefits from, so
+  it is the owner's call. Turning it on is the enable toggle on its row, and that survives restarts.
 
 ### How a plugin declares one
 
@@ -265,10 +276,28 @@ validate after the fact — and when nothing offers a schedulable action the for
 sentence saying so rather than a create button that always fails. A row whose tier has risen shows the
 re-arm inline.
 
+## What deliberately is not a schedule
+
+The sweep was re-run across the tree and these stay on their own timers, because their lifetime is an
+object's rather than the clock's: the WS-hub sweep, the tunnel sweep, the MCP keepalive and the terminal
+idle watch. A settings row for "sweep this map while it exists" would be noise. The honest rule is not
+"no `setInterval` outside the scheduler" but **no *calendar-shaped* work runs off a bespoke timer** —
+anything with a cadence a person might want to see, pause or retune is a row.
+
+Client-side polling is also not this system and never becomes one. A panel refresh or the usage store's
+five-minute poll is freshness for a person who is present; a schedule is work that happens whether or
+not anyone is.
+
+`pruneOrphanedGithubMirror` stays a boot-time call for the same reason: it repairs installations
+affected by a historic eviction bug and converges to zero, so it is startup reconciliation, not
+retention.
+
 ## Not built yet
 
-- **Phase 4 of `docs/future/cron/`**: migrating the remaining bespoke timers (`main/backup.ts`, the
-  agent-usage collector) onto rows.
+- **Unattended backup.** `main/backup.ts` is route-triggered only, and a `core:backup` schedule is one
+  registration away — but it needs a retention policy nobody has asked for yet, and a weekly archive of
+  every database written forever to one directory is unbounded disk growth. The open question is *how
+  many backups should a node keep*; `docs/future/cron/engine.md § migration` has the reasoning.
 - **`agent-run`**, named in the vocabulary and gated on a headless agent runtime.
 - **The display half of measure history** — sparkline and delta
   (`docs/future/dashboards/measure-history.md § Display`). The store accrues samples today; nothing
