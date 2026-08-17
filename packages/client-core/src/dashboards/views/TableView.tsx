@@ -1,7 +1,6 @@
 import { For, Show } from 'solid-js'
 import { EmptyState, Table } from '../../ui/primitives'
 import Cell from './Cell'
-import Provenance from './Provenance'
 import type { PanelViewProps } from './props'
 
 // The table view: columns are the projected fields, each cell drawn by its field's semantic type.
@@ -9,6 +8,11 @@ import type { PanelViewProps } from './props'
 // A row's declared action rides the <tr>, with the keyboard wiring the primitive `Row` would have
 // given a list — a table cell cannot be a Row, and a table whose rows are only clickable by mouse is
 // a table half the app cannot use.
+//
+// NO SOURCE COLUMN IS HARDCODED HERE ANY MORE. Provenance is an ordinary panel-local field on a
+// mapped multi-source panel (mapping.ts § PANEL_SOURCE_FIELD_ID), so it arrives through `fields` like
+// every other column — projectable, hideable, reorderable and filterable, none of which the special
+// case allowed (docs/future/dashboards/charts.md § 4).
 
 export default function TableView(props: PanelViewProps) {
   return (
@@ -19,7 +23,6 @@ export default function TableView(props: PanelViewProps) {
       <Table size="sm" stickyHead>
         <thead>
           <tr>
-            <Show when={props.provenance}><th scope="col">Source</th></Show>
             <For each={props.fields}>{(field) => <th scope="col">{field.name}</th>}</For>
           </tr>
         </thead>
@@ -39,7 +42,6 @@ export default function TableView(props: PanelViewProps) {
                   }
                   : undefined}
               >
-                <Show when={props.provenance}><td><Provenance pluginId={row.pluginId} /></td></Show>
                 <For each={props.fields}>
                   {(field) => <td><Cell field={field} value={row.values[field.id]} /></td>}
                 </For>

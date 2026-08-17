@@ -79,8 +79,12 @@ export type ChartTick = { label: string; at: number }
 
 export type ChartBar = {
   key: string
+  /** The CATEGORY this bar stands in — the x axis names it, so several bars of one cluster share it. */
   label: string
   value: number
+  /** Everything this bar is, in words: its category, its series where there is one, and its measure
+   *  in the field's own units. The mark's `<title>`, composed here because the view decides nothing. */
+  title: string
   /** Set when the plugin declared what this value means. Mutually exclusive with `series`. */
   tone?: PanelTone
   /** Set when the mark is identity with no declared tone. Mutually exclusive with `tone`. */
@@ -89,9 +93,6 @@ export type ChartBar = {
   y: number
   w: number
   h: number
-  /** False where the labels would collide. The value stays reachable through the tooltip and, one
-   *  view flip away, through the table. */
-  labelled: boolean
 }
 
 export type ChartLine = {
@@ -108,9 +109,28 @@ export type ChartLine = {
   points: { x: number; y: number; label: string }[]
 }
 
+/** One key of the legend, in the mark's own colour attribute — the same `tone`/`series` pair a mark
+ *  carries, so the swatch and the mark cannot drift apart. */
+export type ChartLegendKey = {
+  id: string
+  label: string
+  tone?: PanelTone
+  series?: ChartSeriesSlot
+}
+
+/** Both shapes carry these. `legend` is present only when TWO OR MORE series draw: one series has no
+ *  sibling to be told apart from and the panel title already names it, so a one-swatch legend is
+ *  furniture.
+ *
+ *  Where it IS present it is not optional polish. The slot-2 ↔ slot-3 pair of the identity ramp sits
+ *  in the colour-vision-deficiency warn band, which is legal only with a secondary encoding, and this
+ *  is it (charts.md § 1). An ungrouped bar draws one series and its categories are told apart by the
+ *  x axis labels rather than by colour, which is why it has none. */
+type ChartCommon = { xTicks: ChartTick[]; yTicks: ChartTick[]; xLabel: string; yLabel: string; legend?: ChartLegendKey[] }
+
 export type ChartPlot =
-  | { shape: 'bar'; bars: ChartBar[]; yTicks: ChartTick[]; xLabel: string; yLabel: string }
-  | { shape: 'line'; lines: ChartLine[]; xTicks: ChartTick[]; yTicks: ChartTick[]; xLabel: string; yLabel: string }
+  | ({ shape: 'bar'; bars: ChartBar[] } & ChartCommon)
+  | ({ shape: 'line'; lines: ChartLine[] } & ChartCommon)
 
 // ── What a schema can draw ────────────────────────────────────────────────────────────────────
 //
@@ -135,6 +155,25 @@ export const chartSupportedBy = (schema: PluginCollectionSchema): boolean => cha
 /** The axis fields a shape may be pointed at. */
 export const chartAxisFields = (schema: PluginCollectionSchema, shape: ChartShape): PluginCollectionField[] =>
   shape === 'bar' ? enumFields(schema) : datetimeFields(schema)
+
+/** The enums a shape may be SPLIT INTO SERIES by — one line per value, or one bar per value inside
+ *  each category's cluster (charts.md § 3).
+ *
+ *  A line's axis is a datetime, so every enum is a candidate. A bar's axis is already an enum, so the
+ *  candidates are every OTHER one: splitting a bar by the field it is keyed by draws one bar per
+ *  cluster, which is the ungrouped chart with extra arithmetic. That makes the grouped bar
+ *  unrepresentable over a single-enum schema — the editor offers nothing rather than validating a
+ *  choice afterwards, which is the gating rule everywhere else in this file. */
+export const chartSeriesFields = (
+  schema: PluginCollectionSchema,
+  shape: ChartShape,
+  view: PanelView,
+  shaping: PanelShaping,
+): PluginCollectionField[] => {
+  if (shape === 'line') return enumFields(schema)
+  const category = barCategoryField(schema, view, shaping)
+  return enumFields(schema).filter((field) => field.id !== category?.id)
+}
 
 /** The axis to pre-pick for a shape: the `updated`-role datetime for a line, the field the panel
  *  already groups by (then the `status`-role enum) for a bar. That is what the role vocabulary is
@@ -241,51 +280,136 @@ const yTicksFor = (schema: PluginCollectionSchema, view: PanelView, max: number)
   }))
 }
 
+/** The category axis a bar is keyed by: the panel's own choice, then the shaping group-by — the same
+ *  fallback chain a board walks, so flipping board ↔ chart keeps the categories. */
+function barCategoryField(
+  schema: PluginCollectionSchema,
+  view: PanelView,
+  shaping: PanelShaping,
+): PluginCollectionField | undefined {
+  const chosen = fieldById(schema, view.x)
+  return chosen?.type === 'enum' ? chosen : groupField(schema, shaping)
+}
+
+/** The tone the plugin DECLARED for one of a field's values, or `undefined` — which is exactly the
+ *  question the identity ramp answers (charts.md § 1: the ramp is for identity with no declared tone).
+ *
+ *  `boardColumns` cannot answer it and must not be asked: it defaults every column to `muted`, so a
+ *  value declared WITHOUT a tone comes back looking like one declared muted. Colouring by that would
+ *  draw every series of an untoned enum — which is most of them — in the same faint ink and call it
+ *  the plugin's decision. */
+const declaredTone = (field: PluginCollectionField | undefined, valueId: string): PanelTone | undefined =>
+  field?.values?.find((value) => value.id === valueId)?.tone
+
+/** The one place a mark's colour attribute is chosen: the declared tone where there is one, an ordinal
+ *  identity slot where there is not, and never both. */
+const toneOrSlot = (
+  tone: PanelTone | undefined,
+  index: number,
+): { tone: PanelTone } | { series: ChartSeriesSlot } => (tone ? { tone } : { series: seriesSlot(index) })
+
+/** The legend for a set of drawn series, or `undefined` for fewer than two.
+ *
+ *  The fold is disclosed rather than hidden: slots 4 and up all wear the muted `other` colour, so they
+ *  collapse into ONE key that says how many went in. Nothing is visible in the render that is
+ *  unnameable in text (charts.md § Accessibility). */
+function legendFor(entries: readonly ChartLegendKey[]): ChartLegendKey[] | undefined {
+  if (entries.length < 2) return undefined
+  const keys = entries.filter((entry) => entry.series !== 'other')
+  const folded = entries.length - keys.length
+  if (folded) keys.push({ id: 'other', label: folded > 1 ? `Other (${folded})` : 'Other', series: 'other' })
+  return keys
+}
+
 function buildBar(
   rows: readonly PluginCollectionRow[],
   schema: PluginCollectionSchema,
   view: PanelView,
   shaping: PanelShaping,
 ): ChartPlot | undefined {
-  // The panel's own choice, then the shaping group-by — the same fallback chain a board walks, so
-  // flipping board ↔ chart keeps the categories.
-  const field = fieldById(schema, view.x)?.type === 'enum'
-    ? fieldById(schema, view.x)!
-    : groupField(schema, shaping)
+  const field = barCategoryField(schema, view, shaping)
   if (!field) return undefined
 
-  // The board's own bucketing, reused whole: declared values in declaration order (present even when
-  // empty), then undeclared ones in first-appearance order, then one catch-all.
+  // THE GROUPED BAR (charts.md § 3): a third shape by arithmetic but not by config — it is `series` on
+  // `shape: 'bar'`, the key the codec already round-trips for lines. An old client ignores the key and
+  // draws the ungrouped bar, which is the acceptance test the design set.
+  //
+  // A split naming the category axis itself is dropped rather than drawn: it would put one bar in each
+  // cluster, which is this chart with extra steps.
+  const split = fieldById(schema, view.series)
+  const series = split?.type === 'enum' && split.id !== field.id ? split : undefined
+
+  // The board's own bucketing, reused whole for BOTH axes: declared values in declaration order
+  // (present even when empty), then undeclared ones in first-appearance order, then one catch-all.
+  // The ungrouped bar is the one-group case of the same layout rather than a second code path.
   const columns = boardColumns(rows, field)
-  const values = columns.map((column) => aggregateRows(column.rows, schema, view) ?? 0)
-  const max = Math.max(0, ...values)
+  const groups = series
+    ? boardColumns(rows, series)
+    : [{ id: '', label: '', tone: 'muted' as PanelTone, declared: false, rows: [...rows] }]
+
+  const values = groups.map((group) => {
+    // Object identity, not a re-bucket: `boardColumns` already decided which rows are in this series,
+    // and re-deriving the intersection from the cells would have to restate its three destinations.
+    const inGroup = new Set(group.rows)
+    return columns.map((column) =>
+      aggregateRows(series ? column.rows.filter((row) => inGroup.has(row)) : column.rows, schema, view) ?? 0)
+  })
+  const max = Math.max(0, ...values.flat())
   const top = niceTicks(max).slice(-1)[0] || 1
 
   const slot = PLOT_W / Math.max(1, columns.length)
-  const width = slot * 0.7
-  // Every label, until they would collide; then every nth, evenly.
+  // The cluster keeps the width one bar used to have, and the series divide it — so a chart with no
+  // split is laid out exactly as it was before grouping existed.
+  const cluster = slot * 0.7
+  const width = cluster / groups.length
+
+  const bars = groups.flatMap((group, groupIndex) =>
+    columns.map((column, index): ChartBar => {
+      const value = values[groupIndex][index]
+      const height = Math.max(0, (value / top) * PLOT_H)
+      return {
+        key: `${group.id} ${column.id}`,
+        label: column.label,
+        value,
+        title: series
+          ? `${column.label} · ${group.label}: ${axisNumber(schema, view, value)}`
+          : `${column.label}: ${axisNumber(schema, view, value)}`,
+        // WHAT THE COLOUR ANSWERS moves with the split. Unsplit, each bar IS a category, so a toned
+        // category keeps the tone the plugin gave it and anything else takes an ordinal slot. Split,
+        // colour answers "which series", and the category is answered by the x axis instead.
+        ...(series
+          ? toneOrSlot(declaredTone(series, group.id), groupIndex)
+          : toneOrSlot(declaredTone(field, column.id), index)),
+        x: PAD.left + index * slot + (slot - cluster) / 2 + groupIndex * width,
+        y: PAD.top + PLOT_H - height,
+        w: width,
+        h: height,
+      }
+    }))
+
+  // Every category label, until they would collide; then every nth, evenly. The value stays reachable
+  // through the tooltip and, one view flip away, through the table.
   const stride = Math.ceil(columns.length / 8)
+  const xTicks = columns.flatMap((column, index): ChartTick[] =>
+    index % stride === 0 ? [{ label: column.label, at: PAD.left + index * slot + slot / 2 }] : [])
 
-  const bars = columns.map((column, index): ChartBar => {
-    const value = values[index]
-    const height = Math.max(0, (value / top) * PLOT_H)
-    return {
-      key: column.id,
-      label: column.label,
-      value,
-      // A declared value keeps the tone the plugin gave it; anything else is identity and takes an
-      // ordinal slot, so two undeclared categories are still told apart — without either of them
-      // being told it is good or bad.
-      ...(column.declared ? { tone: column.tone } : { series: seriesSlot(index) }),
-      x: PAD.left + index * slot + (slot - width) / 2,
-      y: PAD.top + PLOT_H - height,
-      w: width,
-      h: height,
-      labelled: index % stride === 0,
-    }
-  })
+  const legend = series
+    ? legendFor(groups.map((group, index): ChartLegendKey => ({
+      id: group.id,
+      label: group.label,
+      ...toneOrSlot(declaredTone(series, group.id), index),
+    })))
+    : undefined
 
-  return { shape: 'bar', bars, yTicks: yTicksFor(schema, view, max), xLabel: field.name, yLabel: measureLabel(schema, view) }
+  return {
+    shape: 'bar',
+    bars,
+    xTicks,
+    yTicks: yTicksFor(schema, view, max),
+    xLabel: field.name,
+    yLabel: measureLabel(schema, view),
+    ...(legend ? { legend } : {}),
+  }
 }
 
 function buildLine(
@@ -353,16 +477,30 @@ function buildLine(
       label: group.label,
       // Unsplit: one line, `--accent`, no identity question to answer. Split: the declared tone where
       // the enum has one, else an identity slot.
-      ...(!series
-        ? { tone: 'accent' as PanelTone }
-        : group.declared ? { tone: group.tone } : { series: seriesSlot(index) }),
+      ...(series ? toneOrSlot(declaredTone(series, group.id), index) : { tone: 'accent' as PanelTone }),
       path: placed.length > 1 ? placed.map((point, at) => `${at ? 'L' : 'M'}${point.x} ${point.y}`).join(' ') : '',
       points: placed,
     }]
   })
 
   const xTicks = (last === first ? [first] : [first, last]).map((day) => ({ label: dayLabel(day), at: xAt(day) }))
-  return { shape: 'line', lines, xTicks, yTicks: yTicksFor(schema, view, max), xLabel: time.name, yLabel: measureLabel(schema, view) }
+  // Over the lines that DREW, not the groups that exist: a series with no points has no mark for a
+  // swatch to stand for, and an empty declared column is a real case (`boardColumns` keeps them).
+  const legend = legendFor(lines.map((line): ChartLegendKey => ({
+    id: line.id,
+    label: line.label,
+    ...(line.tone ? { tone: line.tone } : {}),
+    ...(line.series ? { series: line.series } : {}),
+  })))
+  return {
+    shape: 'line',
+    lines,
+    xTicks,
+    yTicks: yTicksFor(schema, view, max),
+    xLabel: time.name,
+    yLabel: measureLabel(schema, view),
+    ...(legend ? { legend } : {}),
+  }
 }
 
 /** The whole chart, or `undefined` when this schema cannot draw the shape the panel asks for — a

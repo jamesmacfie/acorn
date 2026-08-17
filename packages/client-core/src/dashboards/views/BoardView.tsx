@@ -1,5 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import { Card, EmptyState, StatusDot } from '../../ui/primitives'
+import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { boardColumns, groupField, titleField } from '../shaping'
 import Cell from './Cell'
 import Provenance from './Provenance'
@@ -20,8 +21,12 @@ export default function BoardView(props: PanelViewProps) {
   const field = createMemo(() => groupField(props.schema, { groupBy: props.groupBy }))
   const lead = () => titleField(props.schema)
   // The grouped field is the column heading, so repeating it on every card in that column says
-  // nothing. Same argument as the list view leaving its lead field out of the meta strip.
-  const meta = () => props.fields.filter((entry) => entry.id !== lead()?.id && entry.id !== field()?.id)
+  // nothing. Same argument as the list view leaving its lead field out of the meta strip — and the
+  // same one for `source`, whose slot on a card is the provenance badge.
+  const meta = () => props.fields.filter((entry) =>
+    entry.id !== lead()?.id
+    && entry.id !== field()?.id
+    && !(props.provenance && entry.id === PANEL_SOURCE_FIELD_ID))
   // Memoized so a refresh that changes nothing does not hand `<For>` a whole new set of columns —
   // it keys by reference, and a rebuilt column is a rebuilt column of cards.
   const columns = createMemo(() => {

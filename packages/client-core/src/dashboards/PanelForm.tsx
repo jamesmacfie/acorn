@@ -211,12 +211,20 @@ export function ViewOptions(props: { draft: PanelDraft }) {
             />
           </Field>
         </div>
-        {/* Optional, and only on a line: splitting a bar chart by a second enum is a grouped bar
-            chart, which is a third shape and therefore a decision rather than a knob. */}
-        <Show when={draft().shape() === 'line' && draft().groupable().length}>
-          <Field label="Split into series" hint="One line per value. Leave empty for a single line.">
+        {/* Optional on both shapes, and the SAME key: a bar split by a second enum is the grouped
+            bar, which is a third shape by arithmetic but not by config
+            (docs/future/dashboards/charts.md § 3). Offered only where the split is representable —
+            any enum for a line, any enum but the category axis for a bar — so a schema with one enum
+            never sees the control on a bar. */}
+        <Show when={draft().seriesFields().length}>
+          <Field
+            label="Split into series"
+            hint={draft().shape() === 'line'
+              ? 'One line per value. Leave empty for a single line.'
+              : 'One bar per value inside each category. Leave empty for a single bar.'}
+          >
             <FieldSelect
-              fields={draft().groupable()}
+              fields={draft().seriesFields()}
               value={draft().view().series}
               ariaLabel="Series"
               emptyLabel="No split"

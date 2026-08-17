@@ -4,6 +4,7 @@ import {
   buildChart,
   CHART_FRAME,
   chartAxisFields,
+  chartSeriesFields,
   chartShapesFor,
   chartSupportedBy,
   dayBucket,
@@ -179,7 +180,23 @@ describe('bar charts', () => {
     const many = { id: 'kind', name: 'Kind', type: 'enum' as const, values: Array.from({ length: 20 }, (_, index) => ({ id: `v${index}`, label: `V${index}` })) }
     const plot = buildChart([], schema(many), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
-    expect(plot.bars.filter((bar) => bar.labelled).length).toBeLessThanOrEqual(8)
+    expect(plot.bars).toHaveLength(20)
+    expect(plot.xTicks.length).toBeLessThanOrEqual(8)
+  })
+
+  it('gives a value DECLARED WITHOUT A TONE an identity slot, not the muted default', () => {
+    // The plugin declared that the value exists, not what it means, so there is no meaning to keep —
+    // and colouring every value of an untoned enum `muted` would make them all the same bar
+    // (charts.md § 1: the ramp is for identity with no declared tone).
+    const kind = { id: 'kind', name: 'Kind', type: 'enum' as const, values: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }
+    const plot = buildChart([row('1', { kind: 'a' })], schema(kind), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
+    if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
+    expect(plot.bars.map((bar) => bar.series)).toEqual([1, 2])
+  })
+
+  it('draws no legend for an unsplit bar — its categories are named on the axis, not by a swatch', () => {
+    const plot = buildChart(rows, schema(status), { kind: 'chart', shape: 'bar', x: 'state' }, {})
+    expect(plot?.legend).toBeUndefined()
   })
 
   it('falls back to the shaping group-by when the view names no axis', () => {
@@ -192,6 +209,119 @@ describe('bar charts', () => {
     const plot = buildChart(rows, schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.yTicks.some((tick) => tick.label.includes('MB'))).toBe(true)
+  })
+})
+
+describe('the grouped bar', () => {
+  const kind = {
+    id: 'kind',
+    name: 'Kind',
+    type: 'enum' as const,
+    values: [{ id: 'bug', label: 'Bug' }, { id: 'feat', label: 'Feature' }],
+  }
+  const rows = [
+    row('1', { state: 'open', kind: 'bug' }),
+    row('2', { state: 'open', kind: 'feat' }),
+    row('3', { state: 'open', kind: 'feat' }),
+    row('4', { state: 'merged', kind: 'bug' }),
+  ]
+  const grouped = { kind: 'chart' as const, shape: 'bar' as const, x: 'state', series: 'kind' }
+
+  it('clusters one bar per series inside each category, on the shared measure scale', () => {
+    const plot = buildChart(rows, schema(status, kind), grouped, {})
+    if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
+    // Two categories × two series, and the arithmetic is the intersection of both bucketings.
+    expect(plot.bars.map((bar) => [bar.label, bar.value]))
+      .toEqual([['Open', 1], ['Merged', 1], ['Open', 2], ['Merged', 0]])
+    // The x axis still names the CATEGORY once, at the centre of its cluster.
+    expect(plot.xTicks.map((tick) => tick.label)).toEqual(['Open', 'Merged'])
+  })
+
+  it('offers the split only where a second enum exists, and never the category axis itself', () => {
+    expect(chartSeriesFields(schema(status, kind), 'bar', { kind: 'chart', x: 'state' }, {}).map((f) => f.id))
+      .toEqual(['kind'])
+    expect(chartSeriesFields(schema(status), 'bar', { kind: 'chart', x: 'state' }, {})).toEqual([])
+    // A line's axis is a datetime, so every enum is a candidate there.
+    expect(chartSeriesFields(schema(status, updated), 'line', { kind: 'chart', x: 'updated' }, {}).map((f) => f.id))
+      .toEqual(['state'])
+  })
+
+  it('ignores a split naming the category axis rather than drawing one bar per cluster', () => {
+    const plot = buildChart(rows, schema(status, kind), { ...grouped, series: 'state' }, {})
+    if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
+    expect(plot.bars).toHaveLength(2)
+    expect(plot.legend).toBeUndefined()
+  })
+
+  it('colours by SERIES once split, and leaves the categories to the axis', () => {
+    const plot = buildChart(rows, schema(status, kind), grouped, {})
+    if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
+    // `kind` declares no tones, so the two series take identity slots — and the status enum's own
+    // warn/ok never reach the marks, because the category is no longer what the colour answers.
+    expect(plot.bars.map((bar) => bar.series)).toEqual([1, 1, 2, 2])
+    expect(plot.bars.every((bar) => bar.tone === undefined)).toBe(true)
+  })
+
+  it('keeps every bar of a cluster inside the slot the ungrouped bar had', () => {
+    const single = buildChart(rows, schema(status, kind), { kind: 'chart', shape: 'bar', x: 'state' }, {})
+    const plot = buildChart(rows, schema(status, kind), grouped, {})
+    if (plot?.shape !== 'bar' || single?.shape !== 'bar') throw new Error('expected bar charts')
+    const cluster = single.bars[0]
+    for (const bar of plot.bars.filter((entry) => entry.label === 'Open')) {
+      expect(bar.x).toBeGreaterThanOrEqual(cluster.x - 0.001)
+      expect(bar.x + bar.w).toBeLessThanOrEqual(cluster.x + cluster.w + 0.001)
+    }
+  })
+
+  it('names the category AND the series in a bar’s tooltip', () => {
+    const plot = buildChart(rows, schema(status, kind), grouped, {})
+    if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
+    expect(plot.bars[0].title).toBe('Open · Bug: 1')
+  })
+
+  it('is INVISIBLE to a client that does not draw it — the old ungrouped bar, never nothing', () => {
+    // The acceptance test charts.md § 3 set. `series` is a key the codec already round-trips, and the
+    // pre-grouped-bar `buildBar` simply never read it: the same definition still answers a bar.
+    const plot = buildChart(rows, schema(status, kind), grouped, {})
+    expect(plot?.shape).toBe('bar')
+  })
+})
+
+describe('the legend', () => {
+  const kind = { id: 'kind', name: 'Kind', type: 'enum' as const }
+  const day = (n: number) => n * DAY + 3_600_000
+
+  it('carries the mark’s own colour attribute, so a swatch cannot drift from its mark', () => {
+    const rows = [
+      row('1', { updated: day(1), state: 'open' }),
+      row('2', { updated: day(2), state: 'merged' }),
+    ]
+    const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
+    expect(plot?.legend).toEqual([
+      { id: 'open', label: 'Open', tone: 'warn' },
+      { id: 'merged', label: 'Merged', tone: 'ok' },
+    ])
+  })
+
+  it('collapses the fold into one key that says how many went in', () => {
+    const rows = ['a', 'b', 'c', 'd', 'e'].map((value, index) =>
+      row(`${index}`, { updated: day(index + 1), kind: value }))
+    const plot = buildChart(rows, schema(updated, kind), { kind: 'chart', shape: 'line', x: 'updated', series: 'kind' }, {})
+    expect(plot?.legend?.map((key) => key.label)).toEqual(['a', 'b', 'c', 'Other (2)'])
+    expect(plot?.legend?.slice(-1)[0].series).toBe('other')
+  })
+
+  it('is absent for a single series — one mark has no sibling to be told apart from', () => {
+    const plot = buildChart([row('1', { updated: day(1) })], schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    expect(plot?.legend).toBeUndefined()
+  })
+
+  it('stands for the lines that DREW, not the columns that exist', () => {
+    // `merged` is declared, so `boardColumns` keeps it — but no row carries it and no line is drawn,
+    // so a swatch for it would stand for nothing on screen.
+    const rows = [row('1', { updated: day(1), state: 'open' })]
+    const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
+    expect(plot?.legend).toBeUndefined()
   })
 })
 

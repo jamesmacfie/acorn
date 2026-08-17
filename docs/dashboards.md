@@ -309,24 +309,46 @@ something is in it. Every row lands somewhere.
 **Charts are two shapes and no dependency.** A `bar` takes its categories from an enum — the board's
 own bucketing, reused whole, declared values in declaration order — and its height from the same
 measure a `stat` draws, so flipping stat ↔ chart keeps what the panel is counting. A `line` takes its
-x from a `datetime` **bucketed by day**, with an optional series split from an enum; the bucket is why
-`count` and a number aggregate go down one path, since a count at an instant is always one. The axes
-are type-inferred on the first click — a line takes the `updated`-role datetime, a bar takes whatever
-the panel already groups by and then the `status`-role enum — and adjustable after.
+x from a `datetime` **bucketed by day**; the bucket is why `count` and a number aggregate go down one
+path, since a count at an instant is always one. The axes are type-inferred on the first click — a
+line takes the `updated`-role datetime, a bar takes whatever the panel already groups by and then the
+`status`-role enum — and adjustable after.
+
+Either shape may be **split into series** by an enum, and it is the same `view.series` key on both: on
+a line that is one line per value, and on a bar it is the **grouped bar** — a cluster per category,
+one bar per series inside it, on the shared measure scale. A third shape by arithmetic, but not by
+config, which is why it needed no codec change and why a client that does not draw it renders the
+ungrouped bar rather than nothing. The split is offered only where it is representable: any enum for a
+line, any enum *but the category axis* for a bar, so a single-enum collection is never offered one.
 
 Every mark carries an **attribute, never a colour**, and which one depends on what the mark is
-*saying*. A value the plugin **declared** carries `data-tone` — the five-value status vocabulary
+*saying*. A value the plugin gave a **tone** carries `data-tone` — the five-value status vocabulary
 `StatusDot` already uses, so a `Ready` bar is the ok colour. Anything else is **identity** — an
-undeclared category, a series split — and carries `data-series` instead: an ordinal slot coloured by
-`--viz-series-1..3`, theme-axis tokens that are deliberately *not* the status colours. Status colour
-on non-status identity is a lie of the same species as a guessed avatar: it makes whichever series was
-drawn second permanently "warn-amber", which is a judgement nobody made. **Three slots, hard cap** —
-series four onwards folds into `other` in the faint ink, because past three the honest answer is fewer
-series or a table, not a fourth colour. The single unsplit line keeps `--accent`: one mark has no
-sibling to be told apart from, the same argument that put the sparkline there. Pie, gauge, scatter and area are not there,
-and will not be until someone arrives with the panel that needs one. The arithmetic — buckets,
-scales, ticks, path data — is pure in `dashboards/chart.ts`; `ChartView.tsx` is SVG over its output
-and decides nothing.
+undeclared category, a value declared without a tone, a series split — and carries `data-series`
+instead: an ordinal slot coloured by `--viz-series-1..3`, theme-axis tokens that are deliberately
+*not* the status colours. Status colour on non-status identity is a lie of the same species as a
+guessed avatar: it makes whichever series was drawn second permanently "warn-amber", which is a
+judgement nobody made. A declared value with no tone counts as identity, not as muted: declaring that
+a value exists is not declaring what it means, and toning them all faint would draw every series of an
+untoned enum the same. **Three slots, hard cap** — series four onwards folds into `other` in the faint
+ink, because past three the honest answer is fewer series or a table, not a fourth colour. What the
+colour answers moves with the split: an ungrouped bar colours by category, a grouped one colours by
+series and leaves the category to the axis. The single unsplit line keeps `--accent`: one mark has no
+sibling to be told apart from, the same argument that put the sparkline there.
+
+**A legend draws exactly when two or more series do**, never for one — the panel title already names a
+single series and a one-swatch legend is furniture. It is a wrapping row above the plot, each key a
+swatch in the mark's own shape wearing the mark's own `data-tone`/`data-series`, with the label in
+ordinary ink: identity lives in the swatch and never in coloured text. The fold is disclosed rather
+than hidden — the slots past the third collapse into one "Other (3)" key that says how many went in,
+so nothing is visible in the render that is unnameable in text. It is **not polish**: the identity
+ramp's slot-2 ↔ slot-3 pair sits in the colour-vision-deficiency warn band, which is legal only with a
+secondary encoding, and this is it. An ungrouped bar needs none because its categories are named on
+the x axis.
+
+Pie, gauge, scatter and area are not there, and will not be until someone arrives with the panel that
+needs one. The arithmetic — buckets, scales, ticks, cluster offsets, path data, the legend keys — is
+pure in `dashboards/chart.ts`; `ChartView.tsx` is SVG over its output and decides nothing.
 
 ### Trends: the stat that earns a sparkline
 
@@ -375,7 +397,7 @@ fields feeds each panel-local field), **value mapping** (which of a source's enu
 of the panel's columns), and the **derived enum** (the columns themselves — ids, labels and tones the
 user invented, belonging to no plugin).
 
-Five things about it are decisions rather than implementation:
+Six things about it are decisions rather than implementation:
 
 - **A mapped panel's fields are the role vocabulary, plus whatever the user invented.** The roles are
   what the host can align *without asking* — that is the whole argument for them existing — and they
@@ -386,6 +408,17 @@ Five things about it are decisions rather than implementation:
   declared one does, so there is no second class of field anywhere. It has no role to fall back on, so
   a source left unanswered is simply empty for it rather than guessed at, and nothing about the wire
   changed to allow any of it.
+- **A row's source is a field too.** A panel over more than one collection grows one built-in
+  panel-local field, `source`: an enum whose values are the panel's own source keys, labelled with the
+  providing plugin. It is fed by the host's provenance stamp rather than by any mapping row — the
+  matrix has no row for it, because there is nothing to answer — and it carries **no tone**, because
+  provenance is identity and github is not "ok". Because it is an ordinary enum, everything downstream
+  works uninvented: `series` can name it (split a line by github vs linear), `groupBy` can (a
+  by-source board), filters can (hide one source without unmapping it), and the projection can — which
+  is why the table's Source column is now an ordinary column rather than a hardcoded one. A
+  single-source panel does not grow it; a split over one source is a no-op nobody should be offered.
+  The list and the board still draw the badge in its own slot, so they leave the field out of the meta
+  strip rather than printing it twice.
 - **The derived enum *is* the panel's `status` field**, so the board draws the user's columns without
   knowing a mapping exists. The unmapped-value rule above is inherited rather than re-derived, and
   the mapping's `unmapped` key chooses between the catch-all column and hiding the row — never
