@@ -11,7 +11,7 @@ plugins, and the user — and a budgeted vocabulary for saying *when*.
 **This work precedes the dashboard upgrade.** The accepted dashboard redesign
 (`docs/future/dashboards/README.md`) needs measure history, and measure history sampled only while
 someone happens to have a dashboard open is a chart full of holes. The scheduler is what makes it
-gapless, so `docs/future/dashboards/measure-history.md` now names this folder as its foundation and
+gapless, so the measure-history design (now shipped — `docs/dashboards.md § Trends`) named this folder as its foundation and
 the dashboards build order starts here.
 
 ## Why the node, and only the node
@@ -47,7 +47,7 @@ tolerantly, unknown kinds retained inert — the dashboards persistence rules, a
 Named so the budget arguments below have referents; the first two are why this folder exists.
 
 1. **Dashboard measure sampling** (core) — hourly, reads every panel that asked for a history
-   trend, records one number per panel (`../dashboards/measure-history.md`). The driver.
+   trend, records one number per panel (`docs/dashboards.md § Trends`). The driver.
 2. **History compaction and retention** (core) — measure-history's own maintenance job.
 3. **Plugin data refresh on the plugin's own budget** (plugin) — e.g. linear revalidating its
    issue mirror every ten minutes server-side, so samples and panels read fresher data without a
@@ -113,7 +113,7 @@ Named so the budget arguments below have referents; the first two are why this f
 | 3 ✅ | Targets: `collection-sample` (with its two prerequisite seams: the node-side collection read registry and the shared measure pipeline), `plugin-run`, `node-action` with creation-time consent | `targets.md` |
 | 4 ✅ | Migrate the invisible intervals onto rows (backup, audit pruning, usage collection) — deletion of bespoke timers, not new features | `engine.md § migration` |
 
-Phase 3 unblocks the dashboards work outright: `../dashboards/measure-history.md`'s **store and its
+Phase 3 unblocks the dashboards work outright: the measure-history **store and its
 feeder are built** — `core:sample-measures` accrues samples with no client open — so the remaining
 work there is the display half (sparkline, delta) and the rest of the dashboards redesign.
 
@@ -123,6 +123,6 @@ work there is the display half (sparkline, delta) and the rest of the dashboards
 2. [`engine.md`](./engine.md) — storage, policies, routes.
 3. [`declarations.md`](./declarations.md) — how plugins say "I have periodic work".
 4. [`targets.md`](./targets.md) — what a schedule may do, including the reserved agent-run kind.
-5. `../dashboards/measure-history.md` — the first consumer, updated to build on this.
+5. `docs/dashboards.md § Trends` — the first consumer, built on this.
 
 Every file ends with a **verify before building** list; budget a re-verify pass, not a rewrite.

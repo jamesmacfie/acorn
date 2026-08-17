@@ -68,7 +68,7 @@ budgeted like every vocabulary here; unknown kinds in user rows survive inert (`
 One core schedule (`core:sample-measures`, hourly, jittered), not a row per panel: it enumerates
 panels with `view.trend: 'history'` from the dashboards prefs slice — which the node already
 stores — computes each panel's measure, and appends one sample per panel to the measure-history
-table (`../dashboards/measure-history.md`). Panel churn never creates or deletes schedule rows;
+table (`docs/dashboards.md § Trends`). Panel churn never creates or deletes schedule rows;
 compaction (`core:compact-history`, daily) is its sibling.
 
 It needs two seams that do not exist, and **they are the real work of this phase**:
@@ -120,8 +120,8 @@ are untestable — is what makes this extraction mechanical rather than a rewrit
 definition parser (`persist.ts § parsePanelDefinition`) moves or is mirrored with it, since the
 node must parse the prefs blob it stores.
 
-Sampling rules themselves (all-sources-answered gate, signature reset, one bucket per hour) live in
-`../dashboards/measure-history.md § Sampling`, which is written against this target.
+Sampling rules themselves (all-sources-answered gate, signature reset, one bucket per hour) are
+stated in `docs/dashboards.md § Trends`; they were written against this target.
 
 ## `plugin-run`
 
@@ -187,8 +187,8 @@ schedules — the same discipline as write-back's gate.
   change (its existing tests pass unmoved); the node imports it without electron in the graph;
   `boundaries.test.ts` knows the new edge.
 - `core:sample-measures` + `core:compact-history` run end-to-end: panels with history trends accrue
-  hourly samples with no client open, honoring the all-sources-answered gate and signature rules in
-  measure-history.md.
+  hourly samples with no client open, honoring the all-sources-answered gate and the signature rules
+  now stated in `docs/dashboards.md § Trends`.
 - A `node-action` schedule can be created with the tier-armed flow, runs unattended, fails closed
   on tier rise and on unresolvable targets, and its stamped tier renders permanently.
 - An `agent-run` row from a hypothetical future build renders inert here, not as an error.
