@@ -57,7 +57,8 @@ nothing else may be reordered.
 | [`measure-history.md`](./measure-history.md) ✅ | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | SHIPPED — behaviour moved to [`docs/dashboards.md § Trends`](../../dashboards.md); the file keeps the reasoning. |
 | [`charts.md`](./charts.md) ✅ | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | SHIPPED — behaviour in [`docs/dashboards.md § Views are derived`](../../dashboards.md); the file keeps the reasoning and the deviations. |
 | [`placements.md`](./placements.md) ✅ | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | SHIPPED — behaviour in [`docs/dashboards.md § Placements`](../../dashboards.md) and `docs/plugins.md § Cooperative extension points`; the file keeps the reasoning. Regions rode the extension-point contract as a second location, `pane.aside`. |
-| [`dynamic-collections.md`](./dynamic-collections.md) | Run-once-and-pin with schema-drift detection, then the discovery route. | Both gated on the database plugin's saved-query case being wanted. |
+| [`project-database.md`](./project-database.md) | The taskless database connection: a project-scoped URL resolution, its trust gate, and typed columns. | Precondition for the file below, not a dashboards change — nothing here touches a panel or the protocol. |
+| [`dynamic-collections.md`](./dynamic-collections.md) | Run-once-and-pin with schema-drift detection, then the discovery route. | Both gated on the database plugin's saved-query case being wanted — and now also on [`project-database.md`](./project-database.md), which is the gate the 2026-08-17 verify pass found unmet. |
 | [`write-back.md`](./write-back.md) | Board-drag write-back over designated write values. | Gated on real usage of read-only boards. |
 
 Two seams across them, both already load-bearing in the code:

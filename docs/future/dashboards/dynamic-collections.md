@@ -4,6 +4,19 @@
 wanted. Two deliverables in dependency order, both about collections whose schema cannot be known at
 manifest time.
 
+> **A third gate, found by the verify pass below on 2026-08-17 and answered in
+> [`project-database.md`](./project-database.md).** Part 1 assumes a saved query can be exposed as an
+> ordinary collection. It cannot be yet: a collection is fetched as `fetch(nodeId, params, signal)` and
+> *every* layer of `resolveDbUrl` but the last needs a task worktree, while panels carry no task
+> anywhere. The saved-query rows exist in the form this file assumes; the **execution** does not, and
+> reading the storage alone makes the gate look met. A second, smaller gap rides along: `toResultSet`
+> discards `res.fields[].dataTypeID`, so there is nothing to pin *types* from either. Build
+> `project-database.md` first. Two claims below are softened by it — "the pinned definition lives
+> node-side, owned by the database plugin" now also means a project-scoped connection with a
+> project-addressable trust gate, and "column names, types and kanban eligibility" overstates the third:
+> a Postgres OID yields no `enum`, so a freshly pinned collection offers stat/list/table and not board
+> until somebody says a column is one.
+
 The baseline they build on (`docs/dashboards.md § Self-describing responses`): every response carries
 its schema beside its rows, the manifest `schema` is the optional static case, and Linear declares
 none. The consequence, which is what these two exist to remove: **a response-only collection cannot
