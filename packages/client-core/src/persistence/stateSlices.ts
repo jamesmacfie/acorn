@@ -1,3 +1,4 @@
+import { homeTabSlice } from '../dashboards/homeTab'
 import { dashboardsSlice } from '../dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../notifications/notifications'
 import { defaultLayout, normalizeLayout, parseTaskLayouts, type TaskLayout } from '../tasks/layout'
@@ -65,4 +66,5 @@ export const coreStateSlices: readonly PersistedStateSlice<unknown>[] = [
   taskLayoutSlice,
   noticesSlice,
   dashboardsSlice,
+  homeTabSlice,
 ] as readonly PersistedStateSlice<unknown>[]

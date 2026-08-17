@@ -25,11 +25,13 @@ import {
   VIEW_LABELS,
 } from './PanelForm'
 import PanelPreview from './PanelPreview'
+import { addTab, setActiveHomeTab } from './homeTab'
 import {
   dashboards,
   HOME_PLACEMENT,
   homeTabs,
   homeTabScope,
+  setHomeTabs,
   type PlacementScope,
   type PlacementSurface,
 } from './persist'
@@ -102,6 +104,10 @@ const TYPE_GLYPHS: Record<PluginCollectionFieldType, string> = {
   link: 'link',
 }
 
+/** The Dashboard picker's "make one" option. Not a tab id: minted ids are eight hex characters and
+ *  the default tab's is empty, so nothing real can answer to it. */
+const NEW_TAB = '+'
+
 type Preset = 's' | 'm' | 'l'
 
 const PRESET_LABELS: Record<Preset, string> = { s: 'S', m: 'M', l: 'L' }
@@ -164,19 +170,38 @@ export default function PanelWizard(props: {
 
   const tabs = createMemo(() => homeTabs(dashboards()))
 
-  /** Where a commit lands. Home with more than one tab is the only case with a choice inside it
-   *  (docs/future/dashboards/tabs.md); every other surface is the scope the wizard was launched from,
-   *  because a placement you cannot see is not one you can be asked to aim at. */
-  const target = (): PlacementScope => {
+  /** The Home destinations: the dashboards that exist, plus a new one.
+   *
+   *  THIS IS ALSO THE ONLY DOOR TO A SECOND DASHBOARD, and that is deliberate. The tab bar owns the
+   *  `+`, but the bar exists only past one tab — and Home with one dashboard is pixel-identical to
+   *  what it was before tabs (tabs.md § UX), so the first one cannot be created from a button that
+   *  is not there. "Where should this panel go? Somewhere new" is the honest place to ask. */
+  const tabOptions = () => [
+    ...(tabs().length ? tabs() : [{ id: '', name: 'Home' }]),
+    { id: NEW_TAB, name: 'New dashboard…' },
+  ]
+
+  /** Where a commit lands; Home is the only surface with a choice inside it, because a placement you
+   *  cannot see is not one you can be asked to aim at.
+   *
+   *  Creating the destination happens HERE rather than when the option is picked, so the wizard keeps
+   *  its promise that nothing is written until the last step commits. */
+  const resolveTarget = (): PlacementScope => {
     if (surface() !== 'home') return props.scope
-    return tabs().length > 1 ? homeTabScope(tabId()) : HOME_PLACEMENT
+    if (tabId() !== NEW_TAB) return tabs().length > 1 ? homeTabScope(tabId()) : HOME_PLACEMENT
+    const created = addTab(tabs())
+    setHomeTabs(created.tabs)
+    // Land on the dashboard the panel went to. Placing it somewhere invisible is the one outcome
+    // nobody asked for.
+    setActiveHomeTab(created.id)
+    return homeTabScope(created.id)
   }
 
   const rect = (): Rect => sizePresets(draft.definition().view.kind)[preset()]
 
   const commit = () => {
     if (!draft.ready()) return
-    props.onCreate(draft.definition(), target(), rect())
+    props.onCreate(draft.definition(), resolveTarget(), rect())
     props.onClose()
   }
 
@@ -377,16 +402,14 @@ export default function PanelWizard(props: {
               />
             </Field>
 
-            {/* Only past one dashboard. With a single tab there is no question to ask, and Home is
-                what it always was (docs/future/dashboards/tabs.md). */}
-            <Show when={surface() === 'home' && tabs().length > 1}>
+            <Show when={surface() === 'home'}>
               <Field label="Dashboard">
                 <SegmentedControl<string>
                   ariaLabel="Dashboard"
                   size="sm"
                   value={tabId()}
                   onChange={setTabId}
-                  options={tabs().map((tab) => ({ value: tab.id, label: tab.name }))}
+                  options={tabOptions().map((tab) => ({ value: tab.id, label: tab.name }))}
                 />
               </Field>
             </Show>

@@ -56,6 +56,10 @@ export const PrefKeys = {
   // not the device's: a panel describes that node's resources, so it follows the resource and every
   // client paired with the node renders the board its owner built.
   dashboards: 'dashboards',
+  // Which Home dashboard this screen is reading (dashboards/homeTab.ts). The DEVICE's, unlike the
+  // composition above: the board belongs to the node, but which of its tabs you happen to be looking
+  // at is view state, and syncing it would move another machine's screen under its owner.
+  homeTab: 'home_tab',
 } as const
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]

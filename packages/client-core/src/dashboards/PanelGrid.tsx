@@ -9,6 +9,7 @@ import {
   applyResize,
   COLS,
   sizeFor,
+  sizePresets,
   type PanelLayout,
   type Rect,
 } from './layout'
@@ -17,6 +18,9 @@ import Panel from './Panel'
 import PanelEditor from './PanelEditor'
 import PanelWizard from './PanelWizard'
 import {
+  dashboards,
+  homeTabs,
+  homeTabScope,
   layoutAt,
   panelDefinition,
   panelsAt,
@@ -83,7 +87,15 @@ const ARROWS: Record<string, readonly [number, number]> = {
   ArrowDown: [0, 1],
 }
 
-export default function PanelGrid(props: { scope: PlacementScope }) {
+export default function PanelGrid(props: {
+  scope: PlacementScope
+  /** Replaces the "Panels" heading in the same seat. Home's tab bar takes it when there is more than
+   *  one dashboard — tabs ARE the heading then (docs/future/dashboards/tabs.md § UX). Its presence is
+   *  also what keeps the header row on an EMPTY placement, so a freshly created tab still has a bar. */
+  heading?: JSX.Element
+  /** `role="tabpanel"` wiring for the grid, when something above it is a tablist. */
+  panelAria?: { id: string; labelledBy: string }
+}) {
   // The sheet's session. The wrapper distinguishes "open" from "closed", which a bare
   // `PanelDefinition | undefined` cannot — it is opened with no panel by nothing today, and with a
   // draft the wizard handed over (`creating`) or a placed panel being edited.
@@ -319,6 +331,27 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
     return index >= 0 && index + delta >= 0 && index + delta < order.length
   }
 
+  // ── Moving between placements ───────────────────────────────────────────────────────────────
+  //
+  // The Home tabs other than this one (docs/future/dashboards/tabs.md § UX). A flat labelled group
+  // rather than a submenu: `Menu` has no submenu and one is not worth inventing for a list of at most
+  // seven names that is already keyboard-operable as rows.
+  //
+  // Only tabs. Moving to a TASK PANE is the same two calls and a different destination, and it waits
+  // for someone to want it (README § smaller items) — aiming at a pane from Home would put a panel
+  // where nobody is looking, which is the argument the wizard's Where control already makes.
+
+  const moveTargets = () => props.scope.surface !== 'home'
+    ? []
+    : homeTabs(dashboards()).filter((tab) => tab.id !== (props.scope.ownerId ?? ''))
+
+  /** Keeps the DEFINITION and takes a fresh rect at the destination — a rect is per (scope, panel),
+   *  so there is nothing to carry across. */
+  const moveToTab = (id: PanelId, tabId: string) => {
+    unplacePanel(props.scope, id)
+    placePanelAt(homeTabScope(tabId), id, sizePresets(panelDefinition(id)?.view.kind ?? 'list').m)
+  }
+
   // ── Chrome ──────────────────────────────────────────────────────────────────────────────────
 
   const chrome = (definition: PanelDefinition) => (
@@ -363,6 +396,15 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
           >
             Move down
           </Menu.Item>
+          <Show when={moveTargets().length}>
+            <Menu.Separator />
+            <Menu.Label>Move to</Menu.Label>
+            <For each={moveTargets()}>
+              {(tab) => (
+                <Menu.Item context={menu} onSelect={() => moveToTab(definition.id, tab.id)}>{tab.name}</Menu.Item>
+              )}
+            </For>
+          </Show>
           <Menu.Separator />
           {/* REMOVE AND DELETE ARE TWO DIFFERENT THINGS now that a panel can be placed in more than
               one surface (docs/dashboards.md § Placements). Taking a board off Home must not destroy
@@ -466,17 +508,21 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
   )
 
   return (
-    <Show when={panels().length || collections().length}>
+    <Show when={panels().length || collections().length || props.heading}>
       <section class="dash-placement">
         {/* The fallback needs no gate of its own: reaching it means no panels, and the Show above
-            already established that there is then at least one collection to offer. */}
-        <Show when={panels().length} fallback={<div class="dash-placement-add">{addButton()}</div>}>
+            already established that there is then at least one collection to offer — or a heading,
+            which is a tab bar that must survive its own tab being empty. */}
+        <Show when={panels().length || props.heading} fallback={<div class="dash-placement-add">{addButton()}</div>}>
           <SectionHeader level="group" actions={<Show when={collections().length}>{addButton()}</Show>}>
-            Panels
+            {props.heading ?? 'Panels'}
           </SectionHeader>
           <div
             class="dash-grid"
             ref={gridEl}
+            {...(props.panelAria
+              ? { id: props.panelAria.id, role: 'tabpanel', 'aria-labelledby': props.panelAria.labelledBy }
+              : {})}
             style={{
               '--dash-cell': `${cell()}px`,
               '--dash-pitch': `${pitch()}px`,

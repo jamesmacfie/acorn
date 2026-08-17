@@ -545,7 +545,30 @@ empty grid and no invitation — one ghost button, and not even that when no plu
 collection, because an "Add panel" that opens an empty picker is worse than no button. Panels already
 placed still render when a plugin goes away.
 
-**The task pane** is the second, and it is the same `PanelGrid` at a different scope. It is keyed by
+**Home can hold several dashboards, as tabs**, and the bar exists only past one of them. With a
+single dashboard Home is what it always was — no bar, no "1 of 1" chrome — and the feature costs
+nothing until it is used. Past one, the bar takes the "Panels" section-header seat, because tabs *are*
+the heading when there are several; the Add-panel button keeps its right-aligned place on the same
+row, and the active-task list above is untouched. It is a standard ARIA tablist: arrows move
+selection with activation on focus, Home/End jump, roving tabindex, and the grid below is the
+`tabpanel` the active tab labels.
+
+A tab is created by the ghost `+` at the end of the bar, which drops straight into an inline rename —
+a dashboard called "New dashboard" forever is what happens when naming it is a second trip. The
+per-tab verbs (rename, move left/right, armed delete) live in a small overflow on the active tab and
+on the context menu of any tab. Deleting is armed and says what survives: panels stay in the library
+and on other tabs. The **first extra dashboard is created from the wizard's Place step**, whose
+Dashboard picker always offers "New dashboard…" — the bar's `+` cannot be the only door when the bar
+is what one dashboard does not have. A panel moves between tabs through **"Move to…"** in its own
+overflow menu, keeping its definition and taking a fresh rect at the destination.
+
+**Which tab you are reading is device view-state**, the `core.home-tab` slice beside `core.last-source`
+in the device-pref list. The composition belongs to the node and is shared by every client paired with
+it; which of its dashboards this screen happens to be showing is a property of this screen, and syncing
+it would move somebody else's view under them. A remembered tab that has since been deleted falls back
+to the default rather than drawing an empty grid.
+
+**The task pane** is the third, and it is the same `PanelGrid` at a different scope. It is keyed by
 *pane*, not by task: definitions are per-user-per-node and surface-free, so the same board renders in
 that pane in every task. A board per task is a non-goal — a task is ephemeral, and composing one is
 labour nobody repeats. If per-something boards are ever wanted the answer is the scope's `projectId`

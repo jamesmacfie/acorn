@@ -25,6 +25,49 @@
   display: flex;
 }
 
+/* ── The tab bar ─────────────────────────────────────────────────────────────────────────── */
+
+/* Home's dashboards (dashboards/DashboardTabs.tsx), sitting in the section header's LABEL seat —
+   which is why this is quiet text at the header's own size rather than the app's `.ui-tabs` strip.
+   Tabs are the heading here, not a second navigation surface stacked above one, so there is no
+   background, no min-height and no bottom rule; the active tab is full ink over a short accent. */
+.dash-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.dash-tab-slot {
+  display: flex;
+  align-items: center;
+}
+.dash-tab {
+  font: inherit;
+  color: var(--text-muted);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 0;
+  border-bottom: var(--tab-active-w) solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-tab[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); }
+.dash-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: hover) {
+  .dash-tab:hover { color: var(--text); background: var(--bg-hover); }
+}
+
+/* `.ui-input` with the tab's own width, so the bar does not jump when a name becomes editable. */
+.dash-tab-rename { width: 16ch; }
+
+/* The `+` matches the Add-panel button's vocabulary: a ghost that only reads as a control on hover. */
+.dash-tab-add { opacity: 0.6; }
+.dash-tab-add:hover:not(:disabled), .dash-tab-add:focus-visible { opacity: 1; }
+
 /* The task-pane placement (dashboards/DashboardPane.tsx). Nothing but the pane's own padding and a
    scroll — the grid inside is the same component Home draws, at a different scope. */
 .dash-pane {
