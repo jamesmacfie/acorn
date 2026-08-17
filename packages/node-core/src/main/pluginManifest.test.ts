@@ -380,6 +380,28 @@ describe('chrome descriptors', () => {
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
+  it('carries a source’s reserved panel region, and refuses one that also navigates', () => {
+    const source = (over: Record<string, unknown>) => manifest({
+      frames: [PANE],
+      sources: [{ id: 's', label: 'S', order: 1, items: '/v2/p/board/rail-items', ...over }],
+    })
+
+    const parsed = source({ panels: { fieldRole: 'status', views: ['list', 'board'], max: 6 } })
+    expect(parsed.success && parsed.data.contributions.sources[0]!.panels)
+      .toEqual({ fieldRole: 'status', views: ['list', 'board'], max: 6 })
+
+    // A source panel has ONE rectangle beside its rail list, and the detail half of a master/detail
+    // browse already claims it. Declaring both would parse and then draw one of them.
+    expect(messages(manifest({
+      frames: [PROJECT_PANE],
+      routes: [PROJECT_ROUTE],
+      sources: [{ ...PROJECT_SOURCE, panels: {} }],
+    }))).toContain('a source cannot reserve a panel region and navigate to a project-scoped surface — both draw beside the rail list')
+
+    // An `openPane` source is unaffected: it opens a pane in a task and leaves this rectangle alone.
+    expect(source({ panels: {}, onSelect: { verb: 'openPane', pane: 'board' } }).success).toBe(true)
+  })
+
   it('carries a source empty state, bounds its message and narrows its action', () => {
     const source = (emptyState: unknown) => manifest({
       frames: [PANE],
@@ -903,6 +925,42 @@ describe('extension points', () => {
       frames: [PANE],
       extensionPoints: [point(), point({ id: 'other' })],
     }))).toContain("'board' already has an extension point at 'pane.footer'")
+  })
+
+  // ── The aside: a region the USER fills (docs/future/dashboards/placements.md) ────────────────────
+
+  it('accepts an aside beside the same pane that has a footer, and defaults its allowances', () => {
+    const parsed = manifest({
+      frames: [PANE],
+      extensionPoints: [point(), point({ id: 'panels', location: 'pane.aside' })],
+    })
+    // Two locations, two contributors — so the one-per-(surface, location) rule leaves room for both.
+    expect(parsed.success && parsed.data.contributions.extensionPoints[1]!.panels).toBeUndefined()
+    const declared = manifest({
+      frames: [PANE],
+      extensionPoints: [point({ location: 'pane.aside', panels: {} })],
+    })
+    // Declaring the key and nothing inside it is the whole opt-in: own collections, every view, four.
+    expect(declared.success && declared.data.contributions.extensionPoints[0]!.panels).toEqual({ max: 4 })
+  })
+
+  it('refuses panels on a footer, whose contributors are other plugins', () => {
+    expect(messages(manifest({ frames: [PANE], extensionPoints: [point({ panels: {} })] })))
+      .toContain("panels is only valid on a 'pane.aside' extension point")
+  })
+
+  it('refuses a region that names collections and a field role at once', () => {
+    expect(messages(manifest({
+      frames: [PANE],
+      extensionPoints: [point({ location: 'pane.aside', panels: { collections: ['a:b'], fieldRole: 'status' } })],
+    }))).toContain('a panel region names collections or a fieldRole, never both')
+  })
+
+  it('refuses a view kind this build has no renderer for', () => {
+    expect(manifest({
+      frames: [PANE],
+      extensionPoints: [point({ location: 'pane.aside', panels: { views: ['sankey'] } })],
+    }).success).toBe(false)
   })
 })
 

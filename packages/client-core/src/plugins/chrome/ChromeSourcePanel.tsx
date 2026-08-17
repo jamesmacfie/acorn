@@ -3,6 +3,8 @@ import { Dynamic } from 'solid-js/web'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PluginRailItem, PluginSourceDescriptor, PluginSourceEmptyState, Task } from '@acorn/protocol/api.ts'
+import PanelGrid from '../../dashboards/PanelGrid'
+import { panelRegion, regionScope, sourceRegionOwner } from '../../dashboards/region'
 import { activeNodeId } from '../../node/activeNode'
 import { createFleetQuery } from '../../node/fanout'
 import { FRESHNESS_LABELS } from '../../node/freshness'
@@ -195,6 +197,27 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           </For>
         </Show>
       </section>
+      {/* The user's own dashboard, beside this source's list (docs/future/dashboards/placements.md).
+          The easy sibling of a pane's aside, because this section is already the HOST's markup — no
+          frame boundary is involved anywhere, so there is nothing here but a scope and a container.
+
+          The same two grid columns the detail half takes, and they cannot both be here: the manifest
+          refuses a source that reserves a region AND navigates to a project surface, so this is an
+          alternative to the block below rather than a competitor for the rectangle.
+
+          Scoped by (plugin, source), never by project: definitions are per-user-per-node and
+          surface-free, so the same board renders beside this source in every project. Too narrow for
+          twelve cells is simply always collapsed, and the stored geometry returns when it is widened. */}
+      <Show when={props.descriptor.panels}>
+        {(declared) => (
+          <section class="pane pane-right" style={{ 'grid-column': '2 / -1' }}>
+            <PanelGrid
+              scope={regionScope(sourceRegionOwner(props.pluginId, props.descriptor.id))}
+              region={panelRegion(props.pluginId, declared())}
+            />
+          </section>
+        )}
+      </Show>
       {/* Spans the remaining two grid columns: the frame draws its own header and layout, so splitting it
           across mid and right would give it two boxes it cannot lay out across. `pane-right` is what drops
           the trailing border and makes the section a flex column, so the iframe's `height: 100%` resolves

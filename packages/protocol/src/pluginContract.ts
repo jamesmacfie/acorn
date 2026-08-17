@@ -13,7 +13,7 @@
 // places where an OLDER node's parser had fewer defaults to fill — a roster row is bytes a node sent,
 // and that node may be running a version of this schema that predates a field.
 import { z } from 'zod'
-import { collectionParamsSchema, collectionSchema } from './collections.ts'
+import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from './collections.ts'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from './contentLinkPattern.ts'
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from './contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, parseExtensionPointRef } from './extensionPoints.ts'
@@ -310,6 +310,49 @@ const emptyStateDescriptor = z.object({
   actionLabel: z.string().min(1).max(40).optional(),
 })
 
+// ── A reserved panel region (docs/future/dashboards/placements.md) ────────────────────────────────
+//
+// The cooperative extension point with the USER in the contributor's seat: a plugin declares that part
+// of one of its surfaces is a dashboard, and what a person is allowed to compose there. It is one
+// object shared by every surface that can reserve one — a rail source's side panel and a pane's aside —
+// because "which collections, which views, how many" is the same question wherever the rectangle is.
+//
+// THE HOST DRAWS THE REGION. A plugin's layout RESERVES it and never renders into it: panels are host
+// Solid components and a sandboxed frame is a separate realm, so "a rectangle for dashboard items"
+// cannot mean "inside my iframe". The precedent is the document surface's `layout` templates, and no
+// bridge API may pretend otherwise.
+//
+// CONSTRAINTS ARE ENFORCED TWICE, the pattern the repo uses everywhere: the panel editor's selectors
+// simply do not offer a disallowed option (unrepresentable beats validated), and the host re-checks at
+// render time because a manifest-derived roster row is untrusted wire.
+const panelRegion = z.object({
+  // Which collections a panel here may be composed over. ABSENT MEANS THIS PLUGIN'S OWN, which is the
+  // default a region gets by declaring nothing and the only allowance most will ever want — a source's
+  // side panel showing that source's data.
+  //
+  // Present, it is an explicit list of `<pluginId>:<collectionId>` references, which is how the whole
+  // app addresses a collection. Not validated against a registry here or anywhere: a reference to a
+  // collection that is not installed simply matches nothing, which is the same outcome as the plugin
+  // being disabled, and there is exactly one behaviour for both.
+  collections: z.array(z.string().min(1).max(130)).max(16).optional(),
+  // …or, instead of a list, "any collection carrying a field with this role". The widest of the three
+  // allowances and the one a cross-provider region wants: `status` admits every provider that declares
+  // a status-role field, including ones installed after this manifest was written.
+  fieldRole: z.enum(COLLECTION_FIELD_ROLES).optional(),
+  // Which views may be composed here. Absent means all of them.
+  views: z.array(z.enum(PANEL_VIEW_KINDS)).min(1).max(PANEL_VIEW_KINDS.length).optional(),
+  // How many panels fit. A region is a corner of somebody else's surface, not a Home tab, so it has a
+  // ceiling and the ceiling is the owner's to set.
+  max: z.number().int().min(1).max(12).default(4),
+}).superRefine((region, ctx) => {
+  // Both halves are on the same object, so the rule lives here. They are alternatives — a list and a
+  // role requirement answer the same question two ways — and honouring both would mean inventing an
+  // and/or the declaration does not state.
+  if (region.collections && region.fieldRole) {
+    ctx.addIssue({ code: 'custom', path: ['fieldRole'], message: 'a panel region names collections or a fieldRole, never both' })
+  }
+})
+
 const sourceDescriptor = z.object({
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(80),
@@ -326,6 +369,15 @@ const sourceDescriptor = z.object({
   // its own banner, and telling someone "nothing is assigned to you" because a fetch timed out is a
   // lie the host would be telling on the plugin's behalf.
   emptyState: emptyStateDescriptor.optional(),
+  // A dashboard region BESIDE this source's rail list, composed by the user under the constraints
+  // above. The easy sibling of a pane's aside, because the surface it extends is already host-rendered
+  // — no frame boundary is involved anywhere. A source that declares nothing is pixel-identical to
+  // what it was before this key existed.
+  //
+  // Mutually exclusive with a `navigate` onSelect, checked in node-core/main/pluginManifest.ts: the
+  // detail half of a master/detail browse occupies the same rectangle, and a region that would parse
+  // and then never be drawn is the failure that file spends its length refusing.
+  panels: panelRegion.optional(),
   refresh,
 })
 
@@ -426,6 +478,12 @@ const extensionPointDescriptor = z.object({
   // A surface THIS manifest declares, checked below. A point floating free of a surface would be a
   // declaration with nowhere to draw.
   surface: z.string().min(1).max(64),
+  // `pane.aside` only, and checked in node-core/main/pluginManifest.ts. The aside is the point whose
+  // contributor is THE USER rather than another plugin, so what it needs is not a route to read but the
+  // constraints a person's own composition must satisfy. Absent at `pane.aside` means the defaults —
+  // this plugin's own collections, every view, four panels — which is the whole opt-in for an owner
+  // with nothing particular to say.
+  panels: panelRegion.optional(),
 })
 
 const extensionDescriptor = z.object({
@@ -856,7 +914,17 @@ export type PluginChromeAction = z.infer<typeof chromeAction>
 // `navigate` on a routed project, and a command registry row has neither in scope.
 export type PluginCommandAction = z.infer<typeof contextFreeAction>
 export type PluginSourceEmptyState = z.infer<typeof emptyStateDescriptor>
-export type PluginSourceDescriptor = z.infer<typeof sourceDescriptor>
+// `views` and `fieldRole` are WIDER than the parse, by the rule stated above. Both are FILTERS: a
+// newer node naming a view kind or a field role this build has no renderer for must NARROW what is
+// offered, never fail to register, and the client intersects against its own vocabulary
+// (client-core/dashboards/region.ts). `collections` needed no widening — it was already opaque strings.
+export type PluginPanelRegion = Omit<z.infer<typeof panelRegion>, 'views' | 'fieldRole'> & {
+  views?: string[]
+  fieldRole?: string
+}
+export type PluginSourceDescriptor = Omit<z.infer<typeof sourceDescriptor>, 'panels'> & {
+  panels?: PluginPanelRegion
+}
 export type PluginSlotDescriptor = z.infer<typeof slotDescriptor>
 export type PluginPaletteDescriptor = z.infer<typeof paletteDescriptor>
 export type PluginCommandCategory = z.infer<typeof commandCategory>
@@ -884,8 +952,9 @@ export type PluginContextMenuDescriptor = Omit<z.infer<typeof contextMenuDescrip
 // descriptor gives one type up: the client re-checks it against its own copy of the vocabulary before it
 // registers anything, so believing the narrow union here would only mean a reader that cannot check the
 // value it is about to check.
-export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointDescriptor>, 'location'> & {
+export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointDescriptor>, 'location' | 'panels'> & {
   location: string
+  panels?: PluginPanelRegion
 }
 export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
 export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>

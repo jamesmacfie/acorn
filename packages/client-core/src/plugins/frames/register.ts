@@ -2,6 +2,7 @@ import { createComponent, lazy } from 'solid-js'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
+import { panelRegion } from '../../dashboards/region'
 import { activeNodeId } from '../../node/activeNode'
 import { commandRegistry } from '../../registries/commands'
 import { pluginProjectRoutePrefix } from '../../registries/corePaths'
@@ -248,15 +249,31 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           }),
         })
       }
-      // Did this manifest reserve a strip under this pane for OTHER plugins' rows? Read off the manifest
-      // rather than off the registry, and the difference matters: the chrome pass registers the point on
-      // its own schedule, so asking the registry here would make the wrapper depend on which pass ran
-      // first. The host renders nothing when nobody has contributed, so a reserved-but-empty strip costs
-      // the owner a component and no pixels (registries/extensionPoints.ts owns that decision).
+      // Did this manifest reserve part of this pane for somebody else? Two locations, two contributors:
+      // a `pane.footer` strip filled by OTHER PLUGINS' rows, and a `pane.aside` column filled by THE
+      // USER's own panels (docs/future/dashboards/placements.md). Both are read off the manifest rather
+      // than off the registry, and the difference matters: the chrome pass registers points on its own
+      // schedule, so asking the registry here would make the wrapper depend on which pass ran first.
+      //
+      // The host renders nothing into a footer nobody has contributed to, so a reserved-but-empty strip
+      // costs the owner a component and no pixels (registries/extensionPoints.ts owns that decision). An
+      // aside is different and deliberately so: it is the USER's rectangle, and it draws its "Add panel"
+      // affordance from the moment it is reserved, which is the only way a person can put a first panel
+      // in it.
       {
-        const point = (row.installed?.contributions.extensionPoints ?? [])
-          .find((entry) => entry.surface === surface.id && entry.location === 'pane.footer')
+        const points = (row.installed?.contributions.extensionPoints ?? [])
+          .filter((entry) => entry.surface === surface.id)
+        const point = points.find((entry) => entry.location === 'pane.footer')
         const pointId = point ? qualifiedExtensionPointId(pluginId, point.id) : null
+        const asidePoint = points.find((entry) => entry.location === 'pane.aside')
+        // The point id doubles as the placement's owner id — it is already `<pluginId>:<pointId>`, minted
+        // by the host, so a plugin cannot address another package's stored composition.
+        const aside = asidePoint
+          ? {
+            pointId: qualifiedExtensionPointId(pluginId, asidePoint.id),
+            region: panelRegion(pluginId, asidePoint.panels),
+          }
+          : null
         return paneRegistry.register({
           id: surface.id,
           label: surface.label,
@@ -270,7 +287,12 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
               binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
               hash,
             })
-            return pointId ? createComponent(ExtendedPane, { pointId, children: frame }) : frame
+            if (!pointId && !aside) return frame
+            return createComponent(ExtendedPane, {
+              ...(pointId ? { footerPointId: pointId } : {}),
+              ...(aside ? { aside } : {}),
+              children: frame,
+            })
           },
         })
       }

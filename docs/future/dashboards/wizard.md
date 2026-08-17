@@ -140,8 +140,9 @@ re-derives the preview. Nothing on this step may be reachable when its gate fail
 with no number fields offers count only, exactly as today).
 
 **Step 4 — Place.** Title (auto-filled by `defaultPanelTitle` until first keystroke — the existing
-rule), size preset (S/M/L footprint drawn as a 12-cell strip), surface (Home, task pane; future
-surfaces render disabled with their gate named). When Home has more than one tab (`tabs.md`),
+rule), size preset (S/M/L footprint drawn as a 12-cell strip), surface (Home, task pane, plugin area — each
+reachable only from itself except Home, and shipping a new surface meant enabling a card rather than
+designing a step, exactly as this file predicted). When Home has more than one tab (`tabs.md`),
 choosing it offers the tab — defaulting to the one the wizard was launched from — plus "New
 dashboard…" inline. Commit = `savePanel`, `placePanel(scope, id)`, rect = preset width first-fitted
 via the ordinary `normalize` path. Per-panel refresh stays on this step too (it is about the
