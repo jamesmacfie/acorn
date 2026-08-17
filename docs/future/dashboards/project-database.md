@@ -15,7 +15,7 @@ the README's invariant holds, and that is the test that this is the right shape 
 task's **worktree**, and resolves the URL in layers against it: a committed `[database].url_script` run
 in the worktree, then the worktree's `.env`, then `process.env.DATABASE_URL`. Pools are keyed by task
 id. Every layer but the last needs a `root`, and a `root` is a worktree. Panels carry no task at all —
-not on Home, and not in the `pane.aside` regions that shipped with `placements.md`; there is no task
+not on Home, and not in the `pane.aside` regions (`docs/dashboards.md § Placements`); there is no task
 id anywhere in `packages/client-core/src/dashboards/`.
 
 So the saved query *rows* exist in the form run-once-and-pin assumes — project-scoped
@@ -142,7 +142,8 @@ and timestamps as epoch milliseconds.
 
 - **Which saved queries become collections** — all of them, or an opt-in per row. That is the
   enumeration question and belongs to the discovery route (`dynamic-collections.md` § 2).
-- **Whether a pin may promote a text column to an enum.** A wizard question (`wizard.md`).
+- **Whether a pin may promote a text column to an enum.** A wizard question
+  (`docs/dashboards.md § The generated editor`).
 - **Anything about write-back.** A project-scoped connection is a read path here and nothing above
   changes if it stays one.
 

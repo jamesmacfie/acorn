@@ -57,10 +57,11 @@ stops applying to pinned collections.
 cold from the pinned schema, and renaming a column in the SQL surfaces a drift notice with re-pin —
 not an empty column.
 
-**Where this lives in the accepted UX** (`wizard.md`): the Run button's seat is the wizard's
-**Data step** — the collection card for a never-run query shows the query text and "Run once to
-discover columns", and cold view cards in the View step carry the `cold-schema` reason until it is
-pressed. Pinning renders the answered fields as chips on the card with a "pinned <date>" mark. The
+**Where this lives in the shipped wizard** (`docs/dashboards.md § The generated editor`): the Run
+button's seat is the wizard's **Data step** — the collection card for a never-run query shows the
+query text and "Run once to discover columns", and cold view cards in the View step carry the
+`cold-schema` reason until it is pressed. The seat exists and is empty; the wizard was built with
+this button named as future. Pinning renders the answered fields as chips on the card with a "pinned <date>" mark. The
 drift notice is a warning strip on the affected panel and on the card, naming the change in the
 schema's own terms ("`route` is now `path` (text)") with one action, "Re-pin & review mappings",
 which runs the `normalizePanel` pass described above. None of this changes the flow decided here —

@@ -48,7 +48,7 @@ owner's pause or its run history — both are waiting when the plugin returns.
   call in both roots and had the same problem: expired rows already *read* as absent, so a node running
   for months quietly accumulated every mutation it had ever replayed.
 - `core:sample-measures` — hourly, jittered. One pass over every dashboard panel that asked for a
-  history trend, recording one number apiece (§ Targets, and `docs/future/dashboards/measure-history.md`).
+  history trend, recording one number apiece (§ Targets, and `docs/dashboards.md § Trends`).
 - `core:compact-history` — daily at 03:40. Measure history's own retention.
 
 All but the audit prune are declared only when the composition root passes `env` to `createScheduler`,

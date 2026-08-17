@@ -725,12 +725,11 @@ planned rather than refused each have a deliverable spec in
 - **Cross-collection joins.** A panel unions collections and maps fields; it does not join them. Joins
   need key relationships the contract does not express, and `contentLinks`/`refResolvers` already
   cover the adjacent need.
-- **Plugin-hosted regions and rail side panels.** Panels are placement-agnostic and the scope-key
-  format already has room; when these land, host-rendered panels still never render inside a frame
-  document. A plugin's layout *reserves* a region and the host draws it.
 - **A dynamic discovery route, and run-once-and-pin.** Collections are manifest-static or
   compiled-registered only. Discovery is the two-route `agentContexts` pattern when the saved-SQL case
-  needs it, and static declaration is then the degenerate case.
+  needs it, and static declaration is then the degenerate case. Both now also wait on the taskless
+  database connection (`docs/future/dashboards/project-database.md`), which the saved-SQL case turned
+  out to require first.
 - **A per-plugin "dashboard" contribution.** A plugin does not ship a prebuilt dashboard. If starter
   panels prove wanted, the shape is a plugin-*suggested* panel definition the user accepts into their
   own composition, so ownership of composed panels stays with the user.
