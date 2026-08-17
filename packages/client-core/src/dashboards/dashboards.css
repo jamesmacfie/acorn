@@ -384,8 +384,10 @@
 /* ── Panel editor ────────────────────────────────────────────────────────────────────────── */
 
 /* The generated editor (dashboards/PanelEditor.tsx). Nothing bespoke: every control is a shared
-   primitive and everything here is the stacking between them. */
-.dash-editor {
+   primitive and everything here is the stacking between them. Compound with .overlay-body for the
+   same reason as .dash-wizard below: it rides on Modal.Body, and the tie on `gap` must not be left
+   to chunk order. */
+.overlay-body.dash-editor {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
@@ -477,8 +479,12 @@
    grid, and the narrow case reflows the SAME markup — the rail becomes a horizontal strip above the
    body and the preview drops below it, because an alternate markup path is two things to keep true.
 
-   No new tokens: the rail is buttons, the cards are `.ui-card`, the fields are `.ui-field`. */
-.dash-wizard {
+   No new tokens: the rail is buttons, the cards are `.ui-card`, the fields are `.ui-field`.
+
+   Compound with .overlay-body: Modal.Body merges this class onto that element, and the two rules
+   disagree about `display`. Same specificity would leave the winner to stylesheet order — which the
+   bundler does not promise. The compound outranks the primitive whatever order the chunks load in. */
+.overlay-body.dash-wizard {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) minmax(0, 15rem);
   gap: var(--gap-stack);
@@ -574,7 +580,7 @@
 /* One column below the tablet width: the rail strips across the top, the preview drops under the
    body. Same content, same order in the DOM. */
 @media (max-width: 60rem) {
-  .dash-wizard {
+  .overlay-body.dash-wizard {
     grid-template-columns: minmax(0, 1fr);
   }
   .dash-wizard-rail {
