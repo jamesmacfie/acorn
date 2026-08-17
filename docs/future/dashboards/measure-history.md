@@ -1,13 +1,28 @@
 # Measure history: the store, and the stat that earns a trend
 
-**The store and its feeder are BUILT; the display half is not.** `dashboard_measure_samples`,
-`core:sample-measures`, `core:compact-history` and `GET /v2/core/dashboards/history` all ship — see
-[`docs/schedules.md`](../../schedules.md) — so a placed panel with `view.trend: 'history'` accrues
-hourly samples today with no client open. The three `PanelView` keys (`trend`, `compare`, `good`)
-parse and round-trip. What remains is § Display: the sparkline, the delta, and the editor offering
-`trend` at all. Nothing draws a sample yet.
+**SHIPPED — both halves. [`docs/dashboards.md § Trends`](../../dashboards.md) owns the behaviour
+now**, and [`docs/schedules.md`](../../schedules.md) owns the sampler. `dashboard_measure_samples`,
+`core:sample-measures`, `core:compact-history` and `GET /v2/core/dashboards/history` carry the store;
+`dashboards-core/trend.ts` carries the arithmetic, `StatView.tsx` the marks, and the editor offers
+both tiers. This file is kept for the reasoning and the rejected alternatives.
 
-Two places the build differs from the text below:
+Places the build differs from the text below:
+
+- **The sparkline scales min-to-max, not from zero** — deliberately unlike the chart's axis, which is
+  zero-based precisely so a bar chart cannot lie. A sparkline carries no scale at all, so its job is
+  the shape of the change; a flat series sits mid-height rather than dividing by zero.
+- **`compare` is offered only under `trend: 'history'`**, and turning the trend off clears both
+  `compare` and `good`. The model keeps the keys independent — a delta is a lookback into the store,
+  so a panel that records nothing has no baseline to find, and offering the choice anyway would be
+  config that draws nothing.
+- **"Hidden when the panel is too short" is `min-height: 0` on the mark**, not a measurement. The
+  stat's own minimum size already exists in `layout.ts § SIZES`; a `ResizeObserver` to hide a
+  decoration would cost more than the decoration.
+- **The sparkline wears `--accent`, not the `charts.md` series ramp.** The spec deferred its colour
+  to the series-identity ramp, which is unbuilt — and on reflection the deferral was wrong, not just
+  early: a sparkline is one mark with no sibling to be told apart from, so identity colour has no
+  job here, and `accent` is the chart vocabulary's own tone for "the thing being measured". The ramp
+  item (`charts.md § 1`) no longer owns this mark.
 
 - **Panel deletion goes through compaction, not `removePanel`.** A series whose panel no longer
   appears in the prefs blob is dropped by `core:compact-history`, which needs no route and no

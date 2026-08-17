@@ -20,6 +20,7 @@ import {
   retainShaping,
   retargetFilter,
   schemaOf,
+  trendsFor,
   viewsFor,
   withOperator,
 } from './editor'
@@ -86,6 +87,29 @@ const VIEW_LABELS: Record<PanelViewKind, string> = {
 }
 
 const SHAPE_LABELS: Record<ChartShape, string> = { bar: 'Bar', line: 'Line' }
+
+/** The two trend tiers, said in the words that keep them apart. They are different features wearing
+ *  one mark — "when did these rows change" versus "what was this number" — and a person who reads
+ *  them as the same thing will expect a history the store cannot have. */
+const TREND_LABELS: Record<'none' | NonNullable<PanelView['trend']>, string> = {
+  none: 'None',
+  activity: 'Activity',
+  history: 'Recorded',
+}
+
+const COMPARE_LABELS: Record<'none' | NonNullable<PanelView['compare']>, string> = {
+  none: 'None',
+  day: 'Yesterday',
+  week: 'Last week',
+}
+
+/** Direction-goodness is the USER's judgement and nothing else's: open PRs going up is bad for one
+ *  person's board and good for another's, so `Neutral` is the default and the honest one. */
+const GOOD_LABELS: Record<'none' | NonNullable<PanelView['good']>, string> = {
+  none: 'Neutral',
+  up: 'Up is good',
+  down: 'Down is good',
+}
 
 const AGGREGATES: readonly { value: PanelAggregate; label: string }[] = [
   { value: 'count', label: 'Count of rows' },
@@ -341,6 +365,15 @@ export default function PanelEditor(props: {
     // carried across — it is re-inferred for the shape that is now selected.
     setView((current) => ({ ...current, shape: next, x: defaultChartAxis(schema(), next, shaping()) }))
 
+  const trends = createMemo(() => trendsFor(schema()))
+  /** Turning the trend off takes the comparison with it: a delta with no series behind it is config
+   *  that renders nothing, and it would come back the next time somebody flicked the trend on. */
+  const chooseTrend = (entry: 'none' | NonNullable<PanelView['trend']>) => setView((current) => ({
+    ...current,
+    trend: entry === 'none' ? undefined : entry,
+    ...(entry === 'history' ? {} : { compare: undefined, good: undefined }),
+  }))
+
   /** Everything but `count` is an aggregate OVER a field, so choosing one chooses a field too. */
   const chooseAggregate = (aggregate: PanelAggregate) => setView((current) => ({
     ...current,
@@ -546,6 +579,56 @@ export default function PanelEditor(props: {
                 </Field>
               </Show>
             </div>
+          </Show>
+
+          {/* The stat's trend (docs/dashboards.md § Trends). Offered per TIER, because the two are
+              gated on different things: `Activity` needs a datetime to bucket the rows by, and
+              `Recorded` needs only the node's sampler — an empty series is a cold state, not a
+              reason to withhold the choice. The comparison hangs off `Recorded` alone: a delta is a
+              lookback into the store, and a panel that records nothing has no baseline to find. */}
+          <Show when={view().kind === 'stat'}>
+            <div class="dash-editor-pair">
+              <Field
+                label="Trend"
+                hint={view().trend === 'activity'
+                  ? 'When these rows last changed, by day.'
+                  : 'This number, recorded hourly from now on.'}
+              >
+                <SegmentedControl<'none' | NonNullable<PanelView['trend']>>
+                  ariaLabel="Trend"
+                  size="sm"
+                  value={view().trend ?? 'none'}
+                  onChange={chooseTrend}
+                  options={['none' as const, ...trends()].map((entry) => ({ value: entry, label: TREND_LABELS[entry] }))}
+                />
+              </Field>
+              <Show when={view().trend === 'history'}>
+                <Field label="Compare with">
+                  <SegmentedControl<'none' | NonNullable<PanelView['compare']>>
+                    ariaLabel="Compare with"
+                    size="sm"
+                    value={view().compare ?? 'none'}
+                    onChange={(entry) => setView((current) => ({
+                      ...current,
+                      compare: entry === 'none' ? undefined : entry,
+                      ...(entry === 'none' ? { good: undefined } : {}),
+                    }))}
+                    options={(['none', 'day', 'week'] as const).map((entry) => ({ value: entry, label: COMPARE_LABELS[entry] }))}
+                  />
+                </Field>
+              </Show>
+            </div>
+            <Show when={view().trend === 'history' && view().compare}>
+              <Field label="Which way is good?" hint="Leave neutral and the change is drawn in plain ink.">
+                <SegmentedControl<'none' | NonNullable<PanelView['good']>>
+                  ariaLabel="Which way is good"
+                  size="sm"
+                  value={view().good ?? 'none'}
+                  onChange={(entry) => setView((current) => ({ ...current, good: entry === 'none' ? undefined : entry }))}
+                  options={(['none', 'up', 'down'] as const).map((entry) => ({ value: entry, label: GOOD_LABELS[entry] }))}
+                />
+              </Field>
+            </Show>
           </Show>
 
           {/* ── The mapping step ───────────────────────────────────────────────────────────── */}

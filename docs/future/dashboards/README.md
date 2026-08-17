@@ -45,7 +45,7 @@ nothing else may be reordered.
 | 0 | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. |
 | 1 | Grid gesture + panel chrome restyle | `ux-refresh.md` | Pure presentation; touches no data. Parallel-safe with phase 0 and the cron work. |
 | 2 | The panel wizard; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. |
-| 3 | Stat trend + delta rendering; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. |
+| 3 | Stat trend + delta rendering ✅; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. The stat half is built — `docs/dashboards.md § Trends` owns it; the chart half is not. |
 
 ## The work items
 
@@ -54,7 +54,7 @@ nothing else may be reordered.
 | [`ux-refresh.md`](./ux-refresh.md) | The grid gesture and panel chrome restyle. | None — accepted design, phase 1. |
 | [`wizard.md`](./wizard.md) | Staged panel creation with a live preview, over the same generated editor. | Phase 0 derivations must exist first. |
 | [`tabs.md`](./tabs.md) | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | The `tabs` model key (phase 0) before the bar. |
-| [`measure-history.md`](./measure-history.md) | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | Waits on [`../cron/`](../cron/README.md) phases 1–3. |
+| [`measure-history.md`](./measure-history.md) ✅ | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | SHIPPED — behaviour moved to [`docs/dashboards.md § Trends`](../../dashboards.md); the file keeps the reasoning. |
 | [`charts.md`](./charts.md) | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | Series-colour decision (phase 0) before any of it renders. |
 | [`placements.md`](./placements.md) | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | Regions must ride the extension-point contract. |
 | [`dynamic-collections.md`](./dynamic-collections.md) | Run-once-and-pin with schema-drift detection, then the discovery route. | Both gated on the database plugin's saved-query case being wanted. |

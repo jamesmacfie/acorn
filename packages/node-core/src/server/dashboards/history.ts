@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
+import type { DashboardHistoryResponse, DashboardMeasureSample } from '@acorn/protocol/api.ts'
 import { type AppDatabase, schema } from '../db'
 
 // The measure-history store (docs/future/dashboards/measure-history.md § Storage).
@@ -26,8 +27,10 @@ export const DAILY_RETENTION_MS = 400 * DAY_MS
  *  a series that reaches this has found a bug in compaction and is bounded anyway. */
 export const MAX_SAMPLES_PER_PANEL = 1000
 
-export type MeasureSample = { bucket: number; value: number }
-export type MeasureSeries = { signature: string; samples: MeasureSample[] }
+// The wire shapes, from the protocol rather than spelled again here: the client draws the sparkline
+// from exactly what this stores, and two declarations of one row is how the two come to disagree.
+export type MeasureSample = DashboardMeasureSample
+export type MeasureSeries = DashboardHistoryResponse
 
 /** Record one sample, resetting the series first if the panel's meaning changed.
  *

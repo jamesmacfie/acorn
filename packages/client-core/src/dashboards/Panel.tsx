@@ -103,6 +103,7 @@ export default function Panel(props: PanelProps) {
 
   const viewProps = () => ({
     view: props.definition.view,
+    panelId: props.definition.id,
     schema: data.schema(),
     fields: data.fields(),
     rows: data.rows(),

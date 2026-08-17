@@ -582,6 +582,16 @@ export const scheduleTargetsRoute = `${schedulesRoute}/targets`
  *  the host just showed, which is what makes the confirmation impossible to talk out of asking. */
 export const scheduleConfirmRoute = (key: string) => `${scheduleRoute(key)}/confirm`
 
+// Dashboards: the measure series behind a stat's trend (docs/dashboards.md § Trends). READ ONLY, and
+// that is the design rather than a phase — the sampler and the store share a process, so the only
+// writer is the `core:sample-measures` schedule and a write route would have nobody to serve.
+//
+// An empty series answers 200 with an empty array, never 404: absence is data, and a panel that was
+// given a trend a minute ago has a cold state to render rather than an error to branch on.
+export const dashboardHistoryRoute = '/v2/core/dashboards/history'
+export type DashboardMeasureSample = { bucket: number; value: number }
+export type DashboardHistoryResponse = { signature: string; samples: DashboardMeasureSample[] }
+
 // Workspaces (named groups of Projects) — the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`
