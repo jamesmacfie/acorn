@@ -10,6 +10,7 @@ import {
   normalize,
   readingOrder,
   sizeFor,
+  sizePresets,
   type PanelLayout,
   type PanelSize,
   type Rect,
@@ -226,5 +227,31 @@ describe('sizeFor', () => {
 
   it('falls back for a view kind this build cannot draw, so an inert panel still has a rect', () => {
     expect(sizeFor('sankey-diagram')).toEqual(sizeFor('list'))
+  })
+})
+
+describe('the wizard size presets', () => {
+  it('offers three widths over the kind\'s own defaults, at the kind\'s height', () => {
+    const presets = sizePresets('stat')
+    expect([presets.s.w, presets.m.w, presets.l.w]).toEqual([sizeFor('stat').minW, sizeFor('stat').w, COLS])
+    expect([presets.s.h, presets.m.h, presets.l.h]).toEqual([sizeFor('stat').h, sizeFor('stat').h, sizeFor('stat').h])
+  })
+
+  it('never offers a rect below the kind\'s minimum or past the grid', () => {
+    for (const kind of ['stat', 'list', 'table', 'board', 'chart', 'made-up']) {
+      const size = sizeFor(kind)
+      for (const rect of Object.values(sizePresets(kind))) {
+        expect(rect.w).toBeGreaterThanOrEqual(size.minW)
+        expect(rect.w).toBeLessThanOrEqual(COLS)
+        expect(rect.h).toBeGreaterThanOrEqual(size.minH)
+      }
+    }
+  })
+
+  it('is a starting rect the ordinary path accepts, not a shape of its own', () => {
+    // The commit runs through `normalize` like every other rect, so a preset can never produce a
+    // layout the grid would refuse.
+    const layout = normalize({ order: ['a'], rects: { a: sizePresets('board').l } }, () => sizeFor('board'))
+    expect(layout.rects.a).toEqual({ x: 0, y: 0, w: COLS, h: sizeFor('board').h })
   })
 })

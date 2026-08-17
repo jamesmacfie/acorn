@@ -314,9 +314,16 @@ x from a `datetime` **bucketed by day**, with an optional series split from an e
 are type-inferred on the first click — a line takes the `updated`-role datetime, a bar takes whatever
 the panel already groups by and then the `status`-role enum — and adjustable after.
 
-Every mark carries a **tone**, not a colour: the plugin's declared enum tone where it has one, else
-the five-value ordinal ramp `StatusDot` already uses. So a chart restyles with the appearance pack,
-and no chart token had to be invented to make that true. Pie, gauge, scatter and area are not there,
+Every mark carries an **attribute, never a colour**, and which one depends on what the mark is
+*saying*. A value the plugin **declared** carries `data-tone` — the five-value status vocabulary
+`StatusDot` already uses, so a `Ready` bar is the ok colour. Anything else is **identity** — an
+undeclared category, a series split — and carries `data-series` instead: an ordinal slot coloured by
+`--viz-series-1..3`, theme-axis tokens that are deliberately *not* the status colours. Status colour
+on non-status identity is a lie of the same species as a guessed avatar: it makes whichever series was
+drawn second permanently "warn-amber", which is a judgement nobody made. **Three slots, hard cap** —
+series four onwards folds into `other` in the faint ink, because past three the honest answer is fewer
+series or a table, not a fourth colour. The single unsplit line keeps `--accent`: one mark has no
+sibling to be told apart from, the same argument that put the sparkline there. Pie, gauge, scatter and area are not there,
 and will not be until someone arrives with the panel that needs one. The arithmetic — buckets,
 scales, ticks, path data — is pure in `dashboards/chart.ts`; `ChartView.tsx` is SVG over its output
 and decides nothing.
@@ -470,6 +477,23 @@ A rect belongs to a `(scope, panel)` pair, never to the definition, so the same 
 and in the task pane has two of them. **A placed panel with no rect is auto-placed at render**, which
 is one rule serving three cases at once: the migration for every existing blob, the recovery from an
 old client's write, and the default for a newly added panel.
+
+**Home tabs are a fourth top-level key, `tabs`** — a list of `{ id, name }` in display order, and
+nothing else. A tab *is* the placement scope `{ surface: 'home', ownerId: tabId }`, so its panels are
+ordinary placements and its geometry an ordinary `layouts` entry; only names and order are new. The
+default tab's id is `''`, which the key encoder collapses back to the bare `home` key — so every blob
+written before tabs existed is already a valid one-tab state, with no migration and no bar. Parsed
+tolerantly like everything else: duplicates dropped keeping the first, **at most 8 tabs**, names
+trimmed to 60 characters rather than dropped.
+
+The renderer derives its tab list as `tabs` **plus any `home/*` scope that has placements and no
+name**, shown as "Untitled". That one rule does three jobs: it is the recovery from an old client
+that wrote the slice and dropped `tabs`, the defence against a partially written blob, and the reason
+losing a name can never be what loses a composition. The ceiling matches `layouts`' — an old client
+writing the slice loses names and order, keeps every panel; an old client *rendering* sees only the
+bare `home` scope, with the other tabs' panels intact and invisible until a newer client draws them.
+**Deleting a tab unplaces; it never deletes definitions**, and the default tab has no delete — it is
+the bare scope, and deleting it would only mean emptying it.
 
 **Unknown ids survive inert.** Parsing answers "is this shaped like a panel?", never "is that
 collection registered in this build?" — the pane-layout rule verbatim. The registry lookup happens at

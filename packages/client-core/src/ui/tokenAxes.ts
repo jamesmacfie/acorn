@@ -22,6 +22,23 @@ export const DERIVED_THEME_TOKENS = [
   '--find-hit-bg', '--find-current-bg', '--scrim-color',
 ] as const
 
+/** SERIES IDENTITY, for a chart mark that is asking "which one is this" rather than "how is this
+ * doing" (docs/future/dashboards/charts.md § 1). Colour, so theme axis — but neither primitive nor
+ * derived, and that is the whole point of the third group:
+ *
+ *   NOT a primitive: a plugin-contributed theme is validated against `THEME_PALETTE_TOKENS` in full,
+ *   so adding these there would reject every theme already in the wild for omitting them. They carry
+ *   defaults on `:root` instead, and a pack that wants its own may restate them.
+ *
+ *   NOT derived: the five status tones are exactly what they must not be, so there is no primitive to
+ *   reference. They are real values — ONE set, deliberately not a light/dark pair: the defaults sit
+ *   at a lightness that clears 3:1 on both grounds, because a --dark-* flip would only reach the two
+ *   default paths and leave every named dark theme on the light values (tokens-theme.css § SERIES
+ *   IDENTITY has the full argument).
+ *
+ * Three, hard cap. Series four onwards folds into `other`, which is `--text-faint`. */
+export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const
+
 /** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`.
  *
  * The palette half lives in `@acorn/protocol/themeTokens.ts` because it is also the manifest contract
@@ -31,6 +48,7 @@ export const THEME_TOKENS = [
   ...THEME_PALETTE_TOKENS,
   ...SELF_DESCRIPTION_TOKENS,
   ...DERIVED_THEME_TOKENS,
+  ...SERIES_TOKENS,
 ] as const
 
 /** Shape, typography, space, density, chrome, motion. Defaults in `styles/tokens-style.css`. */

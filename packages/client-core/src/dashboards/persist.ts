@@ -41,6 +41,11 @@ export type PlacementScope = {
 
 export const HOME_PLACEMENT: PlacementScope = { surface: 'home' }
 
+/** A Home tab IS the scope `{ surface: 'home', ownerId: tabId }` (docs/future/dashboards/tabs.md).
+ *  The default tab's id is `''`, which `placementScopeKey` collapses back to the bare `home` key —
+ *  so every blob written before tabs existed is already a valid one-tab state. */
+export const homeTabScope = (tabId: string): PlacementScope => ({ surface: 'home', ownerId: tabId })
+
 /** Segments are encoded so an owner id containing the separator — `pluginId:regionId` is one — can
  *  never be read as two, and trailing empties are dropped so home's key is just `home`. */
 export const placementScopeKey = (scope: PlacementScope): string => {
@@ -70,7 +75,17 @@ export type DashboardState = {
    *  Geometry is per (scope, panel), never on the definition: the same panel placed on Home and in a
    *  task pane has two rects. That is the Perses layouts-reference-panels split already in force. */
   layouts: Record<string, Record<PanelId, Rect>>
+  /** The named Home tabs, in display order. Additive and OPTIONAL — absent, or one entry, means no
+   *  tab bar and Home renders exactly as it did before tabs existed (tabs.md § The data model).
+   *
+   *  Only names and order live here. A tab's CONTENT is ordinary `placements`/`layouts` under the
+   *  `home/<tabId>` key, which is why an old client that drops this key loses the names and keeps
+   *  every panel — and why `homeTabs` can recover an unnamed scope rather than orphan it. */
+  tabs?: DashboardTab[]
 }
+
+/** `id: ''` is the default tab (the bare `home` scope). */
+export type DashboardTab = { id: string; name: string }
 
 export const emptyDashboards = (): DashboardState => ({ panels: {}, placements: {}, layouts: {} })
 
@@ -108,6 +123,66 @@ const parseRect = (raw: unknown): Rect | undefined => {
   }
 }
 
+// ── The tab codec ─────────────────────────────────────────────────────────────────────────────
+//
+// The usual posture, and two caps that are product decisions rather than storage ones: a person with
+// nine dashboards has a navigation problem tabs cannot fix, and a 200-character tab name is not a tab
+// name. An over-long name is TRUNCATED rather than dropped, because dropping the entry would strand
+// its panels behind a recovered "Untitled" for no gain.
+
+const MAX_TABS = 8
+const MAX_TAB_NAME = 60
+
+const parseTabs = (raw: unknown): DashboardTab[] => {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const tabs: DashboardTab[] = []
+  for (const entry of raw) {
+    if (tabs.length >= MAX_TABS) break
+    if (!isRecord(entry)) continue
+    // `''` is a legal id — it is the default tab — so the check is the TYPE, not truthiness.
+    const { id, name } = entry
+    if (typeof id !== 'string' || typeof name !== 'string' || !name.trim() || seen.has(id)) continue
+    seen.add(id)
+    tabs.push({ id, name: name.trim().slice(0, MAX_TAB_NAME) })
+  }
+  return tabs
+}
+
+/** The tab id a placement key names, or `undefined` for a key that is not a Home tab's. `home` is the
+ *  default tab; `home/<id>` is a named one; anything longer carries a `projectId` segment, which no
+ *  tab has. */
+export const homeTabIdOf = (key: string): string | undefined => {
+  const segments = key.split('/')
+  if (segments[0] !== 'home' || segments.length > 2) return undefined
+  return decodeURIComponent(segments[1] ?? '')
+}
+
+/** The tabs to render: the named ones in order, then any `home/*` scope that has placements but no
+ *  name, appended as "Untitled".
+ *
+ *  ONE RULE DOING THREE JOBS (tabs.md § Survival rules). It is the recovery from an old client that
+ *  wrote the slice and dropped `tabs`; it is the defence against a partially-written blob; and it is
+ *  why deleting a name can never be what deletes a composition. The bare `home` scope is always a
+ *  candidate whether or not it holds panels — it is the default tab and it has no delete, so it must
+ *  never become unreachable.
+ *
+ *  Empty when the blob names no tabs: one dashboard draws no bar, and Home is pixel-identical to what
+ *  it was before this key existed. */
+export function homeTabs(state: DashboardState): DashboardTab[] {
+  const named = state.tabs ?? []
+  if (!named.length) return []
+  const seen = new Set(named.map((tab) => tab.id))
+  const recovered: DashboardTab[] = []
+  for (const key of ['home', ...Object.keys(state.placements)]) {
+    const id = homeTabIdOf(key)
+    if (id === undefined || seen.has(id)) continue
+    seen.add(id)
+    recovered.push({ id, name: 'Untitled' })
+  }
+  return [...named, ...recovered]
+}
+
 export function parseDashboards(raw: unknown): DashboardState {
   const value = parseJson(raw)
   if (!isRecord(value)) return emptyDashboards()
@@ -128,7 +203,8 @@ export function parseDashboards(raw: unknown): DashboardState {
       if (Object.keys(rects).length) layouts[key] = rects
     }
   }
-  return { panels, placements, layouts }
+  const tabs = parseTabs(value.tabs)
+  return { panels, placements, layouts, ...(tabs.length ? { tabs } : {}) }
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────────────────────
@@ -202,7 +278,7 @@ export const removePanel = (id: PanelId): void =>
         return [key, kept] as const
       }),
     )
-    return { panels, placements, layouts }
+    return { ...state, panels, placements, layouts }
   })
 
 /** Place a panel, or move one already placed. `index` is where it lands; past the end appends. */
@@ -219,6 +295,32 @@ export const unplacePanel = (scope: PlacementScope, id: PanelId): void =>
   void setDashboards((state) => {
     const key = placementScopeKey(scope)
     return { ...state, placements: { ...state.placements, [key]: (state.placements[key] ?? []).filter((candidate) => candidate !== id) } }
+  })
+
+/** Create, rename and reorder, all of them the same write: names and order are the whole of what
+ *  `tabs` holds. Held to the codec's own caps so a store write and a parsed blob cannot disagree. */
+export const setHomeTabs = (tabs: readonly DashboardTab[]): void =>
+  void setDashboards((state) => {
+    const parsed = parseTabs(tabs)
+    const { tabs: _dropped, ...rest } = state
+    return parsed.length ? { ...rest, tabs: parsed } : rest
+  })
+
+/** Delete a tab: its name, its placement list and its geometry. DEFINITIONS SURVIVE — every panel
+ *  stays in the library and on every other surface, which is the whole point of the placement split
+ *  and what the armed confirm's copy promises.
+ *
+ *  The default tab is not deletable. "Delete" of the bare scope would just be "empty it", and it is
+ *  the one tab that has to remain reachable. */
+export const removeHomeTab = (tabId: string): void =>
+  void setDashboards((state) => {
+    if (!tabId) return state
+    const key = placementScopeKey(homeTabScope(tabId))
+    const { [key]: _panels, ...placements } = state.placements
+    const { [key]: _rects, ...layouts } = state.layouts
+    const { tabs: _named, ...rest } = state
+    const tabs = (state.tabs ?? []).filter((tab) => tab.id !== tabId)
+    return { ...rest, placements, layouts, ...(tabs.length ? { tabs } : {}) }
   })
 
 // ── Slice ─────────────────────────────────────────────────────────────────────────────────────

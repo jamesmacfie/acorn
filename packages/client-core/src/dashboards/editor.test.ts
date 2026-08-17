@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { PluginCollectionField, PluginCollectionSchema } from '@acorn/protocol/collections.ts'
+import { MAX_COLLECTION_FIELDS, type PluginCollectionField, type PluginCollectionSchema } from '@acorn/protocol/collections.ts'
 import {
+  collectionCardMeta,
   defaultFilterFor,
   defaultGroupBy,
   normalizePanel,
@@ -12,9 +13,13 @@ import {
   retainView,
   retargetFilter,
   schemaOf,
+  settleComposition,
   trendsFor,
+  viewAvailability,
   viewsFor,
   withOperator,
+  withViewKind,
+  type PanelComposition,
 } from './editor'
 import { MAX_PANEL_REFRESH_SECONDS, MIN_PANEL_REFRESH_SECONDS, type PanelDefinition } from './model'
 import { parsePanelDefinition } from './persist'
@@ -274,5 +279,114 @@ describe("the editor's output is a panel the codec hands back unchanged", () => 
       bySource: { 'github:pulls-mine': { c2: { values: ['open'] } } },
     })
     expect(roundTrip(built)).toEqual(built)
+  })
+})
+
+describe('view availability', () => {
+  const kinds = (schema: PluginCollectionSchema | undefined) =>
+    Object.fromEntries(viewAvailability(schema).map((entry) => [entry.kind, entry.reason]))
+
+  it('agrees with viewsForSchema — one set of gates, two presentations', () => {
+    for (const candidate of [schema, { fields: [] }, { fields: [schema.fields[0]] }]) {
+      expect(viewAvailability(candidate).filter((entry) => entry.ok).map((entry) => entry.kind))
+        .toEqual(viewsFor({ schema: candidate }))
+    }
+  })
+
+  it('names what a warm schema is missing', () => {
+    // Text and number only: no enum to make columns from, no enum or date to draw an axis against.
+    expect(kinds({ fields: [schema.fields[0], schema.fields[1]] }))
+      .toEqual({ stat: 'ok', list: 'ok', table: 'ok', board: 'needs-enum', chart: 'needs-axis' })
+  })
+
+  it('says cold rather than impossible when there is no schema at all', () => {
+    // A response-only collection nobody has read yet. "This data has no status-like field" would be a
+    // claim nobody has checked, so the code says so.
+    const cold = { stat: 'ok', list: 'ok', table: 'ok', board: 'cold-schema', chart: 'cold-schema' }
+    expect(kinds({ fields: [] })).toEqual(cold)
+    expect(kinds(undefined)).toEqual(cold)
+  })
+})
+
+describe('collection card meta', () => {
+  it('prefers the answered schema and reports the cached facts', () => {
+    const answered: PluginCollectionSchema = { fields: [{ id: 'x', name: 'X', type: 'text' }] }
+    const meta = collectionCardMeta(
+      { schema, refresh: 300 },
+      { page: { schema: answered, rows: [] }, answeredAt: 1_700_000_000_000 },
+    )
+    expect(meta.fields).toEqual([{ name: 'X', type: 'text' }])
+    expect(meta.refresh).toBe(300)
+    expect(meta.rows).toBe(0)
+    expect(meta.answeredAt).toBe(1_700_000_000_000)
+    expect(meta.selfDescribing).toBe(false)
+  })
+
+  it('leaves the cached facts absent rather than reporting a zero nobody measured', () => {
+    const meta = collectionCardMeta({ schema })
+    expect(meta.rows).toBeUndefined()
+    expect(meta.answeredAt).toBeUndefined()
+    expect(meta.refresh).toBeUndefined()
+    expect(meta.fields.map((field) => field.name)).toEqual(schema.fields.map((field) => field.name))
+  })
+
+  it('calls a collection with no declared schema self-describing, answered or not', () => {
+    expect(collectionCardMeta(undefined).selfDescribing).toBe(true)
+    expect(collectionCardMeta({}, { page: { schema, rows: [] } })).toMatchObject({ selfDescribing: true })
+  })
+
+  it('caps the chips at the wire\'s own field limit', () => {
+    const wide: PluginCollectionSchema = {
+      fields: Array.from({ length: 40 }, (_, index) => ({ id: `f${index}`, name: `F${index}`, type: 'text' as const })),
+    }
+    expect(collectionCardMeta({ schema: wide }).fields).toHaveLength(MAX_COLLECTION_FIELDS)
+  })
+})
+
+describe('composition rules', () => {
+  const draft = (over: Partial<PanelComposition> = {}): PanelComposition =>
+    ({ view: { kind: 'list' }, shaping: {}, ...over })
+
+  it('choosing board chooses a grouping, because a board with none has no columns', () => {
+    const next = withViewKind(draft(), 'board', schema)
+    expect(next.view.kind).toBe('board')
+    expect(next.shaping.groupBy).toBe('status')
+  })
+
+  it('leaves a grouping the person already set', () => {
+    // `flagged` is groupable but is not the status-role field the default would pick.
+    const next = withViewKind(draft({ shaping: { groupBy: 'flagged' } }), 'board', schema)
+    expect(next.shaping.groupBy).toBe('flagged')
+  })
+
+  it('infers chart axes once, and never over an answer already given', () => {
+    const first = withViewKind(draft(), 'chart', schema)
+    expect(first.view.shape).toBeDefined()
+    const edited = { ...first, view: { ...first.view, x: 'status', shape: 'bar' as const } }
+    expect(withViewKind(edited, 'chart', schema).view.x).toBe('status')
+  })
+
+  it('re-derives rather than blocks when the schema loses what the view needed', () => {
+    // The wizard's "a step whose prerequisites vanished re-derives": the board falls back to a view
+    // this schema can draw, and the filter over a field that went with the source goes with it.
+    const thin: PluginCollectionSchema = { fields: [{ id: 'title', name: 'Title', type: 'text' }] }
+    const next = settleComposition(
+      { view: { kind: 'board' }, shaping: { groupBy: 'status', filters: [{ field: 'size', op: 'gt', value: 1 }] } },
+      thin,
+    )
+    expect(next.view.kind).toBe('stat')
+    expect(next.shaping.groupBy).toBeUndefined()
+    expect(next.shaping.filters).toBeUndefined()
+  })
+
+  it('regroups a board whose grouped field went away but whose view still draws', () => {
+    const next = settleComposition({ view: { kind: 'board' }, shaping: { groupBy: 'gone' } }, schema)
+    expect(next.view.kind).toBe('board')
+    expect(next.shaping.groupBy).toBe('status')
+  })
+
+  it('leaves a still-valid composition alone', () => {
+    const before = { view: { kind: 'board' as const }, shaping: { groupBy: 'status' } }
+    expect(settleComposition(before, schema)).toEqual(before)
   })
 })

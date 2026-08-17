@@ -31,10 +31,36 @@ import { aggregateRows, boardColumns, groupField } from './shaping'
 // same one a plugin's declared enum value can name and an appearance pack already owns
 // (ui/primitives.tsx § StatusDot). A plugin never names a colour, same rule as everywhere.
 
-/** The ordinal ramp, for a series whose value the schema did not pre-tone. It IS the tone
- *  vocabulary, cycled — five distinguishable marks the packs already own, and not one new token to
- *  classify in `ui/tokenAxes.ts`. */
-const RAMP: readonly PanelTone[] = ['accent', 'ok', 'warn', 'bad', 'muted']
+// ── Identity colour, and why it is not a tone ─────────────────────────────────────────────────
+//
+// This used to cycle the five STATUS tones for anything the schema had not pre-toned
+// (`accent/ok/warn/bad/muted`). That is right for status — a `Ready` bar should be the ok colour —
+// and wrong for identity: a line split by source, or a bar over categories nobody declared, is asking
+// "which series is this", and answering with status colours makes github permanently ok-green and
+// linear permanently warn-amber, which reads as a judgement nobody made
+// (docs/future/dashboards/charts.md § 1).
+//
+// So a mark's colour comes from exactly one of two places:
+//
+//   `tone`    the plugin DECLARED what this value means. Keep it — the status vocabulary is doing its
+//             job, and the appearance pack already owns those five colours.
+//   `series`  identity with no declared meaning. An ordinal slot, coloured by `--viz-series-1..3` —
+//             theme-axis tokens distinct from the status tones (ui/tokenAxes.ts).
+//
+// THREE SLOTS, HARD CAP. Slot 4 onwards folds into `other`, drawn muted and disclosed in the legend
+// when that lands. Three is what survives colour-vision checking as a set alongside the five status
+// tones; past three the honest answer is fewer series or a table, not a fourth colour.
+//
+// Still no literal colour here or in `ChartView.tsx`: a mark carries `data-series` beside `data-tone`
+// and `dashboards.css` maps both.
+
+/** `1 | 2 | 3` are the identity slots; `other` is the fold. */
+export type ChartSeriesSlot = 1 | 2 | 3 | 'other'
+
+const SERIES_SLOTS = 3
+
+const seriesSlot = (index: number): ChartSeriesSlot =>
+  index < SERIES_SLOTS ? ((index + 1) as ChartSeriesSlot) : 'other'
 
 /** Abstract units. The SVG scales uniformly to whatever rect the panel has, so nothing here needs a
  *  measurement and the chart survives a panel resize without recomputing.
@@ -55,7 +81,10 @@ export type ChartBar = {
   key: string
   label: string
   value: number
-  tone: PanelTone
+  /** Set when the plugin declared what this value means. Mutually exclusive with `series`. */
+  tone?: PanelTone
+  /** Set when the mark is identity with no declared tone. Mutually exclusive with `tone`. */
+  series?: ChartSeriesSlot
   x: number
   y: number
   w: number
@@ -68,7 +97,12 @@ export type ChartBar = {
 export type ChartLine = {
   id: string
   label: string
-  tone: PanelTone
+  /** Set when the plugin declared what this series means, and for the single unsplit line — one mark
+   *  with no sibling to be told apart from has no use for an identity colour, which is the same
+   *  argument that put the sparkline on `--accent` (charts.md § 5). */
+  tone?: PanelTone
+  /** Set when the series is identity with no declared tone. Mutually exclusive with `tone`. */
+  series?: ChartSeriesSlot
   /** An SVG `d`. Empty for a series with fewer than two points, which draws as dots instead. */
   path: string
   points: { x: number; y: number; label: string }[]
@@ -239,9 +273,10 @@ function buildBar(
       key: column.id,
       label: column.label,
       value,
-      // A declared value keeps the tone the plugin gave it; anything else takes its place on the ramp,
-      // so two undeclared categories are still told apart.
-      tone: column.declared ? column.tone : RAMP[index % RAMP.length],
+      // A declared value keeps the tone the plugin gave it; anything else is identity and takes an
+      // ordinal slot, so two undeclared categories are still told apart — without either of them
+      // being told it is good or bad.
+      ...(column.declared ? { tone: column.tone } : { series: seriesSlot(index) }),
       x: PAD.left + index * slot + (slot - width) / 2,
       y: PAD.top + PLOT_H - height,
       w: width,
@@ -316,7 +351,11 @@ function buildLine(
     return [{
       id: group.id || 'all',
       label: group.label,
-      tone: group.declared && series ? group.tone : RAMP[index % RAMP.length],
+      // Unsplit: one line, `--accent`, no identity question to answer. Split: the declared tone where
+      // the enum has one, else an identity slot.
+      ...(!series
+        ? { tone: 'accent' as PanelTone }
+        : group.declared ? { tone: group.tone } : { series: seriesSlot(index) }),
       path: placed.length > 1 ? placed.map((point, at) => `${at ? 'L' : 'M'}${point.x} ${point.y}`).join(' ') : '',
       points: placed,
     }]

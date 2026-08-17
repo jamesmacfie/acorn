@@ -1,14 +1,19 @@
-import type {
-  PluginCollectionCell,
-  PluginCollectionField,
-  PluginCollectionFieldType,
-  PluginCollectionSchema,
+import {
+  MAX_COLLECTION_FIELDS,
+  type PluginCollectionCell,
+  type PluginCollectionField,
+  type PluginCollectionFieldType,
+  type PluginCollectionPage,
+  type PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
 import { activityField } from '@acorn/dashboards-core/trend.ts'
+import { defaultChartView } from './chart'
 import type { CollectionContribution } from '../registries/collections'
 import { pruneMapping } from './mapping'
 import {
+  PANEL_VIEW_KINDS,
   panelRefreshSeconds,
+  viewSupportedBy,
   viewsForSchema,
   type PanelDefinition,
   type PanelFilter,
@@ -150,6 +155,75 @@ export const viewsFor = (
   answered?: PluginCollectionSchema | undefined,
 ): PanelViewKind[] => viewsForSchema(schemaOf(entry, answered))
 
+/** WHY a view is not offered, as a code. The sheet only ever needed the pass list; the wizard shows
+ *  all five cards and has to say what the disabled ones are missing
+ *  (docs/future/dashboards/wizard.md § Foundation).
+ *
+ *  A CODE, NEVER COPY. The component owns the words — "Board needs a status-like field; this data has
+ *  none." — and this owns the truth, so the sentence can be rewritten without touching a test and the
+ *  test asserts something a translation cannot break. */
+export type ViewReasonCode = 'ok' | 'needs-enum' | 'needs-axis' | 'cold-schema'
+
+export type ViewAvailability = { kind: PanelViewKind; ok: boolean; reason: ViewReasonCode }
+
+/** Every view kind with its verdict, in `PANEL_VIEW_KINDS` order — the same order the cards draw in.
+ *
+ *  The predicates are `viewSupportedBy`'s, reused rather than restated: `viewsForSchema` is exactly
+ *  this list filtered to `ok`, and a second copy of the gates is how the wizard comes to offer a view
+ *  the sheet refuses.
+ *
+ *  The COLD case is separated out because it is not the same answer. A collection that describes
+ *  itself in its response has no schema until something reads it, so board and chart are not
+ *  impossible here — they are unknown, and "this data has no status-like field" would be a claim
+ *  nobody has checked. */
+export function viewAvailability(schema: PluginCollectionSchema | undefined): ViewAvailability[] {
+  const cold = !schema?.fields.length
+  return PANEL_VIEW_KINDS.map((kind): ViewAvailability => {
+    if (viewSupportedBy(kind, schema ?? EMPTY_SCHEMA)) return { kind, ok: true, reason: 'ok' }
+    if (cold) return { kind, ok: false, reason: 'cold-schema' }
+    return { kind, ok: false, reason: kind === 'board' ? 'needs-enum' : 'needs-axis' }
+  })
+}
+
+// ── Collection cards ──────────────────────────────────────────────────────────────────────────
+
+/** Everything the wizard's Data-step gallery shows about a collection, with ZERO new wire data: the
+ *  manifest's own promise, plus whatever this device happens to have cached.
+ *
+ *  Takes the cached answer as an ARGUMENT rather than reading the query cache itself — the deviation
+ *  from wizard.md's sketched `(contribution, nodeId)` signature, and the same shape `schemaOf` already
+ *  has. vitest here runs in node with no Solid plugin and no QueryClient, so a derivation that reads
+ *  the cache is a derivation no test can reach; the component passes `cachedCollectionPage` and
+ *  `cachedCollectionAnsweredAt` (data.ts), which is its job anyway.
+ *
+ *  `rows` and `answeredAt` are OPTIONAL and mean it: absent renders as "not read on this device yet",
+ *  which is the cold case being honest rather than a zero pretending to be an answer. */
+export type CollectionCardMeta = {
+  fields: { name: string; type: PluginCollectionFieldType }[]
+  /** True when the collection declares no static schema — it describes itself in its answer. */
+  selfDescribing: boolean
+  /** The collection's declared cadence, seconds. Absent means it only refreshes when asked. */
+  refresh?: number
+  rows?: number
+  answeredAt?: number
+}
+
+export function collectionCardMeta(
+  entry: Pick<CollectionContribution, 'schema' | 'refresh'> | undefined,
+  cached?: { page?: PluginCollectionPage; answeredAt?: number },
+): CollectionCardMeta {
+  const schema = schemaOf(entry, cached?.page?.schema)
+  return {
+    // The wire's own cap, applied on the way out too: a gallery card is a glance, and a schema that
+    // arrived over-long from somewhere should not be what makes one scroll.
+    fields: schema.fields.slice(0, MAX_COLLECTION_FIELDS).map((field) => ({ name: field.name, type: field.type })),
+    selfDescribing: !entry?.schema?.fields.length,
+    ...(entry?.refresh === undefined ? {} : { refresh: entry.refresh }),
+    ...(cached?.page ? { rows: cached.page.rows.length } : {}),
+    ...(cached?.answeredAt ? { answeredAt: cached.answeredAt } : {}),
+  }
+}
+
 // ── Trends ────────────────────────────────────────────────────────────────────────────────────
 
 /** Which trend tiers a stat over this schema may be offered (docs/dashboards.md § Trends).
@@ -179,6 +253,60 @@ export function retainView(view: PanelView, schema: PluginCollectionSchema): Pan
 export const defaultGroupBy = (schema: PluginCollectionSchema): string | undefined => {
   const groupable = groupableFields(schema)
   return (groupable.find((field) => field.role === 'status') ?? groupable[0])?.id
+}
+
+// ── Composition ───────────────────────────────────────────────────────────────────────────────
+//
+// The two composed rules the SHEET used to hold in its own handlers, lifted here so the wizard can
+// re-host them rather than restate them (wizard.md § Foundation, item 4: "if any step needs logic
+// that does not exist as a pure function, add it to the pure module first"). Both are over the pair
+// `{ view, shaping }` rather than a whole `PanelDefinition`, because that is the pair they touch and
+// it is what the sheet holds as two signals.
+
+/** The half of a draft panel these rules read and write. */
+export type PanelComposition = { view: PanelView; shaping: PanelShaping }
+
+const declares = (schema: PluginCollectionSchema, id: string | undefined): boolean =>
+  !!id && schema.fields.some((field) => field.id === id)
+
+/** Choosing a view kind is not only setting a key.
+ *
+ *  A board with no group-by has no columns, so choosing the view IS choosing a grouping — written
+ *  into SHAPING rather than held by the view, so switching to a table and back keeps it.
+ *
+ *  A chart pre-picks its axes from what the schema declares, the Observable Plot lesson: a sensible
+ *  chart in two clicks and then adjust, rather than four empty selects. Only when the panel names no
+ *  shape yet — re-choosing `chart` must not overwrite axes somebody already set. */
+export function withViewKind(
+  draft: PanelComposition,
+  kind: PanelViewKind,
+  schema: PluginCollectionSchema,
+): PanelComposition {
+  const view: PanelView = {
+    ...draft.view,
+    kind,
+    ...(kind === 'chart' && !draft.view.shape ? defaultChartView(schema, draft.shaping) : {}),
+  }
+  const regroup = kind === 'board' && !declares(schema, draft.shaping.groupBy)
+  return { view, shaping: regroup ? { ...draft.shaping, groupBy: defaultGroupBy(schema) } : draft.shaping }
+}
+
+/** Re-gate everything the SOURCE list decides, after it changes — the wizard's "a step whose
+ *  prerequisites vanished re-derives rather than blocks".
+ *
+ *  Three rules in order, and the order is the point: stale shaping goes first (it is what the view
+ *  gate then reads), a view this schema can no longer draw falls back to one it can, and a board
+ *  whose grouped field went with the source regroups. */
+export function settleComposition(draft: PanelComposition, schema: PluginCollectionSchema): PanelComposition {
+  const shaping = retainShaping(draft.shaping, schema)
+  const offered = viewsForSchema(schema)
+  if (!offered.includes(draft.view.kind as PanelViewKind)) {
+    return withViewKind({ view: draft.view, shaping }, offered[0] ?? 'list', schema)
+  }
+  if (draft.view.kind === 'board' && !declares(schema, shaping.groupBy)) {
+    return { view: draft.view, shaping: { ...shaping, groupBy: defaultGroupBy(schema) } }
+  }
+  return { view: draft.view, shaping }
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────────────────────

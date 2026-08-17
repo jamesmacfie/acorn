@@ -76,6 +76,22 @@ const SIZES: Record<string, PanelSize> = {
  *  card, which is a panel like any other and must not be zero-sized. */
 export const sizeFor = (kind: string): PanelSize => SIZES[kind] ?? SIZES.list
 
+/** The wizard's S/M/L footprints for a view kind (docs/future/dashboards/wizard.md § Foundation) —
+ *  three widths over the per-kind defaults above, at that kind's own height.
+ *
+ *  A STARTING RECT, NOT STORED CONFIG. What the wizard commits goes through `firstFit` and
+ *  `setLayoutAt` like every other rect and is thereafter just geometry; nothing persisted learns that
+ *  a preset was ever involved, so the table can be retuned without a migration.
+ *
+ *  `M` is the kind's default and `L` is the full grid; `S` is its minimum. A kind whose default is
+ *  already full width (board) collapses two of them to the same rect, which is honest — there is no
+ *  fourth size hiding in a 12-column grid. */
+export const sizePresets = (kind: string): { s: Rect; m: Rect; l: Rect } => {
+  const size = sizeFor(kind)
+  const at = (w: number): Rect => ({ x: 0, y: 0, w: Math.max(size.minW, Math.min(COLS, w)), h: size.h })
+  return { s: at(size.minW), m: at(size.w), l: at(COLS) }
+}
+
 // ── Rects ─────────────────────────────────────────────────────────────────────────────────────
 
 export const collides = (a: Rect, b: Rect): boolean =>

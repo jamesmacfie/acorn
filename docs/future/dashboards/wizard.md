@@ -28,10 +28,23 @@ it is being composed.
   not move validation into the UI: a bad choice is still unofferable first, dropped by
   `normalizePanel` second.
 
-## Phase 0 foundation (no pixels in this list)
+## Phase 0 foundation (no pixels in this list) — SHIPPED
 
-Pure functions, all in the modules vitest can reach (components here are untestable — node vitest,
-no Solid plugin). Build and test these before any wizard component exists:
+All four are built and unit-tested; the wizard's components are not. Two deviations from the list
+below, both recorded at the code:
+
+- **`collectionCardMeta` takes the cached answer as an argument**, not a `nodeId`: node vitest has no
+  QueryClient, so a derivation that reads the cache is a derivation no test can reach. The component
+  passes `cachedCollectionPage` and the new `cachedCollectionAnsweredAt` (`data.ts`) — which is the
+  shape `schemaOf` already had, and which keeps the "the editor issues no fetch of its own" invariant
+  visible at the call site rather than buried.
+- **Item 4 found real logic living only in the component**, so it moved: `withViewKind` (choosing a
+  view kind implies a board's grouping and a chart's inferred axes) and `settleComposition` (a source
+  change re-derives shaping, then the view, then the grouping) are now pure in `editor.ts` over a
+  `PanelComposition` pair, and `PanelEditor.tsx` calls them. That is the "no second implementation"
+  rule paid for up front rather than discovered when the wizard's View step disagrees with the sheet.
+
+The list as built:
 
 1. **`viewAvailability(schema)`** in `editor.ts`, superseding call sites of bare `viewsForSchema`
    where a reason is wanted:
@@ -148,8 +161,8 @@ already define what survives.
 - The cold collection composes to the three ungated views with the notice in place, and a cache
   answer arriving mid-wizard unlocks board/chart cards reactively.
 - A mapped (two-source) panel can be fully composed in the wizard, including invented fields.
-- `viewAvailability`, `collectionCardMeta` and `sizePresets` are unit-tested in node vitest; no new
-  logic lives only in a component.
+- ~~`viewAvailability`, `collectionCardMeta` and `sizePresets` are unit-tested in node vitest; no new
+  logic lives only in a component.~~ Done — plus `withViewKind`/`settleComposition`, see § Foundation.
 - The edit sheet's behaviour and tests are untouched.
 
 ## Verify before building
