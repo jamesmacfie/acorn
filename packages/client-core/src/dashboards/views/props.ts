@@ -10,6 +10,10 @@ import type { PanelView } from '../model'
  *  without losing their filters (docs/dashboards.md § Panels). */
 export type PanelViewProps = {
   view: PanelView
+  /** The definition's id, for the one view that reads something keyed by it: a stat's history trend
+   *  is a series the node stores per panel (dashboards/history.ts). Optional because nothing else
+   *  needs it, and a view that draws only what it was handed stays testable. */
+  panelId?: string
   schema: PluginCollectionSchema
   fields: PluginCollectionField[]
   rows: PluginCollectionRow[]

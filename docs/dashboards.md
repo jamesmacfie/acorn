@@ -321,6 +321,45 @@ and will not be until someone arrives with the panel that needs one. The arithme
 scales, ticks, path data — is pure in `dashboards/chart.ts`; `ChartView.tsx` is SVG over its output
 and decides nothing.
 
+### Trends: the stat that earns a sparkline
+
+A `stat` may carry a **trend** — a fortnight-wide sparkline under the number — and the two tiers it
+offers are different features wearing one mark. Never blur them in the UI:
+
+| Tier | Answers | Source | Available |
+| --- | --- | --- | --- |
+| `activity` | "when did these rows change" | the rows already on screen, bucketed by their own `updated`-role datetime | the moment the rows arrive |
+| `history` | "what was this number" | the node's measure store, sampled hourly by `core:sample-measures` ([schedules.md](./schedules.md)) | accrues from when the panel first asks |
+
+The consequence for a day with no data is opposite in the two tiers, which is why they share no code
+past the geometry: **an activity day with no rows is a zero** (nothing changed, and that is a fact),
+**a history day with no sample is a gap** (nobody looked, and interpolating would invent a number the
+panel never displayed). Gaps render as breaks in the line. An empty history series is a cold state —
+"Collecting — hourly, from now on" — not an error, which is also why the read route answers 200 with
+an empty array rather than 404.
+
+The editor gates each tier on what it actually needs: `activity` needs a datetime to bucket by, so a
+schema without one is never offered it and a collection swap that loses the last date drops the key
+(`retainView`, the `retainShaping` rule applied to a view key). `history` needs only the sampler, so
+it is always offered.
+
+`compare` draws a delta beside the number, and **the comparison is a point looked up, never a window
+aggregated** — "vs last week" is the recorded sample nearest one week ago, searched back no further
+than twice the window, not an average of last week. Window aggregates drag in bucket alignment,
+partial windows and timezone edges, which are a metrics product's problems; Datadog's Query Value
+change mode and Grafana's stat-plus-`timeShift` both do the same thing. No qualifying sample means
+**no delta at all** — absence is a fact and it is not zero.
+
+`good` colours that delta, and it exists because **direction-goodness is not guessable**: open PRs
+going up is bad for one person's board and good for another's. Absent, the delta is neutral ink
+rather than a guessed green. It is display config on the *panel* — the user's judgement — deliberately
+unlike units and tones, which are the plugin's facts and hang off the field.
+
+The arithmetic is pure in `dashboards-core/trend.ts` (points, path data, baseline, tone) and
+`StatView.tsx` is SVG over its output, the same split `chart.ts`/`ChartView.tsx` takes. The client
+reads the series from `GET /v2/core/dashboards/history`; there is no write route, because the sampler
+and the store share a process and one writer needs no convergence.
+
 ### The mapping layer, and cross-source panels
 
 A panel over more than one collection, or over one with user-declared columns, goes through
@@ -404,10 +443,10 @@ the *geometry* codec — a rect is a rendering concern the node has no use for.
 
 `PanelView` also carries three optional stat keys, parsed exactly like the chart keys and dropped when
 malformed: `trend` (`'history' | 'activity'`), `compare` (`'day' | 'week'`) and `good`
-(`'up' | 'down'`). `trend: 'history'` is what the node's sampler selects a panel on. The honest ceiling
-is the chart keys' own — an old client that writes the blob drops them, the panel survives as a plain
-stat, and the series simply stops accruing until a newer client writes them back. Nothing draws them
-yet (`docs/future/dashboards/measure-history.md § Display`).
+(`'up' | 'down'`). `trend: 'history'` is what the node's sampler selects a panel on, and § Trends is
+what they draw. The honest ceiling is the chart keys' own — an old client that writes the blob drops
+them, the panel survives as a plain stat, and the series simply stops accruing until a newer client
+writes them back.
 
 **Placements reference panel definitions by id; they never embed them.** Embedding panel config
 inside a "home dashboard" blob works right up until panels need to live in a second place, and then

@@ -542,3 +542,49 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
+
+/* The trend (dashboards/trend.ts). No axes, no grid, no ticks: the number above is the axis, so
+   everything here is one line, its wash and the dot on the most recent day.
+
+   The height is a CAP rather than a size — `min-height: 0` lets it be squeezed out of a short panel
+   instead of pushing the number off the bottom, which is the right way round: the stat is the panel
+   and the sparkline is a decoration on it. */
+.dash-stat-spark {
+  width: 100%;
+  height: 32px;
+  min-height: 0;
+  overflow: visible;
+}
+.dash-stat-spark-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: var(--bw-strong);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  /* The viewBox scales, the ink does not: a 2px line stays 2px in a wide panel and in a narrow one. */
+  vector-effect: non-scaling-stroke;
+}
+.dash-stat-spark-area {
+  fill: var(--accent);
+  opacity: 0.1;
+  stroke: none;
+}
+.dash-stat-spark-end {
+  fill: var(--accent);
+  /* A ring in the panel's own ground, so the dot reads as sitting ON the line rather than being a
+     thicker part of it. */
+  stroke: var(--bg);
+  stroke-width: var(--bw-strong);
+  vector-effect: non-scaling-stroke;
+}
+
+/* Signed, and NEUTRAL unless the panel declared which direction is good — open PRs going up is bad
+   for one person's board and good for another's, so a guessed green would be the host inventing a
+   judgement its user never made. */
+.dash-stat-delta {
+  font-size: var(--fs-sm);
+  font-variant-numeric: var(--tabular);
+  color: var(--text-muted);
+}
+.dash-stat-delta[data-tone='ok'] { color: var(--state-ok); }
+.dash-stat-delta[data-tone='bad'] { color: var(--state-bad); }

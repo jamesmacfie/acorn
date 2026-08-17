@@ -299,6 +299,3 @@ retention.
   every database written forever to one directory is unbounded disk growth. The open question is *how
   many backups should a node keep*; `docs/future/cron/engine.md § migration` has the reasoning.
 - **`agent-run`**, named in the vocabulary and gated on a headless agent runtime.
-- **The display half of measure history** — sparkline and delta
-  (`docs/future/dashboards/measure-history.md § Display`). The store accrues samples today; nothing
-  draws them yet.

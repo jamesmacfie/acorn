@@ -9,8 +9,10 @@ import {
   operatorsForField,
   parseLimit,
   parseRefresh,
+  retainView,
   retargetFilter,
   schemaOf,
+  trendsFor,
   viewsFor,
   withOperator,
 } from './editor'
@@ -136,6 +138,30 @@ describe('the view and group-by selectors', () => {
       { id: 'state', name: 'State', type: 'enum', role: 'status' },
     ] })).toBe('state')
     expect(defaultGroupBy({ fields: [field('title')] })).toBeUndefined()
+  })
+})
+
+describe('the trend selector', () => {
+  it('offers activity only where there is a date to bucket the rows by', () => {
+    expect(trendsFor(schema)).toEqual(['activity', 'history'])
+    // No datetime: the recorded tier still stands, because it asks nothing of the schema — it asks
+    // the node's sampler, and an empty series is a cold state rather than a missing feature.
+    expect(trendsFor({ fields: [field('title')] })).toEqual(['history'])
+  })
+
+  it('drops an activity trend the schema can no longer draw, and keeps a recorded one', () => {
+    const swapped: PluginCollectionSchema = { fields: [field('title')] }
+    expect(retainView({ kind: 'stat', trend: 'activity' }, swapped)).toEqual({ kind: 'stat' })
+    expect(retainView({ kind: 'stat', trend: 'history' }, swapped)).toEqual({ kind: 'stat', trend: 'history' })
+    expect(retainView({ kind: 'stat', trend: 'activity' }, schema)).toEqual({ kind: 'stat', trend: 'activity' })
+    // A response-only collection promises no fields, so there is nothing to check against and the
+    // person's choice survives — the same escape hatch `retainShaping` takes.
+    expect(retainView({ kind: 'stat', trend: 'activity' }, { fields: [] })).toEqual({ kind: 'stat', trend: 'activity' })
+  })
+
+  it('carries the three keys through the codec untouched', () => {
+    const built = normalizePanel(panel({ view: { kind: 'stat', trend: 'history', compare: 'week', good: 'down' } }), schema)
+    expect(parsePanelDefinition(JSON.parse(JSON.stringify(built)))).toEqual(built)
   })
 })
 

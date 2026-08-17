@@ -90,13 +90,15 @@ chart, make it a field where fields already grow:
   field id. It *can* collide with a user's invented field named `source`; reserve the id in the
   invented-field editor (reject it like a duplicate), which is one selector rule.
 
-## 5. The sparkline mark
+## 5. The sparkline mark — SHIPPED, with measure-history
 
-Shared spec with `measure-history.md § Display`, restated as mark rules so both call sites draw one
-thing: reuse the line arithmetic at small size — 2px line, round joins; ~10% opacity area wash; a
-4px end dot with a 2px surface-colour ring; **no axes, grid, ticks or labels**; ≤ 32px tall; gaps
-render as gaps. Colour: series slot 1 (it is an identity mark for "this panel's measure", not a
-status). Tooltip per point via the existing `<title>` path, value + day.
+Built as part of the stat trend (`docs/dashboards.md § Trends`; arithmetic in
+`dashboards-core/trend.ts`, marks in `StatView.tsx`): line + ~10% wash, end dot with a
+surface-colour ring, no axes/grid/ticks, ≤ 32px and squeezed out before the number is, gaps drawn
+as breaks. One deviation from this file's original spec, recorded here and in `measure-history.md`:
+it wears **`--accent`, not series slot 1** — a sparkline is one mark with no sibling to be told
+apart from, so identity colour has no job on it, and the ramp below no longer owns this mark. The
+ramp's remaining consumers are multi-series charts only.
 
 ## Accessibility, all four
 
@@ -117,7 +119,8 @@ status). Tooltip per point via the existing `<title>` path, value + day.
   chart-special-case code, and `TableView`'s hardcoded Source column is gone.
 - Legends appear exactly when two or more series draw, with mark-shaped swatches and the fold
   disclosed.
-- The sparkline renders identically from both trend tiers, gaps preserved.
+- ~~The sparkline renders identically from both trend tiers, gaps preserved.~~ Done — shipped with
+  measure-history (§ 5).
 
 ## Verify before building
 

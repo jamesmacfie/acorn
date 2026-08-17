@@ -4,6 +4,7 @@ import type {
   PluginCollectionFieldType,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
+import { activityField } from '@acorn/dashboards-core/trend.ts'
 import type { CollectionContribution } from '../registries/collections'
 import { pruneMapping } from './mapping'
 import {
@@ -13,6 +14,7 @@ import {
   type PanelFilter,
   type PanelFilterOp,
   type PanelShaping,
+  type PanelView,
   type PanelViewKind,
 } from './model'
 import { groupableFields } from './shaping'
@@ -148,6 +150,30 @@ export const viewsFor = (
   answered?: PluginCollectionSchema | undefined,
 ): PanelViewKind[] => viewsForSchema(schemaOf(entry, answered))
 
+// ── Trends ────────────────────────────────────────────────────────────────────────────────────
+
+/** Which trend tiers a stat over this schema may be offered (docs/dashboards.md § Trends).
+ *
+ *  The two gates are different in kind, which is why this is not one predicate: `activity` needs a
+ *  DATETIME to bucket the rows by, so a schema without one cannot draw it; `history` needs only the
+ *  node's sampler, which is feature presence rather than data presence — an empty series is a cold
+ *  state to render, not a reason to withhold the choice. */
+export const trendsFor = (schema: PluginCollectionSchema): NonNullable<PanelView['trend']>[] =>
+  activityField(schema) ? ['activity', 'history'] : ['history']
+
+/** The view with every reference to something this schema does not have removed — `retainShaping`'s
+ *  rule applied to a view key, and for the same reason: a person who swapped the collection under a
+ *  panel wrote `trend: 'activity'` against a schema that had a date, and no selector can catch a
+ *  choice that was valid when it was made.
+ *
+ *  A response-only collection promises no fields at all, so there is nothing to check against and
+ *  everything survives — the same escape hatch the shaping's own sweep takes. */
+export function retainView(view: PanelView, schema: PluginCollectionSchema): PanelView {
+  if (!schema.fields.length || view.trend !== 'activity' || activityField(schema)) return view
+  const { trend: _dropped, ...rest } = view
+  return rest
+}
+
 /** The group-by to write when the view becomes a board and the panel names none yet. The status-role
  *  field first — that is what the role vocabulary is for — then whatever enum there is. */
 export const defaultGroupBy = (schema: PluginCollectionSchema): string | undefined => {
@@ -241,7 +267,7 @@ export function normalizePanel(panel: PanelDefinition, schema: PluginCollectionS
     queries,
     ...(mapping ? { mapping } : {}),
     shaping,
-    view: panel.view,
+    view: retainView(panel.view, schema),
     ...(panel.refresh === undefined ? {} : { refresh: panel.refresh }),
   }
 }
