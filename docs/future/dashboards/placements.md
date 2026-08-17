@@ -1,6 +1,31 @@
 # Placements: the two unbuilt surfaces
 
-**Unbuilt.** Panels are placement-agnostic and **placement** — where a panel renders, under whose
+**SHIPPED.** Both deliverables are built. Behaviour lives in
+[`docs/dashboards.md § Placements`](../../dashboards.md) and
+[`docs/plugins.md § Cooperative extension points`](../../plugins.md); this file keeps the reasoning
+and records what the build decided that the design left open:
+
+- **Regions rode the extension-point contract as a second LOCATION, `pane.aside`** — a column beside a
+  plugin pane's frame, with the user in the contributor's seat. Position is in the name, the way the
+  frame `layout` template family spells it; an `extensions` entry aimed at an aside delivers nothing.
+- **The constraint vocabulary is one shared block**, `panels: { collections | fieldRole, views, max }`,
+  taken identically by a rail source and by a `pane.aside` point. `collections` and `fieldRole` are
+  alternatives and declaring both is a parse error; `max` defaults to four.
+- **"Where the region sits" is not a field.** It is the location's name for a pane, and the
+  right-hand rectangle for a rail source. A source therefore cannot both reserve a region and
+  `navigate` to a project-scoped surface — the detail half of a master/detail browse is drawn in
+  exactly that seat, and the manifest refuses the pair.
+- **A panel refused at render is not drawn there and nothing is deleted.** The design said "the host
+  re-validates" without saying what re-validation does; it drops the panel from that grid only. A
+  panel whose collection is merely *unresolved* is admitted and draws inert, so a disabled plugin
+  never reads as a policy refusal.
+- **The wizard's "Move to…" still lists only Home tabs.** Aiming at a region from Home would mean
+  composing against constraints belonging to a rectangle that is not on screen — the same argument the
+  task pane already made, one step stronger. Left in README § smaller items.
+
+---
+
+Panels are placement-agnostic and **placement** — where a panel renders, under whose
 constraints — is the first-class concept; "dashboard" is just the default placement. All of that
 machinery exists: the scope key `(surface, ownerId?, projectId?)` is in `persist.ts` with all three
 surface names already in the union (`home` | `pane` | `plugin-region`), segments percent-encoded,

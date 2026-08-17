@@ -30,8 +30,26 @@
  * `pane.footer` is a strip the HOST draws underneath a plugin pane's frame. That placement is the whole
  * argument for the seam: the pane above it is a sandboxed document owned by A, the strip below it is the
  * host's own markup drawn from B's descriptor, and no code crosses between them in either direction.
+ *
+ * `pane.aside` is a COLUMN beside that frame, and it is the same seam with THE USER in the contributor's
+ * seat: what the host draws there is a dashboard the person composed, under constraints the owner
+ * declared (docs/future/dashboards/placements.md). It is a location rather than a parallel mechanism
+ * because every word of the footer's contract already holds — two-sided, declarative, host-mediated —
+ * and only the identity of the contributor changes.
+ *
+ * POSITION IS ENCODED IN THE NAME, the same rule the frame `layout` template family follows: an
+ * `orientation` field alongside a single location would imply the other values exist, which is the first
+ * knob of a layout language. A second position lands with its consumer.
+ *
+ * Which side takes which contributor is not a knob either: a plugin's `extensions` are delivered into
+ * footers only. An `extensions` entry aimed at an aside draws nothing, which is the same silent nothing
+ * every unmatched contribution already gets.
  */
-export const EXTENSION_POINT_LOCATIONS = ['pane.footer'] as const
+export const EXTENSION_POINT_LOCATIONS = ['pane.footer', 'pane.aside'] as const
+
+/** Does this location take rows from OTHER PLUGINS, or panels from the user? One predicate rather than a
+ *  second list, so a location added below cannot forget to answer the question. */
+export const takesPluginExtensions = (location: ExtensionPointLocation): boolean => location === 'pane.footer'
 
 export type ExtensionPointLocation = (typeof EXTENSION_POINT_LOCATIONS)[number]
 

@@ -210,6 +210,17 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])
     if (entry.emptyState?.action) action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
+    // A source panel has ONE rectangle beside its rail list, and both of these want it: a `navigate`
+    // onSelect is the DETAIL half of a master/detail browse, and a reserved panel region is a dashboard
+    // in the same seat (docs/future/dashboards/placements.md). Declaring both would parse and then draw
+    // one of them, which is the "installs and does nothing" failure this file exists to refuse.
+    if (entry.panels && entry.onSelect?.verb === 'navigate') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'sources', i, 'panels'],
+        message: 'a source cannot reserve a panel region and navigate to a project-scoped surface — both draw beside the rail list',
+      })
+    }
   })
   slots.forEach((entry, i) => {
     route(entry.data, ['contributions', 'slots', i, 'data'])
@@ -282,6 +293,13 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: at, message: `'${entry.surface}' already has an extension point at '${entry.location}'` })
     }
     claimedPoints.add(claim)
+    // The two locations take two different contributors, so their keys are not interchangeable. A
+    // footer is filled by other plugins' `extensions` and has no composition to constrain; an aside is
+    // filled by THE USER, and `panels` is the whole of what the owner gets to say about it. A `panels`
+    // block on a footer would parse and never be read.
+    if (entry.panels && entry.location !== 'pane.aside') {
+      ctx.addIssue({ code: 'custom', path: [...at, 'panels'], message: "panels is only valid on a 'pane.aside' extension point" })
+    }
   })
   extensions.forEach((entry, i) => {
     const at = ['contributions', 'extensions', i] as (string | number)[]

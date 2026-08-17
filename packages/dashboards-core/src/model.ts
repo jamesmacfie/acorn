@@ -1,3 +1,4 @@
+import { PANEL_VIEW_KINDS, type PanelViewKind } from '@acorn/protocol/collections.ts'
 import type {
   PluginCollectionCell,
   PluginCollectionEnumValue,
@@ -187,9 +188,11 @@ export type PanelDefinition = {
 // predicate over the schema, and the editor offers only what passes, so a misconfigured panel is
 // unrepresentable rather than validated.
 
-/** The views this build draws. */
-export const PANEL_VIEW_KINDS = ['stat', 'list', 'table', 'board', 'chart'] as const
-export type PanelViewKind = (typeof PANEL_VIEW_KINDS)[number]
+/** The views this build draws. The LIST moved to the wire when a manifest gained the ability to
+ *  narrow it (@acorn/protocol/collections.ts § PANEL_VIEW_KINDS); re-exported here because forty call
+ *  sites say `./model` and one vocabulary cannot live in two places. */
+export { PANEL_VIEW_KINDS }
+export type { PanelViewKind }
 
 const VIEW_REQUIRES: Record<PanelViewKind, (schema: PluginCollectionSchema) => boolean> = {
   // A count over nothing is still a number, so these three ask nothing of the schema.

@@ -28,8 +28,10 @@ export { parsePanelDefinition }
 //   lookup happens at RENDER time and an unresolved panel draws as inert rather than disappearing.
 //   A person's composition is never collateral damage of switching a plugin off.
 
-/** `(surface, ownerId, projectId?)`, per placements.md. Only `home` is drawn today; the other two
- *  are named here so a later phase adds a renderer rather than a key format. */
+/** `(surface, ownerId, projectId?)`, per placements.md. All three are drawn: `home` (a tab per
+ *  `ownerId`), `pane`, and `plugin-region` — a rail source's side panel or a plugin pane's aside,
+ *  owned as `<pluginId>:<somethingId>` (dashboards/region.ts). Each arrived as a renderer and a scope
+ *  constant; none of them needed a key format. */
 export type PlacementSurface = 'home' | 'pane' | 'plugin-region'
 
 export type PlacementScope = {

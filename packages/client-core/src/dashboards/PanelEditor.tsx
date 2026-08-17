@@ -34,6 +34,9 @@ import './dashboards.css'
 
 export default function PanelEditor(props: {
   collections: readonly CollectionContribution[]
+  /** The view kinds a plugin-reserved region allows, when composing into one (dashboards/region.ts).
+   *  Absent on the user's own surfaces, which allow every view the data supports. */
+  views?: readonly PanelViewKind[]
   /** Absent for the add flow. */
   panel?: PanelDefinition
   /** A panel handed over mid-creation by the wizard: it has a definition but has never been saved,
@@ -106,7 +109,8 @@ export default function PanelEditor(props: {
               size="sm"
               value={draft.view().kind as PanelViewKind}
               onChange={draft.chooseView}
-              options={viewsFor({ schema: draft.schema() }).map((kind) => ({ value: kind, label: VIEW_LABELS[kind] }))}
+              options={viewsFor({ schema: draft.schema() }, undefined, props.views)
+                .map((kind) => ({ value: kind, label: VIEW_LABELS[kind] }))}
             />
           </Field>
 

@@ -17,7 +17,21 @@
 
 .extension-group-owner { font-size: var(--fs-xs); }
 
-/* The owner's frame above, the host-drawn strip below (plugins/frames/ExtendedPane.tsx). */
-.extended-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+/* The owner's frame, and the regions the host draws around it (plugins/frames/ExtendedPane.tsx). The
+   footer strip stacks under the frame; the aside is a column beside both of them. */
+.extended-pane { display: flex; min-height: 0; height: 100%; }
+.extended-pane-main { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; }
 .extended-pane-frame { flex: 1 1 auto; min-height: 0; display: flex; }
 .extended-pane-frame > * { flex: 1 1 auto; min-width: 0; }
+
+/* A THIRD of the pane, capped, and it may not squeeze the owner's frame to nothing however many panels
+   somebody composes. Below twelve usable cells the grid collapses to one column on its own, which is
+   what makes a column this narrow work rather than something this file has to arrange. */
+.extended-pane-aside {
+  flex: 0 0 33%;
+  max-width: 30rem;
+  min-width: 0;
+  overflow-y: auto;
+  border-left: var(--divider);
+  background: var(--bg-subtle);
+}

@@ -153,7 +153,15 @@ export function withOperator(filter: PanelFilter, field: PluginCollectionField, 
 export const viewsFor = (
   entry: Pick<CollectionContribution, 'schema'> | undefined,
   answered?: PluginCollectionSchema | undefined,
-): PanelViewKind[] => viewsForSchema(schemaOf(entry, answered))
+  /** A plugin-reserved region's allowance, when this editor is composing into one
+   *  (dashboards/region.ts). Applied as an INTERSECTION with the schema's own gates rather than
+   *  instead of them: an owner may narrow what its rectangle accepts, never widen it into a view the
+   *  data cannot draw. */
+  allowed?: readonly PanelViewKind[],
+): PanelViewKind[] => {
+  const offered = viewsForSchema(schemaOf(entry, answered))
+  return allowed ? offered.filter((kind) => allowed.includes(kind)) : offered
+}
 
 /** WHY a view is not offered, as a code. The sheet only ever needed the pass list; the wizard shows
  *  all five cards and has to say what the disabled ones are missing
@@ -161,8 +169,11 @@ export const viewsFor = (
  *
  *  A CODE, NEVER COPY. The component owns the words — "Board needs a status-like field; this data has
  *  none." — and this owns the truth, so the sentence can be rewritten without touching a test and the
- *  test asserts something a translation cannot break. */
-export type ViewReasonCode = 'ok' | 'needs-enum' | 'needs-axis' | 'cold-schema'
+ *  test asserts something a translation cannot break.
+ *
+ *  `not-here` is the odd one out, deliberately: it is the only reason about the PLACE rather than about
+ *  the data, and the copy has to say so — the same panel is perfectly composable on Home. */
+export type ViewReasonCode = 'ok' | 'needs-enum' | 'needs-axis' | 'cold-schema' | 'not-here'
 
 export type ViewAvailability = { kind: PanelViewKind; ok: boolean; reason: ViewReasonCode }
 
@@ -176,9 +187,16 @@ export type ViewAvailability = { kind: PanelViewKind; ok: boolean; reason: ViewR
  *  itself in its response has no schema until something reads it, so board and chart are not
  *  impossible here — they are unknown, and "this data has no status-like field" would be a claim
  *  nobody has checked. */
-export function viewAvailability(schema: PluginCollectionSchema | undefined): ViewAvailability[] {
+export function viewAvailability(
+  schema: PluginCollectionSchema | undefined,
+  /** A reserved region's allowance, when composing into one. Checked FIRST, because "the owner of this
+   *  rectangle does not allow a chart here" is true whatever the schema says, and reporting a missing
+   *  axis instead would send somebody looking for data that would not have helped. */
+  allowed?: readonly PanelViewKind[],
+): ViewAvailability[] {
   const cold = !schema?.fields.length
   return PANEL_VIEW_KINDS.map((kind): ViewAvailability => {
+    if (allowed && !allowed.includes(kind)) return { kind, ok: false, reason: 'not-here' }
     if (viewSupportedBy(kind, schema ?? EMPTY_SCHEMA)) return { kind, ok: true, reason: 'ok' }
     if (cold) return { kind, ok: false, reason: 'cold-schema' }
     return { kind, ok: false, reason: kind === 'board' ? 'needs-enum' : 'needs-axis' }

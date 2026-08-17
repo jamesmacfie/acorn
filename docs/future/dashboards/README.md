@@ -56,14 +56,15 @@ nothing else may be reordered.
 | [`tabs.md`](./tabs.md) ✅ | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | SHIPPED — behaviour in [`docs/dashboards.md`](../../dashboards.md) (§ Persistence, § Placements); the file keeps the reasoning. |
 | [`measure-history.md`](./measure-history.md) ✅ | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | SHIPPED — behaviour moved to [`docs/dashboards.md § Trends`](../../dashboards.md); the file keeps the reasoning. |
 | [`charts.md`](./charts.md) ✅ | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | SHIPPED — behaviour in [`docs/dashboards.md § Views are derived`](../../dashboards.md); the file keeps the reasoning and the deviations. |
-| [`placements.md`](./placements.md) | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | Regions must ride the extension-point contract. |
+| [`placements.md`](./placements.md) ✅ | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | SHIPPED — behaviour in [`docs/dashboards.md § Placements`](../../dashboards.md) and `docs/plugins.md § Cooperative extension points`; the file keeps the reasoning. Regions rode the extension-point contract as a second location, `pane.aside`. |
 | [`dynamic-collections.md`](./dynamic-collections.md) | Run-once-and-pin with schema-drift detection, then the discovery route. | Both gated on the database plugin's saved-query case being wanted. |
 | [`write-back.md`](./write-back.md) | Board-drag write-back over designated write values. | Gated on real usage of read-only boards. |
 
 Two seams across them, both already load-bearing in the code:
 
-- The grid's per-scope `layouts` key and its narrow-window collapse already carry the placements
-  `placements.md` adds, so a new surface needs a renderer and no storage work.
+- The grid's per-scope `layouts` key and its narrow-window collapse carried the placements
+  `placements.md` added with no storage work at all — both new surfaces were a renderer and a scope
+  constant, and the prediction held to the letter.
 - The panel grid claims **only the panel header** as its drag surface, which is what keeps board-card
   drag unambiguous when `write-back.md` lands. Do not take the body for anything else.
 

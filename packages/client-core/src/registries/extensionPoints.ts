@@ -18,6 +18,7 @@
 // dropped the point in an update — delivers nothing, silently, with no error and nothing to crash.
 import {
   parseExtensionPointRef,
+  takesPluginExtensions,
   type ExtensionPointLocation,
   type PluginExtensionItem,
 } from '@acorn/protocol/extensionPoints.ts'
@@ -74,17 +75,23 @@ export const extensionPointFor = (
 /**
  * What the host should draw in this point right now, in declared order.
  *
- * The EMPTY ANSWER is the interesting one, and there are four ways to get it — the point was never
- * registered, its owner is not running on the node being looked at, no plugin contributes to it, or the
- * contributors are not running either. All four are the same silent nothing, because every one of them
- * means the same thing: there is nobody on both ends of this pipe today.
+ * The EMPTY ANSWER is the interesting one, and there are five ways to get it — the point was never
+ * registered, its owner is not running on the node being looked at, no plugin contributes to it, the
+ * contributors are not running either, or the point's location does not take plugin rows at all. All
+ * five are the same silent nothing, because every one of them means the same thing: there is nobody on
+ * both ends of this pipe today.
+ *
+ * That last one is `pane.aside`, whose contributor is THE USER: the host draws a panel region there
+ * rather than descriptor rows (dashboards/region.ts). Nothing renders an aside through this function
+ * today, so the guard is belt to the braces — but "who may fill this location" is a property of the
+ * location, and this is the one place it can be stated where a test can reach it.
  *
  * Ties break on id so two contributions at the same order are stable rather than dependent on plugin
  * registration sequence — the same rule the slot hosts and the context menu apply.
  */
 export function extensionDeliveries(pointId: string): ExtensionContribution[] {
   const point = extensionPointRegistry.get(pointId)
-  if (!point || !(point.when?.() ?? true)) return []
+  if (!point || !takesPluginExtensions(point.location) || !(point.when?.() ?? true)) return []
   return extensionRegistry.entries()
     .filter((entry) => entry.point === pointId && (entry.when?.() ?? true))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))

@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
-import { collectionContributions } from '../registries/collections'
+import { collectionContribution, collectionContributions } from '../registries/collections'
 import { Button, SectionHeader } from '../ui/primitives'
 import { createArmedConfirm } from '../ui/confirm'
 import Icon from '../ui/Icon'
@@ -17,6 +17,13 @@ import type { PanelDefinition, PanelId } from './model'
 import Panel from './Panel'
 import PanelEditor from './PanelEditor'
 import PanelWizard from './PanelWizard'
+import {
+  regionAllows,
+  regionCollections,
+  regionHasRoom,
+  regionViews,
+  type PanelRegion,
+} from './region'
 import {
   dashboards,
   homeTabs,
@@ -95,6 +102,11 @@ export default function PanelGrid(props: {
   heading?: JSX.Element
   /** `role="tabpanel"` wiring for the grid, when something above it is a tablist. */
   panelAria?: { id: string; labelledBy: string }
+  /** Present when this grid is a rectangle a PLUGIN reserved, carrying what the owner allows there
+   *  (region.ts). Absent for Home and the task pane, which are the user's own surfaces and constrain
+   *  nothing. Every rule it carries is applied in exactly two places below — the offer and the
+   *  render — and nowhere else in this file. */
+  region?: PanelRegion
 }) {
   // The sheet's session. The wrapper distinguishes "open" from "closed", which a bare
   // `PanelDefinition | undefined` cannot — it is opened with no panel by nothing today, and with a
@@ -108,8 +120,25 @@ export default function PanelGrid(props: {
   const [announcement, setAnnouncement] = createSignal('')
   const confirmDelete = createArmedConfirm()
 
-  const panels = () => panelsAt(props.scope)
-  const collections = () => collectionContributions()
+  // The RENDER-time half of a region's constraints. A panel the owner no longer allows here is dropped
+  // from this grid and from nowhere else: its definition, and every other placement of it, survive
+  // (region.ts § regionAllows). The hole it leaves in the geometry is cosmetic and only appears when a
+  // plugin narrows its own region after somebody composed against the wider one.
+  const panels = () => {
+    const region = props.region
+    const placed = panelsAt(props.scope)
+    return region ? placed.filter((panel) => regionAllows(region, panel, collectionContribution)) : placed
+  }
+  /** The EDIT-time half: the editor's selectors simply do not offer what the region disallows, which is
+   *  what makes a disallowed panel unrepresentable rather than validated. */
+  const collections = () => {
+    const region = props.region
+    return region ? regionCollections(region, collectionContributions()) : collectionContributions()
+  }
+  const views = () => props.region && regionViews(props.region)
+  /** A region's cap is the owner's, and it takes the affordance away rather than failing on click — the
+   *  same rule the "no plugin provides a collection" gate below already applies. */
+  const hasRoom = () => !props.region || regionHasRoom(props.region, panels().length)
   const committed = createMemo(() => layoutAt(props.scope))
   /** What the grid draws: the live candidate while a gesture is running, else what is stored. */
   const layout = (): PanelLayout => gesture()?.layout ?? committed()
@@ -514,7 +543,7 @@ export default function PanelGrid(props: {
             already established that there is then at least one collection to offer — or a heading,
             which is a tab bar that must survive its own tab being empty. */}
         <Show when={panels().length || props.heading} fallback={<div class="dash-placement-add">{addButton()}</div>}>
-          <SectionHeader level="group" actions={<Show when={collections().length}>{addButton()}</Show>}>
+          <SectionHeader level="group" actions={<Show when={collections().length && hasRoom()}>{addButton()}</Show>}>
             {props.heading ?? 'Panels'}
           </SectionHeader>
           <div
@@ -594,6 +623,7 @@ export default function PanelGrid(props: {
         <Show when={adding()}>
           <PanelWizard
             collections={collections()}
+            {...(views() ? { views: views()! } : {})}
             scope={props.scope}
             onClose={() => setAdding(false)}
             onOpenEditor={(panel) => setEditing({ panel, creating: true })}
@@ -608,6 +638,7 @@ export default function PanelGrid(props: {
           {(session) => (
             <PanelEditor
               collections={collections()}
+              {...(views() ? { views: views()! } : {})}
               {...(session().panel ? { panel: session().panel } : {})}
               {...(session().creating ? { creating: true } : {})}
               onClose={() => setEditing(undefined)}

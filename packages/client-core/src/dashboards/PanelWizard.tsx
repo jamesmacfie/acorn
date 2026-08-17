@@ -91,6 +91,8 @@ const VIEW_REASONS: Record<ViewReasonCode, string> = {
   'needs-enum': 'Needs a status-like field. This data has none.',
   'needs-axis': 'Needs a category or a date to plot against.',
   'cold-schema': 'Unknown until this collection has been read once.',
+  // About the PLACE, not the data — so the sentence says where, and says the panel is fine elsewhere.
+  'not-here': 'This plugin does not allow this view in its panel area.',
 }
 
 /** The type vocabulary, as glyphs, for the gallery's field chips. Same seven the wire declares. */
@@ -114,6 +116,9 @@ const PRESET_LABELS: Record<Preset, string> = { s: 'S', m: 'M', l: 'L' }
 
 export default function PanelWizard(props: {
   collections: readonly CollectionContribution[]
+  /** The view kinds a plugin-reserved region allows, when composing into one (dashboards/region.ts).
+   *  Absent on the user's own surfaces, which allow every view the data supports. */
+  views?: readonly PanelViewKind[]
   /** The placement the wizard was launched from. It is the default destination, not the only one. */
   scope: PlacementScope
   onCreate: (panel: PanelDefinition, scope: PlacementScope, rect: Rect) => void
@@ -164,7 +169,7 @@ export default function PanelWizard(props: {
 
   // ── Step 2: the five cards ──────────────────────────────────────────────────────────────────
 
-  const availability = createMemo(() => viewAvailability(draft.schema()))
+  const availability = createMemo(() => viewAvailability(draft.schema(), props.views))
 
   // ── Step 4: destination and footprint ───────────────────────────────────────────────────────
 
@@ -394,9 +399,13 @@ export default function PanelWizard(props: {
                   },
                   {
                     value: 'plugin-region',
-                    label: 'Plugin region',
-                    disabled: true,
-                    title: 'Needs plugin-hosted regions (docs/future/dashboards/placements.md).',
+                    label: 'Plugin area',
+                    // Reachable only from the region itself, exactly as the task pane is and for the
+                    // same reason — plus one this surface adds: a region's allowances are the OWNER's,
+                    // so aiming at one from Home would mean composing against constraints belonging to
+                    // a rectangle that is not on screen.
+                    disabled: props.scope.surface !== 'plugin-region',
+                    title: 'Add it from the plugin area itself.',
                   },
                 ]}
               />

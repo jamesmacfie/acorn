@@ -513,10 +513,10 @@ writes them back.
 **Placements reference panel definitions by id; they never embed them.** Embedding panel config
 inside a "home dashboard" blob works right up until panels need to live in a second place, and then
 it is a migration. A placement scope key is `(surface, ownerId?, projectId?)` with segments encoded,
-so an owner id that itself contains a separator can never be read as two. `home` and `pane` are drawn
-today; `plugin-region` is named in the key format so a later phase adds a renderer rather than a key
-format. The split does its job: a new surface is a container and a scope constant, and touches
-neither the key format nor the panel.
+so an owner id that itself contains a separator can never be read as two. All three surfaces are drawn:
+`home` (a tab per `ownerId`), `pane`, and `plugin-region` (a rail source's side panel or a pane's
+aside, `<pluginId>:<somethingId>`). The split did its job — every one of them arrived as a container
+and a scope constant, and none of them touched the key format or the panel.
 
 **Geometry is a third top-level key, `layouts`, keyed by the same scope then by panel id** — four
 small integers per placed panel. A sibling key rather than turning the placement entries into
@@ -607,10 +607,42 @@ that pane in every task. A board per task is a non-goal — a task is ephemeral,
 labour nobody repeats. If per-something boards are ever wanted the answer is the scope's `projectId`
 segment, which the key format already carries, not a task segment.
 
+**Plugin regions** are the fourth and fifth, and they are the same `PanelGrid` again — a rectangle a
+plugin reserved in one of *its own* surfaces for panels the user composes. Two surfaces reserve one
+today: a rail source's side panel, beside its list, and a `pane.aside` extension point, beside a
+plugin pane's frame. Both are stored under `plugin-region/<pluginId>:<somethingId>`, which is why the
+scope key percent-encodes its segments.
+
+**The host draws the region; the plugin's manifest only reserves it.** Panels are host Solid
+components and a sandboxed frame is a separate realm, so "a rectangle for dashboard items" can never
+mean "inside my iframe". The precedent is the document surface's frame `layout` templates — the
+manifest reserves part of the rectangle and the host draws that part — and no bridge API may pretend
+otherwise.
+
+What the owner may say about its rectangle is one small vocabulary, shared by both surfaces:
+**which collections** (its own by default; or an explicit list of `<pluginId>:<collectionId>`
+references; or "any collection with a status-role field"), **which views**, and **how many panels**.
+Those constraints are **enforced twice**, the pattern the repo uses everywhere: the editor's selectors
+simply do not offer a disallowed option, and the host re-checks at render, because a manifest arrives
+inside a roster row and a plugin can narrow its own region in an update long after somebody composed
+against the wider one. A panel refused at render is not drawn *here* and nothing is deleted — it
+survives in the library and on every other surface it is placed in. A panel whose collection is merely
+*unresolved* is admitted and draws inert, so a disabled plugin never looks like a policy refusal.
+
+A region also declares no rectangle of its own beyond its location: a source that declares nothing is
+pixel-identical to what it was before the key existed, and a source cannot both reserve a region and
+navigate to a project-scoped surface, because the detail half of a master/detail browse is already
+drawn in that seat — the manifest refuses the pair at parse.
+
 With more than one surface, **Remove and Delete are two different things**. "Remove from here"
 unplaces; "Delete panel" destroys the definition and is armed, because the editor makes a definition
 genuinely expensive to recompose — filters, a sort, a projection, a whole mapping matrix — and one
 misclick should not cost all of it.
+
+**Every placement survives its plugin.** A region whose owning plugin is disabled or uninstalled
+disappears from view and its persisted definitions survive inert, returning with the plugin. The
+user's hand-built compositions are never collateral damage of a plugin lifecycle event, on any
+surface.
 
 ### The grid
 

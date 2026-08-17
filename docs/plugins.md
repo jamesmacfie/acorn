@@ -1163,11 +1163,26 @@ checks it again on arrival, and the host mints every name.
 } }
 ```
 
-`location` is a closed list with one member — `pane.footer`, a strip the host draws under a plugin
-pane's frame — and it grows when a surface appears to draw it, never ahead of one. `surface` must be a
-`pane` this same manifest declares; a settings page, importer, overlay, reference panel or webview is
-chrome the host already draws around a frame, with nowhere to reserve a strip. One point per surface
-per location.
+`location` is a closed list — `pane.footer`, a strip the host draws under a plugin pane's frame, and
+`pane.aside`, a column beside it — and it grows when a surface appears to draw it, never ahead of one.
+Position is encoded in the *name*, the same rule the frame `layout` template family follows: an
+`orientation` field alongside would be the first knob of a layout language. `surface` must be a `pane`
+this same manifest declares; a settings page, importer, overlay, reference panel or webview is chrome
+the host already draws around a frame, with nowhere to reserve a strip. One point per surface per
+location — so one pane may have both.
+
+**The two locations take two different contributors.** A footer is filled by other plugins'
+`extensions`, below. An **aside is filled by the user**: the host draws a dashboard region there, and
+what the owner declares is not a route to read but the constraints a person's own composition must
+satisfy — `panels: { collections | fieldRole, views, max }`, defaulting to this plugin's own
+collections, every view and four panels ([dashboards.md](./dashboards.md) § Placements owns that
+vocabulary; a rail source declares the same block to get a panel area beside its list). An
+`extensions` entry aimed at an aside delivers nothing, which is the same silent nothing every
+unmatched contribution already gets.
+
+Both regions obey one rule without exception: **the host draws them, the plugin's layout only reserves
+them.** Panels and rows are host components; the frame is a separate realm. No bridge API may pretend
+otherwise.
 
 **B declares what it puts there, by id.**
 
@@ -1360,6 +1375,26 @@ apart without asking. Its `label` and `glyph` are currently unused — a task pa
 switcher entry, but a project-scoped surface is drawn beside its own rail list, which already carries
 the plugin's labels — so do not expect them on screen. The `x` segment is reserved by core for exactly this, and the prefix is derived
 from the plugin id alone — a manifest cannot name it.
+
+A source may instead offer a **panel area beside its list** — a dashboard the *user* composes, drawn by
+the host with its own components, under constraints the source declares:
+
+```json
+{ "contributions": { "sources": [{
+  "id": "linear-issues",
+  "label": "Linear",
+  "order": 20,
+  "items": "/v2/p/linear/rail-items",
+  "panels": { "fieldRole": "status", "views": ["list", "board"], "max": 6 }
+}] } }
+```
+
+`panels: {}` is the whole opt-in and means this plugin's own collections, every view and four panels;
+the block is the same one a `pane.aside` extension point takes, and
+[dashboards.md](./dashboards.md) § Placements owns what it means. **Instead**, not as well: a source
+declaring both `panels` and a `navigate` `onSelect` is a parse error, because the detail half of a
+master/detail browse is drawn in exactly that rectangle. A source that declares neither is
+pixel-identical to what it was before the key existed.
 
 An `overlay` surface is a full-screen picker — the shape the editor's ⌘P file palette has as a compiled
 contribution. The host draws the backdrop, the box, the title and the dismiss affordance; the frame draws

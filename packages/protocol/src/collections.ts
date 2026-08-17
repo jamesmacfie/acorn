@@ -51,6 +51,18 @@ export const COLLECTION_FIELD_TYPES = ['text', 'number', 'boolean', 'datetime', 
 // field with no role is still a perfectly good column.
 export const COLLECTION_FIELD_ROLES = ['title', 'status', 'assignee', 'url', 'updated'] as const
 
+// A THIRD closed vocabulary — the views the host draws a collection with — and it lives here, on the
+// wire, rather than only in the renderer because a MANIFEST now names it: a plugin reserving a panel
+// region may narrow which views a user may compose there
+// (docs/future/dashboards/placements.md § The constraint vocabulary). A narrowing that named a kind
+// this build has no renderer for would be a constraint nobody can satisfy, so it is an enum and an
+// unknown entry is a parse error.
+//
+// Only the LIST is here. WHICH SCHEMA supports which view stays in @acorn/dashboards-core — that is a
+// rendering rule derived from the field types above, not a wire format.
+export const PANEL_VIEW_KINDS = ['stat', 'list', 'table', 'board', 'chart'] as const
+export type PanelViewKind = (typeof PANEL_VIEW_KINDS)[number]
+
 const fieldType = z.enum(COLLECTION_FIELD_TYPES)
 const fieldRole = z.enum(COLLECTION_FIELD_ROLES)
 
