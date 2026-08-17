@@ -130,7 +130,7 @@ const parseRect = (raw: unknown): Rect | undefined => {
 // name. An over-long name is TRUNCATED rather than dropped, because dropping the entry would strand
 // its panels behind a recovered "Untitled" for no gain.
 
-const MAX_TABS = 8
+export const MAX_TABS = 8
 const MAX_TAB_NAME = 60
 
 const parseTabs = (raw: unknown): DashboardTab[] => {

@@ -1,7 +1,9 @@
-import { For, Show } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
-import { HOME_PLACEMENT } from '../dashboards/persist'
+import DashboardTabs from '../dashboards/DashboardTabs'
+import { activeHomeTab, homeTabDomId, HOME_TAB_PANEL_ID, setActiveHomeTab } from '../dashboards/homeTab'
+import { dashboards, homeTabs, HOME_PLACEMENT, homeTabScope } from '../dashboards/persist'
 import PanelGrid from '../dashboards/PanelGrid'
 import { projectsOptions, tasksOptions, workspacesOptions } from '../queries'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
@@ -26,6 +28,20 @@ export default function Home() {
     const project = projects.data?.find((candidate) => candidate.id === task.projectId)
     return !project?.hidden
   })
+
+  // ── Dashboards (docs/future/dashboards/tabs.md) ─────────────────────────────────────────────
+  //
+  // A tab is a placement scope, so all Home owns is WHICH ONE the grid is pointed at. With one
+  // dashboard there is no bar, the scope is the bare `home` key and this page is what it always was.
+  //
+  // The bar is built ONCE, outside the memo, and only conditionally handed to the grid. Solid props
+  // are lazy getters, so it stays reactive — but rebuilding it whenever the tab list changed would
+  // discard the rename it is in the middle of, which is the write that changes the tab list.
+  const tabs = createMemo(() => homeTabs(dashboards()))
+  /** A remembered tab that has since been deleted falls back to the default rather than showing an
+   *  empty grid for a dashboard that does not exist. */
+  const activeTab = () => (tabs().some((tab) => tab.id === activeHomeTab()) ? activeHomeTab() : '')
+  const bar = <DashboardTabs tabs={tabs()} active={activeTab()} onSelect={setActiveHomeTab} />
 
   return (
     <main class="panes home-source">
@@ -53,7 +69,11 @@ export default function Home() {
           </For>
         </ul>
       </Show>
-      <PanelGrid scope={HOME_PLACEMENT} />
+      <PanelGrid
+        scope={tabs().length > 1 ? homeTabScope(activeTab()) : HOME_PLACEMENT}
+        heading={tabs().length > 1 ? bar : undefined}
+        panelAria={tabs().length > 1 ? { id: HOME_TAB_PANEL_ID, labelledBy: homeTabDomId(activeTab()) } : undefined}
+      />
     </main>
   )
 }

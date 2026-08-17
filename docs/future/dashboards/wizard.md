@@ -27,9 +27,12 @@ Five deviations from the spec below, all deliberate:
   own filter box through the same function. The sheet keeps Picker unchanged.
 - **The Place step's surface control offers Home and the launch surface, with plugin regions disabled
   and named.** Aiming at the task-pane placement from Home would put a panel where nobody is looking,
-  so `Task pane` is reachable only from the pane itself. The tab select appears past one Home tab, as
-  specced; **"New dashboard…" inline was not built** — creating a tab is `tabs.md`'s affordance and a
-  second creator here would be the drift this whole file argues against.
+  so `Task pane` is reachable only from the pane itself. "New dashboard…" was **withheld at first**
+  (creating a tab is `tabs.md`'s affordance) and then **landed here when tabs shipped**, because
+  tabs.md put its own creation door in this step: the bar's `+` exists only past one dashboard, so
+  the *first* second-dashboard has nowhere else to be born. It is offered always, and the tab is
+  created **at commit**, never when the option is picked — a half-abandoned wizard leaves nothing
+  behind (`tabs.md § the creation door`).
 - **`placePanelAt` in `persist.ts` is where a preset becomes a rect.** The spec puts the commit in the
   wizard; a geometry write in a component is the one thing `layout.ts`'s own header forbids, and this
   way the rule is testable (`persist.test.ts`).

@@ -1,16 +1,28 @@
 # Tabs: multiple dashboards on Home
 
-**The data model is BUILT (phase 0); the tab bar is not.** Behaviour for what shipped is in
-[`docs/dashboards.md § Persistence`](../../dashboards.md); this file keeps the reasoning and owns the
-unbuilt half — the bar, the verbs and the wizard's tab dimension (`README.md § build order`). One
-sentence of design: **a tab is a home placement scope with an `ownerId`**, and everything else falls
-out of machinery that already exists.
+**SHIPPED.** Behaviour lives in [`docs/dashboards.md`](../../dashboards.md) — the model under
+§ Persistence, the bar and its verbs under § Placements. This file keeps the reasoning: why a tab is
+not a new concept, what the survival rules are defending against, and the four things it deliberately
+does not do. One sentence of design: **a tab is a home placement scope with an `ownerId`**, and
+everything else falls out of machinery that already exists.
 
-## The data model: no new concepts, one new list — SHIPPED
+Two notes for whoever touches it next, neither of them in the behaviour doc:
+
+- **The creation door is in the wizard, not on Home.** The bar owns a `+`, but the bar only exists
+  past one dashboard, and "one dashboard renders today's Home pixel for pixel" is a hard commitment.
+  So the wizard's Place step always offers "New dashboard…", and it creates the tab at COMMIT rather
+  than when the option is picked — the wizard's promise is that nothing is written until the last
+  step, and a half-abandoned wizard leaving an empty dashboard behind would break it.
+- **The bar is built once, in `Home.tsx`, and only conditionally handed to the grid.** Rebuilding it
+  when the tab list changes would discard the inline rename that is *causing* the tab list to
+  change. Solid props are lazy getters, so a stable element is still a reactive one.
+
+## The data model: no new concepts, one new list
 
 `persist.ts` carries it: `DashboardTab`, the `tabs` key on `DashboardState`, the codec with its two
 caps, `homeTabScope`/`homeTabIdOf`, the `homeTabs` derivation, and the `setHomeTabs`/`removeHomeTab`
-store actions. Tested in `persist.test.ts § home tabs`. Two notes for whoever builds the bar:
+store actions. Tested in `persist.test.ts § home tabs`; the bar's own arithmetic — create, rename,
+reorder as pure list transforms — is `homeTab.ts`, tested in `homeTab.test.ts`. Two notes:
 
 - **`homeTabs` always offers the default tab**, whether or not it holds panels — one line past the
   spec's literal "`tabs` ∪ orphaned keys", because the bare scope has no delete and must never become
@@ -68,40 +80,22 @@ degradation directions are defined below.
   that says what survives: "Panels stay in your library and on other tabs." The default tab is not
   deletable — it is the bare scope, and "delete" of it would just be "empty it".
 
-## UX
+## UX and accessibility
 
-- **The bar exists only when there are two or more tabs.** One dashboard renders today's Home,
-  pixel for pixel — no bar, no "1 of 1" chrome. The bar appears when the second tab is created and
-  disappears when it goes; the feature costs nothing until used.
-- **Placement:** the bar replaces the "Panels" section-header line, in the same position — tabs
-  *are* the heading when there are several. The Add-panel button keeps its right-aligned seat on
-  the same row. The active-tasks list above is untouched; tabs scope the panel area only.
-- **Creating:** a ghost `+` at the row's end creates "New dashboard" with the name immediately in
-  an inline rename (select-all), because a tab named "New dashboard" forever is what happens when
-  rename is a separate trip.
-- **Per-tab verbs** live in a small overflow on the active tab (and context-menu on any):
-  Rename · Move left / Move right · Delete (armed). Reorder is menu-first, keyboard-operable by
-  construction — the field-projection precedent.
-- **The wizard's Place step** (`wizard.md`): when more than one tab exists, choosing Home offers
-  the tab (default: the one you launched from), plus "New dashboard…" inline. "Move to…" on a
-  panel lists tabs as destinations alongside the task pane — `placePanel`/`unplacePanel` already
-  do the work.
-- **Active tab is device view-state, not model state**: remembered per device (the rail-selection
-  posture), never written to the node blob — which tab you were reading is not part of the
-  composition. Mind the device-pref write-order gotcha if it lands as a device pref.
+Behaviour is [`docs/dashboards.md § Placements`](../../dashboards.md); the reasoning behind it is one
+line each. The bar exists only past one tab, because a feature should cost nothing until it is used.
+It takes the section-header seat rather than a row of its own, because tabs *are* the heading when
+there are several. Creating drops straight into rename, because a tab called "New dashboard" forever
+is what happens when naming it is a second trip. Reorder is menu-first — Move left / Move right —
+which is keyboard-operable by construction, the field-projection precedent. Delete is armed and its
+copy says what survives, because arrangement is real work and the copy is the only place a person
+learns their definitions are not at risk. And the ARIA is the standard tablist with nothing invented:
+`ui/Tabs.tsx` was not reused only because a tab here carries an inline rename input and an overflow
+trigger, neither of which can live inside a `<button role="tab">`.
 
-## UI and accessibility
-
-Standard ARIA tabs, no invention: the bar is `role="tablist"` (`aria-label="Dashboards"`), each
-tab `role="tab"` with `aria-selected`, the grid container `role="tabpanel"` labelled by the active
-tab. Roving tabindex; **Left/Right arrows** move selection (activation on focus — switching is a
-cheap, local render), **Home/End** jump, rename opens on **Enter** on the active tab's affordance
-or F2. Visually: quiet text tabs in the section-header's own type scale, active tab in full ink
-with a 2px accent underline, inactive muted with a hover wash; the `+` ghost matches the
-Add-panel button's vocabulary. No counts in tabs — a tab is a name, not a stat.
-
-Keyboard chords (e.g. cycling tabs from anywhere on Home) are deliberately not specced here: if
-one is wanted it goes through the existing chord registry, not a tab-local listener.
+No counts in tabs — a tab is a name, not a stat. Keyboard chords (cycling tabs from anywhere on Home)
+are deliberately unspecced: if one is wanted it goes through the existing chord registry, not a
+tab-local listener.
 
 ## What this deliberately does not do
 
@@ -113,29 +107,16 @@ one is wanted it goes through the existing chord registry, not a tab-local liste
 - **No syncing of the active tab across devices** — view state, per device, above.
 - **No tab-level sharing/export** — out of scope with the rest of dashboards.
 
-## Done when
+## What shipped, and the one seat left empty
 
-- ~~The `tabs` key round-trips with the codec rules; the renderer derives named + recovered tabs;
-  an old-client write loses only names/order, proven by a round-trip test.~~ Done.
-- With one tab, Home is pixel-identical to today. Creating a second shows the bar; deleting back
-  to one removes it.
-- Create, inline-rename, reorder and armed delete all work, delete unplacing without touching
-  definitions; the default tab is not deletable.
-- The full ARIA pattern holds: arrows, Home/End, roving tabindex, `tabpanel` labelling — and
-  every gesture the grid supports works identically inside any tab.
-- The wizard places into a chosen tab; "Move to…" moves a panel between tabs keeping its
-  definition and taking a fresh rect at the destination.
-- The measure sampler needs no change: "placed in at least one scope" already counts any tab
-  (`measure-history.md § Sampling`).
+`persist.ts` holds the model; `homeTab.ts` the pure list verbs and the `core.home-tab` device slice;
+`DashboardTabs.tsx` the bar. `PanelGrid` grew two optional props — a `heading` that replaces "Panels"
+and, with it, keeps the header row on an empty placement, and the `tabpanel` wiring — so it is still
+a component that draws one placement rather than one that knows about Home. The measure sampler
+needed no change: "placed in at least one scope" already counts any tab
+(`measure-history.md § Sampling`).
 
-## Verify before building
-
-- `persist.ts` — `placementScopeKey`'s empty-segment collapsing (the `''`-id default rests on
-  it), the parser's treatment of unknown top-level keys on read and write (both ceilings above),
-  and `panelsAt`/`layoutAt` taking arbitrary scopes.
-- `Home.tsx` — where `HOME_PLACEMENT` is passed and where the "Panels" `SectionHeader` renders;
-  the bar takes that seat.
-- The wizard's Place step shape (`wizard.md`) and the "Move to…" submenu item (`README.md §
-  smaller items`) — both grow a tab dimension.
-- The chord registry, if a cycling shortcut is ever asked for.
-- Device view-state conventions (rail-selection restore) for the active-tab memory.
+**"Move to…" lists tabs only.** Moving a panel to a *task pane* is the same two calls at a different
+destination and is still the smaller item it always was (`README.md § smaller items`) — aiming at a
+pane from Home puts a panel where nobody is looking, which is the argument the wizard's Where control
+already makes. When someone wants it, `moveTargets` in `PanelGrid.tsx` is the one line that grows.

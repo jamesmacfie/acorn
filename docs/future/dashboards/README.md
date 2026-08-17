@@ -44,7 +44,7 @@ nothing else may be reordered.
 | pre ✅ | The scheduler: engine, declarations, the `collection-sample` target and its two seams — all four cron phases are built | [`../cron/`](../cron/README.md) | The node-side sampler is what makes measure history gapless; it accrues samples today with no client open. |
 | 0 | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. **All but the `source` panel-local field (`charts.md § 4`) are built.** |
 | 1 ✅ | Grid gesture + panel chrome restyle | `ux-refresh.md` | Pure presentation; touches no data. Parallel-safe with phase 0 and the cron work. **Built** — behaviour in [`docs/dashboards.md § Layout`](../../dashboards.md). |
-| 2 | The panel wizard ✅; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. **The wizard is built** — behaviour in [`docs/dashboards.md § The generated editor`](../../dashboards.md); the bar is what is left, and the wizard already offers its tabs the moment there is more than one. |
+| 2 ✅ | The panel wizard; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. **Both built** — behaviour in [`docs/dashboards.md`](../../dashboards.md) under § The generated editor and § Placements. |
 | 3 | Stat trend + delta rendering ✅; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. The stat half is built — `docs/dashboards.md § Trends` owns it; the chart half is not. |
 
 ## The work items
@@ -53,7 +53,7 @@ nothing else may be reordered.
 | --- | --- | --- |
 | [`ux-refresh.md`](./ux-refresh.md) ✅ | The grid gesture and panel chrome restyle. | SHIPPED — behaviour moved to [`docs/dashboards.md § Layout`](../../dashboards.md); the file keeps the reasoning. |
 | [`wizard.md`](./wizard.md) ✅ | Staged panel creation with a live preview, over the same generated editor. | SHIPPED — behaviour moved to [`docs/dashboards.md § The generated editor`](../../dashboards.md); the file keeps the reasoning and the seats still empty. |
-| [`tabs.md`](./tabs.md) | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | Model key SHIPPED (behaviour in [`docs/dashboards.md § Persistence`](../../dashboards.md)); the bar is what is left. |
+| [`tabs.md`](./tabs.md) ✅ | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | SHIPPED — behaviour in [`docs/dashboards.md`](../../dashboards.md) (§ Persistence, § Placements); the file keeps the reasoning. |
 | [`measure-history.md`](./measure-history.md) ✅ | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | SHIPPED — behaviour moved to [`docs/dashboards.md § Trends`](../../dashboards.md); the file keeps the reasoning. |
 | [`charts.md`](./charts.md) | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | Series-colour decision SHIPPED (§ 1); legend, grouped bar and the `source` field are what is left. |
 | [`placements.md`](./placements.md) | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | Regions must ride the extension-point contract. |
@@ -75,12 +75,11 @@ Each is small, independent, and can ride along with any of the above.
   so — config for a value that never changes is config nobody reads. A rail-source side panel or a
   narrow plugin region may be the first surface that genuinely wants six. *Done when* a placement can
   declare its column count, existing rects survive the change, and Home is untouched.
-- **Drag between placements.** With more than one surface there is somewhere to drag *to*. The answer
-  is a menu action ("Move to…") before it is a drag, and `placePanel`/`unplacePanel` already do the
-  work. The accepted design seats it in the panel overflow menu, as a submenu listing surfaces —
-  and, with `tabs.md`, each Home tab — with the current one checked. *Done when* a panel can be
-  moved from Home to a task pane or another tab without recomposing it, keeping its definition and
-  taking a fresh rect at the destination.
+- **Drag between placements.** Half done: "Move to…" in the panel overflow menu lists the other Home
+  **tabs** and moves a panel to one, keeping its definition and taking a fresh rect (`tabs.md`). What
+  is left is the other SURFACES — a task pane, later a plugin region — which is the same two calls at
+  a different destination plus an answer to "should Home be able to aim at a pane nobody is looking
+  at?". *Done when* a panel can be moved from Home to a task pane without recomposing it.
 - **A screen-reader data table inside a chart.** The chart's accessibility floor is a labelled SVG
   with a tooltip per mark, and the full data one view flip away in `table`. *Done when* a chart
   exposes its own rows without the flip, and without a second rendering path for cells.
