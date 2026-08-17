@@ -1,7 +1,29 @@
 # The grid gesture and panel chrome restyle
 
-**Unbuilt, ungated — phase 1 of the accepted redesign** (`README.md § build order`). Pure
-presentation: this file changes **no persisted shape, no wire contract, no layout arithmetic**.
+**SHIPPED** — phase 1 of the accepted redesign (`README.md § build order`). What the grid does now is
+[`docs/dashboards.md § Layout`](../../dashboards.md); this file is kept for the reasoning behind it,
+in particular the positioning decision in § 4 and the observer landmine under it.
+
+Three deviations from the spec below, all deliberate:
+
+- **§ 2 and § 5 use width tokens, not the literal pixel values.** `1.5px` became `--bw-strong` and the
+  grip's strokes are drawn from `currentColor` at a token width. A px literal in a border is what
+  `styles/cssHygiene.test.ts` ratchets against, and the spec's own rule was "no new tokens", not "new
+  literals".
+- **§ 3's border step-up to `--border-strong` was dropped.** `--surface-border` — what `.ui-card`
+  already uses — resolves to `--border-strong` in every pack, so the declaration would have been dead
+  CSS. The lift is carried by `--shadow-3` and the scale.
+- **§ 5's grip is a `::before` on the header, not an element.** A pseudo-element is decoration the
+  accessibility tree never sees, so it needs no `aria-hidden`, and `Panel.tsx` — which deliberately
+  does not know whether its surface offers dragging — took no diff at all.
+
+Durations landed on `--dur-short` (150ms) for the slot and `--dur-med` (220ms) for the neighbours
+rather than the spec's 120/180, keeping the "slot leads, chain follows" relationship on tokens a pack
+can retune.
+
+---
+
+Pure presentation: this file changes **no persisted shape, no wire contract, no layout arithmetic**.
 `layout.ts` — push-down, wall-clamp, compaction, `firstFit`, `normalize` — is the spec this design
 obeys, not a thing it touches. If an implementation of this file wants to edit `layout.ts`, the
 implementation is wrong.

@@ -562,16 +562,32 @@ not needed anything richer:
 separate visual effect: release persists exactly what was on screen, so no commit computation can
 disagree with the preview, and Escape costs nothing because nothing was written. The panel drags by
 its **header** only — the body scrolls, selects and clicks, and leaving it gesture-free is also what
-keeps a future board-card drag unambiguous (`docs/future/dashboards/write-back.md`). The cell lattice appears when a gesture arms and vanishes
-when it ends, iOS-widget style; nothing about the layout is discoverable chrome until a gesture makes
-it relevant.
+keeps a future board-card drag unambiguous (`docs/future/dashboards/write-back.md`). A **dot lattice**
+marking cell intersections appears when a gesture arms and vanishes when it ends, iOS-widget style;
+nothing about the layout is discoverable chrome until a gesture makes it relevant. The landing slot is
+drawn as the *shape of the panel* — the panel's own radius, a solid edge and a wash of the accent —
+rather than as a dashed wireframe of it, and it glides between candidates while the dragged panel
+itself is lifted (shadow plus a 1.5% scale) so source and payload never look alike.
+
+Panels are positioned **absolutely from the measured cell**, not by `grid-area`, and that is a
+deliberate cost: `grid-area` cannot be transitioned, so push-down and compaction jumped between frames
+and a drag read as a reshuffle. The container therefore states its own height from the live layout,
+which means a mid-gesture preview resizes it — safe only because the `ResizeObserver` measures width
+and never writes back into the layout. The collapsed one-column mode keeps ordinary block flow.
+
+Panel chrome earns its pixels on approach: a six-dot grip, the refresh button and the overflow trigger
+all fade in on hover or focus-within, and the resize corner carries a faint always-visible mark so a
+panel reads as resizable before it is touched. The **freshness word** does not hide — state is not
+decoration.
 
 Every pointer gesture has a keyboard equivalent driven through **the same pure functions**: drag
 sits *on top of* the accessible path rather than instead of it, which is the commitment reorder made
 when it was menu items only. "Move / resize" in the overflow menu puts the panel in layout mode where
-arrows move by a cell and Shift+arrows resize, announced through a live region; Enter commits, Escape
-restores. Move up / move down survive too, reinterpreted onto geometry as a swap toward the neighbour
-in reading order.
+arrows move by a cell and Shift+arrows resize; Enter commits, Escape restores. The position is
+announced through a live region *and* drawn as a caption beside the panel — the same computed string
+twice, because a sighted keyboard user was otherwise getting strictly less than a screen-reader one.
+Move up / move down survive too, reinterpreted onto geometry as a swap toward the neighbour in reading
+order.
 
 Below roughly twelve 44px cells the grid **collapses to one column in reading order** and the gestures
 disarm. That is purely presentational — nothing in storage changes, so widening the window restores

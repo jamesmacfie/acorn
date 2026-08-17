@@ -36,10 +36,15 @@
 
 /* ── The grid ────────────────────────────────────────────────────────────────────────────── */
 
-/* Twelve columns, square cells, each panel at an explicit `grid-area` from its rect
-   (dashboards/layout.ts). The browser owns every pixel except the cell HEIGHT, which is the one
-   ResizeObserver measurement PanelGrid makes — a square cell is what makes the drag overlay read as
-   graph paper and "3 wide, 2 tall" mean something visually.
+/* Twelve columns, square cells. The browser owns every pixel except the cell HEIGHT, which is the
+   one ResizeObserver measurement PanelGrid makes — a square cell is what makes the drag lattice read
+   as a surface and "3 wide, 2 tall" mean something visually.
+
+   The tracks and the gap are declared here and NOTHING IS IN FLOW IN THEM: slots are positioned
+   absolutely off the same measurement, because `grid-area` cannot be transitioned and neighbours
+   gliding through push-down is the whole point of the gesture restyle. The template stays because it
+   is what a style pack owns and what PanelGrid reads the resolved `column-gap` off; the container's
+   height is stated inline from the live layout.
 
    `--dash-cell` and `--dash-pitch` are overwritten inline by that measurement. The values here are
    the pre-measure fallback, so the first paint is a plausible grid rather than a stack of
@@ -57,7 +62,7 @@
 
 /* Too narrow for cells to mean anything: one column in reading order, heights content-driven as
    they were before geometry existed. PURELY PRESENTATIONAL — nothing in storage changes and the
-   component stops emitting grid areas, so widening the window restores the arrangement exactly.
+   component stops emitting boxes, so widening the window restores the arrangement exactly.
    Gestures disarm here; move up / move down still work. */
 .dash-grid[data-collapsed] {
   grid-template-columns: minmax(0, 1fr);
@@ -70,19 +75,35 @@
   min-width: 0;
   min-height: 0;
 }
+/* Out of flow, at the measured pixel box of its rect — and gliding there, so push-down and
+   compaction read as a chain reaction rather than a reshuffle between frames. */
+.dash-grid:not([data-collapsed]) .dash-slot {
+  position: absolute;
+  transition:
+    top var(--dur-med) var(--ease-out),
+    left var(--dur-med) var(--ease-out),
+    width var(--dur-med) var(--ease-out),
+    height var(--dur-med) var(--ease-out);
+}
+/* The panel under the pointer tracks it raw. Animating the thing being dragged is lag. */
+.dash-slot[data-gesture='move'],
+.dash-slot[data-gesture='resize'] {
+  transition: none;
+}
 .dash-slot > .dash-panel {
   flex: 1;
   min-width: 0;
   min-height: 0;
 }
 
-/* The dragged panel leaves the flow visually: raised, shadowed, and translated under the pointer
-   while its placeholder holds the cells it would land in. */
+/* The dragged panel leaves the flow visually: raised, shadowed, scaled a hair, and translated under
+   the pointer while its placeholder holds the cells it would land in. */
 .dash-slot[data-gesture='move'] {
   z-index: var(--z-float);
   box-shadow: var(--shadow-3);
 }
-.dash-slot[data-gesture='resize'] {
+.dash-slot[data-gesture='resize'],
+.dash-slot[data-gesture='keyboard'] {
   z-index: var(--z-float);
 }
 .dash-slot[data-gesture='keyboard'] > .dash-panel {
@@ -90,31 +111,63 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* The candidate cells, in the same dashed language as the overlay so a drag reads as one thing. */
+/* Where the panel will BE, not a diagram of it: the panel's own radius, a solid edge and a wash of
+   the accent. `color-mix` over `--accent` rather than a wash token, so the terminal pack's accent
+   and a plugin-contributed theme's accent both just work. The position transition is faster than a
+   neighbour's, so the slot leads and the chain follows. */
 .dash-placeholder {
-  border: var(--control-bw) dashed var(--border-strong);
+  position: absolute;
+  border: var(--bw-strong) solid color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: var(--radius-surface);
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   min-width: 0;
+  transition:
+    top var(--dur-short) var(--ease-out),
+    left var(--dur-short) var(--ease-out),
+    width var(--dur-short) var(--ease-out),
+    height var(--dur-short) var(--ease-out);
 }
 
 /* The cell lattice, drawn ONLY while a gesture is live — it appears on arm and vanishes on release,
-   iOS-widget style. Two repeating gradients rather than an SVG pattern: no asset, and the same
-   `--dash-pitch` arithmetic as the grid, so panel edges sit exactly on drawn lines.
+   iOS-widget style. Dots at cell INTERSECTIONS rather than ruled lines: ruled lines read as a
+   spreadsheet behind the page and get loud under dense packs, where a lattice reads as a surface
+   things are placed on. One gradient, offset half a gap on both axes so the dots sit where panel
+   corners land.
 
-   The colour is the plain border token at low emphasis rather than the `--divider` recipe: packs
-   zero that width (tokens-style.css), and a lattice with no lines is not a lattice. Some packs will
-   still make it barely there, which is correct — this is scaffolding, not content. */
+   The colour is the plain border token rather than the `--divider` recipe: packs zero that width
+   (tokens-style.css), and a lattice with no dots is not a lattice. Some packs will still make it
+   barely there, which is correct — this is scaffolding, not content. */
 .dash-grid-overlay {
   position: absolute;
   inset: 0;
   z-index: var(--z-base);
   pointer-events: none;
   opacity: 0.5;
-  background:
-    repeating-linear-gradient(to right, var(--border) 0 var(--bw), transparent var(--bw) var(--dash-pitch)),
-    repeating-linear-gradient(to bottom, var(--border) 0 var(--bw), transparent var(--bw) var(--dash-pitch));
+  background: radial-gradient(circle, var(--border) 1.6px, transparent 1.8px);
+  background-size: var(--dash-pitch) var(--dash-pitch);
+  background-position:
+    calc((var(--dash-cell) - var(--dash-pitch)) / 2)
+    calc((var(--dash-cell) - var(--dash-pitch)) / 2);
   transition: opacity var(--dur-short) var(--ease-out);
+}
+
+/* The keyboard path's announcement, drawn. Same string as the live region, near the panel it is
+   about, because a sighted keyboard user was getting strictly less than a screen-reader one. */
+.dash-caption {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-start: 0;
+  z-index: var(--z-float);
+  margin-block-start: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: var(--surface-border);
+  border-radius: var(--radius-popover);
+  background: var(--bg);
+  box-shadow: var(--shadow-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* Invisible until the panel is hovered or focused within: nothing about the layout is discoverable
@@ -134,8 +187,21 @@
   content: '';
   position: absolute;
   inset: 0;
+}
+/* The edges are bars; the corner is a mark, below. */
+.dash-resize-e::after,
+.dash-resize-s::after {
   background: var(--border-strong);
   border-radius: var(--radius-pill);
+}
+/* The one handle that is faintly there before it is hovered — two strokes meeting at the corner, so
+   a panel reads as resizable without a person having to find the edge first. */
+.dash-resize-se {
+  opacity: 0.4;
+}
+.dash-resize-se::after {
+  border-inline-end: var(--bw-strong) solid var(--border-strong);
+  border-block-end: var(--bw-strong) solid var(--border-strong);
 }
 .dash-resize-e {
   inset-block: var(--space-4);
@@ -168,14 +234,6 @@
   white-space: nowrap;
 }
 
-/* A pack that asks for stillness gets it: positions still update live, they just do not animate. */
-@media (prefers-reduced-motion: reduce) {
-  .dash-grid-overlay,
-  .dash-resize {
-    transition: none;
-  }
-}
-
 /* ── Panel ───────────────────────────────────────────────────────────────────────────────── */
 
 /* Fills its rect. Before geometry existed a panel was content-sized and the grid row followed it;
@@ -205,9 +263,56 @@
 .dash-grid:not([data-collapsed]) .dash-slot[data-gesture='move'] .dash-panel-head {
   cursor: grabbing;
 }
-/* The buttons in the header are not the drag surface, and their own cursor says so. */
+
+/* The grip: a 2×3 dot field at the header's leading edge, appearing on hover or focus-within. A
+   PSEUDO-ELEMENT, so it is decoration the accessibility tree never sees and Panel.tsx never learns
+   about — the whole header is still the drag surface and the keyboard path is still the overflow
+   menu's "Move / resize". Drawn only where dragging is actually offered. */
+.dash-grid:not([data-collapsed]) .dash-panel-head::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 9px;
+  opacity: 0;
+  background: radial-gradient(circle, currentcolor 0.9px, transparent 1.1px);
+  background-size: 3px 3px;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.dash-slot:hover .dash-panel-head::before,
+.dash-slot:focus-within .dash-panel-head::before {
+  opacity: 0.45;
+}
+
+/* The buttons in the header are not the drag surface, and their own cursor says so. They also fade
+   with the grip: refresh and the overflow menu are chrome, and chrome earns its pixels on approach.
+   Opacity rather than `display`, so both stay in the tab order and reappear when focused. The
+   FRESHNESS WORD beside them is untouched — state is not decoration and does not hide. */
 .dash-panel-head button {
   cursor: pointer;
+}
+.dash-slot .dash-panel-head button {
+  opacity: 0;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.dash-slot:hover .dash-panel-head button,
+.dash-slot:focus-within .dash-panel-head button,
+.dash-slot .dash-panel-head button[data-open] {
+  opacity: 1;
+}
+
+/* A pack that asks for stillness gets it: everything above still DRAWS and positions still update
+   live, they just do not animate on the way. Reduced motion asks for less movement, not less
+   information. LAST, deliberately — same specificity as the rules it cancels, so it has to come
+   after them; move a transition below this block and it comes back to life. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-grid-overlay,
+  .dash-resize,
+  .dash-placeholder,
+  .dash-grid:not([data-collapsed]) .dash-slot,
+  .dash-grid:not([data-collapsed]) .dash-panel-head::before,
+  .dash-slot .dash-panel-head button {
+    transition: none;
+  }
 }
 .dash-panel-title {
   flex: 1;

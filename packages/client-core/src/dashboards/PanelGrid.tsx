@@ -321,8 +321,18 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
     <Menu
       ariaLabel={`${definition.title} panel actions`}
       placement="bottom-end"
-      trigger={({ toggle }) => (
-        <Button size="xs" variant="ghost" iconOnly aria-label={`${definition.title} panel actions`} onClick={toggle}>
+      trigger={({ open, toggle }) => (
+        <Button
+          size="xs"
+          variant="ghost"
+          iconOnly
+          aria-label={`${definition.title} panel actions`}
+          // Header actions fade out when the pointer leaves the panel — and opening this menu moves
+          // both pointer and focus into a portal, so without this the trigger vanishes under its own
+          // open menu.
+          {...(open() ? { 'data-open': '' } : {})}
+          onClick={toggle}
+        >
           <Icon name="ellipsis" />
         </Button>
       )}
@@ -382,23 +392,63 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
 
   // ── Rendering ───────────────────────────────────────────────────────────────────────────────
   //
-  // CSS grid does the pixel math: 12 columns, rows one square cell tall, each panel at an explicit
-  // `grid-area` from its rect. The collapsed state simply stops emitting the areas, so the browser
-  // stacks them in document order — which `placements` is kept sorted to on every commit.
+  // Twelve columns, rows one square cell tall — but slots are positioned ABSOLUTELY from the same
+  // measurement rather than by `grid-area`. The reason is motion: `grid-area` cannot be transitioned,
+  // so push-down and compaction jumped between frames and a drag read as a reshuffle rather than a
+  // chain reaction. `top/left/width/height` can be transitioned, and computing them is `measure` run
+  // backwards, so the browser and this file cannot disagree about where a cell is. FLIP transforms
+  // over CSS grid were the alternative and were refused: they are fragile under the re-layout this
+  // grid does every frame, and they fight the sub-cell translate the dragged panel already carries.
+  //
+  // The container therefore has no in-flow children and must state its own height, which follows the
+  // LIVE layout — so a mid-gesture preview resizes the container, which the ResizeObserver above
+  // sees. That is only safe because `measure` reads the width and writes nothing back into the
+  // layout. An observer that re-applied the committed model would stomp the preview every frame.
+  //
+  // The collapsed state emits none of it and the slots fall back into ordinary block flow, stacked in
+  // document order — which `placements` is kept sorted to on every commit.
 
-  const areaStyle = (id: PanelId): JSX.CSSProperties => {
-    const rect = layout().rects[id]
-    if (collapsed() || !rect) return {}
-    return { 'grid-area': `${rect.y + 1} / ${rect.x + 1} / span ${rect.h} / span ${rect.w}` }
+  /** The gap, back out of the two measurements: pitch is a cell plus one gap. */
+  const gap = () => pitch() - cell()
+
+  const boxOf = (rect: Rect): JSX.CSSProperties => ({
+    left: `${rect.x * pitch()}px`,
+    top: `${rect.y * pitch()}px`,
+    width: `${rect.w * pitch() - gap()}px`,
+    height: `${rect.h * pitch() - gap()}px`,
+  })
+
+  /** How deep the live layout reaches — the grid's height, since nothing inside it is in flow. */
+  const gridHeight = () => {
+    const current = layout()
+    const rows = panels().reduce((deepest, entry) => {
+      const rect = current.rects[entry.id]
+      return rect ? Math.max(deepest, rect.y + rect.h) : deepest
+    }, 0)
+    return Math.max(0, rows * pitch() - gap())
   }
 
   const slotStyle = (id: PanelId): JSX.CSSProperties => {
+    const rect = layout().rects[id]
+    if (collapsed() || !rect) return {}
     const active = gesture()
     const offset = active?.id === id ? active.offset : undefined
     return {
-      ...areaStyle(id),
-      ...(offset ? { transform: `translate(${offset.x}px, ${offset.y}px)` } : {}),
+      ...boxOf(rect),
+      // A hair of lift composed with the tracking translate, so the payload and the cells it came
+      // from never look like the same object.
+      ...(offset ? { transform: `translate(${offset.x}px, ${offset.y}px) scale(1.015)` } : {}),
     }
+  }
+
+  /** The cells a dragged panel would land in, under the panel floating above them. Kept as a STYLE
+   *  rather than a rect the placeholder is `Show`n by, because a `Show` on the rect would be keyed on
+   *  a fresh object every frame and rebuild the element — and a rebuilt element does not transition
+   *  between the cells it is supposed to glide across. */
+  const placeholderStyle = (): JSX.CSSProperties => {
+    const active = gesture()
+    const rect = active && layout().rects[active.id]
+    return rect ? boxOf(rect) : {}
   }
 
   const handle = (id: PanelId, edge: 'e' | 's' | 'se') => (
@@ -423,7 +473,11 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
           <div
             class="dash-grid"
             ref={gridEl}
-            style={{ '--dash-cell': `${cell()}px`, '--dash-pitch': `${pitch()}px` }}
+            style={{
+              '--dash-cell': `${cell()}px`,
+              '--dash-pitch': `${pitch()}px`,
+              ...(collapsed() ? {} : { height: `${gridHeight()}px` }),
+            }}
             {...(collapsed() ? { 'data-collapsed': '' } : {})}
           >
             {/* Visible ONLY while a gesture is live — it appears on arm and vanishes on release,
@@ -464,13 +518,19 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
                     {handle(definition.id, 's')}
                     {handle(definition.id, 'se')}
                   </Show>
+                  {/* Sighted keyboard users got strictly less than screen-reader users here: the live
+                      region below said where the panel was and nothing on screen did. This is the
+                      same computed string drawn a second time, so it carries no state of its own. */}
+                  <Show when={keyboardGesture()?.id === definition.id}>
+                    <div class="dash-caption" aria-hidden="true">{announcement()}</div>
+                  </Show>
                 </div>
               )}
             </For>
-            {/* The candidate cells, under the panel that is floating above them. Same dashed
-                language as the overlay, so a drag reads as one thing. */}
+            {/* The candidate cells, under the panel that is floating above them — the shape of the
+                panel that will land there rather than a wireframe of it. */}
             <Show when={gesture()?.kind === 'move'}>
-              <div class="dash-placeholder" aria-hidden="true" style={areaStyle(gesture()!.id)} />
+              <div class="dash-placeholder" aria-hidden="true" style={placeholderStyle()} />
             </Show>
           </div>
           <div class="dash-live" aria-live="polite">{announcement()}</div>
