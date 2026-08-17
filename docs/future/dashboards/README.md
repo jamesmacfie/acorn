@@ -1,97 +1,93 @@
-# Dashboards: the backlog
+# Dashboards: what remains
 
-**Everything in this folder is unbuilt.** What the system does today is
-[`docs/dashboards.md`](../../dashboards.md), with the contribution vocabulary in
-`docs/plugins.md § Descriptors`. This folder holds what is left, one deliverable per file, plus
-`refused.md` — the guardrails on what deliberately does *not* get built.
+**The accepted 2026-08-17 redesign is built, end to end** — the scheduler beneath it
+([`docs/schedules.md`](../../schedules.md)), the measure history it feeds, the grid gesture, the
+wizard, Home tabs, the chart growth, and both panel-region placements. Behaviour lives in
+[`docs/dashboards.md`](../../dashboards.md) (with the extension-point half in
+`docs/plugins.md § Cooperative extension points`), and the per-item design records — reasoning,
+deviations, landmines — live where this folder has always retired them: **git history**,
+`git log --follow -- docs/future/dashboards`. The shipped files were `ux-refresh.md`, `wizard.md`,
+`tabs.md`, `measure-history.md`, `charts.md` and `placements.md`; each ended its life stating where
+its behaviour moved, so history is navigable file by file.
 
-Design material that was built, and the pre-build design record it came from, is not kept here. It is
-in git history: `git log --follow -- docs/future/dashboards`. The reasoning that still constrains
-future work has been folded into `docs/dashboards.md`, the files below and `refused.md`; nothing you
-need to build from is only in history.
+This folder now holds only what is **not built**, one deliverable per file, plus `refused.md` — the
+guardrails on what deliberately does not get built. Nothing you need in order to finish is anywhere
+else; this README is the path.
 
 ## The invariant every item must hold
 
 **Everything user-composed lives host-side against one typed contract; plugins are providers of
-well-described records and get zero say over pixels.** Cross-source composition, new view kinds, new
-placements, layout geometry — all client machinery over the same node↔client contract, so the
-contract never grows to chase a use case. One item in this backlog is allowed to break that, and it
-is named: write-back's per-field mutation contract is a genuine wire change and a protocol version
-event (`write-back.md`).
+well-described records and get zero say over pixels.** It held through the whole redesign — the only
+core-contract growth was measure history's node table and read route, which is the host's own
+machinery — and exactly one remaining item is licensed to break it: write-back's per-field mutation
+contract is a genuine wire change and a protocol version event (`write-back.md`).
 
-A corollary that the UX-redesign items below lean on hard: the **plugin contract** and the
-**core node↔client contract** are two different things. Measure history (`measure-history.md`) adds a
-core route and a node table — that is the host growing its own machinery, and it is allowed. Nothing
-in this folder adds a field to `@acorn/protocol/collections.ts` except write-back, which says so.
+## The path to done, in order
 
-## The accepted UX redesign, and its build order
+### 0. The verification pass — before any new code
 
-An interactive design prototype was accepted on 2026-08-17 (claude.ai artifact "Dashboards,
-Redrawn", `https://claude.ai/code/artifact/a083c868-fc3a-4a61-a89c-d837df0fa495` — private to the
-account; the specs below stand alone without it). It commits to three things: panel creation becomes
-a staged **wizard with a live preview**; the drag gesture gets a **dot lattice, a soft slot and real
-motion**; and stat panels earn **deltas and sparklines**. Each is specced in its own file, and they
-are **not independent** — there is foundation work with no pixels in it that must land first.
+Everything UI-shaped shipped **unrendered by any test**, by construction: vitest here runs in node
+with no Solid plugin, and a worktree cannot run the app. One session in the running app clears the
+recorded debt list:
 
-Build in this order. **The scheduler comes first**: measure history is sampled by the node on a
-schedule ([`docs/future/cron/`](../cron/README.md)), so the cron engine and its `collection-sample`
-target — including the two seams it names, node-side collection reads and the shared measure
-pipeline — precede everything trend-shaped here. Phases 1 and 2 may run in parallel with phase 0;
-nothing else may be reordered.
+- the drag: lattice, soft slot, lift, neighbours gliding — does it read as a chain reaction;
+- the wizard: all four steps, the cold self-describing collection, the tab select, "New dashboard…"
+  creating at commit;
+- the tab bar: create, inline rename, arrows/Home/End, armed delete, the device-local active tab
+  surviving a reload;
+- the stat trend: sparkline and delta on a real panel, the "collecting since…" cold state;
+- charts: legend wrap at one-cell width, the three `--viz-series` colours across the style packs
+  (light and dark);
+- placements: a rail-source side panel beside a real source, a `pane.aside` beside a real frame, at
+  honest widths — and whether twelve collapsed columns feel cramped there (see smaller item 1).
 
-| Phase | What | File | Why it is first |
-| --- | --- | --- | --- |
-| pre ✅ | The scheduler: engine, declarations, the `collection-sample` target and its two seams — all four cron phases are built | [`../cron/`](../cron/README.md) | The node-side sampler is what makes measure history gapless; it accrues samples today with no client open. |
-| 0 ✅ | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. **All built.** |
-| 1 ✅ | Grid gesture + panel chrome restyle | `ux-refresh.md` | Pure presentation; touches no data. Parallel-safe with phase 0 and the cron work. **Built** — behaviour in [`docs/dashboards.md § Layout`](../../dashboards.md). |
-| 2 ✅ | The panel wizard; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. **Both built** — behaviour in [`docs/dashboards.md`](../../dashboards.md) under § The generated editor and § Placements. |
-| 3 ✅ | Stat trend + delta rendering; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. **Both halves built** — [`docs/dashboards.md`](../../dashboards.md) owns them under § Trends and § Views are derived. |
+This pass also starts the clock on write-back's usage gate: board usage cannot be observed until
+the boards are being used.
 
-## The work items
+### 1. [`project-database.md`](./project-database.md) — the taskless connection
 
-| File | Deliverable | Gate |
-| --- | --- | --- |
-| [`ux-refresh.md`](./ux-refresh.md) ✅ | The grid gesture and panel chrome restyle. | SHIPPED — behaviour moved to [`docs/dashboards.md § Layout`](../../dashboards.md); the file keeps the reasoning. |
-| [`wizard.md`](./wizard.md) ✅ | Staged panel creation with a live preview, over the same generated editor. | SHIPPED — behaviour moved to [`docs/dashboards.md § The generated editor`](../../dashboards.md); the file keeps the reasoning and the seats still empty. |
-| [`tabs.md`](./tabs.md) ✅ | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | SHIPPED — behaviour in [`docs/dashboards.md`](../../dashboards.md) (§ Persistence, § Placements); the file keeps the reasoning. |
-| [`measure-history.md`](./measure-history.md) ✅ | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | SHIPPED — behaviour moved to [`docs/dashboards.md § Trends`](../../dashboards.md); the file keeps the reasoning. |
-| [`charts.md`](./charts.md) ✅ | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | SHIPPED — behaviour in [`docs/dashboards.md § Views are derived`](../../dashboards.md); the file keeps the reasoning and the deviations. |
-| [`placements.md`](./placements.md) ✅ | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | SHIPPED — behaviour in [`docs/dashboards.md § Placements`](../../dashboards.md) and `docs/plugins.md § Cooperative extension points`; the file keeps the reasoning. Regions rode the extension-point contract as a second location, `pane.aside`. |
-| [`project-database.md`](./project-database.md) | The taskless database connection: a project-scoped URL resolution, its trust gate, and typed columns. | Precondition for the file below, not a dashboards change — nothing here touches a panel or the protocol. |
-| [`dynamic-collections.md`](./dynamic-collections.md) | Run-once-and-pin with schema-drift detection, then the discovery route. | Both gated on the database plugin's saved-query case being wanted — and now also on [`project-database.md`](./project-database.md), which is the gate the 2026-08-17 verify pass found unmet. |
-| [`write-back.md`](./write-back.md) | Board-drag write-back over designated write values. | Gated on real usage of read-only boards. |
+**Ready to build the moment the saved-query demand is declared** — its gate is the owner wanting
+SQL-backed panels, nothing technical. Three decisions are made and verified against the code: a
+panel names a *project* and the node resolves the same layered URL lookup against the main
+checkout; a repo-authored `url_script` never runs unattended without project-addressable consent
+(refuse, never prompt); column types come off `dataTypeID` via a closed OID table with
+`enum`/`person`/`link` never inferred. Its own build order is internal: connection → types → then
+the file below.
 
-Two seams across them, both already load-bearing in the code:
+### 2. [`dynamic-collections.md`](./dynamic-collections.md) — run-once-and-pin, then discovery
 
-- The grid's per-scope `layouts` key and its narrow-window collapse carried the placements
-  `placements.md` added with no storage work at all — both new surfaces were a renderer and a scope
-  constant, and the prediction held to the letter.
-- The panel grid claims **only the panel header** as its drag surface, which is what keeps board-card
-  drag unambiguous when `write-back.md` lands. Do not take the body for anything else.
+Part 1 (run, pin, drift, re-pin) builds on `project-database.md` and nothing else. Part 2 (the
+discovery route) stays gated on part 1 — it enumerates a set that cannot exist until saved queries
+run, and building an unconsumed wire contract first would be the "unused rule nobody has checked"
+mistake on purpose.
 
-## Smaller items
+### 3. [`write-back.md`](./write-back.md) — board-drag mutation
 
-Each is small, independent, and can ride along with any of the above.
+Gated on **real usage of read-only boards**, so the mutation contract is designed against observed
+boards rather than imagined ones. This gate cannot be met by deciding; it is met by time after the
+verification pass puts boards in front of people. The seams it needs are all in place and stated in
+the file: the reserved `writeValue` round-trips, the panel body is gesture-free, and the risk-tier
+confirmation is the consent machinery it reuses.
 
-- **Per-placement column counts.** `COLS` is a constant in `layout.ts`, not config, and deliberately
-  so — config for a value that never changes is config nobody reads. A rail-source side panel or a
-  narrow plugin region may be the first surface that genuinely wants six. *Done when* a placement can
-  declare its column count, existing rects survive the change, and Home is untouched.
-- **Drag between placements.** Half done: "Move to…" in the panel overflow menu lists the other Home
-  **tabs** and moves a panel to one, keeping its definition and taking a fresh rect (`tabs.md`). What
-  is left is the other SURFACES — a task pane, later a plugin region — which is the same two calls at
-  a different destination plus an answer to "should Home be able to aim at a pane nobody is looking
-  at?". *Done when* a panel can be moved from Home to a task pane without recomposing it.
-- **A screen-reader data table inside a chart.** The chart's accessibility floor is a labelled SVG
-  with a tooltip per mark, and the full data one view flip away in `table`. *Done when* a chart
-  exposes its own rows without the flip, and without a second rendering path for cells.
+### Smaller items, any time
 
-(The grouped bar chart, previously listed here, grew real display questions and moved to
-[`charts.md`](./charts.md).)
+- **Per-placement column counts** — *its trigger has now fired*: `pane.aside` regions and
+  rail-source side panels exist and are the narrow surfaces the item predicted. If the verification
+  pass finds twelve collapsed columns cramped there, do this next: a placement declares its column
+  count, existing rects survive, Home untouched.
+- **"Move to…" across surfaces** — half done: Home tabs work. What remains is the task pane and
+  regions as destinations, blocked on one recorded question: should Home be able to aim at a
+  placement nobody is looking at? (The wizard answered no for itself; the menu should answer
+  deliberately, not inherit.)
+- **A screen-reader data table inside a chart** — the chart exposes its own rows without the flip
+  to `table`, with no second rendering path for cells.
+- **`core:backup`** (lives in [`../cron/engine.md § migration`](../cron/engine.md)) — one
+  `scheduler.register` block behind one product decision: how many backups should a node keep?
 
 ## Reading order for a fresh session
 
 1. [`docs/dashboards.md`](../../dashboards.md) — what exists and the decisions it embodies.
 2. [`refused.md`](./refused.md) — what not to build, with the revisit condition for each.
-3. The build-order table above, then the item's own file. Every file ends with a **verify before
-   building** list: paths and claims rot, so budget a re-verify pass, not a rewrite.
+3. This path, top to bottom. Every remaining file ends with a **verify before building** list;
+   paths and claims rot, so budget a re-verify pass, not a rewrite — the last verify pass is what
+   caught `project-database.md`'s gap before it became an improvised semantic.

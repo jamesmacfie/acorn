@@ -59,7 +59,8 @@ sit.
 
 Panel and dashboard definitions are host-owned config in core persistence — never in a frame's
 `state.get/set` prefs namespace, never writable through the bridge, and host panels never render
-inside a frame document (`placements.md § Plugin-hosted regions`). A frame that could edit
+inside a frame document — the host-drawn-region rule, now shipped and stated in
+`docs/plugins.md § Cooperative extension points`. A frame that could edit
 panel definitions could point the host's chrome at routes of its choosing; the composition layer
 stays entirely on the host side of the trust boundary. Revisit never; widen the placement
 constraint vocabulary instead.

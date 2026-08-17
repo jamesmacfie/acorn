@@ -57,7 +57,7 @@ caption naming the consequence in the mapping's own terms — "Drop sets status 
 the write value is many-to-one's answer and the person deserves to see which value wins before
 letting go. A column that **refuses** draws the bad-tinted halo with the reason as text ("No write
 value for github here"), never a bare no-drop cursor. The dragged card lifts with the same
-shadow-and-tilt vocabulary as a panel drag (`ux-refresh.md`), and the confirmation, where the write
+shadow-and-tilt vocabulary as a panel drag (`docs/dashboards.md § The grid`), and the confirmation, where the write
 is risky, is the existing host-drawn strip with no visual novelty — reusing that look is part of
 reusing the semantics.
 
