@@ -15,11 +15,13 @@ import {
 import type { PanelDefinition, PanelId } from './model'
 import Panel from './Panel'
 import PanelEditor from './PanelEditor'
+import PanelWizard from './PanelWizard'
 import {
   layoutAt,
   panelDefinition,
   panelsAt,
   placePanel,
+  placePanelAt,
   removePanel,
   savePanel,
   setLayoutAt,
@@ -82,9 +84,11 @@ const ARROWS: Record<string, readonly [number, number]> = {
 }
 
 export default function PanelGrid(props: { scope: PlacementScope }) {
-  // One signal for both entry points, because there is one editor: the wrapper distinguishes "open,
-  // editing nothing yet" from "closed", which a bare `PanelDefinition | undefined` cannot.
-  const [editing, setEditing] = createSignal<{ panel?: PanelDefinition } | undefined>()
+  // The sheet's session. The wrapper distinguishes "open" from "closed", which a bare
+  // `PanelDefinition | undefined` cannot — it is opened with no panel by nothing today, and with a
+  // draft the wizard handed over (`creating`) or a placed panel being edited.
+  const [editing, setEditing] = createSignal<{ panel?: PanelDefinition; creating?: boolean } | undefined>()
+  const [adding, setAdding] = createSignal(false)
   const [gesture, setGesture] = createSignal<Gesture | undefined>()
   const [cell, setCell] = createSignal(MIN_CELL_PX)
   const [pitch, setPitch] = createSignal(MIN_CELL_PX)
@@ -385,7 +389,7 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
   )
 
   const addButton = () => (
-    <Button size="sm" variant="ghost" onClick={() => setEditing({})}>
+    <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>
       <Icon name="plus" /> Add panel
     </Button>
   )
@@ -536,11 +540,30 @@ export default function PanelGrid(props: { scope: PlacementScope }) {
           <div class="dash-live" aria-live="polite">{announcement()}</div>
         </Show>
 
+        {/* CREATION IS STAGED, EDITING IS NOT (docs/future/dashboards/wizard.md § Entry points). The
+            wizard exists because a panel that does not exist yet cannot be judged from a form; an
+            existing one is already on screen, so its editor is the whole sheet at once. The sheet
+            remains able to do everything the wizard can — the wizard's footer hands the draft
+            straight to it. */}
+        <Show when={adding()}>
+          <PanelWizard
+            collections={collections()}
+            scope={props.scope}
+            onClose={() => setAdding(false)}
+            onOpenEditor={(panel) => setEditing({ panel, creating: true })}
+            onCreate={(panel, scope, rect) => {
+              savePanel(panel)
+              placePanelAt(scope, panel.id, rect)
+            }}
+          />
+        </Show>
+
         <Show when={editing()}>
           {(session) => (
             <PanelEditor
               collections={collections()}
               {...(session().panel ? { panel: session().panel } : {})}
+              {...(session().creating ? { creating: true } : {})}
               onClose={() => setEditing(undefined)}
               onSave={(panel) => {
                 savePanel(panel)

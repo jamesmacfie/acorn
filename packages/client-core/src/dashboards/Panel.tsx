@@ -1,4 +1,4 @@
-import { createSignal, For, Match, Show, Switch, type JSX } from 'solid-js'
+import { createSignal, For, Show, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { PluginCollectionRow, PluginCollectionRowAction } from '@acorn/protocol/collections.ts'
 import { activeNodeId } from '../node/activeNode'
@@ -8,11 +8,7 @@ import { Alert, Button, Card, EmptyState } from '../ui/primitives'
 import Icon from '../ui/Icon'
 import { createPanelData } from './data'
 import type { PanelDefinition } from './model'
-import BoardView from './views/BoardView'
-import ChartView from './views/ChartView'
-import ListView from './views/ListView'
-import StatView from './views/StatView'
-import TableView from './views/TableView'
+import PanelBody from './views/PanelBody'
 import './dashboards.css'
 
 // ONE panel, wherever it is placed (docs/dashboards.md § Placements). Placement-agnostic on
@@ -187,21 +183,10 @@ export default function Panel(props: PanelProps) {
               </EmptyState>
             )}
           >
-            <Switch
-              // A view kind this build cannot draw — a definition written by a client that has more
-              // of them. Same answer as an unresolved collection: say so, change nothing.
-              fallback={(
-                <EmptyState align="start" size="sm" title="View unavailable">
-                  This panel uses a “{props.definition.view.kind}” view, which this version does not draw.
-                </EmptyState>
-              )}
-            >
-              <Match when={props.definition.view.kind === 'stat'}><StatView {...viewProps()} /></Match>
-              <Match when={props.definition.view.kind === 'list'}><ListView {...viewProps()} /></Match>
-              <Match when={props.definition.view.kind === 'table'}><TableView {...viewProps()} /></Match>
-              <Match when={props.definition.view.kind === 'board'}><BoardView {...viewProps()} /></Match>
-              <Match when={props.definition.view.kind === 'chart'}><ChartView {...viewProps()} /></Match>
-            </Switch>
+            {/* The view switch is `views/PanelBody.tsx`, shared with the wizard's live preview —
+                there is exactly one way to draw a panel and a preview that redrew it would be a
+                second one. */}
+            <PanelBody {...viewProps()} />
           </Show>
         </Show>
       </div>

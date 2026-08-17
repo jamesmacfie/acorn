@@ -428,6 +428,161 @@
   text-decoration: line-through;
 }
 
+/* ── Panel wizard ────────────────────────────────────────────────────────────────────────── */
+
+/* Three regions (dashboards/PanelWizard.tsx): the step rail, the step body, the live preview. One
+   grid, and the narrow case reflows the SAME markup — the rail becomes a horizontal strip above the
+   body and the preview drops below it, because an alternate markup path is two things to keep true.
+
+   No new tokens: the rail is buttons, the cards are `.ui-card`, the fields are `.ui-field`. */
+.dash-wizard {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) minmax(0, 15rem);
+  gap: var(--gap-stack);
+  align-items: start;
+  min-width: 0;
+}
+
+.dash-wizard-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dash-wizard-step {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dash-wizard-step:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.dash-wizard-step[aria-current='step'] {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+/* The number is the progress: a rail with four identical rows reads as navigation rather than as a
+   sequence. Circled, so it is a step and not a bullet. */
+.dash-wizard-step-index {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-circle);
+  background: var(--bg-subtle);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: var(--tabular);
+}
+.dash-wizard-step[aria-current='step'] .dash-wizard-step-index {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.dash-wizard-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+}
+
+/* Focus lands here on every step change, so it needs a ring — it is a heading nobody can click. */
+.dash-wizard-heading {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+
+.dash-wizard-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* A FIXED SLOT. The preview is the real panel at a plausible size, not a thumbnail — and a slot that
+   grew with the rows would make every keystroke reflow the dialog. */
+.dash-preview {
+  display: flex;
+  min-width: 0;
+  height: 14rem;
+}
+.dash-preview > .dash-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* One column below the tablet width: the rail strips across the top, the preview drops under the
+   body. Same content, same order in the DOM. */
+@media (max-width: 60rem) {
+  .dash-wizard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dash-wizard-rail {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+}
+
+/* The two galleries — collections on step 1, view kinds on step 2. Auto-fit, so the count is data and
+   nothing computes a width. The cards themselves are `.dash-card`, `.dash-card-title` and
+   `.dash-card-meta`, the board's own three: a gallery card is a title, a mark and some meta, which is
+   what those already are. Only the three things a board card has no equivalent for are below. */
+.dash-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The field vocabulary, visible before a single row has arrived — the thing the old add form could
+   not show. Wraps and then stops: a card is a glance, and a 24-field schema must not make one tall. */
+.dash-collection-chips {
+  max-height: 4rem;
+  overflow: hidden;
+}
+
+/* The schematic on a view card: what the eye picks the view by. */
+.dash-view-glyph {
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+}
+
+/* The S/M/L footprint, drawn as a share of the twelve columns rather than said as a number. */
+.dash-preset-track {
+  display: inline-block;
+  width: 3rem;
+  height: var(--space-2);
+  margin-inline-start: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+.dash-preset-fill {
+  display: block;
+  height: 100%;
+  background: var(--border-strong);
+}
+.ui-segment[aria-checked='true'] .dash-preset-fill {
+  background: var(--accent);
+}
+
 /* ── Board ───────────────────────────────────────────────────────────────────────────────── */
 
 /* Columns are the values of the grouped field, so their COUNT is data — an auto-flow grid takes

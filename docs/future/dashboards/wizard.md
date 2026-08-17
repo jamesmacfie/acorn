@@ -1,10 +1,38 @@
 # The panel wizard
 
-**Unbuilt — phase 2 of the accepted redesign**, behind the phase-0 foundation below
-(`README.md § build order`). Panel *creation* becomes a staged wizard with a live preview. Panel
-*editing* keeps the existing single-sheet generated editor unchanged. Two presentations, one truth:
-both are views over the same pure derivations in `editor.ts`/`compose.ts`/`mapping.ts`/`chart.ts`,
-and the wizard adds **no second implementation** of any rule the sheet already embodies.
+**SHIPPED** — phase 2 of the accepted redesign (`README.md § build order`). What the two composing
+surfaces do now is [`docs/dashboards.md § The generated editor`](../../dashboards.md); this file is
+kept for the reasoning, and for the seats it names that are still empty (run-once-and-pin's button on
+the Data step, starter panels, plugin regions on the Place step).
+
+Panel *creation* is a staged wizard with a live preview. Panel *editing* keeps the single-sheet
+generated editor. Two presentations, one truth: both are views over the same pure derivations in
+`editor.ts`/`compose.ts`/`mapping.ts`/`chart.ts`, and the wizard adds **no second implementation** of
+any rule the sheet already embodies.
+
+Five deviations from the spec below, all deliberate:
+
+- **The sheet's own JSX moved to `PanelForm.tsx` and its state to `draft.ts`.** The spec says the
+  wizard re-hosts the sheet's selectors; the only way to re-host them without a second copy is to
+  make them sections neither surface owns. So `PanelEditor.tsx` is now a Modal and an arrangement of
+  the same sections the wizard deals across four steps, and `createPanelDraft` holds the form state
+  both run on. "No second implementation" is why the diff to the sheet is a re-arrangement rather
+  than an addition.
+- **The view switch moved to `views/PanelBody.tsx`.** "The preview is rendered by the real view
+  components" is only structurally true if there is one switch; `Panel.tsx` and `PanelPreview.tsx`
+  now both call it.
+- **The Data step's gallery replaces `Picker` rather than wrapping it.** A card carrying field chips,
+  a cadence and a cached-rows line is not a filtered list of rows. The filtering behaviour survives
+  because it was never Picker's: `collectionsForPicker` is the derivation, and the gallery passes its
+  own filter box through the same function. The sheet keeps Picker unchanged.
+- **The Place step's surface control offers Home and the launch surface, with plugin regions disabled
+  and named.** Aiming at the task-pane placement from Home would put a panel where nobody is looking,
+  so `Task pane` is reachable only from the pane itself. The tab select appears past one Home tab, as
+  specced; **"New dashboard…" inline was not built** — creating a tab is `tabs.md`'s affordance and a
+  second creator here would be the drift this whole file argues against.
+- **`placePanelAt` in `persist.ts` is where a preset becomes a rect.** The spec puts the commit in the
+  wizard; a geometry write in a component is the one thing `layout.ts`'s own header forbids, and this
+  way the rule is testable (`persist.test.ts`).
 
 The problem it solves: today "Add panel" opens one long form and the panel is first seen after
 saving. Nobody can pick a view by looking at it, the field vocabulary is invisible until rows
@@ -152,7 +180,7 @@ already define what survives.
 - Everything the sheet's selectors already guarantee (native controls, `<Index>` for input lists)
   carries over by reuse.
 
-## Done when
+## Done when — all met
 
 - A panel can be composed end-to-end without ever having existed: data → view (with visible reasons
   on what the data cannot support) → shape → place, with the preview live at every step, and the

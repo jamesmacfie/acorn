@@ -407,14 +407,36 @@ failing rather than the protocol being short.
 
 ### The generated editor
 
-No panel settings UI is hand-written, because a hand-written editor drifts from its schema. One
-component serves both entry points — "add" is the same question asked of a panel that does not exist
-yet — and it edits title, view kind, group-by, filters, sort keys, limit, the visible-field
-projection and its order, the measure a stat or a chart draws, a chart's shape and axes, per-panel
-refresh, the mapping step including the fields the user invented, and the collection's declared
-params.
+No panel settings UI is hand-written, because a hand-written editor drifts from its schema. The
+controls cover title, view kind, group-by, filters, sort keys, limit, the visible-field projection
+and its order, the measure a stat or a chart draws, a chart's shape and axes, per-panel refresh, the
+mapping step including the fields the user invented, and the collection's declared params.
 
-Its inputs are **selectors**: typed, data-aware controls that each know the schema they draw from —
+**Two presentations, one truth.** Creating a panel and editing one are different problems, so they
+are asked differently, and neither implements a rule of its own:
+
+- **Creation is a WIZARD** (`dashboards/PanelWizard.tsx`) — four steps with a live preview beside
+  every one of them. *Data* is a gallery of collection cards showing the field vocabulary, the
+  refresh cadence and what this device has cached, plus the declared params, because a param changes
+  what the rows are. *View* is five cards, always all five, each with a schematic, where a card the
+  data cannot support says WHY. *Shape* is the shaping and mapping controls. *Place* is the title, an
+  S/M/L starting footprint, the destination surface and the panel's own refresh. Nothing is written
+  until the last step commits; Escape at any step writes nothing at all.
+- **Editing is one SHEET** (`dashboards/PanelEditor.tsx`) — every decision at once, for a panel that
+  is already on screen. It remains able to do everything the wizard can: the wizard is a staging of
+  creation, not a capability tier, and its footer hands the draft straight to the sheet.
+
+Both render the same sections (`dashboards/PanelForm.tsx`) over the same in-memory draft
+(`dashboards/draft.ts`), which holds the form state and calls the pure rules. **The preview is the
+real panel**: the same view components (`views/PanelBody.tsx`) over the same compose/mapping/shaping
+pipeline a placed panel runs, so what a commit writes cannot differ from what was on screen.
+
+**Neither surface fetches.** The preview and the gated sections read only what this device has
+already cached, reactive to the query cache so an answer landing mid-compose fills them in place.
+Whether an editor may *run* a collection to learn its shape is a separate question with a person
+behind the button (`docs/future/dashboards/dynamic-collections.md`).
+
+The inputs on both are **selectors**: typed, data-aware controls that each know the schema they draw from —
 pick a field of a given type, pick a comparison the field's type can actually answer, pick a value
 drawn by the field's semantic type, map these values onto those columns, pick a tone. The promise is
 split in two. Selectors make a bad choice unofferable; `normalizePanel` drops the stale choices no
@@ -431,8 +453,8 @@ can be wrong live where they can be. The same rule puts every scale, tick and re
 the same functions the renderer draws it with (`docs/schedules.md`), and a client package cannot
 enter the node's graph. `client-core/src/dashboards/*.ts` are one-line re-exports, so every path
 named in this document still resolves and every component here still says `./model`. Only `editor.ts`,
-`data.ts`, `persist.ts` and the components stayed: they read registries, signals or the query client,
-which is exactly the line the new package draws.
+`data.ts`, `draft.ts`, `persist.ts` and the components stayed: they read registries, signals or the
+query client, which is exactly the line the new package draws.
 
 ## Persistence
 
