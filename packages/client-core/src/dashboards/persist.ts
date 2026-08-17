@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import { isRecord, parsePanelDefinition, parsePanels } from '@acorn/dashboards-core/definition.ts'
 import { PrefKeys } from '../persistence/prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from '../persistence/persistedState'
-import { COLS, normalize, readingOrder, sizeFor, type PanelLayout, type Rect } from './layout'
+import { COLS, firstFit, normalize, readingOrder, sizeFor, type PanelLayout, type Rect } from './layout'
 import type { PanelDefinition, PanelId } from './model'
 
 export { parsePanelDefinition }
@@ -289,6 +289,23 @@ export const placePanel = (scope: PlacementScope, id: PanelId, index?: number): 
     const at = index === undefined ? without.length : Math.max(0, Math.min(without.length, Math.floor(index)))
     return { ...state, placements: { ...state.placements, [key]: [...without.slice(0, at), id, ...without.slice(at)] } }
   })
+
+/** Place a panel AT A STARTING SIZE — the wizard's commit (docs/future/dashboards/wizard.md § Place).
+ *
+ *  The size is a preset the person picked (layout.ts § sizePresets) and nothing more: it is
+ *  first-fitted against what is already there and then run through the ordinary `normalize` path, so
+ *  what lands is a rect like any other. NOTHING PERSISTED LEARNS THAT A PRESET EXISTED — the table can
+ *  be retuned, or the whole idea dropped, without a migration.
+ *
+ *  Call `savePanel` first: the normalise pass asks each placed panel for its view kind's minimums. */
+export function placePanelAt(scope: PlacementScope, id: PanelId, size: { w: number; h: number }): void {
+  const before = layoutAt(scope)
+  placePanel(scope, id)
+  const rect = firstFit(Object.values(before.rects), size)
+  const order = [...before.order.filter((candidate) => candidate !== id), id]
+  const sizeOf = (panelId: PanelId) => sizeFor(dashboards().panels[panelId]?.view.kind ?? 'list')
+  setLayoutAt(scope, normalize({ order, rects: { ...before.rects, [id]: rect } }, sizeOf))
+}
 
 /** Take a panel off one surface. Its definition survives, which is the point of the split. */
 export const unplacePanel = (scope: PlacementScope, id: PanelId): void =>

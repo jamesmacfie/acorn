@@ -44,7 +44,7 @@ nothing else may be reordered.
 | pre ✅ | The scheduler: engine, declarations, the `collection-sample` target and its two seams — all four cron phases are built | [`../cron/`](../cron/README.md) | The node-side sampler is what makes measure history gapless; it accrues samples today with no client open. |
 | 0 | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. **All but the `source` panel-local field (`charts.md § 4`) are built.** |
 | 1 ✅ | Grid gesture + panel chrome restyle | `ux-refresh.md` | Pure presentation; touches no data. Parallel-safe with phase 0 and the cron work. **Built** — behaviour in [`docs/dashboards.md § Layout`](../../dashboards.md). |
-| 2 | The panel wizard; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. |
+| 2 | The panel wizard ✅; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. **The wizard is built** — behaviour in [`docs/dashboards.md § The generated editor`](../../dashboards.md); the bar is what is left, and the wizard already offers its tabs the moment there is more than one. |
 | 3 | Stat trend + delta rendering ✅; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. The stat half is built — `docs/dashboards.md § Trends` owns it; the chart half is not. |
 
 ## The work items
@@ -52,7 +52,7 @@ nothing else may be reordered.
 | File | Deliverable | Gate |
 | --- | --- | --- |
 | [`ux-refresh.md`](./ux-refresh.md) ✅ | The grid gesture and panel chrome restyle. | SHIPPED — behaviour moved to [`docs/dashboards.md § Layout`](../../dashboards.md); the file keeps the reasoning. |
-| [`wizard.md`](./wizard.md) | Staged panel creation with a live preview, over the same generated editor. | Phase 0 derivations SHIPPED; the components are what is left. |
+| [`wizard.md`](./wizard.md) ✅ | Staged panel creation with a live preview, over the same generated editor. | SHIPPED — behaviour moved to [`docs/dashboards.md § The generated editor`](../../dashboards.md); the file keeps the reasoning and the seats still empty. |
 | [`tabs.md`](./tabs.md) | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | Model key SHIPPED (behaviour in [`docs/dashboards.md § Persistence`](../../dashboards.md)); the bar is what is left. |
 | [`measure-history.md`](./measure-history.md) ✅ | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | SHIPPED — behaviour moved to [`docs/dashboards.md § Trends`](../../dashboards.md); the file keeps the reasoning. |
 | [`charts.md`](./charts.md) | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | Series-colour decision SHIPPED (§ 1); legend, grouped bar and the `source` field are what is left. |

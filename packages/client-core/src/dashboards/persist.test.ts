@@ -14,6 +14,7 @@ import {
   parseDashboards,
   parsePanelDefinition,
   placePanel,
+  placePanelAt,
   placementScopeKey,
   removeHomeTab,
   removePanel,
@@ -305,6 +306,29 @@ describe('committing a gesture', () => {
     })
     setLayoutAt(HOME_PLACEMENT, { order: ['a'], rects: { a: { x: 6, y: 0, w: 6, h: 2 } } })
     expect(dashboards().layouts['pane/pr'].a).toEqual({ x: 0, y: 0, w: 4, h: 8 })
+  })
+
+  it('places a wizard commit at its preset size, first-fitted beside what is there', () => {
+    hydrateDashboards({
+      panels: { a: panel('a') },
+      placements: { home: ['a'] },
+      layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 } } },
+    })
+    savePanel(panel('b'))
+    placePanelAt(HOME_PLACEMENT, 'b', { w: 6, h: 4 })
+    // Beside `a` rather than under it: a preset is a starting WIDTH and the position is the ordinary
+    // first fit, which is what makes a small panel land in the gap a wide one left.
+    expect(dashboards().layouts.home.b).toEqual({ x: 4, y: 0, w: 6, h: 4 })
+    expect(dashboards().placements.home).toEqual(['a', 'b'])
+  })
+
+  it('drops a preset below the view kind’s minimum onto the minimum, without a migration', () => {
+    hydrateDashboards(emptyDashboards())
+    savePanel(panel('board', { view: { kind: 'board' } }))
+    // `normalize` is what enforces the per-kind minimums, so the commit path gets them for free —
+    // nothing persisted has to know a preset was ever involved.
+    placePanelAt(HOME_PLACEMENT, 'board', { w: 1, h: 1 })
+    expect(dashboards().layouts.home.board).toEqual({ x: 0, y: 0, w: 4, h: 3 })
   })
 
   it('deleting a panel takes its geometry with it', () => {
