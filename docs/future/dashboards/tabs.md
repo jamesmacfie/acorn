@@ -1,11 +1,23 @@
 # Tabs: multiple dashboards on Home
 
-**Unbuilt — part of the accepted redesign.** The model keys are a phase-0 item; the tab bar itself
-is independent UI that can ship any time after them (`README.md § build order`). One sentence of
-design: **a tab is a home placement scope with an `ownerId`**, and everything else falls out of
-machinery that already exists.
+**The data model is BUILT (phase 0); the tab bar is not.** Behaviour for what shipped is in
+[`docs/dashboards.md § Persistence`](../../dashboards.md); this file keeps the reasoning and owns the
+unbuilt half — the bar, the verbs and the wizard's tab dimension (`README.md § build order`). One
+sentence of design: **a tab is a home placement scope with an `ownerId`**, and everything else falls
+out of machinery that already exists.
 
-## The data model: no new concepts, one new list
+## The data model: no new concepts, one new list — SHIPPED
+
+`persist.ts` carries it: `DashboardTab`, the `tabs` key on `DashboardState`, the codec with its two
+caps, `homeTabScope`/`homeTabIdOf`, the `homeTabs` derivation, and the `setHomeTabs`/`removeHomeTab`
+store actions. Tested in `persist.test.ts § home tabs`. Two notes for whoever builds the bar:
+
+- **`homeTabs` always offers the default tab**, whether or not it holds panels — one line past the
+  spec's literal "`tabs` ∪ orphaned keys", because the bare scope has no delete and must never become
+  unreachable through a name list going missing.
+- **Create, rename and reorder are all `setHomeTabs`** — names and order are the whole of what the
+  key holds, so there is one write rather than three actions. `removeHomeTab` is separate only because
+  it also drops the placement list and the geometry, and refuses the default tab.
 
 The scope key already carries the segment (`persist.ts § placementScopeKey`):
 `(surface, ownerId?, projectId?)`. The task pane and plugin regions already use `ownerId`; Home
@@ -103,8 +115,8 @@ one is wanted it goes through the existing chord registry, not a tab-local liste
 
 ## Done when
 
-- The `tabs` key round-trips with the codec rules; the renderer derives named + recovered tabs;
-  an old-client write loses only names/order, proven by a round-trip test.
+- ~~The `tabs` key round-trips with the codec rules; the renderer derives named + recovered tabs;
+  an old-client write loses only names/order, proven by a round-trip test.~~ Done.
 - With one tab, Home is pixel-identical to today. Creating a second shows the bar; deleting back
   to one removes it.
 - Create, inline-rename, reorder and armed delete all work, delete unplacing without touching

@@ -142,6 +142,19 @@ describe('bar charts', () => {
     const plot = buildChart(rows, schema(status), { kind: 'chart', shape: 'bar', x: 'state' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.bars.map((bar) => bar.tone)).toEqual(['warn', 'ok'])
+    // A declared value carries NO series slot: identity colour has no job where meaning is declared.
+    expect(plot.bars.every((bar) => bar.series === undefined)).toBe(true)
+  })
+
+  it('gives an undeclared category an identity slot, never a status tone', () => {
+    const kind = { id: 'kind', name: 'Kind', type: 'enum' as const }
+    const undeclared = ['a', 'b', 'c', 'd', 'e'].map((value, index) => row(`${index}`, { kind: value }))
+    const plot = buildChart(undeclared, schema(kind), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
+    if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
+    // Three slots then the fold — and not one of them borrows ok/warn/bad, which is the whole point
+    // of the decision (charts.md § 1).
+    expect(plot.bars.map((bar) => bar.series)).toEqual([1, 2, 3, 'other', 'other'])
+    expect(plot.bars.every((bar) => bar.tone === undefined)).toBe(true)
   })
 
   it('draws a declared value with no rows as a zero-height bar rather than dropping the column', () => {
@@ -215,6 +228,23 @@ describe('line charts', () => {
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines.map((line) => line.label)).toEqual(['Open', 'Merged'])
     expect(plot.lines.map((line) => line.tone)).toEqual(['warn', 'ok'])
+    expect(plot.lines.every((line) => line.series === undefined)).toBe(true)
+  })
+
+  it('colours an undeclared series split by identity slot, and folds past the third', () => {
+    const kind = { id: 'kind', name: 'Kind', type: 'enum' as const }
+    const rows = ['a', 'b', 'c', 'd'].map((value, index) => row(`${index}`, { updated: day(index + 1), kind: value }))
+    const plot = buildChart(rows, schema(updated, kind), { kind: 'chart', shape: 'line', x: 'updated', series: 'kind' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    expect(plot.lines.map((line) => line.series)).toEqual([1, 2, 3, 'other'])
+    expect(plot.lines.every((line) => line.tone === undefined)).toBe(true)
+  })
+
+  it('leaves the single unsplit line on accent — one mark has no sibling to be told apart from', () => {
+    const plot = buildChart([row('1', { updated: day(1) })], schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    expect(plot.lines[0].tone).toBe('accent')
+    expect(plot.lines[0].series).toBeUndefined()
   })
 
   it('draws a single-day series as points with no path, centred rather than dividing by zero', () => {

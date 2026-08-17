@@ -8,9 +8,10 @@ import type { PanelViewProps } from './props'
 // file turns that into SVG and picks a class name, and it must stay that way, because vitest here
 // runs in node with no Solid plugin and nothing written here is checked by anything.
 //
-// COLOUR IS A `tone`, NEVER A LITERAL. Each mark carries one of the host's five status tones — from
-// the plugin's declared enum value where it has one, else the ordinal ramp — and `dashboards.css`
-// turns that into a colour the appearance pack owns. No `fill="#…"` may appear in this file.
+// COLOUR IS AN ATTRIBUTE, NEVER A LITERAL. Each mark carries `data-tone` (the plugin declared what
+// this value means) or `data-series` (identity with no declared meaning — an ordinal slot), never
+// both, and `dashboards.css` turns either into a colour the appearance pack owns. No `fill="#…"` may
+// appear in this file.
 //
 // ACCESSIBILITY FLOOR, and it is a floor: the SVG names the shape and both axes, every mark carries
 // a `<title>` tooltip, and the full data is one view flip away in `table`. A bespoke screen-reader
@@ -88,7 +89,15 @@ export default function ChartView(props: PanelViewProps) {
           <For each={bars()}>
             {(bar) => (
               <>
-                <rect class="dash-chart-bar" data-tone={bar.tone} x={bar.x} y={bar.y} width={bar.w} height={bar.h}>
+                <rect
+                  class="dash-chart-bar"
+                  data-tone={bar.tone}
+                  data-series={bar.series}
+                  x={bar.x}
+                  y={bar.y}
+                  width={bar.w}
+                  height={bar.h}
+                >
                   <title>{`${bar.label}: ${bar.value}`}</title>
                 </rect>
                 <Show when={bar.labelled}>
@@ -109,13 +118,20 @@ export default function ChartView(props: PanelViewProps) {
             {(series) => (
               <>
                 <Show when={series.path}>
-                  <path class="dash-chart-line" data-tone={series.tone} d={series.path} />
+                  <path class="dash-chart-line" data-tone={series.tone} data-series={series.series} d={series.path} />
                 </Show>
                 {/* Dots as well as the path: a single-day series has no line to draw, and on a
                     multi-day one this is where the tooltip lives. */}
                 <For each={series.points}>
                   {(point) => (
-                    <circle class="dash-chart-point" data-tone={series.tone} cx={point.x} cy={point.y} r="2">
+                    <circle
+                      class="dash-chart-point"
+                      data-tone={series.tone}
+                      data-series={series.series}
+                      cx={point.x}
+                      cy={point.y}
+                      r="2"
+                    >
                       <title>{point.label}</title>
                     </circle>
                   )}

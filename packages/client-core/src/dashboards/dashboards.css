@@ -426,9 +426,16 @@
    component makes no measurement; the trade is that an extreme aspect ratio letterboxes rather than
    stretching, which is the right way round because stretching distorts the type with it.
 
-   EVERY COLOUR IS A TONE. A mark carries `data-tone` from the plugin's declared enum value or from
-   the ordinal ramp, and the five below are the same five StatusDot uses (primitives.css) — so a
-   chart restyles with the appearance pack and no chart token had to be classified in tokenAxes.ts. */
+   EVERY COLOUR IS A TOKEN, NEVER A LITERAL — and a mark carries one of two attributes, never both
+   (dashboards/chart.ts § Identity colour):
+
+     data-tone    the plugin DECLARED what this value means. The same five StatusDot uses
+                  (primitives.css), so a `Ready` bar is the ok colour.
+     data-series  identity with no declared meaning — a source split, an undeclared category. The
+                  series slots (tokens-theme.css), which are deliberately NOT status colours: a line
+                  that is ok-green only because it was drawn second is a judgement nobody made.
+
+   Both restyle with the appearance pack; neither is spelled in ChartView.tsx. */
 .dash-chart {
   width: 100%;
   height: 100%;
@@ -478,6 +485,18 @@
 .dash-chart-line[data-tone='bad'] { stroke: var(--state-bad); }
 .dash-chart-line[data-tone='accent'] { stroke: var(--accent); }
 .dash-chart-line[data-tone='muted'] { stroke: var(--text-faint); }
+
+/* Series identity. Three slots and a fold: past three, the answer is fewer series or a table, so
+   `other` draws in the same faint ink the unstyled default already uses. */
+.dash-chart-bar[data-series='1'], .dash-chart-point[data-series='1'] { fill: var(--viz-series-1); }
+.dash-chart-bar[data-series='2'], .dash-chart-point[data-series='2'] { fill: var(--viz-series-2); }
+.dash-chart-bar[data-series='3'], .dash-chart-point[data-series='3'] { fill: var(--viz-series-3); }
+.dash-chart-bar[data-series='other'], .dash-chart-point[data-series='other'] { fill: var(--text-faint); }
+
+.dash-chart-line[data-series='1'] { stroke: var(--viz-series-1); }
+.dash-chart-line[data-series='2'] { stroke: var(--viz-series-2); }
+.dash-chart-line[data-series='3'] { stroke: var(--viz-series-3); }
+.dash-chart-line[data-series='other'] { stroke: var(--text-faint); }
 
 /* ── Cells ───────────────────────────────────────────────────────────────────────────────── */
 

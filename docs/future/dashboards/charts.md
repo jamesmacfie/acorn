@@ -8,35 +8,55 @@ The standing rule stays: marks carry **tones, never literal colours** — a plug
 tone where one exists, else a host-owned ramp — so charts restyle with the appearance pack and no
 plugin ever names a colour. Everything below is about what the *host's own* ramp is allowed to be.
 
-## 1. The series-identity colour decision (phase 0)
+## 1. The series-identity colour decision (phase 0) — DECIDED AND SHIPPED
 
-Today every mark colour resolves through the five status tones (`chart.ts § RAMP` cycles
+The old behaviour resolved every mark colour through the five status tones (`chart.ts § RAMP` cycled
 `accent/ok/warn/bad/muted` for undeclared values). That is correct for **status** — a `Ready` bar
 *should* be the ok colour — and wrong for **identity**: a line split by source (github vs linear) or
 a bar grouped by a second enum is asking "which series is this", and answering with status colours
 makes github permanently "ok-green" and linear permanently "warn-amber", which reads as a judgement
 nobody made. Status colour on non-status identity is a lie of the same species as a guessed avatar.
 
-**Decision to make, with a recommendation:**
-
-- **(a) Keep cycling the tone ramp.** Zero new tokens; the lie stands. Rejected on the argument
-  above — it was tolerable while the only series split was an enum's own (usually toned) values;
-  the source split below makes untoned identity series routine.
-- **(b) A themed series ramp — recommended.** Three ordinal identity slots, `--viz-series-1..3`,
-  owned by the **theme axis** (colour), defined per theme pack with sane defaults, distinct from
-  the five status tones. This is a recorded exception to "the dashboard adds no appearance tokens":
-  the tokens belong to the theme vocabulary (`ui/tokenAxes.ts` colour set, its test updated), not
-  to `dashboards.css`, and plugin-contributed themes get the defaults until they name their own.
+**Option (b) was taken.** `--viz-series-1..3` are theme-axis tokens (`SERIES_TOKENS` in
+`ui/tokenAxes.ts`, defaults in `styles/tokens-theme.css`), and `chart.ts` now emits `series` on a
+mark whose colour is identity and `tone` on one whose meaning was declared — never both. `RAMP` is
+gone. The rule and its ceiling are in
+[`docs/dashboards.md § Views are derived`](../../dashboards.md); the rest of this file still stands
+unbuilt on top of it.
 
 Three slots, hard cap: series 4+ folds into an "other" series in the muted tone, counted in the
 legend ("+2 more"). Three is what survives colour-vision checking as a set alongside the status
 palette; past three the answer is fewer series or a table, not a fourth colour. Enum splits whose
 values carry **declared tones keep them** (the plugin said what the value means); the ramp is only
-for identity with no declared tone — sources, and undeclared enum values, which stop borrowing
-status tones the day this lands.
+for identity with no declared tone — sources, and undeclared enum values, which stopped borrowing
+status tones the day this landed.
 
-`ChartView.tsx` keeps its rule that no literal colour appears in the component: marks gain
+`ChartView.tsx` keeps its rule that no literal colour appears in the component: marks carry
 `data-series="1|2|3|other"` beside the existing `data-tone`, and CSS maps them.
+
+**Three deviations from the sketch above**, all recorded at the code:
+
+- **A third token group, not a palette addition.** The tokens are neither primitives nor derived:
+  `THEME_PALETTE_TOKENS` is the *strict* manifest contract for a plugin-contributed theme, so putting
+  them there would reject every theme already in the wild for omitting three names it has never heard
+  of. They carry `:root` defaults instead, `SERIES_TOKENS` is excluded from the axis test's primitives
+  assertion, and a pack that wants its own restates them.
+- **One set of values, not a light/dark pair.** Half the named theme blocks are dark; a `--dark-*`
+  flip would have reached the two default paths and left Monokai and Nord on the light values anyway.
+  All three sit at L≈0.6 in oklch, clearing 3:1 against both `#ffffff` and `#121212`. The accepted
+  cost is the greyscale separation a three-step lightness ramp would have given — the three are told
+  apart by hue alone, and a pack restating them is the calibration knob.
+- **The single unsplit line keeps `--accent`** rather than taking slot 1, for the same reason § 5
+  gives for the sparkline: one mark has no sibling to be told apart from.
+
+**The colour-vision check, computed rather than asserted** (the verify list demanded it; sRGB
+equivalents `#2279dc / #bc48bb / #009a9b`): on both grounds all three clear the lightness band, the
+chroma floor, 3:1 contrast, and the normal-vision separation floor (worst pair ΔE 15.4) — but the
+**slot-2 ↔ slot-3 pair sits in the CVD warn band** (deutan ΔE 6.1, tritan 4.8), which is legal
+*only with secondary encoding*. No shipped mark wears two identity slots yet, so nothing renders
+wrong today — the consequence lands on phase 3: **the § 2 legend is the required secondary encoding
+for colour-vision-deficient readers, not optional polish**, and any chart drawing slots 2 and 3
+together must have it. A pack restating the tokens re-runs this trade for its own ground.
 
 ## 2. The legend
 
@@ -110,9 +130,10 @@ ramp's remaining consumers are multi-series charts only.
 
 ## Done when
 
-- The series ramp exists as theme tokens with the axis test updated, status tones are never applied
-  to untoned identity series, and every pack renders three distinguishable series on both light and
-  dark themes.
+- ~~The series ramp exists as theme tokens with the axis test updated, status tones are never applied
+  to untoned identity series~~ Done — and every pack renders three distinguishable series on both
+  light and dark themes, which is the one half still owed a look in the real app rather than a
+  contrast calculation.
 - A two-enum collection can compose a grouped bar in editor and wizard; an old client draws it
   ungrouped; the codec diff is zero (the key already round-trips).
 - A mapped panel can split a line, group a board, filter, and project by `source` with no
@@ -124,7 +145,7 @@ ramp's remaining consumers are multi-series charts only.
 
 ## Verify before building
 
-- `chart.ts` — `RAMP`, `buildChart`, the per-series bucketing the grouped bar reuses; whether
+- `chart.ts` — `seriesSlot`, `buildChart`, the per-series bucketing the grouped bar reuses; whether
   `ChartView.tsx` currently ignores `series` on `shape: 'bar'` (the old-client acceptance claim
   rests on it).
 - `ui/tokenAxes.ts` + `styles/tokenAxes.test.ts` — the colour-axis token list and the disjointness

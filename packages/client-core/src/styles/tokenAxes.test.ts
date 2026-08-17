@@ -6,6 +6,7 @@ import {
   FRAME_TOKENS,
   INVARIANT_TOKENS,
   SELF_DESCRIPTION_TOKENS,
+  SERIES_TOKENS,
   STYLE_TOKENS,
   THEME_TOKENS,
   Z_ORDER_INVARIANTS,
@@ -72,7 +73,10 @@ describe('token axes are complete', () => {
     // references, so they follow each theme automatically and must NOT be restated per block.
     // The split is DATA now rather than a list written out here (ui/tokenAxes.ts), because a
     // plugin-contributed theme is validated against the same primitives.
-    const derived = new Set<string>([...DERIVED_THEME_TOKENS, ...SELF_DESCRIPTION_TOKENS])
+    // SERIES_TOKENS join them in being excluded, for a third reason: they are theme-axis colour with
+    // :root defaults that a theme block MAY restate and none has to, precisely so a plugin theme
+    // validated against the palette contract is not rejected for omitting them (ui/tokenAxes.ts).
+    const derived = new Set<string>([...DERIVED_THEME_TOKENS, ...SELF_DESCRIPTION_TOKENS, ...SERIES_TOKENS])
     const primitives = [...theme].filter((t) => !derived.has(t))
     expect(primitives).toEqual([...THEME_PALETTE_TOKENS])
     const blocks = declaredByBlock(sheet('tokens-theme.css'))

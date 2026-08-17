@@ -58,6 +58,16 @@ export const cachedCollectionPage = (
   // id would quietly create one for the empty string rather than answer "nothing cached".
   nodeId ? clientFor(nodeId).client.getQueryData<PluginCollectionPage>(collectionQueryKey(query)) : undefined
 
+/** When that page landed, epoch milliseconds, or `undefined` for a query this device has never
+ *  answered. The cache already tracks it; the wizard's collection cards are the reader (editor.ts §
+ *  collectionCardMeta), because "read 3 minutes ago" and "not read on this device yet" are different
+ *  sentences and a row count of zero cannot tell them apart. */
+export const cachedCollectionAnsweredAt = (query: PanelQuery | undefined, nodeId: string): number | undefined => {
+  if (!nodeId) return undefined
+  const at = clientFor(nodeId).client.getQueryState(collectionQueryKey(query))?.dataUpdatedAt
+  return at || undefined
+}
+
 /** Whether a query-cache event is about a collection page. Exported for its own test: every other
  *  query on the node — repos, tasks, rail rows — ticking here would rerun the editor's derivations
  *  for nothing, and a predicate that quietly stopped matching would be invisible. */

@@ -7,7 +7,7 @@ import { CollapsibleSection } from '../ui/CollapsibleSection'
 import Icon from '../ui/Icon'
 import { Modal } from '../ui/Modal'
 import Picker from '../ui/Picker'
-import { chartAxisFields, chartShapesFor, defaultChartAxis, defaultChartView, type ChartShape } from './chart'
+import { chartAxisFields, chartShapesFor, defaultChartAxis, type ChartShape } from './chart'
 import { collectionsForPicker, defaultPanelTitle } from './compose'
 import { cachedCollectionPage, createCollectionCacheRevision } from './data'
 import {
@@ -17,12 +17,14 @@ import {
   operatorNeedsValue,
   parseLimit,
   parseRefresh,
-  retainShaping,
   retargetFilter,
   schemaOf,
+  settleComposition,
   trendsFor,
   viewsFor,
   withOperator,
+  withViewKind,
+  type PanelComposition,
 } from './editor'
 import {
   candidateFieldsFor,
@@ -181,6 +183,13 @@ export default function PanelEditor(props: {
 
   const patch = (change: Partial<PanelShaping>) => setShaping((current) => ({ ...current, ...change }))
 
+  /** Apply what a pure composition rule decided. The two signals are one draft as far as
+   *  `editor.ts` is concerned; keeping them separate here is a form-state convenience, not a model. */
+  const compose = (next: PanelComposition) => {
+    setView(next.view)
+    setShaping(next.shaping)
+  }
+
   // An existing board whose grouped field the plugin has since dropped. Settled once, on open, so
   // the select and the definition agree — a control showing a value the panel does not hold is how
   // a person saves something other than what they read.
@@ -221,13 +230,8 @@ export default function PanelEditor(props: {
     settle()
   }
 
-  /** Re-gate everything the source list decides, after it changes. */
-  const settle = () => {
-    setShaping((current) => retainShaping(current, schema()))
-    const offered = viewsFor({ schema: schema() })
-    if (!offered.includes(view().kind as PanelViewKind)) chooseView(offered[0] ?? 'list')
-    else if (view().kind === 'board' && !fieldById(shaping().groupBy)) patch({ groupBy: defaultGroupBy(schema()) })
-  }
+  /** Re-gate everything the source list decides, after it changes (editor.ts § settleComposition). */
+  const settle = () => compose(settleComposition({ view: view(), shaping: shaping() }, schema()))
 
   const setParam = (index: number, id: string, value: string) =>
     setQueries((current) => current.map((query, at) =>
@@ -343,16 +347,10 @@ export default function PanelEditor(props: {
 
   // ── Views, filters and sort ─────────────────────────────────────────────────────────────────
 
-  const chooseView = (kind: PanelViewKind) => {
-    setView((current) => ({ ...current, kind }))
-    // A board with no group-by has no columns, so choosing the view IS choosing a grouping. It is
-    // written into shaping rather than held by the view, so switching to a table and back keeps it.
-    if (kind === 'board' && !fieldById(shaping().groupBy)) patch({ groupBy: defaultGroupBy(schema()) })
-    // The type-inferred chart: pre-pick the axes from what the schema declares, so a person gets a
-    // sensible chart in two clicks and then adjusts. Only when the panel names no shape yet —
-    // re-choosing `chart` must not overwrite the axes somebody already set.
-    if (kind === 'chart' && !view().shape) setView((current) => ({ ...current, ...defaultChartView(schema(), shaping()) }))
-  }
+  /** The board's implied grouping and the chart's inferred axes, both in `editor.ts § withViewKind`
+   *  rather than here — the wizard's View step applies the same rules to the same pair, and a second
+   *  copy is how the two presentations come to disagree about what choosing a view means. */
+  const chooseView = (kind: PanelViewKind) => compose(withViewKind({ view: view(), shaping: shaping() }, kind, schema()))
 
   const shapes = createMemo(() => chartShapesFor(schema()))
   /** The shape the panel will actually draw: its own, if this schema still supports it. */

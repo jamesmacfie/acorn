@@ -68,6 +68,31 @@
   --scrim-color: #000000;
 }
 
+/* SERIES IDENTITY — chart marks that answer "which series is this", never "how is this doing"
+   (docs/future/dashboards/charts.md § 1). Deliberately NOT the status tones: a line split by source
+   coloured ok-green and warn-amber reads as a judgement nobody made.
+
+   Defaults, not primitives. A theme block may restate these; none has to, and a plugin-contributed
+   theme cannot (they are outside the manifest's palette contract) — it inherits these. See
+   SERIES_TOKENS in ui/tokenAxes.ts.
+
+   ONE SET, NOT A LIGHT/DARK PAIR, and that is a decision rather than an omission. Half the named
+   themes below are dark; a --dark-* flip would only reach the two default paths and leave Monokai and
+   Nord on the light values anyway. So all three sit at L≈0.6 in oklch, which clears 3:1 — the
+   contrast floor for a graphical object — against BOTH the light ground (#ffffff) and the dark one
+   (#121212), and they are hues no status tone occupies (ok green #1a7f37, warn amber #9a6700, bad red
+   #cf222e, and --accent, which is near-black here).
+
+   The accepted ceiling: holding one lightness for both grounds costs the greyscale separation a
+   three-step lightness ramp would have given, so the three are told apart by hue alone. A pack that
+   wants better on its own ground restates them — that is the calibration knob, and it is why these
+   are tokens. Series four onwards folds to --text-faint. */
+:root {
+  --viz-series-1: oklch(0.58 0.17 255);
+  --viz-series-2: oklch(0.60 0.20 328);
+  --viz-series-3: oklch(0.62 0.11 195);
+}
+
 /* Dark token VALUES, defined once as --dark-* (inert until mapped below). Two paths apply them —
    the manual data-theme="dark" toggle and the OS preference (unless forced light); the mappings
    are thin var() indirections so a dark tweak is made in exactly one place. */

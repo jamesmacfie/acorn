@@ -6,14 +6,19 @@ import {
   emptyDashboards,
   hydrateDashboards,
   HOME_PLACEMENT,
+  homeTabIdOf,
+  homeTabs,
+  homeTabScope,
   layoutAt,
   panelsAt,
   parseDashboards,
   parsePanelDefinition,
   placePanel,
   placementScopeKey,
+  removeHomeTab,
   removePanel,
   savePanel,
+  setHomeTabs,
   setLayoutAt,
   unplacePanel,
 } from './persist'
@@ -354,5 +359,100 @@ describe('the store', () => {
     removePanel('a')
     expect(dashboards().panels).toEqual({})
     expect(Object.values(dashboards().placements).flat()).toEqual([])
+  })
+})
+
+describe('home tabs', () => {
+  it('is a placement scope and nothing else — the default tab IS the bare home key', () => {
+    expect(placementScopeKey(homeTabScope(''))).toBe('home')
+    expect(placementScopeKey(homeTabScope('t1'))).toBe('home/t1')
+    expect(homeTabIdOf('home')).toBe('')
+    expect(homeTabIdOf('home/t1')).toBe('t1')
+    // Not a tab: another surface, and the projectId variant, which no tab carries.
+    expect(homeTabIdOf('pane/pr')).toBeUndefined()
+    expect(homeTabIdOf('home/t1/p1')).toBeUndefined()
+  })
+
+  it('parses tolerantly: keeps the empty id, drops duplicates, caps the count and the name', () => {
+    const state = parseDashboards({
+      tabs: [
+        { id: '', name: '  Home  ' },
+        { id: 'a', name: 'Reviews' },
+        { id: 'a', name: 'A second Reviews' },
+        { id: 'b', name: '' },
+        { id: 7, name: 'Not a string id' },
+        'nonsense',
+        { id: 'long', name: 'x'.repeat(200) },
+        ...Array.from({ length: 12 }, (_, index) => ({ id: `fill${index}`, name: `Fill ${index}` })),
+      ],
+    })
+    expect(state.tabs?.map((tab) => tab.id)).toEqual(['', 'a', 'long', 'fill0', 'fill1', 'fill2', 'fill3', 'fill4'])
+    expect(state.tabs?.[0].name).toBe('Home')
+    expect(state.tabs?.[1].name).toBe('Reviews')
+    expect(state.tabs?.[2].name).toHaveLength(60)
+  })
+
+  it('leaves the key off entirely when a blob names no tabs, so today\'s Home is untouched', () => {
+    expect(parseDashboards({ panels: {}, placements: { home: ['a'] } }).tabs).toBeUndefined()
+    expect(homeTabs(parseDashboards({ placements: { home: ['a'], 'home/t1': ['b'] } }))).toEqual([])
+  })
+
+  it('recovers a home scope that has panels but no name, so an old client\'s write loses only the name', () => {
+    // Exactly what an old client leaves behind: it serialises what it parsed, so `tabs` is gone and
+    // every placement survives.
+    const state = parseDashboards({
+      placements: { home: ['a'], 'home/t1': ['b'], 'home/t2': ['c'], 'pane/pr': ['d'] },
+      tabs: [{ id: 't1', name: 'Reviews' }],
+    })
+    expect(homeTabs(state)).toEqual([
+      { id: 't1', name: 'Reviews' },
+      { id: '', name: 'Untitled' },
+      { id: 't2', name: 'Untitled' },
+    ])
+  })
+
+  it('always offers the default tab, even with nothing placed on it', () => {
+    const state = parseDashboards({ placements: { 'home/t1': ['b'] }, tabs: [{ id: 't1', name: 'Reviews' }] })
+    expect(homeTabs(state).map((tab) => tab.id)).toContain('')
+  })
+
+  it('round-trips through the slice codec unchanged', () => {
+    const state = parseDashboards({ tabs: [{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }] })
+    expect(parseDashboards(JSON.stringify(dashboardsSlice.codec.serialize(state))).tabs).toEqual(state.tabs)
+  })
+
+  it('deleting a tab unplaces it and never touches a definition', () => {
+    hydrateDashboards(emptyDashboards())
+    savePanel(panel('a'))
+    placePanel(HOME_PLACEMENT, 'a')
+    placePanel(homeTabScope('t1'), 'a')
+    setLayoutAt(homeTabScope('t1'), { order: ['a'], rects: { a: { x: 0, y: 0, w: 4, h: 4 } } })
+    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }])
+
+    removeHomeTab('t1')
+    expect(dashboards().tabs).toEqual([{ id: '', name: 'Home' }])
+    expect(dashboards().placements['home/t1']).toBeUndefined()
+    expect(dashboards().layouts['home/t1']).toBeUndefined()
+    // The definition, and its place on every other surface, survive.
+    expect(dashboards().panels.a).toBeDefined()
+    expect(panelsAt(HOME_PLACEMENT).map((entry) => entry.id)).toEqual(['a'])
+  })
+
+  it('refuses to delete the default tab, which is the bare scope and has no delete', () => {
+    hydrateDashboards(emptyDashboards())
+    savePanel(panel('a'))
+    placePanel(HOME_PLACEMENT, 'a')
+    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }])
+    removeHomeTab('')
+    expect(dashboards().tabs).toHaveLength(2)
+    expect(panelsAt(HOME_PLACEMENT).map((entry) => entry.id)).toEqual(['a'])
+  })
+
+  it('survives a panel deletion — names are not collateral damage of removing a panel', () => {
+    hydrateDashboards(emptyDashboards())
+    savePanel(panel('a'))
+    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }])
+    removePanel('a')
+    expect(dashboards().tabs).toHaveLength(2)
   })
 })
