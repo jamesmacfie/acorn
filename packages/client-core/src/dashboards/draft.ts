@@ -2,7 +2,7 @@ import { createMemo, createSignal } from 'solid-js'
 import type { PluginCollectionField } from '@acorn/protocol/collections.ts'
 import { activeNodeId } from '../node/activeNode'
 import type { CollectionContribution } from '../registries/collections'
-import { chartShapesFor, defaultChartAxis, type ChartShape } from './chart'
+import { chartSeriesFields, chartShapesFor, defaultChartAxis, type ChartShape } from './chart'
 import { collectionsForPicker, defaultPanelTitle } from './compose'
 import { cachedCollectionAnsweredAt, cachedCollectionPage, createCollectionCacheRevision } from './data'
 import {
@@ -300,10 +300,19 @@ export function createPanelDraft(props: {
     const wanted = view().shape
     return wanted && shapes().includes(wanted) ? wanted : shapes()[0] ?? 'bar'
   }
-  const chooseShape = (next: ChartShape) =>
+  /** The enums this chart may be split into series by — every one for a line, every one but the
+   *  category axis for a bar (chart.ts § chartSeriesFields). Empty means the control is not offered,
+   *  which is how the grouped bar stays unrepresentable over a single-enum schema. */
+  const seriesFields = createMemo(() => chartSeriesFields(schema(), shape(), view(), shaping()))
+  const chooseShape = (next: ChartShape) => setView((current) => {
     // A bar's category axis and a line's time axis are different fields, so the old `x` cannot be
     // carried across — it is re-inferred for the shape that is now selected.
-    setView((current) => ({ ...current, shape: next, x: defaultChartAxis(schema(), next, shaping()) }))
+    const x = defaultChartAxis(schema(), next, shaping())
+    // And a line split by the enum that just became the bar's category axis is a split `buildBar`
+    // drops anyway (chart.ts § the grouped bar); dropping it here too means the select is never
+    // showing a value the panel does not hold.
+    return { ...current, shape: next, x, ...(current.series && current.series === x ? { series: undefined } : {}) }
+  })
 
   const trends = createMemo(() => trendsFor(schema()))
   /** Turning the trend off takes the comparison with it: a delta with no series behind it is config
@@ -403,6 +412,7 @@ export function createPanelDraft(props: {
     extraFields,
     shapes,
     shape,
+    seriesFields,
     trends,
     addable,
     ready: () => queries().length > 0,

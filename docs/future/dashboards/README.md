@@ -42,10 +42,10 @@ nothing else may be reordered.
 | Phase | What | File | Why it is first |
 | --- | --- | --- | --- |
 | pre ✅ | The scheduler: engine, declarations, the `collection-sample` target and its two seams — all four cron phases are built | [`../cron/`](../cron/README.md) | The node-side sampler is what makes measure history gapless; it accrues samples today with no client open. |
-| 0 | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. **All but the `source` panel-local field (`charts.md § 4`) are built.** |
+| 0 ✅ | Model keys + codec + pure derivations; the `tabs` list; the measure-history store (fed by cron); the series-colour decision; the `source` panel-local field | `measure-history.md`, `wizard.md § Foundation`, `charts.md`, `tabs.md § data model` | Everything later renders from these. Building UI first means rebuilding it when the shapes land. **All built.** |
 | 1 ✅ | Grid gesture + panel chrome restyle | `ux-refresh.md` | Pure presentation; touches no data. Parallel-safe with phase 0 and the cron work. **Built** — behaviour in [`docs/dashboards.md § Layout`](../../dashboards.md). |
 | 2 ✅ | The panel wizard; the tab bar | `wizard.md`, `tabs.md` | The wizard needs phase 0's derivations; the tab bar needs only the `tabs` key and is otherwise independent. **Both built** — behaviour in [`docs/dashboards.md`](../../dashboards.md) under § The generated editor and § Placements. |
-| 3 | Stat trend + delta rendering ✅; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. The stat half is built — `docs/dashboards.md § Trends` owns it; the chart half is not. |
+| 3 ✅ | Stat trend + delta rendering; chart growth (legend, grouped bar, source split, sparkline mark) | `measure-history.md § Display`, `charts.md` | Needs the history store accruing samples and the series-colour decision made. **Both halves built** — [`docs/dashboards.md`](../../dashboards.md) owns them under § Trends and § Views are derived. |
 
 ## The work items
 
@@ -55,7 +55,7 @@ nothing else may be reordered.
 | [`wizard.md`](./wizard.md) ✅ | Staged panel creation with a live preview, over the same generated editor. | SHIPPED — behaviour moved to [`docs/dashboards.md § The generated editor`](../../dashboards.md); the file keeps the reasoning and the seats still empty. |
 | [`tabs.md`](./tabs.md) ✅ | Multiple named dashboards on Home — a tab is a `home/<tabId>` placement scope; the bar appears only past one tab. | SHIPPED — behaviour in [`docs/dashboards.md`](../../dashboards.md) (§ Persistence, § Placements); the file keeps the reasoning. |
 | [`measure-history.md`](./measure-history.md) ✅ | The measure-history store and the stat delta/sparkline it feeds; sampled by the scheduler's `collection-sample` target. | SHIPPED — behaviour moved to [`docs/dashboards.md § Trends`](../../dashboards.md); the file keeps the reasoning. |
-| [`charts.md`](./charts.md) | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | Series-colour decision SHIPPED (§ 1); legend, grouped bar and the `source` field are what is left. |
+| [`charts.md`](./charts.md) ✅ | Chart growth: series identity colours, legend, grouped bar, source split, the sparkline mark. | SHIPPED — behaviour in [`docs/dashboards.md § Views are derived`](../../dashboards.md); the file keeps the reasoning and the deviations. |
 | [`placements.md`](./placements.md) | Rail-source side panels, then plugin-hosted regions under the host-drawn-region rule. | Regions must ride the extension-point contract. |
 | [`dynamic-collections.md`](./dynamic-collections.md) | Run-once-and-pin with schema-drift detection, then the discovery route. | Both gated on the database plugin's saved-query case being wanted. |
 | [`write-back.md`](./write-back.md) | Board-drag write-back over designated write values. | Gated on real usage of read-only boards. |

@@ -66,14 +66,63 @@ export const PANEL_FIELDS: readonly PluginCollectionField[] = ROLE_FIELDS
 /** The panel-local field the derived enum lives on, and therefore what a mapped board groups by. */
 export const PANEL_STATUS_FIELD_ID = 'status'
 
+/** WHERE A ROW CAME FROM, as an ordinary panel-local field (docs/future/dashboards/charts.md § 4).
+ *
+ *  A row's source is provenance, not a field, and "split this line by github vs linear" was
+ *  unexpressible because `series` names a field. Rather than a special case in the chart, provenance
+ *  becomes a field where fields already grow — and then EVERYTHING DOWNSTREAM WORKS UNINVENTED:
+ *  `series` can name it, `groupBy` can (a by-source board), filters can (hide one source without
+ *  unmapping it), the projection can (the Source column, which used to be hardcoded in TableView).
+ *
+ *  Three properties hold and each is deliberate:
+ *
+ *    FED BY THE HOST'S STAMP, never by a mapping row. The matrix has no row for it because there is
+ *    nothing to answer — it is never absent and never user-fed.
+ *
+ *    NO TONE. Provenance is IDENTITY, not status: github is not "ok" and linear is not "warn"
+ *    (charts.md § 1). The chart's series ramp colours it; the status vocabulary does not.
+ *
+ *    MULTI-SOURCE ONLY. A split over one source is a no-op nobody should be offered, and the enum
+ *    would carry a single value.
+ *
+ *  No id collision is possible: panel-local ids never cross the wire, so a plugin's field id cannot
+ *  reach this namespace, and an invented field's id is MINTED (`newColumnId`) rather than typed. */
+export const PANEL_SOURCE_FIELD_ID = 'source'
+
+/** ponytail: the plugin's id, and the collection alongside it only where one plugin provides two of
+ *  this panel's sources. The registry's display name would read better and lives in client-core,
+ *  which this package cannot import; pass one down if it ever matters. */
+const sourceLabel = (query: PanelQuery, queries: readonly PanelQuery[]): string =>
+  queries.filter((other) => other.pluginId === query.pluginId).length > 1
+    ? `${query.pluginId} · ${query.collectionId}`
+    : query.pluginId
+
+const provenanceField = (queries: readonly PanelQuery[]): PluginCollectionField[] =>
+  queries.length < 2
+    ? []
+    : [{
+      id: PANEL_SOURCE_FIELD_ID,
+      name: 'Source',
+      type: 'enum',
+      values: queries.map((query) => ({ id: panelSourceKey(query), label: sourceLabel(query, queries) })),
+    }]
+
 const asField = (definition: PanelFieldDef): PluginCollectionField =>
   ({ id: definition.id, name: definition.label, type: definition.type })
 
 /** THE panel-local vocabulary for a given mapping: the five roles, then whatever the user invented,
- *  in the order they declared it. Everything downstream — the schema, the union, the editor's matrix
- *  — walks this one list, so an invented field is never a special case anywhere. */
-export const panelFieldsFor = (mapping: PanelMapping | undefined): PluginCollectionField[] =>
-  [...ROLE_FIELDS, ...(mapping?.extraFields ?? []).map(asField)]
+ *  in the order they declared it, then `source` on a panel with more than one. Everything downstream
+ *  — the schema, the union, the editor's matrix — walks this one list, so an invented field is never
+ *  a special case anywhere.
+ *
+ *  `queries` is OPTIONAL and its absence is the mapping matrix's answer: the matrix asks "which of
+ *  this source's fields feeds each panel field", and `source` has nothing to answer. Callers that
+ *  render data pass the queries; the matrix does not. */
+export const panelFieldsFor = (
+  mapping: PanelMapping | undefined,
+  queries: readonly PanelQuery[] = [],
+): PluginCollectionField[] =>
+  [...ROLE_FIELDS, ...(mapping?.extraFields ?? []).map(asField), ...provenanceField(queries)]
 
 /** An invented field's id is never a role's, so `undefined` here IS "this is one of the five". */
 const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): PanelFieldDef | undefined =>
@@ -251,8 +300,11 @@ export function panelSchema(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,
 ): PluginCollectionSchema {
-  if (!isMapped(sources.map((source) => source.query), mapping)) return sources[0]?.schema ?? EMPTY_SCHEMA
-  const fields = panelFieldsFor(mapping).flatMap((field): PluginCollectionField[] => {
+  const queries = sources.map((source) => source.query)
+  if (!isMapped(queries, mapping)) return sources[0]?.schema ?? EMPTY_SCHEMA
+  const fields = panelFieldsFor(mapping, queries).flatMap((field): PluginCollectionField[] => {
+    // The host feeds this one. No source has to be able to fill it, and no mapping row points at it.
+    if (field.id === PANEL_SOURCE_FIELD_ID) return [field]
     if (!sources.some((source) => sourceFieldFor(source, field.id, mapping))) return []
     if (field.id !== PANEL_STATUS_FIELD_ID) return [field]
     const columns = mapping?.columns ?? []
@@ -290,6 +342,10 @@ export function unionRows(
   const fields = panelSchema(sources, mapping).fields
   const columns = mapping?.columns ?? []
   const hideUnmapped = mapping?.unmapped === 'hidden'
+  // Present exactly when the panel unions more than one source, and written from the SAME host stamp
+  // the provenance badge reads — a plugin cannot state it, so a collection cannot file its rows under
+  // a stranger's source (charts.md § 4).
+  const stampsSource = fields.some((field) => field.id === PANEL_SOURCE_FIELD_ID)
 
   return sources.flatMap((source) => {
     const key = panelSourceKey(source.query)
@@ -300,6 +356,7 @@ export function unionRows(
         if (!sourceFieldId) continue
         values[panelFieldId] = row.values[sourceFieldId] ?? null
       }
+      if (stampsSource) values[PANEL_SOURCE_FIELD_ID] = key
       if (columns.length) {
         const raw = values[PANEL_STATUS_FIELD_ID]
         const column = raw === null || raw === undefined || raw === ''

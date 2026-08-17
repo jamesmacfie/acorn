@@ -8,6 +8,7 @@ import {
   candidateFieldsFor,
   isMapped,
   mappedColumnId,
+  panelFieldsFor,
   panelSchema,
   pruneMapping,
   sourceFieldFor,
@@ -157,7 +158,7 @@ describe('field mapping is pre-filled from the declared ROLES', () => {
 describe('the panel-local schema', () => {
   it('is the role vocabulary, with the user’s columns as the status field’s values', () => {
     const schema = panelSchema(sources, todoBoard)
-    expect(schema.fields.map((field) => field.id)).toEqual(['title', 'status', 'assignee', 'updated', 'url'])
+    expect(schema.fields.map((field) => field.id)).toEqual(['title', 'status', 'assignee', 'updated', 'url', 'source'])
     expect(schema.fields.find((field) => field.id === 'status')?.values).toEqual(todoColumns)
   })
 
@@ -170,6 +171,57 @@ describe('the panel-local schema', () => {
   it('declares no values at all until the user has invented columns', () => {
     const schema = panelSchema(sources, undefined)
     expect(schema.fields.find((field) => field.id === 'status')?.values).toBeUndefined()
+  })
+})
+
+describe('`source` as a panel-local field', () => {
+  // charts.md § 4: a row's source is provenance, not a field — so it becomes a field where fields
+  // already grow, and every downstream feature works uninvented rather than by a chart special case.
+
+  it('appears on a multi-source panel as an ordinary enum over the panel’s own source keys', () => {
+    const field = panelSchema(sources, todoBoard).fields.find((entry) => entry.id === 'source')!
+    expect(field.type).toBe('enum')
+    expect(field.values).toEqual([
+      { id: 'github:pulls-mine', label: 'github' },
+      { id: 'linear:issues-mine', label: 'linear' },
+    ])
+    // NO TONE anywhere: provenance is identity, not status. github is not "ok" and linear is not
+    // "warn" — the chart's series ramp colours these, the status vocabulary does not.
+    expect(field.values!.every((value) => value.tone === undefined)).toBe(true)
+  })
+
+  it('names the collection too where one plugin provides two of the panel’s sources', () => {
+    const second: PanelQuery = { pluginId: 'github', collectionId: 'reviews' }
+    const field = panelSchema([github, { ...github, query: second }], todoBoard)
+      .fields.find((entry) => entry.id === 'source')!
+    expect(field.values?.map((value) => value.label)).toEqual(['github · pulls-mine', 'github · reviews'])
+  })
+
+  it('does not appear over one source — a split with one value is a no-op nobody should be offered', () => {
+    const single = panelSchema([github], { columns: todoColumns })
+    expect(single.fields.map((field) => field.id)).not.toContain('source')
+    expect(unionRows([github], { columns: todoColumns })[0].values.source).toBeUndefined()
+  })
+
+  it('is fed by the host’s stamp on every row, never by a mapping row', () => {
+    const united = unionRows(sources, todoBoard)
+    expect(united.map((entry) => entry.values.source))
+      .toEqual(['github:pulls-mine', 'github:pulls-mine', 'linear:issues-mine', 'linear:issues-mine'])
+    // The matrix has no row for it: there is nothing to answer, so nothing is offered.
+    expect(panelFieldsFor(todoBoard).map((field) => field.id)).not.toContain('source')
+    expect(candidateFieldsFor(github, 'source', todoBoard)).toEqual([])
+  })
+
+  it('groups, filters and projects like any other enum, with no code that knows what it is', () => {
+    const schema = panelSchema(sources, todoBoard)
+    const united = unionRows(sources, todoBoard)
+    const field = schema.fields.find((entry) => entry.id === 'source')!
+    expect(boardColumns(united, field).map((column) => [column.label, column.rows.length]))
+      .toEqual([['github', 2], ['linear', 2]])
+    const onlyLinear = shapeRows(united, schema, {
+      filters: [{ field: 'source', op: 'eq', value: 'linear:issues-mine' }],
+    })
+    expect(onlyLinear.every((entry) => entry.pluginId === 'linear')).toBe(true)
   })
 })
 
@@ -359,7 +411,7 @@ describe('the fields the user invented', () => {
 
   it('appears in the panel schema after the five roles, with the type the user chose', () => {
     const fields = panelSchema(sources, withRef).fields
-    expect(fields.map((field) => field.id)).toEqual(['title', 'status', 'assignee', 'updated', 'url', 'ref'])
+    expect(fields.map((field) => field.id)).toEqual(['title', 'status', 'assignee', 'updated', 'url', 'ref', 'source'])
     expect(fields.find((field) => field.id === 'ref')).toEqual({ id: 'ref', name: 'Ref', type: 'text' })
   })
 
@@ -459,8 +511,10 @@ describe('partial availability', () => {
 
   it('keeps a source’s own field mapping usable when it answered with no schema at all', () => {
     const cold: PanelSourcePage = { query: linearQuery, schema: { fields: [] }, rows: [] }
+    // `source` survives a source that answered with nothing: it is the host's stamp rather than
+    // anything the source has to be able to fill, so it names both either way.
     expect(panelSchema([github, cold], todoBoard).fields.map((field) => field.id))
-      .toEqual(['title', 'status', 'assignee', 'updated', 'url'])
+      .toEqual(['title', 'status', 'assignee', 'updated', 'url', 'source'])
     expect(unionRows([github, cold], todoBoard)).toHaveLength(2)
   })
 })
