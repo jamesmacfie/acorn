@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import { EmptyState } from '../../ui/primitives'
-import { buildChart, CHART_FRAME } from '../chart'
+import { buildChart, CHART_FRAME, TICK_GAP } from '../chart'
 import type { PanelViewProps } from './props'
 
 // The chart view. Deliberately almost nothing: every number on screen — the bar rects, the tick
@@ -20,14 +20,16 @@ import type { PanelViewProps } from './props'
 // polish — it is the secondary encoding the identity ramp's slot-2/slot-3 pair needs to be legal for
 // colour-vision-deficient readers (docs/future/dashboards/charts.md § 1).
 
-/** Half the tick text's line, so a label reads as centred on its gridline. */
-const TICK_GAP = 4
 const LABEL_DROP = 10
 
 export default function ChartView(props: PanelViewProps) {
   const plot = createMemo(() =>
     buildChart(props.rows, props.schema, props.view, props.groupBy ? { groupBy: props.groupBy } : {}))
 
+  // EVERY coordinate comes off the plot's own frame, never a module constant: the left gutter is as
+  // wide as this chart's y axis labels turned out to need, so a chart counting to 200,000 sits further
+  // right than one counting to 9. `CHART_FRAME` is only the stand-in for the un-drawable case below.
+  const frame = () => plot()?.frame ?? CHART_FRAME
   const yTicks = () => plot()?.yTicks ?? []
   const bars = () => {
     const chart = plot()
@@ -99,9 +101,14 @@ export default function ChartView(props: PanelViewProps) {
               </ul>
             )}
           </Show>
+          {/* `font-size` in USER UNITS, from the frame — inside a scaled viewBox a CSS px is a user
+              unit, so type set in the stylesheet scales with the drawing and `--fs-2xs` came out
+              enormous on a large panel. It is geometry here, like the point radius (chart.ts
+              § TICK_FONT), and the stylesheet keeps the colour. */}
           <svg
             class="dash-chart"
-            viewBox={`0 0 ${CHART_FRAME.width} ${CHART_FRAME.height}`}
+            viewBox={`0 0 ${frame().width} ${frame().height}`}
+            font-size={String(frame().tickFont)}
             role="img"
             aria-label={description()}
           >
@@ -113,14 +120,14 @@ export default function ChartView(props: PanelViewProps) {
                 <>
                   <line
                     class="dash-chart-grid"
-                    x1={CHART_FRAME.plotLeft}
-                    x2={CHART_FRAME.plotLeft + CHART_FRAME.plotWidth}
+                    x1={frame().plotLeft}
+                    x2={frame().plotLeft + frame().plotWidth}
                     y1={tick.at}
                     y2={tick.at}
                   />
                   <text
                     class="dash-chart-tick"
-                    x={CHART_FRAME.plotLeft - TICK_GAP}
+                    x={frame().plotLeft - TICK_GAP}
                     y={tick.at}
                     text-anchor="end"
                     dominant-baseline="middle"
@@ -173,9 +180,16 @@ export default function ChartView(props: PanelViewProps) {
               )}
             </For>
 
+            {/* Centred on its gridline, EXCEPT at the edges: `chart.ts` anchors a label that would
+                otherwise hang half of itself outside the box, which is what cut "Aug 18" to "Aug 1". */}
             <For each={xTicks()}>
               {(tick) => (
-                <text class="dash-chart-tick" x={tick.at} y={CHART_FRAME.baseline + LABEL_DROP} text-anchor="middle">
+                <text
+                  class="dash-chart-tick"
+                  x={tick.at}
+                  y={frame().baseline + LABEL_DROP}
+                  text-anchor={tick.anchor ?? 'middle'}
+                >
                   {tick.label}
                 </text>
               )}
@@ -184,10 +198,10 @@ export default function ChartView(props: PanelViewProps) {
             {/* The baseline last, so no mark can sit on the wrong side of it. */}
             <line
               class="dash-chart-axis"
-              x1={CHART_FRAME.plotLeft}
-              x2={CHART_FRAME.plotLeft + CHART_FRAME.plotWidth}
-              y1={CHART_FRAME.baseline}
-              y2={CHART_FRAME.baseline}
+              x1={frame().plotLeft}
+              x2={frame().plotLeft + frame().plotWidth}
+              y1={frame().baseline}
+              y2={frame().baseline}
             />
           </svg>
         </div>

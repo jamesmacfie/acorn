@@ -6,8 +6,9 @@ import {
   type PluginCollectionFieldType,
   type PluginCollectionParam,
 } from '@acorn/protocol/collections.ts'
+import Picker from '../ui/Picker'
 import { Checkbox, Input, Select } from '../ui/primitives'
-import { operatorLabel, operatorsForField } from './editor'
+import { operatorLabel, operatorsForField, toggleParamValue } from './editor'
 import type { PanelFilterOp, PanelMappingColumnDef, PanelTone } from './model'
 
 // SELECTORS: the typed, data-aware config inputs the generated editor is composed from
@@ -227,17 +228,41 @@ const FIELD_TYPE_LABELS: Record<PluginCollectionFieldType, string> = {
   link: 'Link',
 }
 
+/** One choice on a param, whether the plugin declared it or resolved it on the device. */
+type ParamChoice = { id: string; label: string }
+
+/** Empty is a real answer: a param the person has not set is a param the plugin defaults. */
+const ANY_CHOICE: ParamChoice = { id: '', label: 'Any' }
+
 /** A collection's declared param. The host renders the input and hands the value back OPAQUELY — the
  *  plugin owns what `repo` means, and the day it means something else this file does not change
- *  (Grafana's opaque-target lesson). Two forms, matching the two the wire declares. */
+ *  (Grafana's opaque-target lesson).
+ *
+ *  Three forms now, and which one appears is decided by the declaration plus whatever options the
+ *  plugin resolved for this device (registries/collections.ts § paramOptions): checkboxes for a
+ *  multiple-choice enum, the shared searchable picker where there is any closed list to choose one from,
+ *  a text box otherwise. A multiple selection crosses back as ONE comma-joined string, because a param's
+ *  value is a string on the wire and inventing a second encoding for the same field would give every
+ *  plugin two to read. */
 export function ParamInput(props: {
   param: PluginCollectionParam
   value: string
+  /** Device-resolved choices. These WIN over the declared `values` — a plugin that resolved them asked
+   *  for this list, and a stale declaration underneath is not a second list worth merging. */
+  options?: readonly ParamChoice[]
   onChange: (value: string) => void
 }) {
+  const choices = (): ParamChoice[] =>
+    props.options?.length
+      ? [...props.options]
+      : props.param.type === 'enum'
+        ? (props.param.values ?? []).map((value) => ({ id: value, label: value }))
+        : []
+
+  const selected = () => new Set(props.value.split(',').filter(Boolean))
+
   return (
-    <Show
-      when={props.param.type === 'enum' && props.param.values?.length ? props.param.values : undefined}
+    <Switch
       fallback={(
         <Input
           size="sm"
@@ -247,18 +272,52 @@ export function ParamInput(props: {
         />
       )}
     >
-      {(values) => (
-        <Select
-          size="sm"
-          aria-label={props.param.name}
-          value={props.value}
-          onChange={(event) => props.onChange(event.currentTarget.value)}
-        >
-          {/* Empty is a real answer: a param the person has not set is a param the plugin defaults. */}
-          <option value="">Any</option>
-          <For each={values()}>{(value) => <option value={value}>{value}</option>}</For>
-        </Select>
-      )}
-    </Show>
+      <Match when={choices().length && props.param.multiple}>
+        {/* Native checkboxes rather than `<select multiple>`, which needs a modifier key nobody
+            discovers and shows two rows of a scroller. Every choice is visible and each one is its own
+            announced control. */}
+        <span class="dash-param-choices">
+          <For each={choices()}>
+            {(choice) => (
+              <Checkbox
+                size="sm"
+                label={choice.label}
+                checked={selected().has(choice.id)}
+                onChange={(event) => props.onChange(toggleParamValue(
+                  props.value,
+                  choices().map((entry) => entry.id),
+                  choice.id,
+                  event.currentTarget.checked,
+                ))}
+              />
+            )}
+          </For>
+        </span>
+      </Match>
+      <Match when={choices().length}>
+        {/* The shared searchable picker, not a bare `<select>`. A declared enum is three values and
+            either would do; a RESOLVED one is however many repositories this person has, and scrolling
+            a native select past sixty of them is the thing that made this control feel broken. One
+            control for both cases rather than a threshold nobody can justify. */}
+        <span class="dash-param-picker">
+          <Picker<ParamChoice>
+            label={choices().find((choice) => choice.id === props.value)?.label ?? ANY_CHOICE.label}
+            ariaLabel={props.param.name}
+            placeholder={`Filter ${props.param.name.toLowerCase()}`}
+            emptyText="No match."
+            results={(query) => {
+              const needle = query.trim().toLowerCase()
+              const matched = choices().filter((choice) => choice.label.toLowerCase().includes(needle))
+              // "Any" is the CLEAR row, so it belongs at the top of the unfiltered list and nowhere in a
+              // filtered one — somebody typing a repository name is not looking for it.
+              return needle ? matched : [ANY_CHOICE, ...matched]
+            }}
+            rowLabel={(choice) => choice.label}
+            isActive={(choice) => choice.id === props.value}
+            onSelect={(choice) => props.onChange(choice.id)}
+          />
+        </span>
+      </Match>
+    </Switch>
   )
 }

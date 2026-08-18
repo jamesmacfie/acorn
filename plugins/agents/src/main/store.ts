@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, notInArray, or, sql } from 'drizzle-orm'
 import * as schema from '../node/schema'
 import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../shared/schemas'
@@ -90,10 +90,27 @@ export class AgentStore extends AgentSessionRepository {
     // into the Agent Center.
     const taskIds = await this.workspaceTaskIds(filter.workspaceId)
     if (taskIds?.length === 0) return { sessions: [], nextCursor: null }
+    // A session outlives its task's worktree but not its task. Archiving a task retires its agents
+    // with it, so the live list — the Agent Center, the Fleet stat, the attention inbox and the
+    // dashboard collection all read it — stops offering runs whose task is gone, and the archived
+    // list picks them up on the other side. Resolved at read time rather than cascaded onto
+    // `archivedAt` when the task is archived, because removing a project hard-deletes its tasks and
+    // no cascade would ever visit those rows.
+    //
+    // A caller that already pinned a task is exempt: the task drawer is looking AT that task, and
+    // asking core again per read would be a query for an answer the caller has.
+    //
+    // ponytail: one extra core read per list call. Fine while `active()` is a small table scan; if
+    // it stops being one, core grows an `activeIds()` and this asks for that instead.
+    const activeIds = filter.taskId ? null : (await this.core.tasks.active()).map((task) => task.id)
+    const liveTask = activeIds && (activeIds.length ? inArray(schema.agentSessions.taskId, activeIds) : sql`0`)
+    const retiredTask = activeIds && (activeIds.length ? notInArray(schema.agentSessions.taskId, activeIds) : sql`1`)
     const conditions = [
       filter.taskId ? eq(schema.agentSessions.taskId, filter.taskId) : undefined,
       taskIds ? inArray(schema.agentSessions.taskId, taskIds) : undefined,
-      filter.archived ? sql`${schema.agentSessions.archivedAt} IS NOT NULL` : isNull(schema.agentSessions.archivedAt),
+      filter.archived
+        ? or(isNotNull(schema.agentSessions.archivedAt), retiredTask || undefined)
+        : and(isNull(schema.agentSessions.archivedAt), liveTask || undefined),
       filter.attention ? sql`${schema.agentSessions.attention} NOT IN ('none', 'unread')` : undefined,
       filter.cursor ? lt(schema.agentSessions.updatedAt, filter.cursor) : undefined,
       filter.search ? like(schema.agentSessions.title, `%${filter.search.replace(/[%_]/g, '\\$&')}%`) : undefined,

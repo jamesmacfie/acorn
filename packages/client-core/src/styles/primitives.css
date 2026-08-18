@@ -83,6 +83,23 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 
 .ui-field { display: flex; flex-direction: column; gap: var(--space-3); }
 .ui-field[data-layout='row'] { flex-direction: row; align-items: center; gap: var(--space-4); }
+/* `split` is a LABELLED CONTROL AT A COLUMN, not a label with a control after it: the control column is
+   one width for every sibling, so a stack of them lines up on both edges instead of starting wherever
+   each label happened to end. That ragged left edge is what made the field-mapping matrix look thrown
+   together. Separate from `row` rather than replacing it — `row` is an inline chip in a strip of them
+   (the agent composer's config row), where a fixed column would stretch every chip to it.
+
+   The width is a literal and not a token deliberately: one measurement, used in one rule, and a pack
+   that wants a different one restates the rule. */
+.ui-field[data-layout='split'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-2);
+}
+.ui-field[data-layout='split'] > .ui-field-hint,
+.ui-field[data-layout='split'] > .ui-field-error { grid-column: 2; }
 .ui-field-label { font-size: var(--fs-sm); color: var(--text); }
 .ui-field-hint { font-size: var(--fs-sm); color: var(--text-muted); }
 .ui-field-error { font-size: var(--fs-sm); color: var(--danger); }

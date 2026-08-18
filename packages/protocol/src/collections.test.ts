@@ -86,6 +86,15 @@ describe('rows', () => {
     expect(page({ rows: [{ id: 'x', values: {}, action: { verb: 'navigate', surface: 'linear-issue' } }] }).success).toBe(false)
   })
 
+  it('takes the task a row lives in, and refuses anything that is not a task id', () => {
+    // What makes `openPane` usable from a dashboard: the host activates this task and navigates there
+    // before running the action, instead of opening the pane in whatever task is on screen.
+    const withTask = (taskId: unknown) => page({ rows: [{ id: 'x', values: {}, taskId }] })
+    expect(withTask('0f1a4d5e-4a0e-4a3c-8f6b-2f5f4b7a1c9d').success).toBe(true)
+    expect(withTask('task-2').success).toBe(false)
+    expect(page({ rows: [{ id: 'x', values: {} }] }).success).toBe(true)
+  })
+
   it('takes a declared risk tier, and refuses one outside the closed set', () => {
     // The tier is what the HOST renders its confirmation from. A plugin says how dangerous the thing
     // is; it has no way to say what is asked, or to say nothing is.

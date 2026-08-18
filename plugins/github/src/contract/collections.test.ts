@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { pluginCollectionResponseSchema } from '@acorn/protocol/collections.ts'
-import { pullsCollectionPage, pullStatus, type PullCollectionSource } from './collections'
+import { parsePullInvolvement, pullsCollectionPage, pullsSearchQuery, pullStatus, type PullCollectionSource } from './collections'
 
 const pull = (over: Partial<PullCollectionSource> = {}): PullCollectionSource => ({
   owner: 'acme',
@@ -50,6 +50,37 @@ describe('github pull requests as a collection', () => {
     const declared = pullsCollectionPage([]).schema.fields.find((field) => field.role === 'status')
     expect(declared?.values?.map((value) => value.id))
       .toEqual(['draft', 'open', 'unstable', 'behind', 'blocked', 'conflicts', 'ready'])
+  })
+
+  it('asks GitHub who "me" is instead of storing it', () => {
+    // `@me` is why neither the route nor the mirror needs the connected login: GitHub resolves it against
+    // the token, so the answer follows a reconnection without a migration.
+    expect(pullsSearchQuery('review-requested')).toBe('is:pr is:open archived:false review-requested:@me')
+    expect(pullsSearchQuery('assigned')).toBe('is:pr is:open archived:false assignee:@me')
+    expect(pullsSearchQuery('authored')).toBe('is:pr is:open archived:false author:@me')
+  })
+
+  it('lets the repo param narrow the search, and refuses anything that is not one', () => {
+    expect(pullsSearchQuery('assigned', 'acme/web')).toContain('repo:acme/web')
+    // The guard that matters: this string is interpolated into a query GitHub parses, so a space would
+    // otherwise smuggle in a second qualifier. Dropped means "search wider", never "search elsewhere".
+    expect(pullsSearchQuery('assigned', 'acme/web is:draft')).not.toContain('repo:')
+    expect(pullsSearchQuery('assigned', 'acme')).not.toContain('repo:')
+    expect(pullsSearchQuery('assigned', '')).not.toContain('repo:')
+  })
+
+  it('reads several involvements from one param, and drops what it does not know', () => {
+    // The param is a comma-joined set because "assigned to me OR waiting on my review" is one question
+    // and GitHub's qualifiers only AND — so the route runs one search per entry and unions them.
+    expect(parsePullInvolvement('assigned,review-requested')).toEqual(['review-requested', 'assigned'])
+    // Declaration order out, whatever order they were ticked in: one set of choices is one query string,
+    // so two panels with the same answer share a cache key.
+    expect(parsePullInvolvement('authored,review-requested')).toEqual(['review-requested', 'authored'])
+    // A param is opaque to the host and a saved panel outlives this build, so an unknown entry is
+    // dropped and an empty list falls back to the mirror read rather than erroring.
+    expect(parsePullInvolvement('mentioned')).toEqual([])
+    expect(parsePullInvolvement('assigned,mentioned')).toEqual(['assigned'])
+    expect(parsePullInvolvement('')).toEqual([])
   })
 
   it('keys a row by repository as well as number', () => {

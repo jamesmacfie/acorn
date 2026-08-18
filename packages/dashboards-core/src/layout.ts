@@ -60,8 +60,9 @@ export type PanelLayout = {
 export type PanelSize = { minW: number; minH: number; w: number; h: number }
 
 const SIZES: Record<string, PanelSize> = {
-  // One number and a label.
-  stat: { minW: 2, minH: 2, w: 3, h: 2 },
+  // One number and a label. Down to a single cell: a stat is the one kind that stays readable as a
+  // tile, and the sparkline is already written to be squeezed out rather than push the number off.
+  stat: { minW: 1, minH: 1, w: 3, h: 2 },
   // Rows need a title's width.
   list: { minW: 3, minH: 2, w: 4, h: 4 },
   // Columns need more.

@@ -15,6 +15,7 @@ export {
   gapId,
   highlighterTokenize,
   isCodeRow,
+  maxLineCols,
   plainTokenize,
   rowIdentityKeys,
   splitBandIdentityKeys,
@@ -27,3 +28,4 @@ export type { FindHighlight } from '@acorn/client-core/ui/diff/find.ts'
 export { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'
 export { synth } from '@acorn/client-core/ui/diff/synth.ts'
 export { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/ui/diff/virtualization.ts'
+export { createSplitScrollSync } from '@acorn/client-core/ui/diff/splitScrollSync.ts'

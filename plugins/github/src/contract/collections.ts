@@ -68,8 +68,52 @@ export const pullStatus = (row: {
   return 'open'
 }
 
+// ── "…involving me", and why it does not read the mirror ───────────────────────────────────────────
+//
+// The three questions a person actually asks a PR dashboard. Declared as ONE enum param rather than
+// three booleans because the param vocabulary has no boolean, and because they are how you're involved
+// — a single answer reads better in a dropdown than three checkboxes that can contradict each other.
+//
+// Unset is the collection's original behaviour: every open PR in every mirrored repo.
+//
+// Two of the three CANNOT be answered from the mirror, which is the whole reason this exists as a
+// search rather than another `where` clause. Assignees are not mirrored at all — no column, no table.
+// Review requests are mirrored, but only by the PR-DETAIL sync (server/routes/prMirror.ts), so the
+// mirror knows you were asked to review exactly the pull requests you already opened — the precise
+// complement of what someone asking "what's waiting on me" wants to see. A mirror-side filter would
+// have parsed, rendered, and quietly answered "nothing".
+export const PULL_INVOLVEMENT = ['review-requested', 'assigned', 'authored'] as const
+export type PullInvolvement = (typeof PULL_INVOLVEMENT)[number]
+
+const INVOLVEMENT_QUALIFIER: Record<PullInvolvement, string> = {
+  'review-requested': 'review-requested:@me',
+  assigned: 'assignee:@me',
+  authored: 'author:@me',
+}
+
+/** `owner/name`, and nothing that could carry a second search qualifier in on a space. The mirror path
+ *  gets the same shape for free by splitting on `/`; here it is a guard, because this string is
+ *  interpolated into a query GitHub parses. Anything else is dropped, which searches wider rather than
+ *  somewhere unintended. */
+const REPO_QUALIFIER = /^[\w.-]+\/[\w.-]+$/
+
+/** The GitHub search that answers one involvement. `@me` is the load-bearing part: GitHub resolves it
+ *  against the token, so the route never has to know or store which login is us. */
+export const pullsSearchQuery = (involvement: PullInvolvement, repo = ''): string =>
+  ['is:pr', 'is:open', 'archived:false', INVOLVEMENT_QUALIFIER[involvement], REPO_QUALIFIER.test(repo) ? `repo:${repo}` : '']
+    .filter(Boolean)
+    .join(' ')
+
+/** The param's value is a comma-joined set, because "assigned to me OR waiting on my review" is one
+ *  question a person asks and GitHub's qualifiers only AND. So the route runs one search per involvement
+ *  and unions the results — which is why this parses to a LIST rather than a value, and why an
+ *  unrecognised entry is dropped instead of failing: a saved panel outlives the vocabulary. */
+export const parsePullInvolvement = (value: string): PullInvolvement[] =>
+  PULL_INVOLVEMENT.filter((entry) => value.split(',').includes(entry))
+
 /** The mirror columns a row needs. Spelled here rather than imported from the drizzle table, so the
- *  projection stays readable from the client half and testable without a database. */
+ *  projection stays readable from the client half and testable without a database. Search fills the
+ *  same shape (server/routes/collections.ts), so both paths render one set of columns. */
 export type PullCollectionSource = {
   owner: string
   repo: string

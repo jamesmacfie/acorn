@@ -2,9 +2,12 @@ import type { PluginChromeAction, PluginRailItem } from '@acorn/protocol/api.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
+import { toast as pushToast } from '../../notifications/toast'
 import { clientEvents, openPane } from '../../registries/clientEvents'
 import { openInAppUrl } from '../../registries/contentLinks'
 import { projectSurfacePath } from '../../registries/projectSurfaces'
+import { activateTaskSignals, pathForTask } from '../../tasks/activate'
+import { taskById } from '../../tasks/taskLookup'
 import { activeTaskId } from '../../tasks/tasks'
 import { openPluginOverlay } from '../frames/overlays'
 import { ownsRoute } from './data'
@@ -25,6 +28,11 @@ export type ChromeActionContext = {
   // not the same thing twenty times over on a twenty-row rail list.
   item?: PluginRailItem
   promote?: (item: PluginRailItem) => void
+  // The task this click is ABOUT, when the click site knows one and it is not the task on screen. Only a
+  // dashboard row supplies it today, from `PluginCollectionRow.taskId`: a panel is drawn outside every
+  // task, so without this `openPane` had only the active task to work with — which is never the task the
+  // row is about, and usually there is none at all.
+  taskId?: string
   // The routed project and the shell's navigator, for `navigate`. Supplied only by the callers that have
   // them — which is why the manifest refuses to let a COMMAND name that verb at all: a command registry row
   // runs with neither in scope, the same argument that already keeps `createTask` off the command list.
@@ -39,8 +47,14 @@ export type ChromeActionContext = {
   prefer?: 'route' | 'pane' | 'refPanel'
 }
 
-const toast = (pluginId: string, title: string, detail?: string): void =>
+// A refusal is the answer to a CLICK, so it has to be visible where the click was. This posted a
+// notice only, which lands in the bell behind a badge — so every refusal below read as "the button is
+// broken", and one of them cost an afternoon proving otherwise. The notice stays, because it is the
+// durable record and it carries the detail; the toast is the part the clicker actually sees.
+const toast = (pluginId: string, title: string, detail?: string): void => {
+  pushToast(`${pluginId}: ${title}`, { tone: 'danger' })
   void pushNotice({ taskId: activeTaskId() ?? '', kind: 'plugin', title: `${pluginId}: ${title}`, at: Date.now(), ...(detail ? { detail } : {}) })
+}
 
 export function runChromeAction(action: PluginChromeAction, context: ChromeActionContext): void {
   switch (action.verb) {
@@ -50,7 +64,24 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       // open. This refusal used to fire for every rail row of a plugin whose detail belonged to the
       // project rather than to a task, which was the carrier gap and not the message being wrong: the
       // manifest now only lets this verb name a task-scoped pane, and a project-scoped one has `navigate`.
-      const taskId = activeTaskId()
+      //
+      // A click site that NAMES a task is taken there first. Opening the pane alone would not be enough
+      // and would not be honest: the layout event lands in a task the reader is not looking at, so the
+      // click appears to do nothing. Activate then navigate, which is what the notification bell and
+      // every task link in the app do — the pane opens on arrival, from the retained intent below.
+      //
+      // ponytail: the lookup is the ACTIVE node's task cache, so a row from a panel pointed at another
+      // node lands on the refusal below rather than switching nodes first the way the attention inbox
+      // does. Switch here too if panels over remote nodes become a thing people click.
+      const named = context.taskId ? taskById(context.taskId) : undefined
+      if (context.taskId && !named) {
+        return toast(context.pluginId, 'that task is not on this node', 'It may have been archived, or the list has not loaded yet.')
+      }
+      if (named && named.id !== activeTaskId()) {
+        activateTaskSignals(named)
+        context.navigate?.(pathForTask(named))
+      }
+      const taskId = named?.id ?? activeTaskId()
       if (!taskId) return toast(context.pluginId, 'open a task first', 'This opens a pane, and a pane belongs to a task.')
       // The row id travels as a retained pane intent, which is the mechanism that already closed this
       // exact mount-order race for core panes (registries/clientEvents.ts): the intent is held until the

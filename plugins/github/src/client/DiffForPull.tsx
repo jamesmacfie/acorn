@@ -8,7 +8,7 @@ import { filePatchKey, pullKey, type PullFile, type Thread } from '../contract/a
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { EmptyState, FileHead, type LineComposerController, type ThreadCollapseController } from '@acorn/plugin-api/ui'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGap, gapId, type GapRow, highlighterTokenize, isCodeRow, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, type TokenizeLine, type ViewMode } from '@acorn/plugin-api/ui/diff'
+import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGap, gapId, type GapRow, highlighterTokenize, isCodeRow, maxLineCols, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, type TokenizeLine, type ViewMode } from '@acorn/plugin-api/ui/diff'
 import { createDiffScrollRestoration } from './reviewScrollRestoration'
 import type { ReviewViewScope } from './reviewViewState'
 import { createDiffFindController } from './DiffFindController'
@@ -150,6 +150,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
 
   const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads, expanded(), collapsedFiles()))
   const rowKeys = createMemo(() => rowIdentityKeys(rows()))
+  const maxCols = createMemo(() => maxLineCols(rows()))
 
   // Fetch the file's head body once (cached by immutable sha), slice the gap's hidden lines, and
   // splice them into the row stream by recording them in `expanded`.
@@ -204,8 +205,13 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  const shouldMeasureRow = (row: Row) => row.kind === 'thread' || isCodeRow(row)
-  const shouldMeasureBand = (band: SplitBand) => band.kind === 'pair' || (band.kind === 'full' && band.row.kind === 'thread')
+  // Threads only. Code rows used to be measured too, because they soft-wrapped and their real height
+  // was a layout question — which is what made scrolling flash and jitter: every row painted at its
+  // 20px estimate, got corrected a frame later, and a first-time correction above the scroll offset
+  // makes the virtualizer write scrollTop to compensate. Lines don't wrap now, so every code row is
+  // exactly DIFF_LINE_HEIGHT, the estimate is always right, and there is nothing to correct.
+  const shouldMeasureRow = (row: Row) => row.kind === 'thread'
+  const shouldMeasureBand = (band: SplitBand) => band.kind === 'full' && band.row.kind === 'thread'
 
   const find = createDiffFindController({ rows, bands, viewMode, unified: virt, split: splitVirt })
 
@@ -439,6 +445,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
         stickyHead={stickyHead}
         publishScrollEl={(element, mode) => scrollRestoration.publish(element, mode)}
         onScroll={(element) => scrollRestoration.onScroll(element)}
+        maxCols={maxCols}
         scheduleElementMeasure={scheduleElementMeasure}
         shouldMeasureRow={shouldMeasureRow}
         shouldMeasureBand={shouldMeasureBand}

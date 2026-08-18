@@ -337,6 +337,22 @@ const parseCount = (raw: string): number | undefined => {
 /** A limit box that has been emptied means "no limit", not "zero rows". */
 export const parseLimit = parseCount
 
+/** One multiple-choice param's value: the ticked ids, comma-joined, IN DECLARATION ORDER rather than in
+ *  the order they were ticked. A param's value is a string on the wire, so a set has to be encoded — and
+ *  normalising the order is what makes one set of choices one string, so two panels that answered the
+ *  same thing share a query cache key instead of fetching twice (dashboards/data.ts § key). */
+export const toggleParamValue = (
+  value: string,
+  choices: readonly string[],
+  id: string,
+  on: boolean,
+): string => {
+  const picked = new Set(value.split(',').filter(Boolean))
+  if (on) picked.add(id)
+  else picked.delete(id)
+  return choices.filter((choice) => picked.has(choice)).join(',')
+}
+
 /** Empty means "whatever the collection declared", which may itself be nothing. Clamped to the
  *  manifest's own bound on the way in rather than only on the way out, so the editor shows the
  *  number the panel will actually poll at. */

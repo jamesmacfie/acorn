@@ -1,4 +1,4 @@
-import { For, Index, Show } from 'solid-js'
+import { createMemo, createResource, For, Index, Show } from 'solid-js'
 import { Alert, Button, Field, Input, SectionHeader, SegmentedControl, Select } from '../ui/primitives'
 import { CollapsibleSection } from '../ui/CollapsibleSection'
 import Icon from '../ui/Icon'
@@ -131,17 +131,46 @@ export function ParamInputs(props: { draft: PanelDraft }) {
             <Show when={props.draft.queries().length > 1}>
               <span class="dash-editor-note muted">{props.draft.nameOf(query())}</span>
             </Show>
-            <Index each={props.draft.entryFor(query())?.params ?? []}>
-              {(param) => (
-                <Field label={param().name} layout="row">
-                  <ParamInput
-                    param={param()}
-                    value={query().params?.[param().id] ?? ''}
-                    onChange={(value) => props.draft.setParam(index, param().id, value)}
-                  />
-                </Field>
-              )}
-            </Index>
+            <div class="dash-editor-rows">
+              <Index each={props.draft.entryFor(query())?.params ?? []}>
+                {(param) => {
+                  // Per param, on demand, and only where the plugin offers to resolve any: a repository
+                  // list is a request, and asking for one against every param of every collection on the
+                  // panel would spend several to render a text box.
+                  //
+                  // THE SOURCE IS WHICH COLLECTION THIS IS, NOT THE QUERY, and that distinction is a bug
+                  // this had. A query carries its params, so keying the resource off it re-ran the fetch
+                  // on every change — and each re-run put the resource back to `undefined`, which swapped
+                  // the control out from under the value that had just been chosen. It looked exactly
+                  // like the pick had not saved.
+                  //
+                  // A memo with an explicit `equals` rather than reading the two fields inline: the
+                  // fields have to stay tracked (removing a source moves another one into this position)
+                  // but must only NOTIFY when they actually differ.
+                  const collection = createMemo(
+                    () => ({ pluginId: query().pluginId, collectionId: query().collectionId }),
+                    undefined,
+                    { equals: (a, b) => a.pluginId === b.pluginId && a.collectionId === b.collectionId },
+                  )
+                  const [options] = createResource(
+                    () => (props.draft.entryFor(collection())?.paramOptions ? collection() : undefined),
+                    (key) => props.draft.entryFor(key)!.paramOptions!(param().id, props.draft.nodeId),
+                  )
+                  return (
+                    // `group` where the answer is several checkboxes, because a caption cannot be a
+                    // label for more than one control (primitives.tsx § Field).
+                    <Field label={param().name} layout="split" group={param().multiple}>
+                      <ParamInput
+                        param={param()}
+                        options={options()}
+                        value={query().params?.[param().id] ?? ''}
+                        onChange={(value) => props.draft.setParam(index, param().id, value)}
+                      />
+                    </Field>
+                  )
+                }}
+              </Index>
+            </div>
           </Show>
         )}
       </Index>
@@ -167,7 +196,7 @@ export function TitleField(props: { draft: PanelDraft; ref?: (el: HTMLInputEleme
 export function GroupByField(props: { draft: PanelDraft }) {
   return (
     <Show when={props.draft.groupable().length}>
-      <Field label="Group by" hint="A board's columns are this field's values, in the order they are declared.">
+      <Field label="Group by" layout="split">
         <FieldSelect
           fields={props.draft.groupable()}
           value={props.draft.shaping().groupBy}
@@ -346,15 +375,7 @@ export function MappingSection(props: { draft: PanelDraft }) {
         Columns
       </SectionHeader>
 
-      <Show
-        when={draft().columns().length}
-        fallback={(
-          <span class="dash-editor-note muted">
-            With no columns of your own each source keeps its own statuses, so a board shows both
-            providers' vocabularies side by side. Add columns to invent your own.
-          </span>
-        )}
-      >
+      <Show when={draft().columns().length}>
         <ul class="dash-editor-fields">
           <Index each={draft().columns()}>
             {(column, index) => (
@@ -394,19 +415,20 @@ export function MappingSection(props: { draft: PanelDraft }) {
                 when={statusValuesOf(page(), draft().mapping()).length}
                 fallback={<span class="dash-editor-note muted">No status values to map yet.</span>}
               >
-                <Index each={statusValuesOf(page(), draft().mapping())}>
-                  {(value) => (
-                    <div class="dash-editor-row">
-                      <span class="dash-editor-field-name">{value().label}</span>
-                      <ColumnSelect
-                        ariaLabel={`${value().label} column`}
-                        columns={draft().columns()}
-                        value={mappedColumnId(draft().mapping(), panelSourceKey(page().query), value().id)}
-                        onChange={(columnId) => draft().mapValue(panelSourceKey(page().query), value().id, columnId)}
-                      />
-                    </div>
-                  )}
-                </Index>
+                <div class="dash-editor-rows">
+                  <Index each={statusValuesOf(page(), draft().mapping())}>
+                    {(value) => (
+                      <Field label={value().label} layout="split">
+                        <ColumnSelect
+                          ariaLabel={`${value().label} column`}
+                          columns={draft().columns()}
+                          value={mappedColumnId(draft().mapping(), panelSourceKey(page().query), value().id)}
+                          onChange={(columnId) => draft().mapValue(panelSourceKey(page().query), value().id, columnId)}
+                        />
+                      </Field>
+                    )}
+                  </Index>
+                </div>
               </Show>
             </>
           )}
@@ -416,70 +438,69 @@ export function MappingSection(props: { draft: PanelDraft }) {
       {/* Folded, because the role pre-fill is right almost always and a matrix nobody needs to touch
           should not be the first thing they see. */}
       <CollapsibleSection level="sub" label="Fields" persistKey="dashboards.field-mapping">
-        {/* THE ROLE CEILING'S RELEASE VALVE (model.ts § PanelFieldDef). The five roles are what the
-            host can align without asking; anything else — github's repo, linear's identifier — the
-            person names here and then answers for, per source, in the same matrix below. */}
-        <SectionHeader
-          level="sub"
-          actions={(
-            <Button size="xs" variant="ghost" onClick={draft().addField}>
-              <Icon name="plus" /> Add field
-            </Button>
-          )}
-        >
-          Your own fields
-        </SectionHeader>
-        <Show
-          when={draft().extraFields().length}
-          fallback={(
-            <span class="dash-editor-note muted">
-              A panel's fields are the five roles two collections can be counted on to share. Add one
-              of your own for anything else you want to line up.
-            </span>
-          )}
-        >
-          <ul class="dash-editor-fields">
-            <Index each={draft().extraFields()}>
-              {(field, index) => (
-                <li class="dash-editor-row">
-                  <Input
-                    size="sm"
-                    aria-label="Field name"
-                    value={field().label}
-                    onInput={(event) => draft().editField(index, { label: event.currentTarget.value })}
-                  />
-                  <FieldTypeSelect
-                    ariaLabel={`${field().label} type`}
-                    value={field().type}
-                    onChange={(type) => draft().editField(index, { type })}
-                  />
-                  {removeButton('Remove field', () => draft().removeField(index))}
-                </li>
-              )}
-            </Index>
-          </ul>
-        </Show>
-
-        <Index each={draft().pages()}>
-          {(page) => (
-            <>
-              <SectionHeader level="sub">{draft().nameOf(page().query)}</SectionHeader>
-              <Index each={panelFieldsFor(draft().mapping())}>
-                {(field) => (
-                  <Field label={field().name} layout="row">
-                    <FieldSelect
-                      fields={candidateFieldsFor(page(), field().id, draft().mapping())}
-                      value={sourceFieldFor(page(), field().id, draft().mapping())}
-                      ariaLabel={`${field().name} from ${draft().nameOf(page().query)}`}
-                      emptyLabel="None"
-                      onChange={(id) => draft().setSourceField(panelSourceKey(page().query), field().id, id)}
+        {/* A `<details>` lays its children out in plain block flow, so everything inside a fold stacks
+            at zero gap however carefully the rows themselves are spaced. One stack, and the fold reads
+            like the rest of the form. */}
+        <div class="dash-editor-stack">
+          {/* THE ROLE CEILING'S RELEASE VALVE (model.ts § PanelFieldDef). The five roles are what the
+              host can align without asking; anything else — github's repo, linear's identifier — the
+              person names here and then answers for, per source, in the same matrix below. */}
+          <SectionHeader
+            level="sub"
+            actions={(
+              <Button size="xs" variant="ghost" onClick={draft().addField}>
+                <Icon name="plus" /> Add field
+              </Button>
+            )}
+          >
+            Your own fields
+          </SectionHeader>
+          <Show when={draft().extraFields().length}>
+            <ul class="dash-editor-fields">
+              <Index each={draft().extraFields()}>
+                {(field, index) => (
+                  <li class="dash-editor-row">
+                    <Input
+                      size="sm"
+                      aria-label="Field name"
+                      value={field().label}
+                      onInput={(event) => draft().editField(index, { label: event.currentTarget.value })}
                     />
-                  </Field>
+                    <FieldTypeSelect
+                      ariaLabel={`${field().label} type`}
+                      value={field().type}
+                      onChange={(type) => draft().editField(index, { type })}
+                    />
+                    {removeButton('Remove field', () => draft().removeField(index))}
+                  </li>
                 )}
               </Index>
-            </>
-          )}
-        </Index>
+            </ul>
+          </Show>
+
+          <Index each={draft().pages()}>
+            {(page) => (
+              <>
+                <SectionHeader level="sub">{draft().nameOf(page().query)}</SectionHeader>
+                <div class="dash-editor-rows">
+                  <Index each={panelFieldsFor(draft().mapping())}>
+                    {(field) => (
+                      <Field label={field().name} layout="split">
+                        <FieldSelect
+                          fields={candidateFieldsFor(page(), field().id, draft().mapping())}
+                          value={sourceFieldFor(page(), field().id, draft().mapping())}
+                          ariaLabel={`${field().name} from ${draft().nameOf(page().query)}`}
+                          emptyLabel="None"
+                          onChange={(id) => draft().setSourceField(panelSourceKey(page().query), field().id, id)}
+                        />
+                      </Field>
+                    )}
+                  </Index>
+                </div>
+              </>
+            )}
+          </Index>
+        </div>
       </CollapsibleSection>
     </Show>
   )
@@ -632,13 +653,18 @@ export function ShapingSection(props: { draft: PanelDraft }) {
   )
 }
 
+// Both numbers say what empty means in the PLACEHOLDER rather than in a line of prose under the input.
+// It is the same sentence in a quarter of the space, it sits inside the control it is about, and it
+// disappears the moment there is a value — which is exactly when a hint has stopped being read anyway.
+
 export function LimitField(props: { draft: PanelDraft }) {
   return (
-    <Field label="Limit" hint="Rows kept after sorting. Empty keeps them all.">
+    <Field label="Limit" layout="split">
       <Input
         size="sm"
         type="number"
         min="0"
+        placeholder="All rows"
         value={props.draft.limitText()}
         onInput={(event) => props.draft.setLimitText(event.currentTarget.value)}
       />
@@ -648,14 +674,12 @@ export function LimitField(props: { draft: PanelDraft }) {
 
 export function RefreshField(props: { draft: PanelDraft }) {
   return (
-    <Field
-      label="Refresh"
-      hint={refreshHint(props.draft.pages().map((page) => props.draft.entryFor(page.query)?.refresh))}
-    >
+    <Field label="Refresh" layout="split">
       <Input
         size="sm"
         type="number"
         min="0"
+        placeholder={refreshPlaceholder(props.draft.pages().map((page) => props.draft.entryFor(page.query)?.refresh))}
         value={props.draft.refreshText()}
         onInput={(event) => props.draft.setRefreshText(event.currentTarget.value)}
       />
@@ -663,10 +687,9 @@ export function RefreshField(props: { draft: PanelDraft }) {
   )
 }
 
-/** Each source polls at its own declared interval unless the panel overrides them all, so the hint
- *  names the range rather than pretending there is one number. */
-function refreshHint(declared: readonly (number | undefined)[]): string {
+/** Each source polls at its own declared interval unless the panel overrides them all, so this names
+ *  the range rather than pretending there is one number. */
+function refreshPlaceholder(declared: readonly (number | undefined)[]): string {
   const seconds = [...new Set(declared.flatMap((value) => value ?? []))].sort((a, b) => a - b)
-  if (!seconds.length) return 'Seconds. Empty never polls.'
-  return `Seconds. Empty follows each collection's own (${seconds.join(', ')}s).`
+  return seconds.length ? `Every ${seconds.join(', ')}s` : 'Never'
 }

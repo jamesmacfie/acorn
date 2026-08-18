@@ -194,7 +194,20 @@ function createSourceState(
   )
 
   const row = () => result().rows[0]
-  const page = createMemo((): PluginCollectionPage => row()?.data ?? emptyCollectionPage())
+  // SEEDED FROM THE CACHE, not just fetched into it. The fan-out already writes every answer through
+  // this node's QueryClient and fleet.ts persists that to IndexedDB, but fanout.ts only READS the
+  // cache when a fetch fails — so a panel remounted by navigating back to the dashboard drew
+  // "Loading…" over rows it already had, until the refetch landed. The last page is the honest thing
+  // to show while the new one is in flight; `row()` replaces it the moment it answers.
+  //
+  // Reactive on the cache revision rather than a snapshot at mount: the persister restores IndexedDB
+  // AFTER the first paint, so a panel on a cold boot mounts before its own cached page is back.
+  const cacheRevision = createCollectionCacheRevision(nodeId)
+  const cached = createMemo(() => {
+    cacheRevision()
+    return cachedCollectionPage(query, nodeId)
+  })
+  const page = createMemo((): PluginCollectionPage => row()?.data ?? cached() ?? emptyCollectionPage())
   const schema = createMemo(() => {
     const answer = page().schema
     return answer.fields.length ? answer : contribution()?.schema ?? answer
@@ -205,8 +218,10 @@ function createSourceState(
     contribution,
     page,
     schema,
-    answered: () => !!row(),
-    freshness: () => row()?.freshness,
+    // A cached page counts as answered: there are rows to draw. `refreshing` is the whole point of
+    // that word in the vocabulary — data on screen, a read in flight (node/freshness.ts).
+    answered: () => !!row() || !!cached(),
+    freshness: () => row()?.freshness ?? (cached() ? 'refreshing' : undefined),
     reason: () => result().unavailable[0]?.reason,
     refreshSeconds,
   }

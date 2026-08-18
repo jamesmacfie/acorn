@@ -69,13 +69,81 @@ const seriesSlot = (index: number): ChartSeriesSlot =>
  *  it, because stretching would distort the type with it. The upgrade path — if it ever matters — is
  *  the grid's own `ResizeObserver`, which already knows the panel's cell size. */
 export const CHART_BOX = { width: 320, height: 180 } as const
-const PAD = { top: 8, right: 8, bottom: 22, left: 36 } as const
-const PLOT_W = CHART_BOX.width - PAD.left - PAD.right
-const PLOT_H = CHART_BOX.height - PAD.top - PAD.bottom
+
+/** TICK TYPE IS GEOMETRY, and that is why the size lives here rather than in the stylesheet.
+ *
+ *  Inside a scaled `viewBox` a CSS `font-size` is a length in USER UNITS, so it scales with the
+ *  drawing like everything else. The ticks used to take `--fs-2xs` — around 11, which is a twelfth of
+ *  this box's height — and on a half-screen panel that rendered as roughly 28px labels towering over
+ *  the marks they named.
+ *
+ *  So the tick size is a number in the same units as the point radius, the bar widths and the padding,
+ *  and `ChartView.tsx` sets it as an attribute. The appearance pack loses control of it, which is the
+ *  same trade the box itself takes: a very small panel gets small labels, and the way out is the
+ *  ResizeObserver above, not a token. */
+export const TICK_FONT = 7
+
+/** The gap between a tick label and the thing it labels. Here rather than in the view because the left
+ *  gutter is sized around it. */
+export const TICK_GAP = 4
+
+/** Rough advance width of one tick glyph. The y axis is tabular figures, so an estimate is honest for
+ *  the labels that decide the gutter; a letter varies more, but only a category label is letters and
+ *  that axis has slack. Generous on purpose — over-padding is invisible, under-padding clips. */
+const GLYPH_W = TICK_FONT * 0.62
+
+const PAD = { top: 8, right: 8, bottom: 22 } as const
+/** A gutter narrower than this buys nothing back: two-character labels still need somewhere to sit. */
+const MIN_LEFT = 14
+
+/** The plot rect the marks are placed in. Not a constant, because the LEFT gutter is however wide the
+ *  y axis labels turn out to be: `36` fitted three characters, so a count of 200,000 rendered as
+ *  "00000" with the rest of itself outside the box. */
+export type ChartFrame = {
+  width: number
+  height: number
+  plotLeft: number
+  plotTop: number
+  plotWidth: number
+  plotHeight: number
+  baseline: number
+  tickFont: number
+}
+
+const frameWithLeft = (left: number): ChartFrame => ({
+  ...CHART_BOX,
+  plotLeft: left,
+  plotTop: PAD.top,
+  plotWidth: CHART_BOX.width - left - PAD.right,
+  plotHeight: CHART_BOX.height - PAD.top - PAD.bottom,
+  baseline: CHART_BOX.height - PAD.bottom,
+  tickFont: TICK_FONT,
+})
+
+/** The frame for a set of y axis labels. Clamped at a third of the width: a field can format a label
+ *  arbitrarily long ("1,234,567 MB") and past some point the answer is a shorter label, not a plot
+ *  squeezed to nothing. */
+const frameFor = (yLabels: readonly string[]): ChartFrame => {
+  const widest = Math.max(0, ...yLabels.map((label) => label.length))
+  return frameWithLeft(Math.min(CHART_BOX.width / 3, Math.max(MIN_LEFT, widest * GLYPH_W + TICK_GAP * 2)))
+}
+
+/** The frame a chart has before any label widens its gutter. Only a placeholder — every plot carries
+ *  the frame it was actually laid out in. */
+export const CHART_FRAME: ChartFrame = frameWithLeft(MIN_LEFT)
+
+/** Keep a tick label inside the box. A label centred on the last gridline hangs half of itself off the
+ *  right edge, which is how `Aug 18` rendered as "Aug 1". `undefined` means centred, the normal case. */
+const tickAnchor = (at: number, label: string): ChartTick['anchor'] => {
+  const half = (label.length * GLYPH_W) / 2
+  if (at - half < 0) return 'start'
+  if (at + half > CHART_BOX.width) return 'end'
+  return undefined
+}
 
 export type ChartShape = 'bar' | 'line'
 
-export type ChartTick = { label: string; at: number }
+export type ChartTick = { label: string; at: number; anchor?: 'start' | 'end' }
 
 export type ChartBar = {
   key: string
@@ -126,7 +194,16 @@ export type ChartLegendKey = {
  *  in the colour-vision-deficiency warn band, which is legal only with a secondary encoding, and this
  *  is it (charts.md § 1). An ungrouped bar draws one series and its categories are told apart by the
  *  x axis labels rather than by colour, which is why it has none. */
-type ChartCommon = { xTicks: ChartTick[]; yTicks: ChartTick[]; xLabel: string; yLabel: string; legend?: ChartLegendKey[] }
+type ChartCommon = {
+  /** The rect these marks were placed in. The view draws its axes and gridlines from this rather than
+   *  from a constant, because the left gutter is however wide this chart's own labels needed. */
+  frame: ChartFrame
+  xTicks: ChartTick[]
+  yTicks: ChartTick[]
+  xLabel: string
+  yLabel: string
+  legend?: ChartLegendKey[]
+}
 
 export type ChartPlot =
   | ({ shape: 'bar'; bars: ChartBar[] } & ChartCommon)
@@ -139,7 +216,6 @@ export type ChartPlot =
 
 const enumFields = (schema: PluginCollectionSchema) => schema.fields.filter((field) => field.type === 'enum')
 const datetimeFields = (schema: PluginCollectionSchema) => schema.fields.filter((field) => field.type === 'datetime')
-const numberFields = (schema: PluginCollectionSchema) => schema.fields.filter((field) => field.type === 'number')
 
 /** A bar needs a category axis; a line needs a time axis. A schema with neither has nothing to draw
  *  against, however many numbers it carries. */
@@ -199,16 +275,25 @@ export function defaultChartView(schema: PluginCollectionSchema, shaping: PanelS
   // Time first where there is a time axis: a chart of a datetime collection is almost always "over
   // time", and a bar of categories is the fallback rather than the headline.
   const shape: ChartShape = chartShapesFor(schema).includes('line') ? 'line' : 'bar'
-  const number = numberFields(schema)[0]
   const grouped = enumFields(schema).find((field) => field.id === shaping.groupBy)
   const x = defaultChartAxis(schema, shape, shaping)
 
   return {
     shape,
     ...(x ? { x } : {}),
-    // A count is the aggregate that always works; a number field is the more interesting answer when
-    // there is one.
-    ...(number ? { aggregate: 'sum' as const, field: number.id } : { aggregate: 'count' as const }),
+    // ALWAYS A COUNT, never the first number field.
+    //
+    // This used to pre-pick `sum` over the first `number` in the schema, on the reasoning that a real
+    // measure is more interesting than a row count. It is — when the number is a QUANTITY. The field
+    // vocabulary has no way to say that: `number` covers both a size in MB and github's pull request
+    // NUMBER, and the pulls collection declares the identifier first. So the headline chart of every
+    // PR panel opened as "the sum of PR numbers per day", a quantity with no meaning whose axis
+    // reached 200,000 — nonsense that looked like arithmetic.
+    //
+    // A count is the one measure that is meaningful over every collection, and the person is one
+    // select away from the sum they actually wanted. Adding an `id`-ish role to the field vocabulary
+    // to tell the two apart is the field-type fight, and it is not worth having for a default.
+    aggregate: 'count' as const,
     // Only where the grouping is already a decision the person made — a series split nobody asked
     // for turns one readable line into five.
     ...(shape === 'line' && grouped ? { series: grouped.id } : {}),
@@ -271,13 +356,27 @@ function axisNumber(schema: PluginCollectionSchema, view: PanelView, value: numb
 const dayLabel = (at: number): string =>
   new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
-const yTicksFor = (schema: PluginCollectionSchema, view: PanelView, max: number): ChartTick[] => {
+/** The y axis and the frame it implies, in that order: the LABELS decide how wide the left gutter has
+ *  to be, and the gutter decides where everything else is drawn. Which is why both come out of one
+ *  function — a caller that computed them separately could lay the marks out against a gutter the
+ *  labels then outgrew. */
+const yAxisFor = (
+  schema: PluginCollectionSchema,
+  view: PanelView,
+  max: number,
+): { ticks: ChartTick[]; frame: ChartFrame; top: number } => {
   const values = niceTicks(max)
+  const labels = values.map((value) => axisNumber(schema, view, value))
+  const frame = frameFor(labels)
   const top = values[values.length - 1] || 1
-  return values.map((value) => ({
-    label: axisNumber(schema, view, value),
-    at: PAD.top + PLOT_H - (value / top) * PLOT_H,
-  }))
+  return {
+    frame,
+    top,
+    ticks: values.map((value, index) => ({
+      label: labels[index],
+      at: frame.plotTop + frame.plotHeight - (value / top) * frame.plotHeight,
+    })),
+  }
 }
 
 /** The category axis a bar is keyed by: the panel's own choice, then the shaping group-by — the same
@@ -355,9 +454,9 @@ function buildBar(
       aggregateRows(series ? column.rows.filter((row) => inGroup.has(row)) : column.rows, schema, view) ?? 0)
   })
   const max = Math.max(0, ...values.flat())
-  const top = niceTicks(max).slice(-1)[0] || 1
+  const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max)
 
-  const slot = PLOT_W / Math.max(1, columns.length)
+  const slot = frame.plotWidth / Math.max(1, columns.length)
   // The cluster keeps the width one bar used to have, and the series divide it — so a chart with no
   // split is laid out exactly as it was before grouping existed.
   const cluster = slot * 0.7
@@ -366,7 +465,7 @@ function buildBar(
   const bars = groups.flatMap((group, groupIndex) =>
     columns.map((column, index): ChartBar => {
       const value = values[groupIndex][index]
-      const height = Math.max(0, (value / top) * PLOT_H)
+      const height = Math.max(0, (value / top) * frame.plotHeight)
       return {
         key: `${group.id} ${column.id}`,
         label: column.label,
@@ -380,8 +479,8 @@ function buildBar(
         ...(series
           ? toneOrSlot(declaredTone(series, group.id), groupIndex)
           : toneOrSlot(declaredTone(field, column.id), index)),
-        x: PAD.left + index * slot + (slot - cluster) / 2 + groupIndex * width,
-        y: PAD.top + PLOT_H - height,
+        x: frame.plotLeft + index * slot + (slot - cluster) / 2 + groupIndex * width,
+        y: frame.plotTop + frame.plotHeight - height,
         w: width,
         h: height,
       }
@@ -390,8 +489,12 @@ function buildBar(
   // Every category label, until they would collide; then every nth, evenly. The value stays reachable
   // through the tooltip and, one view flip away, through the table.
   const stride = Math.ceil(columns.length / 8)
-  const xTicks = columns.flatMap((column, index): ChartTick[] =>
-    index % stride === 0 ? [{ label: column.label, at: PAD.left + index * slot + slot / 2 }] : [])
+  const xTicks = columns.flatMap((column, index): ChartTick[] => {
+    if (index % stride !== 0) return []
+    const at = frame.plotLeft + index * slot + slot / 2
+    const anchor = tickAnchor(at, column.label)
+    return [{ label: column.label, at, ...(anchor ? { anchor } : {}) }]
+  })
 
   const legend = series
     ? legendFor(groups.map((group, index): ChartLegendKey => ({
@@ -404,8 +507,9 @@ function buildBar(
   return {
     shape: 'bar',
     bars,
+    frame,
     xTicks,
-    yTicks: yTicksFor(schema, view, max),
+    yTicks,
     xLabel: field.name,
     yLabel: measureLabel(schema, view),
     ...(legend ? { legend } : {}),
@@ -432,7 +536,7 @@ function buildLine(
     ? boardColumns(rows, series)
     : [{ id: '', label: measureLabel(schema, view), tone: 'accent' as PanelTone, declared: true, rows: [...rows] }]
 
-  const buckets = groups.map((group) => {
+  const byGroup = groups.map((group) => {
     const byDay = new Map<number, PluginCollectionRow[]>()
     for (const row of group.rows) {
       const cell = row.values[time.id]
@@ -446,24 +550,69 @@ function buildLine(
       if (existing) existing.push(row)
       else byDay.set(day, [row])
     }
-    const points = [...byDay.entries()]
-      .sort(([left], [right]) => left - right)
-      .map(([day, dayRows]) => ({ day, value: aggregateRows(dayRows, schema, view) ?? 0 }))
-    return { group, points }
+    return { group, byDay }
   })
 
-  const days = buckets.flatMap((bucket) => bucket.points.map((point) => point.day))
+  const days = byGroup.flatMap(({ byDay }) => [...byDay.keys()])
   if (!days.length) {
-    return { shape: 'line', lines: [], xTicks: [], yTicks: yTicksFor(schema, view, 0), xLabel: time.name, yLabel: measureLabel(schema, view) }
+    const empty = yAxisFor(schema, view, 0)
+    return {
+      shape: 'line',
+      lines: [],
+      frame: empty.frame,
+      xTicks: [],
+      yTicks: empty.ticks,
+      xLabel: time.name,
+      yLabel: measureLabel(schema, view),
+    }
   }
   const first = Math.min(...days)
   const last = Math.max(...days)
+
+  // ── A DAY WITH NO ROWS IS A ZERO, NOT A GAP ─────────────────────────────────────────────────
+  //
+  // This used to plot only the days that HAD rows and join them up, so a fortnight in which nothing
+  // was updated drew as a straight segment held at whatever height its two neighbours happened to
+  // have. That reads as "steady at 4" when the truth is "nothing happened". `trend.ts` already fills
+  // its sparkline across the window for exactly this reason, and the two should not disagree.
+  //
+  // ONLY THE ADDITIVE AGGREGATES. A count or a sum over no rows is 0 and filling is the honest answer.
+  // An average, minimum or maximum over no rows is UNDEFINED — filling those would draw a dip to the
+  // floor that never happened — so a gappy measure keeps the connect-the-dots reading.
+  const aggregate = view.aggregate ?? 'count'
+  const span = (last - first) / 86_400_000 + 1
+  // ponytail: past the fill limit the gaps stay gaps. A span that wide has more days than this box has
+  // pixels to put them in, so the fill would be invisible arithmetic. Upgrade path: bucket by week or
+  // month once the span asks for it, which is a real feature rather than part of this fix.
+  const FILL_DAY_LIMIT = 400
+  const fill = (aggregate === 'count' || aggregate === 'sum') && span <= FILL_DAY_LIMIT
+  const spanDays = fill ? Array.from({ length: span }, (_, index) => first + index * 86_400_000) : undefined
+
+  const buckets = byGroup.map(({ group, byDay }) => {
+    // A group with no rows AT ALL draws nothing, filled or not: seven flat lines along zero is noise,
+    // and `legendFor` already only speaks for the lines that drew.
+    if (!byDay.size) return { group, points: [] as { day: number; value: number; filled: boolean }[] }
+    const walk = spanDays ?? [...byDay.keys()].sort((left, right) => left - right)
+    return {
+      group,
+      points: walk.map((day) => {
+        const dayRows = byDay.get(day)
+        return dayRows
+          ? { day, value: aggregateRows(dayRows, schema, view) ?? 0, filled: false }
+          : { day, value: 0, filled: true }
+      }),
+    }
+  })
+
   const max = Math.max(0, ...buckets.flatMap((bucket) => bucket.points.map((point) => point.value)))
-  const top = niceTicks(max).slice(-1)[0] || 1
+  const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max)
 
   // A single day has no span to scale against, so it sits in the middle rather than dividing by zero.
-  const xAt = (day: number) => (last === first ? PAD.left + PLOT_W / 2 : PAD.left + ((day - first) / (last - first)) * PLOT_W)
-  const yAt = (value: number) => PAD.top + PLOT_H - (value / top) * PLOT_H
+  const xAt = (day: number) =>
+    last === first
+      ? frame.plotLeft + frame.plotWidth / 2
+      : frame.plotLeft + ((day - first) / (last - first)) * frame.plotWidth
+  const yAt = (value: number) => frame.plotTop + frame.plotHeight - (value / top) * frame.plotHeight
 
   const lines = buckets.flatMap(({ group, points }, index): ChartLine[] => {
     if (!points.length) return []
@@ -471,6 +620,7 @@ function buildLine(
       x: xAt(point.day),
       y: yAt(point.value),
       label: `${group.label || measureLabel(schema, view)} · ${dayLabel(point.day)} · ${axisNumber(schema, view, point.value)}`,
+      filled: point.filled,
     }))
     return [{
       id: group.id || 'all',
@@ -479,11 +629,18 @@ function buildLine(
       // the enum has one, else an identity slot.
       ...(series ? toneOrSlot(declaredTone(series, group.id), index) : { tone: 'accent' as PanelTone }),
       path: placed.length > 1 ? placed.map((point, at) => `${at ? 'L' : 'M'}${point.x} ${point.y}`).join(' ') : '',
-      points: placed,
+      // The PATH runs through the filled zeroes; the DOTS do not. A dot is where the tooltip lives and
+      // a filled day has nothing to say, so marking every empty day would bury the real ones.
+      points: placed.flatMap(({ filled, ...point }) => (filled ? [] : [point])),
     }]
   })
 
-  const xTicks = (last === first ? [first] : [first, last]).map((day) => ({ label: dayLabel(day), at: xAt(day) }))
+  const xTicks = (last === first ? [first] : [first, last]).map((day) => {
+    const label = dayLabel(day)
+    const at = xAt(day)
+    const anchor = tickAnchor(at, label)
+    return { label, at, ...(anchor ? { anchor } : {}) }
+  })
   // Over the lines that DREW, not the groups that exist: a series with no points has no mark for a
   // swatch to stand for, and an empty declared column is a real case (`boardColumns` keeps them).
   const legend = legendFor(lines.map((line): ChartLegendKey => ({
@@ -495,8 +652,9 @@ function buildLine(
   return {
     shape: 'line',
     lines,
+    frame,
     xTicks,
-    yTicks: yTicksFor(schema, view, max),
+    yTicks,
     xLabel: time.name,
     yLabel: measureLabel(schema, view),
     ...(legend ? { legend } : {}),
@@ -515,13 +673,3 @@ export function buildChart(
   const shape: ChartShape = view.shape === 'line' ? 'line' : view.shape === 'bar' ? 'bar' : (chartShapesFor(schema)[0] ?? 'bar')
   return shape === 'line' ? buildLine(rows, schema, view, shaping) : buildBar(rows, schema, view, shaping)
 }
-
-/** Axis and plot geometry the view needs and should not recompute. */
-export const CHART_FRAME = {
-  ...CHART_BOX,
-  plotLeft: PAD.left,
-  plotTop: PAD.top,
-  plotWidth: PLOT_W,
-  plotHeight: PLOT_H,
-  baseline: PAD.top + PLOT_H,
-} as const

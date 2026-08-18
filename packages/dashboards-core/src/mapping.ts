@@ -367,7 +367,16 @@ export function unionRows(
       }
       return [{
         id: `${key}:${row.id}`,
+        // The row's own id BEFORE this qualification, because the qualification is for rendering and
+        // the action is not: a click hands the id to the plugin's pane as its selection, and a pane
+        // told to select `agents:sessions:<uuid>` finds nothing. `id` stays qualified — two sources
+        // can collide on `42` and the board dedupes on it.
+        sourceRowId: row.id,
         values,
+        // Carried for the same reason `action` is: they are one thing. The action opens a pane and
+        // this says in WHICH task, so a mapped panel that dropped it would take every click to the
+        // "open a task first" refusal.
+        ...(row.taskId ? { taskId: row.taskId } : {}),
         ...(row.action ? { action: row.action } : {}),
         pluginId: row.pluginId,
         collectionId: row.collectionId,

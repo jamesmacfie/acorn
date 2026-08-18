@@ -1,5 +1,5 @@
 import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore, type LanguageInput } from 'shiki/core'
-import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { languageIdForPath, type LanguageId } from '@acorn/protocol/languageIds.ts'
 
 // Fine-grained Shiki: only the langs/themes below get bundled (the bundled `shiki` entry pulls a
@@ -42,12 +42,30 @@ const SHIKI: Record<LanguageId, keyof typeof LANGS | 'text'> = {
 
 export const langFor = (path: string) => SHIKI[languageIdForPath(path)]
 
+// THE JAVASCRIPT REGEX ENGINE, NOT ONIGURUMA, AND THE RENDERER'S CSP IS WHY. Shiki's default engine
+// compiles Oniguruma to WebAssembly, and `WebAssembly.instantiate` is gated by `script-src` — the
+// renderer's is `'self'` with no `'wasm-unsafe-eval'` (main/appScheme.ts). So the default engine
+// threw at startup and NOTHING was highlighted anywhere in the app: not a diff, not a code block, not
+// an agent transcript. A silent failure, because the rejection lands in the highlighter's own promise.
+//
+// The other fix is one token of CSP, and this is the better one: the policy stays as tight as it is
+// documented to be, and the WASM payload leaves the renderer bundle.
+//
+// The cost, measured across all seventeen grammars above rather than assumed: sixteen tokenize
+// IDENTICALLY to Oniguruma, character for character and colour for colour. C++ is the one that
+// differs — the JS engine stops resolving part-way through a template declaration and leaves the tail
+// of the line as one plain token. Better than the nothing it renders today, and the day it matters
+// the answer is `'wasm-unsafe-eval'` rather than a second engine.
+//
+// `forgiving` covers the patterns this comparison could not reach: an unsupported regex is then
+// skipped rather than thrown, because a highlighter that degrades beats one that takes its surface
+// down — which is exactly the failure being fixed here.
 let instance: Promise<HighlighterCore> | null = null
 export const getHighlighter = () =>
   (instance ??= createHighlighterCore({
     themes: [import('shiki/themes/github-light.mjs'), import('shiki/themes/github-dark.mjs')],
     langs: Object.values(LANGS).map((load) => load()) as LanguageInput[],
-    engine: createOnigurumaEngine(import('shiki/wasm')),
+    engine: createJavaScriptRegexEngine({ forgiving: true }),
   }))
 
 // ANSI-colour log lines (CI output), tokenized the same dual-theme way as diff code: {content,

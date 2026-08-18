@@ -8,6 +8,7 @@ import {
   estimateSplitBandSize,
   expandGap,
   gapId,
+  maxLineCols,
   plainTokenize,
   rowIdentityKeys,
   splitBandIdentityKeys,
@@ -16,6 +17,7 @@ import {
   type CodeRow,
   type GapRow,
   type ParsedFile,
+  type Row,
 } from './model'
 
 const pullFile = (path: string, patch: string | null): DiffFile => ({
@@ -226,6 +228,19 @@ describe('diff model', () => {
     expect(estimateSplitBandSize(bands[0])).toBe(36)
     expect(estimateSplitBandSize(bands[1])).toBe(20)
     expect(estimateSplitBandSize(bands[2])).toBe(140)
+  })
+
+  it('measures the canvas width in columns, counting a tab to its next tab stop', () => {
+    const code = (raw: string): Row => ({ kind: 'normal', path: 'a.ts', oldNo: 1, newNo: 1, toks: [], raw })
+
+    expect(maxLineCols([code('abc'), code('abcdefgh')])).toBe(8)
+    // Non-code rows carry no line, and a header longer than any line must not widen the canvas.
+    expect(maxLineCols([{ kind: 'hunk', text: '@@ a very long hunk header @@' }, code('ab')])).toBe(2)
+    // One tab from column 0 advances to 8, not to 1 — under-measuring is what clips a line.
+    expect(maxLineCols([code('\tx')])).toBe(9)
+    // A tab mid-column advances to the NEXT stop rather than adding a full eight.
+    expect(maxLineCols([code('ab\tx')])).toBe(9)
+    expect(maxLineCols([])).toBe(0)
   })
 
   it('estimates resolved thread rows at their collapsed height', () => {

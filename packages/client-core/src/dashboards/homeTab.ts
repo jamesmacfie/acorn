@@ -38,11 +38,14 @@ const uniqueName = (tabs: readonly DashboardTab[], base: string): string => {
  *
  *  Creating the SECOND dashboard is what first writes the key at all, so the default tab has to be
  *  named on the way past: it is `home` either way, but a bar whose first tab has no name is a bar
- *  with a hole in it. */
-export function addTab(tabs: readonly DashboardTab[]): { tabs: DashboardTab[]; id: string } {
+ *  with a hole in it.
+ *
+ *  A NAME is optional and still goes through `uniqueName`, so the caller cannot mint two tabs that read
+ *  the same — the wizard asks for one, the tab bar's `+` does not, and neither has to think about it. */
+export function addTab(tabs: readonly DashboardTab[], name = ''): { tabs: DashboardTab[]; id: string } {
   const base = tabs.length ? [...tabs] : [{ id: '', name: 'Home' }]
   const id = crypto.randomUUID().slice(0, 8)
-  return { tabs: [...base, { id, name: uniqueName(base, NEW_TAB_NAME) }], id }
+  return { tabs: [...base, { id, name: uniqueName(base, name.trim() || NEW_TAB_NAME) }], id }
 }
 
 export const renameTab = (tabs: readonly DashboardTab[], id: string, name: string): DashboardTab[] =>
