@@ -105,17 +105,25 @@ export async function ensureWorktree(
   if (pullNumber != null) {
     // PR workspace: fetch the head (uses the checkout's git credentials) and check it out on the
     // PR's branch (`branch` == pr.headRef) so the worktree tracks a real branch, not a detached
-    // commit — new branch from FETCH_HEAD, or reuse the branch if it already exists locally.
+    // commit — new branch from the fetched head, or reuse the branch if it already exists locally.
     // `--` ends option parsing before positionals.
+    //
+    // Into a PRIVATE PER-PR REF, never FETCH_HEAD. That file lives in the repo's COMMON dir, shared
+    // by the checkout and every worktree, and `git fetch` rewrites it — so anything else fetching in
+    // this repo between the two commands below (another task resolving its worktree, the PR-conflicts
+    // route) decided which commit this branch was created at. The branch then carried another PR's
+    // tree under the right name, with a clean status and no diff, and the bad ref outlived the
+    // worktree. The ref is kept afterwards: it costs 41 bytes and records what the branch came from.
+    const head = `refs/acorn/pull/${pullNumber}`
     try {
-      await gitOrThrow(['fetch', 'origin', `pull/${pullNumber}/head`], { cwd: checkout, timeoutMs: 60_000 })
+      await gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], { cwd: checkout, timeoutMs: 60_000 })
     } catch {
       return { ok: false, reason: `Could not fetch pull/${pullNumber}/head.` }
     }
     const exists = await branchExists(checkout, branch)
     const args = exists
       ? ['worktree', 'add', '--', path, branch]
-      : ['worktree', 'add', '-b', branch, '--', path, 'FETCH_HEAD']
+      : ['worktree', 'add', '-b', branch, '--', path, head]
     try {
       await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
     } catch {
