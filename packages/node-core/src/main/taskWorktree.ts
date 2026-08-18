@@ -11,8 +11,9 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from './runConfig'
 import { getProject, type ProjectRow } from './projects'
 import { getProjectConfig } from './projectConfig'
-import { copyWorktreeFiles, ensureWorktree, worktreePorcelain } from './worktrees'
+import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
 import { capabilityId, type CapabilityRegistry } from '../server/plugin/capabilities'
+import { BridgeError } from '../server/bridge'
 
 // Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
@@ -173,6 +174,13 @@ export type WorktreeCreatedHook = (task: TaskRef, cwd: string) => Promise<void>
 export const WORKTREE_CREATED = capabilityId<WorktreeCreatedHook>('core.taskWorktreeCreated')
 type CapabilityReader = Pick<CapabilityRegistry, 'get'>
 
+// The task's worktree must still be a live worktree ON the task's branch. Throws rather than
+// degrading: every path that resolves a cwd is about to run something in it.
+function assertOnBranch(path: string, branch: string): void {
+  const on = worktreeBranch(path)
+  if (on !== branch) throw new BridgeError(409, 'worktree-stale', staleWorktreeReason(path, branch, on))
+}
+
 const inflightCreates = new Map<string, Promise<{ cwd: string; isWorktree: boolean; created: boolean }>>()
 export async function resolveTaskCwd(
   db: AppDatabase,
@@ -192,6 +200,10 @@ export async function resolveTaskCwd(
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
   if (t.worktreePath && isDir(t.worktreePath)) {
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
+    // A path persisted once used to be trusted forever. When that worktree later went stale — pruned,
+    // moved, or checked out onto another branch by hand — the task kept being handed another branch's
+    // files, which is the tree its agent then reads, edits and reports from. Verify, don't assume.
+    if (!isProjectRoot) assertOnBranch(t.worktreePath, t.branch)
     return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
   }
   const branch = t.branch
@@ -209,7 +221,12 @@ export async function resolveTaskCwd(
       t.pullNumber,
       project ? await baseRefPref(db, userId, project.id) : null,
     )
-    if (!wt.ok) return { cwd: checkout, isWorktree: false, created: false }
+    // Falling back to the project root here put the task in the MAIN checkout, on whatever branch the
+    // user last left it — silently, and typically alongside whatever other task lives there. The
+    // failures that reach this line (git refusing a branch already checked out in another worktree, a
+    // stale directory) are all ones the user has to act on, so say so instead.
+    if (!wt.ok) throw new BridgeError(409, 'worktree-unavailable', wt.reason)
+    assertOnBranch(wt.path, branch)
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
     if (wt.created) {
       await copyConfiguredFiles(db, t, checkout, wt.path)
@@ -234,8 +251,16 @@ export async function taskRoot(db: AppDatabase, taskId: string, userId: string |
   const project = await projectForTask(db, t)
   const baseCheckout = project?.path && isDir(project.path) ? project.path : undefined
   if (!baseCheckout) return null
-  const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId, capabilities)
-  return resolve(cwd)
+  // Callers of this treat null as "no worktree yet" and degrade cleanly, so a stale or unavailable
+  // worktree becomes null here rather than an exception through every editor/changes/db read. The
+  // loud path is the one that spawns a session in it.
+  try {
+    const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId, capabilities)
+    return resolve(cwd)
+  } catch (e) {
+    console.warn('[worktrees] no usable worktree for task', taskId, '-', e instanceof Error ? e.message : e)
+    return null
+  }
 }
 
 export { resolveInRoot } from './core/fs'
@@ -297,7 +322,12 @@ export async function taskRunConfig(
   const project = await projectForTask(db, t)
   const baseCheckout = project?.path && isDir(project.path) ? project.path : undefined
   if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
-  const { cwd } = await resolveTaskCwd(db, t, baseCheckout, null, capabilities)
+  let cwd: string
+  try {
+    ({ cwd } = await resolveTaskCwd(db, t, baseCheckout, null, capabilities))
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No usable worktree for this task.' }
+  }
   const config = project ? (await getProjectConfig(db, project.id))?.config : null
   const cfg = loadRepoConfig(cwd, homedir(), {
     setupScript: config?.setupScript,

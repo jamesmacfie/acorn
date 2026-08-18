@@ -94,8 +94,17 @@ This avoids collisions when two Linear or Rollbar connections expose the same vi
 
 Worktrees are created lazily for editor, changes, terminal, preview, or agent execution. The Node
 derives and revalidates the path; clients cannot choose an arbitrary worktree path. A task with no
-branch uses the mapped project folder directly. Archive runs the configured teardown flow where the
-desktop runtime is available and reports partial failures instead of pretending removal succeeded.
+branch uses the mapped project folder directly.
+
+The directory is keyed by owner/repo/branch, so revalidation checks the branch as well as the path:
+before a resolved worktree is handed out — persisted or freshly reused — its on-disk HEAD must still
+be the task's branch. A directory that was pruned, moved, or checked out onto something else is
+refused with a `worktree-stale` 409, and a worktree that cannot be created is refused with
+`worktree-unavailable` rather than silently falling back to the main checkout. Both used to hand the
+task another branch's files, which is the tree its agent then read and edited.
+
+Archive runs the configured teardown flow where the desktop runtime is available and reports partial
+failures instead of pretending removal succeeded.
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these

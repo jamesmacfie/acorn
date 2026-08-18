@@ -121,6 +121,28 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     ])
   })
 
+  // The directory is keyed by owner/repo/branch and was trusted forever once persisted, so a worktree
+  // that drifted kept serving the task another branch's files — what put an agent in a tree that was
+  // not its task's. Both drifts (wrong branch, pruned admin dir) must refuse, not degrade.
+  it('refuses a worktree that has drifted onto another branch', async () => {
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    git(res.cwd, 'checkout', '-b', 'someone-elses-branch')
+
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)).rejects.toThrow(
+      /checked out on 'someone-elses-branch', not 'feat-x'/,
+    )
+  })
+
+  it('refuses a worktree directory whose git link is gone', async () => {
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    rmSync(join(checkout, '.git', 'worktrees'), { recursive: true, force: true })
+
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)).rejects.toThrow(
+      /no longer a live git worktree/,
+    )
+    expect(res.isWorktree).toBe(true)
+  })
+
   it('runs a branchless task from the project root without creating a worktree', async () => {
     const plain = join(dir, 'plain')
     mkdirSync(plain)
