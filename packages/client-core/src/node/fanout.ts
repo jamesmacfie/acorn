@@ -67,7 +67,25 @@ export type FleetQueryOptions = {
   nodeIds?: readonly string[]
 }
 
-const EMPTY: FleetResult<never> = { rows: [], unavailable: [] }
+// What each node's own QueryClient already holds under this key. Serve-then-revalidate: a remounted
+// surface renders the list it last had instead of flashing "Loading…" while the fan-out re-runs — the
+// same bargain `fetchOne` already strikes when a node times out, taken one step earlier. Badged
+// `refreshing` rather than `stale`, because a fetch IS in flight; the real answer replaces these rows.
+// Exported for its test: `createResource` cannot run in this suite (solid resolves to its server build
+// under a node env with no solid plugin), so the seeding rule is covered here rather than through the
+// resource that calls it.
+export function cachedFleet<T>(queryKey: readonly unknown[], options: FleetQueryOptions = {}): FleetResult<T> {
+  const wanted = options.nodeIds ? new Set(options.nodeIds) : null
+  const rows: FleetRow<T>[] = []
+  for (const node of nodes()) {
+    if (wanted && !wanted.has(node.nodeId)) continue
+    const data = clientFor(node.nodeId).client.getQueryData<T>(queryKey)
+    if (data !== undefined) {
+      rows.push({ nodeId: node.nodeId, node, data, freshness: freshnessOf(nodeState(node.nodeId), { isFetching: true }) })
+    }
+  }
+  return { rows, unavailable: [] }
+}
 
 const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : typeof error === 'string' ? error : 'unavailable'
@@ -156,14 +174,15 @@ export function createFleetQuery<T, D = void>(
   fetch: (nodeId: string, dep: D, signal: AbortSignal) => Promise<T>,
   deps: Accessor<D> = (() => undefined as D),
   options: FleetQueryOptions = {},
-  // Initialized, so a consumer never has to handle `undefined`: the empty result IS the pre-answer
-  // state, and it renders as "no rows, nothing unavailable" rather than as a spinner with no deadline.
+  // Initialized, so a consumer never has to handle `undefined`: whatever the per-node caches already
+  // hold IS the pre-answer state, and an empty one renders as "no rows, nothing unavailable" rather
+  // than as a spinner with no deadline.
 ): InitializedResourceReturn<FleetResult<T>> {
   return createResource(
     // The fleet is part of the source so pairing, unpairing or a node coming back re-runs the fan-out.
     // `nodeIds` is joined into the key rather than compared by identity, which an array literal would fail.
     () => ({ dep: deps(), fleet: nodes().map((node) => `${node.nodeId}:${nodeStatus(node.nodeId)?.state ?? ''}`).join(',') }),
     ({ dep }) => fetchFleet(queryKey(dep), (nodeId, signal) => fetch(nodeId, dep, signal), options),
-    { initialValue: EMPTY as FleetResult<T> },
+    { initialValue: cachedFleet<T>(queryKey(deps()), options) },
   )
 }
