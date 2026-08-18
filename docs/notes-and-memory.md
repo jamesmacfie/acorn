@@ -38,6 +38,17 @@ and Rollbar contributions under a deterministic byte/token budget. Section failu
 reported independently. The context pane previews the exact snapshot and can send it to a selected
 managed agent session.
 
+A fresh agent session can receive that snapshot two ways. The **push** queues the assembled block for
+the session's first idle edge — but it is delivered `'after-ready'`, so whenever the CLI is still busy
+when the user types, it lands *after* the first ask, arriving as reference material for work already
+underway. A profile that can carry a standing instruction avoids the race by **pulling** instead: it
+sets `launchArgs` on its `AgentProfileContribution` (Claude Code: `--append-system-prompt`, telling it
+to call `task_context` / `notes_read` / `memory_search` before starting), and `spawnOne` then skips the
+push for that session. A system prompt cannot lose a race, and a pull sees notes edited mid-session.
+The push still governs profiles with no such flag. `launchArgs` reach node-pty as argv and the tmux /
+`-lc` paths as a quoted line (`launchCommandLine`); a command override (dev-server pane) is a
+different binary and gets none.
+
 ## Lifecycle hooks
 
 Managed-agent completion can trigger memory review. The hook creates proposals or review attention;
