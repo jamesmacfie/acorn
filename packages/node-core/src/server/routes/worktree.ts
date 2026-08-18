@@ -134,7 +134,9 @@ export const worktree = new Hono<AppEnv>()
     task = await loadTask(db, taskId)
     if (!task || (task.worktreePath && isDir(task.worktreePath))) return c.json({ ok: true })
     if (!isDir(project.path)) return c.json({ ok: true })
-    await resolveTaskCwd(db, task, project.path, null, c.env.CAPABILITIES)
+    // Eager pre-create is best-effort: a stale/unavailable worktree throws now, and this route's job
+    // is only to get the setup script in early. The surface that actually needs the cwd will say so.
+    await resolveTaskCwd(db, task, project.path, null, c.env.CAPABILITIES).catch((e) => console.warn('[worktree] pre-create skipped:', e instanceof Error ? e.message : e))
     broadcastStatus() // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })

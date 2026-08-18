@@ -1,5 +1,5 @@
 import { gitOrThrow } from './core/git'
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import type { WorktreeResult } from '@acorn/protocol/terminal.ts'
 import { isContainedPath, isDirty, worktreeBranchDirName } from './pathGuards'
@@ -47,6 +47,31 @@ export async function resolveBaseRef(checkout: string, preferred?: string | null
 // flag) and only git-legal ref chars. The dir name is slugged separately; this guards the *git arg*.
 const isValidBranch = (branch: string): boolean => !branch.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(branch)
 
+// The branch a linked worktree actually has checked out, read straight off disk: `<dir>/.git` is a
+// file pointing at the repo's admin dir for that worktree, whose HEAD holds the ref. `null` means
+// the directory is not a live linked worktree — pruned, moved, or on a detached HEAD.
+//
+// Read rather than shelled out to `git branch --show-current` because resolveTaskCwd calls this on
+// EVERY task→cwd resolution, which is once per editor file read, not once per session.
+// Trusts the pointer file: a worktree relinked to a DIFFERENT repo with the same owner/name/branch
+// still passes. Compare the admin dir against the checkout if that ever matters.
+export function worktreeBranch(dir: string): string | null {
+  try {
+    const pointer = readFileSync(join(dir, '.git'), 'utf8').trim()
+    if (!pointer.startsWith('gitdir:')) return null
+    const admin = resolve(dir, pointer.slice('gitdir:'.length).trim())
+    const head = readFileSync(join(admin, 'HEAD'), 'utf8').trim()
+    return head.startsWith('ref: refs/heads/') ? head.slice('ref: refs/heads/'.length) : null
+  } catch {
+    return null
+  }
+}
+
+// Why a worktree directory can't be handed to the task that owns it. Shared so the two callers —
+// reuse below and the persisted-path shortcut in taskWorktree — say the same thing.
+export const staleWorktreeReason = (path: string, branch: string, on: string | null): string =>
+  `${path} is ${on ? `checked out on '${on}', not '${branch}'` : `no longer a live git worktree for '${branch}'`}. Remove the directory and reopen the task.`
+
 // `created` distinguishes a fresh `git worktree add` from reuse of an existing dir — the caller
 // runs the workspace setup script only on the fresh path (docs/workspaces-and-tasks.md).
 type EnsureWorktreeResult = { ok: true; path: string; created: boolean } | { ok: false; reason: string }
@@ -65,7 +90,15 @@ export async function ensureWorktree(
   // Defense in depth: never operate on a path that escaped the worktrees root (handler validates
   // identifiers too, docs/security.md).
   if (!isContainedPath(worktreesRoot, path)) return { ok: false, reason: 'Invalid worktree path.' }
-  if (existsSync(path)) return { ok: true, path, created: false } // reuse
+  if (existsSync(path)) {
+    // Reuse — but only a LIVE worktree still on this branch. The directory name is keyed by
+    // owner/repo/branch alone, and a `git worktree prune`, a manual checkout inside it or a moved
+    // repo all leave the folder behind holding some other branch's files. Handing that back is how
+    // a task's agent ended up reading, editing and reporting on a tree that was not its own.
+    const on = worktreeBranch(path)
+    if (on === branch) return { ok: true, path, created: false }
+    return { ok: false, reason: staleWorktreeReason(path, branch, on) }
+  }
 
   mkdirSync(worktreesRoot, { recursive: true })
 
@@ -164,14 +197,6 @@ export async function worktreePorcelain(path: string): Promise<{ dirty: boolean;
   }
 }
 
-export async function currentBranch(checkout: string): Promise<string | null> {
-  try {
-    const { stdout } = await gitOrThrow(['branch', '--show-current'], { cwd: checkout, timeoutMs: 10_000 })
-    return stdout.trim() || null
-  } catch {
-    return null
-  }
-}
 
 // Remove a worktree via the main checkout. Refuses a dirty worktree unless force is set (which
 // discards uncommitted changes) — surfaced to the UI so removal is never silently destructive.
