@@ -139,9 +139,30 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-spinner[data-size='md'] { font-size: var(--fs-md); }
 
 /* ── SectionHeader ──────────────────────────────────────────────────────────────────────────
-   The base rule is `.section-header` in shell.css — already shared across 18 sites, so the
-   component reuses it rather than introducing a parallel class. These are only the level variants
-   and the slot layout the component adds. */
+   The base rule lives HERE rather than in shell.css, even though 18 shell sites also use the class.
+   SectionHeader is on the @acorn/plugin-api/ui surface, and a plugin frame is served
+   primitives.css but NOT shell.css (apps/desktop/src/app/main/pluginFrameStyles.ts) — so with the base
+   in the shell sheet, every frame that rendered a section header got the level variants and none of the
+   chrome: no height, no divider, no label typography. It renders unstyled rather than failing, which is
+   the quiet kind of broken (plugins/http/src/frame/http.css says the same about .settings-hint).
+   Rule: a class an exported component renders belongs in a sheet frames are served. */
+.section-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
+  margin: 0;
+  background: var(--bg);
+  border-bottom: var(--chrome-divider);
+  font-size: var(--label-size);
+  color: var(--text-muted);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: var(--label-weight);
+}
 .section-header[data-level='group'] {
   height: auto;
   padding: var(--space-5) var(--space-6) var(--space-2);

@@ -7,11 +7,13 @@
 
 export {
   buildDiffRows,
+  buildDiffRowsAsync,
   buildRenderableRows,
   DIFF_LOAD_ROW_HEIGHT,
   estimateRowSize,
   estimateSplitBandSize,
   expandGap,
+  expandGapAsync,
   gapId,
   highlighterTokenize,
   isCodeRow,
@@ -22,6 +24,12 @@ export {
   toBands,
 } from '@acorn/client-core/ui/diff/model.ts'
 export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/ui/diff/model.ts'
+
+// The tokenizer the async builders take. It lives on THIS entrypoint rather than ./client because it
+// is part of the diff toolkit's contract — `buildDiffRowsAsync(file, tokenizeDocument)` is the whole
+// intended call — and because a plugin has no other reason to reach the highlighter directly.
+export { tokenizeDocument } from '@acorn/client-core/highlight/worker.ts'
+export type { TokenizeDocument } from '@acorn/client-core/highlight/worker.ts'
 
 export { collectMatches } from '@acorn/client-core/ui/diff/find.ts'
 export type { FindHighlight } from '@acorn/client-core/ui/diff/find.ts'

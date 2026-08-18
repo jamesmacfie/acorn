@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import type { DiffFile } from './model'
-import type { ParsedFile, TokenizeLine } from './model'
+import type { ParsedFile } from './model'
 
 export type DiffHydrationStatus = 'idle' | 'queued' | 'loading' | 'loaded' | 'error'
 
@@ -8,8 +8,13 @@ const PATCH_BATCH_SIZE = 4
 const BACKGROUND_BATCH_DELAY_MS = 80
 
 type HydratorOptions = {
-  tokenizerForFile: (file: DiffFile) => Promise<TokenizeLine>
-  parseFile: (file: DiffFile, tokenize: TokenizeLine) => ParsedFile
+  /**
+   * Turn a file's patch into rows. Async because tokenizing happens in a worker now
+   * (highlight/worker.ts) — this used to be a synchronous call plus a separate `tokenizerForFile`
+   * hook, and the two collapsed into one when picking the tokenizer stopped being the hydrator's
+   * business.
+   */
+  parseFile: (file: DiffFile) => ParsedFile | Promise<ParsedFile>
   onParsed: (parsed: ParsedFile) => void
   // Patch-body source, injected so the hydrator stays agnostic of where diffs come from (the PR
   // diff wires the query cache + batch endpoint; the compare preview has every body inline):
@@ -105,9 +110,9 @@ export function createDiffHydrator(options: HydratorOptions) {
         publish()
         continue
       }
-      const tokenize = await options.tokenizerForFile(file)
+      const parsed = await options.parseFile(file)
       if (run !== generation || disposed) return
-      options.onParsed(options.parseFile(file, tokenize))
+      options.onParsed(parsed)
       setStatus(path, 'loaded')
       publish()
       await yieldToBrowser()

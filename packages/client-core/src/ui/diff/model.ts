@@ -15,6 +15,9 @@ import gitdiffParser from 'gitdiff-parser'
 import { synth } from './synth'
 import type { getHighlighter } from '../../highlight/shiki'
 import { langFor } from '../../highlight/shiki'
+// Type-only, so the worker client's module graph (and its dynamic `?worker` import) stays out of this
+// module — several plugin tests load it in a node environment where that import cannot resolve.
+import type { TokenizeDocument } from '../../highlight/worker'
 
 // The renderer's own input contract. Deliberately structural, so any producer of a patch — a PR file
 // from github, an uncommitted hunk from changes, whatever comes next — satisfies it without either
@@ -229,16 +232,32 @@ function rawPatchRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
   return rows
 }
 
-export function buildDiffRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
-  if (!file.patch) return []
+// One tokenizable document: the lines of ONE SIDE of ONE HUNK, and the rows they belong to.
+//
+// A hunk interleaves two documents. A deleted line belongs to the pre-image, an inserted line to the
+// post-image, an unchanged line to both. Tokenizing them in display order would feed the grammar a
+// text that never existed — a deleted `*/` would close a comment for the inserted lines below it — so
+// the two sides are gathered separately and each is tokenized as its own document.
+//
+// Context lines are in BOTH batches on purpose. They are what carries grammar state to the deletions
+// on one side and the insertions on the other, so leaving them out of either would put that side's
+// changed lines back on a cold start. Their row appears as a target twice and the second assignment
+// wins; that is deliberate and the sides agree on the text by definition.
+type TokenBatch = { code: string; targets: CodeRow[] }
+
+// The structure of a patch, with the tokens still missing. Split out because the two fill strategies —
+// per line on the main thread, per hunk-side in the worker — differ only in how `batches` is consumed,
+// and the hunk walk below is not worth having twice.
+function buildRowSkeleton(file: DiffFile): { rows: DiffRow[]; batches: TokenBatch[] } | null {
   let parsed: ReturnType<typeof gitdiffParser.parse>
   try {
-    parsed = gitdiffParser.parse(synth(file.path, file.patch))
+    parsed = gitdiffParser.parse(synth(file.path, file.patch ?? ''))
   } catch {
-    return rawPatchRows(file, tokenize)
+    return null
   }
   const hunks = parsed[0]?.hunks ?? []
   const out: DiffRow[] = []
+  const batches: TokenBatch[] = []
   for (let i = 0; i < hunks.length; i++) {
     const h = hunks[i]!
     // Gap before this hunk: top (above the first) or the span since the previous hunk's end.
@@ -252,35 +271,106 @@ export function buildDiffRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[]
         out.push({ kind: 'gap', path: file.path, sha: file.sha, side: 'mid', oldStart: prevOldEnd + 1, newStart: prevNewEnd + 1, count: h.newStart - prevNewEnd - 1 })
     }
     out.push({ kind: 'hunk', text: h.content || `@@ -${h.oldStart} +${h.newStart} @@` })
+    const oldSide: CodeRow[] = []
+    const newSide: CodeRow[] = []
     for (const ch of h.changes) {
+      let row: CodeRow
       if (ch.type === 'normal') {
-        out.push({
-          kind: 'normal',
-          path: file.path,
-          oldNo: ch.oldLineNumber,
-          newNo: ch.newLineNumber,
-          toks: tokenize(file.path, ch.content),
-          raw: ch.content,
-        })
+        row = { kind: 'normal', path: file.path, oldNo: ch.oldLineNumber, newNo: ch.newLineNumber, toks: [], raw: ch.content }
+        oldSide.push(row)
+        newSide.push(row)
       } else if (ch.type === 'insert') {
-        out.push({ kind: 'insert', path: file.path, oldNo: null, newNo: ch.lineNumber, toks: tokenize(file.path, ch.content), raw: ch.content })
+        row = { kind: 'insert', path: file.path, oldNo: null, newNo: ch.lineNumber, toks: [], raw: ch.content }
+        newSide.push(row)
       } else {
-        out.push({ kind: 'delete', path: file.path, oldNo: ch.lineNumber, newNo: null, toks: tokenize(file.path, ch.content), raw: ch.content })
+        row = { kind: 'delete', path: file.path, oldNo: ch.lineNumber, newNo: null, toks: [], raw: ch.content }
+        oldSide.push(row)
       }
+      out.push(row)
+    }
+    // Old side first so the shared context rows end up carrying the post-image's colours, which is
+    // the file as it now stands and the side a reader is looking at.
+    for (const side of [oldSide, newSide]) {
+      if (side.length) batches.push({ code: side.map((r) => r.raw).join('\n'), targets: side })
     }
   }
-  if (out.length === 0) return rawPatchRows(file, tokenize)
+  if (out.length === 0) return null
   // Bottom gap: lines after the last hunk to end-of-file. Size is unknown until the body is fetched
   // (count: null); on expand it collapses to nothing if the hunk already reached EOF.
   const last = hunks[hunks.length - 1]
   if (last) out.push({ kind: 'gap', path: file.path, sha: file.sha, side: 'bottom', oldStart: last.oldStart + last.oldLines, newStart: last.newStart + last.newLines, count: null })
-  attachWordDiffs(out)
-  return out
+  return { rows: out, batches }
+}
+
+export function buildDiffRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
+  if (!file.patch) return []
+  const built = buildRowSkeleton(file)
+  if (!built) return rawPatchRows(file, tokenize)
+  for (const batch of built.batches) {
+    for (const row of batch.targets) row.toks = tokenize(row.path, row.raw)
+  }
+  attachWordDiffs(built.rows)
+  return built.rows
+}
+
+/**
+ * The same rows, tokenized a document at a time instead of a line at a time.
+ *
+ * This is the path the app uses. It is what makes the worker worth having (one message per hunk-side
+ * rather than per line — see highlight/worker.ts) and it is what makes multi-line constructs colour
+ * correctly, because shiki carries grammar state across the lines of a single call.
+ *
+ * Never rejects: `tokenizeDocument` degrades to plain text rather than throwing, and a patch that will
+ * not parse falls back to the untokenized raw rows exactly as the sync path does.
+ */
+export async function buildDiffRowsAsync(file: DiffFile, tokenizeDoc: TokenizeDocument): Promise<DiffRow[]> {
+  if (!file.patch) return []
+  const built = buildRowSkeleton(file)
+  // A patch this parser cannot read is a display problem, not a highlighting one — show the raw lines.
+  if (!built) return rawPatchRows(file, plainTokenize)
+  for (const batch of built.batches) {
+    const lines = await tokenizeDoc(file.path, batch.code)
+    for (let i = 0; i < batch.targets.length; i++) {
+      const toks = lines[i]
+      // A grammar that returned fewer lines than we sent (or nothing, on a fallback) leaves the row
+      // showing its raw text rather than an empty one.
+      batch.targets[i]!.toks = toks?.length ? toks : [{ content: batch.targets[i]!.raw, light: '', dark: '' }]
+    }
+  }
+  attachWordDiffs(built.rows)
+  return built.rows
 }
 
 // Slice the hidden lines for a gap out of the full head-file body and tokenize them. Unchanged
 // context, so oldNo/newNo step together from the gap's start.
 export function expandGap(gap: GapRow, body: string, tokenize: TokenizeLine): CodeRow[] {
+  const rows = gapRows(gap, body)
+  for (const row of rows) row.toks = tokenize(gap.path, row.raw)
+  return rows
+}
+
+/**
+ * As above, tokenized as one document so the revealed run colours consistently.
+ *
+ * ponytail: the run still starts from a cold grammar state at its first line, because the lines above
+ * it were never tokenized — this reveals a slice out of the middle of a file. Expanding into the top
+ * of a block comment therefore still mis-colours until the expansion reaches line 1. Fixing it means
+ * tokenizing the whole body and keeping the state, which is worth doing when someone complains about
+ * an expanded gap specifically rather than on spec.
+ */
+export async function expandGapAsync(gap: GapRow, body: string, tokenizeDoc: TokenizeDocument): Promise<CodeRow[]> {
+  const rows = gapRows(gap, body)
+  if (!rows.length) return rows
+  const lines = await tokenizeDoc(gap.path, rows.map((r) => r.raw).join('\n'))
+  for (let i = 0; i < rows.length; i++) {
+    const toks = lines[i]
+    rows[i]!.toks = toks?.length ? toks : [{ content: rows[i]!.raw, light: '', dark: '' }]
+  }
+  return rows
+}
+
+/** The rows a gap reveals, untokenized. Unchanged context, so oldNo/newNo step together. */
+function gapRows(gap: GapRow, body: string): CodeRow[] {
   const lines = body.split('\n')
   if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop() // drop one trailing newline
   const count = gap.count ?? lines.length - (gap.newStart - 1)
@@ -288,7 +378,7 @@ export function expandGap(gap: GapRow, body: string, tokenize: TokenizeLine): Co
   for (let k = 0; k < count; k++) {
     const raw = lines[gap.newStart - 1 + k]
     if (raw == null) break
-    rows.push({ kind: 'normal', path: gap.path, oldNo: gap.oldStart + k, newNo: gap.newStart + k, toks: tokenize(gap.path, raw), raw })
+    rows.push({ kind: 'normal', path: gap.path, oldNo: gap.oldStart + k, newNo: gap.newStart + k, toks: [], raw })
   }
   return rows
 }

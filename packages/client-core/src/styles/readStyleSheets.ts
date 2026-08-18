@@ -16,7 +16,7 @@ export const stripComments = (text: string): string => text.replace(/\/\*[\s\S]*
  * Nearest ancestor holding pnpm-workspace.yaml. Anchor on the one file that marks the repository root so
  * the helper works from every package.
  */
-function workspaceRoot(): string {
+export function workspaceRoot(): string {
   let dir = fileURLToPath(new URL('.', import.meta.url))
   for (;;) {
     if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir

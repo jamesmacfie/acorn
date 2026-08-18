@@ -94,7 +94,12 @@
    (docs/third-party/monaco.md). Core CSS rather than a plugin stylesheet on purpose — the plugin ships no
    code for this pane, so it has nowhere to put a rule. Same flex-column shape as .pane-right: Monaco
    is absolutely positioned inside its host and needs a definite box to fill. */
-.document-surface { display: flex; flex-direction: column; overflow: hidden; }
+/* `flex: 1; min-height: 0` is the line that makes the box above DEFINITE. Without it this section is a
+   plain flex item at `flex: 0 1 auto`, so its height comes from its content — and its content is a host
+   div at `flex: 1` with an absolutely-positioned Monaco inside, which measures nothing. The editor
+   collapsed to a sliver at the top of an otherwise empty 200px region: the SQL was there, clipped, with
+   the rest of the drag height blank under it. */
+.document-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .document-surface-host { flex: 1; min-height: 0; }
 .document-surface-error { flex: none; padding: var(--space-2) var(--space-3); }
 
@@ -107,24 +112,6 @@
 .document-over-frame-frame { flex: 1; min-height: 0; }
 /* SplitHandle owns the grip (ui/split.ts + primitives.css). */
 .document-over-frame-split { margin: 0; }
-
-.section-header {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  display: flex;
-  align-items: center;
-  height: var(--pane-head-h);
-  padding: 0 var(--pane-pad);
-  margin: 0;
-  background: var(--bg);
-  border-bottom: var(--chrome-divider);
-  font-size: var(--label-size);
-  color: var(--text-muted);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
-  font-weight: var(--label-weight);
-}
 
 .section-refresh {
   flex: none;

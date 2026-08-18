@@ -100,6 +100,21 @@ describe('the generated document', () => {
     expect(fetched).toEqual([])
   })
 
+  // Source order, asserted because it is the whole difference between a frame that looks like the app
+  // and one that renders in Times New Roman. The inline block and `/ui.css` both style bare `html, body`,
+  // so specificity ties and the later sheet wins every tie. `/ui.css` must be the later sheet.
+  it('links the shared stylesheet after its own inline fallbacks', async () => {
+    const html = await (await get(`${PLUGIN_SCHEME}://${HASH}/index.html`)).text()
+    expect(html.indexOf('<style>')).toBeLessThan(html.indexOf('<link rel="stylesheet"'))
+  })
+
+  // Nothing inline may restate a property the shared stylesheet owns. `font` is the one that bit:
+  // as a shorthand, `font: inherit` silently reset four properties base.css had just set.
+  it('declares no font, colour or background of its own', async () => {
+    const inline = /<style>([\s\S]*?)<\/style>/.exec(await (await get(`${PLUGIN_SCHEME}://${HASH}/index.html`)).text())?.[1] ?? ''
+    expect(inline).not.toMatch(/(^|[;{\s])(font|font-family|color|background|background-color)\s*:/)
+  })
+
   it('serves it for the origin root as well', async () => {
     expect((await get(`${PLUGIN_SCHEME}://${HASH}/`)).status).toBe(200)
   })

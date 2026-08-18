@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { declaredByBlock, readStyleSheets, referenced } from './readStyleSheets'
+import { declaredByBlock, readStyleSheets, referenced, workspaceRoot } from './readStyleSheets'
 
 const sheets = readStyleSheets()
 const corpus = sheets.map((f) => f.text).join('\n')
@@ -124,5 +126,60 @@ describe('literal ratchets (these may only go down)', () => {
       .match(/(?:padding|margin|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left))?:[^;]+;/g) ?? []
     const offScale = decls.flatMap((d) => d.match(/-?\d+px/g) ?? []).length
     expect(offScale).toBeLessThanOrEqual(147)
+  })
+})
+
+// A plugin frame is a separate document served exactly one host stylesheet, and that sheet is a
+// HAND-PICKED subset of these files (apps/desktop/src/app/main/pluginFrameStyles.ts). primitives.css is
+// in it because the components on @acorn/plugin-api/ui are, so every class those components render has
+// to be fully styled by that subset alone. A base rule that sits in shell.css instead reaches all 18
+// shell call sites and none of the frames — the header keeps its variant tweaks and loses its height,
+// divider and label typography, which looks like a plugin that ignored the design system rather than
+// like a missing file. That is how .section-header was broken for the Database and HTTP panes.
+//
+// The subset is READ from pluginFrameStyles.ts rather than restated here, so editing that list either
+// keeps this honest or fails it.
+// `font` is a shorthand, and a shorthand needs at minimum a size AND a family. Hand it a family token
+// alone — `font: var(--font-ui)` — and it parses (any var() might expand to anything) but is invalid once
+// substituted. That case does NOT behave like a syntax error: an invalid-at-computed-value-time
+// declaration takes the property's unset value rather than falling back to the previous declaration in
+// the cascade, and every `font` longhand is inherited, so the element inherits from a parent that
+// declares nothing and lands on the browser's default serif. base.css never gets to win.
+//
+// It is invisible in review, invisible to tsc, and it rendered the whole Database pane in Times New Roman.
+// The legitimate uses all carry a size (`font: var(--fs-sm) var(--font-mono)`), so the signature to ban is
+// narrow: a `font` shorthand whose entire value is one var(). Use `font-family` when you mean the family.
+it('never puts a bare token in the font shorthand', () => {
+  // One var() and then the semicolon. A legitimate `font: var(--fs-sm) var(--font-mono)` has a second
+  // token after the first var() closes, so it does not match; the inner value bans parentheses to stop
+  // the scan running past that close paren.
+  const bare = withoutComments(corpus).match(/(?:^|[;{\s])font:\s*var\(--[a-z0-9-]+(?:,[^;()]*)?\)\s*;/g) ?? []
+  expect(bare).toEqual([])
+})
+
+describe('the plugin-frame stylesheet is self-contained', () => {
+  const listPath = join(workspaceRoot(), 'apps/desktop/src/app/main/pluginFrameStyles.ts')
+  const served = [...readFileSync(listPath, 'utf8').matchAll(/from '@acorn\/client-core\/([^']+)\?raw'/g)]
+    .map((m) => m[1])
+
+  it('names sheets that exist', () => {
+    expect(served.length).toBeGreaterThan(5)
+    expect(served.filter((rel) => !sheets.some((f) => f.path.endsWith(`/src/${rel}`)))).toEqual([])
+  })
+
+  it('gives a base rule for every class primitives.css styles', () => {
+    const servedText = served
+      .map((rel) => sheets.find((f) => f.path.endsWith(`/src/${rel}`))?.text ?? '')
+      .map(withoutComments)
+      .join('\n')
+    const primitives = withoutComments(sheets.find((f) => f.name === 'primitives.css')?.text ?? '')
+    // Hooks with no base rule of their own: styled only through a state or a child, so there is
+    // nothing for the served subset to be missing. `.ui-fold` is a <details> — only `[open]` matters.
+    const hooks = new Set(['ui-fold'])
+    const orphans = [...new Set([...primitives.matchAll(/\.([a-z][a-z0-9-]{2,})/g)].map((m) => m[1]))]
+      .filter((name) => !hooks.has(name))
+      .filter((name) => !new RegExp(`(^|[\\s,>+~])\\.${name}\\s*(,|\\{)`, 'm').test(servedText))
+      .sort()
+    expect(orphans).toEqual([])
   })
 })

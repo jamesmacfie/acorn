@@ -117,6 +117,27 @@ export default defineConfig({
       // emitted HTML keeps the /assets/… literals scripts/check-renderer-budget.mjs parses.
       { name: 'acorn:absolute-base', config: () => ({ base: '/' }) },
     ],
+    // Both settings here are load-bearing for the syntax highlighter's Content-Security-Policy:
+    // main/appScheme.ts serves ONE worker entry under a relaxed policy and identifies it by filename.
+    //
+    //   format: 'es'        so the worker can CODE-SPLIT. Under 'iife' rollup cannot emit chunks, so
+    //                       every grammar gets inlined and the worker is a single 3.1 MB file; as a
+    //                       module it is ~250 KB plus the one or two grammars a given diff touches.
+    //                       What it must never become is an inlined BLOB worker — a blob: worker
+    //                       inherits the DOCUMENT's CSP, so the relaxation would silently not apply
+    //                       and Oniguruma would fail inside it.
+    //
+    //   entryFileNames      `worker-` prefix, and it is not cosmetic. Vite emits TWO files whose name
+    //                       derives from highlighter.worker.ts: the worker entry, and a ~270-byte
+    //                       main-thread wrapper that constructs it. Without a prefix both are called
+    //                       `highlighter.worker-<hash>.js` and appScheme's pattern cannot tell the
+    //                       script that needs the relaxed policy from the one that must not have it.
+    //                       `[name]` stays so Monaco's five workers keep their own names — and their
+    //                       own, unrelaxed, policy.
+    worker: {
+      format: 'es',
+      rollupOptions: { output: { entryFileNames: 'assets/worker-[name]-[hash].js' } },
+    },
     build: {
       outDir: 'dist/client',
       rollupOptions: { input: resolve(__dirname, 'index.html') },
