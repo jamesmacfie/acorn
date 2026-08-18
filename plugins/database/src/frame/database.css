@@ -8,8 +8,15 @@
 
    Inlined into the bundle by src/frame/index.tsx, because a plugin origin serves one file. */
 
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
-body { font: var(--font-ui, inherit); }
+/* No `html`/`body` rule here on purpose. base.css is the first module of the host stylesheet a frame is
+   served, and it already sets the margin, the height, the background, the colour, the font family, the
+   size and the line height. This file used to restate them, and the font line was `font: var(--font-ui)`
+   — the SHORTHAND, which needs a size and a family and was handed only a family. A var() that substitutes
+   into something invalid does not get dropped the way a syntax error does: the property becomes invalid at
+   computed-value time, which sets it to `inherit`. `font-family` is inherited, `html` declares none, so
+   the whole pane fell to the browser's default serif and base.css never got a chance to win. Linear and
+   Rollbar use the `font-family` longhand and were unaffected, which is what made this look plugin-specific.
+   Cheapest way not to lose that argument twice: declare nothing base.css already declares. */
 
 /* Was `.db-pane`, a whole pane. It is the bottom region of one now, and the two rules it needs are the
    same: fill the rectangle, and let the children scroll rather than the frame. */
@@ -21,11 +28,11 @@ body { font: var(--font-ui, inherit); }
 }
 .db-empty { padding: var(--space-6); }
 
-.db-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
+/* SectionHeader owns the header itself (its base rule is in the shared primitives sheet, which a frame
+   IS served — see packages/client-core/src/styles/primitives.css § SectionHeader). The database name
+   rides in the LABEL slot beside the word Database rather than in `actions`, because it names what this
+   pane is looking at — so the gap goes on that slot, not on the header's own flex row. */
+.db-head .ui-section-header-label { display: flex; align-items: center; gap: var(--space-4); }
 .db-status {
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -34,8 +41,8 @@ body { font: var(--font-ui, inherit); }
 .db-status.ok { color: var(--add-marker); }
 .db-status.err { color: var(--del-marker); }
 /* Button owns every control in this pane now: `.db-icon-btn` was <Button size="sm">,
-   `.db-run-btn` was variant="solid", `.db-del-btn` was tone="danger". */
-.db-head .ui-btn { margin-left: auto; }
+   `.db-run-btn` was variant="solid", `.db-del-btn` was tone="danger". The reconnect button sits in
+   SectionHeader's `actions` slot, which is what carries the `margin-left: auto` this used to. */
 
 
 /* Alert owns the tone and size; this is the full-bleed banner strip above the grid. */
@@ -148,18 +155,11 @@ body { font: var(--font-ui, inherit); }
   min-height: 0;
   background: var(--bg);
 }
-.db-detail-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  height: var(--pane-head-h);
-  padding: 0 var(--pane-pad);
-  border-bottom: var(--chrome-divider);
-  font-size: var(--fs-sm);
-  text-transform: var(--label-transform);
-  color: var(--text-muted);
-}
-.db-detail-head .ui-btn { margin-left: auto; }
+/* `.db-detail-head` was the shared `.section-header` recipe copied by hand — height, pane padding,
+   divider, label transform, muted text — because that class's base rule used to live in shell.css, which
+   a frame is not served. It is SectionHeader now, and the only rule left is the one the flex column
+   needs from its own parent. */
+.db-detail > .section-header { flex: none; }
 .db-detail-fields {
   flex: 1;
   min-height: 0;

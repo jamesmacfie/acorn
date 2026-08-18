@@ -59,18 +59,28 @@ const HASH_RE = /^[0-9a-f]{64}$/
 // plugin's module script. No inline script (the CSP has no `unsafe-inline` for scripts and must not
 // need one), no favicon, no title a plugin could use to impersonate the shell in a devtools list.
 //
-// `color-scheme` and the two body rules are the only styling here. Everything else a plugin renders is
-// its own CSS over the tokens the host pushes down the port.
+// The inline block sits BEFORE the stylesheet link, and that order is the whole point of it. It used to
+// sit after, where `html, body { … font: inherit }` beat `base.css`'s `body { font-family: var(--font-ui) }`
+// on nothing but source order — same selector, same specificity, later wins. `font` is a shorthand, so
+// `inherit` reset family, size, line-height and weight to the parent, `html` declared none of them, and
+// every frame in the app rendered in the browser's default serif at the browser's default size. It looked
+// exactly like a plugin that had ignored the design system, which is the expensive kind of wrong.
+// (`color: var(--fg, …)` was fighting the same fight and losing worse: there is no `--fg` token, so that
+// declaration was always the fallback.)
+//
+// So: nothing here may restate a property `/ui.css` owns. Ground the document, let the shared sheet
+// dress it. `color-scheme` is the exception and keeps its fallback inline, because it has to be right in
+// the frames of a second before the appearance tokens arrive over the port.
 const documentFor = (): string => `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/ui.css">
 <style>
-  :root { color-scheme: light dark; }
-  html, body { margin: 0; height: 100%; background: var(--bg, transparent); color: var(--fg, inherit); font: inherit; }
+  html { color-scheme: var(--color-scheme, light dark); }
+  html, body { margin: 0; height: 100%; }
 </style>
+<link rel="stylesheet" href="/ui.css">
 </head>
 <body><script type="module" src="/client.js"></script></body>
 </html>

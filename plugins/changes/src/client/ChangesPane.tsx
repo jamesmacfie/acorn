@@ -1,11 +1,11 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { agentSessionsFor, fileStatusMeta, formatFileReference, getHighlighter, projectsOptions, readJson, sendReferenceToAgent, type Task, taskBridge, taskStatus } from '@acorn/plugin-api/client'
+import { agentSessionsFor, fileStatusMeta, formatFileReference, projectsOptions, readJson, sendReferenceToAgent, type Task, taskBridge, taskStatus } from '@acorn/plugin-api/client'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { reviewNotesRoute, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
 import { Alert, Button, CopyButton, DiffLine, ListDetail, NonCodeRow, Row, createArmedConfirm, type LineComposerController } from '@acorn/plugin-api/ui'
-import { buildDiffRows, type CodeRow, highlighterTokenize, isCodeRow, plainTokenize, type Row as DiffRow } from '@acorn/plugin-api/ui/diff'
+import { buildDiffRowsAsync, type CodeRow, isCodeRow, type Row as DiffRow, tokenizeDocument } from '@acorn/plugin-api/ui/diff'
 import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
@@ -40,12 +40,6 @@ export default function ChangesPane(props: { task: Task }) {
   const groups = createMemo(() => groupChanges(changes() ?? []))
   const selected = createMemo(() => pickSelected(groups(), selectedKey()))
 
-  const [hl] = createResource(() => getHighlighter())
-  const tokenize = () => {
-    const highlighter = hl()
-    return highlighter ? highlighterTokenize(highlighter) : plainTokenize
-  }
-
   const [rows] = createResource(
     () => {
       const sel = selected()
@@ -57,7 +51,7 @@ export default function ChangesPane(props: { task: Task }) {
       const file = toPullFile(src.sel, res.patch)
       // Whole-file view: the patch carries full context (server -U1e6), so drop the expand gaps and
       // hunk-header rows — every line is already shown, just with +/- highlights.
-      const diff = buildDiffRows(file, tokenize()).filter((r) => r.kind !== 'gap' && r.kind !== 'hunk')
+      const diff = (await buildDiffRowsAsync(file, tokenizeDocument)).filter((r) => r.kind !== 'gap' && r.kind !== 'hunk')
       return [{ kind: 'file', file }, ...(diff.length ? diff : [{ kind: 'nodiff' } as DiffRow])]
     },
     { initialValue: [] },

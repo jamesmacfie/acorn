@@ -2,13 +2,13 @@ import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } 
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
 import { filesKey } from '../contract/api'
-import { clientEvents, getHighlighter, PrefKeys, prefsOptions, readDraft, registerCommands, savePref, writeDraft } from '@acorn/plugin-api/client'
+import { clientEvents, PrefKeys, prefsOptions, readDraft, registerCommands, savePref, writeDraft } from '@acorn/plugin-api/client'
 import { fetchFilePatches, fileBlobOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
 import { filePatchKey, pullKey, type PullFile, type Thread } from '../contract/api'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { EmptyState, FileHead, type LineComposerController, type ThreadCollapseController } from '@acorn/plugin-api/ui'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGap, gapId, type GapRow, highlighterTokenize, isCodeRow, maxLineCols, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, type TokenizeLine, type ViewMode } from '@acorn/plugin-api/ui/diff'
+import { buildDiffRows, buildDiffRowsAsync, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGapAsync, gapId, type GapRow, isCodeRow, maxLineCols, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, tokenizeDocument, type ViewMode } from '@acorn/plugin-api/ui/diff'
 import { createDiffScrollRestoration } from './reviewScrollRestoration'
 import type { ReviewViewScope } from './reviewViewState'
 import { createDiffFindController } from './DiffFindController'
@@ -77,11 +77,6 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
       return next
     })
   const [threadCollapsed, setThreadCollapsed] = createSignal<Map<string, boolean>>(new Map())
-  let tokenizerPromise: Promise<TokenizeLine> | null = null
-  const loadTokenizer = async () => {
-    return (tokenizerPromise ??= getHighlighter().then(highlighterTokenize).catch(() => plainTokenize))
-  }
-
   const shouldUsePlainTokenizer = (file: PullFile) => {
     const patch = file.patch ?? ''
     if (patch.length > HIGHLIGHT_MAX_PATCH_CHARS) return true
@@ -93,8 +88,10 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   }
 
   const hydrator = createDiffHydrator({
-    tokenizerForFile: (file) => (shouldUsePlainTokenizer(file) ? Promise.resolve(plainTokenize) : loadTokenizer()),
-    parseFile: (file, tokenize) => ({ file, diff: buildDiffRows(file, tokenize) }),
+    parseFile: async (file) => ({
+      file,
+      diff: shouldUsePlainTokenizer(file) ? buildDiffRows(file, plainTokenize) : await buildDiffRowsAsync(file, tokenizeDocument),
+    }),
     onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
     // Patch-body source: the query cache first (per-path patch entries, then the warmed files
     // query — which also resolves binary/too-large files to their legitimate null patch)…
@@ -157,7 +154,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const handleExpand = async (gap: GapRow) => {
     if (gap.sha == null) return
     const body = await queryClient.fetchQuery(fileBlobOptions(owner, repo, gap.sha))
-    const lines = expandGap(gap, body.text, await loadTokenizer())
+    const lines = await expandGapAsync(gap, body.text, tokenizeDocument)
     setExpanded((prev) => new Map(prev).set(gapId(gap), lines))
   }
 

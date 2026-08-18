@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import type { DiffFile, DiffThread } from './model'
 import {
   buildDiffRows,
+  buildDiffRowsAsync,
   buildRenderableRows,
   estimateRowSize,
   estimateSplitBandSize,
   expandGap,
   gapId,
+  isCodeRow,
   maxLineCols,
   plainTokenize,
   rowIdentityKeys,
@@ -271,5 +273,68 @@ describe('diff model', () => {
     const out = wordDiff('a  b', 'a   c')
     expect(out.del.map((t) => t.content).join('')).toBe('a  b')
     expect(out.add.map((t) => t.content).join('')).toBe('a   c')
+  })
+})
+
+// The batched tokenizer, which is the whole reason buildDiffRowsAsync exists. What it has to get
+// right is the SPLIT: a hunk is two documents interleaved, and tokenizing them in display order
+// hands the grammar a text that never existed on disk.
+describe('buildDiffRowsAsync', () => {
+  // A patch whose deletions and insertions would corrupt each other's grammar state if they were fed
+  // to the highlighter in display order: the deleted line closes a block comment, the inserted one
+  // opens a template literal.
+  const mixedHunk = pullFile(
+    'src/a.ts',
+    ['@@ -1,4 +1,4 @@', ' const before = 1', '-*/ deleted', '+`inserted', ' const after = 2'].join('\n'),
+  )
+
+  /** Records what was sent, and colours each line with the document it arrived in. */
+  const recordingTokenizer = (seen: string[]) => async (_path: string, code: string) => {
+    seen.push(code)
+    const doc = seen.length
+    return code.split('\n').map((line) => [{ content: line, light: `doc${doc}`, dark: `doc${doc}` }])
+  }
+
+  it('sends each side of a hunk as its own document, never the interleaved text', async () => {
+    const seen: string[] = []
+    await buildDiffRowsAsync(mixedHunk, recordingTokenizer(seen))
+
+    expect(seen).toEqual([
+      // old side: context + the deletion, and NO inserted line
+      ['const before = 1', '*/ deleted', 'const after = 2'].join('\n'),
+      // new side: context + the insertion, and NO deleted line
+      ['const before = 1', '`inserted', 'const after = 2'].join('\n'),
+    ])
+  })
+
+  it('assigns each line its own tokens, and gives shared context lines the post-image colours', async () => {
+    const seen: string[] = []
+    const rows = (await buildDiffRowsAsync(mixedHunk, recordingTokenizer(seen))).filter(isCodeRow)
+
+    expect(rows.map((row) => [row.kind, row.raw, row.toks[0]?.light])).toEqual([
+      // context rows are in both documents; the new side is assigned second and wins, because that
+      // is the file as it now stands
+      ['normal', 'const before = 1', 'doc2'],
+      ['delete', '*/ deleted', 'doc1'],
+      ['insert', '`inserted', 'doc2'],
+      ['normal', 'const after = 2', 'doc2'],
+    ])
+  })
+
+  it('falls back to the raw line rather than an empty row when the tokenizer returns nothing', async () => {
+    const rows = (await buildDiffRowsAsync(mixedHunk, async () => [])).filter(isCodeRow)
+    expect(rows.map((row) => row.toks.map((tok) => tok.content).join(''))).toEqual([
+      'const before = 1',
+      '*/ deleted',
+      '`inserted',
+      'const after = 2',
+    ])
+  })
+
+  it('produces the same rows as the synchronous builder, tokens aside', async () => {
+    const sync = buildDiffRows(mixedHunk, plainTokenize)
+    const async_ = await buildDiffRowsAsync(mixedHunk, async (_p, code) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }]))
+    const shape = (rows: Row[]) => rows.map((row) => (isCodeRow(row) ? `${row.kind}:${row.oldNo}:${row.newNo}:${row.raw}` : row.kind))
+    expect(shape(async_)).toEqual(shape(sync))
   })
 })

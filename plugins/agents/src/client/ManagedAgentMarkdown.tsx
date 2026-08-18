@@ -26,7 +26,17 @@ export default function AgentMarkdown(props: { text: string; taskId: string; cla
     const current = ++generation
     if (!root) return
     root.innerHTML = renderAgentMarkdown(text)
-    void getHighlighter().then((highlighter) => {
+    // Grammars load on demand now (client-core/highlight/langs.ts), so each fence has to ask for its
+    // own before `codeToHtml` can route to it — the highlighter starts with none loaded.
+    const languagesInPost = new Set(
+      [...(root.querySelectorAll<HTMLElement>('pre > code[data-language]') ?? [])]
+        .map((node) => LANGUAGE_ALIASES[node.dataset.language ?? 'text'] ?? node.dataset.language ?? 'text')
+        .filter((language) => SHIKI_LANGUAGES.has(language)),
+    )
+    if (!languagesInPost.size) return
+    void (async () => {
+      const highlighter = await getHighlighter()
+      await Promise.all([...languagesInPost].map((language) => getHighlighter(language)))
       if (!root || current !== generation) return
       for (const node of root.querySelectorAll<HTMLElement>('pre > code[data-language]')) {
         const requested = node.dataset.language ?? 'text'
@@ -41,7 +51,7 @@ export default function AgentMarkdown(props: { text: string; taskId: string; cla
         const highlighted = wrapper.firstElementChild
         if (highlighted) node.parentElement?.replaceWith(highlighted)
       }
-    })
+    })()
   })
 
   onCleanup(() => generation++)

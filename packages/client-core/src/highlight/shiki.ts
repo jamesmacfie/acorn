@@ -1,77 +1,55 @@
-import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore, type LanguageInput } from 'shiki/core'
+import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
-import { languageIdForPath, type LanguageId } from '@acorn/protocol/languageIds.ts'
+import { loadGrammar } from './langs'
 
-// Fine-grained Shiki: only the langs/themes below get bundled (the bundled `shiki` entry pulls a
-// chunk for every grammar). Dual github-light/dark so colours follow the app theme via CSS vars.
-const LANGS: Record<string, () => Promise<unknown>> = {
-  typescript: () => import('shiki/langs/typescript.mjs'),
-  tsx: () => import('shiki/langs/tsx.mjs'),
-  javascript: () => import('shiki/langs/javascript.mjs'),
-  jsx: () => import('shiki/langs/jsx.mjs'),
-  json: () => import('shiki/langs/json.mjs'),
-  css: () => import('shiki/langs/css.mjs'),
-  html: () => import('shiki/langs/html.mjs'),
-  markdown: () => import('shiki/langs/markdown.mjs'),
-  python: () => import('shiki/langs/python.mjs'),
-  go: () => import('shiki/langs/go.mjs'),
-  rust: () => import('shiki/langs/rust.mjs'),
-  java: () => import('shiki/langs/java.mjs'),
-  c: () => import('shiki/langs/c.mjs'),
-  cpp: () => import('shiki/langs/cpp.mjs'),
-  shellscript: () => import('shiki/langs/shellscript.mjs'),
-  yaml: () => import('shiki/langs/yaml.mjs'),
-  sql: () => import('shiki/langs/sql.mjs'),
-}
-
-// Canonical language id -> shiki grammar, the twin of client-core/editor/language.ts. The vocabulary
-// itself is @acorn/protocol/languageIds.ts, and this map is where "shiki does not bundle that one"
-// gets said: an id with no grammar loaded here falls to `text` rather than throwing inside
-// codeToTokens. That is why the map is total over LanguageId instead of falling through — a new
-// entry in the vocabulary fails `tsc` here until someone decides whether to pull its grammar in.
-const SHIKI: Record<LanguageId, keyof typeof LANGS | 'text'> = {
-  typescript: 'typescript', typescriptreact: 'tsx',
-  javascript: 'javascript', javascriptreact: 'jsx',
-  json: 'json', css: 'css', html: 'html', markdown: 'markdown',
-  python: 'python', go: 'go', rust: 'rust', java: 'java',
-  c: 'c', cpp: 'cpp',
-  shellscript: 'shellscript', yaml: 'yaml', sql: 'sql',
-  // No grammar bundled: plain text, which is what these already rendered as.
-  plaintext: 'text', scss: 'text', less: 'text', xml: 'text', ruby: 'text', ini: 'text', toml: 'text',
-}
-
-export const langFor = (path: string) => SHIKI[languageIdForPath(path)]
-
+// THE MAIN-THREAD HIGHLIGHTER, AND IT IS NO LONGER THE ONE THAT DOES THE WORK. Diffs tokenize in
+// highlighter.worker.ts, under the Oniguruma engine and off this thread. What is left here are the
+// callers a worker would not pay for:
+//
+//   the terminal's ANSI palette   needs `getTheme()`, no grammar and no tokenizing at all
+//   CI log output                 tokenizeAnsiLines — ANSI, also grammar-free
+//   agent markdown code fences    small, already async, and it wants HTML rather than tokens
+//
+// plus the fallback path in ./worker.ts, for a window where the worker could not start.
+//
 // THE JAVASCRIPT REGEX ENGINE, NOT ONIGURUMA, AND THE RENDERER'S CSP IS WHY. Shiki's default engine
-// compiles Oniguruma to WebAssembly, and `WebAssembly.instantiate` is gated by `script-src` — the
-// renderer's is `'self'` with no `'wasm-unsafe-eval'` (main/appScheme.ts). So the default engine
-// threw at startup and NOTHING was highlighted anywhere in the app: not a diff, not a code block, not
-// an agent transcript. A silent failure, because the rejection lands in the highlighter's own promise.
+// compiles Oniguruma to WebAssembly, and `WebAssembly.instantiate` is gated by `script-src` — this
+// document's is `'self'` with no `'wasm-unsafe-eval'` (main/appScheme.ts). So the default engine threw
+// at startup and NOTHING was highlighted anywhere in the app: not a diff, not a code block, not an
+// agent transcript. A silent failure, because the rejection lands in the highlighter's own promise.
 //
-// The other fix is one token of CSP, and this is the better one: the policy stays as tight as it is
-// documented to be, and the WASM payload leaves the renderer bundle.
+// The engine measurably costs 4.6x on the same input, which is what the worker exists to recover
+// WITHOUT widening this document's policy. It stays here because these callers are small and because a
+// second engine on the main thread would be a second engine to keep working.
 //
-// The cost, measured across all seventeen grammars above rather than assumed: sixteen tokenize
-// IDENTICALLY to Oniguruma, character for character and colour for colour. C++ is the one that
-// differs — the JS engine stops resolving part-way through a template declaration and leaves the tail
-// of the line as one plain token. Better than the nothing it renders today, and the day it matters
-// the answer is `'wasm-unsafe-eval'` rather than a second engine.
-//
-// `forgiving` covers the patterns this comparison could not reach: an unsupported regex is then
-// skipped rather than thrown, because a highlighter that degrades beats one that takes its surface
-// down — which is exactly the failure being fixed here.
+// `forgiving` covers the patterns a comparison could not reach: an unsupported regex is then skipped
+// rather than thrown, because a highlighter that degrades beats one that takes its surface down.
+const loaded = new Map<string, Promise<void>>()
+
 let instance: Promise<HighlighterCore> | null = null
-export const getHighlighter = () =>
-  (instance ??= createHighlighterCore({
+
+/**
+ * The shared main-thread highlighter. Pass a grammar name to have it loaded first — grammars are lazy
+ * (see langs.ts), so `codeToTokens`/`codeToHtml` on a language nobody asked for will throw otherwise.
+ */
+export async function getHighlighter(lang?: string): Promise<HighlighterCore> {
+  const hl = await (instance ??= createHighlighterCore({
     themes: [import('shiki/themes/github-light.mjs'), import('shiki/themes/github-dark.mjs')],
-    langs: Object.values(LANGS).map((load) => load()) as LanguageInput[],
+    langs: [],
     engine: createJavaScriptRegexEngine({ forgiving: true }),
   }))
+  if (lang && lang !== 'text') await loadGrammar(hl, loaded, lang)
+  return hl
+}
+
+// The vocabulary lives in langs.ts now (the worker needs it too, and must not import this module).
+// Re-exported because this is where every caller already looks for it.
+export { langFor, LANGS } from './langs'
 
 // ANSI-colour log lines (CI output), tokenized the same dual-theme way as diff code: {content,
 // light, dark} per token, rendered with --l/--r CSS vars. ANSI token boundaries are theme-
 // independent, so the two passes zip 1:1. `ansi` isn't a TextMate grammar — core won't route to it
-// via codeToTokens, so we call tokenizeAnsiWithTheme directly.
+// via codeToTokens, so we call tokenizeAnsiWithTheme directly, and no grammar has to be loaded.
 export type AnsiTok = { content: string; light: string; dark: string }
 export function tokenizeAnsiLines(hl: HighlighterCore, text: string): AnsiTok[][] {
   const light = tokenizeAnsiWithTheme(hl.getTheme('github-light'), text)

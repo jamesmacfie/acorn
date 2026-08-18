@@ -303,7 +303,10 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   })
 
   return (
-    <section class="pane document-surface">
+    // NOT `.pane`: this section's only mount point is inside DocumentOverFrame, which is already a
+    // `.pane` — so carrying the class too drew a second border, radius, shadow and background inside the
+    // first, and a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
+    <section class="document-surface">
       <Show when={error()}><Alert class="document-surface-error">{error()}</Alert></Show>
       <Show when={ready()}><div class="document-surface-host" ref={host} /></Show>
     </section>

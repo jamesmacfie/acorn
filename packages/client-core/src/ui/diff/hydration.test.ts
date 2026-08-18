@@ -2,7 +2,7 @@ import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
 import type { DiffFile } from './model'
 import { createDiffHydrator } from './hydration'
-import type { ParsedFile, TokenizeLine } from './model'
+import type { ParsedFile } from './model'
 
 const pullFile = (path: string, patch: string | null): DiffFile => ({
   path,
@@ -13,8 +13,6 @@ const pullFile = (path: string, patch: string | null): DiffFile => ({
   viewed: false,
   patch,
 })
-
-const plain: TokenizeLine = (_path, content) => [{ content, light: '', dark: '' }]
 
 const waitFor = async (assertion: () => void) => {
   let last: unknown
@@ -37,7 +35,6 @@ const makeHydrator = (parsed: ParsedFile[], overrides: Partial<HydratorOptions> 
   const hydrator = createRoot((dispose) => {
     disposeRoot = dispose
     return createDiffHydrator({
-      tokenizerForFile: async () => plain,
       parseFile: (file) => ({ file, diff: [] }),
       onParsed: (file) => parsed.push(file),
       ...overrides,

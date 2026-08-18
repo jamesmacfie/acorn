@@ -1,5 +1,5 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Button, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Row, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Row, SectionHeader, Toolbar } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import {
@@ -201,13 +201,15 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   return (
     <section class="db-frame">
-      <div class="section-header db-head">
-        <span>Database</span>
+      <SectionHeader
+        class="db-head"
+        actions={<Button size="sm" iconOnly title="Reconnect" aria-label="Reconnect" onClick={() => void connect()}>⟳</Button>}
+      >
+        Database
         <span class="db-status" classList={{ err: status() === 'error', ok: status() === 'connected' }}>
           {status() === 'connected' ? dbName() || 'connected' : status() === 'connecting' ? 'connecting…' : 'error'}
         </span>
-        <Button size="sm" iconOnly title="Reconnect" aria-label="Reconnect" onClick={() => void connect()}>⟳</Button>
-      </div>
+      </SectionHeader>
 
       <Show when={error()}>
         <Alert class="db-error">{error()}</Alert>
@@ -245,7 +247,6 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             label={loadedName() || 'Queries'}
             placeholder="Filter saved queries…"
             emptyText="No saved queries yet."
-            buttonClass="db-run-btn"
             results={matchSaved}
             // Notes are searchable, so show their first line to explain why a row matched.
             rowLabel={savedQueryLabel}
@@ -443,10 +444,9 @@ function RowDetail(props: {
 
   return (
     <aside class="db-detail">
-      <div class="db-detail-head">
-        <span>{props.insert ? `${props.table?.name ?? ''} · new row` : props.table ? `${props.table.name} · row` : 'Row'}</span>
-        <Button size="sm" iconOnly title="Close" aria-label="Close" onClick={props.onClose}>✕</Button>
-      </div>
+      <SectionHeader actions={<Button size="sm" iconOnly title="Close" aria-label="Close" onClick={props.onClose}>✕</Button>}>
+        {props.insert ? `${props.table?.name ?? ''} · new row` : props.table ? `${props.table.name} · row` : 'Row'}
+      </SectionHeader>
       <div class="db-detail-fields">
         <For each={props.columns}>
           {(col) => {

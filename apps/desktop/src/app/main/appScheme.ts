@@ -41,9 +41,40 @@ const CSP = [
   "form-action 'none'",
 ].join('; ')
 
+// THE ONE RESPONSE THAT GETS A DIFFERENT POLICY, and the reason is a fact about workers rather than
+// anything about acorn: a dedicated worker loaded from a same-origin URL takes its CSP from that
+// script's own response headers. It does NOT inherit the document's. So the syntax highlighter can
+// have `wasm-unsafe-eval` — which buys shiki's Oniguruma engine, measured at 4.6x the JavaScript one —
+// while the document above keeps the policy it has always had.
+//
+// Read the rest of this list before concluding it is a relaxation. The worker ends up with strictly
+// FEWER capabilities than the renderer it moved out of: no network, no DOM, no bridge to main, and
+// nothing fetchable at all. It takes strings and returns colours. `shiki/wasm` is the inlined build,
+// so even the WebAssembly arrives as part of the script rather than as a fetch — which is what lets
+// `connect-src 'none'` stand.
+//
+// Verified in Electron rather than assumed, three ways: the document still cannot instantiate WASM,
+// this worker can, and the identical bytes served with the document's header cannot.
+const WORKER_CSP = ["default-src 'none'", "script-src 'self' 'wasm-unsafe-eval'", "connect-src 'none'"].join('; ')
+
+// The build gives worker ENTRIES a `worker-` prefix (electron.vite.config.ts explains why), so this
+// matches the script that becomes a worker context and not the ~270-byte main-thread wrapper Vite also
+// emits from the same source module — which would otherwise share the name and pick up a policy it has
+// no business holding. Monaco's five workers are `worker-editor.worker-…` and friends: same prefix,
+// different name, no relaxation.
+//
+// Only a worker's TOP-LEVEL script response sets its policy. The grammar chunks this worker then
+// imports are governed by the worker's own `script-src 'self'`, so they need nothing here.
+//
+// If a bundler change ever renames the entry, this stops matching, the worker gets the document's
+// policy, Oniguruma fails inside it, and highlight/worker.ts logs and falls back to the main thread.
+// Degraded and loud, which is the failure mode this whole area was rebuilt to have.
+export const HIGHLIGHT_WORKER = /^\/assets\/worker-highlighter\.worker-[\w-]+\.js$/
+
 export function registerAppScheme(): void {
   protocol.handle('app', async (request) => {
-    const resolved = join(ROOT, decodeURIComponent(new URL(request.url).pathname))
+    const pathname = decodeURIComponent(new URL(request.url).pathname)
+    const resolved = join(ROOT, pathname)
     // Traversal guard. `join` normalizes, and Chromium normalizes a standard scheme's path before we
     // see it, but a percent-encoded `..` would arrive intact through decodeURIComponent — so this is
     // the check that keeps the handler from reading outside the bundled renderer.
@@ -59,7 +90,7 @@ export function registerAppScheme(): void {
     // Rebuilt rather than mutated: a fetch Response's headers are immutable. The body is still the
     // stream net.fetch handed us, so this does not buffer the file.
     const headers = new Headers(file.headers)
-    headers.set('content-security-policy', CSP)
+    headers.set('content-security-policy', HIGHLIGHT_WORKER.test(pathname) ? WORKER_CSP : CSP)
     return new Response(file.body, { status: file.status, statusText: file.statusText, headers })
   })
 }

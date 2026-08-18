@@ -2,9 +2,9 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from
 import { createQuery } from '@tanstack/solid-query'
 import { useParams, useSearchParams } from '@solidjs/router'
 import { compareOptions } from './queries'
-import { getHighlighter, projectsOptions } from '@acorn/plugin-api/client'
+import { projectsOptions } from '@acorn/plugin-api/client'
 import { DiffLine, EmptyState, NonCodeRow } from '@acorn/plugin-api/ui'
-import { buildDiffRows, buildRenderableRows, type CodeRow, createDiffHydrator, highlighterTokenize, isCodeRow, type ParsedFile, plainTokenize, type Row, type TokenizeLine } from '@acorn/plugin-api/ui/diff'
+import { buildDiffRowsAsync, buildRenderableRows, type CodeRow, createDiffHydrator, isCodeRow, type ParsedFile, type Row, tokenizeDocument } from '@acorn/plugin-api/ui/diff'
 
 // Right (Diff) pane in create mode: read-only base..head preview. Reuses the diff engine
 // (createDiffHydrator + buildRenderableRows + Shiki) and the row components, but with no review
@@ -31,14 +31,9 @@ export default function ComparePreview() {
   const compareFiles = () => compare.data?.files ?? []
 
   const [parsedByPath, setParsedByPath] = createSignal<Map<string, ParsedFile>>(new Map())
-  let tokenizerPromise: Promise<TokenizeLine> | null = null
-  const loadTokenizer = async () => {
-    return (tokenizerPromise ??= getHighlighter().then(highlighterTokenize).catch(() => plainTokenize))
-  }
 
   const hydrator = createDiffHydrator({
-    tokenizerForFile: () => loadTokenizer(),
-    parseFile: (file, tokenize) => ({ file, diff: buildDiffRows(file, tokenize) }),
+    parseFile: async (file) => ({ file, diff: await buildDiffRowsAsync(file, tokenizeDocument) }),
     onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
     cachedFile: (path) => compareFiles().find((file) => file.path === path) ?? null,
   })

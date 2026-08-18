@@ -294,9 +294,11 @@ ui/diff: GapRow
 ui/diff: ParsedFile
 ui/diff: Row
 ui/diff: SplitBand
+ui/diff: TokenizeDocument
 ui/diff: TokenizeLine
 ui/diff: ViewMode
 ui/diff: buildDiffRows
+ui/diff: buildDiffRowsAsync
 ui/diff: buildRenderableRows
 ui/diff: collectMatches
 ui/diff: createDiffHydrator
@@ -306,6 +308,7 @@ ui/diff: createSplitScrollSync
 ui/diff: estimateRowSize
 ui/diff: estimateSplitBandSize
 ui/diff: expandGap
+ui/diff: expandGapAsync
 ui/diff: gapId
 ui/diff: highlighterTokenize
 ui/diff: isCodeRow
@@ -315,6 +318,7 @@ ui/diff: rowIdentityKeys
 ui/diff: splitBandIdentityKeys
 ui/diff: synth
 ui/diff: toBands
+ui/diff: tokenizeDocument
 ui/editor: MONACO_THEME
 ui/editor: monacoLanguageForPath
 ui/editor: watchMonacoTheme
