@@ -49,6 +49,12 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
     writeFileSync(join(src, 'a.txt'), '3')
     git(src, 'add', '.')
     git(src, 'commit', '-q', '-m', 'three')
+    // A local 'origin' serving refs/pull/7/head at commit one, so the PR path can be exercised
+    // without a network. Fetched from the template copy, which outlives every test in this file.
+    const origin = join(template, 'origin')
+    execFileSync('git', ['clone', '-q', '--bare', src, origin])
+    git(origin, 'update-ref', 'refs/pull/7/head', mainSha)
+    git(src, 'remote', 'add', 'origin', origin)
   })
 
   afterAll(() => rmSync(template, { recursive: true, force: true }))
@@ -86,6 +92,21 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
     const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/x', null, 'origin/develop')
     expect(res.ok).toBe(true)
     if (res.ok) expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(developSha)
+  })
+
+  // The PR branch used to be created from FETCH_HEAD — a file in the repo's COMMON dir that every
+  // concurrent fetch rewrites, so the branch could be born at another PR's head: right name, clean
+  // status, no diff, another task's tree. Asserting the private per-PR ref is what keeps it out.
+  it('creates a PR branch from a private per-PR ref, not FETCH_HEAD', async () => {
+    // A decoy FETCH_HEAD: whatever it says must not reach the new branch.
+    writeFileSync(join(checkout, '.git', 'FETCH_HEAD'), `${developSha}\t\t'refs/pull/999/head' of nowhere\n`)
+
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/pr-7', 7)
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(mainSha)
+    expect(git(res.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('feat/pr-7')
+    expect(git(checkout, 'rev-parse', 'refs/acorn/pull/7').trim()).toBe(mainSha)
   })
 
   it('reuses an existing branch untouched (no base-ref rewrite)', async () => {
