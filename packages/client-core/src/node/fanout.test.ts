@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { clientFor, refreshFleet, _resetFleet } from './fleet'
-import { fetchFleet } from './fanout'
+import { cachedFleet, fetchFleet } from './fanout'
 
 // The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed page"
 // (docs/architecture-overview.md § Fleet semantics) true once instead of four times. These cases are the three
@@ -146,5 +146,35 @@ describe('fetchFleet', () => {
     installFleet([], [])
     await refreshFleet()
     expect(await fetchFleet(KEY, () => Promise.reject(new Error('never called')))).toEqual({ rows: [], unavailable: [] })
+  })
+})
+
+// What a fleet surface draws on the tick it mounts. The remount case: navigating away and back drops
+// the resource but not the per-node QueryClient, so there is a real list to show while it revalidates
+// instead of "Loading…" on every return.
+describe('cachedFleet', () => {
+  it('serves each node\'s last answer, badged refreshing', () => {
+    clientFor('a').client.setQueryData(KEY, 'remembered-a')
+    clientFor('b').client.setQueryData(KEY, 'remembered-b')
+    expect(cachedFleet(KEY).rows.map((row) => [row.nodeId, row.data, row.freshness])).toEqual([
+      ['a', 'remembered-a', 'refreshing'],
+      ['b', 'remembered-b', 'refreshing'],
+    ])
+  })
+
+  it('skips a node with nothing cached rather than inventing a row', () => {
+    clientFor('b').client.setQueryData(KEY, 'remembered-b')
+    expect(cachedFleet(KEY).rows.map((row) => row.nodeId)).toEqual(['b'])
+    expect(cachedFleet(KEY).unavailable).toEqual([])
+  })
+
+  it('is empty when nothing is cached', () => {
+    expect(cachedFleet(KEY)).toEqual({ rows: [], unavailable: [] })
+  })
+
+  it('honours the node subset, so one surface does not seed from a node it never asks', () => {
+    clientFor('a').client.setQueryData(KEY, 'remembered-a')
+    clientFor('b').client.setQueryData(KEY, 'remembered-b')
+    expect(cachedFleet(KEY, { nodeIds: ['b'] }).rows.map((row) => row.nodeId)).toEqual(['b'])
   })
 })

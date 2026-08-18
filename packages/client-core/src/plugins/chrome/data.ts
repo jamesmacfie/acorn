@@ -104,8 +104,11 @@ export function unwatchChrome(): void {
 // Private to chrome. The fan-out writes through the node's QueryClient (node/fanout.ts states the
 // rule), so a key shared with a domain reader would have to share its value shape; nothing else in
 // the app has this shape. `nodeId` is absent on purpose — the cache is already partitioned per node.
-export const chromeKey = (pluginId: string, contributionId: string): readonly unknown[] =>
-  ['plugin-chrome', pluginId, contributionId]
+// `scope` is whatever else went INTO the path — today only the rail's project, which
+// `scopedSourceItemsPath` appends. It has to be in the key because the cache is served on mount now: a
+// key that names only the source would hand the next project the previous project's rows.
+export const chromeKey = (pluginId: string, contributionId: string, scope?: string): readonly unknown[] =>
+  scope ? ['plugin-chrome', pluginId, contributionId, scope] : ['plugin-chrome', pluginId, contributionId]
 
 /** Add the shell's active project without letting a plugin choose another node or namespace. Extra
  * query parameters are advisory scope; plugins that are not project-aware simply ignore them. */

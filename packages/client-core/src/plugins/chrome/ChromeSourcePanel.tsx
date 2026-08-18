@@ -73,15 +73,20 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   // The fan-out rather than a bare resource, pinned to one node: it is the only reader in the codebase
   // that already has a per-node deadline, a cache fallback and the live/stale/offline vocabulary. An
   // offline node shows the list it last had, badged stale, exactly like every native surface.
+  //
+  // The project rides in the DEP rather than being read from `params` inside the fetch, so it reaches
+  // the cache key as well as the path. Both halves of the pair have to agree on scope now that the
+  // fan-out serves its last answer on mount.
+  const scope = () => ({ revision: chromeRevision(), projectId: params.projectId })
   const [result] = createFleetQuery(
-    () => chromeKey(props.pluginId, props.descriptor.id),
-    (node, _revision, signal) => readRailItems(
+    ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
+    (node, { projectId }, signal) => readRailItems(
       props.pluginId,
-      scopedSourceItemsPath(props.descriptor.items, params.projectId),
+      scopedSourceItemsPath(props.descriptor.items, projectId),
       node,
       signal,
     ),
-    chromeRevision,
+    scope,
     { nodeIds: [nodeId] },
   )
 
