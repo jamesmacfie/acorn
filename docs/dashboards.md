@@ -121,7 +121,11 @@ ctx.collections.register({
   collectionId: PULLS_COLLECTION_ID,
   name: 'My pull requests',
   schema: pullsCollectionSchema,
-  params: [{ id: 'repo', name: 'Repository', type: 'text' }],
+  params: [
+    { id: 'repo', name: 'Repository', type: 'enum' },
+    { id: 'involves', name: 'Involving me', type: 'enum', multiple: true, values: ['review-requested', 'assigned', 'authored'] },
+  ],
+  paramOptions: async (paramId, nodeId) => /* the repositories THIS device has mirrored */,
   refresh: 60,
   fetch: async (nodeId, params, signal) => { /* … */ },
 })
@@ -137,6 +141,27 @@ pixel-identical to a first-party one's under every appearance pack.
 param in the panel editor and hands the value back opaquely. The plugin owns what `repo` means, and
 the day it means something else the host does not change. Deliberately not the field vocabulary
 above: a param is an input, not a rendered cell.
+
+Opaque is load-bearing rather than fastidious, and github's second param is the demonstration: unset,
+`involves` serves a select over the PR mirror; set, the same route answers the same columns from a
+GitHub search, because "assigned to me" has no answer in the mirror at all
+([data-layer.md](./data-layer.md#collections-a-projection-never-a-second-store)). The host renders the
+control either way and knows about neither. An enum param's values are ids, shown as typed — so they are
+worth writing as words a person would recognise in a select.
+
+Two shapes past a plain select, and each exists because a param had a question the other could not put:
+
+- **`multiple: true`** on an enum renders checkboxes and hands the ticked ids back as one
+  comma-joined string. "Assigned to me *or* waiting on my review" is one question a person asks, and
+  github answers it by running one search per tick and unioning them — GitHub's own qualifiers only AND.
+  A second param *type* would have been the other spelling and is worse: every reader would then have
+  two enum shapes to branch on, where this way a plugin ignoring the flag still gets a string it can
+  read.
+- **`paramOptions`** resolves a param's choices on the device, for the case no static declaration can
+  cover: github's `repo` is the repositories *this* user mirrored. Compiled plugins only, and
+  deliberately — the loaded-plugin equivalent is a second descriptor route to define, parse and cache,
+  for a case no manifest plugin has yet. The function's shape is what that route would answer with, so
+  the day one exists the synthesiser fills the same field and nothing downstream changes.
 
 ### Self-describing responses, and the cold case
 
@@ -185,6 +210,19 @@ A row's optional `action` takes the manifest's **context-free** verb set — `op
 chrome dispatcher, so a click can do exactly what a command can do and nothing more. Not the full
 chrome-action union: a panel row has no rail row to promote and no routed project to substitute, so
 `createTask` and `navigate` would parse and then do nothing.
+
+A row may also name the **task its thing lives in**, as `taskId`. That is what makes `openPane` usable
+from a dashboard at all: a panel is drawn outside every task, so the verb used to have only the task
+that happened to be on screen — never the one the row is about. With a task named, the dispatcher
+activates it, navigates there, and opens the pane on arrival with the row's id as the retained
+selection intent; a task this node does not have is refused at the click rather than opening the pane
+somewhere else. The agents plugin's session rows are the proving case: clicking one lands in that
+session's own task with that session selected, and the pane learns *which* session from the same
+`plugin:select` intent a rail row's click carries.
+
+Naming a task is not the same as naming a source. Provenance is stamped by the host precisely so a row
+cannot wear a stranger's badge; a task is a core object the host resolves itself, and
+`PluginAttentionWireItem.taskId` is the same field one tier up.
 
 An action may declare a **risk tier** — `read`, `write` or `execute`, the `ToolRisk` vocabulary an
 agent tool already uses. Anything above `read` is armed: the host draws a confirmation strip naming
@@ -592,8 +630,12 @@ per-tab verbs (rename, move left/right, armed delete) live in a small overflow o
 on the context menu of any tab. Deleting is armed and says what survives: panels stay in the library
 and on other tabs. The **first extra dashboard is created from the wizard's Place step**, whose
 Dashboard picker always offers "New dashboard…" — the bar's `+` cannot be the only door when the bar
-is what one dashboard does not have. A panel moves between tabs through **"Move to…"** in its own
-overflow menu, keeping its definition and taking a fresh rect at the destination.
+is what one dashboard does not have. Picking it reveals a name field under the picker, for the same
+reason the bar's `+` drops into a rename: a dashboard called "New dashboard" forever is what happens
+when naming it is a second trip. Empty falls back to the unique default, so it stays an option rather
+than a step, and nothing is written until the last step commits either way. A panel moves between tabs
+through **"Move to…"** in its own overflow menu, keeping its definition and taking a fresh rect at the
+destination.
 
 **Which tab you are reading is device view-state**, the `core.home-tab` slice beside `core.last-source`
 in the device-pref list. The composition belongs to the node and is shared by every client paired with

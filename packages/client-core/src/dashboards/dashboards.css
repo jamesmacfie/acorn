@@ -281,8 +281,15 @@
 
 /* Fills its rect. Before geometry existed a panel was content-sized and the grid row followed it;
    now the row is `h` square cells tall and the panel fills it, which is what gives the body
-   something to scroll inside. In the collapsed one-column state the row is auto and this is inert. */
-.dash-panel {
+   something to scroll inside. In the collapsed one-column state the row is auto and this is inert.
+
+   Compound with .ui-card, for the same reason as .dash-wizard above and with more at stake: Card
+   merges this class onto its own element (ui/primitives.tsx § Card), and the two rules disagree
+   about `display` — block against flex. A tie leaves the winner to chunk order, and when the
+   primitive wins the panel is a BLOCK: the body stops being a flex item, its `flex: 1`/`min-height`
+   go inert, its height goes content-driven and `overflow: auto` on an auto-height box never
+   scrolls. A 500-row table then spills past the card's border instead of scrolling inside it. */
+.ui-card.dash-panel {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
@@ -395,11 +402,16 @@
 
 /* Picker's trigger is sized for the topbar, where it sits beside other chrome and is capped. As a
    form control it is one of several stacked fields, so it takes the field's width like the rest —
-   a 300px button above a full-width input reads as a mistake. */
-.dash-add-picker .repo-picker-button {
+   a 300px button above a full-width input reads as a mistake. Same for a param's picker, which sits in
+   the split field's control column beside inputs that fill it. */
+.dash-add-picker .repo-picker-button,
+.dash-param-picker .repo-picker-button {
   width: 100%;
   max-width: 100%;
 }
+/* Picker renders its own relatively-positioned root, so the wrapper has to pass the width through. */
+.dash-param-picker,
+.dash-param-picker > .repo-picker { display: block; min-width: 0; }
 
 /* One filter, one sort key: controls that read left to right as a sentence. They wrap rather than
    scroll, because a filter row narrowed to a phone is still three choices and hiding one of them
@@ -412,6 +424,38 @@
   gap: var(--gap-inline);
   min-width: 0;
 }
+
+/* A STACK OF SPLIT FIELDS — the field-mapping matrix, a source's params, the status-value columns. The
+   rows themselves align by `.ui-field[data-layout='split']`; what this adds is the breathing room
+   between them, which they had none of: sixteen selects at zero gap read as one control with a
+   texture. */
+.dash-editor-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* One param, several answers at once (selectors.tsx § ParamInput). A COLUMN, so every box sits on the
+   same left edge and the tick targets form one scannable run — laid out in a row they wrapped wherever
+   the words ran out, which put the second line's boxes under the first line's labels. */
+.dash-param-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* …and the caption goes to the TOP of that column rather than to its middle, level with the first box.
+   Only where the control is a stack of them: an ordinary split field is one control on one line, where
+   centred is right. */
+.ui-field[data-layout='split']:has(> .dash-param-choices) { align-items: start; }
+
+/* The box centred on ITS OWN line rather than flush with the line's top. `.ui-check` aligns to the top
+   because it has to carry a hint underneath; a choice here is one line of the same type as the caption
+   beside it, so both line boxes are the same height and start at the same y — centre the square in
+   that line and the first choice reads exactly level with the caption. */
+.dash-param-choices > .ui-check { align-items: center; }
 
 /* Two labelled fields abreast. `start`, not `center`: a hint that wraps to two lines under one of
    them must not shift the other one's control. */
@@ -432,6 +476,9 @@
 .dash-editor-sources {
   display: flex;
   flex-direction: column;
+  /* Two sources at zero gap read as one wrapped line rather than as two things, each with its own
+     remove button. */
+  gap: var(--space-2);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -449,9 +496,19 @@
   font-size: var(--fs-sm);
 }
 
+/* Anything a `<details>` holds, which lays its children out in plain block flow — so a fold full of
+   carefully spaced rows still stacks at zero gap without this. Same gap as the form around it. */
+.dash-editor-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+}
+
 .dash-editor-fields {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -558,11 +615,16 @@
   font-weight: var(--fw-medium);
 }
 
+/* Full height, and it stretches rather than sizing itself: the grid row is as tall as the step body, so
+   the preview matches whatever step you are on. `align-self` on this one item, not `align-items` on the
+   grid — the rail and the body still size to their content. */
 .dash-wizard-preview {
   display: flex;
   flex-direction: column;
+  align-self: stretch;
   gap: var(--space-2);
   min-width: 0;
+  min-height: 0;
 }
 
 /* A FIXED SLOT. The preview is the real panel at a plausible size, not a thumbnail — and a slot that
@@ -571,6 +633,15 @@
   display: flex;
   min-width: 0;
   height: 14rem;
+}
+
+/* In the wizard it fills the column instead, which is not the same thing as growing with its rows: the
+   height comes from the step body beside it, so a keystroke in the form still cannot resize the dialog.
+   The fixed height stays the FLOOR, for the short steps. */
+.dash-wizard-preview .dash-preview {
+  flex: 1;
+  height: auto;
+  min-height: 14rem;
 }
 .dash-preview > .dash-panel {
   flex: 1;
@@ -599,6 +670,10 @@
   gap: var(--space-3);
   min-width: 0;
 }
+
+/* The empty state is a SENTENCE, not a card: left in a 13rem cell it wraps to three words a line beside
+   an acre of nothing. */
+.dash-gallery > .dash-editor-note { grid-column: 1 / -1; }
 
 /* The field vocabulary, visible before a single row has arrived — the thing the old add form could
    not show. Wraps and then stops: a card is a glance, and a 24-field schema must not make one tall. */
@@ -694,7 +769,9 @@
   color: var(--text-muted);
 }
 
-.dash-card {
+/* Also a Card, so also compounded with .ui-card — same `display` tie as .dash-panel, and here it
+   costs the card its stacking. */
+.ui-card.dash-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -805,9 +882,12 @@
   stroke: var(--border-strong);
 }
 
+/* No `font-size` here on purpose. Inside the chart's scaled viewBox a CSS length is a USER unit, so a
+   token size scales with the drawing — at `--fs-2xs` the ticks rendered around 28px on a large panel.
+   The size is geometry and comes off the frame as an SVG attribute (dashboards/chart.ts § TICK_FONT);
+   colour and figure style stay here, where the appearance pack owns them. */
 .dash-chart-tick {
   fill: var(--text-muted);
-  font-size: var(--fs-2xs);
   font-variant-numeric: var(--tabular);
 }
 

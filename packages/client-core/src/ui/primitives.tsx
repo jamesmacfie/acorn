@@ -100,22 +100,45 @@ export function Textarea(props: ComponentProps<'textarea'> & ControlOwn & { mono
   return <textarea {...rest} {...controlAttrs(own)} data-mono={own.mono ? '' : undefined} />
 }
 
-/** Label + control + optional hint/error. Replaces `.settings-field` / `.settings-label`. */
+/** Label + control + optional hint/error. Replaces `.settings-field` / `.settings-label`.
+ *
+ *  `group` is for the case a `<label>` cannot hold: SEVERAL controls under one caption, each with a
+ *  label of its own (a row of checkboxes). Nested labels are invalid, and the browser's repair is to
+ *  point the outer one at the first control — so clicking the caption toggles the first checkbox, which
+ *  is a click nobody meant. `role="group"` with the same caption as its accessible name says the true
+ *  thing and stays keyboard- and screen-reader-correct. */
 export function Field(props: {
   label?: string
   hint?: string
   error?: string
-  layout?: 'stack' | 'row'
+  /** `stack` is label over control. `row` is label then control, sized to content — an inline chip in a
+   *  strip of them. `split` is label LEFT and control at a fixed column RIGHT, which is the one to reach
+   *  for in a stack of fields: the control column is the same width for every sibling, so they line up
+   *  on both edges instead of each starting wherever its label happened to end. */
+  layout?: 'stack' | 'row' | 'split'
+  group?: boolean
   class?: string
   children: JSX.Element
 }) {
-  return (
-    <label class={cx('ui-field', props.class)} data-layout={props.layout ?? 'stack'}>
+  const inner = (
+    <>
       <Show when={props.label}><span class="ui-field-label">{props.label}</span></Show>
       {props.children}
       <Show when={props.hint}><span class="ui-field-hint">{props.hint}</span></Show>
       <Show when={props.error}><span class="ui-field-error" role="alert">{props.error}</span></Show>
-    </label>
+    </>
+  )
+  return (
+    <Show
+      when={props.group}
+      fallback={(
+        <label class={cx('ui-field', props.class)} data-layout={props.layout ?? 'stack'}>{inner}</label>
+      )}
+    >
+      <div class={cx('ui-field', props.class)} data-layout={props.layout ?? 'stack'} role="group" aria-label={props.label}>
+        {inner}
+      </div>
+    </Show>
   )
 }
 

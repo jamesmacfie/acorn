@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { langFor } from './shiki'
+import { getHighlighter, langFor } from './shiki'
 
 describe('langFor', () => {
   it('maps known extensions to their shiki language id', () => {
@@ -31,5 +31,22 @@ describe('langFor', () => {
     expect(langFor('notes.xyz')).toBe('text')
     expect(langFor('Makefile')).toBe('text') // no dot → no extension
     expect(langFor('')).toBe('text')
+  })
+})
+
+// The engine, not the mapping. Nothing here can see the renderer's CSP — node runs WebAssembly
+// happily, which is exactly why the Oniguruma failure was invisible until it reached a window — so
+// what this pins is the half a test CAN see: every grammar this build bundles loads under the engine
+// this build chose, and colour comes out the far end.
+describe('the highlighter itself', () => {
+  it('builds and tokenizes with colour', async () => {
+    const highlighter = await getHighlighter()
+    // `codeToTokensWithThemes`, because that is the call the diff renderer makes (ui/diff/model.ts):
+    // both themes at once, one token list, a colour per side.
+    const [line] = highlighter.codeToTokensWithThemes('export const a: number = 1', {
+      lang: 'typescript',
+      themes: { light: 'github-light', dark: 'github-dark' },
+    })
+    expect((line ?? []).some((token) => token.variants.light.color && token.variants.dark.color)).toBe(true)
   })
 })

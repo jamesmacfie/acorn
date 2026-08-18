@@ -10,7 +10,7 @@ export const coreSourceContributions: SourceContribution[] = [
   {
     id: 'home',
     order: 0,
-    glyph: 'home',
+    glyph: 'house',
     label: 'Home',
     isDefault: true,
     component: Home,

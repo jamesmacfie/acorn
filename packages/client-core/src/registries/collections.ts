@@ -27,6 +27,15 @@ export type CollectionContribution = {
   name: string
   // Declared inputs, passed back to `fetch` opaquely. The plugin owns their meaning.
   params?: PluginCollectionParam[]
+  // A param whose choices only exist on the device: github's `repo` is the repositories THIS user has,
+  // which no static declaration can name. Absent, or answering empty, leaves the param as its declared
+  // form — a text box, or a select over its declared values.
+  //
+  // Compiled feeder only, and deliberately: the loaded-plugin equivalent is a second descriptor route
+  // for the host to read, which is a wire format, a parse and a cache for a case no manifest plugin has
+  // yet. The shape here is the one that route would answer with, so the day one exists the synthesiser
+  // fills this same function and nothing downstream changes.
+  paramOptions?(paramId: string, nodeId: string): Promise<readonly { id: string; label: string }[]>
   // The static promise about what `fetch` returns, for an editor with no data yet. Absent means
   // response-only: the answer describes itself and nothing can be offered before the first read.
   schema?: PluginCollectionSchema

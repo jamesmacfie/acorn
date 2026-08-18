@@ -113,6 +113,27 @@ export const estimateRowSize = (row: Row | undefined) => {
   return DIFF_LINE_HEIGHT
 }
 
+// Widest code line, in columns. Code lines do not soft-wrap, so this is what the row canvas has to
+// be wide enough to hold — and it has to be computed from the DATA, not from layout: only the rows
+// inside the virtual window have boxes, so a `max-content` width would change every time you
+// scrolled and take the horizontal scroll position with it.
+//
+// The font is monospace, so a column is exactly 1ch and no measurement is needed. A tab advances to
+// the next multiple of TAB_COLUMNS rather than counting as one, matching CSS `tab-size`'s default —
+// counting it as one character under-measures indented code, and under-measuring is the failure
+// that clips a line.
+const TAB_COLUMNS = 8
+export const maxLineCols = (rows: readonly Row[]) => {
+  let widest = 0
+  for (const row of rows) {
+    if (!isCodeRow(row)) continue
+    let cols = 0
+    for (const ch of row.raw) cols = ch === '\t' ? (Math.floor(cols / TAB_COLUMNS) + 1) * TAB_COLUMNS : cols + 1
+    if (cols > widest) widest = cols
+  }
+  return widest
+}
+
 export const estimateSplitBandSize = (band: SplitBand | undefined) => {
   if (!band) return DIFF_LINE_HEIGHT
   if (band.kind === 'full') return estimateRowSize(band.row)

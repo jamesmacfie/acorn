@@ -11,6 +11,7 @@ import {
   defaultChartAxis,
   defaultChartView,
   niceTicks,
+  TICK_FONT,
 } from './chart'
 import { viewsForSchema } from './model'
 
@@ -81,8 +82,13 @@ describe('type-inferred defaults', () => {
     expect(defaultChartAxis(schema(status, other), 'bar', { groupBy: 'kind' })).toBe('kind')
   })
 
-  it('measures the first number when there is one, and counts rows when there is not', () => {
-    expect(defaultChartView(schema(status, size), {})).toMatchObject({ aggregate: 'sum', field: 'size' })
+  it('always counts rows, and never pre-picks a number field to sum', () => {
+    // The field vocabulary cannot tell a QUANTITY from an IDENTIFIER — `number` covers a size in MB and
+    // github's pull request number alike — so summing "the first number there is" opened the PR panel
+    // on the sum of PR numbers, an axis reaching 200,000 that meant nothing. A count always means
+    // something, and the sum is one select away.
+    expect(defaultChartView(schema(status, size), {})).toMatchObject({ aggregate: 'count' })
+    expect(defaultChartView(schema(status, size), {}).field).toBeUndefined()
     expect(defaultChartView(schema(status), {})).toMatchObject({ aggregate: 'count' })
   })
 
@@ -168,11 +174,13 @@ describe('bar charts', () => {
   it('keeps every bar inside the plot area', () => {
     const plot = buildChart(rows, schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
+    // Against the plot's OWN frame, not a module constant: the left gutter is as wide as this chart's
+    // labels needed, so a bounds check against a fixed number would pass for the wrong reason.
     for (const bar of plot.bars) {
-      expect(bar.x).toBeGreaterThanOrEqual(CHART_FRAME.plotLeft)
-      expect(bar.x + bar.w).toBeLessThanOrEqual(CHART_FRAME.plotLeft + CHART_FRAME.plotWidth + 0.001)
-      expect(bar.y).toBeGreaterThanOrEqual(CHART_FRAME.plotTop - 0.001)
-      expect(bar.y + bar.h).toBeLessThanOrEqual(CHART_FRAME.baseline + 0.001)
+      expect(bar.x).toBeGreaterThanOrEqual(plot.frame.plotLeft)
+      expect(bar.x + bar.w).toBeLessThanOrEqual(plot.frame.plotLeft + plot.frame.plotWidth + 0.001)
+      expect(bar.y).toBeGreaterThanOrEqual(plot.frame.plotTop - 0.001)
+      expect(bar.y + bar.h).toBeLessThanOrEqual(plot.frame.baseline + 0.001)
     }
   })
 
@@ -381,7 +389,7 @@ describe('line charts', () => {
     const plot = buildChart([row('1', { updated: day(4) })], schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines[0].path).toBe('')
-    expect(plot.lines[0].points[0].x).toBe(CHART_FRAME.plotLeft + CHART_FRAME.plotWidth / 2)
+    expect(plot.lines[0].points[0].x).toBe(plot.frame.plotLeft + plot.frame.plotWidth / 2)
   })
 
   it('ignores a row whose time cell is missing or unparseable', () => {
@@ -403,10 +411,105 @@ describe('line charts', () => {
     const plot = buildChart(rows, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated', aggregate: 'max', field: 'size' }, {})
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     for (const point of plot.lines[0].points) {
-      expect(point.x).toBeGreaterThanOrEqual(CHART_FRAME.plotLeft - 0.001)
-      expect(point.x).toBeLessThanOrEqual(CHART_FRAME.plotLeft + CHART_FRAME.plotWidth + 0.001)
-      expect(point.y).toBeGreaterThanOrEqual(CHART_FRAME.plotTop - 0.001)
-      expect(point.y).toBeLessThanOrEqual(CHART_FRAME.baseline + 0.001)
+      expect(point.x).toBeGreaterThanOrEqual(plot.frame.plotLeft - 0.001)
+      expect(point.x).toBeLessThanOrEqual(plot.frame.plotLeft + plot.frame.plotWidth + 0.001)
+      expect(point.y).toBeGreaterThanOrEqual(plot.frame.plotTop - 0.001)
+      expect(point.y).toBeLessThanOrEqual(plot.frame.baseline + 0.001)
+    }
+  })
+})
+
+describe('a day with no rows', () => {
+  const day = (n: number) => n * DAY + 3_600_000
+  const gappy = [row('1', { updated: day(1), size: 4 }), row('2', { updated: day(3), size: 6 })]
+  const vertices = (path: string) => path.split(/[ML]/).filter(Boolean).length
+
+  it('is a zero on the path, not a straight line across the gap', () => {
+    const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    // Three days in the span, three vertices — the middle one on the floor. Joining day 1 straight to
+    // day 3 drew "steady at 1" across a day on which nothing happened.
+    expect(vertices(plot.lines[0].path)).toBe(3)
+    const middle = plot.lines[0].path.split(/[ML]/).filter(Boolean)[1]
+    expect(Number(middle.trim().split(' ')[1])).toBeCloseTo(plot.frame.baseline, 6)
+  })
+
+  it('gets no dot, so the tooltips stay on the days that have something to say', () => {
+    const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    expect(plot.lines[0].points).toHaveLength(2)
+  })
+
+  it('is filled for a sum as well as a count — both are additive', () => {
+    const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated', aggregate: 'sum', field: 'size' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    expect(vertices(plot.lines[0].path)).toBe(3)
+  })
+
+  it('stays a gap for an average, a minimum or a maximum, which are undefined over no rows', () => {
+    for (const aggregate of ['avg', 'min', 'max'] as const) {
+      const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated', aggregate, field: 'size' }, {})
+      if (plot?.shape !== 'line') throw new Error('expected a line chart')
+      // Two real days, two vertices. A filled zero here would draw a dip to the floor that no row says
+      // happened — "the average size on a day with no rows" has no answer, and 0 is not it.
+      expect(vertices(plot.lines[0].path)).toBe(2)
+    }
+  })
+
+  it('does not resurrect a declared series that has no rows at all', () => {
+    // `merged` is a declared column `boardColumns` keeps, and filling every day of it would draw a flat
+    // line along zero for a series nothing is in.
+    const rows = [row('1', { updated: day(1), state: 'open' }), row('2', { updated: day(3), state: 'open' })]
+    const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    expect(plot.lines.map((line) => line.label)).toEqual(['Open'])
+  })
+
+  it('leaves a very wide span alone rather than filling more days than the box can draw', () => {
+    const wide = [row('1', { updated: day(1) }), row('2', { updated: day(900) })]
+    const plot = buildChart(wide, schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    expect(vertices(plot.lines[0].path)).toBe(2)
+  })
+})
+
+describe('the axis gutter', () => {
+  const day = (n: number) => n * DAY + 3_600_000
+
+  it('widens for the labels it actually has, so a big number is not sliced off at the edge', () => {
+    const small = buildChart([row('1', { state: 'open', size: 2 })], schema(status, size), { kind: 'chart', shape: 'bar', x: 'state' }, {})
+    const big = buildChart(
+      Array.from({ length: 40 }, (_, index) => row(String(index), { state: 'open', size: 20_000 })),
+      schema(status, size),
+      { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' },
+      {},
+    )
+    if (!small || !big) throw new Error('expected two charts')
+    expect(big.frame.plotLeft).toBeGreaterThan(small.frame.plotLeft)
+    // Whatever the labels, the widest of them fits in the gutter it asked for.
+    for (const plot of [small, big]) {
+      const widest = Math.max(...plot.yTicks.map((tick) => tick.label.length))
+      expect(widest * TICK_FONT * 0.62).toBeLessThanOrEqual(plot.frame.plotLeft)
+    }
+  })
+
+  it('never squeezes the plot away, however long a field formats its labels', () => {
+    const plot = buildChart([row('1', { state: 'open', size: 987_654_321 })], schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
+    if (!plot) throw new Error('expected a chart')
+    expect(plot.frame.plotWidth).toBeGreaterThan(CHART_FRAME.width / 2)
+  })
+
+  it('anchors an end label inward rather than letting half of it hang outside the box', () => {
+    // The last tick sits on the last gridline, a few units from the right edge — centred, "Aug 18" lost
+    // its second digit off the side of the SVG.
+    const rows = [row('1', { updated: day(1) }), row('2', { updated: day(40) })]
+    const plot = buildChart(rows, schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    if (plot?.shape !== 'line') throw new Error('expected a line chart')
+    expect(plot.xTicks.slice(-1)[0].anchor).toBe('end')
+    for (const tick of plot.xTicks) {
+      const half = (tick.label.length * TICK_FONT * 0.62) / 2
+      const right = tick.anchor === 'end' ? tick.at : tick.anchor === 'start' ? tick.at + half * 2 : tick.at + half
+      expect(right).toBeLessThanOrEqual(CHART_FRAME.width + 0.001)
     }
   })
 })

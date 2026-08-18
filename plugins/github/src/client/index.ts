@@ -1,7 +1,8 @@
 import { lazy } from 'solid-js'
 import { type ClientPlugin, contentLinkRegistry, readJson, setSelectedSource } from '@acorn/plugin-api/client'
 import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
-import { PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
+import { reposRoute } from '../contract/api'
+import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
 import { pullRefMatchesTask } from '../contract/pullRef'
 import { prFiltersSlice } from './pullList/filterSlice'
 import { prPaneContribution } from './pullDetail/PrPane'
@@ -74,11 +75,32 @@ export const githubClientPlugin: ClientPlugin = {
       collectionId: PULLS_COLLECTION_ID,
       name: 'My pull requests',
       schema: pullsCollectionSchema,
-      params: [{ id: 'repo', name: 'Repository', type: 'text' }],
+      params: [
+        // `enum` with no declared values, because the values are this user's repositories and no static
+        // declaration can name them — `paramOptions` below fills them on the device.
+        { id: 'repo', name: 'Repository', type: 'enum' },
+        // Unset is "every open PR in every mirrored repo" — the collection's original answer, and still
+        // the default. Setting it hands the same columns from a GitHub search instead, which is the only
+        // place two of the three answers exist (contract/collections.ts § involvement). `multiple`,
+        // because "assigned to me or waiting on my review" is one question a person asks.
+        { id: 'involves', name: 'Involving me', type: 'enum', multiple: true, values: [...PULL_INVOLVEMENT] },
+      ],
+      // The repositories this user has mirrored, which is also exactly the set the mirror path can match.
+      // The repo picker's own route and cache; no new endpoint, and no refresh of its own — a panel editor
+      // open long enough for the list to go stale is not a case worth a poll.
+      paramOptions: async (paramId, nodeId) => {
+        if (paramId !== 'repo') return []
+        const repos = await readJson<{ owner: string; name: string }[]>(reposRoute, { nodeId })
+        return repos
+          .map((repo) => ({ id: `${repo.owner}/${repo.name}`, label: `${repo.owner}/${repo.name}` }))
+          .sort((a, b) => a.label.localeCompare(b.label))
+      },
       refresh: 60,
       fetch: async (nodeId, params, signal) => {
-        const query = params.repo ? `?repo=${encodeURIComponent(params.repo)}` : ''
-        const body = await readJson<PluginCollectionResponse>(`${pullsCollectionRoute}${query}`, { nodeId, signal })
+        const query = new URLSearchParams(
+          Object.entries({ repo: params.repo, involves: params.involves }).filter(([, value]) => !!value) as [string, string][],
+        ).toString()
+        const body = await readJson<PluginCollectionResponse>(`${pullsCollectionRoute}${query ? `?${query}` : ''}`, { nodeId, signal })
         return {
           schema: body.schema,
           rows: body.rows.map((row) => ({ ...row, pluginId: 'github', collectionId: PULLS_COLLECTION_ID })),

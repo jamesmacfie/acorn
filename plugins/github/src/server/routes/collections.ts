@@ -1,8 +1,16 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { type AppEnv, ownerId, type PluginDatabase } from '@acorn/plugin-api/node'
+import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { MAX_COLLECTION_ROWS, type PluginCollectionResponse } from '@acorn/protocol/collections.ts'
-import { PULLS_COLLECTION_ID, pullsCollectionPage } from '../../contract/collections'
+import { ghGraphQL, ghGraphQLResult } from '..'
+import { githubToken } from '../githubToken'
+import {
+  parsePullInvolvement,
+  type PullCollectionSource,
+  PULLS_COLLECTION_ID,
+  pullsCollectionPage,
+  pullsSearchQuery,
+} from '../../contract/collections'
 import { pullRequests, repos } from '../../node/schema'
 
 // The collection half of the PR mirror (@acorn/protocol/collections.ts). One route, one question: the
@@ -20,11 +28,107 @@ import { pullRequests, repos } from '../../node/schema'
 // list was opened for that repo. The upgrade, when a dashboard is somebody's home page rather than a
 // second view of a list they already have open, is a single cross-repo refresh through the engine —
 // `resource: 'pulls:mine'`, one GitHub search query, one TTL — not one revalidate per repository.
+// The GitHub side of the `involves` param. One search, whatever the repository count — which is why it
+// is allowed to spend a request where the mirror read above is not: the objection to refreshing here
+// was N repos × one poll, and this is 1. It is the single cross-repo query the comment above names as
+// the upgrade path, arriving early because a mirror-side answer to "asked me to review" would be wrong
+// rather than merely stale.
+//
+// The selection set is deliberately the mirror's list columns and no more — PR_FRAGMENT exists for a
+// PR someone has open in front of them, and pulling its reviews, threads and commits for fifty rows
+// nobody has clicked would cost a rate limit to render columns this collection does not declare.
+const SEARCH_QUERY = `
+query PullsInvolvingMe($q: String!, $first: Int!) {
+  search(query: $q, type: ISSUE, first: $first) {
+    nodes {
+      ... on PullRequest {
+        number title isDraft updatedAt mergeable mergeStateStatus
+        author { login }
+        autoMergeRequest { mergeMethod }
+        repository { name owner { login } }
+      }
+    }
+  }
+}`
+
+// GitHub caps a search page at 100 regardless of what we ask for, so this is GitHub's number, not ours
+// (MAX_COLLECTION_ROWS is five times higher and a panel is a glance either way).
+const SEARCH_PAGE = 100
+
+type GqlSearchPull = {
+  number?: number
+  title?: string
+  isDraft?: boolean
+  updatedAt?: string | null
+  mergeable?: string | null
+  mergeStateStatus?: string | null
+  author?: { login: string } | null
+  autoMergeRequest?: { mergeMethod: string } | null
+  repository?: { name: string; owner: { login: string } } | null
+}
+
+/** Search nodes → the same source shape the mirror select produces. `type: ISSUE` can return issues as
+ *  well as pull requests, and an inline fragment that does not match answers `{}` — so a node with no
+ *  number is dropped rather than rendered as PR #NaN. */
+const toSource = (nodes: readonly GqlSearchPull[]): PullCollectionSource[] =>
+  nodes.flatMap((node) =>
+    node.number && node.repository
+      ? [{
+          owner: node.repository.owner.login,
+          repo: node.repository.name,
+          number: node.number,
+          title: node.title ?? '',
+          draft: node.isDraft ?? false,
+          author: node.author?.login ?? null,
+          updatedAt: node.updatedAt ? Date.parse(node.updatedAt) : null,
+          mergeable: node.mergeable ?? null,
+          mergeStateStatus: node.mergeStateStatus ?? null,
+          autoMergeEnabled: node.autoMergeRequest != null,
+        }]
+      : [],
+  )
+
 export const collections = (db: PluginDatabase) => new Hono<AppEnv>().get(`/${PULLS_COLLECTION_ID}`, async (c) => {
   const userId = ownerId(c)
-  // The one declared param. Plugin-owned meaning, passed through opaquely by the host: here it is
-  // `owner/name`, and anything that does not look like one simply matches nothing.
-  const [owner, name] = (c.req.query('repo') ?? '').split('/')
+  // Declared params. Plugin-owned meaning, passed through opaquely by the host: `repo` is `owner/name`,
+  // and anything that does not look like one simply matches nothing.
+  const repo = c.req.query('repo') ?? ''
+  const [owner, name] = repo.split('/')
+  const involvements = parsePullInvolvement(c.req.query('involves') ?? '')
+
+  // "…involving me" leaves the mirror entirely (contract/collections.ts § involvement). No recognised
+  // value falls through to the mirror read rather than erroring: a param is opaque to the host, so a
+  // stale saved panel is a thing that can arrive here, and the widest honest answer beats a broken tile.
+  if (involvements.length) {
+    const token = await githubToken(c)
+    // One search each, in parallel, unioned — GitHub's qualifiers only AND, so "assigned to me or
+    // waiting on my review" is two questions however it is asked. At most three, and a search is one
+    // call whatever the repository count, so the ceiling is three calls per poll.
+    const results = await Promise.all(involvements.map((involvement) =>
+      ghGraphQL(token, SEARCH_QUERY, { q: pullsSearchQuery(involvement, repo), first: SEARCH_PAGE })
+        .then((res) => ghGraphQLResult<{ search?: { nodes?: GqlSearchPull[] } }>(res)),
+    ))
+    // Any failure fails the panel. A partial union would be a tile that silently under-reports what is
+    // waiting on you, which is the one wrong answer this collection must not give.
+    const failed = results.find((result) => !result.ok)
+    if (failed && !failed.ok) {
+      return failed.kind === 'http'
+        ? respondError(c, failed.failure.status, failed.failure.error)
+        : respondError(c, 502, 'github_unavailable', failed.messages)
+    }
+    // A PR you were assigned AND asked to review is one row. Deduped here rather than by the host: the
+    // host dedupes a mixed board by row id and would have got this right too, but a collection answering
+    // the same record twice is a wrong answer regardless of who is looking at it.
+    const found = new Map<string, PullCollectionSource>()
+    for (const result of results) {
+      if (!result.ok) continue
+      for (const row of toSource(result.data.search?.nodes ?? [])) {
+        found.set(`${row.owner}/${row.repo}#${row.number}`, row)
+      }
+    }
+    const union = [...found.values()].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    return c.json(pullsCollectionPage(union) satisfies PluginCollectionResponse)
+  }
 
   const rows = await db
     .select({

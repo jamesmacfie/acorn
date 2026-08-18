@@ -14,6 +14,7 @@ import {
   retargetFilter,
   schemaOf,
   settleComposition,
+  toggleParamValue,
   trendsFor,
   viewAvailability,
   viewsFor,
@@ -185,6 +186,29 @@ describe('the number boxes', () => {
     expect(parseRefresh('5')).toBe(MIN_PANEL_REFRESH_SECONDS)
     expect(parseRefresh('99999999')).toBe(MAX_PANEL_REFRESH_SECONDS)
     expect(parseRefresh('120')).toBe(120)
+  })
+})
+
+describe('a multiple-choice param', () => {
+  const CHOICES = ['review-requested', 'assigned', 'authored']
+
+  it('encodes the ticked ids as one comma-joined string', () => {
+    expect(toggleParamValue('', CHOICES, 'assigned', true)).toBe('assigned')
+    expect(toggleParamValue('assigned', CHOICES, 'authored', true)).toBe('assigned,authored')
+    expect(toggleParamValue('assigned,authored', CHOICES, 'assigned', false)).toBe('authored')
+    expect(toggleParamValue('assigned', CHOICES, 'assigned', false)).toBe('')
+  })
+
+  it('normalises to declaration order, whatever order they were ticked in', () => {
+    // Not cosmetic: the query cache is keyed by the param string (dashboards/data.ts § key), so two
+    // panels that answered the same thing in a different order would otherwise fetch twice.
+    expect(toggleParamValue('authored', CHOICES, 'review-requested', true)).toBe('review-requested,authored')
+    expect(toggleParamValue('review-requested', CHOICES, 'authored', true)).toBe('review-requested,authored')
+  })
+
+  it('drops a stored value the collection no longer declares', () => {
+    // A saved panel outlives the vocabulary its param was written against.
+    expect(toggleParamValue('mentioned,assigned', CHOICES, 'authored', true)).toBe('assigned,authored')
   })
 })
 

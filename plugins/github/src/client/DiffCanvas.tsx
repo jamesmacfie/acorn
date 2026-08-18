@@ -1,4 +1,5 @@
-import { For, Show } from 'solid-js'
+import { createSplitScrollSync } from '@acorn/plugin-api/ui/diff'
+import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
 import { DiffLine, type LineComposerController, NonCodeRow, SplitCell, type ThreadCollapseController } from '@acorn/plugin-api/ui'
 import { type CodeRow, type FindHighlight, type GapRow, isCodeRow, type Row, type SplitBand, type ViewMode } from '@acorn/plugin-api/ui/diff'
@@ -20,6 +21,8 @@ export function DiffCanvas(props: {
   // The scroller must be handed back: the virtualizer only produces rows once it has this element.
   publishScrollEl: (element: HTMLDivElement, mode: ViewMode) => void
   onScroll: (element: HTMLDivElement) => void
+  /** Widest code line in columns — the row canvas's width, since code lines don't wrap. */
+  maxCols: Accessor<number>
   scheduleElementMeasure: (target: 'unified' | 'split', element: HTMLElement) => void
   shouldMeasureRow: (row: Row) => boolean
   shouldMeasureBand: (band: SplitBand) => boolean
@@ -49,11 +52,14 @@ export function DiffCanvas(props: {
     return band ? [{ vi, band }] : []
   })
 
+  const splitScroll = createSplitScrollSync()
+  onCleanup(splitScroll.dispose)
+
   return (
     <Show when={props.viewMode() === 'split'} fallback={
       <div class="diff" ref={(el) => props.publishScrollEl(el, 'unified')} onScroll={(e) => props.onScroll(e.currentTarget)}>
         {props.stickyHead()}
-        <div class="diff-rows" style={{ height: `${props.virt.getTotalSize()}px` }}>
+        <div class="diff-rows" style={{ height: `${props.virt.getTotalSize()}px`, '--diff-cols': props.maxCols() }}>
           <For each={virtualRows()}>
             {({ vi, row }) => {
               let rowEl: HTMLDivElement | undefined
@@ -119,13 +125,22 @@ export function DiffCanvas(props: {
     }>
       <div class="diff diff-split" ref={(el) => props.publishScrollEl(el, 'split')} onScroll={(e) => props.onScroll(e.currentTarget)}>
         {props.stickyHead()}
-        <div class="diff-split-rows" style={{ height: `${props.splitVirt.getTotalSize()}px` }}>
+        <div
+          class="diff-split-rows"
+          style={{ height: `${props.splitVirt.getTotalSize()}px` }}
+          ref={(el) => splitScroll.attach(el)}
+        >
           <For each={virtualBands()}>
             {({ vi, band }) => {
               let bandEl: HTMLDivElement | undefined
               const measureBand = () => {
                 if (bandEl) props.scheduleElementMeasure('split', bandEl)
               }
+              // onMount, not the ref: the cells are not in the DOM yet when the ref for their band
+              // fires. A band scrolling in while its column is scrolled right must not start at 0.
+              onMount(() => {
+                if (bandEl) splitScroll.adopt(bandEl)
+              })
               const fullRow = () => (band as Extract<SplitBand, { kind: 'full' }>).row
               return (
                 <div

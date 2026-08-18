@@ -12,6 +12,8 @@ const { paneRegistry } = await import('../../registries/panes')
 const { projectSurfaceRegistry } = await import('../../registries/projectSurfaces')
 const { clientEvents, consumePaneIntent, evictPendingIntents } = await import('../../registries/clientEvents')
 const { setActiveTaskId } = await import('../../tasks/tasks')
+const { setTaskLookup } = await import('../../tasks/taskLookup')
+type Task = import('../../queries').Task
 const { closePluginOverlay, pluginOverlayOpen } = await import('../frames/overlays')
 
 // The two verbs that decide WHERE a rail row's detail appears, which is the one thing the descriptor tier
@@ -25,6 +27,7 @@ afterEach(() => {
   for (const entry of disposables.splice(0).reverse()) entry.dispose()
   evictPendingIntents('task-1')
   setActiveTaskId(null)
+  setTaskLookup(() => undefined)
 })
 
 describe('openPane', () => {
@@ -33,6 +36,28 @@ describe('openPane', () => {
     setActiveTaskId('task-1')
     runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item })
     expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'conn-1:ENG-42' })
+  })
+
+  it('takes the reader to the task the click site named, and selects the row there', () => {
+    // A dashboard row is drawn outside every task, so without the named task this would open the pane in
+    // whatever task happened to be on screen — never the one the row is about.
+    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    setTaskLookup((taskId) => (taskId === 'task-2' ? ({ id: 'task-2', links: [] } as unknown as Task) : undefined))
+    setActiveTaskId('task-1')
+    const navigate = vi.fn()
+    runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-2', navigate })
+    expect(navigate).toHaveBeenCalledWith('/t/task-2')
+    expect(consumePaneIntent('task-2', 'board')).toEqual({ kind: 'plugin:select', item: 'conn-1:ENG-42' })
+    evictPendingIntents('task-2')
+  })
+
+  it('refuses a task this node does not have, rather than opening the pane somewhere else', () => {
+    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    setTaskLookup(() => undefined)
+    setActiveTaskId('task-1')
+    runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-2' })
+    expect(consumePaneIntent('task-1', 'board')).toBeUndefined()
+    expect(consumePaneIntent('task-2', 'board')).toBeUndefined()
   })
 
   it('still refuses when there is no task, because a task pane has nowhere else to go', () => {

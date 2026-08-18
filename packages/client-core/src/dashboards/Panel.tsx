@@ -59,14 +59,28 @@ export default function Panel(props: PanelProps) {
     //
     // `navigate` is what lets an `openUrl` row land on acorn's own surface for that item instead of in
     // the browser — the dispatcher asks the recogniser registry, and a URL with no in-app route still
-    // opens externally. A panel row genuinely has no task and no routed project, which is why the row
-    // declares `openUrl` in the first place; resolving the project from the URL is the missing step.
+    // opens externally. A panel row has no ROUTED PROJECT, which is why the row declares `openUrl` in the
+    // first place; resolving the project from the URL is the missing step.
+    //
+    // A task it may have, and only the row knows: an agent session runs in one (`PluginCollectionRow.taskId`).
+    // The dispatcher takes the reader there before opening the pane, and `item` is what tells that pane
+    // WHICH row was clicked — the same retained selection intent a rail row's click carries.
     //
     // `prefer: 'route'` is the dashboard saying what it IS. A panel row is a jumping-off point — you are
     // looking at a list precisely in order to leave it — so the full surface is the destination and a
     // glance panel over a list you were abandoning would be the wrong shape. Surfaces you are working
     // INSIDE ask for the opposite, and get it (plugins/github § makeContentLinkHandler).
-    runChromeAction(row.action, { pluginId: row.pluginId, nodeId, navigate, prefer: 'route' })
+    runChromeAction(row.action, {
+      pluginId: row.pluginId,
+      nodeId,
+      navigate,
+      prefer: 'route',
+      ...(row.taskId ? { taskId: row.taskId } : {}),
+      // Only the id is load-bearing — it is what the target pane selects on. The title is what a rail
+      // row would have carried and nothing on this path reads it, so the row's own id stands in rather
+      // than a guess at which column is its name.
+      item: { id: row.sourceRowId ?? row.id, title: row.id },
+    })
   }
 
   const riskOf = (action: PluginCollectionRowAction | undefined): string | undefined =>

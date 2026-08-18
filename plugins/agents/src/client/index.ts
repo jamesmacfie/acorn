@@ -6,8 +6,9 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './agentActivity'
+import { agentSessionsCollection } from './collectionContribution'
 import { managedAgentApi } from './managedClient'
-import { activateManagedAgentNoticeTargets } from './managedSelection'
+import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents } from './managedSelection'
 import { activateManagedAgentNotifications } from './managedStore'
 import { agentPaneContribution } from './paneContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
@@ -21,6 +22,9 @@ export const agentsClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.panes.register(agentPaneContribution)
     ctx.sources.register(agentCenterSourceContribution)
+    // The same roster the stat counts and the inbox filters, with a schema on it, so a dashboard panel
+    // can be composed over running agents (collectionContribution.ts).
+    ctx.collections.register(agentSessionsCollection)
     ctx.settingsPages.register({
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,
@@ -68,5 +72,6 @@ export const agentsClientPlugin: ClientPlugin = {
     activateManagedAgentReferences()
     activateManagedAgentNotifications()
     activateManagedAgentNoticeTargets()
+    activateManagedAgentPaneIntents()
   },
 }

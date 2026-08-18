@@ -302,12 +302,14 @@ ui/diff: collectMatches
 ui/diff: createDiffHydrator
 ui/diff: createDiffMeasureSchedulers
 ui/diff: createDiffVirtualizer
+ui/diff: createSplitScrollSync
 ui/diff: estimateRowSize
 ui/diff: estimateSplitBandSize
 ui/diff: expandGap
 ui/diff: gapId
 ui/diff: highlighterTokenize
 ui/diff: isCodeRow
+ui/diff: maxLineCols
 ui/diff: plainTokenize
 ui/diff: rowIdentityKeys
 ui/diff: splitBandIdentityKeys

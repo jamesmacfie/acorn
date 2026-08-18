@@ -260,6 +260,20 @@ describe('the union', () => {
     }
     expect(unionRows([withAction, linear], todoBoard)[0].action).toEqual({ verb: 'openUrl', url: 'https://example.com/1' })
   })
+
+  it('keeps the task the row named, and the id the plugin gave it, beside the qualified one', () => {
+    // The two halves an `openPane` click needs: WHICH task to go to, and which row to select once
+    // there. `id` is qualified by source — two providers may both call a row `1` — so the plugin's own
+    // id has to survive separately or the pane is handed an id it has never seen.
+    const withTask: PanelSourcePage = {
+      ...github,
+      rows: [{ ...github.rows[0], taskId: '0f1a4d5e-4a0e-4a3c-8f6b-2f5f4b7a1c9d', action: { verb: 'openPane', pane: 'agents' } }],
+    }
+    const united = unionRows([withTask, linear], todoBoard)[0]
+    expect(united.taskId).toBe('0f1a4d5e-4a0e-4a3c-8f6b-2f5f4b7a1c9d')
+    expect(united.sourceRowId).toBe(github.rows[0].id)
+    expect(united.id).not.toBe(github.rows[0].id)
+  })
 })
 
 describe('provenance is the HOST’s stamp and survives the whole pipeline', () => {

@@ -119,6 +119,15 @@ Freshness splits across the two sides, and the split is the point:
 - **Client-side refresh is per panel and the user's**, bounded to 30s–86400s. It is the first
   contribution whose refetch policy is per-contribution rather than the single shared chrome revision.
 
+The one place a collection is *not* a read over the mirror is github's `involves` param — "review
+requested of me", "assigned to me", "authored by me". Two of those three have no answer in the mirror:
+assignees are not mirrored at all, and review requests arrive only with the PR-**detail** sync, so the
+mirror knows you were asked to review exactly the pull requests you already opened. So that param
+switches the route to one GitHub search (`review-requested:@me`), filling the same columns. It is
+allowed the request the mirror read is not for the reason above inverted: the objection was N repos ×
+one poll, and a search is one call whatever the repo count. It also reaches repos that were never
+mirrored, which for "what is waiting on me" is the point rather than a side effect.
+
 ## Ownership rules
 
 Provider data is a disposable read model. GitHub, Linear, and Rollbar remain the upstream source of

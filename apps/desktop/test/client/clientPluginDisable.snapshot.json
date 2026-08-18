@@ -68,6 +68,7 @@
       "memory.proposals"
     ],
     "collections": [
+      "agents:sessions",
       "github:pulls-mine"
     ],
     "contentLinks": [

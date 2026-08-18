@@ -3,6 +3,7 @@ import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices, type CoreServices } from '@acorn/node-core/main/core/index.ts'
@@ -379,6 +380,41 @@ describe('managed agent runtime conformance', () => {
     })
     expect(driver.noProviderExecutionHistory).toBeNull()
     await expect(runtime.store.requireSession(session.id)).rejects.toThrow('Managed agent session not found')
+  })
+
+  // Archiving a task retires its agents: they leave the live list every glance surface reads (the
+  // dashboard collection, the Fleet stat, the attention inbox) and turn up in the archived one.
+  it('retires the sessions of an archived task from the live list', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry: new AgentDriverRegistry(),
+    })
+    const session = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    }, descriptor('fake'))
+
+    const before = await runtime.store.listSessions({ archived: false })
+    expect(before.sessions.map((row) => row.id)).toEqual([session.id])
+
+    await testDb.db.update(schema.tasks).set({ status: 'archived' }).where(eq(schema.tasks.id, seed.taskId))
+
+    const live = await runtime.store.listSessions({ archived: false })
+    const archived = await runtime.store.listSessions({ archived: true })
+    expect(live.sessions).toEqual([])
+    expect(archived.sessions.map((row) => row.id)).toEqual([session.id])
+    // The task drawer pins a task id and is exempt — it is looking at that task.
+    const pinned = await runtime.store.listSessions({ taskId: seed.taskId, archived: false })
+    expect(pinned.sessions.map((row) => row.id)).toEqual([session.id])
   })
 
   it('scopes session lists and full-text search to one workspace', async () => {

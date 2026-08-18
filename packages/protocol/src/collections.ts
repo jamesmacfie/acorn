@@ -117,6 +117,12 @@ const collectionParam = z.object({
   name: z.string().min(1).max(80),
   type: z.enum(['text', 'enum']),
   values: z.array(z.string().min(1).max(64)).max(MAX_COLLECTION_ENUM_VALUES).optional(),
+  // `enum` only: several values at once, handed back as ONE comma-joined string. A second param TYPE
+  // would have been the other spelling and is the worse one — every reader would then have two enum
+  // shapes to branch on, where this way a plugin that ignores the flag still receives a string it can
+  // read, and the host renders checkboxes instead of a select. The plugin owns what a union of its own
+  // values means; nothing here does.
+  multiple: z.boolean().optional(),
 })
 
 // One scalar per cell. `datetime` is epoch milliseconds, because that is what every other timestamp on
@@ -164,6 +170,21 @@ const collectionRow = z.object({
   id: z.string().min(1).max(200),
   values: z.record(z.string().min(1).max(64), cellValue)
     .refine((values) => Object.keys(values).length <= MAX_COLLECTION_FIELDS, 'too many values'),
+  // The task this row's thing LIVES IN, when it lives in one. A panel row was assumed to have no task
+  // — it is drawn on a dashboard, which is outside every task — and that assumption is what made
+  // `openPane` useless here: the verb needs a task, and the only one in scope was whichever task the
+  // reader happened to have open, which is never the one the row is about.
+  //
+  // The row is the only thing that knows. An agent session runs in a task; a plugin listing sessions
+  // knows which. So the row names it and the host TAKES THE READER THERE before running the action —
+  // activate, navigate, then open the pane — which is the same two steps the attention inbox already
+  // takes, and `PluginAttentionWireItem.taskId` is the same field one tier up.
+  //
+  // Naming a task is not the same as naming a source: provenance is stamped by the host precisely so a
+  // row cannot wear a stranger's badge, whereas a task is a CORE object the host resolves itself. An
+  // id no task on this node matches is refused at the click, not rendered as a broken row — the list
+  // may simply not have loaded, and a row is worth showing either way.
+  taskId: z.string().uuid().optional(),
   action: collectionRowAction.optional(),
 })
 
@@ -194,8 +215,14 @@ export type PluginCollectionRowRisk = z.infer<typeof rowRisk>
 export type PluginCollectionRowBody = z.infer<typeof collectionRow>
 export type PluginCollectionResponse = z.infer<typeof pluginCollectionResponseSchema>
 
-/** A row with its provenance bound by the host. */
-export type PluginCollectionRow = PluginCollectionRowBody & { pluginId: string; collectionId: string }
+/** A row with its provenance bound by the host. `sourceRowId` appears only on a panel that unioned
+ *  several collections: the union qualifies `id` with the source it came from so two providers cannot
+ *  collide on `42`, and this is the id the PLUGIN gave the row — what a click hands back to it. */
+export type PluginCollectionRow = PluginCollectionRowBody & {
+  pluginId: string
+  collectionId: string
+  sourceRowId?: string
+}
 
 /** A parsed answer, every row stamped. What a collection contribution's `fetch` resolves to. */
 export type PluginCollectionPage = { schema: PluginCollectionSchema; rows: PluginCollectionRow[] }

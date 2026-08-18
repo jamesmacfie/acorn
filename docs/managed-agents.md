@@ -45,6 +45,14 @@ are not stored by the model-provider plugin.
 - Notifications and the attention inbox represent requests that need the owner; dismissal of purely
   informational UI is client-local.
 
+A session's lifetime is bounded by its task's. Sessions belonging to a task that is no longer active
+— archived, cancelled, or hard-deleted with its project — are retired: they leave the live list every
+glance surface reads (Agent Center, the Fleet stat, the attention inbox, the `sessions` dashboard
+collection) and appear in the archived list instead. This is resolved when the list is read rather
+than cascaded onto the session's own `archivedAt`, because removing a project deletes its tasks
+outright and no cascade would visit those rows. A read that names a task id is exempt — the task pane
+is looking at that task.
+
 ## Context, files, and attachments
 
 Context is assembled by the Node from registered task sections and sent as an immutable snapshot.

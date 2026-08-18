@@ -57,11 +57,14 @@ import './dashboards.css'
 
 type StepId = 'data' | 'view' | 'shape' | 'place'
 
-const STEPS: readonly { id: StepId; title: string; hint: string }[] = [
-  { id: 'data', title: 'Data', hint: 'Which records the panel is about.' },
-  { id: 'view', title: 'View', hint: 'How they are drawn. Only what this data can support.' },
-  { id: 'shape', title: 'Shape', hint: 'Which of them, in what order, and what is measured.' },
-  { id: 'place', title: 'Place', hint: 'Where it goes and how big it arrives.' },
+// Titles only. Each step used to carry a sentence explaining what it was for, and every one of them
+// described what the controls underneath already show — a paragraph of chrome above the actual question,
+// on all four steps.
+const STEPS: readonly { id: StepId; title: string }[] = [
+  { id: 'data', title: 'Data' },
+  { id: 'view', title: 'View' },
+  { id: 'shape', title: 'Shape' },
+  { id: 'place', title: 'Place' },
 ]
 
 /** A small schematic for each view kind — the whole reason the View step is cards rather than a
@@ -133,6 +136,7 @@ export default function PanelWizard(props: {
   const [preset, setPreset] = createSignal<Preset>('m')
   const [surface, setSurface] = createSignal<PlacementSurface>(props.scope.surface)
   const [tabId, setTabId] = createSignal(props.scope.surface === 'home' ? props.scope.ownerId ?? '' : '')
+  const [newTabName, setNewTabName] = createSignal('')
 
   const step = () => STEPS[stepIndex()]
   let heading: HTMLHeadingElement | undefined
@@ -194,7 +198,8 @@ export default function PanelWizard(props: {
   const resolveTarget = (): PlacementScope => {
     if (surface() !== 'home') return props.scope
     if (tabId() !== NEW_TAB) return tabs().length > 1 ? homeTabScope(tabId()) : HOME_PLACEMENT
-    const created = addTab(tabs())
+    // Empty falls back to `addTab`'s own unique default, so naming one is an option rather than a step.
+    const created = addTab(tabs(), newTabName().trim())
     setHomeTabs(created.tabs)
     // Land on the dashboard the panel went to. Placing it somewhere invisible is the one outcome
     // nobody asked for.
@@ -263,62 +268,62 @@ export default function PanelWizard(props: {
           <h2 id="dash-wizard-heading" class="dash-wizard-heading" tabindex={-1} ref={heading}>
             {step().title}
           </h2>
-          <p class="dash-editor-note muted">{step().hint}</p>
 
           {/* ── Data ────────────────────────────────────────────────────────────────────────── */}
           <Show when={step().id === 'data'}>
             <SourceRows draft={draft} />
-            <Field label={draft.queries().length ? 'Add another collection' : 'Choose a collection'}>
-              <Input
-                size="sm"
-                aria-label="Filter collections"
-                placeholder="Filter collections"
-                value={filter()}
-                onInput={(event) => setFilter(event.currentTarget.value)}
-              />
-            </Field>
-            <div class="dash-gallery">
-              <For
-                each={draft.addable(filter())}
-                fallback={(
-                  <span class="dash-editor-note muted">
-                    {filter() ? 'No collection matches.' : 'Every collection here is already on this panel.'}
-                  </span>
-                )}
-              >
-                {(entry) => {
-                  const meta = createMemo(() => metaFor(entry))
-                  // The board card's own classes, reused: a gallery card is a title, a mark and some
-                  // meta, which is exactly what those are (dashboards.css § Board).
-                  return (
-                    <Card interactive pad="sm" class="dash-card" onActivate={() => draft.addSource(entry)}>
-                      <span class="dash-card-title">
-                        {/* The plugin's own mark where it registered one, its id where it did not —
-                            `Icon` renders an unmatched name as text, so naming a brand blind would
-                            print the literal string (views/Provenance.tsx says the same). */}
-                        <Show when={brandMarkRegistry.get(entry.pluginId)}>
-                          <Icon name={`brand:${entry.pluginId}`} title={entry.pluginId} />
-                        </Show>
-                        <span class="dash-editor-field-name">{entry.name}</span>
-                        <span class="muted">{entry.pluginId}</span>
-                      </span>
-                      <Show when={meta().fields.length}>
-                        <span class="dash-card-meta dash-collection-chips">
-                          <For each={meta().fields}>
-                            {(field) => (
-                              <Chip size="xs" title={field.type} leading={<Icon name={TYPE_GLYPHS[field.type]} />}>
-                                {field.name}
-                              </Chip>
-                            )}
-                          </For>
+            {/* Gone entirely once every collection on this device is already on the panel. The filter
+                box and the gallery were both dead controls at that point, under a sentence explaining
+                that they were — three rows of UI for "there is nothing to do here". */}
+            <Show when={draft.addable().length}>
+              <Field label={draft.queries().length ? 'Add another collection' : 'Choose a collection'}>
+                <Input
+                  size="sm"
+                  aria-label="Filter collections"
+                  placeholder="Filter collections"
+                  value={filter()}
+                  onInput={(event) => setFilter(event.currentTarget.value)}
+                />
+              </Field>
+              <div class="dash-gallery">
+                <For
+                  each={draft.addable(filter())}
+                  fallback={<span class="dash-editor-note muted">No collection matches.</span>}
+                >
+                  {(entry) => {
+                    const meta = createMemo(() => metaFor(entry))
+                    // The board card's own classes, reused: a gallery card is a title, a mark and some
+                    // meta, which is exactly what those are (dashboards.css § Board).
+                    return (
+                      <Card interactive pad="sm" class="dash-card" onActivate={() => draft.addSource(entry)}>
+                        <span class="dash-card-title">
+                          {/* The plugin's own mark where it registered one, its id where it did not —
+                              `Icon` renders an unmatched name as text, so naming a brand blind would
+                              print the literal string (views/Provenance.tsx says the same). */}
+                          <Show when={brandMarkRegistry.get(entry.pluginId)}>
+                            <Icon name={`brand:${entry.pluginId}`} title={entry.pluginId} />
+                          </Show>
+                          <span class="dash-editor-field-name">{entry.name}</span>
+                          <span class="muted">{entry.pluginId}</span>
                         </span>
-                      </Show>
-                      <span class="dash-card-meta">{cardFacts(meta())}</span>
-                    </Card>
-                  )
-                }}
-              </For>
-            </div>
+                        <Show when={meta().fields.length}>
+                          <span class="dash-card-meta dash-collection-chips">
+                            <For each={meta().fields}>
+                              {(field) => (
+                                <Chip size="xs" title={field.type} leading={<Icon name={TYPE_GLYPHS[field.type]} />}>
+                                  {field.name}
+                                </Chip>
+                              )}
+                            </For>
+                          </span>
+                        </Show>
+                        <span class="dash-card-meta">{cardFacts(meta())}</span>
+                      </Card>
+                    )
+                  }}
+                </For>
+              </div>
+            </Show>
             {/* A param changes what the rows ARE, so it is asked here rather than beside the shaping. */}
             <ParamInputs draft={draft} />
             <ColdNotice draft={draft} />
@@ -421,6 +426,20 @@ export default function PanelWizard(props: {
                   options={tabOptions().map((tab) => ({ value: tab.id, label: tab.name }))}
                 />
               </Field>
+              {/* Only under the option it belongs to. Naming the thing you are creating is the one
+                  question "New dashboard…" leaves open, and answering it later means finding the tab's
+                  own rename menu. Still nothing written until the last step commits. */}
+              <Show when={tabId() === NEW_TAB}>
+                <Field label="Name" layout="split">
+                  <Input
+                    size="sm"
+                    aria-label="New dashboard name"
+                    placeholder="New dashboard"
+                    value={newTabName()}
+                    onInput={(event) => setNewTabName(event.currentTarget.value)}
+                  />
+                </Field>
+              </Show>
             </Show>
 
             <RefreshField draft={draft} />

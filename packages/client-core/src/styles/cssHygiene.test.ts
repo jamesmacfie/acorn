@@ -23,6 +23,10 @@ describe('no phantom tokens', () => {
       // rather than a computed width or a grid template is what keeps the SHAPE in the stylesheet
       // where a style pack can reach it.
       '--meter-value', '--kv-extra-cols',
+      // The diff canvas's width in columns (maxLineCols), written inline by DiffCanvas. Same rule:
+      // the component hands over the COUNT, and diff.css keeps the arithmetic that turns it into a
+      // width — so the gutter widths it adds stay reachable by a style pack.
+      '--diff-cols',
       // The dashboard grid's measured square-cell size and its cell-to-cell pitch, written inline by
       // PanelGrid's ResizeObserver. They carry a MEASUREMENT, not a design decision — the shape
       // (twelve columns, the gap, the overlay's lattice) all stays in dashboards.css, which is what
@@ -31,8 +35,18 @@ describe('no phantom tokens', () => {
       '--dash-cell', '--dash-pitch',
     ])
 
+    // Declared in a stylesheet, but on a component's own block rather than `:root` — which is the
+    // one place declaredByBlock reads. These are not tokens and have no business on `:root`: they
+    // are local constants a single feature's arithmetic shares, scoped to the block that owns them.
+    const locallyDeclared = new Set([
+      // diff.css `.diff`: the fixed chrome beside a code line. The row canvas's min-width has to add
+      // the same gutter and marker widths the columns themselves use, and naming them once is what
+      // stops the two from drifting apart and clipping the last character off every long line.
+      '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w',
+    ])
+
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]
-      .filter((name) => !declared.has(name) && !runtimeSet.has(name))
+      .filter((name) => !declared.has(name) && !runtimeSet.has(name) && !locallyDeclared.has(name))
       .sort()
 
     expect(phantom).toEqual([])
@@ -87,6 +101,18 @@ describe('literal ratchets (these may only go down)', () => {
       .map((f) => (withoutComments(f.text).match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).length)
       .reduce((a, b) => a + b, 0)
     expect(leaked).toBe(0)
+  })
+
+  // A class handed to a primitive lands on the SAME element as the primitive's own class, so a bare
+  // `.thing { display: … }` ties with `.ui-card { display: block }` and the winner is chunk order.
+  // Compounding is the fix, and this is the shape that must not come back — a `.dash-panel` that
+  // loses the tie is a block, which silently kills the body's scroll.
+  it('classes merged onto Card are compounded with it', () => {
+    // Anchored at the start of a selector: a descendant rule like `.dash-slot > .dash-panel` already
+    // outranks the primitive and is not the shape at issue.
+    const bare = ['dash-panel', 'dash-card']
+      .filter((name) => new RegExp(`^\\s*(?:[^{}]*,\\s*)?\\.${name}\\s*\\{`, 'm').test(withoutComments(corpus)))
+    expect(bare).toEqual([])
   })
 
   // Individual px VALUES left inside spacing declarations. Everything on the --space-* scale is
