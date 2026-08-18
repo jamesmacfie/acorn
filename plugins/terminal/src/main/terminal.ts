@@ -15,6 +15,7 @@ import {
   computeIdle,
   FIRST_IDLE_MS,
   IDLE_MS,
+  launchCommandLine,
   matchBlockedPrompt,
   parseTmuxSessions,
   resolveBackend,
@@ -397,20 +398,26 @@ async function spawnOne(
     void profile.mcpRegistration(mcpName(), mcpLauncher()).then((res) => { if (res?.ok) mcpRegistered.add(profile.id) }).catch(() => undefined)
   }
 
+  // Profile launchArgs apply only to the profile's OWN binary — a command override (dev-server pane)
+  // is a different program. meta.command stays the bare line the UI shows; the args are launch-only.
+  const launchArgs = opts.command ? [] : (profile.launchArgs ?? [])
+
   let pty: IPty
   if (backend === 'tmux') {
-    ensureTmuxSession(meta.tmuxSession!, cwd, command, env)
+    ensureTmuxSession(meta.tmuxSession!, cwd, launchCommandLine(command, launchArgs), env)
     pty = attachTmuxPty(meta.tmuxSession!, cols, rows)
     await persistSession(meta)
   } else if (opts.command) {
     // No tmux: run the command line through a login shell so PATH/nvm resolve "pnpm" etc.
     pty = spawn(env.SHELL || '/bin/sh', ['-lc', command], { name: 'xterm-256color', cols, rows, cwd, env })
   } else {
-    pty = spawn(command, [], { name: 'xterm-256color', cols, rows, cwd, env })
+    pty = spawn(command, launchArgs, { name: 'xterm-256color', cols, rows, cwd, env })
   }
   wireSession(meta, pty)
-  // A fresh AGENT session gets the combined task-context + repo-memory block queued for its idle edge (docs/notes-and-memory.md).
-  if (profile.kind === 'agent') void launchInjector?.(opts.taskId, id)
+  // A fresh AGENT session gets the combined task-context + repo-memory block queued for its idle edge
+  // (docs/notes-and-memory.md) — UNLESS the profile was launched with a pull instruction (launchArgs),
+  // in which case it fetches the same material itself and a racing push would only duplicate it.
+  if (profile.kind === 'agent' && !launchArgs.length) void launchInjector?.(opts.taskId, id)
   return meta
 }
 
