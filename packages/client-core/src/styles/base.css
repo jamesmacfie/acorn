@@ -49,7 +49,7 @@ svg.glyph,
    HAZARD: `:where()` contributes no specificity, but `:hover:not(:disabled)` still totals (0,2,0)
    — enough to beat a plain `.some-button { transform: … }` at (0,1,0). So a <button> or <a> that
    relies on a transform for POSITIONING would snap back to none while hovered. Nothing does today
-   (the only transforms are on .tabrail-spinner, a pointer-events:none span, and .rail-tip, a div).
+   (the only positioning transform is on .rail-tip, a div).
    If you need to position an interactive element, use inset/margin, not transform. */
 :where(button, a, .ui-row):hover:not(:disabled) { transform: var(--hover-lift); }
 :where(button, .ui-row):active:not(:disabled) { transform: var(--press-scale); }

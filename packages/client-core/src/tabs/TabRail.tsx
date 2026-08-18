@@ -31,7 +31,7 @@ import ExclusiveSlotHost from '../plugins/ExclusiveSlotHost'
 import { registerContextMenuItems, type TaskRowTarget } from '../registries/contextMenus'
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../registries/contextMenuHost'
 import Icon from '../ui/Icon'
-import IconPicker from '../ui/IconPicker'
+import IconPicker, { randomIconName } from '../ui/IconPicker'
 import './tabrail.css'
 import { taskOriginAppearance } from '../tasks/origin'
 import { Alert, StatusDot } from '../ui/primitives'
@@ -231,7 +231,7 @@ export default function TabRail() {
     setNewProjectOptions(options)
     setNewProject(options.some((project) => project.id === current) ? current! : options[0].id)
     setText('')
-    setIconDraft(null)
+    setIconDraft(randomIconName())
     setBranchText('')
     setBranchTouched(false)
     setDraft({ mode: 'new' })
