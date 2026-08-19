@@ -36,16 +36,8 @@
    100% of its container, and a container sized by its content would size to nothing. */
 .plugin-overlay { height: min(60vh, 520px); }
 .plugin-overlay-head { display: flex; align-items: center; gap: var(--space-4); }
-.plugin-overlay-close {
-  margin-left: auto;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-faint);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-.plugin-overlay-close:hover { color: var(--text); }
+.plugin-overlay-close { margin-left: auto; }
+.plugin-overlay-close.ui-btn[data-variant='bare'] { color: var(--text-faint); }
 .plugin-overlay-body { flex: 1; min-height: 0; }
 
 /* Padded body for simple form modals (matches the Integrations settings spacing). */

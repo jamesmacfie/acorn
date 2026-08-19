@@ -4,7 +4,13 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ESC[c])
 // Allow only http(s) and mailto; the input is already HTML-escaped when this runs.
 const safeHref = (u: string): string | null => (/^(https?:\/\/|mailto:)/i.test(u) ? u : null)
 // Images are fetched by the renderer, so mailto is not meaningful here.
-const safeImageSrc = (u: string): boolean => /^https?:\/\//i.test(u)
+//
+// `data:image/` is allowed alongside http(s) because of the sandboxed plugin frames, whose CSP is
+// `img-src 'self' data:` with `connect-src 'none'` (desktop/src/app/main/pluginScheme.ts). A frame
+// cannot load a remote image at all, and a provider's uploads are usually behind the same credential
+// its API is, so the only way one draws a picture is for its node half to fetch the bytes and hand
+// them back inline. Inert either way: an `<img>` never executes what it points at, SVG included.
+const safeImageSrc = (u: string): boolean => /^(https?:\/\/|data:image\/)/i.test(u)
 
 // Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores and real text
 // never contains, so tokens survive escaping and subsequent Markdown transforms can't mutate them.

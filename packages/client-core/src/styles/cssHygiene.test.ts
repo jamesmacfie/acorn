@@ -45,6 +45,9 @@ describe('no phantom tokens', () => {
       // the same gutter and marker widths the columns themselves use, and naming them once is what
       // stops the two from drifting apart and clipping the last character off every long line.
       '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w',
+      // primitives.css `.ui-row`: the track width a `meta` column reserves. Shared by the row and
+      // its grid, and meaningless to anything else.
+      '--row-field-w',
     ])
 
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]

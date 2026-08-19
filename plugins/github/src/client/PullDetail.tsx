@@ -292,15 +292,14 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   {(l) => (
                     <li class="label-row" style={{ 'border-left-color': labelColor(l.color) }}>
                       <span class="label-row-name">{l.name}</span>
-                      <button
-                        type="button"
-                        class="label-row-remove"
+                      <Button
+                        variant="bare" class="label-row-remove"
                         data-armed={armed.armed() === `label:${l.name}` ? '' : undefined}
                         title={armed.armed() === `label:${l.name}` ? 'Click again to remove' : 'Remove label'}
                         onClick={() => { if (armed.request(`label:${l.name}`)) run(removeLabel(o(), r(), n(), l.name)) }}
                       >
                         {armed.armed() === `label:${l.name}` ? '?' : '×'}
-                      </button>
+                      </Button>
                     </li>
                   )}
                 </For>
@@ -377,9 +376,9 @@ export default function PullDetail(props: { task?: Task } = {}) {
                           )}
                         </Show>
                         <Show when={FAILED_STATUSES.has((ck.status ?? '').toLowerCase()) && ck.runId != null}>
-                          <button type="button" class="check-rerun" disabled={rerunned().has(ck.runId!)} onClick={() => triggerRerun(ck.runId!)}>
+                          <Button disabled={rerunned().has(ck.runId!)} onClick={() => triggerRerun(ck.runId!)}>
                             {rerunned().has(ck.runId!) ? 'Queued' : 'Rerun'}
-                          </button>
+                          </Button>
                         </Show>
                       </li>
                     )}
@@ -419,15 +418,14 @@ export default function PullDetail(props: { task?: Task } = {}) {
                         <UserAvatar login={login} />
                         <span class="label-row-name">{login}</span>
                       </span>
-                      <button
-                        type="button"
-                        class="label-row-remove"
+                      <Button
+                        variant="bare" class="label-row-remove"
                         data-armed={armed.armed() === `reviewer:${login}` ? '' : undefined}
                         title={armed.armed() === `reviewer:${login}` ? 'Click again to remove' : 'Remove review request'}
                         onClick={() => { if (armed.request(`reviewer:${login}`)) run(removeReviewer(o(), r(), n(), login)) }}
                       >
                         {armed.armed() === `reviewer:${login}` ? '?' : '×'}
-                      </button>
+                      </Button>
                     </li>
                   )}
                 </For>

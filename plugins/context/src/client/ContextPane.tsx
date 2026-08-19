@@ -165,14 +165,14 @@ export default function ContextPane(props: { task: Task }) {
                           <div class="context-tray-item" data-context-row={rowId}>
                             <div class="context-tray-row">
                               <span class="context-tray-kind">{item.kind}</span>
-                              <button type="button" class="context-tray-expand" onClick={() => toggleOpen(rowId)}>
+                              <Button variant="bare" class="context-tray-expand" onClick={() => toggleOpen(rowId)}>
                                 <span class="context-tray-twist">{isOpen(rowId) ? '▾' : '▸'}</span>
                                 <span class="context-tray-label">{item.label}</span>
-                              </button>
+                              </Button>
                               <Show when={originBadge(item.origin?.author)}><span class="context-origin-badge">{originBadge(item.origin?.author)}</span></Show>
                               <Show when={scopePill(item.jump?.noteScope)}><span class="context-origin-badge muted">{scopePill(item.jump?.noteScope)}</span></Show>
                               <Show when={item.jump?.pane === 'notes'}>
-                                <button type="button" class="context-tray-edit" title="Edit in Notes" aria-label="Edit in Notes" onClick={() => followJump(item)}>✎</button>
+                                <Button variant="bare" class="context-tray-edit" title="Edit in Notes" aria-label="Edit in Notes" onClick={() => followJump(item)}>✎</Button>
                               </Show>
                             </div>
                             <Show when={isOpen(rowId)}>
@@ -207,11 +207,11 @@ export default function ContextPane(props: { task: Task }) {
             </For>
 
             <div class="context-preview">
-              <button type="button" class="context-preview-toggle" onClick={() => setPreviewOpen(!previewOpen())}>
+              <Button variant="bare" class="context-preview-toggle" onClick={() => setPreviewOpen(!previewOpen())}>
                 <span class="context-tray-twist">{previewOpen() ? '▾' : '▸'}</span>
                 <span>preview</span>
                 <span class="muted context-size">{formatSize(bytesOf(assembled()?.block ?? ''))}</span>
-              </button>
+              </Button>
               <Show when={previewOpen()}>
                 <CodeBlock class="context-preview-block" size="xs" maxHeight="block" wrap>{assembled()?.block}</CodeBlock>
               </Show>

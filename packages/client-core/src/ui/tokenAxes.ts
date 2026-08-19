@@ -68,7 +68,7 @@ export const STYLE_TOKENS = [
   '--pane-pad', '--pane-pad-y', '--gap-inline', '--gap-row', '--gap-stack', '--gap-section',
   '--pad-control', '--pad-control-lg', '--pad-chip', '--pad-cell', '--pad-surface', '--pad-body',
   // density
-  '--row-h', '--row-h-sm', '--row-h-virt', '--control-h', '--control-h-sm',
+  '--row-h', '--row-h-sm', '--row-h-virt', '--control-h', '--control-h-sm', '--control-h-xs',
   '--topbar-h', '--pane-head-h', '--tabrail-w', '--task-footer-h',
   '--listdetail-w', '--listdetail-w-narrow',
   '--icon-size', '--icon-box', '--avatar-sm', '--avatar-md', '--diff-line-h', '--term-fs',

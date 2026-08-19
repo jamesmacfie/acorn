@@ -3,7 +3,7 @@ import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { jobLogOptions, runJobsOptions } from '../queries'
 import { checkStatusTone, FAILED_STATUSES, getHighlighter, tokenizeAnsiLines } from '@acorn/plugin-api/client'
-import { CodeBlock, EmptyState, StatusDot } from '@acorn/plugin-api/ui'
+import { Button, CodeBlock, EmptyState, StatusDot } from '@acorn/plugin-api/ui'
 import { splitJobLog } from './splitJobLog'
 import '../styles/checks-panel.css'
 
@@ -83,9 +83,9 @@ export default function ChecksPanel(props: { owner: string; repo: string; runId:
       <aside class="checks-panel">
         <header class="checks-panel-head">
           <span class="checks-panel-title">{job()?.name ?? props.jobName}</span>
-          <button type="button" class="checks-panel-close" onClick={props.onClose} aria-label="Close">
+          <Button variant="bare" class="checks-panel-close" onClick={props.onClose} aria-label="Close">
             ✕
-          </button>
+          </Button>
         </header>
         <div class="checks-panel-body">
           <Show when={!jobs.isLoading} fallback={<p class="muted">Loading steps…</p>}>

@@ -14,7 +14,7 @@ import {
   type AgentPricingDraft,
 } from './pricingDraft'
 import { agentUsageStore } from './usageStore'
-import { Table } from '@acorn/plugin-api/ui'
+import { Button, Table } from '@acorn/plugin-api/ui'
 import './agent-pricing.css'
 
 const PRICE_FIELDS: Array<{ id: AgentPriceField; label: string }> = [
@@ -173,9 +173,9 @@ export default function AgentPricingSettings() {
           <span class="settings-label">Unpriced models seen recently</span>
           <For each={unpricedModels()}>
             {(model) => (
-              <button type="button" class="agent-pricing-model-add" onClick={() => addCustom(model)}>
+              <Button variant="bare" class="agent-pricing-model-add" onClick={() => addCustom(model)}>
                 Add <code>{model}</code>
-              </button>
+              </Button>
             )}
           </For>
         </div>
@@ -226,14 +226,13 @@ export default function AgentPricingSettings() {
                               )}
                             </For>
                             <td>
-                              <button
-                                type="button"
-                                class="agent-pricing-reset"
+                              <Button
+                                variant="bare" class="agent-pricing-reset"
                                 disabled={!row.overridden}
                                 onClick={() => resetCatalogPrice(row.catalogId)}
                               >
                                 Reset
-                              </button>
+                              </Button>
                             </td>
                           </tr>
                         )
@@ -246,14 +245,12 @@ export default function AgentPricingSettings() {
             <section>
               <div class="agent-pricing-custom-head">
                 <h3 class="settings-section-label agent-pricing-heading">Exact model prices</h3>
-                <button
-                  type="button"
-                  class="ui-btn"
+                <Button
                   disabled={current().customModels.some((entry) => !entry.model.trim())}
                   onClick={() => addCustom()}
                 >
                   Add model
-                </button>
+                </Button>
               </div>
               <p class="muted settings-hint">
                 Add the exact model id from Claude’s usage history when a new model is not in the
@@ -307,13 +304,12 @@ export default function AgentPricingSettings() {
                               )}
                             </For>
                             <td>
-                              <button
-                                type="button"
-                                class="agent-pricing-remove"
+                              <Button
+                                variant="bare" class="agent-pricing-remove"
                                 onClick={() => removeCustom(row.id)}
                               >
                                 Remove
-                              </button>
+                              </Button>
                             </td>
                           </tr>
                         )}
@@ -329,9 +325,9 @@ export default function AgentPricingSettings() {
       <Show when={error()}><p class="settings-error" role="alert">{error()}</p></Show>
       <Show when={saved()}><p class="muted agent-pricing-saved" role="status">{saved()}</p></Show>
       <div class="settings-actions">
-        <button type="submit" class="ui-btn" disabled={!dirty() || saving()}>
+        <Button type="submit" disabled={!dirty() || saving()}>
           {saving() ? 'Saving…' : 'Save pricing'}
-        </button>
+        </Button>
       </div>
     </form>
   )

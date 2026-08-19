@@ -1,7 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { createDismissable } from '../ui/dismissable'
 import { collectConcerns, type Concern, type WillEventMap } from './willPhaseModel'
-import { Checkbox } from '../ui/primitives'
+import { Button, Checkbox } from '../ui/primitives'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
 
@@ -75,8 +75,8 @@ export function WillConfirmationHost() {
                 </ul>
               </Show>
               <div class="close-actions">
-                <button autofocus={current.concerns.some((concern) => concern.severity === 'danger')} type="button" class="ui-btn" onClick={() => finish(false)}>Cancel</button>
-                <button autofocus={!current.concerns.some((concern) => concern.severity === 'danger')} type="button" class="ui-btn close-confirm" onClick={() => finish(true)}>{current.actionLabel}</button>
+                <Button autofocus={current.concerns.some((concern) => concern.severity === 'danger')} onClick={() => finish(false)}>Cancel</Button>
+                <Button autofocus={!current.concerns.some((concern) => concern.severity === 'danger')} class="close-confirm" onClick={() => finish(true)}>{current.actionLabel}</Button>
               </div>
             </div>
           </div>

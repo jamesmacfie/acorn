@@ -6,7 +6,7 @@ import { integrationsOptions } from '../queries'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch } from '@acorn/protocol/api.ts'
 import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
-import { Alert, Checkbox } from '../ui/primitives'
+import { Alert, Button, Checkbox, Select } from '../ui/primitives'
 
 // All project-level config for one folder project, collapsed behind a native <details> so a workspace
 // with several projects isn't an overwhelming wall of fields. Reads/writes the project row through
@@ -101,11 +101,11 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
 
         <label class="settings-field">
           <span class="settings-label">Run the script</span>
-          <select class="ui-input" value={trigger()} onChange={(e) => void save({ setupScriptTrigger: e.currentTarget.value as SetupTrigger })}>
+          <Select value={trigger()} onChange={(e) => void save({ setupScriptTrigger: e.currentTarget.value as SetupTrigger })}>
             <option value="terminal">When the terminal is first opened</option>
             <option value="created">When the task is created</option>
             <option value="off">Off — never run it</option>
-          </select>
+          </Select>
         </label>
 
         <label class="settings-field">
@@ -149,15 +149,14 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             <span class="muted settings-hint">
               Where the database schema in the AI query-generation prompt comes from.
             </span>
-            <select
-              class="ui-input"
+            <Select
               value={dbSchemaMode()}
               onChange={(e) => { setDbSchemaValue(null); void save({ dbSchemaMode: e.currentTarget.value as DbSchemaMode | '' }) }}
             >
               <option value="">Live database introspection (default)</option>
               <option value="script">Script — its output is the schema</option>
               <option value="file">File in the worktree</option>
-            </select>
+            </Select>
             <Show when={dbSchemaMode() === 'script'}>
               <textarea
                 class="settings-script"
@@ -239,8 +238,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
         <label class="settings-field">
           <span class="settings-label">Browser preview URL</span>
           <span class="muted settings-hint">How the browser-preview pane finds its URL for this repo's tasks.</span>
-          <select
-            class="ui-input"
+          <Select
             value={previewMode()}
             onChange={(e) => { setPreviewValue(null); void save({ previewMode: e.currentTarget.value as PreviewMode | '' }) }}
           >
@@ -248,7 +246,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             <option value="url">A fixed URL</option>
             <option value="port">localhost with a port</option>
             <option value="script">Script — its output is the URL</option>
-          </select>
+          </Select>
           <Show when={previewMode() === 'script'}>
             <textarea
               class="settings-script"
@@ -359,16 +357,16 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               onInput={(e) => { update(rule().id, (r) => ({ ...r, action: { ...r.action, value: e.currentTarget.value } })); debSave() }}
               onBlur={() => debSave.flush()}
             />
-            <button type="button" class="ui-btn" title="Delete rule" onClick={() => remove(rule().id)}>
+            <Button title="Delete rule" onClick={() => remove(rule().id)}>
               ×
-            </button>
+            </Button>
           </div>
         )}
       </Index>
       <div>
-        <button type="button" class="ui-btn" onClick={add}>
+        <Button onClick={add}>
           Add rule
-        </button>
+        </Button>
       </div>
     </>
   )

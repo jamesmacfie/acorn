@@ -52,6 +52,9 @@ export type LinearIssueDetail = LinearIssueSummary & {
   relations?: LinearRelation[]
 }
 export type LinearCommentRequest = { body: string; parentId?: string }
+// What /uploads answers: the fetched image as a `data:` URL, which is the one image source a plugin
+// frame's CSP allows (see linearUploadRoute).
+export type LinearUploadResponse = { dataUrl: string }
 // The request half only. What the batch route ANSWERS is the host's `PluginRefResolutionBody[]`
 // (@acorn/protocol/refResolvers.ts), because it is declared as this plugin's ref resolver and the
 // vocabulary belongs to whoever renders it.
@@ -85,3 +88,7 @@ export const linearIssueRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
+// One private upload, inlined. The response is deliberately a data URL rather than the bytes: the frame
+// cannot do anything else with them, and the bridge carries JSON.
+export const linearUploadRoute = (url: string, connectionId?: string) =>
+  `/v2/p/linear/uploads?url=${encodeURIComponent(url)}${connectionQuery(connectionId)}`

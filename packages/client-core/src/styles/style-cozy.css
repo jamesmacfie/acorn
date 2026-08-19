@@ -28,8 +28,8 @@
   --gap-row: var(--space-6);
   --gap-stack: var(--space-8);
   --gap-section: var(--space-11);
-  --pad-control: var(--space-3) var(--space-6);
-  --pad-control-lg: var(--space-5) var(--space-9);
+  --pad-control: 0 var(--space-6);
+  --pad-control-lg: 0 var(--space-9);
   --pad-chip: 0 var(--space-6);
   --pad-cell: var(--space-3) var(--space-5);
 
@@ -37,7 +37,9 @@
   --row-h: 46px;
   --row-h-virt: 46px;
   --row-h-sm: 36px;
-  --control-h: 34px;
+  --control-h: 44px;
+  --control-h-sm: 32px;
+  --control-h-xs: 26px;
   --topbar-h: 56px;
   --pane-head-h: 52px;
   --shell-pad: var(--space-3);

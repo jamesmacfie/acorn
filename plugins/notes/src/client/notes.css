@@ -22,7 +22,7 @@
 /* :focus-within as well as :hover — a keyboard user could not reach this at all. */
 /* `.notes-main` is ListDetail's detail column — the flex column it declared is the default. */
 /* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
-.notes-toolbar { gap: var(--space-4); }
+.notes-toolbar.ui-toolbar { gap: var(--space-4); }
 .notes-title-input { flex: 1; min-width: 0; font: inherit; font-size: var(--fs-sm); color: var(--text); background: transparent; border: 0; outline: none; }
 .notes-scope-pill { flex: none; font-size: var(--fs-2xs); color: var(--text-muted); }
 .notes-view-context:hover:not(:disabled) { color: var(--accent); }

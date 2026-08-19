@@ -10,13 +10,21 @@
 
 /* ── Button ─────────────────────────────────────────────────────────────────────────────────
    Matches .overlay-btn exactly, which is what lets a converted call site keep its old class
-   alongside .ui-btn and render identically during migration. */
+   alongside .ui-btn and render identically during migration.
+
+   HEIGHT COMES FROM --control-h, NOT FROM PADDING. Deriving it from padding is what put four
+   heights in one strip on the agent pane header: a text button measured pad + line-box, an
+   icon-only button measured pad + a 16px glyph, and the two pickers beside them each hard-coded a
+   number. Every control in a row lines up now because they all read the same density token — the
+   recipe .ui-segment already used. The pads are inline-only for the same reason: a block pad would
+   fight min-height and put the derived value back. */
 .ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
-  /* Not inline-flex: <button>'s UA default is inline-block, and .overlay-btn never overrode it.
-     Switching would shift baseline alignment at 56 migrated call sites. The Button component's
-     spinner slot is inline anyway. */
   gap: var(--space-3);
+  min-height: var(--control-h);
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--text);
@@ -29,18 +37,22 @@
 .ui-btn:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
 .ui-btn:disabled { opacity: 0.5; cursor: default; }
 
-.ui-btn[data-size='sm'] { padding: var(--pad-control); font-size: var(--fs-xs); }
-.ui-btn[data-icon-only] { padding: var(--space-1); width: var(--control-h); }
+.ui-btn[data-size='sm'] { min-height: var(--control-h-sm); padding: var(--pad-control); font-size: var(--fs-xs); }
+/* Square by construction: min-height already supplies the other axis. */
+.ui-btn[data-icon-only] { padding: 0; width: var(--control-h); }
+.ui-btn[data-size='sm'][data-icon-only] { width: var(--control-h-sm); }
 
 .ui-btn[data-variant='solid'] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .ui-btn[data-variant='solid']:hover:not(:disabled) { opacity: 0.9; background: var(--accent); }
 .ui-btn[data-variant='ghost'] { background: transparent; border-color: transparent; }
 .ui-btn[data-variant='ghost']:hover:not(:disabled) { background: var(--bg-hover); border-color: transparent; }
-/* 'bare' is the .section-refresh / .settings-close shape: an icon affordance with no box at all. */
+/* 'bare' is the .section-refresh / .settings-close shape: an icon affordance with no box at all —
+   including the control height, which is what makes it usable as an inline link inside a sentence. */
 .ui-btn[data-variant='bare'] {
   background: transparent;
   border: 0;
   padding: 0;
+  min-height: 0;
   color: var(--text-muted);
   line-height: 1;
 }
@@ -77,7 +89,7 @@
 .ui-input:disabled { opacity: 0.5; cursor: default; }
 .ui-input[data-width='auto'] { flex: none; }
 .ui-input[data-width='narrow'] { flex: none; width: 90px; }
-.ui-input[data-size='sm'] { padding: var(--pad-control); }
+.ui-input[data-size='sm'] { padding: var(--space-2) var(--space-4); }
 .ui-input[data-invalid] { border-color: var(--danger); }
 textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 
@@ -147,6 +159,7 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
    the quiet kind of broken (plugins/http/src/frame/http.css says the same about .settings-hint).
    Rule: a class an exported component renders belongs in a sheet frames are served. */
 .section-header {
+  flex: none;
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -208,9 +221,39 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-row[data-density='compact'] { min-height: var(--row-h-sm); }
 .ui-row[data-density='roomy'] { min-height: calc(var(--row-h) + var(--space-4)); }
 .ui-row:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
+/* Actions inside a header or an alert take the dense rung: their container is chrome, and a
+   form-height button inside a 44px strip is what made every pane header look top-heavy. `bare`
+   opts out — it has no box to size. */
+.ui-section-header-actions .ui-btn:not([data-variant='bare']),
+.ui-alert-actions .ui-btn:not([data-variant='bare']) {
+  min-height: var(--control-h-sm);
+  padding: var(--pad-control);
+  font-size: var(--fs-xs);
+}
 .ui-row-leading { flex: none; display: inline-flex; align-items: center; }
 .ui-row-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-row-meta { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); }
+/* Several facts read as COLUMNS, not as a sentence. One track per fact, the same width in every
+   row, so the Nth fact lines up down the list the way github's hand-built PR row does. `minmax(0,
+   …)` rather than a bare width: a grid track's default `min-width: auto` refuses to shrink below
+   its content, which would push the trailing action off a narrow pane. */
+.ui-row {
+  /* Local constant, not a token: the track width is this row's arithmetic, and only these two rules
+     share it (diff.css does the same with its gutter widths). */
+  --row-field-w: 84px;
+}
+/* `flex: 0 1 auto` with `min-width: 0`, unlike the plain meta above: four reserved tracks are wider
+   than a narrow left pane, and a non-shrinking grid would crush the title to nothing rather than
+   ellipsize its own cells. */
+.ui-row-meta[data-fields] {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, var(--row-field-w));
+  gap: var(--space-4);
+}
+.ui-row-field { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ui-row-trailing { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); }
 
 /* ── Modal ──────────────────────────────────────────────────────────────────────────────────
@@ -953,18 +996,20 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 }
 .ui-doctab[data-active] .ui-doctab-label { color: var(--text); }
 .ui-doctab-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ui-doctab-close { flex: none; padding: 0 var(--space-3); opacity: 0; }
+.ui-doctab-close.ui-btn { flex: none; padding: 0 var(--space-3); opacity: 0; }
 /* Keyboard-reachable, unlike the mouse-only ✕ this replaces. */
 .ui-doctab:hover .ui-doctab-close,
 .ui-doctab:focus-within .ui-doctab-close,
 .ui-doctab[data-active] .ui-doctab-close { opacity: 1; }
 
 /* ── Button/Row/Tabs extensions ─────────────────────────────────────────────────────────────
-   `xs` is the chrome-badge size: a glyph affordance inside a topbar strip, which ChromeBadge was
-   already asking for with an invalid `data-size` before the size existed. */
-.ui-btn[data-size='xs'] { padding: 0 var(--space-2); font-size: var(--fs-2xs); }
+   `xs` is the SLIM rung: a chip-height affordance that rides inside a list row or a topbar strip
+   without setting the row's height. Three rungs, one per height token — md fills a form or a
+   toolbar, sm is a dense strip, xs sits inside another control's row. */
+.ui-btn[data-size='xs'] { min-height: var(--control-h-xs); padding: 0 var(--space-3); font-size: var(--fs-xs); }
+.ui-btn[data-size='xs'][data-icon-only] { width: var(--control-h-xs); }
 /* An <a class="ui-btn"> has to shed the UA's link decoration and pick up the button's box. */
-a.ui-btn { display: inline-block; text-decoration: none; }
+a.ui-btn { text-decoration: none; }
 a.ui-btn:hover { text-decoration: none; }
 /* An <a class="ui-row"> likewise. */
 a.ui-row { text-decoration: none; cursor: pointer; }

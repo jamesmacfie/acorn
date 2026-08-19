@@ -395,7 +395,13 @@ export type PluginRailTask = {
 export type PluginRailItem = {
   id: string
   title: string
+  /** One pre-joined line of secondary text. For SEVERAL facts use `fields`, which the host lays out
+   *  as columns — linear and rollbar both built a facts array and then flattened it with ` · `, and
+   *  the flattening is what stopped their lists reading like github's aligned one. */
   subtitle?: string
+  /** Ordered secondary facts, one per column. The host reserves the same track width for each, so
+   *  the Nth fact lines up down the whole list. Wins over `subtitle` when both are present. */
+  fields?: string[]
   icon?: string
   badge?: string
   task?: PluginRailTask

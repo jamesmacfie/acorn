@@ -324,15 +324,14 @@ function ProjectRows(props: {
     <Index each={props.rows}>
       {(project) => (
         <div class="ws-row" classList={{ 'ws-row-hidden': project().hidden }}>
-          <button
-            type="button"
-            class="onboarding-eye"
+          <Button
+            variant="bare" class="onboarding-eye"
             title={project().hidden ? 'Hidden — click to show' : 'Hide this project'}
             aria-pressed={project().hidden}
             onClick={() => props.onHide(project().id, !project().hidden)}
           >
             {project().hidden ? '⊘' : '◉'}
-          </button>
+          </Button>
           <Input
             class="ws-row-name"
             aria-label={`Name of ${project().name}`}

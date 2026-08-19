@@ -11,16 +11,8 @@
   gap: var(--space-3);
   margin-left: auto;
 }
-.onboarding-eye {
-  font: inherit;
-  font-size: var(--fs-md);
-  line-height: 1;
-  background: none;
-  border: 0;
-  padding: var(--space-1);
-  cursor: pointer;
-  opacity: 0.85;
-}
+.onboarding-eye { opacity: 0.85; }
+.onboarding-eye.ui-btn[data-variant='bare'] { font-size: var(--fs-md); padding: var(--space-1); }
 .onboarding-eye:hover { opacity: 1; }
 
 /* ── Projects, grouped by workspace ─────────────────────────────────────────────────────────────

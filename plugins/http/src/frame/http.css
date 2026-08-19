@@ -63,11 +63,11 @@
    declare IS the primitive's default, so the class survives only as a name for the rules below. */
 
 /* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
-.http-urlbar { padding: var(--space-4) var(--pane-pad); background: none; }
+.http-urlbar.ui-toolbar { padding: var(--space-4) var(--pane-pad); background: none; }
 .http-urlbar .http-method { flex: 0 0 auto; }
 .http-urlbar .http-url { flex: 1; min-width: 0; font-family: var(--font-mono, monospace); }
 
-.http-metabar { padding: var(--space-2) var(--pane-pad); }
+.http-metabar.ui-toolbar { padding: var(--space-2) var(--pane-pad); }
 
 /* The request's name is a button that opens the save dialog — the only place it can be edited. */
 .http-name-btn {

@@ -54,19 +54,8 @@
   overflow-y: auto;
 }
 .settings-pane .overlay-title { padding: 0 0 var(--space-4); margin: 0 var(--space-11) 0 0; }
-.settings-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font: inherit;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  line-height: 1;
-  padding: var(--space-2);
-}
-.settings-close:hover { color: var(--text); }
+.settings-close { position: absolute; top: 8px; right: 8px; }
+.settings-close.ui-btn[data-variant='bare'] { padding: var(--space-2); }
 
 .settings-section { display: flex; flex-direction: column; gap: 18px; }
 .settings-field { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -129,13 +118,14 @@
 .mcp-server-status.mcp-invalid { color: var(--del-marker); }
 .mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
 .mcp-server-env { font-family: var(--font-mono); }
-.shortcut-reset { margin-left: var(--space-4); padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; font-size: var(--fs-sm); }
-.shortcut-reset:hover { color: var(--text); text-decoration: underline; }
+.shortcut-reset { margin-left: var(--space-4); }
+.shortcut-reset.ui-btn[data-variant='bare'] { color: var(--text-faint); }
+.shortcut-reset:hover { text-decoration: underline; }
 .shortcut-conflict { border-color: var(--del-marker); }
 /* The conflict note is an Alert rendered mid-sentence, so it gives up the block box and the inline
    variant's top margin. Every other Alert site is a standalone message. Distinct from
    `.shortcut-conflict` above, which recolours the key INPUT. */
-.shortcut-conflict-note { display: inline; margin-top: 0; }
+.shortcut-conflict-note.ui-alert { display: inline; margin-top: 0; }
 .shortcut-group { display: contents; }
 .shortcut-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
 .shortcut-group-disabled .help-list { opacity: 0.62; }

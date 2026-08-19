@@ -6,6 +6,8 @@ import { clear } from 'idb-keyval'
 import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, workspacesOptions } from '@acorn/client-core/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/tasks/taskLookup.ts'
+import Picker from '@acorn/client-core/ui/Picker.tsx'
+import { Button, Select } from '@acorn/client-core/ui/primitives.tsx'
 import WorkspacePicker from '@acorn/client-core/ui/WorkspacePicker.tsx'
 import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/workspaces/fleetWorkspaces.ts'
@@ -325,15 +327,14 @@ export default function App() {
     <div class="app" classList={{ 'left-collapsed': collapsed() }}>
       <header class="topbar">
         <div class="topbar-side">
-          <button
-            type="button"
-            class="collapse-toggle"
+          <Button
+            variant="bare" class="collapse-toggle"
             title={collapsed() ? 'Show left pane' : 'Hide left pane'}
             aria-pressed={collapsed()}
             onClick={toggleCollapsed}
           >
             {collapsed() ? '»' : '«'}
-          </button>
+          </Button>
           <Show when={fleetWorkspaces().entries.length}>
             <WorkspacePicker
               workspaces={fleetWorkspaces().entries}
@@ -346,30 +347,33 @@ export default function App() {
             />
           </Show>
           <Show when={scopedProjects().length}>
-            <select
-              class="ui-input project-picker"
-              aria-label="Project"
-              value={params.projectId ?? ''}
+            <Picker<Project>
+              label={scopedProjects().find((project) => project.id === params.projectId)?.name ?? 'Select a project'}
+              ariaLabel="Project"
+              placeholder="Filter projects…"
+              emptyText="No projects."
+              results={(query) => {
+                const q = query.trim().toLowerCase()
+                return q ? scopedProjects().filter((project) => project.name.toLowerCase().includes(q)) : scopedProjects()
+              }}
+              rowLabel={(project) => project.name}
+              isActive={(project) => project.id === params.projectId}
               disabled={!selectedSource() && !!activeTask()}
-              onChange={(event) => {
-                const projectId = event.currentTarget.value
-                if (!projectId) return
+              onSelect={(project) => {
                 if (!selectedSource()) {
                   const source = defaultSourceId()
                   if (source) setSelectedSource(source)
                 }
-                navigate(projectPath(projectId))
+                navigate(projectPath(project.id))
               }}
-            >
-              <For each={scopedProjects()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
-            </select>
+            />
           </Show>
         </div>
         <div class="breadcrumb">
           <Show when={params.projectId} fallback={<span class="brand">acorn</span>}>
-            <button type="button" class="crumb crumb-link" onClick={() => navigate(projectPath(params.projectId ?? ''))}>
+            <Button variant="bare" class="crumb" onClick={() => navigate(projectPath(params.projectId ?? ''))}>
               {projects.data?.find((project) => project.id === params.projectId)?.name ?? params.projectId}
-            </button>
+            </Button>
             <Show when={params.number}>
               <span class="crumb-sep">/</span>
               <span class="crumb crumb-num">#{params.number}</span>
@@ -383,15 +387,15 @@ export default function App() {
         <div class="topbar-side topbar-end">
           {/* Keep the node switcher out of production first-run until a second node exists. */}
           <Show when={nodes().length > 1 || import.meta.env.DEV}>
-            <select
-              class="ui-input node-switcher"
-              data-width="auto"
+            <Select
+              class="node-switcher"
+              width="auto"
               aria-label="Active node"
               value={activeNodeId() ?? ''}
               onChange={(event) => setActiveNode(event.currentTarget.value || null)}
             >
               <For each={nodes()}>{(node) => <option value={node.nodeId}>{node.label}</option>}</For>
-            </select>
+            </Select>
           </Show>
           {/* The compact chip reports the active node's connection state; surfaces render their own
               freshness where they have useful scope. */}

@@ -46,31 +46,16 @@
   padding: 0 var(--space-2);
   border-left: var(--chrome-divider);
 }
-.terminal-new,
-.terminal-close,
-.terminal-interrupt {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  padding: var(--space-1) var(--space-2);
-}
-.terminal-new:hover,
-.terminal-close:hover,
-.terminal-interrupt:hover {
-  color: var(--text);
-}
-.terminal-new {
-  font-size: 16px;
-  padding: 0 var(--space-4);
-}
+.terminal-new.ui-btn[data-variant='bare'],
+.terminal-close.ui-btn[data-variant='bare'],
+.terminal-interrupt.ui-btn[data-variant='bare'] { padding: var(--space-1) var(--space-2); }
+.terminal-new.ui-btn[data-variant='bare'] { font-size: 16px; padding: 0 var(--space-4); }
 /* Menu owns the surface (portal, position, elevation, dismissal) and the item vocabulary. This is
    only the menu's width — `position: relative` on the wrapper went with the absolute positioning. */
 .terminal-menu {
   min-width: 180px;
 }
-.terminal-interrupt {
+.terminal-interrupt.ui-btn[data-variant='bare'] {
   border: var(--control-border);
   border-radius: var(--radius);
 }
@@ -108,7 +93,7 @@
   padding: var(--space-2) var(--space-3);
   font: var(--fs-sm) var(--font-mono);
 }
-.terminal-error-banner { margin-top: 0; padding: var(--space-2) var(--space-4); border-bottom: var(--chrome-divider); }
+.terminal-error-banner.ui-alert { margin-top: 0; padding: var(--space-2) var(--space-4); border-bottom: var(--chrome-divider); }
 .terminal-body {
   flex: 1;
   min-height: 0;

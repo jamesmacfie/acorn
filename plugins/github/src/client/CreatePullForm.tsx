@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { branchesOptions, compareOptions, mentionsOptions } from './queries'
 import { projectsOptions } from '@acorn/plugin-api/client'
 import { pullsKey, type Branch } from '../contract/api'
-import { Alert, Checkbox, EmptyState, Input, MentionTextarea, Picker } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, EmptyState, Input, MentionTextarea, Picker } from '@acorn/plugin-api/ui'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import { githubBrowsePath } from './routes'
@@ -153,9 +153,9 @@ export default function CreatePullForm() {
         </label>
 
         <div class="pr-actions">
-          <button type="button" onClick={submit} disabled={!canCreate()}>
+          <Button onClick={submit} disabled={!canCreate()}>
             {create.isPending ? 'Creating…' : draft() ? 'Create draft pull request' : 'Create pull request'}
-          </button>
+          </Button>
         </div>
 
         <Show when={comparable()} fallback={<div class="create-pr-status">Choose a branch to open a pull request.</div>}>

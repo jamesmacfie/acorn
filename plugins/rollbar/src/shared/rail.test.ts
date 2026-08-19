@@ -33,7 +33,7 @@ describe('Rollbar descriptor rows', () => {
     expect(rollbarRailItem(ITEM)).toEqual({
       id: 'rollbar%3Aproduction:142%2F7',
       title: 'Checkout failed',
-      subtitle: '#142/7 · error · production · Production',
+      fields: ['#142/7', 'error', 'production', 'Production'],
       badge: '12 occurrences',
       task: {
         origin: 'rollbar',

@@ -2,6 +2,7 @@ import { createSignal, Match, Show, Switch } from 'solid-js'
 import Acorn from '../Acorn'
 import { recoveryActions } from '../platform'
 import { nodeReadiness, selectActiveNode } from './activeNode'
+import { Button } from '../ui/primitives'
 
 export default function NodeGate() {
   const [showReason, setShowReason] = createSignal(false)
@@ -22,15 +23,15 @@ export default function NodeGate() {
         <Match when={readiness().kind === 'failed'}>
           <Acorn label="local node failed" />
           <div class="node-gate-actions">
-            <button type="button" class="ui-btn" onClick={() => void selectActiveNode()}>Retry</button>
-            <button type="button" class="ui-btn" aria-expanded={showReason()} onClick={() => setShowReason((v) => !v)}>
+            <Button onClick={() => void selectActiveNode()}>Retry</Button>
+            <Button aria-expanded={showReason()} onClick={() => setShowReason((v) => !v)}>
               Diagnostics
-            </button>
+            </Button>
             <Show when={recoveryActions()}>
               {(recovery) => (
                 <>
-                  <button type="button" class="ui-btn" onClick={() => recovery().openDataFolder()}>Open data folder</button>
-                  <button type="button" class="ui-btn" onClick={() => recovery().quit()}>Quit</button>
+                  <Button onClick={() => recovery().openDataFolder()}>Open data folder</Button>
+                  <Button onClick={() => recovery().quit()}>Quit</Button>
                 </>
               )}
             </Show>

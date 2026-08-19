@@ -29,15 +29,17 @@
   --gap-row: var(--space-5);
   --gap-stack: var(--space-6);
   --gap-section: var(--space-9);
-  --pad-control: var(--space-3) var(--space-6);
-  --pad-control-lg: var(--space-4) var(--space-8);
+  --pad-control: 0 var(--space-6);
+  --pad-control-lg: 0 var(--space-8);
   --pad-chip: 0 var(--space-6);
 
   /* ── Density ───────────────────────────────────────────────────────────────────────────── */
   --row-h: 44px;
   --row-h-virt: 44px;
   --row-h-sm: 34px;
-  --control-h: 34px;
+  --control-h: 38px;
+  --control-h-sm: 32px;
+  --control-h-xs: 26px;
   --topbar-h: 54px;
   --pane-head-h: 46px;
   --shell-pad: var(--space-5);

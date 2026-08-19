@@ -2,6 +2,7 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import type { PairedDevice } from '@acorn/protocol/node.ts'
 import { nodeDevices, revokeNodeDevice } from '../node/fleetActions'
 import { formatLastSeen } from '../node/freshness'
+import { Button } from '../ui/primitives'
 
 // Every client paired with one node, with a revoke per row (docs/ui-design.md § New surfaces: "revoke this or other
 // devices").
@@ -42,9 +43,9 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
 
   return (
     <div class="node-devices">
-      <button type="button" class="node-devices-toggle" aria-expanded={open()} onClick={() => setOpen(!open())}>
+      <Button variant="bare" class="node-devices-toggle" aria-expanded={open()} onClick={() => setOpen(!open())}>
         {open() ? 'Hide paired clients' : 'Paired clients…'}
-      </button>
+      </Button>
       <Show when={open()}>
         <Show when={devices.loading}><p class="muted">Reading the device list…</p></Show>
         <Show when={!devices.loading && !active().length}>
@@ -58,9 +59,7 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
               <li class="node-device">
                 <span class="node-device-name">{device.name}</span>
                 <span class="muted">last seen {formatLastSeen(device.lastSeenAt ?? undefined)}</span>
-                <button
-                  type="button"
-                  class="ui-btn node-danger"
+                <Button class="node-danger"
                   disabled={busy() === device.id}
                   /* No "is this me?" guard. The client cannot know which row is its own — the device id it
                      was issued lives in main, not here — and revoking yourself is a legitimate action that
@@ -68,7 +67,7 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
                   onClick={() => void revoke(device)}
                 >
                   Revoke
-                </button>
+                </Button>
               </li>
             )}
           </For>

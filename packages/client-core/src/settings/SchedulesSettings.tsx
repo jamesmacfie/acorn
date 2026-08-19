@@ -315,9 +315,9 @@ export default function SchedulesSettings() {
                   {row.enabled ? `next ${formatWhen(row.nextRunAt, now)}` : 'paused'}
                   <Show when={row.lastRunAt}>{(last) => <> · last run {formatRelativeTime(last(), now)}</>}</Show>
                   {' · '}
-                  <button type="button" class="shortcut-reset" onClick={() => setExpanded(expanded() === row.key ? null : row.key)}>
+                  <Button variant="bare" class="shortcut-reset" onClick={() => setExpanded(expanded() === row.key ? null : row.key)}>
                     {expanded() === row.key ? 'hide runs' : 'runs'}
-                  </button>
+                  </Button>
                 </span>
                 {/* Honest about the two ways a row can be listed but unrunnable, because both look like
                     "it just stopped working" from the outside. */}

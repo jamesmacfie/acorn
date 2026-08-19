@@ -216,9 +216,12 @@ export function SectionHeader(props: {
    a pill — differences no token substitution can express across 18 separate `-row` selectors.
    Also absorbs the role/tabindex/Enter/Space wiring that DockerBrowse hand-writes twice.
 
-   Deliberately NOT for the virtualized/tabular rows (.diff-row, .dbgrid-row, …): those are
-   measured geometry where a changed box model silently corrupts scroll math. */
+   Still NOT for the tabular rows (.diff-row, .dbgrid-row, …): those are measured geometry where a
+   changed box model silently corrupts scroll math. A virtualized LIST row is fine — github's PR list
+   is one, and it takes its measured height through `style` while opting out of `min-height`. */
 export function Row(props: {
+  /** Number of `.ui-row-field` cells inside `meta`, so the row can reserve a track for each. */
+  metaFields?: number
   selected?: boolean
   nested?: boolean
   /** Indentation level. Generalises `nested` (which is depth 1) for TreeRow. */
@@ -228,8 +231,19 @@ export function Row(props: {
   density?: 'compact' | 'default' | 'roomy'
   onActivate?: () => void
   /** Renders an <a class="ui-row">. github's PR rows are links, so they were an <A> with the row's
-   *  classes hand-applied — which lost middle-click and copy-link everywhere else. */
+   *  classes hand-applied — which lost middle-click and copy-link everywhere else.
+   *
+   *  With `onActivate` it behaves exactly as the router's <A> does, and for the same reason: a plain
+   *  left-click is intercepted and routed, while middle-click, ⌘-click and "copy link address" fall
+   *  through to the real href. Reimplemented rather than imported because primitives.tsx is served
+   *  to plugin frames, and a frame is a separate document with no Router above it. */
   href?: string
+  /** Absolute placement from a virtualizer. The one prop a measured list cannot express as a class —
+   *  github's PR list is why Row's own note used to exclude virtualized rows. */
+  style?: JSX.CSSProperties
+  /** Pointer or keyboard focus entered/left the row. One callback rather than four handlers because
+   *  every caller wants the same thing from all four: start a prefetch, then cancel it. */
+  onHover?: (entered: boolean) => void
   /** Shape story. `stacked` is the multi-line row (rollbar's occurrence list) that had to override
    *  `.ui-row`'s centring three times. */
   variant?: 'default' | 'stacked'
@@ -245,7 +259,7 @@ export function Row(props: {
     <>
       <Show when={props.leading}><span class="ui-row-leading">{props.leading}</span></Show>
       <span class="ui-row-body">{props.children}</span>
-      <Show when={props.meta}><span class="ui-row-meta">{props.meta}</span></Show>
+      <Show when={props.meta}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{props.meta}</span></Show>
       <Show when={props.trailing}><span class="ui-row-trailing">{props.trailing}</span></Show>
     </>
   )
@@ -260,6 +274,19 @@ export function Row(props: {
         data-density={props.density ?? 'default'}
         data-variant={props.variant ?? 'default'}
         title={props.title}
+        style={props.style}
+        onFocus={() => props.onHover?.(true)}
+        onBlur={() => props.onHover?.(false)}
+        onMouseEnter={() => props.onHover?.(true)}
+        onMouseLeave={() => props.onHover?.(false)}
+        onClick={(event) => {
+          if (!props.onActivate) return
+          // Anything the browser has its own answer for stays the browser's: a new tab, a new
+          // window, a download, or a handler that already claimed the event.
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+          event.preventDefault()
+          activate()
+        }}
       >
         {body}
       </a>

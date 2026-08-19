@@ -52,7 +52,7 @@ export default function PullRefPanel(props: RefPanelProps) {
         <header class="integrations-panel-head">
           <span class="integrations-panel-title">{props.target.displayId}</span>
           <Toolbar.Spacer />
-          <Button variant="bare" class="integrations-panel-close" onClick={props.onClose} aria-label="Close">✕</Button>
+          <Button class="integrations-panel-close" onClick={props.onClose} aria-label="Close">✕</Button>
         </header>
         <div class="integrations-panel-body">
           <Show

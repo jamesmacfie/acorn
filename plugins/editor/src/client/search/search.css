@@ -19,7 +19,7 @@
 }
 /* Input kind="filter" owns the control; this keeps the panel's own padding. */
 .search-input { padding: var(--space-2) var(--space-4); }
-.search-toggles {
+.search-toggles.ui-toolbar {
   flex: none;
   display: flex;
   justify-content: flex-end;

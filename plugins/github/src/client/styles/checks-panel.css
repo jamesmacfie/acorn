@@ -33,14 +33,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.checks-panel-close {
-  font: inherit;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  padding: var(--space-1) var(--space-3);
-}
+.checks-panel-close.ui-btn[data-variant='bare'] { padding: var(--space-1) var(--space-3); }
 .checks-panel-body {
   flex: 1;
   overflow-y: auto;

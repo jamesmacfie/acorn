@@ -1,13 +1,10 @@
-/* PR list (left pane). */
-.pr-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  height: var(--row-h);
-  padding: 0 var(--pane-pad);
-  border-bottom: var(--divider);
-  border-left: var(--marker-w) solid transparent;
-  font-size: var(--fs-sm);
+/* PR list (left pane). Row owns the box, hover, selected tint and left marker — this list looked
+   different from every integration browse only because it hand-built all four. */
+.pr-row.ui-row {
+  /* The virtualizer's measured height is the truth for a row in a measured list: --row-h and
+     --row-h-virt are equal in every pack today, but a min-height that ever exceeded the slot would
+     overlap the next row and corrupt the scroll math rather than just look wrong. */
+  min-height: 0;
   transition:
     background-color var(--dur-short) var(--ease-out),
     border-color var(--dur-short) var(--ease-out);
@@ -36,65 +33,19 @@
    longer reached for by the database frame, where it was never served and rendered nothing. */
 .pr-filter { flex: none; margin-left: auto; width: min(44%, 160px); padding: 5px 7px; }
 
-.pr-row { color: inherit; text-decoration: none; cursor: pointer; }
-.pr-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
-.pr-row:hover { background: var(--bg-hover); }
 .pr-num { color: var(--text-muted); flex-shrink: 0; }
-.pr-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.pr-author {
-  flex: 0 1 76px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  text-align: right;
-}
-.pr-time {
-  flex: none;
-  min-width: 48px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-/* "Open as workspace" affordance — hidden until the row is hovered/focused (docs/workspaces-and-tasks.md). */
-.pr-ws-btn {
-  flex: none;
-  opacity: 0;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: transparent;
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: 0 var(--space-3);
-  cursor: pointer;
-}
+/* "Open as workspace" affordance — Button size="xs" owns the box; this is only the reveal
+   (docs/workspaces-and-tasks.md). */
+.pr-ws-btn { opacity: 0; }
 .pr-row:hover .pr-ws-btn,
 .pr-row:focus-within .pr-ws-btn { opacity: 1; }
-.pr-ws-btn:hover { background: var(--bg); color: var(--text); border-color: var(--border-strong); }
-.pr-load-more {
-  display: block;
-  width: 100%;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
+.pr-load-more { display: block; width: 100%; text-align: center; }
+.pr-load-more.ui-btn[data-variant='bare'] {
   background: var(--bg);
-  border: none;
   border-top: var(--chrome-divider);
   padding: 10px var(--pane-pad);
-  text-align: center;
-  cursor: pointer;
 }
-.pr-load-more:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
-.pr-load-more:disabled { cursor: default; }
-.pr-badge {
-  flex-shrink: 0;
-  font-size: var(--fs-xs);
-  line-height: 18px;
-  color: var(--warn);
-  border: var(--control-bw) solid var(--badge-border);
-  border-radius: var(--radius);
-  padding: 0 5px;
-}
-
+.pr-load-more.ui-btn[data-variant='bare']:hover:not(:disabled) { background: var(--bg-hover); }
 /* +TASK failure (PullList.tsx). The Alert primitive owns the colour and size; this is only the
    list's inset, which a shared component cannot know about. */
 .pr-task-error { margin: var(--space-2) var(--pane-pad); }

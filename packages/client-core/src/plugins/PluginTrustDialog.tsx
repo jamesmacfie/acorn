@@ -5,7 +5,7 @@ import { createDismissable } from '../ui/dismissable'
 import { pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
 import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
-import { Alert, Kbd } from '../ui/primitives'
+import { Alert, Badge, Button, Kbd } from '../ui/primitives'
 
 // The consent surface for running code a node handed this device
 // (docs/plugins.md).
@@ -102,13 +102,13 @@ export default function PluginTrustDialog() {
                     {previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
                   </h2>
                   <p class="plugin-trust-meta">
-                    <span class="ui-badge" data-size="xs">
+                    <Badge size="xs">
                       {previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}
-                    </span>
-                    <span class="ui-badge" data-size="xs">
+                    </Badge>
+                    <Badge size="xs">
                       <Icon name="monitor" /> from {nodeLabel(current().nodeId)}
-                    </span>
-                    <Show when={!previousVersion()}><span class="ui-badge" data-size="xs">first time</span></Show>
+                    </Badge>
+                    <Show when={!previousVersion()}><Badge size="xs">first time</Badge></Show>
                   </p>
                 </div>
               </header>
@@ -140,9 +140,9 @@ export default function PluginTrustDialog() {
                         <li class="added" classList={{ high: line.high }}>
                           <Icon name={line.icon} />
                           <span>{line.text}</span>
-                          <span class="ui-badge" data-size="xs" data-tone={line.tier === 'declared' ? 'warn' : 'accent'}>
+                          <Badge size="xs" tone={line.tier === 'declared' ? 'warn' : 'accent'}>
                             {TIER_LABEL[line.tier]}
-                          </span>
+                          </Badge>
                         </li>
                       )}
                     </For>
@@ -190,12 +190,12 @@ export default function PluginTrustDialog() {
               <p class="plugin-trust-escape">
                 Not sure? Press <Kbd size="xs">Esc</Kbd> — {previousVersion() ? `${previousVersion()} keeps running and ` : ''}acorn asks again next launch.
               </p>
-              <button type="button" class="ui-btn" data-variant="ghost" disabled={saving()} onClick={() => void decide('rejected')}>
+              <Button variant="ghost" disabled={saving()} onClick={() => void decide('rejected')}>
                 {previousVersion() ? `Keep ${previousVersion()}` : 'Don’t run it'}
-              </button>
-              <button type="button" class="ui-btn" disabled={saving()} onClick={() => void decide('accepted')}>
+              </Button>
+              <Button disabled={saving()} onClick={() => void decide('accepted')}>
                 {saving() ? 'Saving…' : previousVersion() ? 'Trust the update' : `Trust ${current().row.name} ${current().row.installed?.version}`}
-              </button>
+              </Button>
             </div>
           </section>
         </div>

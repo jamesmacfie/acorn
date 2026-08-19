@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, previewViews } from '@acorn/plugin-api/client'
-import { EmptyState, Spinner } from '@acorn/plugin-api/ui'
+import { Button, EmptyState, Spinner } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -112,10 +112,10 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
           </EmptyState>
         }>
           <div class="preview-chrome">
-            <button type="button" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => preview?.command(props.taskId, 'back')}>‹</button>
-            <button type="button" class="preview-nav-btn" title="Forward" disabled={!canFwd()} onClick={() => preview?.command(props.taskId, 'forward')}>›</button>
-            <button type="button" class="preview-nav-btn" title={loading() ? 'Stop' : 'Reload'} onClick={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</button>
-            <button type="button" class="preview-nav-btn" title="Home" onClick={() => props.url && preview?.load(props.taskId, props.url)}>⌂</button>
+            <Button variant="bare" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => preview?.command(props.taskId, 'back')}>‹</Button>
+            <Button variant="bare" class="preview-nav-btn" title="Forward" disabled={!canFwd()} onClick={() => preview?.command(props.taskId, 'forward')}>›</Button>
+            <Button variant="bare" class="preview-nav-btn" title={loading() ? 'Stop' : 'Reload'} onClick={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
+            <Button variant="bare" class="preview-nav-btn" title="Home" onClick={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
             <input
               class="preview-url"
               type="text"
@@ -124,7 +124,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
               onInput={(e) => setAddr(e.currentTarget.value)}
               onKeyDown={(e) => e.key === 'Enter' && go()}
             />
-            <button type="button" class="preview-nav-btn" title="Toggle preview DevTools" aria-label="Toggle preview DevTools" onClick={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</button>
+            <Button variant="bare" class="preview-nav-btn" title="Toggle preview DevTools" aria-label="Toggle preview DevTools" onClick={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
             <Show when={loading()}><Spinner label="Loading page" /></Show>
           </div>
         </Show>

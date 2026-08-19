@@ -34,7 +34,7 @@ import Icon from '../ui/Icon'
 import IconPicker, { randomIconName } from '../ui/IconPicker'
 import './tabrail.css'
 import { taskOriginAppearance } from '../tasks/origin'
-import { Alert, StatusDot } from '../ui/primitives'
+import { Alert, Button, Select, StatusDot } from '../ui/primitives'
 import { Menu } from '../ui/Menu'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
@@ -477,11 +477,11 @@ export default function TabRail() {
               <div class="overlay-body">
                 <Show when={d().mode === 'new'}>
                   <p class="muted">{selectedProject()?.vcs === 'git' ? 'A local-first task on a new branch.' : 'Runs in the project folder.'}</p>
-                  <select class="ui-input" value={newProject()} onChange={(e) => setNewProject(e.currentTarget.value)}>
+                  <Select value={newProject()} onChange={(e) => setNewProject(e.currentTarget.value)}>
                     <For each={newProjectOptions()}>
                       {(project) => <option value={project.id}>{project.name}</option>}
                     </For>
-                  </select>
+                  </Select>
                 </Show>
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
                   <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
@@ -510,9 +510,9 @@ export default function TabRail() {
                       }}
                       />
                   </Show>
-                  <button type="submit" class="ui-btn" disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !effectiveBranch())}>
+                  <Button type="submit" disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !effectiveBranch())}>
                     {d().mode === 'new' ? 'Create' : 'Save'}
-                  </button>
+                  </Button>
                 </form>
               </div>
             </div>

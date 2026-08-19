@@ -3,7 +3,7 @@
 
 .docker-browse { display: flex; flex-direction: column; overflow: hidden; }
 
-.docker-filters { padding: 6px var(--pane-pad); }
+.docker-filters.ui-toolbar { padding: 6px var(--pane-pad); }
 /* Input kind="filter" owns the control. What is left is what differs. */
 .docker-search { min-width: 120px; }
 
