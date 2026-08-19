@@ -51,31 +51,45 @@ export function createSplitDrag(opts: {
 
   const onPointerDown = (event: PointerEvent) => {
     event.preventDefault()
-    if (event.currentTarget instanceof HTMLElement) event.currentTarget.setPointerCapture(event.pointerId)
+    const handle = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined
+    handle?.setPointerCapture(event.pointerId)
     const start = opts.axis === 'x' ? event.clientX : event.clientY
     opts.onStart?.()
 
     // Without this, dragging selects every label it passes over.
-    const previousUserSelect = document.body.style.userSelect
     document.body.style.userSelect = 'none'
 
     let frame = 0
+    let ended = false
     const move = (pointer: PointerEvent) => {
       const current = opts.axis === 'x' ? pointer.clientX : pointer.clientY
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => opts.onDelta(current - start))
     }
+    // Idempotent, because it is reachable from four places. Clears by REMOVING the property rather than
+    // restoring a snapshot: a snapshot taken while an earlier drag was still stuck would preserve `none`
+    // forever, whereas removal heals a document that already leaked one.
     const up = () => {
+      if (ended) return
+      ended = true
       cancelAnimationFrame(frame)
-      document.body.style.userSelect = previousUserSelect
+      document.body.style.removeProperty('user-select')
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      handle?.removeEventListener('lostpointercapture', up)
       release = undefined
       opts.onCommit?.()
     }
     release = up
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    // `pointerup` is not guaranteed: an interrupted gesture fires `pointercancel` instead, and losing
+    // capture (the handle re-rendering mid-drag) fires neither. Missing either path left
+    // `user-select: none` on the body, so nothing in the document could be selected for the rest of the
+    // session. PanelGrid's own drag already handles cancel for the same reason.
+    window.addEventListener('pointercancel', up)
+    handle?.addEventListener('lostpointercapture', up)
   }
 
   const onKeyDown = (event: KeyboardEvent) => {

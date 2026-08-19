@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   eventChord,
+  isBrowserEditingChord,
   isPluginKeyClaim,
   isPluginShortcutChord,
   isReservedPluginKeyClaim,
@@ -25,6 +26,16 @@ describe('chord grammar', () => {
       expect(isReservedPluginKeyClaim(chord)).toBe(true)
       expect(isPluginKeyClaim(chord)).toBe(false)
     }
+  })
+})
+
+describe('browser editing chords', () => {
+  it.each(['meta+c', 'meta+v', 'meta+x', 'meta+a', 'meta+z', 'meta+shift+z', 'ctrl+c', 'ctrl+y'])('leaves %s to the browser', (chord) => {
+    expect(isBrowserEditingChord(chord)).toBe(true)
+  })
+
+  it.each(['c', 'meta+k', 'meta+alt+c', 'meta+ctrl+c', 'alt+c', 'meta+enter'])('does not claim %s', (chord) => {
+    expect(isBrowserEditingChord(chord)).toBe(false)
   })
 })
 

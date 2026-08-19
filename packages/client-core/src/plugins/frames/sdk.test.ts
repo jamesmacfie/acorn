@@ -143,13 +143,28 @@ describe('frame key forwarding', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     host(() => undefined)
     const acorn = await handshake()
-    acorn.keys.claim(['meta+x'])
-    press({ code: 'KeyX', key: 'x' })
+    acorn.keys.claim(['meta+j'])
+    press({ code: 'KeyJ', key: 'j' })
     press({ code: 'KeyA', key: 'a', metaKey: false, target: { nodeName: 'INPUT' } } as unknown as Partial<KeyboardEvent>)
     await new Promise((resolve) => setTimeout(resolve, 5))
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('meta+x'))
-    expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+x' })
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('meta+j'))
+    expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+j' })
     expect(sent).not.toContainEqual({ kind: 'keydown', chord: 'a' })
+  })
+
+  it('leaves the clipboard to the browser, so a selection inside a frame can be copied', async () => {
+    host(() => undefined)
+    await handshake()
+    const copy = press({ code: 'KeyC', key: 'c' })
+    const paste = press({ code: 'KeyV', key: 'v' })
+    const selectAll = press({ code: 'KeyA', key: 'a' })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    // Cancelling these is what made Cmd+C in a plugin's table do nothing at all.
+    expect(copy).not.toHaveBeenCalled()
+    expect(paste).not.toHaveBeenCalled()
+    expect(selectAll).not.toHaveBeenCalled()
+    expect(sent).not.toContainEqual({ kind: 'keydown', chord: 'meta+c' })
   })
 })
 
