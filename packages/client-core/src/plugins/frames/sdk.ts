@@ -22,7 +22,7 @@ import type {
   PluginWebviewNavigated,
 } from '@acorn/protocol/pluginBridge.ts'
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
-import { eventChord, hasCommandModifier, isNormalizedChord, isPluginKeyClaim, isTypingTarget } from '@acorn/protocol/keybindings.ts'
+import { eventChord, hasCommandModifier, isBrowserEditingChord, isNormalizedChord, isPluginKeyClaim, isTypingTarget } from '@acorn/protocol/keybindings.ts'
 // The one import from outside this directory, and it is safe for the same reason the protocol imports
 // above are: ui/frameTips.ts is framework-free with no imports of its own, so it carries none of the
 // shell into a plugin's bundle. mountFrame() below is what needs it.
@@ -206,6 +206,10 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     const onKeyDown = (event: KeyboardEvent): void => {
       const chord = eventChord(event)
       if (!chord || claimed.has(chord)) return
+      // Copy/cut/paste/undo/select-all belong to the browser, not to the shell: there is no host
+      // binding to resolve, and cancelling them is what stopped a selection inside a frame from ever
+      // reaching the clipboard. A frame that genuinely wants one claims it (handled above).
+      if (isBrowserEditingChord(chord)) return
       // Do not cancel a browser behavior for a value the host's chord grammar will reject. Space is
       // the important case: eventChord can describe it, but it is not a bindable Acorn chord.
       if (!isNormalizedChord(chord)) return

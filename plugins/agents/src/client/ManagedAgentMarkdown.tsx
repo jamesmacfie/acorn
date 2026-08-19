@@ -20,11 +20,16 @@ const LANGUAGE_ALIASES: Record<string, string> = {
 export default function AgentMarkdown(props: { text: string; taskId: string; class?: string }) {
   let root: HTMLDivElement | undefined
   let generation = 0
+  let rendered: string | undefined
 
   createEffect(() => {
     const text = props.text
+    // A prop is a getter, not a memo, so this effect re-runs whenever anything upstream ticks — even
+    // when the text is identical. Assigning innerHTML replaces every text node underneath, which throws
+    // away the reader's selection, so compare before writing.
+    if (!root || text === rendered) return
+    rendered = text
     const current = ++generation
-    if (!root) return
     root.innerHTML = renderAgentMarkdown(text)
     // Grammars load on demand now (client-core/highlight/langs.ts), so each fence has to ask for its
     // own before `codeToHtml` can route to it — the highlighter starts with none loaded.

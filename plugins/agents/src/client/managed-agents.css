@@ -116,13 +116,6 @@
 
 .agent-transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .agent-transcript-list { width: 100%; padding-block: var(--space-2); }
-.agent-transcript-canvas { position: relative; width: 100%; }
-.agent-virtual-row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-}
 .agent-event { max-width: 880px; margin: 0 auto; padding: var(--space-3) var(--space-7); }
 .agent-event:empty { display: none; }
 .agent-message { position: relative; padding: var(--space-3) 0; }
