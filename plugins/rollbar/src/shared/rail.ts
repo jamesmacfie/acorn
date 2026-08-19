@@ -14,16 +14,18 @@ export function parseRollbarRailItemId(value: string): RollbarRailTarget | null 
 }
 
 export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
+  // Positional, and never filtered — see linear/shared/rail.ts: the host lays these out as columns
+  // and an empty cell is what keeps the Nth fact under the Nth fact of every other row.
   const facts = [
     `#${item.identifier}`,
     item.level,
     item.environment,
     item.integrationLabel,
-  ].filter(Boolean)
+  ]
   return {
     id: rollbarRailItemId(item),
     title: item.title,
-    subtitle: facts.join(' · '),
+    fields: facts,
     badge: `${item.totalOccurrences} occurrence${item.totalOccurrences === 1 ? '' : 's'}`,
     task: {
       origin: 'rollbar',

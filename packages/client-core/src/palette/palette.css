@@ -1,6 +1,6 @@
 /* Command palette (docs/command-palette-and-shortcuts.md): flat, square, 1px borders per docs/ui-design.md. */
 .overlay.palette { width: min(560px, 90vw); padding: 0; }
-.palette-input {
+.palette-input.ui-input {
   width: 100%;
   padding: var(--space-5) var(--space-6);
   font: inherit;

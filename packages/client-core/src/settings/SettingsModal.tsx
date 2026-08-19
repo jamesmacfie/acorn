@@ -6,6 +6,7 @@ import { ContributionBoundary } from '../ui/ContributionBoundary'
 import { createDismissable } from '../ui/dismissable'
 import { Dynamic } from 'solid-js/web'
 import './settings.css'
+import { Button } from '../ui/primitives'
 
 export default function SettingsModal(props: { onClose: () => void; initialTab?: string }) {
   const workspaces = createQuery(() => workspacesOptions(true))
@@ -59,7 +60,7 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
         </nav>
 
         <div class="settings-pane">
-          <button type="button" class="settings-close" onClick={props.onClose} title="Close" aria-label="Close">✕</button>
+          <Button variant="bare" class="settings-close" onClick={props.onClose} title="Close" aria-label="Close">✕</Button>
           <Show when={activePage()}>
             {(page) => (
               <ContributionBoundary contributionId={`settings:${page().id}`}>

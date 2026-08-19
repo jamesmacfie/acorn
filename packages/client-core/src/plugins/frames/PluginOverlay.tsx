@@ -2,6 +2,7 @@ import { Show } from 'solid-js'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { closePluginOverlay } from './overlays'
+import { Button } from '../../ui/primitives'
 
 // The host's chrome around a plugin overlay — the full-screen picker slot, what the editor's ⌘P file
 // palette occupies as a compiled contribution (docs/plugins.md § Frame contribution kind).
@@ -30,7 +31,7 @@ export default function PluginOverlay(props: PluginOverlayProps) {
         <div class="overlay plugin-overlay" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
           <header class="overlay-title plugin-overlay-head">
             <span>{props.label}</span>
-            <button type="button" class="plugin-overlay-close" onClick={closePluginOverlay} aria-label="Close">✕</button>
+            <Button variant="bare" class="plugin-overlay-close" onClick={closePluginOverlay} aria-label="Close">✕</Button>
           </header>
           <div class="plugin-overlay-body">
             <PluginFrame binding={props.binding()} hash={props.hash} onClose={closePluginOverlay} />

@@ -35,9 +35,9 @@ export default function GithubConnect(props: {
             <Show
               when={flow.device()}
               fallback={
-                <button type="button" class="ui-btn wizard-primary" onClick={() => void flow.start()} disabled={flow.busy()}>
+                <Button class="wizard-primary" onClick={() => void flow.start()} disabled={flow.busy()}>
                   {flow.busy() ? 'Starting…' : 'Get a code'}
-                </button>
+                </Button>
               }
             >
               {(started) => (
@@ -51,7 +51,7 @@ export default function GithubConnect(props: {
                       isAllowedExternalUrl → shell.openExternal, so it opens in the owner's browser. */}
                   <Button href={started().verificationUri} target="_blank" rel="noopener noreferrer">Open GitHub</Button>
                   <p class="wizard-waiting">Waiting for approval…</p>
-                  <button type="button" class="wizard-link" onClick={flow.cancel}>Cancel</button>
+                  <Button variant="bare" class="wizard-link" onClick={flow.cancel}>Cancel</Button>
                 </div>
               )}
             </Show>

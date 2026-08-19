@@ -39,7 +39,7 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
               the reserved-`ref`-prop defect, and the reason it was found at all. */}
           <span class="integrations-panel-title">{props.displayId}</span>
           <Toolbar.Spacer />
-          <Button variant="bare" class="integrations-panel-close" onClick={props.onClose} aria-label="Close">✕</Button>
+          <Button class="integrations-panel-close" onClick={props.onClose} aria-label="Close">✕</Button>
         </header>
         <PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />
         {/* Host-drawn, below the frame rather than inside it. Creating a task is a core write that makes a

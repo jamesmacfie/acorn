@@ -1,5 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
+import { Select } from '../ui/primitives'
 
 // Controlled connection + model dropdowns over the configured model-provider connections
 // (availableModelConnections in core/shared/modelProviders). The connection select is hidden when
@@ -22,8 +23,7 @@ export default function ModelConnectionPicker(props: {
   return (
     <>
       <Show when={props.connections.length > 1}>
-        <select
-          class="ui-input"
+        <Select
           title="Model provider"
           value={current()?.connection.id ?? ''}
           onChange={(e) => {
@@ -34,17 +34,16 @@ export default function ModelConnectionPicker(props: {
           <For each={props.connections}>
             {(c) => <option value={c.connection.id}>{c.connection.label || c.provider.label}</option>}
           </For>
-        </select>
+        </Select>
       </Show>
       <Show when={models().length}>
-        <select
-          class="ui-input"
+        <Select
           title="Model"
           value={props.modelId}
           onChange={(e) => props.onChange({ connectionId: current()?.connection.id ?? '', modelId: e.currentTarget.value })}
         >
           <For each={models()}>{(m) => <option value={m.id}>{m.label}</option>}</For>
-        </select>
+        </Select>
       </Show>
     </>
   )

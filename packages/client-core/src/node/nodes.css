@@ -252,15 +252,8 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-.node-devices-toggle {
-  align-self: flex-start;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
+.node-devices-toggle { align-self: flex-start; }
+.node-devices-toggle.ui-btn[data-variant='bare'] { font-size: var(--fs-xs); }
 .node-device-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .node-device { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
 .node-device-name { font-weight: var(--fw-medium); }

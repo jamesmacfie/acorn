@@ -30,8 +30,8 @@
   --gap-row: var(--space-5);
   --gap-stack: var(--space-6);
   --gap-section: var(--space-9);
-  --pad-control: var(--space-3) var(--space-5);
-  --pad-control-lg: var(--space-4) var(--space-7);
+  --pad-control: 0 var(--space-5);
+  --pad-control-lg: 0 var(--space-7);
   --pad-chip: 0 var(--space-5);
   --pad-cell: var(--space-2) var(--space-4);
 
@@ -39,8 +39,9 @@
   --row-h: 40px;
   --row-h-virt: 40px;
   --row-h-sm: 32px;
-  --control-h: 32px;
-  --control-h-sm: 26px;
+  --control-h: 38px;
+  --control-h-sm: 30px;
+  --control-h-xs: 24px;
   --topbar-h: 52px;
   --pane-head-h: 44px;
 
@@ -97,8 +98,12 @@
   border-radius: var(--radius-control);
 }
 
-/* Buttons read as filled affordances rather than outlined ones. */
-:root[data-style='modern'] .ui-btn:not([data-variant='bare']) {
+/* Buttons read as filled affordances rather than outlined ones. `solid` is excluded as well as
+   `bare`: this selector is (0,3,0) and the variant's own `background: var(--accent)` is (0,2,0), so
+   without the exclusion the pack repaints every solid button in --bg-subtle and leaves its
+   --accent-fg label invisible on it (the Database pane's Save/Generate/Execute). */
+:root[data-style='modern'] .ui-btn:not([data-variant='bare']):not([data-variant='solid']) {
   background: var(--bg-subtle);
   font-weight: var(--fw-medium);
 }
+:root[data-style='modern'] .ui-btn[data-variant='solid'] { font-weight: var(--fw-medium); }

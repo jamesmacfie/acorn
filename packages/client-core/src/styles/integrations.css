@@ -149,8 +149,6 @@
   border-radius: var(--radius-pill);
   padding: var(--space-1) 9px;
 }
-.integration-remove { color: var(--danger); border-color: transparent; background: transparent; }
-.integration-remove:hover:not(:disabled) { border-color: var(--danger); }
 
 /* "Add integration" — the trigger. */
 .integration-add-btn {

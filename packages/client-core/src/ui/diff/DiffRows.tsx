@@ -12,6 +12,7 @@ import { UserAvatar } from '../UserAvatar'
 import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './model'
 import { markTokens, type FindHighlight } from './find'
 import { persistDraft } from '../../lib/draftState'
+import { Button } from '../primitives'
 
 export type LineComposerController = {
   isOpen: () => boolean
@@ -64,9 +65,9 @@ export function NonCodeRow(props: {
           <span class="diff-load" classList={{ 'diff-load-error': row().status === 'error' }}>
             <span>{row().status === 'error' ? 'Could not load diff.' : 'Loading diff…'}</span>
             <Show when={row().status === 'error'}>
-              <button class="diff-load-retry" onClick={() => props.retryDiff?.(row().file)}>
+              <Button variant="bare" onClick={() => props.retryDiff?.(row().file)}>
                 Retry
-              </button>
+              </Button>
             </Show>
           </span>
         )}
@@ -295,10 +296,10 @@ function LineComposer(props: {
             mentions={props.mentions}
           />
           <div class="diff-composer-actions">
-            <button disabled={busy() || !(props.composer?.body().trim() ?? '')} onClick={submit}>
+            <Button disabled={busy() || !(props.composer?.body().trim() ?? '')} onClick={submit}>
               {busy() ? 'Adding\u2026' : 'Comment'}
-            </button>
-            <button onClick={() => props.composer?.setOpen(false)}>Cancel</button>
+            </Button>
+            <Button onClick={() => props.composer?.setOpen(false)}>Cancel</Button>
           </div>
           <Show when={err()}>
             <span class="diff-thread-err">{err()}</span>
@@ -399,13 +400,13 @@ function ThreadRow(props: {
       <div class="diff-thread-head">
         <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Conversation'}</span>
         <Show when={resolved()}>
-          <button class="diff-thread-link" onClick={toggleCollapsed}>
+          <Button variant="bare" class="diff-thread-link" onClick={toggleCollapsed}>
             {collapsed() ? 'Show' : 'Hide'}
-          </button>
+          </Button>
         </Show>
-        <button class="diff-thread-link" disabled={busy()} onClick={toggleResolve}>
+        <Button variant="bare" class="diff-thread-link" disabled={busy()} onClick={toggleResolve}>
           {resolved() ? 'Unresolve' : 'Resolve'}
-        </button>
+        </Button>
       </div>
       <Show when={!collapsed()}>
         <For each={props.thread.comments}>
@@ -429,9 +430,9 @@ function ThreadRow(props: {
             mentions={props.mentions}
           />
           <div class="diff-composer-actions">
-            <button disabled={busy() || replyId() == null || !body().trim()} onClick={submitReply}>
+            <Button disabled={busy() || replyId() == null || !body().trim()} onClick={submitReply}>
               {busy() ? 'Replying\u2026' : 'Reply'}
-            </button>
+            </Button>
           </div>
           <Show when={err()}>
             <span class="diff-thread-err">{err()}</span>

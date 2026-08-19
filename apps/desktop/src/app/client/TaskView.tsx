@@ -210,9 +210,8 @@ export default function TaskView(props: {
       <Show when={(runTargets() ?? []).length}>
         <For each={runTargets() ?? []}>
           {(target) => (
-            <button
-              type="button"
-              class="pane-switch-btn pane-switch-run"
+            <Button
+              variant="bare" class="pane-switch-btn pane-switch-run"
               classList={{ active: target.running }}
               data-tip={`${target.running ? 'Stop' : 'Run'} ${target.id}`}
               data-tip-sub={target.command}
@@ -220,11 +219,11 @@ export default function TaskView(props: {
               onClick={() => void toggleTarget(target.id, target.running)}
             >
               {target.running ? '■' : '▶'}<span class="pane-switch-run-id">{target.id}</span>
-            </button>
+            </Button>
           )}
         </For>
       </Show>
-      <button type="button" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</button>
+      <Button variant="bare" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</Button>
     </>
   )
 

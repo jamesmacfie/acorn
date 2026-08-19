@@ -2,6 +2,7 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import type { McpServerSummary } from '@acorn/protocol/mcp.ts'
 import { activeTaskId } from '../tasks/tasks'
 import { mcpApi } from './mcpClient'
+import { Button } from '../ui/primitives'
 
 // Settings → MCP (docs/mcp.md): a read-only inspector over the MCP config files the agents in
 // this task's worktree would load (plus ~/.claude.json). Secrets arrive already masked from main.
@@ -59,8 +60,8 @@ export default function McpSettings() {
         </For>
       </Show>
       <div class="settings-actions">
-        <button type="button" class="ui-btn" onClick={() => void createStarter()}>Create .mcp.json</button>
-        <button type="button" class="ui-btn" onClick={() => void refetch()}>Rescan</button>
+        <Button onClick={() => void createStarter()}>Create .mcp.json</Button>
+        <Button onClick={() => void refetch()}>Rescan</Button>
         <Show when={msg()}><span class="muted">{msg()}</span></Show>
       </div>
 

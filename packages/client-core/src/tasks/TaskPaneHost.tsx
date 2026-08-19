@@ -15,7 +15,7 @@ import Icon from '../ui/Icon'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'
 import { formatChord } from './paneShortcuts'
-import { EmptyState } from '../ui/primitives'
+import { Button, EmptyState } from '../ui/primitives'
 import { createSplitDrag } from '../ui/split'
 
 export default function TaskPaneHost(props: {
@@ -125,9 +125,8 @@ export default function TaskPaneHost(props: {
                   <Show when={nodeFreshness() !== 'live'}>
                     <NodeChip nodeId={activeNodeId() ?? ''} compact />
                   </Show>
-                  <button
-                    type="button"
-                    class="pane-pin-btn"
+                  <Button
+                    variant="bare" class="pane-pin-btn"
                     classList={{ active: isPinned(pane.id) }}
                     data-tip={isPinned(pane.id) ? 'Unpin pane' : 'Pin pane'}
                     aria-label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Pin ${pane.label}`}
@@ -135,15 +134,14 @@ export default function TaskPaneHost(props: {
                     onClick={() => dispatch({ type: 'pin', pane: pane.id })}
                   >
                     {isPinned(pane.id) ? '◆' : '◇'}
-                  </button>
+                  </Button>
                   <Show when={layout().panes.length > 1 || isPinned(pane.id)}>
-                    <button
-                      type="button"
-                      class="pane-close-btn"
+                    <Button
+                      variant="bare" class="pane-close-btn"
                       data-tip={isPinned(pane.id) ? 'Unpin pane before closing' : 'Close pane'}
                       aria-label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Close ${pane.label}`}
                       onClick={() => dispatch({ type: 'close', pane: pane.id })}
-                    >✕</button>
+                    >✕</Button>
                   </Show>
                 </div>
                 <ContributionBoundary contributionId={pane.id}>
@@ -170,30 +168,28 @@ export default function TaskPaneHost(props: {
       <nav class="pane-switcher" aria-label="Task panes">
         <For each={switcherPanes()}>
           {(pane) => (
-            <button
-              type="button"
-              class="pane-switch-btn"
+            <Button
+              variant="bare" class="pane-switch-btn"
               classList={{ active: showsPane(pane.id) }}
               data-tip={pane.label}
               data-tip-key={props.shortcutFor?.(`pane.show.${pane.id}`) ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!) : pane.defaultChord ? formatChord(pane.defaultChord) : undefined}
               data-tip-sub={`${pane.description ?? pane.label} · ⌘-click to open beside`}
               aria-label={pane.label}
               onClick={(event) => onSwitch(pane.id, event)}
-            ><Icon name={pane.glyph} /></button>
+            ><Icon name={pane.glyph} /></Button>
           )}
         </For>
         {props.extraButtons}
         {/* Not `disabled` while closing — disabled buttons swallow the mouseover the tooltip needs. */}
-        <button
-          type="button"
-          class="pane-switch-btn pane-switch-close"
+        <Button
+          variant="bare" class="pane-switch-btn pane-switch-close"
           data-tip={props.closing ? 'Removing…' : 'Close task'}
           aria-label={props.closing ? 'Removing task' : 'Close task'}
           aria-busy={props.closing || undefined}
           onClick={() => { if (!props.closing) props.onCloseTask() }}
         >
           {props.closing ? <span class="spin">⠿</span> : '✕'}
-        </button>
+        </Button>
       </nav>
     </>
   )

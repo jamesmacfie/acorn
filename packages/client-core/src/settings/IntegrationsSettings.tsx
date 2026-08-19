@@ -12,7 +12,7 @@ import {
 } from '../integrations/integrationClient'
 import { createDeviceFlow } from '../integrations/deviceFlow'
 import { integrationsKey, integrationsOptions } from '../queries'
-import { Alert } from '../ui/primitives'
+import { Alert, Button, Chip } from '../ui/primitives'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   return (
@@ -128,17 +128,17 @@ export default function IntegrationsSettings() {
                 </div>
                 <div class="integration-actions">
                   <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
-                    <button type="button" class="integration-remove" onClick={() => void test(connection.id)} disabled={busy()}>Test</button>
+                    <Button variant="ghost" tone="danger" onClick={() => void test(connection.id)} disabled={busy()}>Test</Button>
                     {/* Rotation means "submit a new credential for this connection", which a device flow
                         has no shape for — the owner never holds the token. Disconnect and connect again
                         is the honest path, so the button is simply absent. */}
                     <Show when={provider()?.connection.kind !== 'device-flow'}>
-                      <button type="button" class="integration-remove" onClick={() => { setProviderId(connection.providerId); setRotationId(connection.id); setCredentials({}); setAdding(true) }} disabled={busy()}>Rotate</button>
+                      <Button variant="ghost" tone="danger" onClick={() => { setProviderId(connection.providerId); setRotationId(connection.id); setCredentials({}); setAdding(true) }} disabled={busy()}>Rotate</Button>
                     </Show>
-                    <button type="button" class="integration-remove" onClick={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
+                    <Button variant="ghost" tone="danger" onClick={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
                       {connection.status === 'disabled' ? 'Enable' : 'Disable'}
-                    </button>
-                    <button type="button" class="integration-remove" onClick={() => void disconnect(connection.id)} disabled={busy()}>Disconnect</button>
+                    </Button>
+                    <Button variant="ghost" tone="danger" onClick={() => void disconnect(connection.id)} disabled={busy()}>Disconnect</Button>
                   </Show>
                 </div>
               </div>
@@ -147,18 +147,23 @@ export default function IntegrationsSettings() {
         </For>
       </div>
 
-      <button type="button" class="ui-btn integration-add-btn" classList={{ open: adding() }} onClick={() => setAdding((value) => !value)}>
+      <Button class="integration-add-btn" classList={{ open: adding() }} onClick={() => setAdding((value) => !value)}>
         <span class="integration-add-icon">+</span> Add or rotate integration
-      </button>
+      </Button>
 
       <div class="integration-add-panel" classList={{ open: adding() }}>
         <div class="integration-add-inner">
           <div class="integration-provider-chips">
             <For each={connectable()}>
               {(provider) => (
-                <button type="button" class="integration-chip" classList={{ active: selectedProvider()?.id === provider.id }} onClick={() => { setProviderId(provider.id); setRotationId(null); setCredentials({}) }}>
-                  <span class="integration-logo-mono"><Icon name={provider.glyph} /></span> {provider.label}
-                </button>
+                <Chip
+                  class="integration-chip"
+                  classList={{ active: selectedProvider()?.id === provider.id }}
+                  leading={<span class="integration-logo-mono"><Icon name={provider.glyph} /></span>}
+                  onActivate={() => { setProviderId(provider.id); setRotationId(null); setCredentials({}) }}
+                >
+                  {provider.label}
+                </Chip>
               )}
             </For>
           </div>
@@ -184,18 +189,18 @@ export default function IntegrationsSettings() {
                     </label>
                   )}
                 </For>
-                <button type="button" class="ui-btn" onClick={() => void add()} disabled={busy() || !complete()}>
+                <Button onClick={() => void add()} disabled={busy() || !complete()}>
                   {busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
-                </button>
+                </Button>
               </>
             }
           >
             <Show
               when={deviceFlow.device()}
               fallback={
-                <button type="button" class="ui-btn" onClick={() => void deviceFlow.start()} disabled={deviceFlow.busy()}>
+                <Button onClick={() => void deviceFlow.start()} disabled={deviceFlow.busy()}>
                   {deviceFlow.busy() ? 'Starting…' : `Connect ${selectedProvider()?.label ?? ''}`}
-                </button>
+                </Button>
               }
             >
               {(started) => (
@@ -212,7 +217,7 @@ export default function IntegrationsSettings() {
                     Open {new URL(started().verificationUri).host}
                   </a>
                   <p class="integration-add-hint muted">Waiting for approval…</p>
-                  <button type="button" class="integration-remove" onClick={deviceFlow.cancel}>Cancel</button>
+                  <Button variant="ghost" tone="danger" onClick={deviceFlow.cancel}>Cancel</Button>
                 </div>
               )}
             </Show>

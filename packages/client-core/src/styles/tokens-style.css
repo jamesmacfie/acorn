@@ -75,8 +75,9 @@
   --gap-row: var(--space-4);
   --gap-stack: var(--space-5);
   --gap-section: var(--space-7);
-  --pad-control: var(--space-2) var(--space-4);
-  --pad-control-lg: var(--space-3) var(--space-6);
+  /* Inline only — control height is --control-h (see .ui-btn in primitives.css). */
+  --pad-control: 0 var(--space-4);
+  --pad-control-lg: 0 var(--space-6);
   --pad-chip: 0 var(--space-4);
   --pad-cell: var(--space-1) var(--space-3);
   --pad-surface: var(--pane-pad);
@@ -89,8 +90,10 @@
   --row-h: 36px;
   --row-h-sm: 30px;
   --row-h-virt: 36px;
-  --control-h: 26px;
-  --control-h-sm: 22px;
+  /* The BUTTON height (primitives.css .ui-btn), and the square side of an icon-only one. */
+  --control-h: 32px;
+  --control-h-sm: 26px;
+  --control-h-xs: 20px;
   --topbar-h: 48px;
   --pane-head-h: 48px;
   --tabrail-w: 52px;

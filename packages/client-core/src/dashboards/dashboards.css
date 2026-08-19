@@ -289,7 +289,7 @@
    primitive wins the panel is a BLOCK: the body stops being a flex item, its `flex: 1`/`min-height`
    go inert, its height goes content-driven and `overflow: auto` on an auto-height box never
    scrolls. A 500-row table then spills past the card's border instead of scrolling inside it. */
-.ui-card.dash-panel {
+.dash-panel.ui-card {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
@@ -771,7 +771,7 @@
 
 /* Also a Card, so also compounded with .ui-card — same `display` tie as .dash-panel, and here it
    costs the card its stacking. */
-.ui-card.dash-card {
+.dash-card.ui-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);

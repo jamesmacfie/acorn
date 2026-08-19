@@ -47,16 +47,7 @@
   font-size: var(--fs-sm);
   color: var(--text-faint);
 }
-.wizard-link {
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: none;
-  border: 0;
-  padding: var(--space-1);
-  cursor: pointer;
-}
-.wizard-link:hover { color: var(--text); }
+.wizard-link.ui-btn[data-variant='bare'] { padding: var(--space-1); }
 
 /* The branch point: open a folder, or connect GitHub. Both first-class, side by side. */
 .wizard-cards {

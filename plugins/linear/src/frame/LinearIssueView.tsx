@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { Badge, Button, Chip, DescriptionList, renderMarkdown, Spinner, Tabs, Textarea } from '@acorn/plugin-api/ui'
+import { Badge, Button, Chip, DescriptionList, Spinner, Tabs, Textarea } from '@acorn/plugin-api/ui'
 import type { LinearComment, LinearIssueDetail, LinearRelatedIssue } from '../shared/api'
 import { priorityMeta } from '../shared/triage'
 import { formatDate, relativeTime } from './model'
@@ -41,6 +41,13 @@ export type LinearIssueViewProps = {
    * the ref-panel contract passes `onContentClick` down instead of resolving it in the panel.
    */
   onContentClick(event: MouseEvent): void
+  /**
+   * Markdown to sanitised HTML. `renderMarkdown` alone would do, and this is a prop for the same reason
+   * `onContentClick` is: a Linear body can point at a private upload, resolving one needs the bridge,
+   * and the resolved set is app state that has to be able to tick this render. So the view asks for
+   * HTML and stays ignorant of where the pictures came from.
+   */
+  renderBody(markdown: string): string
 }
 
 export function LinearIssueView(props: LinearIssueViewProps) {
@@ -83,10 +90,11 @@ export function LinearIssueView(props: LinearIssueViewProps) {
           }}>Reply</Button>
         </Show>
       </div>
-      {/* innerHTML over host-sanitised markup. `renderMarkdown` escapes the source, allows only
-          http(s)/mailto hrefs and drops every attribute it did not write — which is exactly why it was
-          moved onto the frame-safe barrel rather than reimplemented here. */}
-      <div class="ui-markdown" innerHTML={renderMarkdown(entry.body)} onClick={props.onContentClick} />
+      {/* innerHTML over host-sanitised markup. `renderMarkdown` behind `renderBody` escapes the source,
+          allows only http(s)/mailto hrefs and `data:image/` sources, and drops every attribute it did
+          not write — which is exactly why it was moved onto the frame-safe barrel rather than
+          reimplemented here. */}
+      <div class="ui-markdown" innerHTML={props.renderBody(entry.body)} onClick={props.onContentClick} />
       <Show when={repliesOf(entry.id).length}>
         <ul class="ln-comment-children"><For each={repliesOf(entry.id)}>{(child) => comment(child, true)}</For></ul>
       </Show>
@@ -179,7 +187,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
         </DescriptionList>
 
         <Show when={issue().description} fallback={<p class="ln-muted">No description.</p>}>
-          {(description) => <div class="ui-markdown" innerHTML={renderMarkdown(description())} onClick={props.onContentClick} />}
+          {(description) => <div class="ui-markdown" innerHTML={props.renderBody(description())} onClick={props.onContentClick} />}
         </Show>
 
         <Show when={(issue().attachments ?? []).length}>

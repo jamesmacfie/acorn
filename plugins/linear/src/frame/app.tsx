@@ -1,11 +1,18 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, EmptyState, ListDetail, Row } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, ListDetail, renderMarkdown, Row } from '@acorn/plugin-api/ui'
 import { openLinkOnClick, type AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
-import { linearCommentsRoute, linearIssueRoute, type LinearIssueDetail } from '../shared/api'
+import {
+  linearCommentsRoute,
+  linearIssueRoute,
+  linearUploadRoute,
+  type LinearIssueDetail,
+  type LinearUploadResponse,
+} from '../shared/api'
 import { parseLinearRailItemId, type LinearRailTarget } from '../shared/rail'
 import { canonicalIdentifier, linearIdentifierFromHref, targetKey, taskLinearTargets } from './model'
 import { LinearIssueView } from './LinearIssueView'
+import { inlineUploadImages, uploadImageUrls } from './uploads'
 
 // One bundle, two manifest surfaces. What it renders is decided by `bridge.context`, which is the whole
 // point of the frame contract: the HOST says what this rectangle was opened to look at, and the plugin
@@ -46,9 +53,45 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
   const [refreshing, setRefreshing] = createSignal(false)
   const [posting, setPosting] = createSignal(false)
   const [postError, setPostError] = createSignal('')
+  // Private Linear uploads, keyed by their https URL, resolved to `data:` URLs the frame's CSP allows.
+  // Cumulative across tickets on purpose: it is a pure URL→bytes map, the URLs are content-addressed by
+  // Linear, and re-pointing the view at a related ticket and back should not refetch the screenshots.
+  const [images, setImages] = createSignal<Record<string, string>>({})
   let load = 0
 
   const activeIdentifier = () => override() ?? target()?.identifier ?? ''
+
+  /**
+   * Resolve every upload this ticket draws, in ONE state write.
+   *
+   * The batch matters more than it looks. Each resolution changes `renderBody`, which changes an
+   * `innerHTML`, and an innerHTML rewrite drops whatever the reader had selected in that block. Writing
+   * the map once per ticket means one rewrite; writing it per image means one per screenshot.
+   *
+   * Fire-and-forget beside the detail render rather than in front of it: the text is the thing someone
+   * opened the ticket for, and it should not wait on a picture.
+   */
+  const resolveImages = async (detail: LinearIssueDetail, connectionId?: string): Promise<void> => {
+    const known = images()
+    const wanted = uploadImageUrls([detail.description ?? '', ...detail.comments.map((entry) => entry.body)].join('\n'))
+      .filter((url) => !known[url])
+    if (!wanted.length) return
+    const fetched = await Promise.all(wanted.map(async (url) => {
+      try {
+        const body = await props.bridge.api.get<LinearUploadResponse>(linearUploadRoute(url, connectionId))
+        return [url, body.dataUrl] as const
+      } catch {
+        // A single unreachable upload is not worth an error banner over a ticket that otherwise read
+        // fine. It stays an unresolved https URL, which the CSP shows as a broken image.
+        return null
+      }
+    }))
+    const resolved = fetched.filter((entry): entry is NonNullable<typeof entry> => !!entry)
+    if (resolved.length) setImages((prev) => ({ ...prev, ...Object.fromEntries(resolved) }))
+  }
+
+  /** Markdown to HTML, with this ticket's private uploads swapped in. Reactive through `images()`. */
+  const renderBody = (markdown: string): string => renderMarkdown(inlineUploadImages(markdown, images()))
 
   const fetchIssue = async (identifier: string, connectionId?: string): Promise<void> => {
     const request = ++load
@@ -57,6 +100,7 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
       const detail = await props.bridge.api.get<LinearIssueDetail>(linearIssueRoute(identifier, connectionId))
       if (request !== load) return
       setIssue(detail)
+      void resolveImages(detail, connectionId)
     } catch (error) {
       if (request !== load) return
       setIssue(null)
@@ -228,6 +272,7 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
               }}
               onOpenRelated={openRelated}
               onContentClick={onContentClick}
+              renderBody={renderBody}
               onComment={(body, parentId) => void comment(body, parentId)}
               onCopy={(text) => void copy(text)}
             />

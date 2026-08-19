@@ -337,7 +337,6 @@ export default function AgentPane(props: { task: Task }) {
                 placement="bottom-end"
                 trigger={({ toggle, open }) => (
                   <Button
-                    class="managed-agent-action-picker"
                     iconOnly
                     aria-label="Session actions"
                     aria-haspopup="menu"

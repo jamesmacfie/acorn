@@ -19,7 +19,7 @@ import {
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
-import { Alert } from '../ui/primitives'
+import { Alert, Button } from '../ui/primitives'
 
 type ShortcutGroup = {
   key: string
@@ -121,7 +121,7 @@ export default function ShortcutsSettings() {
             <div class="settings-section-label shortcut-group-heading">
               <span>{group.label}<Show when={group.pluginId}> · {nodeLabel()}</Show></span>
               <Show when={group.bindings.length}>
-                <button type="button" class="shortcut-reset" onClick={() => void resetBindings(group.bindings)}>Reset section</button>
+                <Button variant="bare" class="shortcut-reset" onClick={() => void resetBindings(group.bindings)}>Reset section</Button>
               </Show>
             </div>
             <Show when={group.disabled}><p class="shortcut-plugin-state muted">Plugin disabled — shortcuts remain editable and will apply when it is enabled.</p></Show>
@@ -147,8 +147,8 @@ export default function ShortcutsSettings() {
                       {/* Sits mid-sentence inside the description, so it keeps inline flow — the one
                           `.action-error` site that was not a standalone message. */}
                       <Show when={binding.conflict}><Alert class="shortcut-conflict-note"> · conflicts with {binding.conflict}</Alert></Show>
-                      <button type="button" class="shortcut-reset" aria-label={`Unbind ${binding.description}`} onClick={() => void saveOverride(binding, null)}>×</button>
-                      <button type="button" class="shortcut-reset" onClick={() => void resetBindings([binding])}>Reset</button>
+                      <Button variant="bare" class="shortcut-reset" aria-label={`Unbind ${binding.description}`} onClick={() => void saveOverride(binding, null)}>×</Button>
+                      <Button variant="bare" class="shortcut-reset" onClick={() => void resetBindings([binding])}>Reset</Button>
                     </dd>
                   </>
                 )}
@@ -164,9 +164,9 @@ export default function ShortcutsSettings() {
       </For>
       <Show when={orphaned().length}>
         <div class="settings-actions shortcut-cleanup">
-          <button type="button" class="ui-btn" onClick={() => void saveOverrides(removeOverrideIds(overrides(), orphaned()))}>
+          <Button onClick={() => void saveOverrides(removeOverrideIds(overrides(), orphaned()))}>
             Remove settings for plugins that are no longer installed ({orphaned().length})
-          </button>
+          </Button>
         </div>
       </Show>
     </>

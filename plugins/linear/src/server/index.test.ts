@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { linearUploadTarget } from './routes/linear'
 import { issuesFilter, linearData, linearError, parseIdentifier, projectIssuesFilter } from './index'
 
 describe('linear server helpers', () => {
@@ -34,5 +35,19 @@ describe('linear server helpers', () => {
     await expect(linearData<{ value: number }>(new Response(JSON.stringify({ data: { value: 3 } })))).resolves.toEqual({ value: 3 })
     await expect(linearData(new Response(JSON.stringify({ errors: [{ message: 'bad key' }] })))).rejects.toThrow('bad key')
     await expect(linearData(new Response(JSON.stringify({ data: null })))).rejects.toThrow('empty response')
+  })
+})
+
+describe('linearUploadTarget', () => {
+  it('accepts only https uploads.linear.app', () => {
+    expect(linearUploadTarget('https://uploads.linear.app/w/f/a.png')?.href).toBe('https://uploads.linear.app/w/f/a.png')
+    // Every one of these would otherwise be a request this route makes with the owner's Linear key.
+    expect(linearUploadTarget('http://uploads.linear.app/a.png')).toBeNull()
+    expect(linearUploadTarget('https://evil.example.com/a.png')).toBeNull()
+    expect(linearUploadTarget('https://uploads.linear.app.evil.com/a.png')).toBeNull()
+    expect(linearUploadTarget('https://evil.com/?x=uploads.linear.app')).toBeNull()
+    expect(linearUploadTarget('file:///etc/passwd')).toBeNull()
+    expect(linearUploadTarget('/relative')).toBeNull()
+    expect(linearUploadTarget(undefined)).toBeNull()
   })
 })

@@ -23,6 +23,13 @@ describe('renderMarkdown', () => {
       '<p><img src="https://x.com/a.png?name=&quot;bad&quot;" alt="&lt;bad&gt;" loading="lazy" decoding="async" referrerpolicy="no-referrer"></p>',
     )
     expect(renderMarkdown('![fallback](javascript:alert)')).toBe('<p>fallback</p>')
+    // `data:` is allowed for images only, and only for an image type: a plugin frame draws its
+    // provider's private uploads this way (integrations/markdown.ts § safeImageSrc).
+    expect(renderMarkdown('![shot](data:image/png;base64,iVBORw0KGgo=)')).toBe(
+      '<p><img src="data:image/png;base64,iVBORw0KGgo=" alt="shot" loading="lazy" decoding="async" referrerpolicy="no-referrer"></p>',
+    )
+    expect(renderMarkdown('![nope](data:text/html;base64,PHNjcmlwdD4=)')).toBe('<p>nope</p>')
+    expect(renderMarkdown('[nope](data:image/png;base64,iVBORw0KGgo=)')).not.toContain('href')
     expect(renderMarkdown('`![not-an-image](https://x.com/a.png)`')).toBe(
       '<p><code>![not-an-image](https://x.com/a.png)</code></p>',
     )

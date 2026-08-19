@@ -465,6 +465,7 @@ export default function AgentComposer(props: {
           <Button
             variant="solid"
             tone="accent"
+            size="sm"
             class="agent-send"
             busy={sending()}
             disabled={(!draft().trim() && !attachments().length && !contexts().length)

@@ -21,6 +21,10 @@
 //     into the workspace's linked Linear projects. Not `projects:config` (no scripts), not
 //     `projects:write`, no `tasks` facet: creating and linking a task stays in the host-owned
 //     promotion flow, which is why the frame's `api` list has no task WRITE scope either.
+//   net: [api.linear.app, uploads.linear.app] — the second host is not the API. A ticket body can point
+//     at a private upload, and a plugin frame can neither reach the network nor hold a credential, so
+//     the node half fetches the file and hands the frame a `data:` URL (src/server/routes/linear.ts
+//     § /uploads). Disclosure only today, but it is the honest list either way.
 //   api: ['core.tasks:read'] — the pane frame reads `/v2/core/tasks` to find which tickets this task
 //     links. The ref-panel frame needs none of it; one list covers both surfaces, which is the
 //     coarsest thing here and the reason it stays a one-item list.
@@ -40,7 +44,7 @@ export default {
   permissions: {
     api: ['core.tasks:read'],
     events: [],
-    node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: ['api.linear.app'] },
+    node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: ['api.linear.app', 'uploads.linear.app'] },
   },
   contributions: {
     // THREE surfaces, one bundle: it decides what to draw from `bridge.context`. `providerId` on the

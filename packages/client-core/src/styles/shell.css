@@ -85,7 +85,6 @@
 /* Right-most pane: drops the trailing border, and is a flex column so the sticky header stays put
    while the diff scroller below owns the viewport. Sole owner of .pane-right (was split with diff.css). */
 .pane-right { border-right: 0; display: flex; flex-direction: column; overflow: hidden; }
-.pane-right .section-header { flex: none; }
 /* Left pane is a flex column so the PR list scrolls (and virtualizes) independently of the tabs. */
 .pane-left { display: flex; flex-direction: column; overflow: hidden; }
 .pr-list-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 0; }
@@ -113,7 +112,7 @@
 /* SplitHandle owns the grip (ui/split.ts + primitives.css). */
 .document-over-frame-split { margin: 0; }
 
-.section-refresh {
+.section-refresh.ui-btn {
   flex: none;
   margin-left: var(--space-2);
   width: 22px;

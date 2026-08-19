@@ -163,44 +163,56 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           {(entry) => <Alert>{entry().label} unavailable — {entry().reason}</Alert>}
         </Show>
 
-        <Show
-          when={row()}
-          fallback={<EmptyState align="start" busy={!unavailable()}>{unavailable() ? 'No cached items.' : 'Loading…'}</EmptyState>}
-        >
-          {/* The authored empty state, or the fixed string for a source that declares none. It renders
-              only under `row()` — i.e. the plugin's own route ANSWERED, with nothing — because an
-              unreachable node is the banner above and "nothing is assigned to you" would be a claim the
-              host has no business making on a failed fetch. */}
-          <For each={items()} fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}>
-            {(item) => (
-              <Row
-                onActivate={props.descriptor.onSelect ? () => select(item) : undefined}
-                selected={item.id === detailItem()}
-                leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
-                meta={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
-                trailing={(
-                  <>
-                    <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>
-                    <Show when={item.task && props.descriptor.onSelect?.verb !== 'createTask'}>
-                      <button
-                        type="button"
-                        class="ui-btn"
-                        data-size="sm"
-                        aria-label={`Create or attach task for ${item.title}`}
-                        onClick={(event) => promote(event, item)}
-                      >
-                        +TASK
-                      </button>
+        {/* `.pane-left` is an overflow:hidden flex column, so the list needs its own scroller or it
+            is simply clipped at the pane edge — the shape github's `.pr-list-scroll` and docker's
+            `.docker-list` each already have. Every integration browse renders through here, so this
+            one wrapper is the Linear, Rollbar and Chrome lists all at once. */}
+        <div class="scroll">
+          <Show
+            when={row()}
+            fallback={<EmptyState align="start" busy={!unavailable()}>{unavailable() ? 'No cached items.' : 'Loading…'}</EmptyState>}
+          >
+            {/* The authored empty state, or the fixed string for a source that declares none. It renders
+                only under `row()` — i.e. the plugin's own route ANSWERED, with nothing — because an
+                unreachable node is the banner above and "nothing is assigned to you" would be a claim the
+                host has no business making on a failed fetch. */}
+            <For each={items()} fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}>
+              {(item) => (
+                <Row
+                  onActivate={props.descriptor.onSelect ? () => select(item) : undefined}
+                  selected={item.id === detailItem()}
+                  leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
+                  meta={(
+                    <Show
+                      when={item.fields?.length}
+                      fallback={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
+                    >
+                      <For each={item.fields}>{(field) => <span class="ui-row-field muted">{field}</span>}</For>
                     </Show>
-                  </>
-                )}
-                title={item.title}
-              >
-                {item.title}
-              </Row>
-            )}
-          </For>
-        </Show>
+                  )}
+                  metaFields={item.fields?.length}
+                  trailing={(
+                    <>
+                      <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>
+                      <Show when={item.task && props.descriptor.onSelect?.verb !== 'createTask'}>
+                        <Button
+                          size="xs"
+                          aria-label={`Create or attach task for ${item.title}`}
+                          onClick={(event) => promote(event, item)}
+                        >
+                          +TASK
+                        </Button>
+                      </Show>
+                    </>
+                  )}
+                  title={item.title}
+                >
+                  {item.title}
+                </Row>
+              )}
+            </For>
+          </Show>
+        </div>
       </section>
       {/* The user's own dashboard, beside this source's list (docs/future/dashboards/placements.md).
           The easy sibling of a pane's aside, because this section is already the HOST's markup — no

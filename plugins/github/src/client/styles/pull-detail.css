@@ -59,36 +59,10 @@
   font-size: var(--fs-sm);
 }
 .check-name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.check-rerun,
-.pr-actions button,
-.composer button,
-.diff-composer-actions button,
-.linear-reply-btn,
-.repo-select {
-  flex: none;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-2) 9px;
-  cursor: pointer;
-}
-.check-rerun:hover,
-.pr-actions button:hover:not(:disabled),
-.composer button:hover:not(:disabled),
-.diff-composer-actions button:hover:not(:disabled),
-.linear-reply-btn:hover,
-.repo-select:hover { background: var(--bg-hover); border-color: var(--accent); }
-
 /* PR actions + comment composer. */
 .pr-actions { display: flex; align-items: center; gap: 7px; margin-top: var(--space-5); flex-wrap: wrap; }
-.pr-actions button:disabled,
-.composer button:disabled,
-.diff-composer-actions button:disabled { opacity: 0.5; cursor: default; }
 
-/* Create-PR form (mid pane in create mode). Reuses .repo-select / .pr-filter / .composer-input /
+/* Create-PR form (mid pane in create mode). Reuses .pr-filter / .composer-input /
    .pr-actions; this just lays them out and stretches the title + body full width. */
 /* Fill the pane below its sticky header (the pane is the scroll container; this is the rest of the
    row height). overflow: hidden auto — never a horizontal scrollbar (the absolute branch popover can
@@ -165,18 +139,9 @@
   text-overflow: ellipsis;
 }
 .label-row-remove {
-  flex: none;
   width: 24px;
   height: 24px;
-  font: inherit;
-  font-size: var(--fs-sm);
-  line-height: 1;
-  color: var(--text-muted);
-  background: none;
-  border: var(--control-bw) solid transparent;
-  border-radius: var(--radius);
   opacity: 0;
-  cursor: pointer;
   transition:
     opacity var(--dur-short) var(--ease-out),
     background-color var(--dur-short) var(--ease-out),
@@ -184,8 +149,8 @@
 }
 .label-row:hover .label-row-remove,
 .label-row:focus-within .label-row-remove { opacity: 1; }
-.label-row-remove:hover {
-  color: var(--text);
+.label-row-remove.ui-btn[data-variant='bare'] { border: var(--control-bw) solid transparent; border-radius: var(--radius); }
+.label-row-remove.ui-btn[data-variant='bare']:hover:not(:disabled) {
   background: var(--bg-selected);
   border-color: var(--border);
 }
@@ -207,7 +172,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   width: 100%;
-  height: 34px;
+  min-height: var(--control-h);
   box-sizing: border-box;
   font: inherit;
   font-size: var(--fs-sm);
@@ -455,5 +420,5 @@
 
 /* Armed for a second click (createArmedConfirm). github had no confirmation on these at all; the
    changed label is the prompt and the tone is what marks it destructive. */
-.label-row-remove[data-armed] { opacity: 1; color: var(--danger); border-color: var(--danger); }
-.pr-actions button[data-armed] { color: var(--danger); border-color: var(--danger); }
+.label-row-remove.ui-btn[data-variant='bare'][data-armed] { opacity: 1; color: var(--danger); border-color: var(--danger); }
+.pr-actions .ui-btn[data-armed] { color: var(--danger); border-color: var(--danger); }

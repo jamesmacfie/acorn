@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration, IntegrationProject, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 import { integrationProjectsOptions, integrationsOptions, workspaceExternalProjectsKey, workspaceExternalProjectsOptions } from '../queries'
 import { setWorkspaceExternalProjects } from '../workspaces/mutations'
-import { Alert, Checkbox } from '../ui/primitives'
+import { Alert, Button, Checkbox } from '../ui/primitives'
 
 // Settings → per-workspace page: which of a connected integration's projects this workspace follows.
 //
@@ -106,9 +106,9 @@ function ConnectionProjects(props: {
       <div class="settings-field-row">
         <span class="settings-label">{props.connection.label}</span>
         <Show when={projects.isError}>
-          <button type="button" class="ui-btn" data-size="sm" disabled={projects.isFetching} onClick={() => void projects.refetch()}>
+          <Button size="sm" disabled={projects.isFetching} onClick={() => void projects.refetch()}>
             {projects.isFetching ? 'Retrying…' : 'Retry'}
-          </button>
+          </Button>
         </Show>
       </div>
       <Show when={!projects.isPending} fallback={<p class="muted">Loading projects…</p>}>

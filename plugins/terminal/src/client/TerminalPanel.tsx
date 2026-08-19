@@ -6,7 +6,7 @@ import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { Alert, createSplitDrag, DocumentTabs, EmptyState, Menu, SplitHandle } from '@acorn/plugin-api/ui'
+import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Menu, SplitHandle } from '@acorn/plugin-api/ui'
 import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 
@@ -265,9 +265,8 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                 class="terminal-menu"
                 ariaLabel="New session"
                 trigger={({ toggle, open }) => (
-                  <button
-                    type="button"
-                    class="terminal-new"
+                  <Button
+                    variant="bare" class="terminal-new"
                     disabled={busy() || !ws()}
                     title={ws() ? 'New session' : 'Select a task first'}
                     aria-haspopup="menu"
@@ -275,7 +274,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                     onClick={toggle}
                   >
                     +
-                  </button>
+                  </Button>
                 )}
               >
                 {(menu) => (
@@ -302,14 +301,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                 )}
             </Menu>
             <Show when={activeRunning()}>
-              <button type="button" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api.interrupt(activeId()!)}>
+              <Button variant="bare" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api.interrupt(activeId()!)}>
                 ^C
-              </button>
+              </Button>
             </Show>
           </div>
-          <button type="button" class="terminal-close" onClick={props.onClose} title="Close drawer (sessions keep running)" aria-label="Close">
+          <Button variant="bare" class="terminal-close" onClick={props.onClose} title="Close drawer (sessions keep running)" aria-label="Close">
             ✕
-          </button>
+          </Button>
         </header>
 
         <Show when={error()}>{(msg) => <Alert class="terminal-error-banner">{msg()}</Alert>}</Show>

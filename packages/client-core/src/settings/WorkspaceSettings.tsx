@@ -8,6 +8,7 @@ import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
 import { ProjectConfig } from './WorkspaceProjectSettings'
 import WorkspaceExternalProjects from './WorkspaceExternalProjects'
+import { Button } from '../ui/primitives'
 
 // Settings → per-workspace page: workspace IDENTITY (name / icon / colour) + membership + delete.
 // Build/run/db/preview config is REPO-level (repo-level-settings): a workspace groups repos, but
@@ -125,9 +126,9 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
                 if (/^#?[0-9a-fA-F]{6}$/.test(v)) void saveColor(v.startsWith('#') ? v : `#${v}`)
               }}
             />
-            <button type="button" class="ui-btn" disabled={busy() || !color()} onClick={() => void saveColor(null)}>
+            <Button disabled={busy() || !color()} onClick={() => void saveColor(null)}>
               Reset
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -167,9 +168,9 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
 
       <Show when={!props.workspace.isDefault}>
         <div class="settings-danger">
-          <button type="button" class="ui-btn settings-delete" disabled={busy()} onClick={() => void remove()}>
+          <Button class="settings-delete" disabled={busy()} onClick={() => void remove()}>
             Delete workspace
-          </button>
+          </Button>
         </div>
       </Show>
     </div>

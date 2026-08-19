@@ -26,16 +26,18 @@ export function parseLinearRailItemId(value: string): LinearRailTarget | null {
 // Byte-for-byte the seed `client/promotion.ts` produced, down to the branch fallback, so a task promoted
 // from the loaded rail is indistinguishable from one promoted before the move.
 export function linearRailItem(issue: LinearProjectIssue): PluginRailItem {
+  // Positional, and never filtered: `fields` is laid out as columns, so an issue with no assignee
+  // has to keep the empty cell or its priority slides under the next row's assignee.
   const facts = [
     issue.identifier,
-    issue.state?.name,
-    issue.assignee,
+    issue.state?.name ?? '',
+    issue.assignee ?? '',
     priorityMeta(issue.priority, issue.priorityLabel).label,
-  ].filter(Boolean)
+  ]
   return {
     id: linearRailItemId({ connectionId: issue.integrationId, identifier: issue.identifier }),
     title: issue.title,
-    subtitle: facts.join(' · '),
+    fields: facts,
     ...(issue.labels.length ? { badge: issue.labels.map((label) => label.name).join(', ') } : {}),
     task: {
       origin: 'linear',

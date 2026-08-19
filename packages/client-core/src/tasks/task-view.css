@@ -79,23 +79,16 @@
 /* Browser chrome above the preview WebContentsView: navigation + URL bar + preview devtools + spinner. */
 .preview-chrome { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 5px var(--space-3); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
 .preview-nav-btn {
-  flex: none;
   width: 26px;
   height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-glyph);
-  font-size: var(--fs-lg);
-  line-height: 1;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius);
-  cursor: pointer;
 }
-.preview-nav-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.preview-nav-btn:disabled { opacity: 0.35; cursor: default; }
+.preview-nav-btn.ui-btn[data-variant='bare'] { font-size: var(--fs-lg); border-radius: var(--radius); }
+.preview-nav-btn.ui-btn[data-variant='bare']:hover:not(:disabled) { background: var(--bg-hover); }
+.preview-nav-btn.ui-btn[data-variant='bare']:disabled { opacity: 0.35; }
 .preview-url {
   flex: 1;
   min-width: 0;
@@ -120,7 +113,7 @@
   color: var(--text);
 }
 /* Alert owns the tone and size; this is the chrome-strip truncation it cannot know about. */
-.plugin-webview-blocked {
+.plugin-webview-blocked.ui-alert {
   flex: none;
   max-width: 45%;
   margin-top: 0;
@@ -153,20 +146,18 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-glyph);
+}
+.pane-switch-btn.ui-btn[data-variant='bare'] {
   font-size: var(--fs-lg);
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
   border-bottom: var(--divider);
   border-right: var(--tab-active-w) solid transparent;
-  cursor: pointer;
-  line-height: 1;
 }
-.pane-switch-btn:hover { background: var(--bg-hover); color: var(--text); }
-.pane-switch-btn.active { background: var(--bg-selected); color: var(--text); border-right-color: var(--accent); }
+.pane-switch-btn.ui-btn[data-variant='bare']:hover:not(:disabled) { background: var(--bg-hover); }
+.pane-switch-btn.ui-btn[data-variant='bare'].active { background: var(--bg-selected); color: var(--text); border-right-color: var(--accent); }
 /* Close-task ✕ sits at the bottom of the rail, set off from the pane switches above it. */
-.pane-switch-close { margin-top: auto; border-bottom: 0; border-top: var(--chrome-divider); }
-.pane-switch-close:hover { color: var(--del-marker); }
+.pane-switch-close { margin-top: auto; }
+.pane-switch-close.ui-btn[data-variant='bare'] { border-bottom: 0; border-top: var(--chrome-divider); }
+.pane-switch-close.ui-btn[data-variant='bare']:hover:not(:disabled) { color: var(--del-marker); }
 
 /* Close-task confirmation modal bits (reuses the shared .overlay shell). */
 .close-actions { display: flex; justify-content: flex-end; gap: var(--space-5); }
@@ -210,21 +201,18 @@
 .pane-close-btn, .pane-pin-btn {
   width: 22px;
   height: 22px;
-  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--fs-sm);
-  line-height: 1;
-  border: var(--control-bw) solid transparent;
-  border-radius: var(--radius-control);
-  background: var(--bg);
-  color: var(--text-muted);
   opacity: 0.55;
-  cursor: pointer;
 }
-.pane-close-btn:hover { opacity: 1; background: var(--bg-hover); color: var(--del-marker); }
-.pane-pin-btn:hover, .pane-pin-btn.active { opacity: 1; background: var(--bg-hover); color: var(--accent); }
+.pane-close-btn.ui-btn[data-variant='bare'],
+.pane-pin-btn.ui-btn[data-variant='bare'] { border-radius: var(--radius-control); }
+.pane-close-btn.ui-btn[data-variant='bare'],
+.pane-pin-btn.ui-btn[data-variant='bare'] { border: var(--control-bw) solid transparent; background: var(--bg); }
+.pane-close-btn.ui-btn[data-variant='bare']:hover:not(:disabled) { opacity: 1; background: var(--bg-hover); color: var(--del-marker); }
+.pane-pin-btn.ui-btn[data-variant='bare']:hover:not(:disabled),
+.pane-pin-btn.ui-btn[data-variant='bare'].active { opacity: 1; background: var(--bg-hover); color: var(--accent); }
 .contribution-failed { align-items: center; justify-content: center; gap: var(--space-4); }
 .contribution-unavailable { flex: 1; }
 

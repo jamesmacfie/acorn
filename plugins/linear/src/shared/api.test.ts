@@ -24,7 +24,7 @@ describe('linear wire contract', () => {
         name,
         typeof value === 'function' ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy)) : value,
       ])
-    expect(paths.length).toBe(5) // guards against the filter silently matching nothing
+    expect(paths.length).toBe(6) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {
       expect(typeof path, name).toBe('string')
       expect(path as string, name).toMatch(/^\/v2\/p\/linear\//)

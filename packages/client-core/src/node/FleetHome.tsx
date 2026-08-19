@@ -10,7 +10,7 @@ import { reconnectNode } from './fleetActions'
 import { formatLastSeen } from './freshness'
 import NodeChip from './NodeChip'
 import './nodes.css'
-import { Alert } from '../ui/primitives'
+import { Alert, Button } from '../ui/primitives'
 
 // Fleet home (docs/ui-design.md § New surfaces): the landing view once more than one node is paired — a
 // card per node with connection state, counts, last-refresh and the two actions that matter from here.
@@ -120,15 +120,13 @@ export default function FleetHome() {
                   </div>
                 </dl>
                 <div class="fleet-card-actions">
-                  <button
-                    type="button"
-                    class="ui-btn"
+                  <Button
                     disabled={active()}
                     onClick={() => setActiveNode(node.nodeId)}
                   >
                     {active() ? 'Active' : 'Make active'}
-                  </button>
-                  <button type="button" class="ui-btn" onClick={() => void reconnectNode(node.nodeId)}>Reconnect</button>
+                  </Button>
+                  <Button onClick={() => void reconnectNode(node.nodeId)}>Reconnect</Button>
                 </div>
               </li>
             )

@@ -5,7 +5,7 @@ import { repoConfigTrustRoute, type RepoConfigTrustReview } from '@acorn/protoco
 import { closeRepoConfigTrust, configTrustRequest } from './configTrust'
 import { createDismissable } from '../ui/dismissable'
 import './config-trust.css'
-import { Alert } from '../ui/primitives'
+import { Alert, Button } from '../ui/primitives'
 
 export default function ConfigTrustDialog() {
   const [review, setReview] = createSignal<RepoConfigTrustReview | null>(null)
@@ -91,10 +91,10 @@ export default function ConfigTrustDialog() {
             </Show>
           </div>
           <div class="overlay-actions">
-            <button type="button" class="ui-btn" data-variant="ghost" onClick={closeRepoConfigTrust}>Not now</button>
-            <button type="button" class="ui-btn" disabled={saving() || !review()?.current} onClick={() => void trustAndRun()}>
+            <Button variant="ghost" onClick={closeRepoConfigTrust}>Not now</Button>
+            <Button disabled={saving() || !review()?.current} onClick={() => void trustAndRun()}>
               {saving() ? 'Trusting…' : configTrustRequest()?.retry ? 'Trust and run' : 'Trust configuration'}
-            </button>
+            </Button>
           </div>
         </section>
       </div>

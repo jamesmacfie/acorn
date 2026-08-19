@@ -7,7 +7,7 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../registries/sources'
 import { Tabs } from '../ui/Tabs'
 import { createDismissable } from '../ui/dismissable'
-import { Alert } from '../ui/primitives'
+import { Alert, Button, Select } from '../ui/primitives'
 
 // Shared "+TASK" flow for the integration browses (docs/workspaces-and-tasks.md). Promoting an
 // external item (a Rollbar error, a Linear ticket) either CREATES a new task or ATTACHES the item to
@@ -130,8 +130,8 @@ export function PromoteToTaskModal(props: {
                 <input class="ui-input" type="text" placeholder="branch" value={branch()} onInput={(e) => setBranch(e.currentTarget.value)} />
               </Show>
               <div class="close-actions">
-                <button type="button" class="ui-btn" onClick={props.onClose}>Cancel</button>
-                <button type="submit" class="ui-btn" disabled={busy() || !title().trim() || (project()?.vcs === 'git' && !slugifyBranch(branch()))}>Create task</button>
+                <Button onClick={props.onClose}>Cancel</Button>
+                <Button type="submit" disabled={busy() || !title().trim() || (project()?.vcs === 'git' && !slugifyBranch(branch()))}>Create task</Button>
               </div>
             </form>
           </Show>
@@ -139,12 +139,12 @@ export function PromoteToTaskModal(props: {
           <Show when={mode() === 'attach'}>
             <form id="promote-panel-attach" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitAttach}>
               <p class="muted">Attach this item to an existing task.</p>
-              <select class="ui-input" value={attachId()} onChange={(e) => setAttachId(e.currentTarget.value)}>
+              <Select value={attachId()} onChange={(e) => setAttachId(e.currentTarget.value)}>
                 <For each={props.attachTasks}>{(t) => <option value={t.id}>{t.title} · {t.branch}</option>}</For>
-              </select>
+              </Select>
               <div class="close-actions">
-                <button type="button" class="ui-btn" onClick={props.onClose}>Cancel</button>
-                <button type="submit" class="ui-btn" disabled={busy() || !attachId()}>Attach</button>
+                <Button onClick={props.onClose}>Cancel</Button>
+                <Button type="submit" disabled={busy() || !attachId()}>Attach</Button>
               </div>
             </form>
           </Show>

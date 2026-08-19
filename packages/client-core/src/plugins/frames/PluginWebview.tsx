@@ -4,7 +4,7 @@ import { pluginWebviews } from '../../platform'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { displayHost, pluginWebviewKey, resolvePluginWebviewUrl } from './webviewModel'
-import { Alert, EmptyState, Spinner } from '../../ui/primitives'
+import { Alert, Button, EmptyState, Spinner } from '../../ui/primitives'
 
 export type PluginWebviewProps = {
   pluginId: string
@@ -123,9 +123,9 @@ export default function PluginWebview(props: PluginWebviewProps) {
   return (
     <section class="pane workspace-preview plugin-webview" style={{ 'grid-column': '1 / 3' }}>
       <div class="preview-chrome plugin-webview-chrome">
-        <button type="button" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => void native?.command(key(), 'back')}>‹</button>
-        <button type="button" class="preview-nav-btn" title="Forward" disabled={!canForward()} onClick={() => void native?.command(key(), 'forward')}>›</button>
-        <button type="button" class="preview-nav-btn" title="Reload" onClick={() => void native?.command(key(), 'reload')}>↻</button>
+        <Button variant="bare" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => void native?.command(key(), 'back')}>‹</Button>
+        <Button variant="bare" class="preview-nav-btn" title="Forward" disabled={!canForward()} onClick={() => void native?.command(key(), 'forward')}>›</Button>
+        <Button variant="bare" class="preview-nav-btn" title="Reload" onClick={() => void native?.command(key(), 'reload')}>↻</Button>
         <span class="plugin-webview-hostname" title={url() || home() || ''}>{displayHost(url() || home() || '') || 'No page loaded'}</span>
         <Show when={blocked()}><Alert tone="warn" class="plugin-webview-blocked">Blocked navigation to {blocked()}</Alert></Show>
         {/* Was a literal ◐ glyph with no accessible name. */}

@@ -1,5 +1,5 @@
 import { createResource, createSignal, For, Match, Show, Switch } from 'solid-js'
-import { EmptyState } from '@acorn/plugin-api/ui'
+import { EmptyState, Select } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { projectRoute, projectsRoute, type Project, type ProjectsResponse } from '@acorn/protocol/api.ts'
 import HttpPanel from './HttpPanel'
@@ -89,10 +89,10 @@ function SettingsSurface(props: { bridge: AcornBridge }) {
       <p class="settings-hint">
         Variables for the API panel, saved per project. Pick a project to edit its variables.
       </p>
-      <select class="ui-input" aria-label="Project" value={selected()} onChange={(event) => setSelected(event.currentTarget.value)}>
+      <Select aria-label="Project" value={selected()} onChange={(event) => setSelected(event.currentTarget.value)}>
         <option value="">Choose a project…</option>
         <For each={visible()}>{(candidate) => <option value={candidate.id}>{candidate.name}</option>}</For>
-      </select>
+      </Select>
       <Show when={chosen()}>
         {(candidate) => <HttpVariables projectId={candidate().id} projectName={nameOf(candidate())} />}
       </Show>

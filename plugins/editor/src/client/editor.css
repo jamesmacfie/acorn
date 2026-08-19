@@ -37,7 +37,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.editor-save {
+.editor-save.ui-btn {
   margin-left: auto;
   flex: none;
   font: inherit;

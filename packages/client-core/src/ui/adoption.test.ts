@@ -25,14 +25,17 @@ const SRC = (() => {
   }
 })()
 
-const walk = (dir: string): string[] =>
+const walk = (dir: string, ext: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith('.tsx') ? [join(dir, e.name)] : [])
+    e.isDirectory()
+      ? (e.name === 'node_modules' || e.name === 'dist' || e.name === '.acorn' ? [] : walk(join(dir, e.name), ext))
+      : e.name.endsWith(ext) ? [join(dir, e.name)] : [])
 
-const tsx = () =>
-  [join(SRC, 'packages/client-core/src'), join(SRC, 'plugins'), join(SRC, 'apps/desktop/src')]
-    .filter(existsSync)
-    .flatMap(walk)
+const ROOTS = ['packages/client-core/src', 'plugins', 'apps/desktop/src']
+const under = (ext: string) => () =>
+  ROOTS.map((r) => join(SRC, r)).filter(existsSync).flatMap((d) => walk(d, ext))
+const tsx = under('.tsx')
+const allCss = under('.css')
 const rel = (p: string) => p.slice(SRC.length + 1)
 
 describe('primitive adoption', () => {
@@ -43,6 +46,108 @@ describe('primitive adoption', () => {
     const retired = /class="[^"]*\b(overlay-btn|integration-key-input|ui-form-field|query-gate-\w+|action-error)\b/
     const offenders = tsx().filter((f) => retired.test(readFileSync(f, 'utf8'))).map(rel)
     expect(offenders).toEqual([])
+  })
+
+  // A primitive spreads its OWN data-attributes after `rest`, so a call site that writes the raw
+  // attribute instead of the prop is silently overridden — `<Button data-size="sm">` rendered at
+  // md, and nobody could see it in review or in tsc (ComponentProps<'button'> accepts any data-*).
+  // The +TASK button in every integration browse sat at full control height for exactly this.
+  it('no call site passes a primitive its own data-attribute instead of the prop', () => {
+    const owned = /<(?:Button|Badge|Chip|Row|Input|Select|Textarea|Spinner|Toolbar|SegmentedControl|ToggleButton|Card|Alert)\b[^>]*\sdata-(?:size|tone|variant|shape|dashed|icon-only|width|kind|invalid)=/
+    const offenders = tsx().filter((f) => owned.test(readFileSync(f, 'utf8'))).map(rel)
+    expect(offenders).toEqual([])
+  })
+
+  // A class handed to a primitive lands on the SAME element as the primitive's own class, so it
+  // competes with `.ui-x` at (0,1,0) — which it ties and wins on order — but LOSES outright to
+  // `.ui-x[data-variant='…']` at (0,2,0). cssHygiene.test.ts already bans the bare shape for Card;
+  // this is the general rule, and it is checked against what each call site actually renders.
+  //
+  // Three bugs in one week: docker's filter strip lost its padding to `.ui-toolbar[data-size='sm']`,
+  // Modern repainted every solid button because its pack rule outranked the variant, and eight more
+  // strips had silently lost their gap. None of it is visible in review or to tsc.
+  const CSS_CLASH = (() => {
+    // What each primitive emits unconditionally (the `?? 'default'` in primitives.tsx).
+    const DEFAULTS: Record<string, Record<string, string>> = {
+      'ui-btn': { variant: 'outline', tone: 'neutral', size: 'md' },
+      'ui-input': { size: 'md', width: 'full' },
+      'ui-toolbar': { variant: 'bar', size: 'md' },
+      'ui-alert': { tone: 'danger', variant: 'inline' },
+      'ui-badge': { tone: 'neutral', shape: 'tag', size: 'sm' },
+      'ui-chip': { tone: 'neutral', size: 'sm' },
+      'section-header': { level: 'pane' },
+    }
+    const COMPONENT: Record<string, string> = {
+      Button: 'ui-btn', Input: 'ui-input', Select: 'ui-input', Textarea: 'ui-input',
+      Toolbar: 'ui-toolbar', Alert: 'ui-alert', Badge: 'ui-badge', Chip: 'ui-chip',
+      Card: 'ui-card', Row: 'ui-row', EmptyState: 'ui-empty', Table: 'ui-table',
+      CodeBlock: 'ui-code', Meter: 'ui-meter', SegmentedControl: 'ui-segments',
+      Tabs: 'ui-tabs', SectionHeader: 'section-header',
+    }
+    const FLAGS = ['iconOnly', 'dashed', 'invalid', 'mono', 'busy']
+    const VALUED = ['variant', 'tone', 'size', 'width', 'kind', 'shape', 'level']
+    const attrName = (prop: string) => (prop === 'iconOnly' ? 'icon-only' : prop.toLowerCase())
+
+    // Every (class, primitive, emitted attributes) triple in the app.
+    const sites = new Map<string, { base: string; attrs: Record<string, string> }[]>()
+    const open = new RegExp(`<(${Object.keys(COMPONENT).join('|')})\\b((?:[^<>]|\\{[^{}]*\\})*?)/?>`, 'gs')
+    for (const file of tsx()) {
+      for (const m of readFileSync(file, 'utf8').matchAll(open)) {
+        const cls = /\bclass="([^"]+)"/.exec(m[2])
+        if (!cls) continue
+        const base = COMPONENT[m[1]]
+        const attrs: Record<string, string> = { ...(DEFAULTS[base] ?? {}) }
+        for (const prop of VALUED) {
+          const set = new RegExp(`\\b${prop}="([^"]+)"`).exec(m[2])
+          if (set) attrs[attrName(prop)] = set[1]
+        }
+        for (const flag of FLAGS) if (new RegExp(`\\b${flag}(?=[\\s/>])`).test(m[2])) attrs[attrName(flag)] = ''
+        for (const name of cls[1].split(/\s+/)) {
+          if (!sites.has(name)) sites.set(name, [])
+          sites.get(name)!.push({ base, attrs })
+        }
+      }
+    }
+
+    // Every `.ui-x[data-…]` rule in primitives.css, with the properties it declares.
+    const strip = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '')
+    const declared = (body: string) => new Set([...body.matchAll(/(?:^|;)\s*([a-z-]+)\s*:/g)].map((d) => d[1]))
+    const attrRules: { base: string; needs: [string, string | undefined][]; props: Set<string> }[] = []
+    const primitives = strip(readFileSync(join(SRC, 'packages/client-core/src/styles/primitives.css'), 'utf8'))
+    for (const rule of primitives.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const props = declared(rule[2])
+      for (const selector of rule[1].split(',')) {
+        const m = /^\s*\.(ui-[\w-]+|section-header)((?:\[data-[\w-]+(?:='[^']*')?\])+)\s*$/.exec(selector)
+        if (!m) continue
+        const needs = [...m[2].matchAll(/\[data-([\w-]+)(?:='([^']*)')?\]/g)].map((a) => [a[1], a[2]] as [string, string | undefined])
+        attrRules.push({ base: m[1], needs, props })
+      }
+    }
+
+    const offenders: string[] = []
+    for (const file of allCss()) {
+      const text = strip(readFileSync(file, 'utf8'))
+      for (const rule of text.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+        const props = declared(rule[2])
+        for (const selector of rule[1].split(',')) {
+          const m = /^\s*\.([\w-]+)\s*$/.exec(selector)
+          if (!m) continue
+          for (const site of sites.get(m[1]) ?? []) {
+            for (const attrRule of attrRules) {
+              if (attrRule.base !== site.base) continue
+              if (!attrRule.needs.every(([a, v]) => a in site.attrs && (v === undefined || site.attrs[a] === v))) continue
+              const clash = [...props].filter((prop) => attrRule.props.has(prop))
+              if (clash.length) offenders.push(`${rel(file)} .${m[1]} loses ${clash.sort().join(', ')} to .${site.base}`)
+            }
+          }
+        }
+      }
+    }
+    return [...new Set(offenders)].sort()
+  })
+
+  it('a class handed to a primitive is compounded with it, so the primitive cannot outrank it', () => {
+    expect(CSS_CLASH()).toEqual([])
   })
 
   // Files fully converted to the primitive components. Add a file here when you migrate it; the
@@ -116,6 +221,38 @@ describe('primitive adoption', () => {
     'plugins/github/src/client/DiffToolbar.tsx',
     'plugins/onboarding/src/client/OnboardingWizard.tsx',
     'plugins/http/src/frame/RequestTabs.tsx',
+    // Tier-4: the Button/Select sweep. Every raw <select> in the app became the Select primitive,
+    // and every ACTION button became Button — the row/tab/menu-item buttons Button's own note
+    // excludes stayed as they were, which is why some heavily-converted files are still absent.
+    'apps/desktop/src/app/client/App.tsx',
+    'apps/desktop/src/app/client/TaskView.tsx',
+    'packages/client-core/src/configTrust/ConfigTrustDialog.tsx',
+    'packages/client-core/src/modelProviders/ModelConnectionPicker.tsx',
+    'packages/client-core/src/node/FleetHome.tsx',
+    'packages/client-core/src/node/NodeGate.tsx',
+    'packages/client-core/src/plugins/PluginApprovalDialog.tsx',
+    'packages/client-core/src/plugins/PluginTrustDialog.tsx',
+    'packages/client-core/src/plugins/chrome/ChromeSourcePanel.tsx',
+    'packages/client-core/src/plugins/frames/PluginOverlay.tsx',
+    'packages/client-core/src/plugins/frames/PluginWebview.tsx',
+    'packages/client-core/src/registries/willPhase.tsx',
+    'packages/client-core/src/settings/McpSettings.tsx',
+    'packages/client-core/src/settings/NodeDevices.tsx',
+    'packages/client-core/src/settings/SchedulesSettings.tsx',
+    'packages/client-core/src/settings/ShortcutsSettings.tsx',
+    'packages/client-core/src/settings/WorkspaceExternalProjects.tsx',
+    'packages/client-core/src/tasks/TaskPaneHost.tsx',
+    'packages/client-core/src/ui/ContributionBoundary.tsx',
+    'packages/client-core/src/workspaces/WorkspaceProjectAssignments.tsx',
+    'plugins/agents/src/client/AgentPricingSettings.tsx',
+    'plugins/context/src/client/ContextPane.tsx',
+    'plugins/github/src/client/CreatePullForm.tsx',
+    'plugins/http/src/frame/app.tsx',
+    'plugins/onboarding/src/client/GithubConnect.tsx',
+    'plugins/preview/src/client/PreviewPane.tsx',
+    'plugins/terminal/src/client/TerminalPanel.tsx',
+    'plugins/terminal/src/client/TerminalSettings.tsx',
+    'plugins/workflows/src/client/WorkflowsSettings.tsx',
   ]
 
   it.each(CONVERTED)('%s uses primitives, not raw controls', (file) => {

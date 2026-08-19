@@ -6,7 +6,7 @@ import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
-import { Alert } from '../ui/primitives'
+import { Alert, Button } from '../ui/primitives'
 
 // Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
 //
@@ -141,37 +141,31 @@ export default function NodesSettings() {
                   </Show>
 
                   <div class="node-actions">
-                    <button type="button" class="ui-btn" disabled={busy()} onClick={() => reconnectNode(node.nodeId)}>Reconnect</button>
-                    <button
-                      type="button"
-                      class="ui-btn"
+                    <Button disabled={busy()} onClick={() => reconnectNode(node.nodeId)}>Reconnect</Button>
+                    <Button
                       disabled={busy()}
                       onClick={() => { setRenameValue(node.label); setRenaming(node.nodeId) }}
                     >
                       Rename
-                    </button>
+                    </Button>
                     {/* Labelled distinctly on purpose (docs/ui-design.md § Node management). Confusing the two is
                         how an owner loses access to a remote node: unpair is recoverable with the same
                         pairing code, revoke means the node has torn up this client's credential. */}
                     <Show when={!node.local}>
-                      <button
-                        type="button"
-                        class="ui-btn"
+                      <Button
                         disabled={busy()}
                         title="This client forgets the node. The node keeps this device paired."
                         onClick={() => void run(() => removeNode(node.nodeId, false))}
                       >
                         Unpair…
-                      </button>
-                      <button
-                        type="button"
-                        class="ui-btn node-danger"
+                      </Button>
+                      <Button class="node-danger"
                         disabled={busy()}
                         title="The node forgets this client. You will need a new pairing code to come back."
                         onClick={() => void run(() => removeNode(node.nodeId, true))}
                       >
                         Revoke this client…
-                      </button>
+                      </Button>
                     </Show>
                   </div>
                 </div>
@@ -182,9 +176,9 @@ export default function NodesSettings() {
 
         <Switch>
           <Match when={step().kind === 'idle'}>
-            <button type="button" class="ui-btn nodes-add-btn" onClick={() => setStep({ kind: 'endpoint' })}>
+            <Button class="nodes-add-btn" onClick={() => setStep({ kind: 'endpoint' })}>
               <span class="integration-add-icon">+</span> Add a node
-            </button>
+            </Button>
           </Match>
 
           <Match when={step().kind === 'endpoint'}>
@@ -202,8 +196,8 @@ export default function NodesSettings() {
                 <p class="muted">The address the node prints when it starts. https only — the certificate is the identity.</p>
               </label>
               <div class="node-step-actions">
-                <button type="button" class="ui-btn" disabled={busy()} onClick={() => void probe()}>{busy() ? 'Contacting…' : 'Continue'}</button>
-                <button type="button" class="ui-btn" onClick={cancel}>Cancel</button>
+                <Button disabled={busy()} onClick={() => void probe()}>{busy() ? 'Contacting…' : 'Continue'}</Button>
+                <Button onClick={cancel}>Cancel</Button>
               </div>
             </div>
           </Match>
@@ -233,15 +227,13 @@ export default function NodesSettings() {
                     </Alert>
                   </Show>
                   <div class="node-step-actions">
-                    <button
-                      type="button"
-                      class="ui-btn"
+                    <Button
                       disabled={!probed().compatible}
                       onClick={() => setStep({ kind: 'code', probe: probed() })}
                     >
                       It matches
-                    </button>
-                    <button type="button" class="ui-btn" onClick={cancel}>It does not — stop</button>
+                    </Button>
+                    <Button onClick={cancel}>It does not — stop</Button>
                   </div>
                 </div>
               )
@@ -273,10 +265,10 @@ export default function NodesSettings() {
                     <input class="ui-input" value={label()} onInput={(event) => setLabel(event.currentTarget.value)} />
                   </label>
                   <div class="node-step-actions">
-                    <button type="button" class="ui-btn" disabled={busy() || !code().trim()} onClick={() => void pair(probed())}>
+                    <Button disabled={busy() || !code().trim()} onClick={() => void pair(probed())}>
                       {busy() ? 'Pairing…' : 'Pair'}
-                    </button>
-                    <button type="button" class="ui-btn" onClick={cancel}>Cancel</button>
+                    </Button>
+                    <Button onClick={cancel}>Cancel</Button>
                   </div>
                 </div>
               )

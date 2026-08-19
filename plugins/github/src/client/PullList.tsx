@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
-import { A, useNavigate, useParams } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { activateTaskSignals, CHECK_TONE, checksState, clientEvents, createTask, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, scanContentRefs, type Task, tasksKey, tasksOptions, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
@@ -11,7 +11,7 @@ import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
-import { Alert, Button, EmptyState, Input, StatusDot } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, EmptyState, Input, Row, StatusDot } from '@acorn/plugin-api/ui'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -239,34 +239,46 @@ export default function PullList() {
                   const detail = createQuery(() => pullDetailOptions(owner(), repo(), String(pr.number), false))
                   const checks = () => detail.data?.checks ?? []
                   return (
-                    <A
+                    // Row, not a hand-built <A>: this list and every integration browse are the same
+                    // list, and they had two hover treatments, two selected treatments and two row
+                    // boxes between them. `href` keeps the real link (middle-click, copy address);
+                    // `onActivate` routes the plain click, exactly as <A> did.
+                    <Row
                       class="pr-row"
-                      classList={{ active: params.number === String(pr.number) }}
                       href={`${githubBrowsePath(params.projectId ?? '')}/${pr.number}`}
-                      onFocus={() => queueRowPrefetch(pr.number)}
-                      onBlur={cancelRowPrefetch}
-                      onMouseEnter={() => queueRowPrefetch(pr.number)}
-                      onMouseLeave={cancelRowPrefetch}
+                      onActivate={() => navigate(`${githubBrowsePath(params.projectId ?? '')}/${pr.number}`)}
+                      selected={params.number === String(pr.number)}
+                      onHover={(entered) => (entered ? queueRowPrefetch(pr.number) : cancelRowPrefetch())}
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }}
+                      leading={(
+                        <>
+                          <span class="pr-num">#{pr.number}</span>
+                          <Show when={checks().length}>
+                            <StatusDot tone={CHECK_TONE[checksState(checks())]} />
+                          </Show>
+                        </>
+                      )}
+                      meta={(
+                        <>
+                          <span class="ui-row-field">{pr.author ?? ''}</span>
+                          <span class="ui-row-field">{formatRelativeTime(pr.updatedAt)}</span>
+                        </>
+                      )}
+                      metaFields={2}
+                      trailing={(
+                        <>
+                          <Show when={pr.draft}><Badge tone="warn" size="xs">draft</Badge></Show>
+                          <Show when={pr.headRef}>
+                            <Button size="xs" class="pr-ws-btn" title="Open as task" onClick={(e) => void openAsTask(e, pr)}>
+                              +TASK
+                            </Button>
+                          </Show>
+                        </>
+                      )}
+                      title={pr.title}
                     >
-                      <span class="pr-num">#{pr.number}</span>
-                      <Show when={checks().length}>
-                        <StatusDot tone={CHECK_TONE[checksState(checks())]} />
-                      </Show>
-                      <span class="pr-title">{pr.title}</span>
-                      <Show when={pr.draft}>
-                        <span class="pr-badge">draft</span>
-                      </Show>
-                      <Show when={pr.author}>
-                        <span class="pr-author muted">{pr.author}</span>
-                      </Show>
-                      <span class="pr-time muted">{formatRelativeTime(pr.updatedAt)}</span>
-                      <Show when={pr.headRef}>
-                        <button type="button" class="pr-ws-btn" title="Open as task" onClick={(e) => void openAsTask(e, pr)}>
-                          +TASK
-                        </button>
-                      </Show>
-                    </A>
+                      {pr.title}
+                    </Row>
                   )
                 }}
               </For>
@@ -274,14 +286,13 @@ export default function PullList() {
           </Show>
           {/* Load-more only on closed; hidden while filtering since the filter only sees loaded pages. */}
           <Show when={tab() === 'closed' && closedPulls.hasNextPage && !filter().trim()}>
-            <button
-              type="button"
-              class="pr-load-more"
+            <Button
+              variant="bare" class="pr-load-more"
               disabled={closedPulls.isFetchingNextPage}
               onClick={() => void closedPulls.fetchNextPage()}
             >
               {closedPulls.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           </Show>
         </Show>
       </div>

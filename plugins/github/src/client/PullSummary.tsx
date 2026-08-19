@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import type { Accessor } from 'solid-js'
-import { Alert, Chip, CollapsibleSection, CopyButton, createArmedConfirm, Icon, UserAvatar } from '@acorn/plugin-api/ui'
+import { Alert, Button, Chip, CollapsibleSection, CopyButton, createArmedConfirm, Icon, Select, UserAvatar } from '@acorn/plugin-api/ui'
 import { formatRelativeTime, REF_LINK_CLASS, splitRefTokens } from '@acorn/plugin-api/client'
 import type { Pull, PullConflicts } from '../contract/api'
 
@@ -77,25 +77,24 @@ export function PullSummary(props: {
         <Show when={props.pull().state === 'open'}>
           <div class="pr-actions">
             <Show when={!props.pull().autoMergeEnabled}>
-              <select class="repo-select" value={props.mergeMethod()} onChange={(e) => props.setMergeMethod(e.currentTarget.value)}>
+              <Select size="sm" width="auto" aria-label="Merge method" value={props.mergeMethod()} onChange={(e) => props.setMergeMethod(e.currentTarget.value)}>
                 <option value="squash">squash</option><option value="merge">merge</option><option value="rebase">rebase</option>
-              </select>
+              </Select>
             </Show>
-            <Show when={props.pull().autoMergeEnabled}><button type="button" onClick={() => props.run(props.disableAutoMerge.run())} disabled={props.disableAutoMerge.pending}>Disable auto-merge</button></Show>
-            <Show when={!props.pull().autoMergeEnabled && props.pull().mergeStateStatus === 'BLOCKED'}><button type="button" onClick={() => props.run(props.enableAutoMerge.run())} disabled={props.enableAutoMerge.pending}>Enable auto-merge ({props.mergeMethod()})</button></Show>
+            <Show when={props.pull().autoMergeEnabled}><Button onClick={() => props.run(props.disableAutoMerge.run())} disabled={props.disableAutoMerge.pending}>Disable auto-merge</Button></Show>
+            <Show when={!props.pull().autoMergeEnabled && props.pull().mergeStateStatus === 'BLOCKED'}><Button onClick={() => props.run(props.enableAutoMerge.run())} disabled={props.enableAutoMerge.pending}>Enable auto-merge ({props.mergeMethod()})</Button></Show>
             <Show when={!props.pull().autoMergeEnabled && props.pull().mergeStateStatus !== 'BLOCKED'}>
-              <button type="button" onClick={() => props.run(props.merge.run())} disabled={props.merge.pending || props.pull().mergeable === 'CONFLICTING'} title={props.pull().mergeable === 'CONFLICTING' ? 'Resolve merge conflicts before merging' : undefined}>Merge</button>
+              <Button onClick={() => props.run(props.merge.run())} disabled={props.merge.pending || props.pull().mergeable === 'CONFLICTING'} title={props.pull().mergeable === 'CONFLICTING' ? 'Resolve merge conflicts before merging' : undefined}>Merge</Button>
             </Show>
-            <button
-              type="button"
+            <Button
               data-armed={closeArmed.armed() ? '' : undefined}
               onClick={() => { if (closeArmed.request('close')) props.run(props.close.run()) }}
               disabled={props.close.pending}
-            >{closeArmed.armed() ? 'Close?' : 'Close'}</button>
-            <button type="button" onClick={() => props.run(props.draft.run(!props.pull().draft))} disabled={props.draft.pending}>{props.pull().draft ? 'Ready for review' : 'Convert to draft'}</button>
+            >{closeArmed.armed() ? 'Close?' : 'Close'}</Button>
+            <Button onClick={() => props.run(props.draft.run(!props.pull().draft))} disabled={props.draft.pending}>{props.pull().draft ? 'Ready for review' : 'Convert to draft'}</Button>
           </div>
         </Show>
-        <Show when={props.pull().state === 'closed'}><div class="pr-actions"><button type="button" onClick={() => props.run(props.reopen.run())} disabled={props.reopen.pending}>Reopen</button></div></Show>
+        <Show when={props.pull().state === 'closed'}><div class="pr-actions"><Button onClick={() => props.run(props.reopen.run())} disabled={props.reopen.pending}>Reopen</Button></div></Show>
         <Show when={props.actionError()}><Alert>{props.actionError()}</Alert></Show>
       </div>
 

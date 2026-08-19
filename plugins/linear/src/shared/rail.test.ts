@@ -31,7 +31,7 @@ describe('Linear descriptor rows', () => {
     expect(linearRailItem(ISSUE)).toEqual({
       id: 'linear%3Aacme:ENG-42',
       title: 'Ship it',
-      subtitle: 'ENG-42 · In Progress · Ada · Urgent',
+      fields: ['ENG-42', 'In Progress', 'Ada', 'Urgent'],
       badge: 'bug',
       task: {
         origin: 'linear',

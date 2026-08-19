@@ -5,7 +5,7 @@ import { activeNodeId, setActiveNode } from '../node/activeNode'
 import { nodes } from '../node/fleet'
 import { noticeKindContribution } from '../registries/notices'
 import Icon from '../ui/Icon'
-import { Alert } from '../ui/primitives'
+import { Alert, Button } from '../ui/primitives'
 import Popover from '../ui/Popover'
 import './notifications.css'
 import { openRepoConfigTrust } from '../configTrust/configTrust'
@@ -44,14 +44,14 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
       ariaLabel="Notifications"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <button type="button" class="theme-toggle" title="Notifications" aria-expanded={open()} onClick={toggle}>
+        <Button variant="bare" class="theme-toggle" title="Notifications" aria-expanded={open()} onClick={toggle}>
           ◔
           {/* One pill for both sections. An attention item always counts — it is unresolved by definition —
               so it is added rather than max()'d with the unread notices. */}
           <Show when={unreadCount() + inbox().rows.length}>
             {(count) => <span class="notify-count">{count()}</span>}
           </Show>
-        </button>
+        </Button>
       )}
     >
       {({ close }) => (
@@ -100,7 +100,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
           </Show>
           <div class="notify-head">
             <span>Notifications</span>
-            <button type="button" class="notify-mark-all" onClick={markAllRead}>Mark all read</button>
+            <Button variant="bare" onClick={markAllRead}>Mark all read</Button>
           </div>
           <ul class="notify-list">
             <For each={noticesForActiveNode()} fallback={<li class="notify-empty muted">No notifications.</li>}>

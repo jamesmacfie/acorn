@@ -40,6 +40,7 @@ import type {
   LinearProjectIssue,
   LinearProjectIssuesResponse,
   LinearRailItemsResponse,
+  LinearUploadResponse,
 } from '../../shared/api'
 import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
 import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
@@ -53,6 +54,24 @@ import { sortLinearIssues } from '../../shared/triage'
 // this owns multi-connection resolution.
 const PROVIDER = 'linear'
 const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === 'linear.issues')!.ttlMs
+
+// The only host /uploads will spend a credential against. See the route for why that is the whole
+// security argument rather than a nicety. Exported and pure because it IS that argument, and a branch
+// carrying the owner's Linear key should be checkable without standing up a request context.
+const UPLOAD_HOST = 'uploads.linear.app'
+export const linearUploadTarget = (raw: string | undefined): URL | null => {
+  let url: URL
+  try {
+    url = new URL(raw ?? '')
+  } catch {
+    return null
+  }
+  return url.protocol === 'https:' && url.hostname === UPLOAD_HOST ? url : null
+}
+// A ticket screenshot, generously. The cap exists because the answer is base64 inside a JSON body that
+// crosses a MessagePort into an iframe — a 200 MB video attachment would wedge the frame, and something
+// that big is not what anyone wants drawn inline anyway.
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
 // ── The portable carrier ──────────────────────────────────────────────────────────────────────────
 //
@@ -385,6 +404,48 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
       return respondError(c, 502, 'provider_unavailable')
     }
     return c.json({ ok: true })
+  })
+  // One image out of a ticket body, inlined as a data URL.
+  //
+  // This route exists because of two walls that meet here, and neither is movable:
+  //
+  //   The frame has no network.  A plugin's UI runs at `app-plugin://<hash>` under
+  //                              `img-src 'self' data:; connect-src 'none'`, so it can neither load a
+  //                              remote image nor fetch one. `data:` is the only picture it can draw.
+  //   The upload is private.     uploads.linear.app wants the same Authorization header the GraphQL
+  //                              endpoint takes, and the frame never holds a credential.
+  //
+  // So the node half, which has both the network and the key, does the fetch and hands back something
+  // the CSP already allows. Widening the frame's CSP instead was the shorter diff and the wrong one: an
+  // `<img src>` to an arbitrary host is an exfiltration channel, which is exactly what `connect-src
+  // 'none'` exists to deny.
+  //
+  // `url` is HOST-LOCKED, and that is the whole security argument. It arrives from a ticket description
+  // — third-party authored content — so without the check this is a general-purpose proxy that spends
+  // the owner's Linear key against whatever host that content names, and reflects the answer back.
+  .get('/uploads', async (c) => {
+    const target = linearUploadTarget(c.req.query('url'))
+    if (!target) return respondError(c, 400, 'bad_request')
+
+    const requested = c.req.query('integration')
+    const all = await linearConnections(c)
+    const candidates = requested ? all.filter(({ row }) => row.id === requested) : all
+    if (!candidates.length) return respondError(c, 403, 'provider_not_connected')
+
+    // Same shape as the detail route above: without ?integration, which workspace owns this file is
+    // exactly what is unknown, so ask each in turn and take the first that answers.
+    for (const { key } of candidates) {
+      const res = await fetch(target, { headers: { Authorization: key } }).catch(() => null)
+      if (!res?.ok) continue
+      // Images only. Anything else is either a document the reader should open in Linear, or a content
+      // type this route has no business turning into a `data:` URL.
+      const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+      if (!type.startsWith('image/')) return respondError(c, 415, 'provider_unsupported_media')
+      const bytes = Buffer.from(await res.arrayBuffer())
+      if (bytes.byteLength > MAX_UPLOAD_BYTES) return respondError(c, 413, 'provider_resource_too_large')
+      return c.json({ dataUrl: `data:${type};base64,${bytes.toString('base64')}` } satisfies LinearUploadResponse)
+    }
+    return respondError(c, 404, 'provider_resource_not_found')
   })
 
 // The Hono routes over the portable carrier — the only way in. Its request context supplies the

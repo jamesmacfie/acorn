@@ -1,16 +1,11 @@
 /* Top bar side clusters: dropdown (start) and auth (end). */
 .topbar-side { display: inline-flex; align-items: center; gap: var(--pane-pad); }
 .topbar-end { justify-content: flex-end; }
-.theme-toggle {
-  font: inherit;
-  color: var(--text-muted);
-  background: none;
-  border: 0;
-  cursor: pointer;
-  padding: var(--space-1) var(--space-3);
-  line-height: 1;
-}
-.theme-toggle:hover { color: var(--text); }
+/* Deltas from Button's `bare` variant. `.ui-btn[data-variant='bare']` is (0,2,0) and its hover is
+   (0,4,0), so a plain `.class` rule loses to the primitive — the same compounding the Card note in
+   styles/cssHygiene.test.ts describes, one column higher because a variant is an attribute. The OWN
+   class leads: boundaries.test.ts reads the first class of a selector as the rule's owner. */
+.theme-toggle.ui-btn[data-variant='bare'] { padding: var(--space-1) var(--space-3); }
 
 /* Agent-working badge beside the terminal toggle: spinning glyph + active count. */
 .term-working {
@@ -24,16 +19,7 @@
 }
 
 /* Left-pane collapse chevron: a quiet glyph toggle next to the picker. */
-.collapse-toggle {
-  font: inherit;
-  color: var(--text-muted);
-  background: none;
-  border: 0;
-  cursor: pointer;
-  padding: var(--space-1) var(--space-3);
-  line-height: 1;
-}
-.collapse-toggle:hover { color: var(--text); }
+.collapse-toggle.ui-btn[data-variant='bare'] { padding: var(--space-1) var(--space-3); }
 
 /* Breadcrumb (top-bar center): owner / repo / #number, each segment muted, the number bold. */
 .breadcrumb {
@@ -50,16 +36,6 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.crumb-link {
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-}
-.crumb-link:hover { color: var(--text); }
 .crumb-sep { color: var(--text-faint); flex: none; }
 .crumb-num { color: var(--text); font-weight: 600; flex: none; }
 
@@ -69,7 +45,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
-  height: 36px;
+  min-height: var(--control-h);
   max-width: 300px;
   box-sizing: border-box;
   font: inherit;
@@ -211,7 +187,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  height: 32px;
+  min-height: var(--control-h);
   font: inherit;
   color: var(--text-muted);
   background: var(--bg);

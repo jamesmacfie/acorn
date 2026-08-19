@@ -13,7 +13,7 @@ import {
 } from '../node/nodePlugins'
 import Icon from '../ui/Icon'
 import { createDismissable } from '../ui/dismissable'
-import { Alert } from '../ui/primitives'
+import { Alert, Badge, Button } from '../ui/primitives'
 import { closePluginApproval, describePluginRequest, pluginApprovalTask, pluginRequestOutcomeMessage } from './approval'
 import { syncPluginDistribution } from './distribution'
 import { setPluginDevGrant } from './host'
@@ -218,8 +218,8 @@ export default function PluginApprovalDialog() {
                   <div>
                     <h2 id="plugin-approval-title">{describePluginRequest(current())}</h2>
                     <p class="plugin-trust-meta">
-                      <span class="ui-badge" data-size="xs"><Icon name="monitor" /> on {nodeLabel()}</span>
-                      <Show when={current().dev}><span class="ui-badge" data-size="xs" data-tone="warn">development mode</span></Show>
+                      <Badge size="xs"><Icon name="monitor" /> on {nodeLabel()}</Badge>
+                      <Show when={current().dev}><Badge size="xs" tone="warn">development mode</Badge></Show>
                     </p>
                   </div>
                 </header>
@@ -278,21 +278,21 @@ export default function PluginApprovalDialog() {
                   when={screen() === 'review'}
                   fallback={
                     <>
-                      <button type="button" class="ui-btn" data-variant="ghost" disabled={busy()} onClick={() => void deny()}>
+                      <Button variant="ghost" disabled={busy()} onClick={() => void deny()}>
                         Deny
-                      </button>
-                      <button type="button" class="ui-btn" disabled={busy()} onClick={() => void approve()}>
+                      </Button>
+                      <Button disabled={busy()} onClick={() => void approve()}>
                         {busy() ? 'Working…' : current().action === 'uninstall' ? 'Remove it' : 'Fetch it'}
-                      </button>
+                      </Button>
                     </>
                   }
                 >
-                  <button type="button" class="ui-btn" data-variant="ghost" data-tone="danger" disabled={busy()} onClick={() => void removeIt()}>
+                  <Button variant="ghost" tone="danger" disabled={busy()} onClick={() => void removeIt()}>
                     Remove it
-                  </button>
-                  <button type="button" class="ui-btn" disabled={busy()} onClick={() => void enableIt()}>
+                  </Button>
+                  <Button disabled={busy()} onClick={() => void enableIt()}>
                     {busy() ? 'Working…' : current().dev ? 'Trust and develop' : 'Keep it'}
-                  </button>
+                  </Button>
                 </Show>
               </div>
             </section>
