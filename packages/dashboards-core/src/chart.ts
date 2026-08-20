@@ -7,52 +7,19 @@ import { cellText, formatCell } from './format'
 import type { PanelShaping, PanelTone, PanelView } from './model'
 import { aggregateRows, boardColumns, groupField } from './shaping'
 
-// THE CHART VIEW's arithmetic (docs/dashboards.md § Views): buckets, aggregates, scales, ticks and
-// path data. Pure and tested, because `ChartView.tsx` cannot be — vitest here runs in node with no
-// Solid plugin — so the component is a thin `<svg>` over what this answers and decides nothing.
+// The chart view's arithmetic: buckets, aggregates, scales, ticks and path data. Which shapes exist,
+// which schemas can draw them and where a mark's colour comes from are all in
+// docs/dashboards.md § Views are derived, not chosen from a menu.
 //
-// A VIEW KIND, NOT A CONTRACT CHANGE. Nothing crosses the wire that does not already: `number` and
-// `datetime` were in the field vocabulary from the start and group-by was already shaping. If
-// drawing a chart ever appears to need a new field type or a new response shape, that is the
-// field-type fight (docs/future/dashboards/refused.md § No new field type without a fight), not a
-// chart requirement.
-//
-// TWO SHAPES ONLY, and that is a budget rather than a starting point:
-//
-//   BAR    category axis from an enum field (or the shaping group-by), value from a number
-//          aggregate over the filtered rows.
-//   LINE   x from a datetime bucketed by day, y from a number aggregate or a count, optional series
-//          split from an enum.
-//
-// Pie, gauge, scatter, area: no, until someone arrives with the panel that needs one.
-//
-// HAND-ROLLED SVG, NO CHARTING DEPENDENCY. Two shapes, no zoom, no brush. Colour never comes from
-// here as a literal: a mark carries a `tone` from the host's own five-value status vocabulary — the
-// same one a plugin's declared enum value can name and an appearance pack already owns
-// (ui/primitives.tsx § StatusDot). A plugin never names a colour, same rule as everywhere.
+// Pure and tested because `ChartView.tsx` cannot be. Vitest here runs in node with no Solid plugin,
+// so the component is a thin `<svg>` over what this file answers.
 
-// ── Identity colour, and why it is not a tone ─────────────────────────────────────────────────
+// ── Identity colour ───────────────────────────────────────────────────────────────────────────
 //
-// This used to cycle the five STATUS tones for anything the schema had not pre-toned
-// (`accent/ok/warn/bad/muted`). That is right for status — a `Ready` bar should be the ok colour —
-// and wrong for identity: a line split by source, or a bar over categories nobody declared, is asking
-// "which series is this", and answering with status colours makes github permanently ok-green and
-// linear permanently warn-amber, which reads as a judgement nobody made
-// (docs/dashboards.md § Views are derived, not chosen from a menu).
-//
-// So a mark's colour comes from exactly one of two places:
-//
-//   `tone`    the plugin DECLARED what this value means. Keep it — the status vocabulary is doing its
-//             job, and the appearance pack already owns those five colours.
-//   `series`  identity with no declared meaning. An ordinal slot, coloured by `--viz-series-1..3` —
-//             theme-axis tokens distinct from the status tones (ui/tokenAxes.ts).
-//
-// THREE SLOTS, HARD CAP. Slot 4 onwards folds into `other`, drawn muted and disclosed in the legend
-// when that lands. Three is what survives colour-vision checking as a set alongside the five status
-// tones; past three the honest answer is fewer series or a table, not a fourth colour.
-//
-// Still no literal colour here or in `ChartView.tsx`: a mark carries `data-series` beside `data-tone`
-// and `dashboards.css` maps both.
+// A mark's colour comes from one of two attributes, never a literal: `tone` when the plugin declared
+// what a value means, `series` when the mark is identity with no declared tone. Three identity slots,
+// then a muted `other` fold. `dashboards.css` maps both attributes to colours.
+// See docs/dashboards.md § Views are derived, not chosen from a menu.
 
 /** `1 | 2 | 3` are the identity slots; `other` is the fold. */
 export type ChartSeriesSlot = 1 | 2 | 3 | 'other'
@@ -65,40 +32,38 @@ const seriesSlot = (index: number): ChartSeriesSlot =>
 /** Abstract units. The SVG scales uniformly to whatever rect the panel has, so nothing here needs a
  *  measurement and the chart survives a panel resize without recomputing.
  *
- *  The accepted ceiling: a very wide or very tall panel letterboxes its chart rather than stretching
- *  it, because stretching would distort the type with it. The upgrade path — if it ever matters — is
- *  the grid's own `ResizeObserver`, which already knows the panel's cell size. */
+ *  The ceiling: a very wide or very tall panel letterboxes its chart rather than stretching it, which
+ *  would distort the type with it. Upgrade path is the grid's own `ResizeObserver`, which already
+ *  knows the panel's cell size. */
 export const CHART_BOX = { width: 320, height: 180 } as const
 
-/** TICK TYPE IS GEOMETRY, and that is why the size lives here rather than in the stylesheet.
+/** Tick type is geometry, so the size lives here rather than in the stylesheet.
  *
- *  Inside a scaled `viewBox` a CSS `font-size` is a length in USER UNITS, so it scales with the
- *  drawing like everything else. The ticks used to take `--fs-2xs` — around 11, which is a twelfth of
- *  this box's height — and on a half-screen panel that rendered as roughly 28px labels towering over
- *  the marks they named.
+ *  Inside a scaled `viewBox` a CSS `font-size` is a length in user units, so it scales with the
+ *  drawing. The ticks used to take `--fs-2xs`, around 11, which is a twelfth of this box's height, and
+ *  on a half-screen panel that rendered as roughly 28px labels towering over the marks they named.
  *
  *  So the tick size is a number in the same units as the point radius, the bar widths and the padding,
- *  and `ChartView.tsx` sets it as an attribute. The appearance pack loses control of it, which is the
- *  same trade the box itself takes: a very small panel gets small labels, and the way out is the
- *  ResizeObserver above, not a token. */
+ *  and `ChartView.tsx` sets it as an attribute. The appearance pack loses control of it, the same
+ *  trade the box itself takes. */
 export const TICK_FONT = 7
 
 /** The gap between a tick label and the thing it labels. Here rather than in the view because the left
  *  gutter is sized around it. */
 export const TICK_GAP = 4
 
-/** Rough advance width of one tick glyph. The y axis is tabular figures, so an estimate is honest for
- *  the labels that decide the gutter; a letter varies more, but only a category label is letters and
- *  that axis has slack. Generous on purpose — over-padding is invisible, under-padding clips. */
+/** Rough advance width of one tick glyph. The y axis is tabular figures, so an estimate holds for the
+ *  labels that decide the gutter. Only a category label is letters, and that axis has slack. Generous,
+ *  because over-padding is invisible and under-padding clips. */
 const GLYPH_W = TICK_FONT * 0.62
 
 const PAD = { top: 8, right: 8, bottom: 22 } as const
 /** A gutter narrower than this buys nothing back: two-character labels still need somewhere to sit. */
 const MIN_LEFT = 14
 
-/** The plot rect the marks are placed in. Not a constant, because the LEFT gutter is however wide the
- *  y axis labels turn out to be: `36` fitted three characters, so a count of 200,000 rendered as
- *  "00000" with the rest of itself outside the box. */
+/** The plot rect the marks are placed in. Not a constant, because the left gutter is however wide the
+ *  y axis labels turn out to be. At a fixed `36` a count of 200,000 rendered as "00000" with the rest
+ *  of itself outside the box. */
 export type ChartFrame = {
   width: number
   height: number
@@ -147,7 +112,7 @@ export type ChartTick = { label: string; at: number; anchor?: 'start' | 'end' }
 
 export type ChartBar = {
   key: string
-  /** The CATEGORY this bar stands in — the x axis names it, so several bars of one cluster share it. */
+  /** The category this bar stands in. The x axis names it, so several bars of one cluster share it. */
   label: string
   value: number
   /** Everything this bar is, in words: its category, its series where there is one, and its measure
@@ -166,9 +131,9 @@ export type ChartBar = {
 export type ChartLine = {
   id: string
   label: string
-  /** Set when the plugin declared what this series means, and for the single unsplit line — one mark
-   *  with no sibling to be told apart from has no use for an identity colour, which is the same
-   *  argument that put the sparkline on `--accent` (charts.md § 5). */
+  /** Set when the plugin declared what this series means, and for the single unsplit line. One mark
+   *  with no sibling to be told apart from has no use for an identity colour, the same argument that
+   *  put the sparkline on `--accent`. */
   tone?: PanelTone
   /** Set when the series is identity with no declared tone. Mutually exclusive with `tone`. */
   series?: ChartSeriesSlot
@@ -177,8 +142,8 @@ export type ChartLine = {
   points: { x: number; y: number; label: string }[]
 }
 
-/** One key of the legend, in the mark's own colour attribute — the same `tone`/`series` pair a mark
- *  carries, so the swatch and the mark cannot drift apart. */
+/** One key of the legend, carrying the same `tone` or `series` attribute the mark does, so the swatch
+ *  and the mark cannot drift apart. */
 export type ChartLegendKey = {
   id: string
   label: string
@@ -186,14 +151,12 @@ export type ChartLegendKey = {
   series?: ChartSeriesSlot
 }
 
-/** Both shapes carry these. `legend` is present only when TWO OR MORE series draw: one series has no
- *  sibling to be told apart from and the panel title already names it, so a one-swatch legend is
- *  furniture.
+/** Both shapes carry these. `legend` is present only when two or more series draw: one series has no
+ *  sibling to be told apart from and the panel title already names it.
  *
- *  Where it IS present it is not optional polish. The slot-2 ↔ slot-3 pair of the identity ramp sits
- *  in the colour-vision-deficiency warn band, which is legal only with a secondary encoding, and this
- *  is it (charts.md § 1). An ungrouped bar draws one series and its categories are told apart by the
- *  x axis labels rather than by colour, which is why it has none. */
+ *  It is a secondary encoding, not polish. The slot-2 and slot-3 pair of the identity ramp sits in the
+ *  colour-vision-deficiency warn band, which is legal only with one. An ungrouped bar draws one series
+ *  and its categories are told apart by the x axis labels, so it has none. */
 type ChartCommon = {
   /** The rect these marks were placed in. The view draws its axes and gridlines from this rather than
    *  from a constant, because the left gutter is however wide this chart's own labels needed. */
@@ -232,14 +195,13 @@ export const chartSupportedBy = (schema: PluginCollectionSchema): boolean => cha
 export const chartAxisFields = (schema: PluginCollectionSchema, shape: ChartShape): PluginCollectionField[] =>
   shape === 'bar' ? enumFields(schema) : datetimeFields(schema)
 
-/** The enums a shape may be SPLIT INTO SERIES by — one line per value, or one bar per value inside
- *  each category's cluster (charts.md § 3).
+/** The enums a shape may be split into series by: one line per value, or one bar per value inside each
+ *  category's cluster.
  *
  *  A line's axis is a datetime, so every enum is a candidate. A bar's axis is already an enum, so the
- *  candidates are every OTHER one: splitting a bar by the field it is keyed by draws one bar per
- *  cluster, which is the ungrouped chart with extra arithmetic. That makes the grouped bar
- *  unrepresentable over a single-enum schema — the editor offers nothing rather than validating a
- *  choice afterwards, which is the gating rule everywhere else in this file. */
+ *  candidates are every other one. Splitting a bar by the field it is keyed by draws one bar per
+ *  cluster, which is the ungrouped chart with extra arithmetic. A single-enum schema is therefore
+ *  never offered a grouped bar. */
 export const chartSeriesFields = (
   schema: PluginCollectionSchema,
   shape: ChartShape,
@@ -252,8 +214,7 @@ export const chartSeriesFields = (
 }
 
 /** The axis to pre-pick for a shape: the `updated`-role datetime for a line, the field the panel
- *  already groups by (then the `status`-role enum) for a bar. That is what the role vocabulary is
- *  for, cashed one more time. */
+ *  already groups by, then the `status`-role enum, for a bar. */
 export function defaultChartAxis(
   schema: PluginCollectionSchema,
   shape: ChartShape,
@@ -266,11 +227,11 @@ export function defaultChartAxis(
   return (grouped ?? enumFields(schema).find((field) => field.role === 'status') ?? enumFields(schema)[0])?.id
 }
 
-/** Type-inferred defaults, the Observable Plot lesson: a person should get a sensible chart in two
- *  clicks and then adjust, rather than face four empty selects.
+/** Type-inferred defaults, so a person gets a sensible chart in two clicks and then adjusts rather
+ *  than facing four empty selects.
  *
- *  Nothing here is written silently over an answer the person already gave — the editor calls it when
- *  the view BECOMES a chart, and the selects then show exactly what it decided. */
+ *  Nothing here overwrites an answer the person already gave. The editor calls it when the view
+ *  becomes a chart, and the selects then show what it decided. */
 export function defaultChartView(schema: PluginCollectionSchema, shaping: PanelShaping): Partial<PanelView> {
   // Time first where there is a time axis: a chart of a datetime collection is almost always "over
   // time", and a bar of categories is the fallback rather than the headline.
@@ -281,30 +242,29 @@ export function defaultChartView(schema: PluginCollectionSchema, shaping: PanelS
   return {
     shape,
     ...(x ? { x } : {}),
-    // ALWAYS A COUNT, never the first number field.
+    // Always a count, never the first number field.
     //
     // This used to pre-pick `sum` over the first `number` in the schema, on the reasoning that a real
-    // measure is more interesting than a row count. It is — when the number is a QUANTITY. The field
+    // measure is more interesting than a row count. It is, when the number is a quantity. The field
     // vocabulary has no way to say that: `number` covers both a size in MB and github's pull request
-    // NUMBER, and the pulls collection declares the identifier first. So the headline chart of every
-    // PR panel opened as "the sum of PR numbers per day", a quantity with no meaning whose axis
-    // reached 200,000 — nonsense that looked like arithmetic.
+    // number, and the pulls collection declares the identifier first. So the headline chart of every
+    // PR panel opened as "the sum of PR numbers per day", whose axis reached 200,000.
     //
-    // A count is the one measure that is meaningful over every collection, and the person is one
-    // select away from the sum they actually wanted. Adding an `id`-ish role to the field vocabulary
-    // to tell the two apart is the field-type fight, and it is not worth having for a default.
+    // A count is meaningful over every collection, and the person is one select away from the sum they
+    // wanted. Adding an `id`-ish role to the field vocabulary to tell the two apart is not worth it
+    // for a default.
     aggregate: 'count' as const,
-    // Only where the grouping is already a decision the person made — a series split nobody asked
-    // for turns one readable line into five.
+    // Only where the grouping is already a decision the person made. A series split nobody asked for
+    // turns one readable line into five.
     ...(shape === 'line' && grouped ? { series: grouped.id } : {}),
   }
 }
 
 // ── Scales and ticks ──────────────────────────────────────────────────────────────────────────
 
-/** A step from the 1/2/5 × 10ⁿ ladder — the tick spacing people read without doing arithmetic.
- *  Rounded DOWN the ladder rather than to the nearest rung: a slightly denser axis is easier to read
- *  a value off than a sparse one, and the alternative rounds a max of 10 up to two ticks. */
+/** A step from the 1/2/5 × 10ⁿ ladder, the tick spacing people read without doing arithmetic.
+ *  Rounded down the ladder rather than to the nearest rung: a slightly denser axis is easier to read a
+ *  value off, and rounding to the nearest turns a max of 10 into two ticks. */
 function niceStep(range: number, count: number): number {
   if (!(range > 0) || !Number.isFinite(range)) return 1
   const raw = range / Math.max(1, count)
@@ -313,9 +273,9 @@ function niceStep(range: number, count: number): number {
   return (normalized < 2 ? 1 : normalized < 5 ? 2 : normalized < 10 ? 5 : 10) * magnitude
 }
 
-/** Tick VALUES from zero to AT LEAST `max` — the last one is the axis top, so no mark can ever be
- *  drawn above the highest gridline. Zero-based because both shapes measure a quantity, and a bar
- *  chart whose axis starts at 47 is the classic way to lie with one. */
+/** Tick values from zero to at least `max`, so the last one is the axis top and no mark is ever drawn
+ *  above the highest gridline. Zero-based because both shapes measure a quantity, and a bar chart
+ *  whose axis starts at 47 is the classic way to lie with one. */
 export function niceTicks(max: number, count = 4): number[] {
   if (!(max > 0) || !Number.isFinite(max)) return [0]
   const step = niceStep(max, count)
@@ -329,7 +289,7 @@ export function niceTicks(max: number, count = 4): number[] {
   return out
 }
 
-/** UTC midnight of a timestamp. The line shape buckets by DAY: a count has no meaning at a point in
+/** UTC midnight of a timestamp. The line shape buckets by day: a count has no meaning at a point in
  *  time, and one rule for every aggregate beats a per-aggregate special case. */
 export const dayBucket = (at: number): number => Math.floor(at / 86_400_000) * 86_400_000
 
@@ -346,8 +306,8 @@ function measureLabel(schema: PluginCollectionSchema, view: PanelView): string {
   return field ? `${aggregate} of ${field.name}` : String(aggregate)
 }
 
-/** A number on an axis, in the units the FIELD declared — the same `format.ts` a cell goes through,
- *  so a "MB" column's axis says MB without the chart knowing what MB is. */
+/** A number on an axis, in the units the field declared. The same `format.ts` a cell goes through, so
+ *  an "MB" column's axis says MB without the chart knowing what MB is. */
 function axisNumber(schema: PluginCollectionSchema, view: PanelView, value: number): string {
   const field = (view.aggregate ?? 'count') === 'count' ? undefined : fieldById(schema, view.field)
   return field ? cellText(formatCell(field, value)) : String(value)
@@ -356,10 +316,9 @@ function axisNumber(schema: PluginCollectionSchema, view: PanelView, value: numb
 const dayLabel = (at: number): string =>
   new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
-/** The y axis and the frame it implies, in that order: the LABELS decide how wide the left gutter has
- *  to be, and the gutter decides where everything else is drawn. Which is why both come out of one
- *  function — a caller that computed them separately could lay the marks out against a gutter the
- *  labels then outgrew. */
+/** The y axis and the frame it implies, in that order: the labels decide how wide the left gutter has
+ *  to be, and the gutter decides where everything else is drawn. Both come out of one function so a
+ *  caller cannot lay marks out against a gutter the labels then outgrow. */
 const yAxisFor = (
   schema: PluginCollectionSchema,
   view: PanelView,
@@ -379,8 +338,8 @@ const yAxisFor = (
   }
 }
 
-/** The category axis a bar is keyed by: the panel's own choice, then the shaping group-by — the same
- *  fallback chain a board walks, so flipping board ↔ chart keeps the categories. */
+/** The category axis a bar is keyed by: the panel's own choice, then the shaping group-by. The same
+ *  fallback chain a board walks, so flipping board and chart keeps the categories. */
 function barCategoryField(
   schema: PluginCollectionSchema,
   view: PanelView,
@@ -390,13 +349,12 @@ function barCategoryField(
   return chosen?.type === 'enum' ? chosen : groupField(schema, shaping)
 }
 
-/** The tone the plugin DECLARED for one of a field's values, or `undefined` — which is exactly the
- *  question the identity ramp answers (charts.md § 1: the ramp is for identity with no declared tone).
+/** The tone the plugin declared for one of a field's values, or `undefined`, which is the question the
+ *  identity ramp answers.
  *
  *  `boardColumns` cannot answer it and must not be asked: it defaults every column to `muted`, so a
- *  value declared WITHOUT a tone comes back looking like one declared muted. Colouring by that would
- *  draw every series of an untoned enum — which is most of them — in the same faint ink and call it
- *  the plugin's decision. */
+ *  value declared without a tone comes back looking like one declared muted. Colouring by that would
+ *  draw every series of an untoned enum, which is most of them, in the same faint ink. */
 const declaredTone = (field: PluginCollectionField | undefined, valueId: string): PanelTone | undefined =>
   field?.values?.find((value) => value.id === valueId)?.tone
 
@@ -409,9 +367,9 @@ const toneOrSlot = (
 
 /** The legend for a set of drawn series, or `undefined` for fewer than two.
  *
- *  The fold is disclosed rather than hidden: slots 4 and up all wear the muted `other` colour, so they
- *  collapse into ONE key that says how many went in. Nothing is visible in the render that is
- *  unnameable in text (charts.md § Accessibility). */
+ *  The fold is disclosed rather than hidden. Slots 4 and up all wear the muted `other` colour, so they
+ *  collapse into one key that says how many went in, and nothing is visible in the render that is
+ *  unnameable in text. */
 function legendFor(entries: readonly ChartLegendKey[]): ChartLegendKey[] | undefined {
   if (entries.length < 2) return undefined
   const keys = entries.filter((entry) => entry.series !== 'other')
@@ -429,16 +387,16 @@ function buildBar(
   const field = barCategoryField(schema, view, shaping)
   if (!field) return undefined
 
-  // THE GROUPED BAR (charts.md § 3): a third shape by arithmetic but not by config — it is `series` on
-  // `shape: 'bar'`, the key the codec already round-trips for lines. An old client ignores the key and
-  // draws the ungrouped bar, which is the acceptance test the design set.
+  // The grouped bar is a third shape by arithmetic but not by config: it is `series` on `shape: 'bar'`,
+  // the key the codec already round-trips for lines. An old client ignores the key and draws the
+  // ungrouped bar.
   //
-  // A split naming the category axis itself is dropped rather than drawn: it would put one bar in each
+  // A split naming the category axis itself is dropped rather than drawn. It would put one bar in each
   // cluster, which is this chart with extra steps.
   const split = fieldById(schema, view.series)
   const series = split?.type === 'enum' && split.id !== field.id ? split : undefined
 
-  // The board's own bucketing, reused whole for BOTH axes: declared values in declaration order
+  // The board's own bucketing, reused whole for both axes: declared values in declaration order
   // (present even when empty), then undeclared ones in first-appearance order, then one catch-all.
   // The ungrouped bar is the one-group case of the same layout rather than a second code path.
   const columns = boardColumns(rows, field)
@@ -457,7 +415,7 @@ function buildBar(
   const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max)
 
   const slot = frame.plotWidth / Math.max(1, columns.length)
-  // The cluster keeps the width one bar used to have, and the series divide it — so a chart with no
+  // The cluster keeps the width one bar used to have, and the series divide it, so a chart with no
   // split is laid out exactly as it was before grouping existed.
   const cluster = slot * 0.7
   const width = cluster / groups.length
@@ -473,7 +431,7 @@ function buildBar(
         title: series
           ? `${column.label} · ${group.label}: ${axisNumber(schema, view, value)}`
           : `${column.label}: ${axisNumber(schema, view, value)}`,
-        // WHAT THE COLOUR ANSWERS moves with the split. Unsplit, each bar IS a category, so a toned
+        // What the colour answers moves with the split. Unsplit, each bar is a category, so a toned
         // category keeps the tone the plugin gave it and anything else takes an ordinal slot. Split,
         // colour answers "which series", and the category is answered by the x axis instead.
         ...(series
@@ -540,8 +498,8 @@ function buildLine(
     const byDay = new Map<number, PluginCollectionRow[]>()
     for (const row of group.rows) {
       const cell = row.values[time.id]
-      // `Number(null)` is 0, which is a perfectly finite January 1970 — blankness has to be checked
-      // before the coercion, not after it.
+      // `Number(null)` is 0, a perfectly finite January 1970, so blankness has to be checked before
+      // the coercion rather than after it.
       if (cell === null || cell === undefined || cell === '') continue
       const at = Number(cell)
       if (!Number.isFinite(at)) continue
@@ -569,16 +527,16 @@ function buildLine(
   const first = Math.min(...days)
   const last = Math.max(...days)
 
-  // ── A DAY WITH NO ROWS IS A ZERO, NOT A GAP ─────────────────────────────────────────────────
+  // ── A day with no rows is a zero, not a gap ───────────────────────────────────────────────────
   //
-  // This used to plot only the days that HAD rows and join them up, so a fortnight in which nothing
+  // This used to plot only the days that had rows and join them up, so a fortnight in which nothing
   // was updated drew as a straight segment held at whatever height its two neighbours happened to
   // have. That reads as "steady at 4" when the truth is "nothing happened". `trend.ts` already fills
-  // its sparkline across the window for exactly this reason, and the two should not disagree.
+  // its sparkline across the window for the same reason, and the two should not disagree.
   //
-  // ONLY THE ADDITIVE AGGREGATES. A count or a sum over no rows is 0 and filling is the honest answer.
-  // An average, minimum or maximum over no rows is UNDEFINED — filling those would draw a dip to the
-  // floor that never happened — so a gappy measure keeps the connect-the-dots reading.
+  // Additive aggregates only. A count or a sum over no rows is 0, so filling is the honest answer. An
+  // average, minimum or maximum over no rows is undefined, and filling those would draw a dip to the
+  // floor that never happened, so a gappy measure keeps the connect-the-dots reading.
   const aggregate = view.aggregate ?? 'count'
   const span = (last - first) / 86_400_000 + 1
   // ponytail: past the fill limit the gaps stay gaps. A span that wide has more days than this box has
@@ -589,7 +547,7 @@ function buildLine(
   const spanDays = fill ? Array.from({ length: span }, (_, index) => first + index * 86_400_000) : undefined
 
   const buckets = byGroup.map(({ group, byDay }) => {
-    // A group with no rows AT ALL draws nothing, filled or not: seven flat lines along zero is noise,
+    // A group with no rows at all draws nothing, filled or not: seven flat lines along zero is noise,
     // and `legendFor` already only speaks for the lines that drew.
     if (!byDay.size) return { group, points: [] as { day: number; value: number; filled: boolean }[] }
     const walk = spanDays ?? [...byDay.keys()].sort((left, right) => left - right)
@@ -629,7 +587,7 @@ function buildLine(
       // the enum has one, else an identity slot.
       ...(series ? toneOrSlot(declaredTone(series, group.id), index) : { tone: 'accent' as PanelTone }),
       path: placed.length > 1 ? placed.map((point, at) => `${at ? 'L' : 'M'}${point.x} ${point.y}`).join(' ') : '',
-      // The PATH runs through the filled zeroes; the DOTS do not. A dot is where the tooltip lives and
+      // The path runs through the filled zeroes; the dots do not. A dot is where the tooltip lives and
       // a filled day has nothing to say, so marking every empty day would bury the real ones.
       points: placed.flatMap(({ filled, ...point }) => (filled ? [] : [point])),
     }]
@@ -641,7 +599,7 @@ function buildLine(
     const anchor = tickAnchor(at, label)
     return { label, at, ...(anchor ? { anchor } : {}) }
   })
-  // Over the lines that DREW, not the groups that exist: a series with no points has no mark for a
+  // Over the lines that drew, not the groups that exist: a series with no points has no mark for a
   // swatch to stand for, and an empty declared column is a real case (`boardColumns` keeps them).
   const legend = legendFor(lines.map((line): ChartLegendKey => ({
     id: line.id,
@@ -661,9 +619,9 @@ function buildLine(
   }
 }
 
-/** The whole chart, or `undefined` when this schema cannot draw the shape the panel asks for — a
- *  definition written against a collection whose fields have since changed. The view renders the
- *  same inert notice it does for a view kind it cannot draw. */
+/** The whole chart, or `undefined` when this schema cannot draw the shape the panel asks for, which
+ *  happens to a definition written against a collection whose fields have since changed. The view
+ *  renders the same inert notice it does for a view kind it cannot draw. */
 export function buildChart(
   rows: readonly PluginCollectionRow[],
   schema: PluginCollectionSchema,

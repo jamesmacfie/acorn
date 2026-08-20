@@ -3,49 +3,37 @@ import { dayBucket } from './chart'
 import type { PanelView } from './model'
 import { aggregateRows } from './shaping'
 
-// THE STAT'S TREND: the sparkline beside the number and the delta under it
-// (docs/dashboards.md § Trends).
+// The stat's trend: the sparkline beside the number and the delta under it. The two tiers, the
+// zero-versus-gap rule and the baseline argument are all in docs/dashboards.md § Trends.
 //
-// Pure and tested, for the same reason `chart.ts` is: vitest here runs in node with no Solid plugin,
-// so `StatView.tsx` cannot be checked by anything and must therefore decide nothing. Every number on
-// screen — the path data, the end dot, the delta and its tone — comes out of this file.
-//
-// TWO TIERS WEARING ONE MARK, and they must never be blurred:
-//
-//   ACTIVITY   "when did these rows change" — the rows already on screen, bucketed by their own
-//              updated-role datetime. Needs no store, available the moment the rows arrive.
-//   HISTORY    "what was this number" — the panel's measure as the node's sampler recorded it. Only
-//              the store can answer it, and it accrues from when the panel first asked.
-//
-// The consequence for a day with no data is opposite in the two tiers, which is why they share no
-// code past the geometry: an activity day with no rows is a ZERO (nothing changed, and that is a
-// fact), a history day with no sample is a GAP (nobody looked, and interpolating would invent a
-// number the panel never displayed).
+// Pure and tested for the same reason `chart.ts` is: vitest here runs in node with no Solid plugin, so
+// `StatView.tsx` cannot be checked by anything and therefore decides nothing. Every number on screen,
+// the path data, the end dot, the delta and its tone, comes out of this file.
 
 const DAY_MS = 86_400_000
 
-/** The window both tiers draw: a fortnight, which is also the store's hourly retention tier — so a
+/** The window both tiers draw: a fortnight, which is also the store's hourly retention tier, so a
  *  sparkline never asks for a day that compaction has already collapsed to one point. */
 export const TREND_DAYS = 14
 
 export type MeasureSample = { bucket: number; value: number }
 
-/** One day of the window. `null` is a GAP, drawn as a break in the line and never interpolated. */
+/** One day of the window. `null` is a gap, drawn as a break in the line and never interpolated. */
 export type TrendPoint = { day: number; value: number | null }
 
-/** The fortnight's UTC days, oldest first. FIXED rather than "however many days the series has": a
+/** The fortnight's UTC days, oldest first. Fixed rather than "however many days the series has": a
  *  three-day-old series has to read as three days of a fortnight, not as a full one. */
 const windowDays = (now: number): number[] => {
   const last = dayBucket(now)
   return Array.from({ length: TREND_DAYS }, (_, index) => last - (TREND_DAYS - 1 - index) * DAY_MS)
 }
 
-/** The history tier: the day's LAST value, per day, over the window. Last rather than an average
- *  because a stat shows point-in-time state — the same rule the store's own compaction applies. */
+/** The history tier: the day's last value, per day, over the window. Last rather than an average
+ *  because a stat shows point-in-time state, the same rule the store's own compaction applies. */
 export function historyPoints(samples: readonly MeasureSample[], now: number): TrendPoint[] {
   const byDay = new Map<number, number>()
-  // Sorted rather than trusting the caller: the route answers ascending, but "last value wins" is a
-  // property of this arithmetic and should not be a property of somebody else's ORDER BY.
+  // Sorted rather than trusting the caller. The route answers ascending, but "last value wins" is a
+  // property of this arithmetic and should not depend on somebody else's ORDER BY.
   for (const sample of [...samples].sort((left, right) => left.bucket - right.bucket)) {
     byDay.set(dayBucket(sample.bucket), sample.value)
   }
@@ -53,8 +41,8 @@ export function historyPoints(samples: readonly MeasureSample[], now: number): T
 }
 
 /** The datetime the activity tier buckets by: the declared `updated` role, then whatever datetime
- *  there is. Exported because it is also the EDITOR's gate — a schema with no datetime is never
- *  offered the activity trend, so a trend that cannot draw is unrepresentable rather than validated. */
+ *  there is. Exported because it is also the editor's gate, so a schema with no datetime is never
+ *  offered the activity trend and a trend that cannot draw is unrepresentable rather than validated. */
 export const activityField = (schema: PluginCollectionSchema): PluginCollectionField | undefined =>
   schema.fields.find((field) => field.role === 'updated' && field.type === 'datetime')
     ?? schema.fields.find((field) => field.type === 'datetime')
@@ -73,8 +61,8 @@ export function activityPoints(
   const byDay = new Map<number, PluginCollectionRow[]>()
   for (const row of rows) {
     const cell = row.values[time.id]
-    // `Number(null)` is 0, which is a perfectly finite January 1970 — blankness has to be checked
-    // before the coercion, not after it (chart.ts § buildLine says the same).
+    // `Number(null)` is 0, a perfectly finite January 1970, so blankness has to be checked before the
+    // coercion rather than after it. `chart.ts` buildLine says the same.
     if (cell === null || cell === undefined || cell === '') continue
     const at = Number(cell)
     if (!Number.isFinite(at)) continue
@@ -92,9 +80,11 @@ export function activityPoints(
 
 // ── The mark ──────────────────────────────────────────────────────────────────────────────────
 //
-// Abstract units, scaled uniformly by the SVG to whatever the stat body has — the same trade
-// `CHART_BOX` takes, and at this size letterboxing is invisible. No axes, no grid, no ticks: the
-// stat's number IS the axis.
+// ── The mark ──────────────────────────────────────────────────────────────────────────────────
+//
+// Abstract units, scaled uniformly by the SVG to whatever the stat body has, the same trade `CHART_BOX`
+// takes. At this size letterboxing is invisible. No axes, no grid, no ticks: the stat's number is the
+// axis.
 
 export const SPARK_BOX = { width: 120, height: 28 } as const
 /** Room for the end dot and its ring at every edge, so neither is clipped by the viewBox. */
@@ -109,7 +99,7 @@ export type Sparkline = {
   /** Runs of a single day: no line to draw, so they are drawn as dots instead. Without these an
    *  every-other-day series would render as nothing at all. */
   dots: { x: number; y: number }[]
-  /** The most recent point — where the number on screen is. */
+  /** The most recent point, where the number on screen is. */
   end: { x: number; y: number }
 }
 
@@ -130,9 +120,9 @@ export function sparkline(points: readonly TrendPoint[]): Sparkline | undefined 
 
   const xAt = (index: number) =>
     round(points.length < 2 ? (left + right) / 2 : left + (index / (points.length - 1)) * (right - left))
-  // MIN-TO-MAX, not zero-based, and deliberately unlike the chart's axis: a sparkline carries no
-  // scale, so its job is to show the shape of the change rather than its size against zero. A flat
-  // series sits in the middle rather than dividing by zero — and a flat line is the honest answer.
+  // Min-to-max rather than zero-based, unlike the chart's axis: a sparkline carries no scale, so its
+  // job is to show the shape of the change rather than its size against zero. A flat series sits in
+  // the middle rather than dividing by zero, and a flat line is the honest answer.
   const yAt = (value: number) =>
     round(max === min ? (top + bottom) / 2 : bottom - ((value - min) / (max - min)) * (bottom - top))
 
@@ -145,8 +135,8 @@ export function sparkline(points: readonly TrendPoint[]): Sparkline | undefined 
     if (run.length > 1) {
       segments.push({
         line: run.map((point, index) => `${index ? 'L' : 'M'}${point.x} ${point.y}`).join(' '),
-        // The wash is closed to the baseline under this run only — an area spanning a gap would
-        // colour days that were never sampled.
+        // The wash is closed to the baseline under this run only. An area spanning a gap would colour
+        // days that were never sampled.
         area: `M${run[0].x} ${bottom} ${run.map((point) => `L${point.x} ${point.y}`).join(' ')} L${run[run.length - 1].x} ${bottom} Z`,
       })
     }
@@ -159,8 +149,8 @@ export function sparkline(points: readonly TrendPoint[]): Sparkline | undefined 
   })
   flush()
 
-  // The last day that HAS a value, which is not the last day of the window when the series ends in a
-  // gap — the dot belongs on the most recent thing actually known, wherever that sits.
+  // The last day that has a value, which is not the last day of the window when the series ends in a
+  // gap. The dot belongs on the most recent thing actually known, wherever that sits.
   const last = points.reduce((best, point, index) => (point.value === null ? best : index), 0)
   return { segments, dots, end: { x: xAt(last), y: yAt(points[last].value ?? 0) } }
 }
@@ -175,13 +165,12 @@ export const COMPARE_LABELS: Record<NonNullable<PanelView['compare']>, string> =
   week: 'last week',
 }
 
-/** THE BASELINE IS A POINT LOOKED UP, NEVER A WINDOW AGGREGATED — on the record. "Vs last week" is
- *  the sample nearest to one week ago, not an average of last week: window aggregates drag in bucket
- *  alignment, partial windows, timezone edges and per-panel aggregation config, which are a metrics
- *  product's problems. Datadog's Query Value change mode and Grafana's stat-plus-timeShift both do
- *  the same thing.
+/** The baseline is a point looked up, never a window aggregated. "Vs last week" is the sample nearest
+ *  to one week ago, not an average of last week: window aggregates drag in bucket alignment, partial
+ *  windows, timezone edges and per-panel aggregation config, which are a metrics product's problems.
+ *  Datadog's Query Value change mode and Grafana's stat-plus-timeShift both do the same thing.
  *
- *  Searched no further back than 2× the window, so a series with a three-week hole says nothing
+ *  Searched no further back than twice the window, so a series with a three-week hole says nothing
  *  rather than comparing today against a number from a different month. */
 export function baselineValue(
   samples: readonly MeasureSample[],
@@ -202,15 +191,15 @@ export function baselineValue(
 export type TrendDelta = {
   /** Current live measure minus the baseline. Signed; zero is a real answer and says "unchanged". */
   change: number
-  /** `muted` unless the panel declared which direction is good — direction-goodness is NOT guessable
-   *  (open PRs going up is bad for one person's board and good for another's), so an absent `good`
+  /** `muted` unless the panel declared which direction is good. Direction-goodness is not guessable,
+   *  since open PRs going up is bad for one person's board and good for another's, so an absent `good`
    *  renders in neutral ink rather than a guessed green. */
   tone: 'ok' | 'bad' | 'muted'
 }
 
-/** `undefined` when there is no delta to draw, which is a FACT and not a zero: no comparison asked
+/** `undefined` when there is no delta to draw, which is a fact and not a zero: no comparison asked
  *  for, no live measure, or no sample old enough to be a baseline. The stat draws nothing at all in
- *  that case — the em-dash rule, one level down. */
+ *  that case. */
 export function trendDelta(
   current: number | null,
   samples: readonly MeasureSample[],
