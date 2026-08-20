@@ -16,25 +16,23 @@ import { panelSourceKey, type PanelAggregate, type PanelView, type PanelViewKind
 import { ColumnSelect, FieldSelect, FieldTypeSelect, OperatorSelect, ParamInput, ToneSelect, ValueInput } from './selectors'
 import './dashboards.css'
 
-// THE PANEL FORM, in sections (docs/dashboards.md § The generated editor).
+// The panel form, in sections. See docs/dashboards.md § The generated editor.
 //
 // Every control a panel is composed with lives here exactly once, and the two surfaces that compose
 // panels arrange them differently: `PanelEditor` stacks all of them in one sheet, `PanelWizard` deals
-// them across four steps. Nothing below knows which one it is inside — that is the whole point, and
-// it is why the wizard adds no second implementation of any rule the sheet already embodies.
+// them across four steps. Nothing below knows which one it is inside, which is why the wizard adds no
+// second implementation of any rule the sheet already embodies.
 //
-// Nothing here is hand-written per collection. Every control is a SELECTOR over the schema
+// Nothing here is hand-written per collection. Every control is a selector over the schema
 // (selectors.tsx) and every list of choices comes from a derivation (editor.ts, mapping.ts, chart.ts)
-// reached through the draft (draft.ts): the views offered are the ones the schema supports, the
-// group-by fields are the ones with finite values, the operators are the ones the field's type can
-// answer, the value input is the one its type is entered with, and the mapping matrix is one "map
-// these onto those" selector repeated. There is no validation pass at the end because there is no
-// invalid state to catch.
+// reached through the draft (draft.ts): the views offered are the ones the schema supports, the group-by
+// fields are the ones with finite values, the operators are the ones the field's type can answer, the
+// value input is the one its type is entered with, and the mapping matrix is one "map these onto those"
+// selector repeated. There is no validation pass at the end because there is no invalid state to catch.
 //
-// SOLID NOTE, and it is not optional: every list below whose rows contain an input uses `<Index>`.
-// `<For>` keys by REFERENCE, so replacing a filter — or a mapping column — on each keystroke
-// re-creates its row and the input loses focus mid-word. `<Index>` keys by position, which is what a
-// positional list is.
+// A Solid note, and it is not optional: every list below whose rows contain an input uses `<Index>`.
+// `<For>` keys by reference, so replacing a filter, or a mapping column, on each keystroke re-creates its
+// row and the input loses focus mid-word. `<Index>` keys by position, which is what a positional list is.
 
 export const VIEW_LABELS: Record<PanelViewKind, string> = {
   stat: 'Stat',
@@ -46,9 +44,9 @@ export const VIEW_LABELS: Record<PanelViewKind, string> = {
 
 const SHAPE_LABELS: Record<ChartShape, string> = { bar: 'Bar', line: 'Line' }
 
-/** The two trend tiers, said in the words that keep them apart. They are different features wearing
- *  one mark — "when did these rows change" versus "what was this number" — and a person who reads
- *  them as the same thing will expect a history the store cannot have. */
+/** The two trend tiers, said in the words that keep them apart. They are different features wearing one
+ *  mark, "when did these rows change" against "what was this number", and a person who reads them as the
+ *  same thing will expect a history the store cannot have. */
 const TREND_LABELS: Record<'none' | NonNullable<PanelView['trend']>, string> = {
   none: 'None',
   activity: 'Activity',
@@ -61,7 +59,7 @@ const COMPARE_LABELS: Record<'none' | NonNullable<PanelView['compare']>, string>
   week: 'Last week',
 }
 
-/** Direction-goodness is the USER's judgement and nothing else's: open PRs going up is bad for one
+/** Direction-goodness is the user's judgement and nothing else's: open PRs going up is bad for one
  *  person's board and good for another's, so `Neutral` is the default and the honest one. */
 const GOOD_LABELS: Record<'none' | NonNullable<PanelView['good']>, string> = {
   none: 'Neutral',
@@ -138,15 +136,15 @@ export function ParamInputs(props: { draft: PanelDraft }) {
                   // list is a request, and asking for one against every param of every collection on the
                   // panel would spend several to render a text box.
                   //
-                  // THE SOURCE IS WHICH COLLECTION THIS IS, NOT THE QUERY, and that distinction is a bug
+                  // The source is which collection this is, not the query, and that distinction is a bug
                   // this had. A query carries its params, so keying the resource off it re-ran the fetch
-                  // on every change — and each re-run put the resource back to `undefined`, which swapped
+                  // on every change, and each re-run put the resource back to `undefined`, which swapped
                   // the control out from under the value that had just been chosen. It looked exactly
                   // like the pick had not saved.
                   //
                   // A memo with an explicit `equals` rather than reading the two fields inline: the
-                  // fields have to stay tracked (removing a source moves another one into this position)
-                  // but must only NOTIFY when they actually differ.
+                  // fields have to stay tracked, because removing a source moves another one into this
+                  // position, but must only notify when they actually differ.
                   const collection = createMemo(
                     () => ({ pluginId: query().pluginId, collectionId: query().collectionId }),
                     undefined,
@@ -157,8 +155,8 @@ export function ParamInputs(props: { draft: PanelDraft }) {
                     (key) => props.draft.entryFor(key)!.paramOptions!(param().id, props.draft.nodeId),
                   )
                   return (
-                    // `group` where the answer is several checkboxes, because a caption cannot be a
-                    // label for more than one control (primitives.tsx § Field).
+                    // `group` where the answer is several checkboxes, because a caption cannot be a label
+                    // for more than one control (primitives.tsx, `Field`).
                     <Field label={param().name} layout="split" group={param().multiple}>
                       <ParamInput
                         param={param()}
@@ -190,9 +188,8 @@ export function TitleField(props: { draft: PanelDraft; ref?: (el: HTMLInputEleme
   )
 }
 
-/** Group-by is shaping, so it is offered whenever the schema has a field with finite values rather
- *  than only under the board — set it here, flip to board, and the columns are already the ones you
- *  chose. */
+/** Group-by is shaping, so it is offered whenever the schema has a field with finite values rather than
+ *  only under the board: set it here, flip to board, and the columns are already the ones you chose. */
 export function GroupByField(props: { draft: PanelDraft }) {
   return (
     <Show when={props.draft.groupable().length}>
@@ -209,9 +206,9 @@ export function GroupByField(props: { draft: PanelDraft }) {
   )
 }
 
-/** Everything the chosen VIEW KIND asks for: a chart's shape and axes, the measure a stat and a chart
- *  share, and a stat's trend. Each gated on the kind that draws it, so no control is reachable when
- *  its view is not. */
+/** Everything the chosen view kind asks for: a chart's shape and axes, the measure a stat and a chart
+ *  share, and a stat's trend. Each gated on the kind that draws it, so no control is reachable when its
+ *  view is not. */
 export function ViewOptions(props: { draft: PanelDraft }) {
   const draft = () => props.draft
   return (
@@ -345,10 +342,10 @@ export function ViewOptions(props: { draft: PanelDraft }) {
   )
 }
 
-/** The mapping step, which APPEARS WHEN THERE IS SOMETHING TO MAP. A single-collection panel is the
- *  same three-decision form it always was; the columns and the per-source matrices show up on the
- *  second source, or when somebody invents a column over one. Confronting every user with a matrix to
- *  compose a list of their pull requests would be the generated editor's failure mode. */
+/** The mapping step, which appears when there is something to map. A single-collection panel is the same
+ *  three-decision form it always was, and the columns and the per-source matrices show up on the second
+ *  source, or when somebody invents a column over one. Confronting every user with a matrix to compose a
+ *  list of their pull requests would be the generated editor's failure mode. */
 export function MappingSection(props: { draft: PanelDraft }) {
   const draft = () => props.draft
   return (
@@ -506,7 +503,7 @@ export function MappingSection(props: { draft: PanelDraft }) {
   )
 }
 
-/** Filters, sort keys and the visible-field projection — everything that shapes the rows rather than
+/** Filters, sort keys and the visible-field projection: everything that shapes the rows rather than
  *  choosing them or drawing them. All of it gated on there being a schema to shape against. */
 export function ShapingSection(props: { draft: PanelDraft }) {
   const draft = () => props.draft
@@ -653,9 +650,9 @@ export function ShapingSection(props: { draft: PanelDraft }) {
   )
 }
 
-// Both numbers say what empty means in the PLACEHOLDER rather than in a line of prose under the input.
-// It is the same sentence in a quarter of the space, it sits inside the control it is about, and it
-// disappears the moment there is a value — which is exactly when a hint has stopped being read anyway.
+// Both numbers say what empty means in the placeholder rather than in a line of prose under the input. It
+// is the same sentence in a quarter of the space, it sits inside the control it is about, and it
+// disappears the moment there is a value, which is when a hint has stopped being read anyway.
 
 export function LimitField(props: { draft: PanelDraft }) {
   return (
@@ -687,8 +684,8 @@ export function RefreshField(props: { draft: PanelDraft }) {
   )
 }
 
-/** Each source polls at its own declared interval unless the panel overrides them all, so this names
- *  the range rather than pretending there is one number. */
+/** Each source polls at its own declared interval unless the panel overrides them all, so this names the
+ *  range rather than pretending there is one number. */
 function refreshPlaceholder(declared: readonly (number | undefined)[]): string {
   const seconds = [...new Set(declared.flatMap((value) => value ?? []))].sort((a, b) => a - b)
   return seconds.length ? `Every ${seconds.join(', ')}s` : 'Never'

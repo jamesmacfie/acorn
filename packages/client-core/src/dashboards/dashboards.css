@@ -1,12 +1,12 @@
 /* User-composed panels (dashboards/Panel.tsx and dashboards/views/).
    Co-located with the components, per the manifest note in styles.css.
 
-   Deliberately thin. The frame is `.ui-card`, the rows are `.ui-row`, the table is `.ui-table` and
-   the empty states are `.ui-empty` — everything here is the space BETWEEN those, so a panel over a
-   third-party plugin's collection restyles with every appearance pack for free. No new APPEARANCE
-   tokens: a panel that needed one would be asserting a shape the packs do not already have a rung
-   for. The two `--dash-*` properties below are a measurement PanelGrid writes in, not a design
-   decision — the shape stays here, where a pack can reach it. */
+   Thin on purpose. The frame is `.ui-card`, the rows are `.ui-row`, the table is `.ui-table` and the
+   empty states are `.ui-empty`. Everything here is the space between those, so a panel over a
+   third-party plugin's collection restyles with every appearance pack for free. No new appearance
+   tokens: a panel that needed one would be asserting a shape the packs do not already have a rung for.
+   The two `--dash-*` properties below are a measurement PanelGrid writes in, not a design decision.
+   The shape stays here, where a pack can reach it. */
 
 /* ── Placement ───────────────────────────────────────────────────────────────────────────── */
 
@@ -27,10 +27,10 @@
 
 /* ── The tab bar ─────────────────────────────────────────────────────────────────────────── */
 
-/* Home's dashboards (dashboards/DashboardTabs.tsx), sitting in the section header's LABEL seat —
-   which is why this is quiet text at the header's own size rather than the app's `.ui-tabs` strip.
-   Tabs are the heading here, not a second navigation surface stacked above one, so there is no
-   background, no min-height and no bottom rule; the active tab is full ink over a short accent. */
+/* Home's dashboards (dashboards/DashboardTabs.tsx), sitting in the section header's label seat. That
+   is why this is quiet text at the header's own size rather than the app's `.ui-tabs` strip. Tabs are
+   the heading here, not a second navigation surface stacked above one, so there is no background, no
+   min-height and no bottom rule. The active tab is full ink over a short accent. */
 .dash-tabs {
   display: flex;
   align-items: center;
@@ -69,7 +69,7 @@
 .dash-tab-add:hover:not(:disabled), .dash-tab-add:focus-visible { opacity: 1; }
 
 /* The task-pane placement (dashboards/DashboardPane.tsx). Nothing but the pane's own padding and a
-   scroll — the grid inside is the same component Home draws, at a different scope. */
+   scroll. The grid inside is the same component Home draws, at a different scope. */
 .dash-pane {
   height: 100%;
   overflow: auto;
@@ -79,19 +79,18 @@
 
 /* ── The grid ────────────────────────────────────────────────────────────────────────────── */
 
-/* Twelve columns, square cells. The browser owns every pixel except the cell HEIGHT, which is the
-   one ResizeObserver measurement PanelGrid makes — a square cell is what makes the drag lattice read
-   as a surface and "3 wide, 2 tall" mean something visually.
+/* Twelve columns, square cells. The browser owns every pixel except the cell height, which is the one
+   ResizeObserver measurement PanelGrid makes. A square cell is what makes the drag lattice read as a
+   surface and "3 wide, 2 tall" mean something visually.
 
-   The tracks and the gap are declared here and NOTHING IS IN FLOW IN THEM: slots are positioned
+   The tracks and the gap are declared here and nothing is in flow in them. Slots are positioned
    absolutely off the same measurement, because `grid-area` cannot be transitioned and neighbours
-   gliding through push-down is the whole point of the gesture restyle. The template stays because it
-   is what a style pack owns and what PanelGrid reads the resolved `column-gap` off; the container's
-   height is stated inline from the live layout.
+   gliding through push-down is the whole point of the gesture restyle. The template stays because it is
+   what a style pack owns and what PanelGrid reads the resolved `column-gap` off; the container's height
+   is stated inline from the live layout.
 
-   `--dash-cell` and `--dash-pitch` are overwritten inline by that measurement. The values here are
-   the pre-measure fallback, so the first paint is a plausible grid rather than a stack of
-   zero-height rows. */
+   `--dash-cell` and `--dash-pitch` are overwritten inline by that measurement. The values here are the
+   pre-measure fallback, so the first paint is a plausible grid rather than a stack of zero-height rows. */
 .dash-grid {
   --dash-cell: var(--row-h);
   --dash-pitch: var(--row-h);
@@ -103,10 +102,10 @@
   min-width: 0;
 }
 
-/* Too narrow for cells to mean anything: one column in reading order, heights content-driven as
-   they were before geometry existed. PURELY PRESENTATIONAL — nothing in storage changes and the
-   component stops emitting boxes, so widening the window restores the arrangement exactly.
-   Gestures disarm here; move up / move down still work. */
+/* Too narrow for cells to mean anything: one column in reading order, heights content-driven as they
+   were before geometry existed. Purely presentational: nothing in storage changes and the component
+   stops emitting boxes, so widening the window restores the arrangement exactly. Gestures disarm here;
+   move up and move down still work. */
 .dash-grid[data-collapsed] {
   grid-template-columns: minmax(0, 1fr);
   grid-auto-rows: auto;
@@ -118,8 +117,8 @@
   min-width: 0;
   min-height: 0;
 }
-/* Out of flow, at the measured pixel box of its rect — and gliding there, so push-down and
-   compaction read as a chain reaction rather than a reshuffle between frames. */
+/* Out of flow, at the measured pixel box of its rect, gliding there so push-down and compaction read
+   as a chain reaction rather than a reshuffle between frames. */
 .dash-grid:not([data-collapsed]) .dash-slot {
   position: absolute;
   transition:
@@ -154,9 +153,9 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Where the panel will BE, not a diagram of it: the panel's own radius, a solid edge and a wash of
-   the accent. `color-mix` over `--accent` rather than a wash token, so the terminal pack's accent
-   and a plugin-contributed theme's accent both just work. The position transition is faster than a
+/* Where the panel will be, not a diagram of it: the panel's own radius, a solid edge and a wash of the
+   accent. `color-mix` over `--accent` rather than a wash token, so the terminal pack's accent and a
+   plugin-contributed theme's accent both just work. The position transition is faster than a
    neighbour's, so the slot leads and the chain follows. */
 .dash-placeholder {
   position: absolute;
@@ -171,15 +170,15 @@
     height var(--dur-short) var(--ease-out);
 }
 
-/* The cell lattice, drawn ONLY while a gesture is live — it appears on arm and vanishes on release,
-   iOS-widget style. Dots at cell INTERSECTIONS rather than ruled lines: ruled lines read as a
+/* The cell lattice, drawn only while a gesture is live. It appears on arm and vanishes on release,
+   iOS-widget style. Dots at cell intersections rather than ruled lines, because ruled lines read as a
    spreadsheet behind the page and get loud under dense packs, where a lattice reads as a surface
    things are placed on. One gradient, offset half a gap on both axes so the dots sit where panel
    corners land.
 
    The colour is the plain border token rather than the `--divider` recipe: packs zero that width
-   (tokens-style.css), and a lattice with no dots is not a lattice. Some packs will still make it
-   barely there, which is correct — this is scaffolding, not content. */
+   (tokens-style.css), and a lattice with no dots is not a lattice. Some packs will still make it barely
+   there, which is correct. This is scaffolding, not content. */
 .dash-grid-overlay {
   position: absolute;
   inset: 0;
@@ -194,8 +193,8 @@
   transition: opacity var(--dur-short) var(--ease-out);
 }
 
-/* The keyboard path's announcement, drawn. Same string as the live region, near the panel it is
-   about, because a sighted keyboard user was getting strictly less than a screen-reader one. */
+/* The keyboard path's announcement, drawn. Same string as the live region, near the panel it is about,
+   because a sighted keyboard user was getting strictly less than a screen-reader one. */
 .dash-caption {
   position: absolute;
   inset-block-start: 100%;
@@ -214,7 +213,7 @@
 }
 
 /* Invisible until the panel is hovered or focused within: nothing about the layout is discoverable
-   chrome until a gesture makes it relevant. No `n`/`w` handles — with gravity on, resizing from the
+   chrome until a gesture makes it relevant. No `n` or `w` handles: with gravity on, resizing from the
    top or left is a move plus a resize and earns its complexity nowhere. */
 .dash-resize {
   position: absolute;
@@ -237,8 +236,8 @@
   background: var(--border-strong);
   border-radius: var(--radius-pill);
 }
-/* The one handle that is faintly there before it is hovered — two strokes meeting at the corner, so
-   a panel reads as resizable without a person having to find the edge first. */
+/* The one handle that is faintly there before it is hovered: two strokes meeting at the corner, so a
+   panel reads as resizable without a person having to find the edge first. */
 .dash-resize-se {
   opacity: 0.4;
 }
@@ -266,8 +265,8 @@
   cursor: nwse-resize;
 }
 
-/* The keyboard path's running commentary. Off-screen rather than `display: none`, which screen
-   readers skip entirely. */
+/* The keyboard path's running commentary. Off-screen rather than `display: none`, which screen readers
+   skip entirely. */
 .dash-live {
   position: absolute;
   width: var(--space-1);
@@ -279,16 +278,16 @@
 
 /* ── Panel ───────────────────────────────────────────────────────────────────────────────── */
 
-/* Fills its rect. Before geometry existed a panel was content-sized and the grid row followed it;
-   now the row is `h` square cells tall and the panel fills it, which is what gives the body
-   something to scroll inside. In the collapsed one-column state the row is auto and this is inert.
+/* Fills its rect. Before geometry existed a panel was content-sized and the grid row followed it; now
+   the row is `h` square cells tall and the panel fills it, which is what gives the body something to
+   scroll inside. In the collapsed one-column state the row is auto and this is inert.
 
-   Compound with .ui-card, for the same reason as .dash-wizard above and with more at stake: Card
-   merges this class onto its own element (ui/primitives.tsx § Card), and the two rules disagree
-   about `display` — block against flex. A tie leaves the winner to chunk order, and when the
-   primitive wins the panel is a BLOCK: the body stops being a flex item, its `flex: 1`/`min-height`
-   go inert, its height goes content-driven and `overflow: auto` on an auto-height box never
-   scrolls. A 500-row table then spills past the card's border instead of scrolling inside it. */
+   Compound with .ui-card, for the same reason as .dash-wizard below and with more at stake: Card merges
+   this class onto its own element (ui/primitives.tsx, Card), and the two rules disagree about `display`,
+   block against flex. A tie leaves the winner to chunk order, and when the primitive wins the panel is a
+   block: the body stops being a flex item, its `flex: 1` and `min-height` go inert, its height goes
+   content-driven and `overflow: auto` on an auto-height box never scrolls. A 500-row table then spills
+   past the card's border instead of scrolling inside it. */
 .dash-panel.ui-card {
   display: flex;
   flex-direction: column;
@@ -298,8 +297,8 @@
   height: 100%;
 }
 
-/* Also the placement's DRAG SURFACE (dashboards/PanelGrid.tsx) — the body is deliberately not, so a
-   press inside a board stays free for a future card gesture. The cursor is the whole affordance. */
+/* Also the placement's drag surface (dashboards/PanelGrid.tsx). The body is not, so a press inside a
+   board stays free for a future card gesture. The cursor is the whole affordance. */
 .dash-panel-head {
   display: flex;
   align-items: center;
@@ -314,10 +313,10 @@
   cursor: grabbing;
 }
 
-/* The grip: a 2×3 dot field at the header's leading edge, appearing on hover or focus-within. A
-   PSEUDO-ELEMENT, so it is decoration the accessibility tree never sees and Panel.tsx never learns
-   about — the whole header is still the drag surface and the keyboard path is still the overflow
-   menu's "Move / resize". Drawn only where dragging is actually offered. */
+/* The grip: a 2x3 dot field at the header's leading edge, appearing on hover or focus-within. A
+   pseudo-element, so it is decoration the accessibility tree never sees and Panel.tsx never learns
+   about. The whole header is still the drag surface and the keyboard path is still the overflow menu's
+   "Move / resize". Drawn only where dragging is actually offered. */
 .dash-grid:not([data-collapsed]) .dash-panel-head::before {
   content: '';
   flex: none;
@@ -333,10 +332,10 @@
   opacity: 0.45;
 }
 
-/* The buttons in the header are not the drag surface, and their own cursor says so. They also fade
-   with the grip: refresh and the overflow menu are chrome, and chrome earns its pixels on approach.
-   Opacity rather than `display`, so both stay in the tab order and reappear when focused. The
-   FRESHNESS WORD beside them is untouched — state is not decoration and does not hide. */
+/* The buttons in the header are not the drag surface, and their own cursor says so. They also fade with
+   the grip: refresh and the overflow menu are chrome, and chrome earns its pixels on approach. Opacity
+   rather than `display`, so both stay in the tab order and reappear when focused. The freshness word
+   beside them is untouched. State is not decoration and does not hide. */
 .dash-panel-head button {
   cursor: pointer;
 }
@@ -350,10 +349,10 @@
   opacity: 1;
 }
 
-/* A pack that asks for stillness gets it: everything above still DRAWS and positions still update
+/* A pack that asks for stillness gets it: everything above still draws and positions still update
    live, they just do not animate on the way. Reduced motion asks for less movement, not less
-   information. LAST, deliberately — same specificity as the rules it cancels, so it has to come
-   after them; move a transition below this block and it comes back to life. */
+   information. Last on purpose, at the same specificity as the rules it cancels, so it has to come
+   after them. Move a transition below this block and it comes back to life. */
 @media (prefers-reduced-motion: reduce) {
   .dash-grid-overlay,
   .dash-resize,
@@ -377,10 +376,10 @@
   white-space: nowrap;
 }
 
-/* Scrolls itself rather than growing the surface: the RECT decides how tall a panel is, and a
-   500-row collection must not decide it instead. A table taller than its panel scrolls inside it,
-   which is what every surveyed dashboard does, and the row cap in the wire contract
-   (@acorn/protocol/collections.ts) bounds the worst case. */
+/* Scrolls itself rather than growing the surface: the rect decides how tall a panel is, and a 500-row
+   collection must not decide it instead. A table taller than its panel scrolls inside it, which is what
+   every surveyed dashboard does, and the row cap in the wire contract (@acorn/protocol/collections.ts)
+   bounds the worst case. */
 .dash-panel-body {
   flex: 1;
   min-width: 0;
@@ -391,19 +390,19 @@
 /* ── Panel editor ────────────────────────────────────────────────────────────────────────── */
 
 /* The generated editor (dashboards/PanelEditor.tsx). Nothing bespoke: every control is a shared
-   primitive and everything here is the stacking between them. Compound with .overlay-body for the
-   same reason as .dash-wizard below: it rides on Modal.Body, and the tie on `gap` must not be left
-   to chunk order. */
+   primitive and everything here is the stacking between them. Compound with .overlay-body for the same
+   reason as .dash-wizard below: it rides on Modal.Body, and the tie on `gap` must not be left to chunk
+   order. */
 .overlay-body.dash-editor {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
 }
 
-/* Picker's trigger is sized for the topbar, where it sits beside other chrome and is capped. As a
-   form control it is one of several stacked fields, so it takes the field's width like the rest —
-   a 300px button above a full-width input reads as a mistake. Same for a param's picker, which sits in
-   the split field's control column beside inputs that fill it. */
+/* Picker's trigger is sized for the topbar, where it sits beside other chrome and is capped. As a form
+   control it is one of several stacked fields, so it takes the field's width like the rest. A 300px
+   button above a full-width input reads as a mistake. Same for a param's picker, which sits in the
+   split field's control column beside inputs that fill it. */
 .dash-add-picker .repo-picker-button,
 .dash-param-picker .repo-picker-button {
   width: 100%;
@@ -415,8 +414,8 @@
 
 /* One filter, one sort key: controls that read left to right as a sentence. They wrap rather than
    scroll, because a filter row narrowed to a phone is still three choices and hiding one of them
-   behind a scrollbar hides the operator. `.ui-input` already carries `flex: 1; min-width: 0`, so
-   the selects share the row without this file saying anything about their widths. */
+   behind a scrollbar hides the operator. `.ui-input` already carries `flex: 1; min-width: 0`, so the
+   selects share the row without this file saying anything about their widths. */
 .dash-editor-row {
   display: flex;
   flex-wrap: wrap;
@@ -425,9 +424,9 @@
   min-width: 0;
 }
 
-/* A STACK OF SPLIT FIELDS — the field-mapping matrix, a source's params, the status-value columns. The
+/* A stack of split fields: the field-mapping matrix, a source's params, the status-value columns. The
    rows themselves align by `.ui-field[data-layout='split']`; what this adds is the breathing room
-   between them, which they had none of: sixteen selects at zero gap read as one control with a
+   between them, which they had none of. Sixteen selects at zero gap read as one control with a
    texture. */
 .dash-editor-rows {
   display: flex;
@@ -436,8 +435,8 @@
   min-width: 0;
 }
 
-/* One param, several answers at once (selectors.tsx § ParamInput). A COLUMN, so every box sits on the
-   same left edge and the tick targets form one scannable run — laid out in a row they wrapped wherever
+/* One param, several answers at once (selectors.tsx, ParamInput). A column, so every box sits on the
+   same left edge and the tick targets form one scannable run. Laid out in a row they wrapped wherever
    the words ran out, which put the second line's boxes under the first line's labels. */
 .dash-param-choices {
   display: flex;
@@ -446,19 +445,19 @@
   min-width: 0;
 }
 
-/* …and the caption goes to the TOP of that column rather than to its middle, level with the first box.
+/* And the caption goes to the top of that column rather than to its middle, level with the first box.
    Only where the control is a stack of them: an ordinary split field is one control on one line, where
    centred is right. */
 .ui-field[data-layout='split']:has(> .dash-param-choices) { align-items: start; }
 
-/* The box centred on ITS OWN line rather than flush with the line's top. `.ui-check` aligns to the top
+/* The box centred on its own line rather than flush with the line's top. `.ui-check` aligns to the top
    because it has to carry a hint underneath; a choice here is one line of the same type as the caption
-   beside it, so both line boxes are the same height and start at the same y — centre the square in
-   that line and the first choice reads exactly level with the caption. */
+   beside it, so both line boxes are the same height and start at the same y. Centre the square in that
+   line and the first choice reads exactly level with the caption. */
 .dash-param-choices > .ui-check { align-items: center; }
 
-/* Two labelled fields abreast. `start`, not `center`: a hint that wraps to two lines under one of
-   them must not shift the other one's control. */
+/* Two labelled fields abreast. `start`, not `center`: a hint that wraps to two lines under one of them
+   must not shift the other one's control. */
 .dash-editor-pair {
   display: flex;
   flex-wrap: wrap;
@@ -490,13 +489,13 @@
   min-width: 0;
 }
 
-/* A sentence between controls — the "no columns yet" explanation and a source's name above its
-   inputs. Not a Field hint, because it belongs to a section rather than to one control. */
+/* A sentence between controls: the "no columns yet" explanation and a source's name above its inputs.
+   Not a Field hint, because it belongs to a section rather than to one control. */
 .dash-editor-note {
   font-size: var(--fs-sm);
 }
 
-/* Anything a `<details>` holds, which lays its children out in plain block flow — so a fold full of
+/* Anything a `<details>` holds, which lays its children out in plain block flow, so a fold full of
    carefully spaced rows still stacks at zero gap without this. Same gap as the form around it. */
 .dash-editor-stack {
   display: flex;
@@ -532,14 +531,14 @@
 
 /* ── Panel wizard ────────────────────────────────────────────────────────────────────────── */
 
-/* Three regions (dashboards/PanelWizard.tsx): the step rail, the step body, the live preview. One
-   grid, and the narrow case reflows the SAME markup — the rail becomes a horizontal strip above the
-   body and the preview drops below it, because an alternate markup path is two things to keep true.
+/* Three regions (dashboards/PanelWizard.tsx): the step rail, the step body, the live preview. One grid,
+   and the narrow case reflows the same markup: the rail becomes a horizontal strip above the body and
+   the preview drops below it, because an alternate markup path is two things to keep true.
 
    No new tokens: the rail is buttons, the cards are `.ui-card`, the fields are `.ui-field`.
 
    Compound with .overlay-body: Modal.Body merges this class onto that element, and the two rules
-   disagree about `display`. Same specificity would leave the winner to stylesheet order — which the
+   disagree about `display`. Same specificity would leave the winner to stylesheet order, which the
    bundler does not promise. The compound outranks the primitive whatever order the chunks load in. */
 .overlay-body.dash-wizard {
   display: grid;
@@ -608,7 +607,7 @@
   min-width: 0;
 }
 
-/* Focus lands here on every step change, so it needs a ring — it is a heading nobody can click. */
+/* Focus lands here on every step change, so it needs a ring. It is a heading nobody can click. */
 .dash-wizard-heading {
   margin: 0;
   font-size: var(--fs-md);
@@ -617,7 +616,7 @@
 
 /* Full height, and it stretches rather than sizing itself: the grid row is as tall as the step body, so
    the preview matches whatever step you are on. `align-self` on this one item, not `align-items` on the
-   grid — the rail and the body still size to their content. */
+   grid, so the rail and the body still size to their content. */
 .dash-wizard-preview {
   display: flex;
   flex-direction: column;
@@ -627,7 +626,7 @@
   min-height: 0;
 }
 
-/* A FIXED SLOT. The preview is the real panel at a plausible size, not a thumbnail — and a slot that
+/* A fixed slot. The preview is the real panel at a plausible size, not a thumbnail, and a slot that
    grew with the rows would make every keystroke reflow the dialog. */
 .dash-preview {
   display: flex;
@@ -637,7 +636,7 @@
 
 /* In the wizard it fills the column instead, which is not the same thing as growing with its rows: the
    height comes from the step body beside it, so a keystroke in the form still cannot resize the dialog.
-   The fixed height stays the FLOOR, for the short steps. */
+   The fixed height stays the floor, for the short steps. */
 .dash-wizard-preview .dash-preview {
   flex: 1;
   height: auto;
@@ -648,8 +647,8 @@
   min-width: 0;
 }
 
-/* One column below the tablet width: the rail strips across the top, the preview drops under the
-   body. Same content, same order in the DOM. */
+/* One column below the tablet width: the rail strips across the top, the preview drops under the body.
+   Same content, same order in the DOM. */
 @media (max-width: 60rem) {
   .overlay-body.dash-wizard {
     grid-template-columns: minmax(0, 1fr);
@@ -660,10 +659,10 @@
   }
 }
 
-/* The two galleries — collections on step 1, view kinds on step 2. Auto-fit, so the count is data and
+/* The two galleries: collections on step 1, view kinds on step 2. Auto-fit, so the count is data and
    nothing computes a width. The cards themselves are `.dash-card`, `.dash-card-title` and
-   `.dash-card-meta`, the board's own three: a gallery card is a title, a mark and some meta, which is
-   what those already are. Only the three things a board card has no equivalent for are below. */
+   `.dash-card-meta`, the board's own three, since a gallery card is a title, a mark and some meta, which
+   is what those already are. Only the three things a board card has no equivalent for are below. */
 .dash-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
@@ -671,12 +670,12 @@
   min-width: 0;
 }
 
-/* The empty state is a SENTENCE, not a card: left in a 13rem cell it wraps to three words a line beside
+/* The empty state is a sentence, not a card: left in a 13rem cell it wraps to three words a line beside
    an acre of nothing. */
 .dash-gallery > .dash-editor-note { grid-column: 1 / -1; }
 
-/* The field vocabulary, visible before a single row has arrived — the thing the old add form could
-   not show. Wraps and then stops: a card is a glance, and a 24-field schema must not make one tall. */
+/* The field vocabulary, visible before a single row has arrived, the thing the old add form could not
+   show. Wraps and then stops: a card is a glance, and a 24-field schema must not make one tall. */
 .dash-collection-chips {
   max-height: 4rem;
   overflow: hidden;
@@ -709,9 +708,9 @@
 
 /* ── Board ───────────────────────────────────────────────────────────────────────────────── */
 
-/* Columns are the values of the grouped field, so their COUNT is data — an auto-flow grid takes
-   whatever number arrives without the component ever computing a width. The board scrolls sideways
-   inside the panel body rather than widening the surface it sits on. */
+/* Columns are the values of the grouped field, so their count is data. An auto-flow grid takes whatever
+   number arrives without the component ever computing a width. The board scrolls sideways inside the
+   panel body rather than widening the surface it sits on. */
 .dash-board {
   display: grid;
   grid-auto-flow: column;
@@ -751,9 +750,9 @@
   font-variant-numeric: var(--tabular);
 }
 
-/* Each column scrolls on its own, so one long column cannot push the others out of view. The panel's
-   own rect is what makes that true now — before geometry existed this needed a hard pixel cap,
-   because a content-sized panel had no height to scroll inside. */
+/* Each column scrolls on its own, so one long column cannot push the others out of view. The panel's own
+   rect is what makes that true now. Before geometry existed this needed a hard pixel cap, because a
+   content-sized panel had no height to scroll inside. */
 .dash-board-cards {
   flex: 1;
   display: flex;
@@ -769,8 +768,8 @@
   color: var(--text-muted);
 }
 
-/* Also a Card, so also compounded with .ui-card — same `display` tie as .dash-panel, and here it
-   costs the card its stacking. */
+/* Also a Card, so also compounded with .ui-card: same `display` tie as .dash-panel, and here it costs
+   the card its stacking. */
 .dash-card.ui-card {
   display: flex;
   flex-direction: column;
@@ -778,7 +777,7 @@
   min-width: 0;
   text-align: start;
 }
-/* Flex so a provenance mark sits on the title's baseline row rather than pushing it — on a
+/* Flex so a provenance mark sits on the title's baseline row rather than pushing it. On a
    single-source panel there is nothing beside the title and the rule costs nothing. */
 .dash-card-title {
   display: flex;
@@ -798,8 +797,8 @@
 }
 
 /* Which source a row came from, on a mixed panel (dashboards/views/Provenance.tsx). Muted and
-   `flex: none`, because it is an identifier rather than content: it must not grow, wrap or compete
-   with the title beside it. The mark itself is `currentColor`, so this one rule tones it. */
+   `flex: none`, because it is an identifier rather than content: it must not grow, wrap or compete with
+   the title beside it. The mark itself is `currentColor`, so this one rule tones it. */
 .dash-provenance {
   flex: none;
   color: var(--text-muted);
@@ -807,19 +806,19 @@
 
 /* ── Chart ───────────────────────────────────────────────────────────────────────────────── */
 
-/* Hand-rolled SVG over `dashboards/chart.ts`'s output — no charting dependency for two shapes with
-   no zoom and no brush. The viewBox scales uniformly to whatever rect the panel has, so the
-   component makes no measurement; the trade is that an extreme aspect ratio letterboxes rather than
-   stretching, which is the right way round because stretching distorts the type with it.
+/* Hand-rolled SVG over `dashboards/chart.ts`'s output. No charting dependency for two shapes with no
+   zoom and no brush. The viewBox scales uniformly to whatever rect the panel has, so the component
+   makes no measurement. The trade is that an extreme aspect ratio letterboxes rather than stretching,
+   which is the right way round because stretching distorts the type with it.
 
-   EVERY COLOUR IS A TOKEN, NEVER A LITERAL — and a mark carries one of two attributes, never both
-   (dashboards/chart.ts § Identity colour):
+   Every colour is a token, never a literal, and a mark carries one of two attributes, never both. See
+   docs/dashboards.md § Views are derived, not chosen from a menu:
 
-     data-tone    the plugin DECLARED what this value means. The same five StatusDot uses
+     data-tone    the plugin declared what this value means. The same five StatusDot uses
                   (primitives.css), so a `Ready` bar is the ok colour.
-     data-series  identity with no declared meaning — a source split, an undeclared category. The
-                  series slots (tokens-theme.css), which are deliberately NOT status colours: a line
-                  that is ok-green only because it was drawn second is a judgement nobody made.
+     data-series  identity with no declared meaning: a source split, an undeclared category. The
+                  series slots (tokens-theme.css) are not status colours, since a line that is
+                  ok-green only because it was drawn second is a judgement nobody made.
 
    Both restyle with the appearance pack; neither is spelled in ChartView.tsx. */
 .dash-chart-wrap {
@@ -840,13 +839,13 @@
   overflow: visible;
 }
 
-/* The legend, drawn whenever two or more series do (dashboards/chart.ts § legendFor). It WRAPS
-   rather than truncating: a key that scrolled out of sight would take a colour's only name with it,
-   and the fold's own key ("Other (3)") is the disclosure that the ramp ran out of slots.
+/* The legend, drawn whenever two or more series do (dashboards/chart.ts, legendFor). It wraps rather
+   than truncating: a key that scrolled out of sight would take a colour's only name with it, and the
+   fold's own key ("Other (3)") is the disclosure that the ramp ran out of slots.
 
    The swatch is the mark's own shape wearing the mark's own two attributes, so it restyles with the
    appearance pack for free and cannot drift to a different colour from the thing it stands for. The
-   LABEL is ordinary muted ink — identity lives in the swatch and never in coloured text. */
+   label is ordinary muted ink. Identity lives in the swatch and never in coloured text. */
 .dash-chart-legend {
   display: flex;
   flex-wrap: wrap;
@@ -882,9 +881,9 @@
   stroke: var(--border-strong);
 }
 
-/* No `font-size` here on purpose. Inside the chart's scaled viewBox a CSS length is a USER unit, so a
-   token size scales with the drawing — at `--fs-2xs` the ticks rendered around 28px on a large panel.
-   The size is geometry and comes off the frame as an SVG attribute (dashboards/chart.ts § TICK_FONT);
+/* No `font-size` here on purpose. Inside the chart's scaled viewBox a CSS length is a user unit, so a
+   token size scales with the drawing. At `--fs-2xs` the ticks rendered around 28px on a large panel.
+   The size is geometry and comes off the frame as an SVG attribute (dashboards/chart.ts, TICK_FONT);
    colour and figure style stay here, where the appearance pack owns them. */
 .dash-chart-tick {
   fill: var(--text-muted);
@@ -939,9 +938,9 @@
   white-space: nowrap;
 }
 
-/* A monogram, not a photograph — the mark is the initials of the same display string beside it
-   (dashboards/format.ts § personInitials), because the wire carries a name and not an account. Sized
-   off `--avatar-sm` so it matches the avatars everywhere else in the app under every density pack. */
+/* A monogram, not a photograph. The mark is the initials of the same display string beside it
+   (dashboards/format.ts, personInitials), because the wire carries a name and not an account. Sized off
+   `--avatar-sm` so it matches the avatars everywhere else in the app under every density pack. */
 .dash-cell-avatar {
   flex: none;
   display: inline-flex;
@@ -996,9 +995,9 @@
 /* The trend (dashboards/trend.ts). No axes, no grid, no ticks: the number above is the axis, so
    everything here is one line, its wash and the dot on the most recent day.
 
-   The height is a CAP rather than a size — `min-height: 0` lets it be squeezed out of a short panel
-   instead of pushing the number off the bottom, which is the right way round: the stat is the panel
-   and the sparkline is a decoration on it. */
+   The height is a cap rather than a size. `min-height: 0` lets it be squeezed out of a short panel
+   instead of pushing the number off the bottom, which is the right way round: the stat is the panel and
+   the sparkline is a decoration on it. */
 .dash-stat-spark {
   width: 100%;
   height: 32px;
@@ -1021,16 +1020,16 @@
 }
 .dash-stat-spark-end {
   fill: var(--accent);
-  /* A ring in the panel's own ground, so the dot reads as sitting ON the line rather than being a
+  /* A ring in the panel's own ground, so the dot reads as sitting on the line rather than being a
      thicker part of it. */
   stroke: var(--bg);
   stroke-width: var(--bw-strong);
   vector-effect: non-scaling-stroke;
 }
 
-/* Signed, and NEUTRAL unless the panel declared which direction is good — open PRs going up is bad
-   for one person's board and good for another's, so a guessed green would be the host inventing a
-   judgement its user never made. */
+/* Signed, and neutral unless the panel declared which direction is good. Open PRs going up is bad for
+   one person's board and good for another's, so a guessed green would be the host inventing a judgement
+   its user never made. */
 .dash-stat-delta {
   font-size: var(--fs-sm);
   font-variant-numeric: var(--tabular);
