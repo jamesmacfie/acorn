@@ -1,25 +1,23 @@
 import { createSignal, Show, type JSX } from 'solid-js'
 import { cx } from './cx'
 
-// A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written
-// with its own localStorage closure; three separate mechanisms were in circulation across the app
-// (native <details>, a signal plus a twist glyph, and a Set of collapsed ids), two of them missing
+// A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written with
+// its own localStorage closure, and three separate mechanisms were in circulation across the app (native
+// <details>, a signal plus a twist glyph, and a Set of collapsed ids), two of them missing
 // `aria-expanded`.
 //
-// Native <details>/<summary>, so keyboard behaviour and semantics come free and every current
-// <details> site keeps exactly what it had. The summary is composed from SectionHeader's
-// label/count/actions structure, so a closed fold looks like a section header — which is what all of
-// these were imitating.
+// Native <details> and <summary>, so keyboard behaviour and semantics come free. The summary is composed
+// from SectionHeader's label, count and actions structure, so a closed fold looks like a section header,
+// which is what all of these were imitating.
 //
-// Accordion behaviour (only one open at a time) has zero consumers. Not here.
-//
-// Content folds INSIDE a card — agents' reasoning and tool-output blocks — should stay raw
-// <details>. They are not titled sections, and wrapping them would add chrome they do not want.
+// Accordion behaviour has no consumers, so it isn't here. Content folds inside a card, such as agents'
+// reasoning and tool-output blocks, should stay raw <details>: they aren't titled sections, and wrapping
+// them would add chrome they don't want.
 
-// Reading and writing one localStorage key is the same carve-out ui/diff/DiffRows.tsx already has
-// for draft state, and is why this is a component rather than a caller responsibility: the eight
-// github sites each hand-wrote the same closure, and the one that mattered (the fold you left open)
-// was the one people got wrong.
+// Reading and writing one localStorage key is the same carve-out ui/diff/DiffRows.tsx has for draft
+// state, and is why this is a component rather than a caller responsibility: the eight github sites each
+// hand-wrote the same closure, and the one that mattered, the fold you left open, was the one people got
+// wrong.
 const readOpen = (key: string | undefined, fallback: boolean): boolean => {
   if (!key) return fallback
   try {
@@ -42,8 +40,8 @@ const writeOpen = (key: string | undefined, open: boolean): void => {
 export function CollapsibleSection(props: {
   label: JSX.Element
   count?: number
-  /** Rendered in the summary row and click-isolated from the toggle — a CopyButton in a fold's
-   *  header must not open the fold. */
+  /** Rendered in the summary row and click-isolated from the toggle: a CopyButton in a fold's header
+   *  must not open the fold. */
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
   persistKey?: string

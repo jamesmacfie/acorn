@@ -15,7 +15,7 @@ import {
 import { placementScopeKey } from './persist'
 
 // The constraints a plugin declares over a rectangle it reserved for the user's panels
-// (docs/future/dashboards/placements.md). Both halves are here — what the editor OFFERS and what the
+// (docs/dashboards.md § Placements). Both halves are here — what the editor OFFERS and what the
 // host RE-CHECKS at render — because the whole promise is that the two cannot disagree.
 //
 // The components are not covered: this suite runs in bare node with no Solid plugin, so a green run says

@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 
@@ -52,6 +52,13 @@ const scheduleGrantSchema = z.strictObject({
   cadence: cadenceSchema,
 }) as z.ZodType<PluginScheduleGrant>
 
+// `cleansUp` is the whole grant beside the id, and it is what the diff turns on: a package that used
+// to only warn on archive and now offers to change something has grown its reach.
+const taskCheckGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  cleansUp: z.boolean(),
+}) as z.ZodType<PluginTaskCheckGrant>
+
 const ackSchema = z.strictObject({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -74,6 +81,9 @@ const ackSchema = z.strictObject({
   // Default keeps acknowledgements written before schedules existed readable. An old acknowledgement
   // says the previously accepted bundle ran nothing on its own, which is what was true of it.
   schedules: z.array(scheduleGrantSchema).max(4).default([]),
+  // Default keeps acknowledgements written before archive checks existed readable. An old
+  // acknowledgement says the previously accepted bundle had nothing to say on archive.
+  taskChecks: z.array(taskCheckGrantSchema).max(4).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure that came with the decision could not be fully parsed — a node running a
@@ -209,6 +219,7 @@ export class PluginTrustStore {
       keyClaims: [],
       extensions: [],
       schedules: [],
+      taskChecks: [],
       decision: 'accepted',
       decidedAt: Date.now(),
       partial: true,

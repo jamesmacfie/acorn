@@ -1,7 +1,7 @@
-// Drivable browser — pure layer (docs/panes.md): CDP accessibility payloads → a compact AxNode
-// tree with stable per-snapshot refs (e1, e2, …), and the ref book-keeping clicks/fills resolve
-// against. The Playwright ARIA-snapshot model: agents reference refs, never CSS selectors. The
-// Electron webContents/debugger glue lives in browserService.ts; this module tests under plain Node.
+// Drivable browser, pure layer (docs/panes.md): CDP accessibility payloads become a compact AxNode tree
+// with stable per-snapshot refs (e1, e2, …), plus the ref bookkeeping clicks and fills resolve against.
+// The Playwright ARIA-snapshot model: agents reference refs, never CSS selectors. The Electron
+// webContents and debugger glue lives in browserService.ts; this module tests under plain Node.
 
 export type AxNode = {
   ref?: string // present when the node is actionable (has a backend DOM node)
@@ -27,9 +27,9 @@ const STRUCTURAL_ROLES = new Set(['generic', 'none', 'InlineTextBox', 'LineBreak
 
 export type AxSnapshot = { tree: AxNode[]; refs: Map<string, number> } // ref → backendDOMNodeId
 
-// Flat CDP list → tree. Ignored/anonymous structural nodes are flattened (children promoted) so
-// the snapshot stays small enough to hand an agent; refs are assigned in traversal order to nodes
-// that are actionable (backed by a DOM node) and meaningful (named or value-bearing).
+// Flat CDP list to a tree. Ignored and anonymous structural nodes are flattened, with children
+// promoted, so the snapshot stays small enough to hand an agent. Refs are assigned in traversal order to
+// nodes that are actionable (backed by a DOM node) and meaningful (named or value-bearing).
 export function buildAxTree(nodes: CdpAxNode[]): AxSnapshot {
   const byId = new Map(nodes.map((n) => [n.nodeId, n]))
   const hasParent = new Set<string>()
@@ -52,7 +52,7 @@ export function buildAxTree(nodes: CdpAxNode[]): AxSnapshot {
     // Flatten: ignored nodes and anonymous structure add noise, not signal.
     if (node.ignored || (STRUCTURAL_ROLES.has(role) && !name && !value)) return visitChildren(node)
     const out: AxNode = { role, ...(name ? { name } : {}), ...(value ? { value } : {}) }
-    // Refs number in PRE-order (parent before children) — the reading order agents see.
+    // Refs number in pre-order, parent before children, which is the reading order agents see.
     if (node.backendDOMNodeId != null && (name || value || !STRUCTURAL_ROLES.has(role))) {
       out.ref = `e${++counter}`
       refs.set(out.ref, node.backendDOMNodeId)
@@ -65,14 +65,14 @@ export function buildAxTree(nodes: CdpAxNode[]): AxSnapshot {
   return { tree: roots.flatMap(visit), refs }
 }
 
-// Resolve a ref from the LAST snapshot; anything else is stale by definition.
+// Resolve a ref from the last snapshot; anything else is stale by definition.
 export function resolveRef(snapshot: AxSnapshot | null, ref: string): number {
   const backendNodeId = snapshot?.refs.get(ref)
   if (backendNodeId == null) throw new Error(`Stale or unknown ref '${ref}' — take a new browser_snapshot first.`)
   return backendNodeId
 }
 
-// Render the tree as the compact indented text agents read best (verne/Playwright shape).
+// Render the tree as the compact indented text agents read best.
 export function renderAxTree(tree: AxNode[], depth = 0): string {
   const lines: string[] = []
   for (const node of tree) {
@@ -83,7 +83,7 @@ export function renderAxTree(tree: AxNode[], depth = 0): string {
   return lines.join('\n')
 }
 
-// ERR_ABORTED (-3) on navigation is benign (redirects/SPA) — verne's documented gotcha.
+// ERR_ABORTED (-3) on navigation is benign: redirects and SPA transitions produce it.
 export const isBenignNavError = (err: unknown): boolean => {
   const e = err as { errno?: number; code?: string; message?: string }
   return e?.errno === -3 || e?.code === 'ERR_ABORTED' || !!e?.message?.includes('ERR_ABORTED')
@@ -91,15 +91,15 @@ export const isBenignNavError = (err: unknown): boolean => {
 
 export const isAllowedBrowserUrl = (url: string): boolean => /^https?:\/\//i.test(url)
 
-// Preview navigation allows only HTTP(S) URLs without userinfo in the authority, so a configured URL like
-// `http://localhost@evil.com` can't disguise a foreign host as localhost.
+// Preview navigation allows only HTTP(S) URLs with no userinfo in the authority, so a configured URL
+// like `http://localhost@evil.com` can't disguise a foreign host as localhost.
 export const isAllowedPreviewUrl = (url: string): boolean => /^https?:\/\/[^@/?#]+(?::\d+)?(\/|$|\?|#)/.test(url)
 
-// Page-rule fill script (docs/panes.md), run via wc.executeJavaScript on dom-ready. Both strings
-// are JSON.stringify-embedded so selector/value content can't escape into the script. Sets the
-// value through the native prototype setter so controlled inputs (React/Solid) observe it, then
-// dispatches the events their bindings listen for. Retries briefly for SPA-rendered inputs.
-// Returns a boolean — executeJavaScript rejects on non-serializable completion values.
+// Page-rule fill script (docs/panes.md), run via wc.executeJavaScript on dom-ready. Both strings are
+// JSON.stringify-embedded so selector and value content can't escape into the script. Sets the value
+// through the native prototype setter so controlled inputs observe it, then dispatches the events their
+// bindings listen for. Retries briefly for SPA-rendered inputs, and returns a boolean because
+// executeJavaScript rejects on non-serializable completion values.
 export function buildFillScript(selector: string, value: string): string {
   return `(() => {
   const sel = ${JSON.stringify(selector)}, val = ${JSON.stringify(value)};

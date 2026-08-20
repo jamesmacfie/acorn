@@ -50,7 +50,7 @@ describe('parsePorcelainV2 (pure)', () => {
     const changes = parsePorcelainV2('1 .M N... 100644 100644 100644 abc def a.ts')
     const merged = mergeNumstat(changes, '3\t1\ta.ts', false)
     expect(merged[0]).toMatchObject({ additions: 3, deletions: 1 })
-    // binary files report '-'
+    // Binary files report '-'.
     expect(mergeNumstat(changes, '-\t-\ta.ts', false)[0]).toMatchObject({ additions: null, deletions: null })
   })
 })
@@ -71,7 +71,7 @@ describe('local diff over a real worktree', () => {
   const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'pipe' }).toString()
 
   // Fixture built once and copied per test: these assertions need real git (renames via `git mv`,
-  // staged-vs-worktree diffs, commit contents) but not six git spawns of setup per case.
+  // staged-versus-worktree diffs, commit contents) but not six git spawns of setup per case.
   let template: string
 
   beforeAll(() => {
@@ -139,7 +139,7 @@ describe('local diff over a real worktree', () => {
     await expect(localFileBlob(dir, 'src/a.ts', '--evil')).rejects.toThrow('Invalid ref')
   })
 
-  // ~15 sequential git spawns — over vitest's 5s default on a busy machine.
+  // About 15 sequential git spawns, over vitest's 5s default on a busy machine.
   it('stage/unstage/discard/commit land the reviewed work (docs/panes.md)', { timeout: 15_000 }, async () => {
     // stage → commit
     writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nCOMMIT ME\nline3\n')

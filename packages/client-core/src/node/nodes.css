@@ -1,7 +1,7 @@
 /* Node freshness chip (NodeChip.tsx) and Settings → Nodes (settings/NodesSettings.tsx).
    Co-located with the components, per the manifest note in styles.css. */
 
-/* The six-value vocabulary from docs/vNext/ui.md § Connection and staleness — mapped here, so the
+/* The six-value vocabulary from docs/ui-design.md § States — mapped here, so the
    component derives the state and the stylesheet owns how it reads. */
 .node-chip {
   display: inline-flex;

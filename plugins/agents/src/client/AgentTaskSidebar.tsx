@@ -41,15 +41,15 @@ export default function AgentTaskSidebar(props: {
   onSelectSession: (sessionId: string, requestId?: string) => void
   onError: (message: string) => void
 }) {
-  // The desktop probe, on the capability rather than on a PTY accessor's null return — the same thing
-  // `terminalApi()` was being used for here, said directly. CommandPalette already reads it this way.
+  // The desktop probe, on the capability rather than on a PTY accessor's null return. CommandPalette
+  // already reads it this way.
   const hasEngine = () => capabilities().terminal
   const [workflowData, { refetch }] = createResource(
     () => props.task.id,
     async (taskId) => {
-      // Resolved per call, never captured: client plugin registration order is not a dependency
-      // contract, and `undefined` here is also the honest answer on a node with workflows disabled —
-      // the roster then shows agent sessions alone rather than failing to render.
+      // Resolved per call, never captured: client plugin registration order isn't a dependency
+      // contract, and `undefined` here is also the honest answer on a node with workflows disabled, so
+      // the roster shows agent sessions alone rather than failing to render.
       const workflows = clientCapability(WORKFLOW_CONTROL)
       if (!hasEngine() || !workflows) return { runs: [], steps: [] as WorkflowStepRow[] }
       const runs = await workflows.runs(taskId)
@@ -66,7 +66,7 @@ export default function AgentTaskSidebar(props: {
     buildRoster(props.task.id, sessions(), workflowData().steps, workflowData().runs))
 
   onMount(() => {
-    // `terminalApi().onStatus` WAS `wsOnStatus`, forwarded verbatim — the session-status frame is
+    // `terminalApi().onStatus` was `wsOnStatus`, forwarded verbatim: the session-status frame is
     // client-core's WebSocket, not anything terminal owns.
     const offStatus = wsOnStatus(() => void refetch())
     onCleanup(offStatus)

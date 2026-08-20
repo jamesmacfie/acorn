@@ -3,13 +3,12 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Architecture boundary enforcement for the current workspace (docs/architecture-overview.md).
-// The scanner resolves relative and bare @acorn/* specifiers so the package graph is checked across
-// both intra-package and cross-package imports.
-// the suite asserts up front that it can still see a non-trivial graph.
+// Architecture boundary enforcement. Every rule below is stated, with the failure it prevents, in
+// docs/architecture-overview.md § Package boundaries — read that first, then this for the mechanics.
 //
-// Test files follow the same package graph rules as production files unless a specific rule grants an
-// explicit exception.
+// The scanner resolves relative and bare @acorn/* specifiers, so the package graph is checked across
+// intra-package and cross-package imports alike. Test files follow the same rules as production files
+// unless a rule names an exception.
 
 const ROOT = (() => {
   let dir = dirname(fileURLToPath(import.meta.url))
@@ -36,9 +35,8 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
   })
   .map((dir) => {
     const name = (JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string }).name
-    // Kind comes from WHERE a package lives, not from what it is called. It used to key off the
-    // `@acorn/plugin-` name prefix, which quietly made `@acorn/plugin-api` — a shared library in
-    // packages/ that every plugin imports — classify as a plugin, inverting three rules at once.
+    // Kind comes from where a package lives, not what it's called. The `@acorn/plugin-` name prefix
+    // classified `@acorn/plugin-api`, a shared library every plugin imports, as a plugin.
     const base = basename(dirname(dir))
     const kind: Pkg['kind'] = base === 'apps' ? 'app' : base === 'plugins' ? 'plugin' : 'lib'
     return { name, dir, src: join(dir, 'src'), kind }
@@ -47,15 +45,12 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
 const byName = new Map(PACKAGES.map((p) => [p.name, p]))
 const pkgOf = (file: string): Pkg | undefined => PACKAGES.find((p) => file.startsWith(p.dir + '/'))
 
-// Every import form, including side-effect `import '…'` and the vi.mock family — a mock path is a
-// real dependency edge, and missing them is how the database -> editor edge went undeclared.
+// Every import form, including side-effect `import '…'` and the vi.mock family: a mock path is a real
+// dependency edge, and missing them is how the database -> editor edge went undeclared.
 //
-// It does NOT strip comments, and that is a real sharp edge rather than a theoretical one: a comment
-// containing `import('@acorn/plugin-x/…')` — the natural way to describe code you just moved — becomes a
-// phantom edge, and if the path is a placeholder or has since moved it fails the resolver rule below.
-// Deliberately left as is: stripping comments means parsing, the false positive is loud and immediate rather
-// than silent, and the alternative failure mode (missing a real edge hidden after a `//`) is worse. Describe
-// a moved import in prose, not in a form that parses.
+// It does not strip comments, and that is a sharp edge: a comment containing an import call becomes a
+// phantom edge and fails the resolver rule below. Stripping would mean parsing, and missing a real edge
+// hidden after a `//` is the worse failure. Describe a moved import in prose, not in a form that parses.
 const IMPORT_RE =
   /(?:\bfrom\s*|\bimport\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bvi\.(?:mock|doMock|importActual|importMock)\s*\(\s*)(['"])([^'"\n]+)\1/g
 
@@ -83,10 +78,8 @@ function resolveFile(abs: string): string | null {
 type Target = { file: string | null; external: string | null; pkg: Pkg | undefined }
 
 function resolveSpec(from: string, spec: string): Target {
-  // Vite import queries select a loader/representation; they are not part of the filesystem path.
-  // Keep the original specifier on the edge for diagnostics and dependency rules, but resolve the
-  // underlying first-party module so `?raw`, `?url`, and future fragment-bearing imports remain
-  // covered by the same existence and boundary checks.
+  // Vite import queries pick a loader, not a filesystem path. Keep the original specifier for
+  // diagnostics but resolve the underlying module, so `?raw` and `?url` stay covered.
   const fileSpec = spec.split(/[?#]/, 1)[0]
   if (fileSpec.startsWith('.')) {
     const file = resolveFile(resolve(dirname(from), fileSpec))
@@ -121,18 +114,17 @@ const rel = (f: string) => relative(ROOT, f)
 const firstParty = EDGES.filter((e) => e.target.pkg)
 const crossPackage = firstParty.filter((e) => e.target.pkg!.name !== e.fromPkg.name)
 
-// The first path segment of a file inside its package's src/ — 'client', 'server', 'main',
-// 'contract', 'shared', …
+// The first path segment of a file inside its package's src/: 'client', 'server', 'main', 'contract',
+// 'shared', and so on.
 const segment = (pkg: Pkg, file: string): string => relative(pkg.src, file).split('/')[0]
 
-// contract/ is the ONE cross-plugin import surface (docs/plugins.md § Package shape). A plugin
-// may import another plugin's contract/; anything else is a coupling edge.
+// contract/ is the one cross-plugin import surface (docs/plugins.md § Package shape). A plugin may
+// import another plugin's contract/; anything else is a coupling edge.
 const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
   !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'contract'
 
-// Test scaffolding by LOCATION rather than by filename: a `.test.ts` suffix, a package's test/ or e2e/
-// tree, or its testkit/ — the last of which holds helpers that are test-only but deliberately not
-// suffixed, because they are imported BY tests rather than run as one.
+// Test scaffolding by location, not filename: a `.test.ts` suffix, a package's test/ or e2e/ tree, or
+// its testkit/, whose helpers are test-only but deliberately unsuffixed.
 const isTestCode = (file: string): boolean => /\.test\.tsx?$/.test(file) || /\/(test|e2e|testkit)\//.test(rel(file))
 
 // Which side of the client/node split a file sits on, from its path inside its package.
@@ -140,20 +132,9 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/client-core') return 'client'
   if (pkg.name === '@acorn/node-core') return 'node'
   if (pkg.name === '@acorn/protocol') return 'shared'
-  // The facade carries both halves, so it is classified per entrypoint. Without this its `node/`
-  // directory would fall through to 'shared' below (the node-side segments are server/main/…,
-  // deliberately not `node`, because client-core/src/node/ is the FLEET node — client code), and a
-  // renderer file importing @acorn/plugin-api/node would drag node code into the bundle with no
-  // rule firing.
-  // `testkit` counts as node for the same reason `node` does: it re-exports the host's context assembly,
-  // a real SQLite database and core's tables. It is test-only either way (the rule below fails a
-  // production file that imports any testkit/), so this classification is about keeping the client/node
-  // rule truthful rather than about who may import it.
-  //
-  // Except `testkit/client.ts`, which is the test seam for CLIENT plugin code — the fixtures a content-link
-  // resolver or a panel test needs. It is classified by the half it serves, exactly like the production
-  // entrypoints one directory over, because the alternative was a client-side plugin test deep-importing
-  // client-core and being written into a baseline that is only supposed to shrink.
+  // The facade carries both halves, so it's classified per entrypoint. Otherwise `node/` falls through
+  // to 'shared' and a renderer importing @acorn/plugin-api/node drags node code into the bundle with no
+  // rule firing. `testkit` counts as node; `testkit/client.ts` is the client seam and counts as client.
   if (pkg.name === '@acorn/plugin-api') {
     const seg = segment(pkg, file)
     if (seg === 'testkit') return file.endsWith('/client.ts') ? 'client' : 'node'
@@ -166,8 +147,8 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
 }
 
 describe('architecture boundaries', () => {
-  // Guard against the whole suite silently going blind — every assertion below is "expect empty",
-  // which a broken resolver would satisfy trivially.
+  // Anti-vacuity for the suite: every assertion below is "expect empty", which a broken resolver would
+  // satisfy trivially.
   it('sees a non-trivial package graph (anti-vacuity)', () => {
     expect(PACKAGES.length).toBeGreaterThanOrEqual(20)
     expect(EDGES.length).toBeGreaterThan(2000)
@@ -210,8 +191,8 @@ describe('architecture boundaries', () => {
   })
 
   it('shared libraries never import a plugin', () => {
-    // packages/* -> plugins/* is the inversion that made client-core cyclic. Acyclicity alone does
-    // not catch it: a plugin whose only upstream is @acorn/protocol closes no cycle.
+    // Acyclicity alone doesn't catch this: a plugin whose only upstream is @acorn/protocol closes no
+    // cycle.
     const inverted = crossPackage
       .filter((e) => e.fromPkg.kind === 'lib' && e.target.pkg!.kind === 'plugin')
       .map((e) => `${e.fromPkg.name} -> ${e.target.pkg!.name}`)
@@ -234,18 +215,9 @@ describe('architecture boundaries', () => {
   })
 
   it('spawning a child process is an enumerated exception to the broker', () => {
-    // main/core/exec/proc.ts opens by quoting docs/security.md: "all child processes go through the process
-    // broker". Nineteen production modules import node:child_process directly, ten of them in plugins.
-    //
-    // Most of those are legitimately outside the broker's model, which captures bounded output from a
-    // short-lived child and kills its process group. A PTY, a long-lived JSON-RPC agent driver, a
-    // `docker logs -f` stream and a pg client are none of those things. The problem was never that the
-    // exceptions exist — it is that nothing distinguished a sanctioned one from a call site that simply
-    // had not been migrated, so the claim in the docs was flatly untrue and unenforceable.
-    //
-    // This is the list. Every entry is a considered exception, and the reason is written beside it in
-    // the file itself. Adding one is a decision; docs/security.md now describes THIS, not the universal
-    // claim it used to make.
+    // Every entry is a considered exception with its reason beside it. The broker models a short-lived
+    // child with bounded output and a killable process group; a PTY, a long-lived JSON-RPC agent driver,
+    // a `docker logs -f` stream and a pg client are none of those.
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
       'packages/node-core/src/main/core/exec/proc.ts', // IS the broker
@@ -271,8 +243,7 @@ describe('architecture boundaries', () => {
       'plugins/http/src/server/send.ts',
     ])
     const importers = [...new Set(
-      // Build tooling excluded: apps/desktop/scripts/ runs at package time and never ships, so the
-      // broker's confinement guarantees have nothing to say about it.
+      // Build tooling excluded: apps/desktop/scripts/ runs at package time and never ships.
       EDGES.filter((e) => !isTestCode(e.fromFile) && !/\/scripts\//.test(rel(e.fromFile)))
         .filter((e) => e.target.external === 'node:child_process' || e.target.external === 'child_process')
         .map((e) => rel(e.fromFile)),
@@ -283,20 +254,12 @@ describe('architecture boundaries', () => {
   })
 
   it('plugins reach the host only through @acorn/plugin-api', () => {
-    // Every package declares `"exports": { "./*": "./src/*" }`, so there is no encapsulation at the
-    // module-system level at all — a plugin can reach any file in core. This used to be answered
-    // with a reviewed list of module roots; it is now answered with a package. @acorn/plugin-api
-    // re-exports an enumerated surface, its own snapshot test makes growing that surface a
-    // deliberate act, and a third-party plugin can depend on it without inheriting the server.
-    //
-    // A plugin's first-party imports are therefore: the facade, the wire types, another plugin's
-    // contract/, and its own files. Nothing else in packages/.
+    // `"exports": { "./*": "./src/*" }` gives the module system no encapsulation, so this is where a
+    // plugin's import surface is enforced instead: the facade, the wire types, another plugin's
+    // contract/, and its own files.
     const ALLOWED_CSS = new Set([
-      // A stylesheet is not re-exportable — `export … from` carries bindings, and this file has
-      // none. Core-owned CSS for a core-owned component the plugin renders.
-      //
-      // `palette/palette.css` used to be here too, for the editor plugin's file finder. PaletteSurface
-      // owns that stylesheet now, so the plugin imports a component instead of reaching for CSS.
+      // A stylesheet isn't re-exportable, since `export … from` carries bindings and this file has none.
+      // Core-owned CSS for a core-owned component the plugin renders.
       '@acorn/client-core/workspaces/onboarding.css',
     ])
     const offenders = crossPackage
@@ -311,26 +274,12 @@ describe('architecture boundaries', () => {
   })
 
   it('plugin TESTS reach core through @acorn/plugin-api/testkit (shrinking baseline)', () => {
-    // This used to be an allowlist of module roots asserting exact set equality, and the comment on it
-    // said a third-party author "gets a testkit entrypoint if and when one is built". One is built:
-    // @acorn/plugin-api/testkit, whose makeTestNodeContext calls the same context assembly the host calls
-    // at boot. So the list stopped being an allowlist and became a BASELINE — the deep imports still to
-    // migrate, which may only shrink.
+    // Deep imports still to migrate, which may only shrink. @acorn/plugin-api/testkit is the seam that
+    // replaced them: its makeTestNodeContext calls the same context assembly the host calls at boot.
     //
-    // Why it can shrink now and could not before. The reason a test reached past the facade was that no
-    // seam existed for it: a test that seeds core's tables, needs an authenticated gate, or wants a real
-    // plugin context had nowhere else to go, and forty-odd test files rebuilt the host by hand — including
-    // forged `as unknown as NodePluginContext` literals, which stay green when the real host changes and
-    // are therefore the worst kind of test. The testkit is that seam,
-    // and it deliberately carries things ./node refuses (core's table schema, core's database type)
-    // because seeding a fixture is legitimate and always will be.
-    //
-    // How to work with this rule:
-    //   MIGRATE as you touch. A test you are editing anyway moves to the testkit; nobody sweeps the rest.
-    //   REMOVE a root when the last file under it goes. The assertion is exact, so that is enforced.
-    //   NEVER ADD a root. A new deep seam is the signal that the testkit is missing something — add it
-    //     there (packages/node-core/src/testkit/, re-exported from the facade) rather than here.
-    //   LOWER the ceiling. It is the count of surviving deep imports, so migrating one file lowers it.
+    // Migrate as you touch. Remove a root when its last file goes. Never add a root: a new deep seam
+    // means the testkit is missing something, so widen it instead. Lower the ceiling below when you
+    // migrate a file.
     const TESTKIT_BASELINE = [
       '@acorn/client-core/node',
       '@acorn/client-core/palette',
@@ -348,8 +297,7 @@ describe('architecture boundaries', () => {
       '@acorn/node-core/server/routes',
       '@acorn/node-core/testkit',
     ]
-    // 167 across 48 files the day before the testkit landed; 147 across 37 once the first eleven files
-    // moved across, which drained two client-core roots with them. Only ever smaller.
+    // 167 across 48 files the day before the testkit landed; 147 across 37 once the first eleven moved.
     const MAX_DEEP_IMPORTS = 147
     const rootOf = (spec: string): string => {
       const pkg = spec.startsWith('@acorn/node-core/') ? '@acorn/node-core/' : '@acorn/client-core/'
@@ -367,17 +315,9 @@ describe('architecture boundaries', () => {
   })
 
   it('the testkit is imported only by tests', () => {
-    // Three test helpers used to live in packages/node-core/src/server/routes/ — testDb.ts with sixty
-    // inbound references across eleven packages, plus testAuth.ts and testIntegration.ts. Nothing about
-    // them was a route; they sat there because that is where they were first needed, and every consumer
-    // then imported test scaffolding through a path that reads like production surface.
-    //
-    // The directory rename is most of the fix: `@acorn/node-core/testkit/db.ts` says what it is at
-    // every call site. This is the part the rename cannot do — keeping a production file from reaching
-    // for one, which is how a tmp-dir SQLite factory ends up shipped.
-    //
-    // Any package's testkit/, not just node-core's: the rule immediately found the same shape in
-    // plugins/github, whose seedGithubIntegration helper was sitting in server/.
+    // Keeps a production file from importing test scaffolding, which is how a tmp-dir SQLite factory
+    // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
+    // same shape in plugins/github.
     const offenders = EDGES.filter((e) => !isTestCode(e.fromFile))
       .filter((e) => e.target.file?.includes('/src/testkit/'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
@@ -385,13 +325,9 @@ describe('architecture boundaries', () => {
   })
 
   it('plugins broadcast through the plugin context (shrinking baseline)', () => {
-    // docs/plugins.md promised event subscriptions and NodePluginContext had no `events` member; what
-    // plugins actually did was deep-import main/wsHub.ts and main/notify.ts. The context now carries
-    // the real surface (server/plugin/types.ts § PluginBroadcast), and this is the ratchet that drains
-    // the imports it replaced.
-    //
-    // Every plugin now receives these event projections through NodePluginContext. Keep this ratchet
-    // empty: a new direct import would be an architectural regression, not an item to append here.
+    // Plugins used to deep-import main/wsHub.ts and main/notify.ts because NodePluginContext had no
+    // `events` member. Keep this ratchet empty: a new direct import is a regression, not an item to
+    // append here.
     const BROADCAST_BASELINE: string[] = []
     const HUB = ['@acorn/node-core/main/wsHub.ts', '@acorn/node-core/main/notify.ts']
     const offenders = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && !e.isTest)
@@ -401,17 +337,8 @@ describe('architecture boundaries', () => {
   })
 
   it('apps reach plugins through entrypoints or contract/ (shrinking baseline)', () => {
-    // A plugin's public surface is its three entrypoints — node/index.ts, client/index.ts,
-    // main/index.ts — plus contract/, which is also what another plugin may import. An app is allowed
-    // to know more than a plugin does, but "allowed to import anything" is how a composition root ends
-    // up depending on an internal module that was never meant to be load-bearing. That is what this
-    // ratchet measures: it may only shrink.
-    //
-    // The baseline is empty: composition roots consume only node/index.ts, client/index.ts,
-    // main/index.ts, or contract/ surfaces. Keep this ratchet empty as an import-boundary guard.
-    //
-    // Tests are exempt. A test may reach into whatever it is testing, and holding integration tests to
-    // the production surface would only push them into re-exporting internals through it.
+    // A plugin's public surface is node/index.ts, client/index.ts, main/index.ts and contract/. Empty,
+    // and keep it that way. Tests are exempt: a test may reach into whatever it's testing.
     const APP_DEEP_IMPORT_BASELINE: string[] = []
     const ENTRYPOINTS = ['/node/index.ts', '/client/index.ts', '/main/index.ts']
     const deep = EDGES.filter((e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile))
@@ -425,28 +352,21 @@ describe('architecture boundaries', () => {
   })
 
   it('protocol declares no plugin route', () => {
-    // The rule that keeps api.ts from becoming a mixing bowl again. It was 701 lines holding route
-    // builders for nine plugins' namespaces, which meant no plugin could define its own wire surface
-    // without editing core — the single largest blocker to third-party plugins.
-    //
-    // One literal does the whole job with no name list and no false positives: every plugin route
-    // lives under /v2/p/<plugin>/ and core's under /v2/core/. If protocol contains the plugin prefix,
-    // it is building a route it does not own.
+    // One literal does the whole job: every plugin route lives under /v2/p/<plugin>/ and core's under
+    // /v2/core/, so protocol containing the plugin prefix means it's building a route it doesn't own.
     const proto = byName.get('@acorn/protocol')!
     const files = walk(proto.src)
-    // Anti-vacuity for THIS rule: the guard at the top of the suite counts packages and edges, not
-    // protocol's own files, so a walk that returned nothing would satisfy the assertion below.
+    // Anti-vacuity: the suite's own guard counts packages and edges, not protocol's files, so a walk
+    // that returned nothing would satisfy the assertion below.
     expect(files.length).toBeGreaterThan(15)
     const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('/v2/p/')).map((f) => relative(proto.src, f))
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
   it('the reserved plugin route segment is spelled the same on both sides of the client/node boundary', () => {
-    // client-core/registries/corePaths.ts declares PLUGIN_ROUTE_SEGMENT and node-core/main/pluginManifest.ts
-    // re-spells the same string to confine manifest routes at parse time — it cannot import the constant,
-    // because the client is downstream of the node. Both files say they are "one edit apart on purpose";
-    // this is the test that turns that edit into a failure instead of a route the device refuses after the
-    // node accepted it.
+    // corePaths.ts declares PLUGIN_ROUTE_SEGMENT and node-core/main/pluginManifest.ts re-spells it,
+    // because the client is downstream of the node. This turns the drift into a failure here rather
+    // than a route the device refuses after the node accepted it.
     const client = byName.get('@acorn/client-core')!
     const node = byName.get('@acorn/node-core')!
     const corePaths = readFileSync(join(client.src, 'registries/corePaths.ts'), 'utf8')
@@ -457,30 +377,20 @@ describe('architecture boundaries', () => {
   })
 
   it('protocol modules named for a plugin are an enumerated, shrinking set', () => {
-    // The routes are gone (rule above), but a plugin's TYPES can still accumulate here without one.
-    // This is the ratchet for that: an explicit list, in the SCHEMA_BASELINE style, so adding a
-    // plugin-shaped module to protocol is a decision someone has to write down rather than a drift.
-    //
-    // Each survivor is here for a stated reason, not by neglect:
+    // The routes are gone, but a plugin's types can still accumulate here. Each survivor has a reason:
     const PLUGIN_NAMED_BASELINE = [
-      // Both sides consume it and `ServerMsg` is the terminal WS transport itself, which core's own
-      // hub (main/wsHub.ts) speaks. Core vocabulary that happens to share a plugin's name.
+      // Both sides consume it, and `ServerMsg` is the terminal WS transport core's own hub speaks.
       'terminal.ts',
-      // `NoteLocation` addresses a task/workspace/global scope — core's own addressing scheme. The
-      // notes ROUTES that used it moved to plugins/notes/src/shared/api.ts.
+      // `NoteLocation` addresses a task, workspace or global scope, which is core's own scheme.
       'notes.ts',
       // The workflow row types are read by client-core's notification pipeline as well as the plugin.
       'workflow.ts',
-      // Blocked, not kept: client-core/registries/agentToolRenderers.ts imports it, so it cannot move
-      // until the shell stops naming agents (finding 10).
+      // Blocked, not kept: client-core/registries/agentToolRenderers.ts imports it, so it can't move
+      // until the shell stops naming agents.
       'managedAgents.ts',
     ]
-    // Kept OUT of the baseline on purpose, because a baseline means "still to fix" and these are not.
-    // The match is a name collision with core vocabulary, not a dependency: `AgentContextContribution`
-    // is client-core's registry type and has nothing to do with plugins/context.
-    // `contextMenus.ts` is the same kind of collision: it holds the host's right-click location
-    // vocabulary, which the node checks a manifest against and the client re-checks a roster row
-    // against. Nothing to do with plugins/context; it merely starts with the same seven letters.
+    // Not in the baseline, because a baseline means "still to fix" and these aren't. Both are name
+    // collisions with core vocabulary, not dependencies.
     const NAME_COLLISIONS = ['agentContext.ts', 'contextMenus.ts']
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
@@ -488,22 +398,15 @@ describe('architecture boundaries', () => {
       .map((f) => relative(proto.src, f))
       .filter((f) => !f.endsWith('.test.ts'))
       .filter((f) => !NAME_COLLISIONS.includes(f))
-      // Matched on the FILE NAME, not the contents: a comment cannot create a dependency, and
-      // scanning prose for 'context' or 'http' would flag half of core's English.
+      // Matched on the file name, not the contents: a comment can't create a dependency, and scanning
+      // prose for 'context' or 'http' would flag half of core's English.
       .filter((f) => pluginNames.some((n) => f.toLowerCase().replace(/s?\.ts$/, '').includes(n.replace(/s$/, ''))))
     expect([...new Set(named)].sort()).toEqual([...PLUGIN_NAMED_BASELINE].sort())
   })
 
   it('only core reaches the machine identity store', () => {
-    // The node's identity used to be WRITTEN by a feature plugin: plugins/github's device-flow route
-    // set `c.env.ACTIVE_IDENTITY` after connecting an account, so core's answer to "who is the user"
-    // was a side effect of one provider. It is now minted by core at boot (main/core/identity/identity.ts),
-    // and providers only consume the read-only CoreServices.identity seam.
-    //
-    // This rule keeps the raw store out of reach so the inversion cannot come back. The allowlist is
-    // node-core, which owns the store, plus the two composition roots, which construct it and hand it
-    // to createCoreServices — the one legitimate reason to name it outside core. A plugin appearing
-    // here means someone went around the seam again.
+    // The allowlist is node-core, which owns the store, plus the two composition roots that construct
+    // it. A plugin appearing here means someone went around the seam again.
     const IDENTITY_STORE_OK = new Set(['packages/node-core', 'apps/node'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
@@ -512,23 +415,14 @@ describe('architecture boundaries', () => {
         .map(() => relative(ROOT, p.dir)),
     )
     expect([...new Set(offenders)].filter((p) => !IDENTITY_STORE_OK.has(p)).sort()).toEqual([])
-    // Anti-vacuity: the regex above must still match the declaration and the two reads in the auth
-    // middleware, or this rule passes because it stopped finding anything at all.
+    // Anti-vacuity: the regex must still match the declaration and the two reads in the auth middleware.
     expect([...new Set(offenders)]).toContain('packages/node-core')
   })
 
   it('only main touches the third-party plugin cache and trust store', () => {
-    // Two invariants from docs/plugins.md, both of which are only
-    // invariants while nothing outside main can name the stores.
-    //
-    // "Trust binds to bytes": the acknowledgement is bound to a hash the MAIN process computed from
-    // the bytes it received. A renderer-side module that read or wrote either store would be a second
-    // place a hash could enter the system, which is exactly the property a compromised node needs.
-    //
-    // "The renderer stays inert": bundle bytes and cache paths never cross contextBridge. The client
-    // reaches both stores through client-core/plugins/host.ts, which speaks hashes and decisions and
-    // nothing else — and which is also the seam a future web client re-implements over IndexedDB
-    // (docs/future/remote.md), so it must stay the only door.
+    // Trust binds to bytes, and the renderer stays inert. Both hold only while nothing outside main can
+    // name the stores: a renderer module touching either would be a second place a hash could enter the
+    // system, and client-core/plugins/host.ts is the one door, speaking hashes and decisions only.
     const PLUGIN_STORE_OK = new Set(['apps/desktop'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
@@ -536,42 +430,16 @@ describe('architecture boundaries', () => {
         .map(() => relative(ROOT, p.dir)),
     )
     expect([...new Set(offenders)].filter((p) => !PLUGIN_STORE_OK.has(p)).sort()).toEqual([])
-    // Anti-vacuity: the regex must still find the classes and their tests, or this rule passes
-    // because it stopped looking for anything.
+    // Anti-vacuity: the regex must still find the classes and their tests.
     expect([...new Set(offenders)]).toContain('apps/desktop')
   })
 
   it('the Electron surface stays where it is declared', () => {
-    // apps/desktop IS the Electron app, so anything in it may name electron. Outside it, the rule is
-    // about one thing only: nothing may STATICALLY import electron VALUES. A type-only import is
-    // erased, and a lazy `createRequire(import.meta.url)('electron')` behind a function only resolves
-    // when it is called — neither exists at the moment Node links the module, which is when the
-    // failure this rule exists to prevent happens ("The requested module 'electron' does not provide
-    // an export named 'dialog'", the standalone node dead at boot).
+    // apps/desktop is the Electron app, so anything in it may name electron.
     //
-    // This used to be a hand-maintained allowlist of three FILE NAMES, which answered "which files
-    // mention electron" rather than "can the Electron-free node boot" — and it passed while preview's
-    // previewService.ts held a static value import that was one innocent import away from breaking
-    // boot. The allowlist is gone: every remaining reference outside apps/desktop is type-only or lazy,
-    // so there is nothing left to enumerate.
-    //
-    // The durable check is execution — apps/node/test/integration/mainBarrelLoad.test.ts loads every
-    // plugin's main barrel in plain Node. This stays as the fast first line, and it catches one case
-    // execution cannot: an UNUSED static value import, which esbuild/tsx elides before Node sees it,
-    // so it loads fine today and breaks the day someone uses the binding.
-    //
-    // Same clause-parsing idiom as the schema and ui/ rules: `[^'"]*?`, because a preceding import's
-    // specifier carries the quotes that bound the statement.
-    //
-    // Comments ARE stripped here, unlike in the graph scan at the top of this file. Both files that
-    // got the lazy treatment describe the import they used to have, in the form they used to have it —
-    // the natural way to write that comment — and a rule that fails the fix it is documenting is a
-    // rule people delete. Stripping is safe at this narrow scale: the only false negative would be an
-    // electron import hidden inside a string literal containing `//`.
-    // `export … from 'electron'` counts too. A re-export is a static value binding exactly like an import,
-    // fails Node's linker in exactly the same way, and is the more likely form on a BARREL — which is
-    // precisely the file this rule is protecting. Execution only partly covers it: a re-export the barrel's
-    // consumers never touch is still linked, but one in a module nothing imports is elided like any other.
+    // Comments are stripped here, unlike the graph scan at the top of this file: both files that got the
+    // lazy treatment describe the import they used to have, in the form they used to have it, and a rule
+    // that fails the fix it documents is a rule people delete.
     const ELECTRON_VALUE_IMPORT = /\b(?:import|export)\s+(?!type\b)([^'"]*?)\s+from\s*['"]electron['"]/g
     const importsElectronValues = (source: string): boolean => {
       const text = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -585,13 +453,12 @@ describe('architecture boundaries', () => {
       }
       return false
     }
-    // The edge scan already found every file that names electron at all; this only has to decide how.
+    // The edge scan already found every file that names electron; this only decides how.
     const naming = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))]
     const offenders = naming.filter((f) => !rel(f).startsWith('apps/desktop/')).filter((f) => importsElectronValues(readFileSync(f, 'utf8')))
     // Anti-vacuity: the regex must still recognise the real form, which apps/desktop is full of.
     expect(naming.filter((f) => importsElectronValues(readFileSync(f, 'utf8'))).length).toBeGreaterThan(5)
     // And the forms no file in the tree happens to use, so the predicate is pinned rather than trusted.
-    // Inline strings because the point is the shapes, not anyone's file.
     expect(importsElectronValues("export { app } from 'electron'")).toBe(true)
     expect(importsElectronValues("export * from 'electron'")).toBe(true)
     expect(importsElectronValues("export type { BrowserWindow } from 'electron'")).toBe(false)
@@ -601,51 +468,31 @@ describe('architecture boundaries', () => {
   })
 
   it('the platform seam is the only door to the host (shrinking baseline)', () => {
-    // Same shape as the electron rule above, one layer up. That one keeps the NODE bootable by banning
-    // static electron value imports outside the desktop app; this one keeps the CLIENT portable by
-    // banning direct reads of the injected `window.acorn` global outside packages/client-core/src/platform/.
-    //
-    // The rule already existed in prose — plugins/host.ts's header says "sprinkling `window.acorn.*`
-    // through client code would make the storage the contract by accident" — and was applied to exactly
-    // one of fifteen modules, because nothing enforced it (git history: docs/future/node-first/platform-seam.md).
-    // The seam was a TypeScript type, not a boundary. It is a boundary now.
-    //
-    // Why a scan rather than an import-graph edge: the global is not imported, it is READ. `acornGlobal`
-    // is module-private inside platform/index.ts, so the only spelling left to police is `window.acorn`
-    // itself.
-    //
-    // Comments ARE stripped, same reasoning as the electron rule: every file that got migrated describes
-    // the global it used to read, in the form it used to read it, and a rule that fails the fix it is
-    // documenting is a rule people delete.
-    //
-    // TESTS are exempt, and permanently. A test that stubs `globalThis.window = { acorn: … }` is
-    // exercising the platform implementation, which is a legitimate thing to do forever — unlike a
-    // production module reaching around the seam, which never is. Same for apps/desktop/e2e, which
-    // asserts from OUTSIDE the renderer that the preload did or did not run.
+    // A source scan rather than a graph edge, because the global is read rather than imported:
+    // `acornGlobal` is module-private inside platform/index.ts, so `window.acorn` is the only spelling
+    // left to police. Comments are stripped, same reasoning as the electron rule. Tests are exempt
+    // permanently: stubbing `globalThis.window` is how the platform implementation gets exercised.
     const READS_GLOBAL = /\bwindow\s*(?:\.\s*acorn\b|\?\.\s*acorn\b|\[\s*['"]acorn['"]\s*\])/
     const readsHostGlobal = (source: string): boolean =>
       READS_GLOBAL.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
     const SEAM = join(ROOT, 'packages', 'client-core', 'src', 'platform') + '/'
-    // The Electron preload is the seam's IMPLEMENTATION. It writes the global (exposeInMainWorld) rather
-    // than reading it, so it does not match — but name it here so the next implementation knows where the
-    // other end of this contract lives.
+    // The preload writes the global (exposeInMainWorld) rather than reading it, so it doesn't match.
+    // Named here so the next implementation knows where the other end of this contract lives.
     const files = PACKAGES.flatMap((p) => walk(p.src))
       .filter((f) => !isTestCode(f) && !f.startsWith(SEAM))
       .filter((f) => readsHostGlobal(readFileSync(f, 'utf8')))
-    // Baseline, not an allowlist: entries may only be removed. Empty since the seam landed — every reach
-    // was mechanical, and there were only fifteen. Migrate a new one rather than listing it here; if the
-    // seam does not carry what you need, widen the seam.
+    // Baseline, not an allowlist: entries may only be removed. Empty since the seam landed. If the seam
+    // doesn't carry what you need, widen the seam.
     const PLATFORM_BASELINE: string[] = []
     expect(files.map(rel).sort()).toEqual(PLATFORM_BASELINE)
-    // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree, or this
-    // rule passes because it stopped looking. Inline strings, because the point is the shapes.
+    // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree.
     expect(readsHostGlobal('const off = window.acorn?.onClosePane?.(cb)')).toBe(true)
     expect(readsHostGlobal("window.acorn?.preview?.evict(taskId)")).toBe(true)
     expect(readsHostGlobal("if (!window.acorn?.terminal) return null")).toBe(true)
     expect(readsHostGlobal("window['acorn'].nodeFetch(id, req)")).toBe(true)
     expect(readsHostGlobal('// the `window.acorn` global is declared in the platform seam')).toBe(false)
     expect(readsHostGlobal('const w = window.acornish')).toBe(false)
-    // And the seam itself must still be the thing doing the reading, or it has been hollowed out.
+    // And the seam itself must still be doing the reading, or it's been hollowed out.
     expect(readsHostGlobal(readFileSync(join(SEAM, 'index.ts'), 'utf8'))).toBe(true)
   })
 
@@ -662,33 +509,26 @@ describe('architecture boundaries', () => {
   })
 
   it('plugin-api is a facade: re-exports only, and only of the three core packages', () => {
-    // The facade's value is that it is enumerable and boring. The moment it grows behaviour of its
-    // own it becomes a fourth core package with its own bugs, and "the plugin API" stops being a
-    // view onto the host and starts being a thing that has to be kept in sync with it.
+    // The moment the facade grows behaviour of its own it becomes a fourth core package with its own
+    // bugs.
     const api = PACKAGES.find((p) => p.name === '@acorn/plugin-api')!
     const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api'])
     const foreign = EDGES.filter((e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     // Re-exports only: no plain imports, and no declarations. `export … from` is the whole file.
     const DECLARES = /^\s*(import\s|export\s+(const|let|var|function|class|default|async)\b)/m
-    // The suite's own `*.test.ts` files are excluded, and nothing else is. Note this deliberately does
-    // NOT use isTestCode(), which would also exempt src/testkit/index.ts — the entrypoint a plugin's
-    // node-environment suite imports, and therefore the one that most needs the no-components rule below.
+    // Deliberately not isTestCode(), which would also exempt src/testkit/index.ts: the entrypoint a
+    // plugin's node-environment suite imports, and the one that most needs the no-components rule below.
     const entrypoints = walk(api.src).filter((f) => !/\.test\.tsx?$/.test(f))
     const declaring = entrypoints.filter((f) => DECLARES.test(readFileSync(f, 'utf8'))).map(rel)
-    // Only the frame-safe ui/index.ts and compiled-host ui/host.ts barrels may re-export from a .tsx
-    // module. Components anywhere else make that entrypoint unloadable from a plugin's
-    // node-environment test suite. Keeping the two UI barrels separate prevents a sandboxed frame
-    // importing Button from also evaluating router/query/registry machinery.
+    // Only the frame-safe ui/index.ts and compiled-host ui/host.ts barrels may re-export a `.tsx`
+    // module, or that entrypoint stops loading from a plugin's node-environment suite.
     //
-    // A DIRECT-specifier grep, and the property it stands for is transitive — `/client` reaches
-    // client-core/registries/keybindings through two hops, and for a while that file was a `.tsx`
-    // containing no JSX, one component away from breaking every plugin's node-environment suite with
-    // nothing firing here. Nor is `.tsx` the only way to lose node-safety: ./ui/editor is plain `.ts`
-    // and still unloadable, because monaco-editor reads `window` at module scope.
-    // packages/plugin-api/src/entrypoints.test.ts is what actually knows — it imports each node-safe
-    // entrypoint in a node environment. This stays because it is instant and names the offending
-    // specifier, which a `window is not defined` stack does not.
+    // A direct-specifier grep for a transitive property, so it's incomplete: `/client` reaches
+    // client-core/registries/keybindings in two hops, and `.tsx` isn't the only way to lose node-safety
+    // (./ui/editor is plain `.ts` and unloadable, because monaco-editor reads `window` at module scope).
+    // packages/plugin-api/src/entrypoints.test.ts is what actually knows; this stays because it's
+    // instant and names the offending specifier.
     const componentEntrypoints = new Set([
       'packages/plugin-api/src/ui/index.ts',
       'packages/plugin-api/src/ui/host.ts',
@@ -701,29 +541,19 @@ describe('architecture boundaries', () => {
   })
 
   it('client-core ui/ is pure presentation: props in, DOM out', () => {
-    // ui/ is what @acorn/plugin-api/ui re-exports, so its import edges ARE the design-system
-    // contract. A component that starts wanting data gets wrapped in connected/ — a thin
-    // subscribe-and-hand-rows-to-a-pure-component layer — never a fetch added in place.
+    // ui/ is what @acorn/plugin-api/ui re-exports, so its import edges are the design-system contract.
     //
-    // An ALLOWLIST of destinations, not a denylist of data modules: a denylist silently stops
-    // covering the next directory someone adds, which is the failure mode that matters here.
-    // Four carve-outs, all pure or presentation infrastructure:
+    // An allowlist of destinations, not a denylist of data modules, because a denylist silently stops
+    // covering the next directory someone adds. Four carve-outs, all pure or presentation:
     //   lib/         DOM predicates, debounce, the localStorage draft helper DiffRows binds to
     //   highlight/   the shiki highlighter the diff model colours through
     //   palette/model.ts  fuzzyScore, a module with zero imports of its own
-    //   registries/registry.ts  the Registry CLASS — a container with an id index and disposal,
-    //     importing only solid-js. ui/brandMarks.ts holds the brand-mark corpus in one, because a
-    //     plugin's logo has to be able to arrive and leave with its roster row. Note this admits
-    //     the container and NOT any registry INSTANCE: `registries/sources.ts` and its siblings are
-    //     still application state and still out of bounds, which is the line the rule cares about.
+    //   registries/registry.ts  the Registry class, importing only solid-js. The container, not any
+    //     instance: `registries/sources.ts` and its siblings are still application state.
     //
-    // TYPE-ONLY imports pass. ui/WorkspacePicker.tsx does `import type { FleetWorkspace } from
-    // '../workspaces/fleetWorkspaces'` — a shape it renders, not a store it reads — and a rule
-    // written against all imports would fail a component that is behaving correctly.
-    //
-    // Known and deliberate: ui/diff/DiffRows.tsx reaches lib/draftState, which reads and writes
-    // localStorage. That is a store write by the spirit of the rule; it is allowed because the
-    // draft belongs to the comment box being rendered and lib/draftState.ts says so in its header.
+    // Type-only imports pass: ui/WorkspacePicker.tsx imports the `FleetWorkspace` type, a shape it
+    // renders rather than a store it reads. Known and deliberate: ui/diff/DiffRows.tsx reaches
+    // lib/draftState, which touches localStorage, because the draft belongs to the comment box.
     const UI_MAY_IMPORT = (file: string): boolean => {
       const p = rel(file)
       if (!p.startsWith('packages/client-core/src/')) return false
@@ -731,8 +561,8 @@ describe('architecture boundaries', () => {
       return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('highlight/')
         || inner === 'palette/model.ts' || inner === 'registries/registry.ts'
     }
-    // Same clause-parsing idiom as the schema ratchet below: `[^'"]*?` for the clause, because a
-    // preceding import's specifier contains the quotes that bound the statement.
+    // `[^'"]*?` for the clause, because a preceding import's specifier contains the quotes that bound
+    // the statement.
     const CLAUSE_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
     const BARE_IMPORT_RE = /\bimport\s*['"]([^'"\n]+)['"]/g
     const uiDir = join(ROOT, 'packages/client-core/src/ui')
@@ -786,13 +616,9 @@ describe('architecture boundaries', () => {
   })
 
   it('a plugin contract/ never re-exports its own internals', () => {
-    // The contract/ exemption below is only worth having if a contract file cannot smuggle the
-    // internals back in. `export type { X } from '../main/heavy.ts'` is still an import edge, and it
-    // would drag the implementation module into every consumer — turning the sanctioned surface into
-    // a hole. Types a contract needs must LIVE in contract/ (or in shared/, which both sides may use).
-    // TRANSITIVELY, not just the direct edge. `contract/x.ts -> shared/y.ts -> main/heavy.ts` reaches the
-    // implementation in one extra hop, and `side()` classifies `shared` as 'shared' so no other rule
-    // stops it — which made the direct-edge version of this check cosmetic.
+    // A contract file must not smuggle the internals back in. Transitively, not just the direct edge:
+    // `contract/x.ts -> shared/y.ts -> main/heavy.ts` reaches the implementation in one extra hop, and
+    // `side()` classifies `shared` as 'shared', so no other rule stops it.
     const internal = (pkg: Pkg, file: string) => ['client', 'server', 'main'].includes(segment(pkg, file))
     const withinPkg = new Map<string, { file: string; spec: string }[]>()
     for (const e of firstParty) {
@@ -822,14 +648,10 @@ describe('architecture boundaries', () => {
 
   it('plugin server code owns its own schema (shrinking baseline)', () => {
     const SCHEMA_BASELINE: string[] = []
-    // Any import FROM core's db module that is not exclusively type-only. Relative and bare package
-    // specifiers are resolved before this rule runs. Type-only imports (`import type { AppDatabase }`)
-    // are legitimate and stay.
-    // `[^'"]*?` for the clause, NOT `[^;]*?`. A clause never contains a quote, but a PRECEDING import's
-    // specifier does — with `[^;]*?` the lazy match happily spanned two statements in semicolon-free
-    // source, so `import { readFile } from 'node:fs/promises'` followed by a type-only db import matched
-    // as one, and the rule flagged a package that reads nothing. Quotes are the statement boundary here;
-    // newlines are allowed on purpose, for multi-line brace clauses.
+    // Any import from core's db module that isn't exclusively type-only.
+    //
+    // `[^'"]*?` for the clause, not `[^;]*?`. A clause never contains a quote but a preceding import's
+    // specifier does, so in semicolon-free source the lazy match spanned two statements.
     const DB_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]@acorn\/node-core\/server\/db[^'"]*['"]/g
     const importsCoreTables = (text: string): boolean => {
       DB_IMPORT_RE.lastIndex = 0
@@ -843,9 +665,8 @@ describe('architecture boundaries', () => {
       }
       return false
     }
-    // Production code only. A TEST that seeds core's `tasks`/`repo_paths` to build a fixture is
-    // legitimate and always will be — counting those would make this ratchet impossible to drive to
-    // zero, which is the one thing it exists to do.
+    // Production code only: a test that seeds core's `tasks` or `repo_paths` is legitimate, and counting
+    // those would make this ratchet impossible to zero.
     const offenders = PACKAGES.filter((p) => p.kind === 'plugin')
       .filter((p) =>
         walk(p.src)
@@ -857,30 +678,17 @@ describe('architecture boundaries', () => {
   })
 
   it('a contribution props type never names a member `ref`', () => {
-    // `ref` is a RESERVED JSX attribute, and the reservation is invisible in both directions.
-    //
-    // Solid's compiler rewrites `ref={value}` on a COMPONENT into a `ref(r$)` method that assigns `r$`
-    // back into `value`, because on an element that is how a DOM node is captured. So a contribution
-    // whose props declare `ref` as DATA receives a function instead: the panel reads
-    // `props.ref.displayId` as `undefined`, and neither the compiler nor the registry can tell. That
-    // shipped — a Linear reference panel opened with a blank title over an empty frame while every
-    // guard on the way in held — and TypeScript is no help, because Solid declares `ref` on
-    // `IntrinsicAttributes`, which exempts it from the excess-property check that catches every other
-    // misspelled prop on the same JSX call.
-    //
-    // A CALLBACK `ref` is the legitimate form (a primitive forwarding a DOM node to its caller), so
-    // that is what the rule allows rather than banning the name outright.
-    //
-    // Scoped to registries/, which is where the props types that cross a `Dynamic`/registry call site
-    // are declared. Elsewhere in the repo `ref: ExternalRef` is an ordinary field on wire and server
-    // types that never becomes a JSX attribute, and a repo-wide ban would be a rule about the word
-    // rather than about the hazard.
+    // Solid rewrites `ref={value}` on a component into a `ref(r$)` call, so a contribution whose props
+    // declare `ref` as data receives a function instead. That shipped: a Linear reference panel opened
+    // with a blank title over an empty frame, and TypeScript can't see it because `ref` lives on
+    // `IntrinsicAttributes`. A callback `ref` is the legitimate form, so that's what the rule allows.
+    // Scoped to registries/, where the props types that cross a registry call site are declared.
     const dir = join(ROOT, 'packages/client-core/src/registries')
     const files = walk(dir).filter((f) => !isTestCode(f))
     const offenders: string[] = []
     for (const file of files) {
       for (const [index, line] of readFileSync(file, 'utf8').split('\n').entries()) {
-        // An indented `ref:` / `ref?:` member declaration. A same-named function parameter never starts
+        // An indented `ref:` or `ref?:` member declaration. A same-named function parameter never starts
         // its line, and neither does an inline union member.
         const declared = /^\s+ref\??:\s*(.+?)[,;]?\s*$/.exec(line)
         // `(el) => void` and `((el) => void) | undefined` are both fine; a type is not.
@@ -896,8 +704,8 @@ describe('architecture boundaries', () => {
   it('no plugin imports another outside contract/', () => {
     const seen = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && e.target.pkg!.kind === 'plugin')
-      // Importing another plugin's contract/ is the sanctioned mechanism, not a coupling: it carries
-      // types and capability/event ids only, and the rule above keeps it that way.
+      // Importing another plugin's contract/ is sanctioned, not coupling: it carries types and
+      // capability or event ids only.
       .filter((e) => !isContract(e.target.pkg, e.target.file))
       .map((e) => `${e.fromPkg.name} -> ${e.target.pkg!.name}`)
     expect([...new Set(seen)].sort()).toEqual([])
@@ -905,26 +713,20 @@ describe('architecture boundaries', () => {
 
   // A CSS class defined in a plugin's stylesheet must not be worn by markup outside that plugin.
   //
-  // This is the `.action-error` failure, and it kept happening: `.linear-md` was worn by NOTES and
-  // defined by GITHUB; `.editor-save` was worn by notes and defined by EDITOR; `.new-pr-btn` was
-  // worn by DOCKER and defined by github; and `.file-status*` / `.file-stat*` — the rendering half
-  // of `fileStatusMeta`, which core exports on the PUBLIC plugin api — were worn by CORE's own diff
-  // rows and defined by github. Each one meant a pane silently lost its styling when an unrelated
-  // plugin was switched off, and none of it was visible to the compiler or to any other test.
-  //
-  // Shared presentation belongs in client-core (a primitive, a role sheet, a utility). A plugin
-  // stylesheet is for that plugin's own markup.
+  // This kept happening: `.linear-md` worn by notes and defined by github, `.editor-save` worn by notes
+  // and defined by editor, `.new-pr-btn` worn by docker and defined by github, `.file-status*` worn by
+  // core's diff rows and defined by github. Each meant a pane silently lost its styling when an
+  // unrelated plugin was switched off, invisible to the compiler.
   it('no plugin stylesheet styles another package\'s markup', () => {
     const pluginDirs = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
       .filter((e) => e.isDirectory()).map((e) => e.name)
 
-    // Class names too generic or too structural to attribute by grep: state flags a plugin sets on
-    // its own elements, and the shared vocabularies (ui-*, diff rows, tokens) that live in core.
+    // Class names too generic or structural to attribute by grep: state flags a plugin sets on its own
+    // elements, plus the shared vocabularies that live in core.
     const SHARED = /^(ui-|diff-|is-|has-|active$|muted$|glyph$|placeholder$|spin$|truncate$|scroll$|mono$|list-reset$|markdown$)/
 
-    // `walk` is the import-graph helper and only yields JS/TS, so it silently returns no stylesheets
-    // at all — which made the first draft of this rule pass unconditionally. Stylesheets need their
-    // own traversal.
+    // `walk` yields only JS and TS, so it silently returns no stylesheets, which made the first draft of
+    // this rule pass unconditionally.
     const cssIn = (dir: string, out: string[] = []): string[] => {
       if (!existsSync(dir)) return out
       for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -943,9 +745,8 @@ describe('architecture boundaries', () => {
         const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
         for (const group of text.match(/[^{}]+(?=\{)/g) ?? []) {
           for (const selector of group.split(',')) {
-            // Ownership is the FIRST class of the FIRST compound unit, and nothing else. `.a.b` is a
-            // modifier on `.a` (`.notes-include-dot.on` does not make `.on` notes'), and `.a .b` is
-            // this plugin scoping something inside its own container, which is legitimate.
+            // Ownership is the first class of the first compound unit. `.a.b` is a modifier on `.a`, and
+            // `.a .b` is this plugin scoping something inside its own container.
             const first = selector.trim().match(/^\.([a-zA-Z][\w-]*)/)
             if (first && !SHARED.test(first[1])) declared.add(first[1])
           }
@@ -955,7 +756,7 @@ describe('architecture boundaries', () => {
 
       // Every .tsx outside this plugin. A class is "worn" when it appears inside a class attribute.
       const outside = [join(ROOT, 'packages'), join(ROOT, 'apps', 'desktop', 'src'), join(ROOT, 'plugins')]
-        // `.flatMap(walk)` would hand walk the array index as its accumulator — call it explicitly.
+        // `.flatMap(walk)` would hand walk the array index as its accumulator. Call it explicitly.
         .filter(existsSync).flatMap((d) => walk(d))
         .filter((f) => f.endsWith('.tsx') && !f.startsWith(join(ROOT, 'plugins', plugin) + '/'))
       for (const file of outside) {
@@ -969,24 +770,14 @@ describe('architecture boundaries', () => {
         }
       }
     }
-    // Shrinking baseline, same idiom as the schema rule above. Everything left is one plugin
-    // CONTRIBUTING markup into another's container — memory renders a section inside context's tray,
-    // changes renders a tool card inside the agent transcript — so the markup genuinely belongs to
-    // the guest and the box genuinely belongs to the host. That wants a real seam (the host passing
-    // its own components down, or the classes moving to client-core), not a rename. The entries here
-    // may only be removed.
+    // Shrinking baseline. Everything left is one plugin contributing markup into another's container, so
+    // the markup belongs to the guest and the box belongs to the host. That wants a real seam rather
+    // than a rename, and entries may only be removed.
     //
-    // Seven of memory's nine went when the cooperative extension point landed, and not by using it:
-    // those seven rules were memory's own markup living in context's stylesheet, so they moved to
-    // plugins/memory/src/client/memory-section.css and took their names with them. The two that
-    // remain are context's VOCABULARY — `.context-tray-kind` and `.context-tray-label` are worn by
-    // ContextPane too — so they are a real host/guest contract rather than a misplaced rule.
-    //
-    // Those two do not go until memory's section stops being a component in context's realm, and the
-    // cooperative point cannot take it: the section renders editable inputs, a select, a textarea and
-    // a two-button accept/reject gate per proposal, which is UI rather than a descriptor. Widening the
-    // descriptor vocabulary far enough to express it would be shipping a widget toolkit in the wire
-    // format, which the plugin contract refuses by name.
+    // The two survivors are context's vocabulary: `.context-tray-kind` and `.context-tray-label` are
+    // worn by ContextPane too. They don't go until memory's section stops being a component in context's
+    // realm, and the cooperative extension point can't take it — the section renders editable inputs, a
+    // select, a textarea and a per-proposal accept/reject gate, which is UI rather than a descriptor.
     const BASELINE = [
       'plugins/agents defines .agent-path-link, worn by plugins/changes/src/client/agentToolRenderer.tsx',
       'plugins/agents defines .agent-tool, worn by plugins/changes/src/client/agentToolRenderer.tsx',

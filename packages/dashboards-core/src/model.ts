@@ -98,7 +98,7 @@ export type PanelView = {
   x?: string
   /** `chart` only, and optional there: the enum whose values split one line into several. */
   series?: string
-  /** `stat` only; other kinds ignore all three (docs/future/dashboards/measure-history.md § Display).
+  /** `stat` only; other kinds ignore all three (docs/dashboards.md § Trends).
    *
    *  `activity` is "when did these rows change" — bucketed from the rows already on screen, needing
    *  no store at all. `history` is "what was this number", which only the node's measure sampler can

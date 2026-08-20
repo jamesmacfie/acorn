@@ -206,6 +206,7 @@ node: StreamEvent
 node: TASK_CREATED
 node: TASK_SESSIONS
 node: TEARDOWN_TIMEOUT_MS
+node: TaskConcern
 node: TaskCreatedHook
 node: TaskRef
 node: TaskSessionsBridge

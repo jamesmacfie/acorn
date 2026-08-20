@@ -7,7 +7,7 @@ import type {
 import type { PanelAggregate, PanelFilter, PanelShaping, PanelTone, PanelView } from './model'
 
 // The shaping layer: filter, sort, limit, visible-field projection
-// (docs/future/dashboards/composition.md § The four layers).
+// (docs/dashboards.md § Panels).
 //
 // Generic and identical for every collection, and CLIENT-SIDE over the returned rows as the
 // baseline — a collection may declare params that narrow its answer, but that is an optimization it
@@ -157,8 +157,8 @@ export const fieldWithRole = (
 
 // ── Grouping ──────────────────────────────────────────────────────────────────────────────────
 //
-// A KANBAN IS NOT A COMPONENT — it is group-by over a field with finite values (composition.md
-// § Views are derived from schema). Everything a board draws comes out of this function and the
+// A KANBAN IS NOT A COMPONENT — it is group-by over a field with finite values (docs/dashboards.md
+// § Views are derived, not chosen from a menu). Everything a board draws comes out of this function and the
 // ordinary shaping above it: the columns are the grouped field's declared values in the order the
 // plugin declared them, and the cards inside a column are the already-filtered, already-sorted rows
 // in the order they arrived. There is no per-column sort or per-column filter to implement.
@@ -202,7 +202,7 @@ export type PanelBoardColumn = {
 /** The columns of a board, in the order they are drawn.
  *
  *  Three destinations, and every row lands in exactly one of them — the design's rule is that a
- *  value with nowhere to go is never silently dropped (composition.md § The motivating scenario):
+ *  value with nowhere to go is never silently dropped (docs/dashboards.md § The mapping layer, and cross-source panels):
  *
  *    a DECLARED value gets the column the schema promised, in declaration order, and that column
  *    exists whether or not any row is in it — a kanban whose column vanishes when its last card

@@ -36,9 +36,9 @@ describe('loadRepoConfig (docs/workflows.md §2)', () => {
   })
 
   it('workspace devScript → a base `dev` target; repo config and the run_targets JSON override it', () => {
-    // Alone: the workspace dev script surfaces as a plain `dev` target (no default flag, no URL).
+    // Alone, the workspace dev script surfaces as a plain `dev` target: no default flag, no URL.
     expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev' }).runTargets).toEqual([{ id: 'dev', command: 'pnpm dev' }])
-    // The per-repo run_targets JSON column is more specific → it overrides the workspace base.
+    // The per-repo run_targets JSON column is more specific, so it overrides the workspace base.
     const json = JSON.stringify([{ id: 'dev', command: 'make run' }])
     expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev', runTargetsJson: json }).runTargets).toEqual([{ id: 'dev', command: 'make run' }])
     // A committed repo config.toml also wins over the workspace base.
@@ -95,12 +95,12 @@ browser = "run:dev"
     expect(cfg.errors).toEqual([])
     expect(cfg.copy).toEqual(['.env.local', '.env.development'])
     expect(cfg.scripts.archive).toBe('docker compose down')
-    // `ratio` in the file is tolerated but not parsed — panes split equally (docs/workflows.md).
+    // `ratio` in the file is tolerated but not parsed: panes split equally (docs/workflows.md).
     expect(cfg.layouts).toEqual([{ id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }])
   })
 
   it('db/preview: project config fallback resolves; committed [database]/[preview] toml wins (project-level-settings)', () => {
-    // DB fallback only (no toml): the project values pass through.
+    // DB fallback only, with no toml, so the project values pass through.
     const fallback = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback', previewMode: 'port', previewValue: '3000' })
     expect(fallback.errors).toEqual([])
     expect(fallback.dbUrlScript).toBe('db-fallback')
@@ -117,15 +117,15 @@ value = "https://app.test"
     expect(cfg.errors).toEqual([])
     expect(cfg.dbUrlScript).toBe('bin/print-db-url')
     expect(cfg.preview).toEqual({ mode: 'url', value: 'https://app.test' })
-    // browserRules is DB-only (no toml layer): it passes through untouched.
+    // browserRules is DB-only, with no toml layer, so it passes through untouched.
     const rule = { id: 'r1', enabled: true, urlPattern: 'localhost/login', trigger: 'load' as const, action: { type: 'fill' as const, selector: '#u', value: 'dev' } }
     expect(loadRepoConfig(repoDir, userDir, { browserRules: [rule] }).browserRules).toEqual([rule])
   })
 
   it('dbUrlFromRepo reports url_script provenance — it decides whether the trust gate applies', () => {
-    // dbUrlScript is executed as a shell script (plugins/database/main/database.ts), so the checkout
-    // authoring it must be gated on review while the user authoring it must not be. That hinges
-    // entirely on this flag, so it is asserted for every layer that can win.
+    // dbUrlScript runs as a shell script (plugins/database/main/database.ts), so a checkout authoring it
+    // must be gated on review while a user authoring it must not be. That hinges entirely on this flag,
+    // so it's asserted for every layer that can win.
     expect(loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback' }).dbUrlFromRepo).toBe(false)
     writeConfig(userDir, `[database]\nurl_script = "personal"`)
     const user = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback' })

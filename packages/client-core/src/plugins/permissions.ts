@@ -1,5 +1,5 @@
-import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { pluginExtensionGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { pluginExtensionGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../tasks/paneShortcuts'
 import { describeChannel, isSubscribable } from './frames/channels'
@@ -141,6 +141,28 @@ export const schedulePermissionLines = (grants: readonly PluginScheduleGrant[]):
       line(`schedule:${grant.id}:${JSON.stringify(grant.cadence)}`, {
         text: `Run “${grant.label}” on the node ${describeCadence(grant.cadence)}, with nobody watching`,
         icon: 'clock',
+      }),
+    )
+
+export const taskCheckGrants = (contributions: PluginContributions): PluginTaskCheckGrant[] =>
+  pluginTaskCheckGrants(contributions)
+
+// `Declared`, like a schedule and for the same honest reason: what runs is the plugin's own node code
+// and nothing checks what it does once it starts. What the line adds is WHEN — archiving a task now
+// asks this package — and, for a check that can clean up, that it will offer to change something.
+//
+// Two sentences rather than one with a clause, because they are two different facts about the package
+// and the second one is the one worth reading twice. `cleansUp` is in the key: a version that starts
+// offering a cleanup where it used to only warn has grown its reach.
+export const taskCheckPermissionLines = (grants: readonly PluginTaskCheckGrant[]): PermissionLine[] =>
+  [...grants]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((grant) =>
+      line(`task-check:${grant.id}:${grant.cleansUp}`, {
+        text: grant.cleansUp
+          ? 'Check a task before you archive it, and offer to clean up after it'
+          : 'Check a task before you archive it',
+        icon: 'archive',
       }),
     )
 

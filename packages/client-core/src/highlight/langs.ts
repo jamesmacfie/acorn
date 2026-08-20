@@ -1,15 +1,14 @@
-// The grammar vocabulary, split out of shiki.ts because two bundles need it and only one of them may
-// have an engine in it: highlighter.worker.ts loads grammars under Oniguruma, shiki.ts loads them under
-// the JavaScript engine, and a worker that imported shiki.ts would drag the second engine across the
-// boundary the worker exists to create.
+// The grammar vocabulary, split out of shiki.ts because two bundles need it and only one may have an
+// engine in it: highlighter.worker.ts loads grammars under Oniguruma, shiki.ts loads them under the
+// JavaScript engine, and a worker importing shiki.ts would drag the second engine across the boundary
+// the worker exists to create.
 import { languageIdForPath, type LanguageId } from '@acorn/protocol/languageIds.ts'
 
-// Fine-grained: only the grammars named here can ever be bundled (the bundled `shiki` entry pulls a
-// chunk for every grammar in existence). These are LOADED LAZILY — see loadGrammar — so naming one
-// here costs nothing until a file of that language is actually rendered. That is what makes the list
-// cheap to extend, and why scss/less/xml/ruby/ini/toml are on it now: each was in the vocabulary,
-// mapped to `text`, and rendered plain for no reason other than the eager-load cost that used to
-// apply to all of them at once.
+// Fine-grained: only the grammars named here can ever be bundled, because the bundled `shiki` entry
+// pulls a chunk for every grammar in existence. These load lazily (see loadGrammar), so naming one costs
+// nothing until a file of that language is rendered. That's what makes the list cheap to extend, and why
+// scss, less, xml, ruby, ini and toml are on it: each was in the vocabulary, mapped to `text`, and
+// rendered plain only because of the eager-load cost that used to apply to all of them at once.
 export const LANGS: Record<string, () => Promise<unknown>> = {
   typescript: () => import('shiki/langs/typescript.mjs'),
   tsx: () => import('shiki/langs/tsx.mjs'),
@@ -38,14 +37,13 @@ export const LANGS: Record<string, () => Promise<unknown>> = {
 
 export type GrammarName = keyof typeof LANGS
 
-// Canonical language id -> shiki grammar, the twin of client-core/editor/language.ts. The vocabulary
-// itself is @acorn/protocol/languageIds.ts, and this map is where "shiki does not bundle that one"
-// gets said: an id with no grammar loaded here falls to `text` rather than throwing inside
-// codeToTokens. That is why the map is total over LanguageId instead of falling through — a new
-// entry in the vocabulary fails `tsc` here until someone decides whether to pull its grammar in.
+// Canonical language id to shiki grammar, the twin of client-core/editor/language.ts. The vocabulary is
+// @acorn/protocol/languageIds.ts, and this map is where "shiki doesn't bundle that one" gets said: an id
+// with no grammar loaded here falls to `text` rather than throwing inside codeToTokens.
 //
-// Every id now has a grammar. `plaintext` maps to `text` because that IS the decision for plain text,
-// not a gap.
+// Total over LanguageId rather than falling through, so a new entry in the vocabulary fails `tsc` here
+// until someone decides whether to pull its grammar in. Every id has a grammar now, and `plaintext` maps
+// to `text` because that is the decision for plain text, not a gap.
 const SHIKI: Record<LanguageId, GrammarName | 'text'> = {
   typescript: 'typescript', typescriptreact: 'tsx',
   javascript: 'javascript', javascriptreact: 'jsx',
@@ -62,9 +60,10 @@ export const langFor = (path: string): GrammarName | 'text' => SHIKI[languageIdF
 export const isGrammar = (lang: string): lang is GrammarName => lang in LANGS
 
 /**
- * Load one grammar into a highlighter, at most once per name. Callers pass their own `loaded` set so
- * the two highlighters (worker, main thread) keep separate ledgers — they are separate instances and
- * a grammar loaded into one is not loaded into the other.
+/**
+ * Load one grammar into a highlighter, at most once per name. Callers pass their own `loaded` set so the
+ * worker and main-thread highlighters keep separate ledgers: they're separate instances, and a grammar
+ * loaded into one isn't loaded into the other.
  */
 export async function loadGrammar(
   hl: { loadLanguage: (lang: never) => Promise<void> },

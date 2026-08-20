@@ -230,7 +230,7 @@ export async function forEachConnection<T>(
     if (row.status === 'disabled' || row.status === 'needs-auth') continue
     let value: T | undefined
     try {
-      // The visitor — which is what actually calls the provider — runs inside the scope.
+      // The visitor, which is what actually calls the provider, runs inside the scope.
       value = await secrets.use(row.authRef, `${row.provider}: use connection`, (secret) => visit(row, secret))
     } catch (error) {
       if (!(error instanceof SecretUnavailableError)) throw error
@@ -264,9 +264,7 @@ export function externalRefForConnection(row: StoredConnection, identifier: stri
 // --- Request-context seams, for provider plugins ---
 //
 // Core-owned routes pass their database explicitly. Provider plugins use these request-context wrappers,
-// which keep the core handle inside the service boundary while scoping every read to the caller.
-//
-// They also keep the database, owner ID, and secret scope consistent at every provider call site.
+// which keep the core handle inside the service boundary and scope every read to the caller.
 
 /** Every stored connection for one provider, owned by the calling principal. */
 export const ownedConnections = (c: Context<AppEnv>, providerId: string): Promise<StoredConnection[]> =>
@@ -280,11 +278,12 @@ export const withOwnedConnections = <T>(
 ): Promise<T[]> => forEachConnection(getDb(c.env), ownerId(c), providerId, c.env.SECRETS, visit)
 
 /**
+/**
  * The external-item read model for the calling principal, scoped to one provider
- * (integrations/itemStore.ts). This is how a compiled provider's ROUTE reaches core's `issues`
- * table; a provider's mirrored RESOURCE gets the same store on `ProviderResourceContext.items`
- * instead. The compiled tier is trusted, so `providerId` is taken at its word here — the loaded
- * tier's twin (`providers.items` on the request context) asserts ownership first.
+ * (integrations/itemStore.ts). This is how a compiled provider's route reaches core's `issues` table; a
+ * provider's mirrored resource gets the same store on `ProviderResourceContext.items`. The compiled tier
+ * is trusted, so `providerId` is taken at its word; the loaded tier's twin (`providers.items` on the
+ * request context) asserts ownership first.
  */
 export const ownedExternalItems = (c: Context<AppEnv>, providerId: string): ExternalItemStore =>
   createExternalItemStore(getDb(c.env), ownerId(c), providerId)

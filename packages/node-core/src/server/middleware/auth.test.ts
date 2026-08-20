@@ -39,7 +39,7 @@ describe('machine identity binding', () => {
     expect(await response.json()).toEqual({ principal: null })
   })
 
-  // Surrounding whitespace is not in this list: HTTP trims header values, so 'internal ' arrives as
+  // Surrounding whitespace isn't in this list: HTTP trims header values, so 'internal ' arrives as
   // 'internal' and matching it is correct.
   it('rejects an internal token that differs only in length or content', async () => {
     for (const presented of ['interna', 'internalx', 'INTERNAL', '']) {
@@ -97,8 +97,8 @@ describe('device bearer', () => {
     expect(await response.json()).toEqual({ principal: null })
   })
 
-  // fetch merges repeated headers with ", " and a valid bearer contains no comma, so a comma means
-  // more than one Authorization header arrived. That is ambiguous — reject rather than pick one.
+  // fetch merges repeated headers with ", " and a valid bearer contains no comma, so a comma means more
+  // than one Authorization header arrived. That's ambiguous, so reject rather than pick one.
   it('rejects duplicate Authorization headers rather than choosing one', async () => {
     const authenticate = vi.fn().mockResolvedValue({ deviceId: 'dev-1' })
     const response = await withBearer('Bearer good, Bearer evil', envWith({ authenticate }))
@@ -113,7 +113,7 @@ describe('device bearer', () => {
     expect(await response.json()).toEqual({ principal: null })
   })
 
-  // A rejected bearer is a rejection, not an invitation to try the next mechanism — so a caller cannot
+  // A rejected bearer is a rejection, not an invitation to try the next mechanism, so a caller can't
   // present a bad device token alongside a valid internal token and be admitted as the machine.
   it('does not fall back to the internal token when a presented bearer fails', async () => {
     const response = await app.fetch(

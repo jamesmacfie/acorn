@@ -141,7 +141,7 @@ export const workspaceExternalProjects = sqliteTable(
   (t) => [primaryKey({ columns: [t.workspaceId, t.integrationId, t.externalId] })],
 )
 
-// A Task is the single-project unit of work (docs/workspaces-and-tasks.md/03-data-model.md): a project +
+// A Task is the single-project unit of work (docs/workspaces-and-tasks.md): a project +
 // optional branch + optional worktree + optional linked PR + its panes/terminals. Shown as a row in the rail.
 // `project_id` is the authoritative owner.
 export const tasks = sqliteTable('tasks', {
@@ -308,7 +308,7 @@ export const scheduleRuns = sqliteTable(
   (t) => [primaryKey({ columns: [t.key, t.startedAt] })],
 )
 
-// --- Measure history: what a panel's number WAS (docs/future/dashboards/measure-history.md) ---
+// --- Measure history: what a panel's number WAS (docs/dashboards.md § Trends) ---
 //
 // The collections wire carries CURRENT ROWS ONLY. "6 open now" is derivable; "▲ 2 vs last week" is
 // not, and neither is a sparkline — there is no history anywhere in the system. Rather than growing

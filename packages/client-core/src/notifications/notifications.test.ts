@@ -50,7 +50,7 @@ describe('detectEdges (docs/terminal-and-agents.md)', () => {
   })
   it('tracks edges only against a known previous state — no phantom edges', () => {
     expect(detectEdges([], [agent({ idle: true, agentState: 'idle' })], 1)).toEqual([])
-    // No change → no edge (a suppressed notification never desyncs the next transition).
+    // No change means no edge: a suppressed notification never desyncs the next transition.
     const idle = agent({ idle: true, agentState: 'idle' })
     expect(detectEdges([idle], [idle], 1)).toEqual([])
   })
@@ -87,8 +87,8 @@ describe('ring cap + read state + pref round-trip', () => {
 })
 
 // A notice belongs to whichever node produced the frame or session list behind it. Without the stamp,
-// switching nodes showed node A's "claude finished" rows in node B's bell — pointing at tasks the user
-// cannot reach from there, with a rail badge counting them against node B's task ids.
+// switching nodes showed node A's "claude finished" rows in node B's bell, pointing at tasks the user
+// can't reach from there, with a rail badge counting them against node B's task ids.
 describe('notices are scoped to the node that raised them', () => {
   beforeEach(() => _resetNotices())
   afterEach(() => setActiveNode(null))
@@ -104,8 +104,8 @@ describe('notices are scoped to the node that raised them', () => {
     setActiveNode('node-a')
     expect(noticesForActiveNode().map((n) => n.title)).toEqual(['on a'])
     expect(unreadCount()).toBe(1)
-    // Both are still in the ring — this is a filter, not an eviction, so switching back restores the
-    // history rather than losing it (which is why notices are keyed rather than cleared on a switch).
+    // Both are still in the ring: this is a filter, not an eviction, so switching back restores the
+    // history rather than losing it.
     expect(notices()).toHaveLength(2)
   })
 
@@ -113,7 +113,8 @@ describe('notices are scoped to the node that raised them', () => {
     setActiveNode('node-a')
     pushNotice({ taskId: 'shared-id', kind: 'finished', title: 'on a', at: 1 })
     setActiveNode('node-b')
-    // The SAME task id on another node — the collision docs/architecture-overview.md says must never collide.
+    // The same task id on another node, the collision docs/architecture-overview.md says must never
+    // collide.
     pushNotice({ taskId: 'shared-id', kind: 'finished', title: 'on b', at: 2 })
     expect(unreadForTask('shared-id')).toBe(1)
   })

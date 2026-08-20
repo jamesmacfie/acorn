@@ -27,18 +27,18 @@ describe('isDevicePref', () => {
   })
 
   it('leaves per-machine BEHAVIOUR on the node', () => {
-    // The line is "how this window looks" versus "how that machine behaves". Agent tool permissions govern
-    // what an agent running THERE may do; the onboarded flag and startup context injection are facts about a
-    // node's own setup. Moving them to the device would have made one laptop's answer govern every node.
+    // The line is "how this window looks" versus "how that machine behaves". Agent tool permissions
+    // govern what an agent running there may do; the onboarded flag and startup context injection are
+    // facts about a node's setup. On the device, one laptop's answer would govern every node.
     for (const key of [PrefKeys.agentToolPermissions, PrefKeys.startupContextInjection, PrefKeys.onboarded]) {
       expect(isDevicePref(key), key).toBe(false)
     }
   })
 
   it('leaves the four COMPOSITION kinds on the node whose resources they describe', () => {
-    // A pane layout, an open-file set, a repo's PR filters and a context selection are all facts about
-    // one node's tasks and repos, so every client that pairs with that node should render them and the
-    // agent should be able to read them. They used to be device-local, which is why the keys and their
+    // A pane layout, an open-file set, a repo's PR filters and a context selection are facts about one
+    // node's tasks and repos, so every client paired with that node should render them and the agent
+    // should be able to read them. They used to be device-local, which is why the keys and their
     // `<nodeId>/<taskId>` suffixes are checked here rather than assumed.
     for (const key of [PrefKeys.taskLayoutsScoped, PrefKeys.editorOpenFilesScoped, PrefKeys.prFiltersScoped, PrefKeys.contextSelectionScoped]) {
       expect(isDevicePref(key), key).toBe(false)
@@ -55,7 +55,7 @@ describe('the storage round trip', () => {
   it('reads back what it wrote, under a namespaced key', () => {
     writeDevicePref(PrefKeys.theme, 'dark')
     expect(readDevicePrefs()).toEqual({ [PrefKeys.theme]: 'dark' })
-    // Namespaced, so an unrelated localStorage entry (a plugin's own draft, say) is not mistaken for a pref.
+    // Namespaced, so an unrelated localStorage entry isn't mistaken for a pref.
     store.set('http-draft:task-1', '{}')
     expect(readDevicePrefs()).toEqual({ [PrefKeys.theme]: 'dark' })
   })
@@ -64,7 +64,7 @@ describe('the storage round trip', () => {
 describe('seedDevicePrefs', () => {
   it('copies the node\'s existing values across once, so an upgrade keeps the theme', () => {
     seedDevicePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.agentToolPermissions]: '{}' })
-    // Only the device keys — a node pref copied into localStorage would be read from two places.
+    // Only the device keys: a node pref copied into localStorage would be read from two places.
     expect(readDevicePrefs()).toEqual({ [PrefKeys.theme]: 'dark' })
   })
 
@@ -85,7 +85,7 @@ describe('mergePrefs', () => {
 
   it('ignores a leftover under a key that has since moved to the node', () => {
     // The device-wins rule is why this matters: left visible, a stale local layout would shadow the
-    // node's copy forever and no other client's write would ever show up.
+    // node's copy forever and no other client's write would show up.
     store.set(`acorn-pref:${layoutKey}`, '{"panes":["stale"]}')
     expect(mergePrefs({ [layoutKey]: '{"panes":["fresh"]}' })).toEqual({ [layoutKey]: '{"panes":["fresh"]}' })
   })
@@ -100,8 +100,8 @@ describe('drainMigratedPrefs', () => {
 
     const drained = await drainMigratedPrefs('node-a', {}, async (key, value) => void written.push([key, value]))
 
-    // The pre-scoped aggregate goes too: it is a legacy input to the same slice, and leaving it on the
-    // device would keep a copy of the same fact in two places.
+    // The pre-scoped aggregate goes too: it's a legacy input to the same slice, and leaving it on the
+    // device would keep the same fact in two places.
     expect(written).toEqual([[layoutKey, '{"panes":["local"]}'], [PrefKeys.taskLayouts, '{}']])
     expect(drained).toEqual({ [layoutKey]: '{"panes":["local"]}', [PrefKeys.taskLayouts]: '{}' })
     expect(store.has(`acorn-pref:${layoutKey}`)).toBe(false)

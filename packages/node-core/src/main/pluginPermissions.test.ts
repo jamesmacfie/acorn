@@ -5,8 +5,8 @@ import type { CoreServices } from './core'
 import { pluginManifestSchema, type NodePermissions } from './pluginManifest'
 import { scopeCapabilities, scopeCore } from './pluginPermissions'
 
-// A stand-in CoreServices: this module only ever picks properties off the object, so identity is all
-// the assertions need and building a real one would drag a database in for nothing.
+// A stand-in CoreServices: this module only picks properties off the object, so identity is all the
+// assertions need and building a real one would drag a database in for nothing.
 const marker = (name: string) => ({ marker: name }) as never
 const externalProjects = vi.fn(async () => [])
 const CORE = {
@@ -34,7 +34,7 @@ const permissions = (node: Record<string, unknown> = {}): NodePermissions =>
 const scoped = (node: Record<string, unknown> = {}, core: CoreServices = CORE): CoreServices =>
   scopeCore(core, permissions(node), 'demo', { idsForOwner: (owner) => owner === 'demo' ? ['demo-provider'] : [] })
 
-// The facets that are NOT reachable through `core: [...]`, whatever a manifest writes there.
+// The facets not reachable through `core: [...]`, whatever a manifest writes there.
 const keys = (services: CoreServices) => Object.keys(services).sort()
 
 describe('scopeCore', () => {
@@ -46,8 +46,8 @@ describe('scopeCore', () => {
     const services = scoped({ core: ['git', 'tasks'] })
     expect(keys(services)).toEqual(['git', 'tasks'])
     expect(services.git).toBe(CORE.git)
-    // The point of gating by omission: an undeclared facet is `undefined`, so the plugin author gets
-    // a TypeError the first time they run it rather than a silent no-op in production.
+    // The point of gating by omission: an undeclared facet is `undefined`, so the plugin author gets a
+    // TypeError the first time they run it rather than a silent no-op in production.
     expect(services.fs).toBeUndefined()
     expect(services.models).toBeUndefined()
   })
@@ -62,7 +62,7 @@ describe('scopeCore', () => {
   })
 
   it('keeps secrets and the process broker off unless each is asked for by name', () => {
-    // Not reachable through the `core` list — these two have their own manifest booleans on purpose.
+    // Not reachable through the `core` list: these two have their own manifest booleans on purpose.
     expect(keys(scoped({ core: ['secrets', 'proc', 'exec'] }))).toEqual([])
     expect(keys(scoped({ secrets: true }))).toEqual(['secrets'])
     expect(keys(scoped({ exec: true }))).toEqual(['proc'])
@@ -71,8 +71,8 @@ describe('scopeCore', () => {
   it('keeps project config and its executable scripts out of the read grant', () => {
     const read = scoped({ core: ['projects:read'] }).projects
     expect(Object.keys(read).sort()).toEqual(['byGithub', 'byId', 'checkouts', 'externalProjects'])
-    // The disclosure phase 5's trust prompt has to name: "read projects" includes every mapped
-    // project path on the machine.
+    // The disclosure the trust prompt has to name: "read projects" includes every mapped project path
+    // on the machine.
     expect(read.checkouts).toBe(CORE.projects.checkouts)
     expect(read.externalProjects).not.toBe(CORE.projects.externalProjects)
     expect((read as { config?: unknown }).config).toBeUndefined()

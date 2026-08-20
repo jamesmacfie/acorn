@@ -1486,6 +1486,76 @@ project, rendering at core's `/p/:projectId` alongside every other source; its o
 client-core, not registry lookups, so a contributed route can never be resolved in core's place. The one
 question core asks back is `SourceContribution.taskPath`: where a task the source owns should live.
 
+## Task checks
+
+A plugin that knows something about a task the owner is about to archive says so through a **task
+check**, and that is the only way anything gets into the archive dialog.
+
+```
+GET  /v2/p/<id>/archive/check?taskId=…   → { concern } | { concern: null }
+POST /v2/p/<id>/archive/apply            ← { taskId }
+```
+
+Two feeders, one registry, exactly like schedules and collections: a compiled plugin calls
+`ctx.taskChecks.register({ id, check, apply? })`, a loaded one declares `contributions.taskChecks` in
+its manifest and the host synthesises the same registration over the two routes above. Nothing
+downstream can tell which one answered. The registry is
+`packages/node-core/src/server/plugin/taskChecks.ts`; the dialog it feeds is
+`packages/client-core/src/registries/willPhase.tsx`.
+
+A concern is plain data:
+
+```ts
+{ id, message, severity: 'warn' | 'danger', details?: string[], detailsMore?: number,
+  action?: { label, checked } }
+```
+
+`details` is what the dialog lists under the message — changed paths, container names — capped at
+five, with `detailsMore` counting what did not fit so the host draws "+7 more" and no plugin has to
+invent that string. `action` draws a checkbox, and the cleanup behind it is `apply`, run by the
+archive itself after the repo teardown script and **before the worktree is removed**, so a cleanup
+that needs the worktree still has it.
+
+There is no callback anywhere in that shape, and that is the design rather than an omission. The
+action a concern offers is a route declared once — on the context or in the manifest — where the node
+can confine it to the plugin's own namespace and re-confine it on every dispatch. An action arriving
+inside a response body is an action nothing checked; the same rule
+[extensionPoints.ts](../packages/protocol/src/extensionPoints.ts) states for why an extension item
+carries no per-item verb.
+
+**What the host binds and a plugin cannot state:** the plugin id on every concern, the qualified id
+`<pluginId>:<checkId>:<concernId>` the client hands back to name a cleanup, the route namespace, and
+the deadlines. `severity` IS the plugin's to declare — unlike a context menu's absent `tone`, a plugin
+saying "danger" is making that claim about its own data, not about a core resource.
+
+**Every deadline is a race and not merely an abort.** The `AbortSignal` a check receives is a
+courtesy: a check that watches it can stop early, and a check that ignores it — which is most of them
+— would otherwise leave the dialog waiting forever. Two seconds for a check, because a person is
+watching; sixty for a cleanup, because by then the dialog is gone. A check that is slow, throws, or
+answers with something unusable contributes no row, which is also what a check that found nothing
+contributes. A cleanup that fails names its plugin in the archive result: `ok` stays true, because the
+task IS archived, and the owner is told what did not happen.
+
+Declaring a check earns one line in the trust dialog, under `Declared` beside the schedules and for
+the same honest reason — the host holds the confinement and the deadline, but what runs is the
+plugin's own node code. `cleansUp` is part of the recorded grant, so a version that starts offering to
+change something where it used to only warn reads as newly requested.
+
+Four per plugin, the same ceiling as schedules. Both routes are confined to the plugin's own namespace
+at manifest parse and again at every dispatch, and a manifest declaring a check with no `node` half is
+a parse error rather than a check that 404s on every archive.
+
+Three checks ship today: docker (running containers, with a `compose down` cleanup), changes
+(uncommitted files, naming the first five paths — advisory, because committing or discarding on the
+owner's behalf is exactly what a confirmation exists to avoid), and terminal (active sessions —
+disclosure, since core stops them itself).
+
+The client-side seam this replaced, `registerWillHandler`, is still on `@acorn/plugin-api/ui/host`
+and is still what core uses for the two events that have no node meaning: the app quitting and a
+workspace being removed. No plugin should use it. It hands the caller an unregister function nobody
+was obliged to hold, and the one plugin that used it dropped the function, accumulated a handler on
+every re-activation — twice per boot and once per node switch — and drew its warning twice.
+
 ## Collaboration rules
 
 Plugins collaborate through four mechanisms:

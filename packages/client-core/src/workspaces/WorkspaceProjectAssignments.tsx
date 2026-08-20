@@ -11,11 +11,10 @@ import Icon from '../ui/Icon'
 import { Modal } from '../ui/Modal'
 import './onboarding.css'
 
-// Projects manager. Projects are LISTED UNDER the workspace they belong to rather than each carrying a
-// workspace dropdown in isolation: the grouping is the thing being edited, and a column of identical
-// "Default" selects made the one fact that matters — which projects are grouped together — the hardest
-// thing to read. Moving a project is still a select, but it now says where it is moving FROM by where
-// it sits, and its last option creates the workspace you are moving to.
+// Projects manager. Projects are listed under the workspace they belong to rather than each carrying a
+// workspace dropdown in isolation: the grouping is what's being edited, and a column of identical
+// "Default" selects made the one fact that matters hardest to read. Moving a project is still a select,
+// but it says where it's moving from by where it sits, and its last option creates a new workspace.
 //
 // Git and GitHub are facets on the row, not prerequisites: a plain folder and a path-less import share
 // the same controls and can be repaired in place.
@@ -52,8 +51,7 @@ export default function WorkspaceProjectAssignments() {
       projects: all.filter((project) => project.workspaceId === workspace.id),
     }))
   })
-  // A project whose workspace is missing from the list would otherwise vanish from this page with no
-  // way to rescue it.
+  // A project whose workspace is missing from the list would otherwise vanish with no way to rescue it.
   const orphans = createMemo(() => {
     const known = new Set((workspaces.data ?? []).map((workspace) => workspace.id))
     return (projects.data ?? []).filter((project) => !known.has(project.workspaceId))
@@ -94,8 +92,7 @@ export default function WorkspaceProjectAssignments() {
     setNewWorkspace(null)
   }
 
-  // Commit on blur/Enter, not per keystroke. A blank name is a no-op that snaps back, matching the
-  // server, which rejects it.
+  // Commit on blur or Enter, not per keystroke. A blank name snaps back, matching the server.
   async function renameInPlace(field: HTMLInputElement, current: string, save: (name: string) => Promise<unknown>) {
     const name = field.value.trim()
     if (!name || name === current) {
@@ -121,9 +118,8 @@ export default function WorkspaceProjectAssignments() {
     setMovingToNew(null)
   }
 
-  // Was `confirm()`, which Electron renders unstyled — the same slip TabRail.tsx documents avoiding.
   // Modal rather than arm-to-confirm because the blast radius is real: every project in the workspace
-  // moves. Sibling of DeleteProjectModal below, which already established the shape.
+  // moves. Not `confirm()`, which Electron renders unstyled.
   const [confirmDeleteWorkspace, setConfirmDeleteWorkspace] = createSignal<Workspace | null>(null)
 
   return (
@@ -318,9 +314,8 @@ function ProjectRows(props: {
   onDelete: (project: Project) => void
 }) {
   return (
-    // Index, not For: the name cell is an editable input, and For keys rows by object identity —
-    // every refetch hands back new Project objects, so the row (and the caret) would be destroyed
-    // mid-typing. Index keys by position, which is what an editable list needs.
+    // Index, not For: the name cell is an editable input, and For keys rows by object identity, so
+    // every refetch would destroy the row and the caret mid-typing.
     <Index each={props.rows}>
       {(project) => (
         <div class="ws-row" classList={{ 'ws-row-hidden': project().hidden }}>

@@ -15,13 +15,13 @@ vi.mock('..', async (importOriginal) => {
 
 const PRINCIPAL: Principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
 
-// TWO handles, for two different tables in two different files, which is the shape every github route
+// Two handles, for two different tables in two different files, which is the shape every github route
 // test has now:
-//   - `plugin.db` is this plugin's migrated github.sqlite, which the router is a factory over. None of
-//     the paths asserted below reach it (each returns before the sync-state bust), but it is a real
-//     migrated handle rather than a stub so the router cannot silently stop touching it unnoticed.
-//   - `env.DB` is CORE's, because the stored GitHub credential lives in core's `integrations` table and
-//     is read through the core seam. Returning no rows is the not-connected path; the token's value is
+//   `plugin.db` is this plugin's migrated github.sqlite, which the router is a factory over. None of
+//     the paths asserted below reach it, each returning before the sync-state bust, but it's a real
+//     migrated handle rather than a stub so the router can't silently stop touching it unnoticed.
+//   `env.DB` is core's, because the stored GitHub credential lives in core's `integrations` table and is
+//     read through the core seam. Returning no rows is the not-connected path, and the token's value is
 //     irrelevant here because gh() itself is mocked.
 const noIntegrations = {
   select: () => ({ from: () => ({ where: async () => [] }) }),

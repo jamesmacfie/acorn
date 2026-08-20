@@ -43,7 +43,7 @@ import {
 import { groupableFields, shapeRows, visibleFields } from './shaping'
 
 // ONE DRAFT PANEL, held in memory, with every rule the two presentations share
-// (docs/dashboards.md § The generated editor, docs/future/dashboards/wizard.md).
+// (docs/dashboards.md § The generated editor, docs/dashboards.md § The generated editor).
 //
 // It exists because there are now TWO ways to compose a panel — the single-sheet editor and the
 // staged wizard — and "two presentations, one truth" is only true if the truth lives somewhere

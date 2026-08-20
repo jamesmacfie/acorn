@@ -16,7 +16,7 @@
 .onboarding-eye:hover { opacity: 1; }
 
 /* ── Projects, grouped by workspace ─────────────────────────────────────────────────────────────
-   The grouping IS the model being edited, so it is the layout: one bordered card per workspace, its
+   The grouping is the model being edited, so it's the layout: one bordered card per workspace, its
    projects inside. */
 .ws-groups {
   display: flex;
@@ -24,10 +24,13 @@
   gap: var(--space-5);
   margin: var(--space-5) 0;
 }
-/* The CARD owns the column tracks and the header and every row subgrid into them, so the workspace
+/* The card owns the column tracks and subgrids the header and every row into them, so the workspace
    name, the project names, the selects and the buttons line up in one set of columns. Each row is
-   still its own element, which is what keeps per-row borders, hover and hidden-state styling. */
-/* Fixed tracks for the two controls, flexible ones for the text. `auto` tracks size to max-content
+   still its own element, which keeps per-row borders, hover and hidden-state styling.
+
+   Fixed tracks for the two controls, flexible ones for the text. `auto` tracks size to max-content and
+   are served before any fr, so leaving the select and the action buttons on `auto` is what keeps the
+   text columns elastic. */
    and are served BEFORE any fr, so leaving the select and the action buttons on `auto` let them eat
    the row and squeezed the path down to an ellipsis. */
 .ws-group {
@@ -45,8 +48,8 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--pad-cell);
-  /* The last column is right-aligned against the card edge, so it carries the trailing breathing
-     room itself rather than relying on the cell padding it shares with a wider neighbour. */
+  /* The last column is right-aligned against the card edge, so it carries the trailing breathing room
+     itself rather than relying on the cell padding it shares with a wider neighbour. */
   padding-right: var(--space-5);
 }
 .ws-group-head {
@@ -55,7 +58,7 @@
 }
 .ws-group-count { grid-column: 3 / span 2; font-size: var(--fs-sm); white-space: nowrap; }
 .ws-group-delete { justify-self: end; }
-/* An empty workspace is its header and nothing else, so that header is not dividing anything. */
+/* An empty workspace is its header and nothing else, so that header isn't dividing anything. */
 .ws-group-head:last-child { border-bottom: 0; }
 .ws-group-name-static { font-weight: var(--fw-semibold); }
 
@@ -85,7 +88,7 @@
   color: var(--text-muted);
   font-size: var(--fs-md);
 }
-/* The path is reference, not a control — it takes the slack and ellipsizes so the controls to its
+/* The path is reference, not a control, so it takes the slack and ellipsizes and the controls to its
    right keep the same x across every row. */
 .ws-row-path {
   color: var(--text-faint);
@@ -94,8 +97,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Absence of a folder is the one thing on this row worth prompting about, so it says what to do
-   rather than trailing off into an ellipsis. */
+/* Absence of a folder is the one thing on this row worth prompting about, so it says what to do rather
+   than trailing off into an ellipsis. */
 .ws-row-nopath { color: var(--warn); }
 .ws-row-actions {
   display: flex;

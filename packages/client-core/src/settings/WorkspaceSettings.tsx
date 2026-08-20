@@ -62,7 +62,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   }
 
   const remove = async () => {
-    const confirmed = await confirmWillEvent({
+    const { confirmed } = await confirmWillEvent({
       kind: 'workspace:remove',
       payload: { workspaceId: props.workspace.id, name: props.workspace.name },
       title: 'Delete workspace',

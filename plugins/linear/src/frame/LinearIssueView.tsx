@@ -135,7 +135,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
               the item it resolves to is the ticket already on screen. So the button would re-open where
               the reader already is. A frame cannot ask for "the browser specifically" — that is the
               host's call by design — so the clipboard stays the honest affordance for this one URL.
-              docs/third-party/linear.md § 5 records it. */}
+              docs/integrations.md § Linear records it. */}
           <Button size="sm" onClick={() => props.onCopy(issue().url)}>Copy link</Button>
         </div>
       </header>

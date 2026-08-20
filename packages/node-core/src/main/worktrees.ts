@@ -194,7 +194,7 @@ export async function worktreeDirty(path: string): Promise<boolean> {
   }
 }
 
-// Dirty flag + changed-file count for the live rail/footer markers (docs/workspaces-and-tasks.md/05).
+// Dirty flag + changed-file count for the live rail/footer markers (docs/workspaces-and-tasks.md).
 export async function worktreePorcelain(path: string): Promise<{ dirty: boolean; count: number }> {
   try {
     const { stdout } = await gitOrThrow(['status', '--porcelain'], { cwd: path, timeoutMs: 10_000 })

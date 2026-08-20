@@ -74,7 +74,7 @@ describe('task paths', () => {
   })
 })
 
-// "Is there already a task for this?" — the question a reference panel asks before offering to create
+// "Is there already a task for this?", the question a reference panel asks before offering to create
 // one, and the question that got a wrong answer the first time it was asked.
 describe('taskTracksRef', () => {
   const linked = (links: Task['links']): Task => ({ id: 'task-1', links } as Task)
@@ -88,17 +88,18 @@ describe('taskTracksRef', () => {
 
   it('compares the connection only when both sides carry one', () => {
     const task = linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }])
-    // A panel target from a scanned PR body has no connection — a body says `ENG-42`, not which of
-    // several connected Linears owns it — so requiring one would find nothing for the commonest case.
+    // A panel target from a scanned PR body has no connection, since a body says `ENG-42` rather than
+    // which of several connected Linears owns it, so requiring one would find nothing for the commonest
+    // case.
     expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-42' })).toBe(true)
     expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-42', connectionId: 'c1' })).toBe(true)
     expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-42', connectionId: 'c2' })).toBe(false)
   })
 
-  // THE BUG THIS FUNCTION EXISTS FOR. A link-only check is not enough, because a task can record an
-  // external item somewhere other than `links` — a github-pr task keeps its PR as `pullNumber` on the
-  // row, and its links hold the LINEAR tickets found in the PR body. Matching links alone found nothing
-  // and the panel offered to create a task that already existed.
+  // The bug this function exists for. A link-only check isn't enough, because a task can record an
+  // external item somewhere other than `links`: a github-pr task keeps its PR as `pullNumber` on the row,
+  // and its links hold the Linear tickets found in the PR body. Matching links alone found nothing and
+  // the panel offered to create a task that already existed.
   it('asks each source for its own second spelling of the same relationship', () => {
     const task = { id: 'task-1', links: [], pullNumber: 42 } as unknown as Task
     const github = sourceRegistry.register({

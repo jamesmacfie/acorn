@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
 import type { DashboardHistoryResponse, DashboardMeasureSample } from '@acorn/protocol/api.ts'
 import { type AppDatabase, schema } from '../db'
 
-// The measure-history store (docs/future/dashboards/measure-history.md § Storage).
+// The measure-history store (docs/dashboards.md § Trends).
 //
 // Node-side, its own table, and NO WRITE ROUTE: the sampler and the store share a process, so the
 // only writer is the schedule. That is the whole reason this feature stopped being a client concern —

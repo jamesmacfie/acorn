@@ -6,7 +6,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // The platform seam: the renderer's ONE door to whatever is hosting it (git history: docs/future/node-first/platform-seam.md).
@@ -137,6 +137,9 @@ export type PluginTrustDecision = {
   // What this package will run on its own, and how often (docs/schedules.md). Required here and
   // defaulted in the store's schema, exactly as the three above are.
   schedules: PluginScheduleGrant[]
+  // What this package will say — and possibly do — when a task is archived. Required here and
+  // defaulted in the store's schema, exactly as the four above are.
+  taskChecks: PluginTaskCheckGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = PluginTrustDecision & {

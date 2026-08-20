@@ -18,15 +18,15 @@ describe('loopbackPortOf', () => {
   })
 
   it('is null for a URL that is not loopback', () => {
-    // Already reachable from the client, so there is nothing to tunnel — and opening a port to it would be
-    // the general proxy docs/api-reference.md § Streams rules out ("Only declared ports; no general SOCKS").
+    // Already reachable from the client, so there's nothing to tunnel, and opening a port to it would be
+    // the general proxy docs/api-reference.md § Streams rules out.
     expect(loopbackPortOf('https://staging.example.com:8443')).toBeNull()
     expect(loopbackPortOf('http://192.168.1.20:3000')).toBeNull()
   })
 
   it('is null for the userinfo disguise', () => {
-    // `http://localhost@evil.test` has hostname `evil.test`. The preview URL guard in Electron main refuses
-    // the same shape; the allowlist must not be the place that lets it through.
+    // `http://localhost@evil.test` has hostname `evil.test`. The preview URL guard in Electron main
+    // refuses the same shape; the allowlist must not be the place that lets it through.
     expect(loopbackPortOf('http://localhost@evil.test:3000/')).toBeNull()
   })
 

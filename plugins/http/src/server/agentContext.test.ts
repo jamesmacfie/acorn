@@ -1,6 +1,6 @@
-// The redaction test, and it is here rather than beside the route on purpose: this is the assertion
-// that a captured snapshot cannot carry a credential, and it has to hold over rows whose ciphertext has
-// ALREADY been opened, which is the state the capture route reads them in.
+// The redaction test, here rather than beside the route on purpose: this is the assertion that a
+// captured snapshot can't carry a credential, and it has to hold over rows whose ciphertext has
+// already been opened, which is the state the capture route reads them in.
 import { describe, expect, it } from 'vitest'
 import { redactUrl, requestOption, requestSnapshot } from './agentContext'
 import type { HttpRequest } from '../shared/model'
@@ -79,13 +79,13 @@ describe('redactUrl', () => {
   it('handles the shapes that would otherwise slip through', () => {
     // A flag with no value has nothing to hide.
     expect(redactUrl('https://x.test/a?debug')).toBe('https://x.test/a?debug')
-    // An empty value is not a secret and stays readable as "this key exists".
+    // An empty value isn't a secret and stays readable as "this key exists".
     expect(redactUrl('https://x.test/a?q=')).toBe('https://x.test/a?q=')
     // A value containing '=' loses all of it, not just the first part.
     expect(redactUrl('https://x.test/a?sig=ab=cd')).toBe('https://x.test/a?sig=•••')
-    // The fragment survives; a '#' inside it does not split the URL twice.
+    // The fragment survives, and a '#' inside it doesn't split the URL twice.
     expect(redactUrl('https://x.test/a?k=v#frag#ment')).toBe('https://x.test/a?k=•••#frag#ment')
-    // A trailing '?' with nothing after it does not leave a stray separator.
+    // A trailing '?' with nothing after it doesn't leave a stray separator.
     expect(redactUrl('https://x.test/a?')).toBe('https://x.test/a')
   })
 })

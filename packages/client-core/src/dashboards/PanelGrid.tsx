@@ -97,7 +97,7 @@ const ARROWS: Record<string, readonly [number, number]> = {
 export default function PanelGrid(props: {
   scope: PlacementScope
   /** Replaces the "Panels" heading in the same seat. Home's tab bar takes it when there is more than
-   *  one dashboard — tabs ARE the heading then (docs/future/dashboards/tabs.md § UX). Its presence is
+   *  one dashboard — tabs ARE the heading then (docs/dashboards.md § Persistence). Its presence is
    *  also what keeps the header row on an EMPTY placement, so a freshly created tab still has a bar. */
   heading?: JSX.Element
   /** `role="tabpanel"` wiring for the grid, when something above it is a tablist. */
@@ -362,7 +362,7 @@ export default function PanelGrid(props: {
 
   // ── Moving between placements ───────────────────────────────────────────────────────────────
   //
-  // The Home tabs other than this one (docs/future/dashboards/tabs.md § UX). A flat labelled group
+  // The Home tabs other than this one (docs/dashboards.md § Persistence). A flat labelled group
   // rather than a submenu: `Menu` has no submenu and one is not worth inventing for a list of at most
   // seven names that is already keyboard-operable as rows.
   //
@@ -615,7 +615,7 @@ export default function PanelGrid(props: {
           <div class="dash-live" aria-live="polite">{announcement()}</div>
         </Show>
 
-        {/* CREATION IS STAGED, EDITING IS NOT (docs/future/dashboards/wizard.md § Entry points). The
+        {/* CREATION IS STAGED, EDITING IS NOT (docs/dashboards.md § The generated editor). The
             wizard exists because a panel that does not exist yet cannot be judged from a form; an
             existing one is already on screen, so its editor is the whole sheet at once. The sheet
             remains able to do everything the wizard can — the wizard's footer hands the draft

@@ -150,6 +150,40 @@ describe('archiveTask teardown ordering', () => {
     if (!res.ok) expect(res.reason).toContain('running session')
   })
 
+  it('runs the opted-in plugin cleanups while the worktree still exists', async () => {
+    const seen: { ids: readonly string[]; worktreeThere: boolean }[] = []
+    const res = await archiveTask(t.db, 'task1', { applyChecks: ['docker:containers:c'] }, {
+      ...deps(),
+      applyTaskChecks: async (task, ids) => {
+        seen.push({ ids, worktreeThere: existsSync(task.worktreePath!) })
+        return []
+      },
+    })
+    expect(res).toEqual({ ok: true })
+    // The whole point of the position: docker's `compose down` and anything else that wants the tree
+    // runs before removal, not racing it from the client.
+    expect(seen).toEqual([{ ids: ['docker:containers:c'], worktreeThere: true }])
+    expect(existsSync(worktree)).toBe(false)
+  })
+
+  it('does not ask when nothing was ticked', async () => {
+    const applyTaskChecks = vi.fn(async () => [])
+    await archiveTask(t.db, 'task1', {}, { ...deps(), applyTaskChecks })
+    expect(applyTaskChecks).not.toHaveBeenCalled()
+  })
+
+  it('archives anyway when a cleanup fails, and names the plugin', async () => {
+    const res = await archiveTask(t.db, 'task1', { applyChecks: ['docker:containers:c'] }, {
+      ...deps(),
+      applyTaskChecks: async () => ['docker'],
+    })
+    // `ok` is true because the task IS archived — offering a retry for something already done would be
+    // worse than saying what did not happen.
+    expect(res).toEqual({ ok: true, cleanupFailed: ['docker'] })
+    const [row] = await t.db.select().from(schema.tasks)
+    expect(row.status).toBe('archived')
+  })
+
   it('never removes the project folder for a legacy checkout-marker task', async () => {
     await t.db.insert(schema.tasks).values({
       id: 'marker-task', title: 'Legacy checkout', origin: 'local', projectId: 'project-widget',

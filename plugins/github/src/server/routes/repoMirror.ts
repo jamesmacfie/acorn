@@ -7,7 +7,7 @@ import { deleteRepoMirrorStatements } from '../mirrorRetention'
 import { repos, syncState } from '../../node/schema'
 
 // Every exported helper here already took the handle as a parameter, which is why this module needed no
-// reshaping when the tables moved — only the type of the thing being passed in changed.
+// reshaping when the tables moved.
 type Db = PluginDatabase
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 
@@ -46,10 +46,9 @@ const routeFailureFromGithub = (res: Response): RouteFailure | null => {
   if (res.status === 404) return { error: 'repo_not_found', status: 404 }
   const err = ghError(res)
   if (!err) return null
-  // Deliberate fold: a 403 "forbidden" repo is reported as repo_not_found. GitHub itself 404s
-  // repos you can't see; matching that gives the UI one "can't get there" state and avoids
-  // confirming that a private repo exists. Revisit only if the UI ever wants a distinct
-  // "no access" message.
+  // Deliberate fold: a 403 "forbidden" repo is reported as repo_not_found. GitHub itself 404s repos you
+  // can't see, so matching that gives the UI one "can't get there" state and avoids confirming that a
+  // private repo exists.
   if (err.error === 'forbidden') return { error: 'repo_not_found', status: 404 }
   return err
 }
@@ -65,10 +64,9 @@ const repoRow = (userId: string, repo: GitHubRepo, fetchedAt: number) => ({
   fetchedAt,
 })
 
-// Refresh the user's repo mirror from GitHub, atomically (one db.batch, like mirrorPr). The repos
-// list carries an ETag in sync_state (`repos`), so a 304 costs no rate budget — just bump freshness
-// and keep the mirror. Returns RouteResult<void>: the sync engine re-reads the mirror after a cold
-// refresh, so there is no value to hand back.
+// Refresh the user's repo mirror from GitHub, atomically (one db.batch, like mirrorPr). The repos list
+// carries an ETag in sync_state, so a 304 costs no rate budget. Returns RouteResult<void>, because the
+// sync engine re-reads the mirror after a cold refresh.
 export const refreshRepos = async (token: string, db: Db, userId: string, fetcher: GitHubFetcher = gh): Promise<RefreshResult> => {
   const resource = reposResource()
   const [sync] = await db
@@ -81,7 +79,7 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
   })
   const now = Date.now()
 
-  // 304 Not Modified → mirror still valid; bump freshness only (free against the rate limit).
+  // 304 Not Modified: the mirror is still valid, so bump freshness only. Free against the rate limit.
   if (res.status === 304) {
     await db
       .insert(syncState)
@@ -100,7 +98,7 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
   const removedRepoIds = previous.map((repo) => repo.id).filter((id) => !retainedIds.has(id))
   const rows = body.map((repo) => repoRow(userId, repo, now))
 
-  // Full-list replace + sync bump, all-or-nothing: a mid-refresh failure leaves the prior mirror and
+  // Full-list replace plus sync bump, all or nothing: a mid-refresh failure leaves the prior mirror and
   // stale sync intact, and the next request retries.
   await db.batch([
     db.delete(repos).where(eq(repos.userId, userId)),
@@ -115,12 +113,11 @@ export const refreshRepos = async (token: string, db: Db, userId: string, fetche
   return { ok: true }
 }
 
-// Read-path repo resolution: a mirror miss falls through to a live GitHub fetch (+ mirror), so a
-// never-seen repo still resolves. Deliberately looser than the write path — resolvePr in
-// prContext.ts is mirror-only, so PR writes require a previously-mirrored repo (see the note
-// there). A mirror HIT is served with no TTL check: repo rows only refresh via the repos-list
-// refresh (refreshRepos), so a renamed/transferred repo resolves to its old repoId until then —
-// accepted staleness (docs/data-layer.md).
+// Read-path repo resolution: a mirror miss falls through to a live GitHub fetch and mirror, so a
+// never-seen repo still resolves. Looser than the write path, where resolvePr in prContext.ts is
+// mirror-only. A mirror hit is served with no TTL check, because repo rows only refresh via
+// refreshRepos, so a renamed or transferred repo resolves to its old repoId until then. Accepted
+// staleness (docs/data-layer.md).
 export const resolveRepoForUser = async (
   db: Db,
   token: string,

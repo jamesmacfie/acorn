@@ -39,62 +39,60 @@ import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts
 import { contentLinkRegistry } from '../../registries/contentLinks'
 import { refResolverRegistry } from '../../registries/refResolvers'
 
-// Turning accepted manifests into NATIVE shell contributions — the descriptor half of what
+// Turning accepted manifests into native shell contributions: the descriptor half of what
 // plugins/frames/register.ts does for rectangles (docs/plugins.md).
 //
-// Same shape as that file, deliberately: one module-level map of per-plugin disposables, a
-// dispose-then-register pass so a re-run replaces a plugin's whole contribution set rather than
-// reconciling it, and a per-surface try/catch so one duplicate id does not cost the plugin its other
-// chrome. What differs is the gate, and it differs because chrome is DATA:
+// Same shape as that file: one module-level map of per-plugin disposables, a dispose-then-register pass
+// so a re-run replaces a plugin's whole contribution set rather than reconciling it, and a per-surface
+// try/catch so one duplicate id doesn't cost the plugin its other chrome. What differs is the gate,
+// because chrome is data:
 //
-//   frames  gate on `bundleAccepted` — bytes execute, and this device said yes to these exact bytes.
-//   chrome  gate on "no client bundle, OR its bundle was accepted". A descriptor executes nothing, so
-//           a plugin that ships no code at all needs no trust prompt and gets its chrome. A plugin
-//           whose code this device REFUSED gets none: its panes were never registered, so its chrome
-//           would be offering an `openPane` that cannot land, and decorating the shell on behalf of
-//           something the owner declined is the wrong answer regardless.
+//   frames  gate on `bundleAccepted`. Bytes execute, and this device said yes to these exact bytes.
+//   chrome  gate on "no client bundle, or its bundle was accepted". A descriptor executes nothing, so a
+//           plugin that ships no code needs no trust prompt and gets its chrome. A plugin whose code
+//           this device refused gets none: its panes were never registered, so its chrome would offer an
+//           `openPane` that can't land.
 //
 // Per-node presence stays the render-time gate. A plugin installed on node A contributes nothing to a
-// surface looking at node B, because its routes are not there.
+// surface looking at node B, because its routes aren't there.
 
 // `.tsx` behind `lazy`, so this module stays importable from a bare-Node test suite: the repo's vitest
-// configs have no Solid transform, and a module that reaches a JSX file cannot be imported at all
-// (registries/slots.ts explains the same split). `lazy` never resolves the import until something renders.
+// configs have no Solid transform, and a module that reaches a JSX file can't be imported at all.
+// `lazy` never resolves the import until something renders.
 const ChromeSourcePanel = lazy(() => import('./ChromeSourcePanel'))
 const ChromeBadge = lazy(() => import('./ChromeBadge'))
 
 const registered = new Map<string, Disposable[]>()
 
-// The node the rail and the task footer are looking at. There is no other candidate — a task belongs to
+// The node the rail and the task footer are looking at. There's no other candidate: a task belongs to
 // whichever node the window is talking to.
 const chromeNode = (): string => activeNodeId() ?? ''
 
-// The surface ids a manifest declared, as the DEVICE read them, split by what each verb may name.
+// The surface ids a manifest declared, as the device read them, split by what each verb may name.
 export type { DeclaredSurfaces }
 
 // Can this action actually do anything from a click site with no row and no routed project? The node
-// checked all three when it parsed the manifest; a roster row is wire input, so the device checks them
-// again. Shared by commands, palette rows and a source's empty-state button, which take the same
-// narrowed verb set for the same reason (node-core/main/pluginManifest.ts § contextFreeAction).
+// checked all three when it parsed the manifest, and a roster row is wire input, so the device checks
+// again. Shared by commands, palette rows and a source's empty-state button.
 const contextFreeActionUsable = (pluginId: string, surfaces: DeclaredSurfaces, action: PluginChromeAction): boolean => {
   if (action.verb === 'openPane') return surfaces.panes.has(action.pane)
   if (action.verb === 'openOverlay') return surfaces.overlays.has(action.overlay)
   if (action.verb === 'runNodeAction') return ownsRoute(pluginId, action.path)
   if (action.verb === 'openUrl') return isPluginOpenableUrl(action.url)
-  // `createTask` needs a selected rail row, `navigate` needs a routed project and a navigator. Refused
-  // rather than read, because the verb does not carry the field the site would need.
+  // `createTask` needs a selected rail row, and `navigate` needs a routed project and a navigator.
+  // Refused rather than read, because the verb doesn't carry the field the site would need.
   return false
 }
 
 /** An authored empty state with an unusable action reduced to its message. Exported because the
- * descriptor it sanitises is captured inside a component closure, where a test cannot reach it — and a
+ * descriptor it sanitises is captured inside a component closure, where a test can't reach it, and a
  * button that can only toast is exactly the failure worth pinning. */
 export const usableEmptyState = (
   pluginId: string,
   surfaces: DeclaredSurfaces,
   empty: PluginSourceEmptyState | undefined,
 ): PluginSourceEmptyState | undefined =>
-  // The message survives on its own: it is the part the rail was missing, and losing a sentence over a
+  // The message survives on its own: it's the part the rail was missing, and losing a sentence over a
   // button would be the worse trade.
   empty?.action && !contextFreeActionUsable(pluginId, surfaces, empty.action) ? { message: empty.message } : empty
 
@@ -113,13 +111,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   }
   const note = (seconds: number | undefined): void => void (seconds !== undefined && refreshes.push(seconds))
 
-  // Brand marks first, so a contribution registered below can already name `brand:<id>` — Icon reads
-  // the registry reactively, so ordering is a nicety rather than a correctness rule.
+  // Brand marks first, so a contribution registered below can already name `brand:<id>`. Icon reads the
+  // registry reactively, so ordering is a nicety rather than a correctness rule.
   //
-  // The name is stamped from the plugin id and never read off the manifest, the same rule
-  // contentLinks' `providerId` follows below: a package cannot claim another package's mark, with
-  // `icons` no more able to than `icon`. `add` already warns on a collision with a core mark, and
-  // core wins, which is the correct precedence while both exist.
+  // The name is stamped from the plugin id and never read off the manifest, the same rule contentLinks'
+  // `providerId` follows below: a package can't claim another package's mark, and `icons` is no more
+  // able to than `icon`. `add` already warns on a collision with a core mark, and core wins.
   if (installed.icon) {
     const { d } = installed.icon
     add('icon', pluginId, () => brandMarkRegistry.register({ id: pluginId, d }))
@@ -141,8 +138,8 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   const commands: PluginCommandDescriptor[] = [
     ...(contributions.commands ?? []),
     ...(contributions.palette ?? []).flatMap((descriptor): PluginCommandDescriptor[] =>
-      // The two verbs a command cannot carry, dropped rather than promoted. `createTask` needs a selected
-      // rail row and `navigate` needs a routed project plus a navigator, and a palette row has none of them.
+      // The two verbs a command can't carry, dropped rather than promoted. `createTask` needs a selected
+      // rail row and `navigate` needs a routed project plus a navigator.
       descriptor.action.verb === 'createTask' || descriptor.action.verb === 'navigate'
         ? []
         : [{ ...descriptor, category: 'action', palette: true, action: descriptor.action }]),
@@ -187,9 +184,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   for (const descriptor of contributions.contentLinks ?? []) {
     // `openPane` is optional: a plugin whose only home for a matched item is its own reference panel
-    // declares no pane at all, and the host resolves the panel by provider at click time. An openPane that
-    // IS named still has to be a declared task pane — a roster row is bytes a node sent, so the node's
-    // parse-time check is re-run here rather than trusted.
+    // declares no pane, and the host resolves the panel by provider at click time. An openPane that is
+    // named still has to be a declared task pane, so the node's parse-time check is re-run here rather
+    // than trusted.
     const pane = descriptor.openPane
     if (pane !== undefined && !taskPanes.has(pane)) {
       console.warn(`[plugin-chrome] ${pluginId} content link '${descriptor.id}' names an undeclared pane '${pane}'.`)
@@ -202,9 +199,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       }
       return contentLinkRegistry.register({
         id: descriptor.id,
-        // Stamped from the plugin id, never read off the descriptor. It is what makes the plugin's own
-        // reference panel reachable from one of its links, and a manifest that could state it would be a
-        // manifest that could point a link at another plugin's panel.
+        // Stamped from the plugin id, never read off the descriptor. It's what makes the plugin's own
+        // reference panel reachable from one of its links, and a manifest that could state it could
+        // point a link at another plugin's panel.
         providerId: pluginId,
         parse: (href) => {
           const captures = pattern.match(href)
@@ -229,29 +226,28 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       ...(descriptor.providerId ? { providerId: descriptor.providerId } : {}),
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
       component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }),
-      // A row's `task` block is the promotion capability. Register it independently of row selection
-      // so an integration can use the row click for detail navigation and a separate host-drawn
-      // +TASK affordance for promotion.
+      // A row's `task` block is the promotion capability. Registered independently of row selection, so
+      // an integration can use the row click for detail navigation and a separate host-drawn +TASK
+      // affordance for promotion.
       promotion: descriptorPromotion(pluginId),
-      // Still no `routes` on the source contribution, and that is now a placement decision rather than a
-      // deferral. The reason a descriptor source could not have them was that `SourceRouteContribution`
-      // takes a bare pattern, so a manifest claiming one could claim core's `/p/:projectId` and take over
-      // project navigation for the whole shell. The host-minted prefix that fixes that arrived with
-      // `contributions.routes` — but a manifest route belongs to the SURFACE it addresses, not to a rail
-      // list, so it is registered next to that surface's component (registries/projectSurfaces.ts) and the
-      // shell picks up both from there.
+      // Still no `routes` on the source contribution, and that's a placement decision rather than a
+      // deferral. `SourceRouteContribution` takes a bare pattern, so a manifest claiming one could claim
+      // core's `/p/:projectId` and take over project navigation for the whole shell. The host-minted
+      // prefix that fixes that arrived with `contributions.routes`, but a manifest route belongs to the
+      // surface it addresses rather than to a rail list, so it's registered next to that surface's
+      // component (registries/projectSurfaces.ts).
     }))
   }
 
   for (const descriptor of contributions.slots ?? []) {
     note(descriptor.refresh)
-    // Two manifest slot names, two registries. `footer` is a TASK slot — it draws inside a task's
-    // layout and gets a taskId it does not use — while `topbar` is a SHELL slot whose context is the
-    // whole window. The badge component ignores both, because its data comes from a node route rather
-    // than from anything the slot could hand it; what differs is which host draws it and when.
+    // Two manifest slot names, two registries. `footer` is a task slot: it draws inside a task's layout
+    // and gets a taskId it doesn't use. `topbar` is a shell slot whose context is the whole window. The
+    // badge component ignores both, because its data comes from a node route rather than anything the
+    // slot could hand it; what differs is which host draws it and when.
     //
-    // A slot name this client does not know is skipped rather than mapped to a default. A roster row
-    // is bytes a node sent, and a newer node's `topbar.left` must not silently become the footer.
+    // A slot name this client doesn't know is skipped rather than mapped to a default. A roster row is
+    // bytes a node sent, and a newer node's `topbar.left` must not silently become the footer.
     if (descriptor.slot === 'footer') {
       add('slot', descriptor.id, () => taskSlotRegistry.register({
         id: descriptor.id,
@@ -262,9 +258,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     } else if (descriptor.slot === 'topbar') {
       add('slot', descriptor.id, () => uiSlotRegistry.register({
         id: descriptor.id,
-        // The topbar's right end — the app's status bar, and the only topbar slot with a host. Order
-        // 500 puts plugin chips after the notification bell (10) and before the account menu, which is
-        // not a slot at all.
+        // The topbar's right end, the app's status bar and the only topbar slot with a host. Order 500
+        // puts plugin chips after the notification bell (10) and before the account menu, which isn't a
+        // slot at all.
         slot: 'topbar.right',
         order: 500,
         when: () => pluginEnabledOnNode(chromeNode(), pluginId),
@@ -277,8 +273,8 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   for (const descriptor of contributions.contextMenus ?? []) {
     // The verb is checked here rather than inside the adapter, because this is where the manifest's own
-    // declared surfaces are in scope — the same check a command and a source's empty state get, for the
-    // same reason: a row that parses and can only toast is worse for an author than one that is refused.
+    // declared surfaces are in scope. Same check a command and a source's empty state get: a row that
+    // parses and can only toast is worse for an author than one that's refused.
     if (!contextFreeActionUsable(pluginId, surfaces, descriptor.action)) {
       console.warn(`[plugin-chrome] ${pluginId} context menu '${descriptor.id}' has an action this device cannot honour.`)
       continue
@@ -292,14 +288,14 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   // ── Cooperative cross-plugin extension (registries/extensionPoints.ts) ──────────────────────────
   //
   // Both halves ride this pass rather than the frames pass, and both are gated on the same
-  // `hasWithheldCode` question every other descriptor is, because both ARE descriptors: a point is a
+  // `hasWithheldCode` question every other descriptor is, because both are descriptors: a point is a
   // manifest line and a contribution is a route plus a verb. No plugin code executes on either side.
   const pointBinding = { nodeId: chromeNode, enabled: () => pluginEnabledOnNode(chromeNode(), pluginId) }
   for (const descriptor of contributions.extensionPoints ?? []) {
-    // The surface is re-checked here rather than inside the adapter, because this is where the manifest's
-    // own declared frames are in scope. A point hanging off a surface this manifest does not declare
-    // would be a strip with no rectangle above it — the "parses and can never appear" failure the node's
-    // parser refuses, re-refused on the device because a roster row is bytes a node sent.
+    // The surface is re-checked here rather than inside the adapter, because this is where the
+    // manifest's own declared frames are in scope. A point hanging off a surface this manifest doesn't
+    // declare would be a strip with no rectangle above it: the "parses and can never appear" failure the
+    // node's parser refuses, re-refused on the device because a roster row is bytes a node sent.
     if (!surfaceIds.has(descriptor.surface)) {
       console.warn(`[plugin-chrome] ${pluginId} extension point '${descriptor.id}' names an undeclared surface '${descriptor.surface}'.`)
       continue
@@ -308,9 +304,8 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   }
 
   for (const descriptor of contributions.extensions ?? []) {
-    // Same check a command and a context-menu row get, for the same reason: a row that parses and can
-    // only toast is worse for an author than one that is refused. The point owner never sees this
-    // failure — a contribution the device cannot honour simply never delivers.
+    // Same check a command and a context-menu row get. The point owner never sees this failure: a
+    // contribution the device can't honour simply never delivers.
     if (descriptor.onSelect && !contextFreeActionUsable(pluginId, surfaces, descriptor.onSelect)) {
       console.warn(`[plugin-chrome] ${pluginId} extension '${descriptor.id}' has an action this device cannot honour.`)
       continue
@@ -325,12 +320,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       id: descriptor.id,
       order: descriptor.order,
       // Addressed per node by the inbox's fan-out, never against the ambient active node. A node that
-      // does not run this plugin answers with nothing rather than being asked.
+      // doesn't run this plugin answers with nothing rather than being asked.
       fetch: async (nodeId, signal): Promise<AttentionItem[]> => {
         if (!pluginEnabledOnNode(nodeId, pluginId)) return []
         const items = await readAttention(pluginId, descriptor.items, nodeId, signal)
-        // Namespaced with the contribution id, as registries/attention.ts requires: the id is the row
-        // key across refetches, and two plugins reporting `stuck` must not collide in one merged list.
+        // Namespaced with the contribution id, as registries/attention.ts requires: the id is the row key
+        // across refetches, and two plugins reporting `stuck` must not collide in one merged list.
         return items.map((item) => ({ ...item, id: `${descriptor.id}:${item.id}` }))
       },
     }))
@@ -342,7 +337,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       id: descriptor.id,
       order: descriptor.order,
       label: descriptor.label,
-      // `0` is hidden on the card, which is the right answer for a node that does not run this plugin.
+      // `0` is hidden on the card, which is the right answer for a node that doesn't run this plugin.
       fetch: async (nodeId, signal) =>
         pluginEnabledOnNode(nodeId, pluginId) ? readStat(pluginId, descriptor.data, nodeId, signal) : 0,
     }))
@@ -352,7 +347,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     note(descriptor.refresh)
     const declared = new Set((descriptor.params ?? []).map((param) => param.id))
     add('collection', descriptor.id, () => collectionRegistry.register({
-      // The registry id is the host's, minted from the plugin id — the same stamp `ctx.collections`
+      // The registry id is the host's, minted from the plugin id, the same stamp `ctx.collections`
       // applies on the compiled side, so a placement addressing `(pluginId, collectionId)` resolves the
       // same contribution whichever feeder supplied it.
       id: collectionKey(pluginId, descriptor.id),
@@ -362,12 +357,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       ...(descriptor.params ? { params: descriptor.params } : {}),
       ...(descriptor.schema ? { schema: descriptor.schema } : {}),
       ...(descriptor.refresh !== undefined ? { refresh: descriptor.refresh } : {}),
-      // Addressed per node, never against the ambient active node: a node that does not run this
-      // plugin answers with nothing rather than being asked.
+      // Addressed per node, never against the ambient active node: a node that doesn't run this plugin
+      // answers with nothing rather than being asked.
       fetch: async (nodeId, params, signal) => {
         if (!pluginEnabledOnNode(nodeId, pluginId)) return emptyCollectionPage()
-        // Only what the manifest declared reaches the route. A caller passing an undeclared key would
-        // be inventing a scope the plugin never agreed to answer for.
+        // Only what the manifest declared reaches the route. A caller passing an undeclared key would be
+        // inventing a scope the plugin never agreed to answer for.
         const passed = Object.fromEntries(Object.entries(params).filter(([key]) => declared.has(key)))
         return readCollection(pluginId, descriptor.id, descriptor.items, nodeId, passed, signal)
       },
@@ -376,12 +371,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   for (const descriptor of contributions.agentContexts ?? []) {
     // The composer groups and replaces snapshots by `source`, so `source` is a namespace and the host
-    // binds it — from the plugin id plus the contribution id, in the same colon form `ownsTaskOrigin`
-    // accepts. A manifest never gets to name it: `http` claiming `context.task` would evict acorn's
-    // own task-context snapshot from someone's draft.
+    // binds it, from the plugin id plus the contribution id in the colon form `ownsTaskOrigin` accepts.
+    // A manifest never names it: `http` claiming `context.task` would evict acorn's own task-context
+    // snapshot from someone's draft.
     const source = `${pluginId}:${descriptor.id}`
-    // No `revision`. It is synchronous and a descriptor answers across a fetch, so there is no number
-    // to return in time; the invalidation ping the rest of the chrome rides covers the same freshness.
+    // No `revision`. It's synchronous and a descriptor answers across a fetch, so there's no number to
+    // return in time; the invalidation ping the rest of the chrome rides covers the same freshness.
     add('agent context', descriptor.id, () => agentContextRegistry.register({
       id: descriptor.id,
       source,
@@ -397,27 +392,27 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   }
 
   for (const descriptor of contributions.themes ?? []) {
-    // A theme is a descriptor in the strictest sense available: not merely "data the host renders",
-    // but data the host cannot render as anything except colour, because the only thing it becomes is
-    // a block of `--token: <colour>` declarations the host composed (./themes.ts). It
-    // therefore rides this pass's gate unchanged — a descriptor-only package contributes its themes,
-    // a package whose code this device refused contributes none of its chrome, themes included. The
-    // second half is a judgement rather than a necessity: nothing in a theme executes, so it could
-    // safely register from a withheld package. It does not, because a picker entry from a package the
-    // owner declined is still the shell decorating itself on behalf of something the owner said no to.
+    // A theme is a descriptor in the strictest sense: not merely data the host renders, but data the
+    // host can't render as anything except colour, because the only thing it becomes is a block of
+    // `--token: <colour>` declarations the host composed (./themes.ts). So it rides this pass's gate
+    // unchanged.
+    //
+    // Withholding themes from a refused package is a judgement rather than a necessity, since nothing in
+    // a theme executes. A picker entry from a package the owner declined is still the shell decorating
+    // itself on behalf of something the owner said no to.
     add('theme', descriptor.id, () => registerPluginTheme(pluginId, descriptor))
   }
 
   for (const descriptor of contributions.refResolvers ?? []) {
-    // `providerId` is the plugin id and nothing else. The descriptor cannot state one, because a
-    // resolver claiming another provider's name is how a plugin would get its own rows rendered as
-    // that provider's items — the same line the content-link stamp holds one registry over.
+    // `providerId` is the plugin id and nothing else. The descriptor can't state one, because a resolver
+    // claiming another provider's name is how a plugin would get its own rows rendered as that
+    // provider's items.
     add('ref resolver', descriptor.id, () => refResolverRegistry.register({
       id: descriptor.id,
       providerId: pluginId,
       kind: descriptor.kind,
-      // Asking a node that is not running the plugin spends a round trip to be told nothing, and the
-      // consumer's fallback (the bare identifier) is the same either way.
+      // Asking a node that isn't running the plugin spends a round trip to be told nothing, and the
+      // consumer's fallback, the bare identifier, is the same either way.
       resolve: async (identifiers) => pluginEnabledOnNode(chromeNode(), pluginId)
         ? resolveRefs(pluginId, descriptor.resolve, chromeNode(), identifiers)
         : [],
@@ -434,21 +429,20 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 export function syncChromeContributions(): void {
   disposeAll()
   const refreshes: number[] = []
-  // A package with code this device has not been cleared to run drops out here: a descriptor is a click
+  // A package with code this device hasn't been cleared to run drops out here: a descriptor is a click
   // site, and a rail row that opens a pane which will never mount is worse than no rail row. But the
-  // question is `hasWithheldCode`, NOT `!trusted` — a descriptor-only package (model-providers ships
-  // one) has no bytes to accept and must still contribute, and the frames pass asks the stronger
-  // question because it is the one that mounts code (../contributions.ts).
+  // question is `hasWithheldCode`, not `!trusted`: a descriptor-only package, as model-providers ships,
+  // has no bytes to accept and must still contribute, and the frames pass asks the stronger question
+  // because it's the one that mounts code.
   for (const entry of eligiblePlugins()) {
     if (hasWithheldCode(entry)) continue
     registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.row, refreshes))
   }
-  // One timer at the smallest declared interval, rather than one per descriptor. The polling fallback is
-  // for data that changes with no node-side trigger; the primary path is still the status ping, and a
-  // handful of tiny reads sharing a tick is not worth five timers.
+  // One timer at the smallest declared interval rather than one per descriptor. The polling fallback is
+  // for data that changes with no node-side trigger; the primary path is still the status ping.
   //
-  // Not a `pollerContribution`: `startClientPollers()` snapshots the registry once at app mount, and this
-  // pass runs after the distribution round trip — a poller registered here would never be started.
+  // Not a `pollerContribution`: `startClientPollers()` snapshots the registry once at app mount, and
+  // this pass runs after the distribution round trip, so a poller registered here would never start.
   if (registered.size) watchChrome(refreshes.length ? Math.min(...refreshes) : undefined)
   else unwatchChrome()
 }

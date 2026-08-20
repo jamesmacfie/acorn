@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { confineExistingFile, resolveInRoot } from './fs'
 
-// A worktree holds arbitrary checked-out content. The interesting adversary is not a `../` in a
-// request — it is a symlink an untrusted branch committed, which a lexical check cannot see.
+// A worktree holds arbitrary checked-out content. The interesting adversary isn't a `../` in a request,
+// it's a symlink an untrusted branch committed, which a lexical check can't see.
 const base = mkdtempSync(join(tmpdir(), 'acorn-fs-'))
 const root = join(base, 'worktree')
 const outside = join(base, 'outside')
@@ -15,7 +15,7 @@ beforeAll(() => {
   mkdirSync(outside, { recursive: true })
   writeFileSync(join(root, 'src', 'app.ts'), 'ok')
   writeFileSync(join(outside, 'secret.txt'), 'id_rsa')
-  // The two shapes that matter: a symlinked FILE and a symlinked DIRECTORY pointing out of the root.
+  // The two shapes that matter: a symlinked file and a symlinked directory pointing out of the root.
   symlinkSync(join(outside, 'secret.txt'), join(root, 'leak.txt'))
   symlinkSync(outside, join(root, 'escape'))
 })
@@ -38,7 +38,7 @@ describe('resolveInRoot', () => {
   })
 
   it('rejects a path THROUGH a symlinked directory that leaves the root', () => {
-    // Lexically this is `<root>/escape/secret.txt` — inside the root. Only the symlink gate catches it.
+    // Lexically this is `<root>/escape/secret.txt`, inside the root. Only the symlink gate catches it.
     expect(resolveInRoot(root, 'escape/secret.txt')).toBeNull()
     expect(resolveInRoot(root, 'escape/not-created-yet.txt')).toBeNull()
   })
@@ -50,10 +50,10 @@ describe('confineExistingFile', () => {
   })
 
   it('rejects a symlinked LEAF pointing outside the root', async () => {
-    // resolveInRoot already covers this: the leaf EXISTS, so its ancestor walk stops at the leaf
-    // itself and realpath resolves the symlink. Asserted on both entry points because the taxonomy
-    // reports 'escapes' rather than 'missing', and confusing the two would tell the caller (and the
-    // owner) the wrong thing about a hostile symlink.
+    // resolveInRoot already covers this: the leaf exists, so its ancestor walk stops at the leaf itself
+    // and realpath resolves the symlink. Asserted on both entry points because the taxonomy reports
+    // 'escapes' rather than 'missing', and confusing the two would tell the caller the wrong thing about
+    // a hostile symlink.
     expect(resolveInRoot(root, 'leak.txt')).toBeNull()
     await expect(confineExistingFile(root, 'leak.txt')).resolves.toEqual({ ok: false, reason: 'escapes' })
   })

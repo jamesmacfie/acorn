@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Index, on, onCleanup, Show } from 'solid-js'
+import { onScopeEvicted } from '@acorn/plugin-api/client'
 import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
@@ -20,14 +21,23 @@ const VISIBLE_EVENT_TYPES = new Set([
   'diagnostic',
 ])
 
-// Deliberately NOT virtualized. The virtualizer this used to run called `measure()` on every new event,
-// which CLEARS the item size cache — so every row fell back to the size estimate, the canvas height
-// jumped, and the rows re-measured, on every event. It also had to rebuild rows from `getVirtualItems()`,
+// Deliberately not virtualized. The virtualizer this used to run called `measure()` on every new event,
+// which clears the item size cache, so every row fell back to the size estimate, the canvas height
+// jumped, and the rows re-measured, on every event. It also rebuilt rows from `getVirtualItems()`,
 // which returns fresh objects on each scroll and re-measure, replacing the DOM under any selection.
 //
-// ponytail: plain DOM, no cap. Fine for the few hundred cards a real session holds; if one ever feels
-// slow to open, render only the last N behind a "show earlier" control — a fixed window with no
-// measurement feedback loop — rather than restoring a measuring virtualizer.
+// Plain DOM, no cap. Fine for the few hundred cards a real session holds. If one ever feels slow to
+// open, render only the last N behind a "show earlier" control, which is a fixed window with no
+// measurement feedback loop, rather than restoring a measuring virtualizer.
+
+// A plain Map, in memory for the life of the window. Scroll position is worth remembering across a pane
+// unmount, not worth a store or a round trip to disk. Cleared with the roster it keys off, so a node
+// switch can't leave positions behind for sessions that are gone.
+const scrollTopBySession = new Map<string, number>()
+onScopeEvicted((e) => {
+  if (e.scope === 'node-switched') scrollTopBySession.clear()
+})
+
 export default function AgentTranscript(props: {
   taskId: string
   snapshot: AgentSessionSnapshot
@@ -46,15 +56,46 @@ export default function AgentTranscript(props: {
     return `${items().length}:${last?.lastSeq ?? 0}`
   })
 
+  const sessionId = createMemo(() => props.snapshot.session.id)
+
   let wasNearBottom = true
   let frame = 0
+  let target: number | null = null
+  let applied = -1
+  const nearBottom = (element: HTMLDivElement) =>
+    element.scrollHeight - element.scrollTop - element.clientHeight < 96
   const noteScroll = () => {
     const element = scrollElement()
     if (!element) return
-    wasNearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 96
+    // Our own restore write echoes back as a scroll event; a real scroll ends the restore.
+    if (element.scrollTop === applied) return
+    target = null
+    wasNearBottom = nearBottom(element)
+    scrollTopBySession.set(sessionId(), element.scrollTop)
   }
-  // Follow the tail only while the reader is already at the tail. Scrolling up to read (or to select)
-  // is a decision to stop following, so the next event must not yank the viewport back down.
+  // Leaving the task unmounts this pane, so the reader must land back where they were. Code highlighting
+  // resolves after mount and keeps growing the list, so the browser clamps an early write. Re-apply the
+  // target until it sticks, driven by the list's own resizes.
+  const applyTarget = () => {
+    const element = scrollElement()
+    if (!element || target === null) return
+    element.scrollTop = target
+    applied = element.scrollTop
+    if (element.scrollTop < target - 1) return
+    target = null
+    wasNearBottom = nearBottom(element)
+  }
+  const growth = new ResizeObserver(applyTarget)
+  onCleanup(() => growth.disconnect())
+  // Switching sessions in the sidebar swaps the snapshot without remounting, so this covers both mount
+  // and session change.
+  createEffect(on(sessionId, (id) => {
+    target = scrollTopBySession.get(id) ?? null
+    wasNearBottom = target === null
+    applyTarget()
+  }))
+  // Follow the tail only while the reader is already at the tail. Scrolling up to read, or to select, is
+  // a decision to stop following, so the next event must not yank the viewport back down.
   createEffect(on(tail, () => {
     if (!wasNearBottom) return
     cancelAnimationFrame(frame)
@@ -89,7 +130,7 @@ export default function AgentTranscript(props: {
             </EmptyState>
           }
         >
-          <div class="agent-transcript-list">
+          <div class="agent-transcript-list" ref={(element) => growth.observe(element)}>
             {/*
               `Index`, not `For`: buildConversationItems rebuilds every item object on every snapshot, and
               `For` keys by reference, so it would recreate the whole list on each streamed event and take

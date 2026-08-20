@@ -9,7 +9,7 @@ import { readCollection } from '../collections/registry'
 import { type AppDatabase, schema } from '../db'
 import { appendSample, hourBucket } from './history'
 
-// One pass of `core:sample-measures` (docs/future/dashboards/measure-history.md § Sampling).
+// One pass of `core:sample-measures` (docs/dashboards.md § Trends).
 //
 // ONE core schedule, not a row per panel: it enumerates the panels that asked for a history trend,
 // computes each one's measure, and appends one sample apiece. Panel churn never creates or deletes

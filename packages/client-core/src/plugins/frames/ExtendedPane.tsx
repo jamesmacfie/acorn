@@ -18,7 +18,7 @@ import '../chrome/extension-points.css'
 //   `pane.footer`  a strip UNDER the frame, filled by other plugins' `extensions` — descriptor rows the
 //                  host fetches from the contributor's own namespace and draws with its own components.
 //   `pane.aside`   a column BESIDE the frame, filled by THE USER: a dashboard they composed, under
-//                  constraints the owner declared (docs/future/dashboards/placements.md).
+//                  constraints the owner declared (docs/dashboards.md § Placements).
 //
 // THE HOST DRAWS BOTH REGIONS; the owner's layout only RESERVES them. Every future plugin author will
 // read "a rectangle for dashboard items" as "inside my iframe", and it cannot mean that — panels are

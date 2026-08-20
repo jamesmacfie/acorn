@@ -10,11 +10,12 @@
 // and the rollback of everything registered here all stay in host.ts, because they are decisions about
 // a SET of plugins and this is one plugin's surface.
 import type { CoreServices } from '../../main/core'
-import type { NodePermissions, PluginCollectionDescriptor, PluginCommandDescriptor, PluginScheduleDescriptor } from '../../main/pluginManifest'
+import type { NodePermissions, PluginCollectionDescriptor, PluginCommandDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
 import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerCollectionRead } from '../collections/registry'
 import { registerNodeAction } from '../nodeActions/registry'
+import { registerTaskCheck } from './taskChecks'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
@@ -47,6 +48,10 @@ export type LoadedPluginBinding = {
   // person can put one on a schedule (../nodeActions/registry.ts). The rest of a command — its
   // palette entry, its keybinding, its category — is the CLIENT's business and never reaches here.
   commands?: readonly PluginCommandDescriptor[]
+  // And what it declared as archive checks, by the same route as schedules: the registration is
+  // synthesised from these two paths so both feeders land through `ctx.taskChecks`
+  // (./taskChecks.ts).
+  taskChecks?: readonly PluginTaskCheckDescriptor[]
 }
 
 export type PluginContextOptions = {
@@ -159,6 +164,12 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
     nodeActions: {
       register: (action) => registerNodeAction({ ...action, pluginId: plugin }),
     },
+    // Owner-bound like the three above, and here it is also the provenance the DIALOG draws: every
+    // concern this check answers with is rendered beside the plugin's name, so filing one under a
+    // stranger's name would be putting words in that plugin's mouth in front of the owner.
+    taskChecks: {
+      register: (check) => registerTaskCheck({ ...check, pluginId: plugin }),
+    },
     // asContextSection is where core's database handle is DROPPED rather than merely left unused: core's
     // own `issues` section keeps it, a plugin-registered one can never see it, and neither side has to be
     // trusted to remember.
@@ -246,7 +257,7 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
       return undefined as R
     }
 
-  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'contextSections', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'taskChecks', 'contextSections', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a
     // typeof check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined

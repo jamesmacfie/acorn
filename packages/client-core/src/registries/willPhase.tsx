@@ -1,6 +1,6 @@
-import { createSignal, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { createDismissable } from '../ui/dismissable'
-import { collectConcerns, type Concern, type WillEventMap } from './willPhaseModel'
+import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
 import { Button, Checkbox } from '../ui/primitives'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
@@ -9,8 +9,14 @@ type Prompt = {
   title: string
   actionLabel: string
   concerns: Concern[]
-  resolve: (confirmed: boolean) => void
+  resolve: (decision: WillDecision) => void
 }
+
+/** What the caller learns. `checked` is the id of every concern whose checkbox was still ticked when
+ *  the owner confirmed — for `task:archive` those are the qualified ids the node matches against its
+ *  task-check registry, and the caller passes them straight through to the archive request. */
+export type WillDecision = { confirmed: boolean; checked: string[] }
+
 const [prompt, setPrompt] = createSignal<Prompt | null>(null)
 
 export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
@@ -20,10 +26,10 @@ export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
   actionLabel: string
   alwaysConfirm?: boolean
   concerns?: Concern[]
-}): Promise<boolean> {
+}): Promise<WillDecision> {
   const concerns = [...(options.concerns ?? []), ...(await collectConcerns(options.kind, options.payload))]
-  if (!options.alwaysConfirm && !concerns.length) return true
-  return new Promise<boolean>((resolve) => setPrompt({ title: options.title, actionLabel: options.actionLabel, concerns, resolve }))
+  if (!options.alwaysConfirm && !concerns.length) return { confirmed: true, checked: [] }
+  return new Promise<WillDecision>((resolve) => setPrompt({ title: options.title, actionLabel: options.actionLabel, concerns, resolve }))
 }
 
 export function WillConfirmationHost() {
@@ -34,9 +40,21 @@ export function WillConfirmationHost() {
     const current = prompt()
     if (!current) return
     setPrompt(null)
-    for (const concern of current.concerns) concern.onDecision?.(confirmed, checks()[concern.id] ?? concern.checkbox?.checked ?? false)
+    const checked: string[] = []
+    for (const concern of current.concerns) {
+      const ticked = checks()[concern.id] ?? concern.checkbox?.checked ?? false
+      if (confirmed && concern.checkbox && ticked) checked.push(concern.id)
+      // Contained, because this loop is between the owner clicking and the caller finding out. One
+      // handler throwing used to skip the resolve below, leaving the archive promise pending forever:
+      // the dialog closed and nothing happened, with no error anyone would connect to it.
+      try {
+        concern.onDecision?.(confirmed, ticked)
+      } catch (error) {
+        console.error(`[will] ${concern.feature} onDecision failed:`, error)
+      }
+    }
     setChecks({})
-    current.resolve(confirmed)
+    current.resolve({ confirmed, checked })
   }
   const dismiss = createDismissable({ onDismiss: () => finish(false), container: () => dialog })
   return (
@@ -60,6 +78,16 @@ export function WillConfirmationHost() {
                       <span aria-hidden="true">{concern.severity === 'danger' ? '⛔' : '⚠'}</span>
                       <span>{concern.message}</span>
                       <span class="muted">— {concern.feature}</span>
+                      <Show when={concern.details?.length}>
+                        <ul class="will-concern-details">
+                          {/* Sliced here as well as on the node: a client-side producer answers with
+                              whatever it holds, and the cap is the dialog's rule, not the producer's. */}
+                          <For each={concern.details!.slice(0, DETAILS_MAX)}>{(detail) => <li>{detail}</li>}</For>
+                          <Show when={(concern.detailsMore ?? 0) + Math.max(0, concern.details!.length - DETAILS_MAX)}>
+                            {(more) => <li class="muted">+{more()} more</li>}
+                          </Show>
+                        </ul>
+                      </Show>
                       <Show when={concern.checkbox}>
                         {(checkbox) => (
                           <Checkbox

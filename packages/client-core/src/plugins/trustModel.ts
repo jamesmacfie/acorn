@@ -8,6 +8,8 @@ import {
   type PermissionLine,
   scheduleGrants,
   schedulePermissionLines,
+  taskCheckGrants,
+  taskCheckPermissionLines,
   uiPermissionLines,
   webviewGrants,
   webviewPermissionLines,
@@ -73,9 +75,19 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       // Schedules sit here rather than under `Enforced` for the reason the legend gives: the host does
       // hold the cadence and the route confinement, but what RUNS is the plugin's own node code, and a
       // claim about that can never be stronger than the group it is in.
-      now: [...nodePermissionLines(installed.permissions), ...schedulePermissionLines(scheduleGrants(installed.contributions))],
+      now: [
+        ...nodePermissionLines(installed.permissions),
+        ...schedulePermissionLines(scheduleGrants(installed.contributions)),
+        // Beside the schedules and for the same reason: the host holds the route confinement and the
+        // deadline, but what runs on archive is the plugin's own node code.
+        ...taskCheckPermissionLines(taskCheckGrants(installed.contributions)),
+      ],
       was: previous
-        ? [...nodePermissionLines(previous.permissions), ...schedulePermissionLines(previous.schedules ?? [])]
+        ? [
+          ...nodePermissionLines(previous.permissions),
+          ...schedulePermissionLines(previous.schedules ?? []),
+          ...taskCheckPermissionLines(previous.taskChecks ?? []),
+        ]
         : null,
     },
     {
@@ -120,6 +132,9 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     // requested, and "this package now runs itself every five minutes" is exactly the change that must
     // not slide past the update prompt unremarked.
     schedules: scheduleGrants(installed.contributions),
+    // Recorded for the same reason as the four above. "This package now stops my containers when I
+    // archive" is exactly the change the update prompt has to be able to mark as new.
+    taskChecks: taskCheckGrants(installed.contributions),
     decision,
   })
   resolvePendingTrust(request.row.name, request.hash)

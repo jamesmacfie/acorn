@@ -35,7 +35,7 @@ function, not the beneficiary of special cases.
 
 ## What already exists (no work)
 
-- Non-GitHub git remotes: clone/branch/worktree/push (docs/projects/README.md — the "Git
+- Non-GitHub git remotes: clone/branch/worktree/push (docs/workspaces-and-tasks.md — the "Git
   folder" tier).
 - Provider registries: `ConnectionProviderContribution` / `IntegrationProviderContribution`
   (`packages/node-core/src/server/integrations/types.ts`), provider route projection, core
@@ -89,7 +89,7 @@ time. The phase-4 doc notes what changes when it is repackaged as third-party.
   claimed by pattern, origins by namespace, capabilities by id. The architecture test's
   enumerated-plugin-modules rule (docs/architecture-overview.md, "Who owns which contract")
   extends: core gains no `smolforge`-named module, ever.
-- **Facets stay detected, never demanded** (docs/projects/README.md invariant). A provider claim
+- **Facets stay detected, never demanded** (docs/workspaces-and-tasks.md invariant). A provider claim
   enriches a project; failure to reach the forge never blocks git operations.
 - **Provider data stays disposable.** Issues/PRs mirror into the external-item store and can be
   dropped and re-fetched; tasks, links, and transcripts-upload state are the durable rows.
@@ -106,5 +106,5 @@ time. The phase-4 doc notes what changes when it is repackaged as third-party.
   include `repo:read`, `repo:write`, `transcripts:write`), Issues, Pull Requests, CI/CD Actions,
   AI Transcripts (upload/list/by-commit), Webhooks.
 - `docs/plugins.md`, `docs/security.md` — plugin loading, sandboxing, permissions, node security.
-- `docs/projects/README.md` — the projects model and its invariants (phases 0/1 shipped).
+- `docs/workspaces-and-tasks.md` — the projects model and its invariants (phases 0/1 shipped).
 - `docs/integrations.md`, `docs/plugins.md` — current provider and plugin contracts.

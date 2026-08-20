@@ -21,7 +21,6 @@ import { ToastHost } from '@acorn/client-core/notifications/ToastHost.tsx'
 import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
 import { isTerminalTarget } from '@acorn/client-core/lib/isTypingTarget.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
 import { capabilities } from '@acorn/client-core/capabilities.ts'
 import { desktopExtras } from '@acorn/client-core/platform/index.ts'
 import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
@@ -36,6 +35,7 @@ import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/registries/keybindings.ts'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/registries/willPhase.tsx'
+import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { RefPanelHost } from '@acorn/client-core/registries/refPanelHost.tsx'
 import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
@@ -129,30 +129,38 @@ export default function App() {
   })
 
   onMount(() => {
-    const offDirty = registerWillHandler('task:archive', 'Changes', ({ taskId }) => {
-      const status = taskStatus(taskId)
-      return status?.dirty
-        ? { id: `dirty:${taskId}`, feature: 'Changes', message: `${status.dirtyCount ?? 0} uncommitted files`, severity: 'danger' }
-        : null
-    })
-    const offSessions = registerWillHandler('task:archive', 'Terminal', ({ taskId }) => {
-      const active = sessions().filter((session) => session.taskId === taskId && session.status === 'running')
-      return active.length
-        ? { id: `sessions:${taskId}`, feature: 'Terminal', message: `${active.length} active session${active.length === 1 ? '' : 's'}`, severity: 'warn' }
-        : null
-    })
+    // The one archive producer left on the client, and it produces nothing of its own: it asks the
+    // node, which is where every plugin now declares what it has to say about archiving a task
+    // (node-core/server/plugin/taskChecks.ts). The docker, changes and terminal warnings that used to
+    // be registered here and in the docker client bundle all arrive through this.
+    //
+    // Mapped rather than passed through because a NODE concern carries no callback: the cleanup the
+    // owner ticks is a route the node runs at the right point in the archive, and the id below is
+    // what the archive request hands back to name it.
+    const offNode = registerWillHandler('task:archive', 'plugins', async ({ taskId }) =>
+      (await taskBridge().task.archiveConcerns(taskId)).map((concern) => ({
+        id: concern.id,
+        feature: concern.pluginId,
+        message: concern.message,
+        severity: concern.severity,
+        ...(concern.details ? { details: concern.details } : {}),
+        ...(concern.detailsMore ? { detailsMore: concern.detailsMore } : {}),
+        ...(concern.action ? { checkbox: concern.action } : {}),
+      })))
+    // Quitting has no node meaning — a node does not know a window is closing — so this one stays a
+    // client handler over the session store.
     const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
       const active = sessions().filter((session) => session.status === 'running')
       return active.length
         ? { id: 'sessions:all', feature: 'Terminal', message: `${active.length} active session${active.length === 1 ? '' : 's'}`, severity: 'warn' }
         : null
     })
-    onCleanup(() => { offQuit(); offSessions(); offDirty() })
+    onCleanup(() => { offQuit(); offNode() })
   })
   onMount(() => {
-    const off = desktopExtras()?.onWillQuit(() => confirmWillEvent({
+    const off = desktopExtras()?.onWillQuit(async () => (await confirmWillEvent({
       kind: 'app:quit', payload: {}, title: 'Quit acorn', actionLabel: 'Quit',
-    }))
+    })).confirmed)
     if (off) onCleanup(off)
   })
 

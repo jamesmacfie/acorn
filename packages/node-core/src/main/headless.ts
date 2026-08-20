@@ -1,14 +1,14 @@
-// Headless step runner (docs/workflows.md) — the single biggest new workflow capability: run an
-// agent CLI to COMPLETION in a worktree and capture a structured result, modeled on the
-// term:previewUrl capture (run + timeout + parse). Interactive sessions stay spawnOne's job.
+// Headless step runner (docs/workflows.md): run an agent CLI to completion in a worktree and capture a
+// structured result, modelled on the term:previewUrl capture of run, timeout and parse. Interactive
+// sessions stay spawnOne's job.
 //
-// Argv templates per profile (the docs/workflows.md seam revived). Flags VERIFIED against the CLIs
-// installed on this machine (2026-07-03) — the design doc's names were re-checked per the plan:
+// Argv templates per profile. Flags verified against the CLIs installed on this machine (2026-07-03):
 //   claude: -p --output-format stream-json --verbose --json-schema <schema> --model <m>
-//           --permission-mode <mode>  (+ --resume <session_id> for continuity)
-//   codex:  exec --json --output-schema <FILE> -m <m>   (schema is a FILE path, not inline)
-// Agent CLIs are NEVER invoked in tests — the committed test/fixtures/fake-agent.sh stands in,
-// wired through this same argv-template path.
+//           --permission-mode <mode>, plus --resume <session_id> for continuity
+//   codex:  exec --json --output-schema <FILE> -m <m>, where the schema is a file path, not inline
+//
+// Agent CLIs are never invoked in tests: the committed test/fixtures/fake-agent.sh stands in, wired
+// through this same argv-template path.
 import { spawn } from 'node:child_process'
 import { lineDelimitedJsonAdapter, parseStreamJson } from './agentProfiles/streamJson'
 import type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent, StreamJsonAdapter } from './agentProfiles'
@@ -18,15 +18,15 @@ export type HeadlessMode = 'interactive' | 'headless'
 
 export type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent }
 
-// Build the non-interactive invocation for a profile. `command` is injectable so tests route the
-// same template through the fake agent script.
+// Build the non-interactive invocation for a profile. `command` is injectable so tests route the same
+// template through the fake agent script.
 export function buildHeadlessArgv(profileId: string, command: string, opts: HeadlessOpts): HeadlessArgv | null {
   return requireProfile(profileId).headlessArgv?.(command, opts) ?? null
 }
 
-// --- Stream-json parsing (pure). claude's -p stream: one JSON object per line; the final
-// `type: "result"` event carries result/session_id/cost and (with --json-schema) the structured
-// output. Unknown lines are kept as raw events — the Agents-panel feed (15) renders them.
+// --- Stream-json parsing, pure. claude's -p stream is one JSON object per line; the final
+// `type: "result"` event carries result, session_id, cost and, with --json-schema, the structured
+// output. Unknown lines are kept as raw events, which the Agents panel feed renders.
 export { parseStreamJson }
 
 // --- The runner ---
@@ -49,8 +49,8 @@ export function runHeadless(
 ): Promise<HeadlessResult> {
   return new Promise((resolve) => {
     const adapter = opts.adapter ?? lineDelimitedJsonAdapter
-    // detached → own process group, so the timeout kill reaps grandchildren too (a hung agent's
-    // own children would otherwise hold the stdio pipes open and stall the 'close' event).
+    // detached gives it its own process group, so the timeout kill reaps grandchildren too. A hung
+    // agent's own children would otherwise hold the stdio pipes open and stall the 'close' event.
     const child = spawn(argv.file, argv.args, { cwd: opts.cwd, env: opts.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
     let stdout = ''
     let lineBuffer = ''
@@ -109,7 +109,7 @@ export function runHeadless(
       if (cancelled) return resolve({ status: 'cancelled', exitCode, capture, stderrTail })
       if (timedOut) return resolve({ status: 'timeout', exitCode, capture, stderrTail })
       if (exitCode !== 0) return resolve({ status: 'error', exitCode, capture, stderrTail })
-      // Exit 0 but no result event → the output is unusable for edges: a typed error, not a guess.
+      // Exit 0 with no result event means output that's unusable for edges: a typed error, not a guess.
       if (capture.result == null && capture.structuredOutput == null) return resolve({ status: 'malformed', exitCode, capture, stderrTail })
       resolve({ status: 'ok', exitCode, capture, stderrTail })
     })

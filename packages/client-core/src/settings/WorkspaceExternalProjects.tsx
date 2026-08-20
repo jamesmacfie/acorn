@@ -10,7 +10,7 @@ import { Alert, Button, Checkbox } from '../ui/primitives'
 // The HOST draws this, for every provider, and that is the point. `workspace_external_projects` is
 // core's table on a core route, and the only writer it ever had lived inside the Linear plugin's browse
 // pane — so when that pane became a host-drawn rail, the mapping became unwritable and every
-// integration silently showed everything (docs/third-party/linear.md § 1). A plugin cannot get it back:
+// integration silently showed everything (docs/integrations.md § Linear). A plugin cannot get it back:
 // every workspace mutation is permanently unmappable on the frame bridge, and `CoreServices.projects`
 // has a provider-scoped READ and no write at all, both deliberately.
 //

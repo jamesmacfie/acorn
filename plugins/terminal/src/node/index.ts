@@ -42,6 +42,21 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         ctx.capabilities.provide(TASK_CREATED, registrations.taskCreated),
         ctx.capabilities.provide(WORKTREE_CREATED, registrations.worktreeCreated),
       ]
+      // Archiving stops a task's live sessions (the guard and the kill both go through the bridge
+      // above), so this is disclosure rather than an offer: no `apply`, because core already does it.
+      ctx.taskChecks.register({
+        id: 'sessions',
+        check: async (task) => {
+          const running = registrations.taskSessions.runningCount(task.id)
+          return running
+            ? {
+              id: 'running',
+              severity: 'warn' as const,
+              message: `${running} active session${running === 1 ? '' : 's'}`,
+            }
+            : null
+        },
+      })
       ctx.routes.register(terminal, { prefix: '', note: '/sessions, /profiles — PTY control only' })
 
       // Run targets are terminal sessions in the task worktree, so the service can only be built where

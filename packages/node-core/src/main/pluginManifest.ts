@@ -46,6 +46,7 @@ export type {
   PluginPaneLayout,
   PluginRefResolverDescriptor,
   PluginScheduleDescriptor,
+  PluginTaskCheckDescriptor,
 } from '@acorn/protocol/pluginContract.ts'
 
 // Cross-field checks, which is why they are here and not on the fields: every one of them needs
@@ -57,7 +58,7 @@ export type {
 // plugin may address its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read
 // core routes, or another plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The RENDERER twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -212,7 +213,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     if (entry.emptyState?.action) action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
     // A source panel has ONE rectangle beside its rail list, and both of these want it: a `navigate`
     // onSelect is the DETAIL half of a master/detail browse, and a reserved panel region is a dashboard
-    // in the same seat (docs/future/dashboards/placements.md). Declaring both would parse and then draw
+    // in the same seat (docs/dashboards.md § Placements). Declaring both would parse and then draw
     // one of them, which is the "installs and does nothing" failure this file exists to refuse.
     if (entry.panels && entry.onSelect?.verb === 'navigate') {
       ctx.addIssue({
@@ -269,6 +270,17 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     // its cadence forever against a 404. An error at install beats a run row that fails every hour.
     if (!manifest.node) {
       ctx.addIssue({ code: 'custom', path: at, message: 'a schedule runs a node route; declare `node` in the manifest' })
+    }
+  })
+  taskChecks.forEach((entry, i) => {
+    const at = ['contributions', 'taskChecks', i] as (string | number)[]
+    route(entry.check, [...at, 'check'])
+    if (entry.apply !== undefined) route(entry.apply, [...at, 'apply'])
+    // Verbatim the schedule rule above, and for the identical reason: only a node half serves
+    // `/v2/p/<id>/`, so a check declared by a client-only package would be asked on every archive and
+    // 404 every time. The owner would see a plugin that installed and does nothing.
+    if (!manifest.node) {
+      ctx.addIssue({ code: 'custom', path: at, message: 'a task check calls a node route; declare `node` in the manifest' })
     }
   })
   // ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ──────────────────────
@@ -405,7 +417,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules, ...taskChecks]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

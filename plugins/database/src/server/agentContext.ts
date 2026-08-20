@@ -1,24 +1,22 @@
 // "Saved database queries" in the agent composer, as the two routes the manifest's `agentContexts`
 // descriptor names.
 //
-// This used to be a client contribution over rows the renderer already held. Moving it to the node is
-// the same move http made, and the disclosure question is the easier half of that one: what travels
-// here is SQL a person wrote down and a note they wrote beside it. No credential ever enters this file
-// — the connection URL is resolved per connect in main/database.ts and never persisted, so there is
-// nothing here to redact, which is a fact worth stating rather than leaving the reader to check.
+// This used to be a client contribution over rows the renderer already held. What travels here is SQL a
+// person wrote down and a note they wrote beside it. No credential enters this file: the connection URL
+// is resolved per connect in main/database.ts and never persisted, so there's nothing to redact.
 //
-// What the host does NOT let this file decide: `source` (bound from the plugin id), the capture time,
+// What the host doesn't let this file decide: `source` (bound from the plugin id), the capture time,
 // and the byte measurement the 512 KiB composer ceiling is checked against.
 import { MAX_PLUGIN_AGENT_CONTEXT_OPTIONS } from '@acorn/protocol/agentContext.ts'
 import type { AgentContextOption, PluginAgentContextSnapshotBody } from '@acorn/protocol/agentContext.ts'
 import type { DbSavedQuery } from '../shared/database'
 
-// The composer's option list is capped by the host's parser; bound it here as well, so a project with
+// The composer's option list is capped by the host's parser. Bound it here too, so a project with
 // thousands of saved queries answers a list rather than one the host silently rejects whole.
 export const MAX_CONTEXT_QUERIES = MAX_PLUGIN_AGENT_CONTEXT_OPTIONS
 
 // A single query's SQL is bounded going into the table (20k), and this is the second bound: what one
-// snapshot may contribute to a prompt. Same number, restated at the boundary that has the ceiling.
+// snapshot may contribute to a prompt.
 const MAX_SNAPSHOT_SQL = 20_000
 
 export const savedQueryOption = (query: DbSavedQuery): AgentContextOption => ({
@@ -30,8 +28,7 @@ export const savedQueryOption = (query: DbSavedQuery): AgentContextOption => ({
 export const savedQuerySnapshot = (query: DbSavedQuery): PluginAgentContextSnapshotBody => ({
   // Stable rather than time-stamped: the composer replaces a snapshot by contextId, so re-capturing the
   // same query updates it instead of attaching it twice. The compiled contribution this replaces put
-  // `Date.now()` in here, which meant every capture of the same query stacked up in a draft. The host
-  // prefixes the plugin id.
+  // `Date.now()` here, so every capture stacked up in a draft. The host prefixes the plugin id.
   contextId: query.id,
   label: `Database · ${query.name}`,
   content: [

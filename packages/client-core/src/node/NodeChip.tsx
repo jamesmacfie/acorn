@@ -4,9 +4,9 @@ import { formatLastSeen, freshnessOf, FRESHNESS_LABELS, type FreshnessQuery } fr
 import { StatusDot } from '../ui/primitives'
 import './nodes.css'
 
-// The chip's six-value freshness vocabulary, in StatusDot's terms. NodeChip was the one *designed*
-// status indicator in the codebase, so it keeps its chip shape and its vocabulary; only the dot
-// itself is now the shared primitive.
+// The chip's six-value freshness vocabulary, in StatusDot's terms. NodeChip was the one designed status
+// indicator in the codebase, so it keeps its chip shape and its vocabulary; only the dot is the shared
+// primitive.
 const FRESHNESS_TONE = {
   live: 'ok',
   refreshing: 'accent',
@@ -16,13 +16,13 @@ const FRESHNESS_TONE = {
   error: 'bad',
 } as const
 
-// The two error codes the badge must not flatten into "offline". Both describe a node that is reachable
-// and answering; neither is fixed by waiting, which is exactly what "Offline" tells the owner to do.
+// The two error codes the badge must not flatten into "offline". Both describe a node that's reachable
+// and answering, and neither is fixed by waiting, which is exactly what "Offline" tells the owner to do.
 //
-//   identity_mismatch — a changed fingerprint is a security stop, not a connectivity blip
-//                       (docs/security.md).
-//   protocol_mismatch — the node speaks a major this app does not (docs/api-reference.md § Versioning).
-//                       The actionable half is the sub-line: one of the two has to be upgraded.
+//   identity_mismatch  a changed fingerprint is a security stop, not a connectivity blip
+//                      (docs/security.md).
+//   protocol_mismatch  the node speaks a major this app doesn't (docs/api-reference.md § Versioning).
+//                      The actionable half is the sub-line: one of the two has to be upgraded.
 const HARD_ERRORS = {
   identity_mismatch: { label: 'Identity changed', detail: 'identity changed' },
   protocol_mismatch: { label: 'Version mismatch', detail: 'upgrade the app or the node' },

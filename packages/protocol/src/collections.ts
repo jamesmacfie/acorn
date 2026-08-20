@@ -54,7 +54,7 @@ export const COLLECTION_FIELD_ROLES = ['title', 'status', 'assignee', 'url', 'up
 // A THIRD closed vocabulary — the views the host draws a collection with — and it lives here, on the
 // wire, rather than only in the renderer because a MANIFEST now names it: a plugin reserving a panel
 // region may narrow which views a user may compose there
-// (docs/future/dashboards/placements.md § The constraint vocabulary). A narrowing that named a kind
+// (docs/dashboards.md § Placements). A narrowing that named a kind
 // this build has no renderer for would be a constraint nobody can satisfy, so it is an enum and an
 // unknown entry is a parse error.
 //

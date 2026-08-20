@@ -4,7 +4,7 @@ import type { PanelView } from './model'
 import { aggregateRows } from './shaping'
 
 // THE STAT'S TREND: the sparkline beside the number and the delta under it
-// (docs/future/dashboards/measure-history.md § Display).
+// (docs/dashboards.md § Trends).
 //
 // Pure and tested, for the same reason `chart.ts` is: vitest here runs in node with no Solid plugin,
 // so `StatView.tsx` cannot be checked by anything and must therefore decide nothing. Every number on

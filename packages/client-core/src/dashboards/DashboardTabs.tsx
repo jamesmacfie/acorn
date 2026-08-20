@@ -7,7 +7,7 @@ import { ContextMenu, Menu, type MenuContext } from '../ui/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
 
-// The Home tab bar (docs/future/dashboards/tabs.md). It draws a list of names and calls three
+// The Home tab bar (docs/dashboards.md § Persistence). It draws a list of names and calls three
 // functions; a tab's CONTENT is the ordinary `home/<tabId>` placement the grid beside it renders, so
 // there is nothing here about panels at all.
 //

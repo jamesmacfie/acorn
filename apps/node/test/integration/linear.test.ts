@@ -137,7 +137,7 @@ describe('Linear provider parity', () => {
   it('contributes no rows when a connection has no linked projects, rather than the viewer’s own issues', async () => {
     // The fallback this replaces showed whatever was assigned to you, which answered a question nobody
     // asked and whose rows belonged to no project in the workspace. The rail says so instead, through the
-    // source's authored `emptyState` (docs/third-party/linear.md § finding 1).
+    // source's authored `emptyState` (docs/integrations.md § Linear).
     vi.mocked(linearFetch).mockImplementation(async () => graphQl({ issues: { nodes: [node('Urgent')] } }))
 
     const response = await app.fetch(new Request('http://acorn.test/api/linear/rail-items'), env())

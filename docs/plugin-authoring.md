@@ -105,7 +105,7 @@ is the widest one that owns tables; `plugins/model-providers/` is the narrowest 
 ### Contributions
 
 `contributions` is a loose object — a manifest written for a newer acorn contributes less on an older
-one rather than failing to parse — with fourteen named keys, each capped. The caps are not arbitrary:
+one rather than failing to parse — with nineteen named keys, each capped. The caps are not arbitrary:
 each one is the point past which a contribution stops being an integration and starts being an app
 inside someone else's chrome.
 
@@ -133,6 +133,7 @@ because its data comes from a route on your always-running node half.
 | `themes` | 8 | A **colour** theme: `{ id, label, dark?, tokens }`, where `tokens` is the complete palette. You write no CSS — the host generates the block. See below. |
 | `contextMenus` | 8 | A row on a host-drawn right-click menu: `{ id, location, label, icon?, order?, when?, action }`. `location` is from a closed list (`task.row` today); `when` is a map of literals that must all equal the target's facts; `action` takes the narrow verb set and receives the id of what was right-clicked. |
 | `extensionPoints` | 4 | A strip inside one of **your** panes that other plugins may fill: `{ id, label, location, surface }`. `location` is from a closed list (`pane.footer` today) and `surface` must be a `pane` this manifest declares. You write no code for it — the host draws the strip. |
+| `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
 | `extensions` | 8 | Rows **you** put inside another plugin's point: `{ id, point, label, order?, items, onSelect?, refresh? }`. `point` is `<ownerPluginId>:<pointId>`, `items` is a GET on your own namespace, `onSelect` takes the narrow verb set. |
 
 A theme is the one contribution with no route and no bundle behind it, so it is the cheapest thing a
@@ -173,6 +174,35 @@ designated surfaces (`rail.taskList` today). Declaring one **seizes nothing** �
 provider in Settings → Plugins, and acorn draws its own again the moment your plugin is disabled or your
 surface throws. It is not a pane, so no verb can name it and it never appears in the pane switcher.
 
+A `taskChecks` entry is the one contribution that runs when a person is about to lose something.
+Archiving a task removes its worktree, so the host asks every plugin first and draws the answers in one
+dialog. Your `check` route is called with `?taskId=`, and answers either `{ concern: null }` — the
+common case, which must stay cheap — or:
+
+```json
+{ "concern": { "id": "containers", "severity": "warn",
+               "message": "8 running containers are linked to this task",
+               "details": ["api", "db", "worker"], "detailsMore": 5,
+               "action": { "label": "Also stop its containers", "checked": true } } }
+```
+
+`details` is drawn as a list under the message, capped at five, with `detailsMore` counting what did
+not fit so the host writes "+5 more" for you. `action` draws a checkbox, and if it is still ticked when
+the owner confirms, the host POSTs `{ taskId }` to your `apply` — while the worktree still exists, so
+a cleanup that needs it has it. Declare no `apply` and no checkbox is drawn, whatever your answer says:
+that is the advisory mode, and it is the right one for anything you should not do on someone's behalf.
+
+Three deadlines to write against. Your check has **two seconds**, because a person is watching a
+dialog; your cleanup has sixty. Both `AbortSignal`s are a courtesy, not a leash — the host stops
+waiting either way, so a check that wants to be included has to be quick rather than merely
+interruptible. A check that is slow, throws, or answers with something the host cannot draw
+contributes no row, exactly like one that found nothing; the archive is never blocked by your plugin
+being broken.
+
+Both routes are confined like every other, and both are shown in the trust prompt — the second line
+says you offer to clean up, so a version that starts changing something where it used to only warn
+reads as newly requested.
+
 Every path in every descriptor is confined at parse time to `/v2/p/<id>/` — your own namespace and
 nothing else. That check lives in `pluginManifest.ts` rather than on the fields because it needs `id`,
 and it is the parse-time twin of the runtime confinement the frame bridge applies.
@@ -184,7 +214,8 @@ whose `onSelect` navigates to it (its only mount site); an `overlay` needs an ac
 `surfaceAction` may name only a `document-over-frame` pane; a webview needs a client bundle; an
 extension point must hang off a `pane` this manifest declares and only one may sit at each location on
 it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference and its `items` route
-must be your own; a `coreSlot` surface needs both a designated slot name and a client bundle; and no id
+must be your own; a `taskChecks` entry needs a `node` half, since only that serves the namespace its two
+routes live in; a `coreSlot` surface needs both a designated slot name and a client bundle; and no id
 may repeat across contributions.
 
 ### The action verbs

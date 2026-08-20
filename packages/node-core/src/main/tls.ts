@@ -6,28 +6,28 @@ import { join } from 'node:path'
 const TLS_DIR = 'tls'
 const KEY_FILE = 'key.pem'
 const CERT_FILE = 'cert.pem'
-// 20 years. A local dev tool that stops working on a Tuesday because a cert it minted itself expired
-// is a worse failure than a long-lived key, and rotation means re-pairing every device.
+// 20 years. A local dev tool that stops working on a Tuesday because a cert it minted itself expired is
+// a worse failure than a long-lived key, and rotation means re-pairing every device.
 const DAYS = '7300'
 
 export type NodeCertificate = {
   keyPem: string
   certPem: string
-  // sha256 of the DER, lowercase hex without separators. The broker normalizes both sides of the
-  // comparison (main/nodeBroker.ts), so the only requirement here is that it is stable.
+  // sha256 of the DER, lowercase hex with no separators. The broker normalizes both sides of the
+  // comparison (main/nodeBroker.ts), so the only requirement is that it's stable.
   fingerprint: string
 }
 
 export const certificateFingerprint = (certPem: string): string =>
   new X509Certificate(certPem).fingerprint256.replace(/:/g, '').toLowerCase()
 
-// Every extension is set EXPLICITLY rather than left to OpenSSL 3's `-x509` defaults, because two of
-// them are load-bearing beyond "the handshake works":
-//   basicConstraints CA:TRUE   lets this one file double as a trust anchor, so a spawned child gets
-//                              full validation from NODE_EXTRA_CA_CERTS with zero code and no
-//                              `rejectUnauthorized: false` anywhere (docs/mcp.md).
-//   subjectAltName IP:127.0.0.1  is what makes that child's hostname check PASS instead of having to
-//                              be disabled. A cert with only a CN is not matched by any modern client.
+// Every extension is set explicitly rather than left to OpenSSL 3's `-x509` defaults, because two are
+// load-bearing beyond "the handshake works":
+//   basicConstraints CA:TRUE     lets this one file double as a trust anchor, so a spawned child gets
+//                                full validation from NODE_EXTRA_CA_CERTS with no code and no
+//                                `rejectUnauthorized: false` anywhere (docs/mcp.md).
+//   subjectAltName IP:127.0.0.1  is what makes that child's hostname check pass instead of having to be
+//                                disabled. No modern client matches a cert with only a CN.
 function generate(keyPath: string, certPath: string): void {
   try {
     execFileSync(
@@ -41,13 +41,13 @@ function generate(keyPath: string, certPath: string): void {
         '-addext', 'basicConstraints=critical,CA:TRUE',
         '-addext', 'keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign',
       ],
-      // stdin ignored so a prompt can never hang boot; stderr captured for the error message below
-      // (openssl writes only progress dots there, never key material).
+      // stdin ignored so a prompt can never hang boot; stderr captured for the error message below,
+      // where openssl writes only progress dots.
       { stdio: ['ignore', 'ignore', 'pipe'] },
     )
   } catch (error) {
-    // Never leave half a pair behind: a key with no cert would be read as "already provisioned" on
-    // the next boot and fail somewhere much less explicable.
+    // Never leave half a pair behind: a key with no cert reads as "already provisioned" on the next boot
+    // and fails somewhere much less explicable.
     rmSync(keyPath, { force: true })
     rmSync(certPath, { force: true })
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -60,18 +60,18 @@ function generate(keyPath: string, certPath: string): void {
   }
 }
 
-// Read (or, on first start, mint) this data root's certificate. Idempotent: a second call returns the
-// same fingerprint, which is what makes it safe to call on every boot.
+// Read, or on first start mint, this data root's certificate. Idempotent: a second call returns the same
+// fingerprint, which is what makes it safe to call on every boot.
 export function ensureCert(root: string): NodeCertificate {
   const dir = join(root, TLS_DIR)
-  // 0700 BEFORE openssl runs: it writes the key under the ambient umask, so the directory — not a
-  // post-hoc chmod — is what closes the window in which a 0644 private key exists.
+  // 0700 before openssl runs: it writes the key under the ambient umask, so the directory rather than a
+  // post-hoc chmod is what closes the window in which a 0644 private key exists.
   mkdirSync(dir, { recursive: true, mode: 0o700 })
   chmodSync(dir, 0o700)
 
   const keyPath = join(dir, KEY_FILE)
   const certPath = join(dir, CERT_FILE)
-  // Both or neither. Half a pair means an interrupted generate (or a hand-edited root), and the only
+  // Both or neither. Half a pair means an interrupted generate, or a hand-edited root, and the only
   // recovery that leaves a working node is to mint a fresh pair.
   if (!existsSync(keyPath) || !existsSync(certPath)) generate(keyPath, certPath)
   chmodSync(keyPath, 0o600)

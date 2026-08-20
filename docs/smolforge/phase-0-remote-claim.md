@@ -16,7 +16,7 @@ self-hosted deployment on any domain) is currently just "a git project with a re
 for git operations, invisible to integrations.
 
 The GitHub columns are fine and stay (the projects migration owns them; do not disturb its
-dual-write invariants — docs/projects/README.md). What's missing is the generic version.
+dual-write invariants — docs/workspaces-and-tasks.md). What's missing is the generic version.
 
 ## Design
 
@@ -62,7 +62,7 @@ on folder changes and via `POST /v2/core/projects/:id/detect`): run every regist
 multiple providers (mirrors exist); each row is independent. Rows are a cache of disk truth,
 exactly like facets: safe to drop, rebuilt on next detection.
 
-Migration workflow per docs/projects/README.md practical notes (schema.ts →
+Migration workflow per docs/workspaces-and-tasks.md practical notes (schema.ts →
 `pnpm --filter @acorn/node-core db:generate` → replay check).
 
 ### API and client
@@ -76,7 +76,7 @@ Migration workflow per docs/projects/README.md practical notes (schema.ts →
   onto claims is a later cleanup, noted, not required.
 - Cache note: project payloads are persisted in the renderer's IndexedDB query cache with no
   buster — adding an **optional** field is safe; do not make `claims` required on the persisted
-  type without bumping the query key (docs/projects/README.md, client cache gotcha).
+  type without bumping the query key (docs/workspaces-and-tasks.md, client cache gotcha).
 
 ## Why not URL-pattern strings in the manifest instead of a parse function?
 

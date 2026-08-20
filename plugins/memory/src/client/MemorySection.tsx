@@ -6,12 +6,14 @@ import './memory-section.css'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
-// The memory surfaces of the Manifest pane (docs/agent-tools.md), kept as a child in the memory
-// plugin so it owns every memoryApi() call: the human gate over auto-generated proposals — accept
-// (with an optional description edit) writes to the task worktree + index, reject leaves no trace —
-// and the manual "+ memory" form (project scope → the task worktree, lands via its PR; private scope →
-// ~/.acorn/memory). `onChanged` lets the host refresh its assembled-context view after a write;
-// `onPendingChange` surfaces the pending-proposal count on the Manifest's memory section row.
+// The memory surfaces of the Manifest pane (docs/agent-tools.md), kept as a child in the memory plugin
+// so it owns every memoryApi() call. Two things: the human gate over auto-generated proposals, where
+// accept (with an optional description edit) writes to the task worktree and index and reject leaves no
+// trace, and the manual "+ memory" form, where project scope goes to the task worktree and lands via
+// its PR while private scope goes to ~/.acorn/memory.
+//
+// `onChanged` lets the host refresh its assembled-context view after a write; `onPendingChange`
+// surfaces the pending-proposal count on the Manifest's memory section row.
 export default function MemorySection(props: {
   task: Task
   onChanged: () => void
@@ -48,8 +50,8 @@ export default function MemorySection(props: {
   const [memType, setMemType] = createSignal<MemoryType>('convention')
   const [memScope, setMemScope] = createSignal<'project' | 'private'>('project')
   const [memBody, setMemBody] = createSignal('')
-  // Only failures live here now: success and failure used to share one muted grey span, so a failed
-  // save read exactly like a successful one. The success is a toast; a failure needs to persist.
+  // Only failures live here now. Success and failure used to share one muted grey span, so a failed save
+  // read exactly like a successful one. Success is a toast; a failure needs to persist.
   const [memMsg, setMemMsg] = createSignal<string | null>(null)
 
   async function addMemory() {

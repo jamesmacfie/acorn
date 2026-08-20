@@ -11,9 +11,9 @@ import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
 import './styles/pull-detail.css'
 
-// Mid (Navigator) pane in create mode: base/head pickers + title/body/draft + Create. base/head
-// live in the URL (?base=&head=) so they're shareable and reactive — the compare query and the
-// right-pane preview both read them. Title/body prefill from the compare until the user edits.
+// Mid (Navigator) pane in create mode: base and head pickers, title, body, draft and Create. base and
+// head live in the URL (?base=&head=) so they're shareable and reactive, and the compare query and the
+// right-pane preview both read them. Title and body prefill from the compare until the user edits.
 export default function CreatePullForm() {
   const params = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -40,7 +40,7 @@ export default function CreatePullForm() {
   const [touched, setTouched] = createSignal(false)
   const [error, setError] = createSignal('')
 
-  // Prefill title/body from the compare once it lands, until the user types in either field.
+  // Prefill title and body from the compare once it lands, until the user types in either field.
   createEffect(() => {
     const data = compare.data
     if (!data || touched()) return
@@ -49,9 +49,9 @@ export default function CreatePullForm() {
     setBody(filled.body)
   })
 
-  // Restore this repo's stored draft (created after the prefill effect so it wins over a prefill that
-  // resolves from cache on the first tick), then keep writing it back as the user edits. Deps are
-  // explicit via `on` — the body must not subscribe to the fields it assigns.
+  // Restore this repo's stored draft, created after the prefill effect so it wins over a prefill that
+  // resolves from cache on the first tick, then keep writing it back as the user edits. Deps are
+  // explicit via `on`, because the body must not subscribe to the fields it assigns.
   createEffect(
     on(
       () => `${o()}/${r()}`,
@@ -61,7 +61,7 @@ export default function CreatePullForm() {
         setBody(d?.body ?? '')
         setDraft(d?.draft ?? false)
         setTouched(d?.touched ?? false)
-        // The URL wins when it carries a comparison already (back-navigation, a shared link).
+        // The URL wins when it carries a comparison already: back-navigation, or a shared link.
         if (d && !searchParams.base && !searchParams.head && (d.base || d.head))
           setSearchParams({ base: d.base || undefined, head: d.head || undefined }, { replace: true })
       },
@@ -96,7 +96,7 @@ export default function CreatePullForm() {
     }
   }
 
-  // Substring filter over the loaded branches; the shared Picker owns the popover + filter input.
+  // Substring filter over the loaded branches; the shared Picker owns the popover and filter input.
   const branchResults = (query: string) => {
     const q = query.trim().toLowerCase()
     const list = branches.data ?? []

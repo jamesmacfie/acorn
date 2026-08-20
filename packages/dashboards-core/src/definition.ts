@@ -196,7 +196,7 @@ const parseView = (raw: unknown): PanelView => {
   const shape = raw.shape === 'bar' || raw.shape === 'line' ? raw.shape : undefined
   const x = str(raw.x)
   const series = str(raw.series)
-  // The trend keys (docs/future/dashboards/measure-history.md § Display), literal-checked exactly
+  // The trend keys (docs/dashboards.md § Trends), literal-checked exactly
   // like `shape` above and dropped when malformed. `trend: 'history'` is also what the NODE's
   // sampler selects on, so a client that drops these keys on a round trip does not corrupt the
   // panel — the series simply stops accruing until a newer client writes them back.

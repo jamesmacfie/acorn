@@ -104,7 +104,15 @@ refused with a `worktree-stale` 409, and a worktree that cannot be created is re
 task another branch's files, which is the tree its agent then read and edited.
 
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
-failures instead of pretending removal succeeded.
+failures instead of pretending removal succeeded. Its order is guard → repo teardown script → stop
+sessions → plugin cleanups → remove worktree → mark archived; the two teardown steps sit before
+removal so anything that needs the worktree still has it.
+
+Before any of that, the confirmation dialog asks every plugin what it has to say about this task —
+running containers, uncommitted files, live sessions — and offers whatever cleanup each one declared.
+That is a plugin contribution called a task check, and it is the only way anything reaches that
+dialog: [plugins.md § Task checks](./plugins.md). A cleanup that fails names its plugin; the task is
+still archived, because it is.
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these

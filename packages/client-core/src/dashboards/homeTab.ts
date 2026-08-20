@@ -3,7 +3,7 @@ import { PrefKeys } from '../persistence/prefKeys'
 import { appStateBinding, type PersistedStateSlice } from '../persistence/persistedState'
 import { MAX_TABS, type DashboardTab } from './persist'
 
-// The tab bar's own state and arithmetic (docs/future/dashboards/tabs.md § UX). Everything a tab IS
+// The tab bar's own state and arithmetic (docs/dashboards.md § Persistence). Everything a tab IS
 // lives in `persist.ts` — a tab is the placement scope `home/<tabId>` and a name in the `tabs` list.
 // What is here is the two things that are NOT the model:
 //

@@ -3,9 +3,9 @@ import * as api from './api'
 import { linearProjectIssuesRoute } from './api'
 
 // Protocol's api.test.ts had no Linear cases, so these are new rather than moved. They pin what tsc
-// cannot see: a retyped route template compiles fine and 404s.
+// can't see: a retyped route template compiles fine and 404s.
 //
-// The batch query key that used to be pinned here is gone with `contract/issues.ts` — the host owns one
+// The batch query key that used to be pinned here is gone with `contract/issues.ts`. The host owns one
 // key for every provider's resolver now, and client-core/registries/refResolvers.ts carries the
 // persisted-cache warning that came with it.
 describe('linear wire contract', () => {
@@ -14,8 +14,8 @@ describe('linear wire contract', () => {
       .toBe('/v2/p/linear/project-issues?integration=conn-1&ids=p2%2Cp1')
   })
 
-  // The same net protocol's api.test.ts keeps over its own builders, scoped to this plugin:
-  // enumerated from the module rather than listed, so a new route is covered the day it lands.
+  // The same net protocol's api.test.ts keeps over its own builders, scoped to this plugin: enumerated
+  // from the module rather than listed, so a new route is covered the day it lands.
   it('namespaces every exported route builder under its own plugin prefix', () => {
     const dummy = ['x']
     const paths = Object.entries(api)

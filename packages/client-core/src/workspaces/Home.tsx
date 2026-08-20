@@ -29,7 +29,7 @@ export default function Home() {
     return !project?.hidden
   })
 
-  // ── Dashboards (docs/future/dashboards/tabs.md) ─────────────────────────────────────────────
+  // ── Dashboards (docs/dashboards.md § Persistence) ─────────────────────────────────────────────
   //
   // A tab is a placement scope, so all Home owns is WHICH ONE the grid is pointed at. With one
   // dashboard there is no bar, the scope is the bare `home` key and this page is what it always was.

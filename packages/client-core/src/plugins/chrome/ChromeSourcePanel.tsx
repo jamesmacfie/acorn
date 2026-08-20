@@ -30,7 +30,7 @@ export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourc
 
 // "Nothing here yet." is true and tells nobody anything, and its uselessness had a real cost: linear
 // answered an unmapped workspace by showing the viewer's own assigned issues instead, because a wrong
-// list beat a blank one (docs/third-party/linear.md § finding 1). A source can now say what empty means
+// list beat a blank one (docs/integrations.md § Linear). A source can now say what empty means
 // here and offer one place to go.
 //
 // One action, no markup, no per-facet variants. The action is optional and NOT a gap to be filled later
@@ -214,7 +214,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           </Show>
         </div>
       </section>
-      {/* The user's own dashboard, beside this source's list (docs/future/dashboards/placements.md).
+      {/* The user's own dashboard, beside this source's list (docs/dashboards.md § Placements).
           The easy sibling of a pane's aside, because this section is already the HOST's markup — no
           frame boundary is involved anywhere, so there is nothing here but a scope and a container.
 

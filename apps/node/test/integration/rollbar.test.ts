@@ -49,7 +49,7 @@ const API_ITEM = {
   last_occurrence_id: 555,
 }
 
-// Synthetic occurrence — no real value, no token, no PII.
+// Synthetic occurrence: no real value, no token, no PII.
 const INSTANCE = {
   id: 555,
   timestamp: 1_700_100_000,
@@ -60,7 +60,7 @@ const INSTANCE = {
   },
 }
 
-// Compatibility item fetch = canonical item + occurrence list + selected occurrence detail.
+// Compatibility item fetch: canonical item, occurrence list, and selected occurrence detail.
 const mockDetailFetch = () => {
   vi.mocked(rollbarFetch)
     .mockResolvedValueOnce(rollbarJson(API_ITEM))
@@ -68,7 +68,7 @@ const mockDetailFetch = () => {
     .mockResolvedValueOnce(rollbarJson(INSTANCE))
 }
 
-describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
+describe('Rollbar source (docs/integrations.md, docs/integrations.md § Rollbar)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
 
@@ -82,8 +82,8 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
       await next()
     })
     app.route('/api/integrations', integrations)
-    // Through the portable carrier, exactly as production mounts it — rollbar has no compiled router
-    // to hand `app.route` any more.
+    // Through the portable carrier, exactly as production mounts it: rollbar has no compiled router to
+    // hand `app.route` any more.
     const fetch = createRollbarFetch()
     app.all('/api/rollbar/*', (c) => servePluginFetch(c, { pluginId: 'rollbar', mount: '/api/rollbar', fetch }))
   })
@@ -252,8 +252,8 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
     await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142/occurrences?integration=${integrationId}`), env())
     const [cached] = await t.db.select().from(schema.issueResources)
     const envelope = JSON.parse(cached.data) as { value: RollbarOccurrencesResponse }
-    // A child row may contain an `unknown` normalization; the provider must recognize the stored
-    // value as stale and refresh it.
+    // A child row may contain an `unknown` normalization; the provider must recognize the stored value
+    // as stale and refresh it.
     await t.db.update(schema.issueResources).set({ data: JSON.stringify(envelope.value) })
 
     const before = vi.mocked(rollbarFetch).mock.calls.length
@@ -281,7 +281,7 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
 
   it('legacy counter-only link resolves to the canonical item', async () => {
     const integrationId = await connect()
-    // No prior list/summary → detail must resolve via item_by_counter, which still returns id 999.
+    // No prior list or summary, so detail must resolve via item_by_counter, which still returns id 999.
     mockDetailFetch()
     const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
     expect(res.status).toBe(200)
@@ -291,7 +291,7 @@ describe('Rollbar source (docs/integrations.md, docs/next/rollbar.md)', () => {
   it('partial success: one connection fails, the other still returns items', async () => {
     const good = await connect('good')
     const bad = await connect('bad')
-    // Order of connections is by creation; both listed. Mock: good succeeds, bad 500s.
+    // Order of connections is by creation, and both are listed. The mock has good succeed and bad 500.
     vi.mocked(rollbarFetch)
       .mockResolvedValueOnce(rollbarJson({ items: [API_ITEM] }))
       .mockResolvedValueOnce(new Response('boom', { status: 500 }))

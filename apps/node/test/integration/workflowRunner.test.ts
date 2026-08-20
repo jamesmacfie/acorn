@@ -14,13 +14,12 @@ registerBuiltInProfiles() // profiles come from the agents plugin
 
 const FAKE_AGENT = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-agent.sh')
 
-// Real fake-agent steps over a real DB + a real NotesStore: the handoff substrate is exercised,
-// not stubbed. Only policy/checks/notify are test doubles.
+// Real fake-agent steps over a real DB and a real NotesStore: the handoff substrate is exercised, not
+// stubbed. Only policy, checks and notify are test doubles.
 describe('WorkflowRunner (docs/workflows.md)', () => {
-  // TWO databases, because there are two databases now: the runner writes its runs and steps into the
-  // workflows plugin's own file, and core's holds the `tasks` rows the fan-out test asserts over. A test
-  // that could reach both through one handle would keep passing after the plugin started reading a table
-  // it no longer owns.
+  // Two databases, because there are two: the runner writes its runs and steps into the workflows
+  // plugin's own file, and core's holds the `tasks` rows the fan-out test asserts over. A test reaching
+  // both through one handle would keep passing after the plugin started reading a table it no longer owns.
   let t: TestDb
   let wf: TestPluginDb
   let dir: string
@@ -101,12 +100,12 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       ['build', 'done'],
       ['review', 'done'],
     ])
-    // Transitions persisted with the captured result + structured output + session id.
+    // Transitions persisted with the captured result, structured output and session id.
     expect(JSON.parse(steps[0].structuredJson!)).toEqual({ summary: 'guarded the null token', files: ['src/auth/login.ts'] })
     expect(steps[0].sessionId).toBe('fake-sess-1')
     expect(steps[0].costUsd).toBeCloseTo(0.0123)
 
-    // The handoff note exists (author: workflow) and appeared in review's assembled input.
+    // The handoff note exists with author `workflow`, and appeared in review's assembled input.
     const handoff = await notes.read({ scope: 'task', taskId: 'task1' }, `workflow-handoffs-${runId}`)
     expect(handoff.author).toBe('workflow')
     expect(handoff.body).toContain('guarded the null token')
@@ -143,7 +142,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(steps.map((s) => s.status)).toEqual(['done', 'waiting-gate', 'pending'])
     expect(d.notify).toHaveBeenCalledWith('task1', 'gate', expect.stringContaining('needs you'))
 
-    // NO further transitions while gated — the final step must not start.
+    // No further transitions while gated: the final step must not start.
     await new Promise((r) => setTimeout(r, 300))
     steps = await runner.steps(runId)
     expect(steps[2].status).toBe('pending')
@@ -184,7 +183,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   })
 
   it('policy gate ignores a lying step result — the verdict is re-derived in the runtime', async () => {
-    // The agent step CLAIMS success in its structured output; the policy dep says red. Red wins.
+    // The agent step claims success in its structured output; the policy dep says red. Red wins.
     structuredByStep = { build: '{"ci":"green","trust_me":true}' }
     const d = deps()
     d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'checks mirror says failing' }))
@@ -216,7 +215,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const [step] = await runner.steps(runId)
     expect(step.iteration).toBe(2)
 
-    // Never green → the bound is a first-class terminal state.
+    // Never green, so the bound is a first-class terminal state.
     const d2 = deps()
     d2.failingChecks = vi.fn(async () => '- test: failure')
     const runner2 = new WorkflowRunner(wf.db, d2)
@@ -290,7 +289,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const { ensureWorktree } = await import('@acorn/node-core/main/worktrees.ts')
     const { schema } = await import('@acorn/node-core/server/db/index.ts')
 
-    // Real repo + worktrees per child (never the acorn repo).
+    // Real repo and worktrees per child, never the acorn repo.
     const checkout = join(dir, 'checkout')
     execFileSync('git', ['init', '-q', '-b', 'main', checkout])
     execFileSync('git', ['-C', checkout, 'config', 'user.email', 't@t.test'])
@@ -360,7 +359,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
 
-    // 3 child task rows with parentId + real worktrees on their branches.
+    // Three child task rows with parentId, on real worktrees on their branches.
     const taskRows = await t.db.select().from(schema.tasks)
     expect(taskRows.filter((r) => r.parentId === 'task1')).toHaveLength(3)
     for (const id of childTaskIds) expect(existsSync(cwdByTask.get(id)!)).toBe(true)
@@ -377,7 +376,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(joined.results).toHaveLength(3)
     expect(joined.failures).toBe(0)
 
-    // Partial failure: child-2 fails → the join (and run) are marked, all outcomes recorded.
+    // Partial failure: child-2 fails, so the join and the run are marked and all outcomes recorded.
     failSecondChild = true
     childTaskIds.length = 0
     const runId2 = await runner.start('task1', DEF_FAN)
@@ -534,8 +533,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runId = await runner.start('task1', DEF)
     await waitDone(runner, runId)
 
-    // Simulate a crash mid-run: force step B back to 'running' with the run 'running', as if the
-    // app died while it executed, then reconstruct a FRESH runner over the same DB.
+    // Simulate a crash mid-run: force step B back to 'running' with the run 'running', as if the app
+    // died while it executed, then reconstruct a fresh runner over the same DB.
     const steps = await runner.steps(runId)
     const { eq } = await import('drizzle-orm')
     await wf.db.update(workflowSteps).set({ status: 'running' }).where(eq(workflowSteps.id, steps[1].id))

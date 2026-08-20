@@ -1,9 +1,9 @@
-// Memory auto-generation (docs/notes-and-memory.md): the harness dividend — acorn owns the task boundary,
-// so extraction fires deterministically at task completion (agent session end / archive), runs a
-// HEADLESS memory-review step (fake agent in tests), passes a cheap verify (referenced files
-// exist, duplicate content-hash, contradiction flag), and files PROPOSALS through the human gate
-// (12's counter to LLM-rewrite corruption). Nothing touches disk as memory until a human accepts;
-// accepted memories land in the TASK WORKTREE (reviewed via its PR) + the index updates.
+// Memory auto-generation (docs/notes-and-memory.md). acorn owns the task boundary, so extraction fires
+// deterministically at task completion (agent session end or archive), runs a headless memory-review
+// step (a fake agent in tests), passes a cheap verify (referenced files exist, duplicate content-hash,
+// contradiction flag), and files proposals through the human gate. Nothing touches disk as memory until
+// a human accepts; accepted memories land in the task worktree, reviewed via its PR, and the index
+// updates.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { HeadlessResult } from '@acorn/plugin-api/node'
@@ -47,8 +47,9 @@ export type VerifyContext = {
 
 export type VerifiedCandidate = { candidate: MemoryCandidate; blocking: string[]; flags: string[] }
 
-// The three checks acorn needs: dangling references and duplicates block; a same-name, different-content
-// memory is flagged for human resolution at the gate (supersede, never overwrite in place).
+// The three checks acorn needs: dangling references and duplicates block, and a same-name,
+// different-content memory is flagged for human resolution at the gate. Supersede, never overwrite in
+// place.
 export function verifyCandidates(candidates: MemoryCandidate[], ctx: VerifyContext): VerifiedCandidate[] {
   return candidates.map((candidate) => {
     const blocking: string[] = []
@@ -130,7 +131,7 @@ export async function generateMemoryProposals(deps: MemoryGenDeps): Promise<Memo
   return { proposed, rejected }
 }
 
-// --- The gate's verdict paths (the ONLY way memory lands on disk from this pipeline) ---
+// --- The gate's verdict paths: the only way memory lands on disk from this pipeline ---
 
 export async function acceptProposal(
   store: MemoryProposalStore,
