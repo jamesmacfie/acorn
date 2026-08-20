@@ -107,8 +107,8 @@ describe('generating a theme block', () => {
 
 describe('a hostile theme cannot escape the block it is written into', () => {
   // The single real attack surface in this feature. Each value below is a way out of a CSS
-  // declaration; none of them may reach the stylesheet, and the check is that generation THROWS
-  // rather than that the output is escaped — an escaper is a thing that can be subtly wrong.
+  // declaration; none of them may reach the stylesheet, and the check is that generation throws
+  // rather than that the output is escaped: an escaper is a thing that can be subtly wrong.
   const escapes = [
     '#fff; } :root { --bg: red',
     '#fff }',
@@ -173,8 +173,8 @@ describe('a stored preference outliving its plugin', () => {
   })
 
   it('falls back to the built-in default once the owner is gone, without touching the pref', () => {
-    // Disabled, uninstalled, its bundle no longer trusted, or its node unreachable — all of them
-    // reach this function as the same absence, which is exactly why the fallback is a READ and the
+    // Disabled, uninstalled, its bundle no longer trusted, or its node unreachable. All of them
+    // reach this function as the same absence, which is exactly why the fallback is a read and the
     // stored value is left alone: the pref has to survive a node having a bad minute.
     const entry = register('board', theme())
     entry.dispose()

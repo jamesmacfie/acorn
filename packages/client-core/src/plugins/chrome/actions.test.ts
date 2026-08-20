@@ -16,7 +16,7 @@ const { setTaskLookup } = await import('../../tasks/taskLookup')
 type Task = import('../../queries').Task
 const { closePluginOverlay, pluginOverlayOpen } = await import('../frames/overlays')
 
-// The two verbs that decide WHERE a rail row's detail appears, which is the one thing the descriptor tier
+// The two verbs that decide where a rail row's detail appears, which is the one thing the descriptor tier
 // could not previously express. They are disjoint by manifest rule, and this pins the runtime half of that:
 // `openPane` still refuses without a task, `navigate` never needs one.
 
@@ -40,7 +40,7 @@ describe('openPane', () => {
 
   it('takes the reader to the task the click site named, and selects the row there', () => {
     // A dashboard row is drawn outside every task, so without the named task this would open the pane in
-    // whatever task happened to be on screen — never the one the row is about.
+    // whatever task happened to be on screen, never the one the row is about.
     disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
     setTaskLookup((taskId) => (taskId === 'task-2' ? ({ id: 'task-2', links: [] } as unknown as Task) : undefined))
     setActiveTaskId('task-1')
@@ -83,7 +83,7 @@ describe('openOverlay', () => {
 })
 
 describe('surfaceAction', () => {
-  // The one verb whose effect lands INSIDE a plugin. Fire-and-forget by design: a pane nobody has open
+  // The one verb whose effect lands inside a plugin. Fire-and-forget by design: a pane nobody has open
   // has no frame listening, which is the honest outcome for a command meaning "do this in the thing I
   // am looking at". It is deliberately NOT retained the way a pane intent is.
   it('emits the command id to the named surface, addressed by plugin', async () => {
@@ -96,7 +96,7 @@ describe('surfaceAction', () => {
 
   it('refuses without a command id, because what it delivers IS the command id', async () => {
     // A footer badge's click has no command in scope. Rather than invent a second name for the thing
-    // being delivered, the verb declines there — visibly, so an author is told.
+    // being delivered, the verb declines there, visibly, so an author is told.
     const heard: unknown[] = []
     const off = clientEvents.on('plugin:surface-action', (event) => void heard.push(event))
     runChromeAction({ verb: 'surfaceAction', surface: 'database' }, { pluginId: 'database', nodeId: 'node-a' })

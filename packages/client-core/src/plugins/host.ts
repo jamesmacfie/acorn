@@ -6,11 +6,11 @@ import { pluginCustody, type PluginDevGrantRequest, type PluginHostState, type P
 // Every other module in the client reaches the bundle cache and the trust store through this one
 // file, never through the platform seam's `pluginCustody()` directly. That is the whole design: today it fronts
 // Electron main's content-addressed store, and a future web client (docs/future/remote.md) fronts
-// IndexedDB plus server-side per-user acknowledgements. The INTERFACE is the part that has to stay
+// IndexedDB plus server-side per-user acknowledgements. The interface is the part that has to stay
 // portable; the storage behind it is not, and letting the host object leak through client code would
 // make the storage the contract by accident. `src/platform/` generalised this rule to the whole seam.
 //
-// Absent means "no host for third-party plugins here" — a browser build, or a test. Every caller
+// Absent means "no host for third-party plugins here": a browser build, or a test. Every caller
 // treats that as "nothing installed", never as an error.
 
 const bridge = pluginCustody
@@ -24,7 +24,7 @@ export const readPluginHostState = async (): Promise<PluginHostState> => {
 }
 
 // Ask the host to fetch a plugin's client bundle from a node and cache it. The bytes never come back
-// here — the answer is the hash the HOST computed from what arrived, which is the only hash anything
+// here. The answer is the hash the host computed from what arrived, which is the only hash anything
 // in this system is allowed to trust.
 export const cachePluginBundle = async (request: {
   nodeId: string

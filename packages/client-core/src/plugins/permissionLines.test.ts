@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
 
-// The permission DIFF the update prompt shows is a set-difference over the grant KEYS, so the wording
+// The permission diff the update prompt shows is a set-difference over the grant keys, so the wording
 // is free to change and the identifier is what has to stay stable. That makes this a contract test on
 // the keys, and a readability check on the sentences.
 
@@ -106,7 +106,7 @@ describe('the update diff', () => {
 
   it('marks a growing set of unrecognised requests as new', () => {
     // The count is in the key on purpose. An update asking for three things this shell cannot name
-    // where it previously asked for one HAS grown its reach — and it is the growth an owner can
+    // where it previously asked for one has grown its reach, and it is the growth an owner can
     // reason about least, so it is the last thing that should diff as unchanged.
     const before = permissions({ api: ['core.quantum:read'] })
     const after = permissions({ api: ['core.quantum:read', 'core.warp:write', 'core.flux:read'] })
