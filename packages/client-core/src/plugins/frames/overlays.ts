@@ -2,8 +2,8 @@ import { createSignal } from 'solid-js'
 
 // Which plugin overlay is on screen (docs/plugins.md § Frame contribution kind).
 //
-// ONE at a time, and a plain signal rather than a registry: an overlay covers the window, so "two open"
-// is not a state the surface has — the second would hide the first and the reader would have no way to
+// One at a time, and a plain signal rather than a registry: an overlay covers the window, so "two open"
+// is not a state the surface has. The second would hide the first and the reader would have no way to
 // tell which Escape dismissed. Opening a second one replaces the first, the same way the shell's own
 // palettes behave.
 //

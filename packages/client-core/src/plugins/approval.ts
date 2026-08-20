@@ -6,7 +6,7 @@ import type { PluginApprovalRequest, PluginInstallSource } from '@acorn/protocol
 // a `.tsx` file is structurally untestable, and the opener is reached from the notification bell.
 //
 // It carries a task id and nothing else. The requests themselves are read from the node's device-only
-// roster route when the dialog opens, never from the notification frame — a notice is a ping, and what the
+// roster route when the dialog opens, never from the notification frame. A notice is a ping, and what the
 // owner is being asked to approve has to come from the gated surface (docs/plugins.md § Approval-mediated
 // install).
 
@@ -46,7 +46,7 @@ export const describePluginRequest = (request: PluginApprovalRequest): string =>
  * What the agent is told once the owner has answered.
  *
  * Written on this side of the boundary on purpose. The agent gets a plain sentence and no detail it could
- * act on beyond the outcome — in particular, a refusal never explains how to get a different answer.
+ * act on beyond the outcome. In particular, a refusal never explains how to get a different answer.
  */
 export const pluginRequestOutcomeMessage = (
   request: PluginApprovalRequest,

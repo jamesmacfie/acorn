@@ -3,7 +3,7 @@
 // The node broadcasts a content-free `plugins:changed` when it swaps a plugin's node half; everything
 // below is re-running passes that already exist, in the order boot runs them. There is no new
 // registration mechanism here because there does not need to be one: the frame and chrome registries
-// dispose-then-register, and a plugin frame is an iframe keyed by bundle hash AS ITS ORIGIN, so a new
+// dispose-then-register, and a plugin frame is an iframe keyed by bundle hash as its origin, so a new
 // hash is a new origin and a new document with nothing carried over from the old one.
 import { refreshNodePlugins } from '../node/nodePlugins'
 import { wsOnPluginsChanged } from '../wsClient'
