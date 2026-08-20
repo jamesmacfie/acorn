@@ -1,7 +1,7 @@
 // The agents plugin's client part (docs/plugins.md § The plugin API).
 //
 // `required: true`, matching the node half: the Agent pane and the Agent Center rail source are what
-// the managed-agent runtime is FOR, and core's task view falls back to a pane list that assumes they
+// the managed-agent runtime is for, and core's task view falls back to a pane list that assumes they
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
@@ -29,17 +29,16 @@ export const agentsClientPlugin: ClientPlugin = {
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,
     })
-    // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one: the
-    // card exists to show several nodes at once.
+    // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,
+    // because the card exists to show several nodes at once.
     ctx.nodeStats.register({
       id: 'agents.active', order: 10, label: ['agent running', 'agents running'],
       fetch: async (nodeId, signal) =>
         (await managedAgentApi.sessions({ archived: false }, { nodeId, signal })).sessions.filter(isActiveAgent).length,
     })
-    // The attention inbox's first and most important source: an agent waiting on a permission or a
-    // question is blocked until the owner answers. `attention: true` is a server-side filter the route
-    // already supports, so this is one request per node rather than a full roster fetch and a client
-    // filter.
+    // The attention inbox's most important source: an agent waiting on a permission or a question is
+    // blocked until the owner answers. `attention: true` is a server-side filter the route already
+    // supports, so this is one request per node rather than a full roster fetch and a client filter.
     ctx.attention.register({
       id: 'agents.sessions', order: 10,
       fetch: async (nodeId, signal) => {
@@ -47,8 +46,8 @@ export const agentsClientPlugin: ClientPlugin = {
         return page.sessions.filter(needsAttention).map((session) => {
           const copy = ATTENTION_COPY[session.attention] ?? { title: 'needs attention', severity: 'warn' as const }
           return {
-            // Not the bare session id: the row's identity is (this source, this session), and two sources
-            // colliding on a session id would make one of them un-renderable.
+            // Not the bare session id: the row's identity is (this source, this session), and two
+            // sources colliding on a session id would make one of them un-renderable.
             id: `agents.sessions:${session.id}`,
             taskId: session.taskId,
             title: `${session.title || session.providerId} ${copy.title}`,
@@ -63,9 +62,8 @@ export const agentsClientPlugin: ClientPlugin = {
       },
     })
   },
-  // Not registration: these three attach listeners to the managed-session store (agent references in
-  // note bodies, the notice feed, and which notice targets resolve to a session) and return nothing
-  // the registries can hold. `activateManagedAgentNotifications` also opens the app-lifetime agent
+  // Not registration: these three attach listeners to the managed-session store and return nothing the
+  // registries can hold. `activateManagedAgentNotifications` also opens the app-lifetime agent
   // WebSocket subscription and primes the store over HTTP, which is why the whole set is in `activate`
   // rather than `init`.
   activate: () => {

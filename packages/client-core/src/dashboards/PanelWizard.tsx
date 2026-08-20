@@ -37,7 +37,7 @@ import {
 } from './persist'
 import './dashboards.css'
 
-// THE PANEL WIZARD (docs/future/dashboards/wizard.md) — panel CREATION, staged, with the panel
+// THE PANEL WIZARD (docs/dashboards.md § The generated editor) — panel CREATION, staged, with the panel
 // visible while it is being composed.
 //
 // It exists because "Add panel" used to open one long form and the panel was first seen after saving:

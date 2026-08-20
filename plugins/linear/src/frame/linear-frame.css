@@ -1,7 +1,7 @@
 /* Linear's frame layout. Feature CSS only: the primitive, tabs, overlay and copy stylesheets arrive as
-   the host-served /ui.css, and the token values for the active theme/style axes arrive over the bridge.
-   Every value below is a token with a fallback, so the frame follows an appearance change without
-   knowing which pack won — and still renders if a token is ever dropped. */
+   the host-served /ui.css, and the token values for the active theme and style axes arrive over the
+   bridge. Every value below is a token with a fallback, so the frame follows an appearance change
+   without knowing which pack won, and still renders if a token is ever dropped. */
 :root {
   color-scheme: light dark;
   font-family: var(--font-ui, system-ui, sans-serif);
@@ -15,8 +15,8 @@ button { font: inherit; }
 .ln-brandbar { min-height: 2.375rem; display: flex; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
 .ln-brand-mark { color: var(--brand-linear, var(--accent)); }
 .ln-brand { letter-spacing: .01em; }
-/* ListDetail owns the split, the column width and the divider. What is left is this frame's padding,
-   and the narrow-width rule at the foot of the file. */
+/* ListDetail owns the split, the column width and the divider. What's left is this frame's padding and
+   the narrow-width rule at the foot of the file. */
 .ln-targets { overflow-y: auto; padding: var(--space-3, .375rem); }
 .ln-target.ui-row { padding-inline: var(--space-4, .5rem); color: var(--text-muted); font-family: var(--font-mono, monospace); }
 .ln-target.ui-row[data-selected] { color: var(--text); }
@@ -31,14 +31,15 @@ button { font: inherit; }
 
 .ln-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-8, 1.25rem) var(--space-6, .75rem); }
 /* The workflow-state pill and the label chip both take their colour from Linear's own hex, passed in as
-   a custom property rather than an inline background so the border/tint relationship stays one rule. */
+   a custom property rather than an inline background, so the border and tint relationship stays one
+   rule. */
 
 .ln-content > .ui-tabs { padding-inline: var(--space-8, 1.25rem); }
 .ln-panel { padding: var(--space-7, 1rem) var(--space-8, 1.25rem) var(--space-9, 1.5rem); }
 .ln-panel[hidden] { display: none; }
 .ln-section-head { margin: var(--space-7, 1rem) 0 var(--space-4, .5rem); font-size: var(--fs, .8125rem); }
 
-/* DescriptionList's `facts` layout owns the grid. What is left is the ruled-tile look. */
+/* DescriptionList's `facts` layout owns the grid. What's left is the ruled-tile look. */
 .ln-facts { gap: 0; margin: 0 0 var(--space-7, 1rem); border-top: var(--control-bw, .0625rem) solid var(--border); }
 .ln-facts .ui-dl-item { padding: var(--space-5, .625rem) var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
 .ln-branch { display: flex; align-items: center; gap: var(--space-3, .375rem); }
@@ -48,7 +49,7 @@ button { font: inherit; }
 .ln-links li { display: flex; align-items: center; gap: var(--space-3, .375rem); min-width: 0; }
 .ln-attachment-kind { color: var(--text-muted); font-size: var(--fs-sm, .75rem); text-transform: uppercase; }
 /* An anchor now that the host has a verb for opening one, so it needs the accent `.markdown a` already
-   gives a link inside a description — the two are the same affordance in two containers. */
+   gives a link inside a description: the two are the same affordance in two containers. */
 .ln-attachment-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); cursor: pointer; }
 
 .ln-subissue-bar { height: .25rem; background: var(--bg-subtle, var(--bg-hover)); margin-bottom: var(--space-4, .5rem); }
@@ -77,11 +78,11 @@ button { font: inherit; }
 .ln-composer { display: grid; gap: var(--space-3, .375rem); margin-top: var(--space-6, .75rem); }
 .ln-composer-actions { display: flex; align-items: center; gap: var(--space-3, .375rem); }
 
-/* Rendered ticket markdown is `.ui-markdown`, served to this frame in /ui.css. This copy had the
-   border role wrong on `pre` (--control-bw, the width a pack may zero); the shared one does not. */
+/* Rendered ticket markdown is `.ui-markdown`, served to this frame in /ui.css. This copy had the border
+   role wrong on `pre` (--control-bw, the width a pack may zero); the shared one doesn't. */
 
 @media (max-width: 45rem) {
-  /* Drop the ticket switcher rather than squeeze it — it is a convenience for a task linking several
+  /* Drop the ticket switcher rather than squeeze it: it's a convenience for a task linking several
      tickets, and the frame's viewport is the pane. Written against both classes so it beats
      ListDetail's own `[data-list]` rule on specificity rather than on stylesheet order. */
   .ln-layout.ui-listdetail[data-list] { grid-template-columns: minmax(0, 1fr); }

@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginCache, PutResult } from './pluginCache'
@@ -91,6 +91,12 @@ const disclosureSchema = z.object({
     label: z.string().min(1).max(80),
     cadence: cadenceSchema,
   })).max(4).default([]) as z.ZodType<PluginScheduleGrant[]>,
+  // Defaulted for the same reason the two above are: a node whose manifest schema predates archive
+  // checks sends a disclosure without the field.
+  taskChecks: z.array(z.strictObject({
+    id: z.string().min(1).max(64),
+    cleansUp: z.boolean(),
+  })).max(4).default([]) as z.ZodType<PluginTaskCheckGrant[]>,
 })
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
@@ -100,6 +106,7 @@ const NO_DISCLOSURE = {
   keyClaims: [],
   extensions: [],
   schedules: [],
+  taskChecks: [],
 } satisfies z.infer<typeof disclosureSchema>
 
 export type PluginsState = {

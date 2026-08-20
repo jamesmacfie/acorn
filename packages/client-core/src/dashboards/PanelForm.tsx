@@ -242,7 +242,7 @@ export function ViewOptions(props: { draft: PanelDraft }) {
         </div>
         {/* Optional on both shapes, and the SAME key: a bar split by a second enum is the grouped
             bar, which is a third shape by arithmetic but not by config
-            (docs/future/dashboards/charts.md § 3). Offered only where the split is representable —
+            (docs/dashboards.md § Views are derived, not chosen from a menu). Offered only where the split is representable —
             any enum for a line, any enum but the category axis for a bar — so a schema with one enum
             never sees the control on a bar. */}
         <Show when={draft().seriesFields().length}>

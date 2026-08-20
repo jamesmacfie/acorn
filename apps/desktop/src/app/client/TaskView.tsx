@@ -83,11 +83,15 @@ export default function TaskView(props: {
   async function openClose() {
     setCloseError('')
     setTeardownFailed(false)
-    const confirmed = await confirmWillEvent({
+    const decision = await confirmWillEvent({
       kind: 'task:archive', payload: { taskId: props.task.id },
       title: 'Archive task', actionLabel: 'Archive task',
     })
-    if (confirmed) await confirmClose()
+    if (!decision.confirmed) return
+    // Held rather than passed straight through, because the teardown-failed path re-invokes the
+    // archive from a button and the cleanups the owner ticked are still the cleanups they ticked.
+    setPendingChecks(decision.checked)
+    await confirmClose()
   }
 
   async function openProfile(profileId: string) {
@@ -166,6 +170,8 @@ export default function TaskView(props: {
   // While the guarded teardown runs (it can take seconds — teardown script + worktree removal),
   // the pane-switcher's close button shows a spinner so the archive visibly has feedback.
   const [archiving, setArchiving] = createSignal(false)
+  // The plugin cleanups this archive is carrying, from the dialog to the request (and to the retry).
+  const [pendingChecks, setPendingChecks] = createSignal<string[]>([])
 
   async function confirmClose(skipTeardown = false) {
     if (archiving()) return
@@ -178,13 +184,16 @@ export default function TaskView(props: {
       setArchiving(true)
       try {
         const result = await bridge.task.archive(archivedTaskId, {
-          deleteWorktree: true, force: true, skipTeardown,
+          deleteWorktree: true, force: true, skipTeardown, applyChecks: pendingChecks(),
         })
         if (!result.ok) {
           setTeardownFailed(!!result.teardownFailed)
           setCloseError(result.output ? `${result.reason}\n${result.output}` : result.reason)
           return
         }
+        // Archived either way — `ok` is true — but the owner ticked something that did not happen.
+        if (result.cleanupFailed?.length) console.warn('[tasks] cleanup failed for:', result.cleanupFailed.join(', '))
+        setPendingChecks([])
       } finally {
         setArchiving(false)
       }

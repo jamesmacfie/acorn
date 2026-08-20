@@ -289,16 +289,20 @@ export default function TabRail() {
   async function openArchive(w: Task) {
     setMenuId(null)
     setArchiveErr('')
-    const confirmed = await confirmWillEvent({
+    const decision = await confirmWillEvent({
       kind: 'task:archive', payload: { taskId: w.id }, title: 'Archive task', actionLabel: 'Archive task',
     })
-    if (confirmed) await archive(w)
+    if (decision.confirmed) await archive(w, decision.checked)
   }
 
-  async function archive(w: Task) {
+  async function archive(w: Task, applyChecks: string[] = []) {
     if (capabilities().terminal) {
-      const res = await taskBridge().task.archive(w.id)
+      // `force`, matching the task pane's own archive. This used to send no options at all, so a task
+      // with a dirty worktree came back "Worktree has uncommitted changes — confirm to discard" AFTER
+      // the owner had confirmed exactly that on the danger row. Confirming means confirming.
+      const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
       if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
+      if (res.cleanupFailed?.length) setArchiveErr(`Archived, but cleanup failed for: ${res.cleanupFailed.join(', ')}`)
     } else {
       await archiveTask(w.id)
     }

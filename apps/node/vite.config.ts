@@ -11,20 +11,20 @@ export default defineConfig({
     conditions: ['node'],
     mainFields: ['module', 'jsnext:main', 'jsnext'],
   },
-  // `noExternal` only decides what Vite's SSR pipeline would auto-externalize; the `external`
-  // predicate below is the real rule.
+  // `noExternal` only decides what Vite's SSR pipeline would auto-externalize; the `external` predicate
+  // below is the real rule.
   ssr: { noExternal: true },
-  // Keep `process.env` a runtime lookup — the service reads SESSION_ENC_KEY and ACORN_PORT from the
-  // environment it is spawned with, and the optional GitHub plugin reads its own client id there.
+  // Keep `process.env` a runtime lookup: the service reads SESSION_ENC_KEY and ACORN_PORT from the
+  // environment it's spawned with, and the optional GitHub plugin reads its own client id there.
   define: {
     'process.env': 'process.env',
     'global.process.env': 'global.process.env',
     'globalThis.process.env': 'globalThis.process.env',
   },
   build: {
-    // Electron 42 ships Node 22, and the standalone deployment targets current Node. (electron-vite
-    // has no entry for Electron 42 and silently falls back to node16.17, which downlevels far more
-    // than either runtime needs.)
+    // Electron 42 ships Node 22, and the standalone deployment targets current Node. electron-vite has
+    // no entry for Electron 42 and silently falls back to node16.17, which downlevels far more than
+    // either runtime needs.
     target: 'node22',
     outDir: 'dist',
     assetsDir: 'chunks',
@@ -42,7 +42,7 @@ export default defineConfig({
         standalone: resolve(__dirname, 'src/server/standalone.ts'),
       },
       // node: builtins are listed explicitly as well as caught by the predicate, so a bare
-      // `import 'path'` (no node: prefix) can never be bundled either.
+      // `import 'path'` with no node: prefix can never be bundled either.
       external: (id: string) =>
         externalizeBareImports(id) || builtinModules.includes(id.replace(/^node:/, '')),
       output: {

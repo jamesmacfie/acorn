@@ -55,11 +55,38 @@ export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: s
 // (running sessions / dirty worktree) for the UI to surface. A failed teardown script
 // (docs/terminal-and-agents.md) sets teardownFailed so the UI can offer continue (re-archive with
 // skipTeardown) or abort; `output` is the script's tail for display.
-export type ArchiveResult = { ok: true } | { ok: false; reason: string; teardownFailed?: boolean; output?: string }
+// `cleanupFailed` names the plugins whose opted-in cleanup threw. `ok` is still true: the task IS
+// archived, and reporting a failure would have the caller offering to retry something already done.
+export type ArchiveResult =
+  | { ok: true; cleanupFailed?: string[] }
+  | { ok: false; reason: string; teardownFailed?: boolean; output?: string }
 
-export type ArchiveOpts = { deleteWorktree?: boolean; force?: boolean; skipTeardown?: boolean }
+export type ArchiveOpts = {
+  deleteWorktree?: boolean
+  force?: boolean
+  skipTeardown?: boolean
+  // Qualified concern ids whose checkbox the owner left ticked in the archive dialog. Matched against
+  // the node's own task-check registry before anything runs, never treated as a route
+  // (node-core/server/plugin/taskChecks.ts).
+  applyChecks?: string[]
+}
 
-// Live worktree status for a task (docs/workspaces-and-tasks.md/05). `missing` = the task has a
+// What a plugin said about a task the owner is about to archive, as the dialog receives it. The node
+// mints `id` (`<pluginId>:<checkId>:<concernId>`) and stamps `pluginId`, so a package can neither
+// collide with another's checkbox nor draw a row under its name.
+export type TaskArchiveConcern = {
+  id: string
+  pluginId: string
+  message: string
+  severity: 'warn' | 'danger'
+  // At most five, with `detailsMore` counting what did not fit — the host draws "+N more".
+  details?: string[]
+  detailsMore?: number
+  // Present only when the plugin declared a cleanup route to go with it.
+  action?: { label: string; checked: boolean }
+}
+
+// Live worktree status for a task (docs/workspaces-and-tasks.md). `missing` = the task has a
 // worktreePath but the directory is gone (removed outside acorn) → needs repair. Computed in main
 // (git status --porcelain + an existence check) and polled by the rail / task footer.
 export type TaskStatus = {

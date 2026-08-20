@@ -166,9 +166,9 @@ export class AgentWebhookService {
   readonly #db: PluginDatabase
   readonly #secrets: SecretService
   // Only for the create-time "does this task exist" guard: `tasks` is core's table, so the plain id is
-  // dereferenced through the owner rather than joined. The URL validation below is untouched — it
+  // dereferenced through the owner rather than joined. The URL validation below is untouched: it
   // resolves DNS and rejects non-loopback plain http, credentials in the URL and non-https targets,
-  // which is a stronger guard than any host allowlist and is deliberately not moved to core.
+  // which is a stronger guard than any host allowlist and deliberately not moved to core.
   readonly #core: CoreServices
   #timer: ReturnType<typeof setTimeout> | null = null
   #pumping = false
@@ -347,7 +347,7 @@ export class AgentWebhookService {
         .where(eq(schema.agentWebhookDeliveries.id, delivery.id))
       return
     }
-    // reveal(): the signature is computed below over the delivery body, outside any scope this
+    // reveal(), because the signature is computed below over the delivery body, outside any scope this
     // could bracket. SecretUnavailable reads as the same null used for an unavailable credential.
     const secret = await this.#secrets.reveal(webhook.secretEnc, 'agent webhook: sign delivery').catch((error: unknown) => {
       if (error instanceof SecretUnavailableError) return null

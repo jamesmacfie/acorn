@@ -542,6 +542,41 @@ describe('chrome descriptors', () => {
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
+  it('carries a task check, confines both its routes and insists there is a node half to serve them', () => {
+    const good = nodeManifest({
+      taskChecks: [{ id: 'containers', check: '/v2/p/board/archive/check', apply: '/v2/p/board/archive/apply', timeout: 3 }],
+    })
+    expect(good.success && good.data.contributions.taskChecks[0]?.apply).toBe('/v2/p/board/archive/apply')
+
+    // `apply` is optional: a check that only warns is a real mode, not a degenerate one.
+    expect(nodeManifest({ taskChecks: [{ id: 'c', check: '/v2/p/board/c' }] }).success).toBe(true)
+
+    // Both halves are confined, and neither may be another plugin's or core's — a check is a route the
+    // HOST calls, so an unconfined one would be a way to make the node read anything on archive.
+    expect(messages(nodeManifest({
+      taskChecks: [{ id: 'c', check: '/v2/p/linear/c' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+    expect(messages(nodeManifest({
+      taskChecks: [{ id: 'c', check: '/v2/p/board/c', apply: '/v2/core/tasks' }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+
+    // Same rule a schedule gets, for the same reason: only a node half serves that namespace.
+    expect(messages(manifest({
+      taskChecks: [{ id: 'c', check: '/v2/p/board/c' }],
+    }))).toEqual(['a task check calls a node route; declare `node` in the manifest'])
+  })
+
+  it('caps task checks at four and refuses an id another contribution kind already took', () => {
+    const five = Array.from({ length: 5 }, (_, i) => ({ id: `c${i}`, check: '/v2/p/board/c' }))
+    expect(nodeManifest({ taskChecks: five }).success).toBe(false)
+    expect(nodeManifest({ taskChecks: five.slice(0, 4) }).success).toBe(true)
+
+    expect(messages(nodeManifest({
+      frames: [PANE],
+      taskChecks: [{ id: 'board', check: '/v2/p/board/c' }],
+    }))).toEqual([`duplicate contribution id 'board'`])
+  })
+
   it('floors the polling fallback so a descriptor cannot busy-loop a remote node', () => {
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 30 }] }).success).toBe(true)
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 5 }] }).success).toBe(false)
@@ -927,7 +962,7 @@ describe('extension points', () => {
     }))).toContain("'board' already has an extension point at 'pane.footer'")
   })
 
-  // ── The aside: a region the USER fills (docs/future/dashboards/placements.md) ────────────────────
+  // ── The aside: a region the USER fills (docs/dashboards.md § Placements) ────────────────────
 
   it('accepts an aside beside the same pane that has a footer, and defaults its allowances', () => {
     const parsed = manifest({

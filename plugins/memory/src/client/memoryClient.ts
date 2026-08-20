@@ -1,5 +1,5 @@
-// The renderer's memory surface (docs/notes-and-memory.md). Was the `window.acorn.memory` preload bridge; now
-// loopback HTTP. Backed by the main-process memory index, so it 503s in dev:node.
+// The renderer's memory surface (docs/notes-and-memory.md). Was the `window.acorn.memory` preload
+// bridge, now loopback HTTP. Backed by the main-process memory index, so it 503s in dev:node.
 import { memoryAddRoute, memoryListRoute, memoryProposalsRoute, memoryResolveProposalRoute, memorySearchRoute } from '../shared/api'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 
@@ -29,9 +29,9 @@ export type MemoryProposalRow = {
   type: MemoryType
   description: string
   body: string
-  // Verification flags from the auto-generation verify pass (e.g. "contradicts the existing
-  // '<name>' — accepting supersedes it"). Structural — rendered as badges beside the description,
-  // never folded into it. Defaulted to [] by main for proposals written before the field existed.
+  // Verification flags from the auto-generation verify pass, such as "contradicts the existing '<name>'
+  // - accepting supersedes it". Structural, rendered as badges beside the description and never folded
+  // into it. Defaulted to [] by main for proposals written before the field existed.
   flags: string[]
   status: 'pending' | 'accepted' | 'rejected'
   createdAt: number
@@ -43,7 +43,7 @@ export type MemoryApi = {
   add(p: { taskId: string; scope: 'project' | 'private'; name: string; description: string; type: MemoryType; body: string }): Promise<{ path: string } | { error: string }>
   // `options` is the fleet escape hatch (client-core's node/fanout.ts): the attention inbox asks every
   // paired node for its pending proposals, so this one read has to be addressable. Everything else here
-  // stays on the ambient active node, which is right for a pane bound to one task.
+  // stays on the ambient active node.
   proposals(taskId?: string, options?: { nodeId?: string; signal?: AbortSignal }): Promise<MemoryProposalRow[]>
   resolveProposal(id: string, approved: boolean, edited?: { name: string; type: MemoryType; description: string; body: string }): Promise<{ ok: boolean; reason?: string }>
 }

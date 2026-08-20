@@ -28,6 +28,9 @@ export type {
   PluginProviderResourceRequest,
   PluginRequestContext,
 } from '@acorn/node-core/server/plugin/types.ts'
+// What `ctx.taskChecks.register` answers with. Here because a check worth writing is a function, not
+// an inline literal, and a function needs a return type to name (server/plugin/taskChecks.ts).
+export type { TaskConcern } from '@acorn/node-core/server/plugin/taskChecks.ts'
 // The major this build of the API speaks. A loaded plugin's acorn-plugin.json must name exactly this
 // in `apiVersion`, and a build script generating a manifest reads it from
 // @acorn/protocol/pluginApiVersion.ts, which is where this one comes from too.

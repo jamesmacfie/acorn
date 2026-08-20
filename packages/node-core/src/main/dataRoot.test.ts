@@ -24,7 +24,7 @@ afterEach(() => {
     try {
       root.release()
     } catch {
-      // already released by the test
+      // Already released by the test.
     }
   }
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
@@ -45,8 +45,8 @@ describe('openDataRoot', () => {
 
     const identity = JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))
     expect(identity.createdAt).toBeGreaterThan(0)
-    // Deliberately absent. It was written once here and read by nothing, and it went stale the moment
-    // the binary serving this root moved on (docs/api-reference.md § Versioning). The live answer is the
+    // Deliberately absent. It was written once here and read by nothing, and it went stale the moment the
+    // binary serving this root moved on (docs/api-reference.md § Versioning). The live answer is the
     // running binary's NODE_PROTOCOL_VERSION, reported at GET /v2/node.
     expect(identity).not.toHaveProperty('protocolVersion')
   })
@@ -75,8 +75,8 @@ describe('openDataRoot', () => {
     expect(() => openTracked(dir)).not.toThrow()
   })
 
-  // The reason the lock stores a pid rather than merely existing: a crashed node leaves the file
-  // behind, and without a liveness probe the next start would be wedged until someone rm'd it.
+  // The reason the lock stores a pid rather than merely existing: a crashed node leaves the file behind,
+  // and without a liveness probe the next start would be wedged until someone removed it.
   it('takes over a lock whose holder is gone', () => {
     const dir = freshDir()
     mkdirSync(dir, { recursive: true })

@@ -1,10 +1,9 @@
-// PR write actions. Routed through the broker, which attaches the device bearer in Electron main; no
-// cookie and therefore no CSRF check (server/index.ts explains why). Throws the
-// structured error code on failure so callers can branch (e.g. merge_failed, reauth).
+// PR write actions. Routed through the broker, which attaches the device bearer in Electron main, so
+// there's no cookie and therefore no CSRF check (server/index.ts explains why). Throws the structured
+// error code on failure so callers can branch on merge_failed, reauth and the rest.
 //
-// GitHub verbs only. Workspace/repo-visibility writes live in core/client/workspaces/mutations.ts,
-// task and review-note writes in core/client/tasks/mutations.ts, and prefs behind
-// core/client/settings/savePref.ts — none of those are GitHub concepts.
+// GitHub verbs only. Workspace and repo-visibility writes live in core's workspaces/mutations.ts, task
+// and review-note writes in core's tasks/mutations.ts, and prefs behind core's settings/savePref.ts.
 import { postJson, writeJson } from '@acorn/plugin-api/client'
 import { autoMergeRoute, createPullRoute, pullRoute, rerunFailedRoute, requestedReviewersRoute, resolveThreadRoute } from '../contract/api'
 
@@ -49,5 +48,5 @@ export const resolveThread = (o: string, r: string, n: string, threadId: string,
 export const setViewed = (o: string, r: string, n: string, path: string, viewed: boolean) =>
   postJson(pullRoute(o, r, n, 'viewed'), { path, viewed })
 
-// Rerun a check's failed Actions jobs. Repo-scoped (keyed by the workflow run id, not the PR).
+// Rerun a check's failed Actions jobs. Repo-scoped, keyed by the workflow run id rather than the PR.
 export const rerunFailed = (o: string, r: string, runId: number) => postJson(rerunFailedRoute(o, r, runId))

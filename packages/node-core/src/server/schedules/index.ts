@@ -69,7 +69,7 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
       },
     })
 
-    // The driver (docs/future/dashboards/measure-history.md). ONE schedule for every panel that asked
+    // The driver (docs/dashboards.md § Trends). ONE schedule for every panel that asked
     // for a history trend, not a row per panel: panel churn must never create or delete schedule rows,
     // and turning a trend on in the editor is a checkbox, not a hidden registration.
     //

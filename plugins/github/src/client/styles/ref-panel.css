@@ -1,10 +1,10 @@
 /* The pull-request reference panel (../PullRefPanel.tsx).
  *
- * Deliberately tiny. The overlay, the header and the dismiss affordance are the SHELL's
+ * Deliberately tiny. The overlay, the header and the dismiss affordance are the shell's
  * (client-core/styles/integrations.css § .integrations-panel), the same ones a plugin frame's panel is
- * wrapped in, so a first-party panel and a loaded one are the same box. What is left here is the handful
- * of rows inside it, and every value is a token — a panel that hardcoded a size or a colour would look
- * correct in exactly one appearance pack. */
+ * wrapped in, so a first-party panel and a loaded one are the same box. What's left is the handful of
+ * rows inside it, and every value is a token, because a panel that hardcoded a size or a colour would
+ * look correct in exactly one appearance pack. */
 
 .gh-ref-title {
   margin: 0 0 var(--space-4);

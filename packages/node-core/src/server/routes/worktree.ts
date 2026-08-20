@@ -10,7 +10,8 @@ import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../main/archive'
 import { runProcess } from '../../main/core/proc'
 import { broadcastStatus } from '../../main/notify'
 import { buildSessionEnv } from '../../main/taskEnv'
-import { computeTaskStatuses, isDir, loadTask, projectForTask, projectSetup, resolveTaskCwd, taskRoot } from '../../main/taskWorktree'
+import { computeTaskStatuses, isDir, loadTask, projectForTask, projectSetup, resolveTaskCwd, taskRoot, toTaskRef } from '../../main/taskWorktree'
+import { applyTaskChecks, collectTaskConcerns } from '../plugin/taskChecks'
 import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../bridge'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
@@ -39,7 +40,15 @@ export type TaskCreatedHook = (taskId: string) => Promise<void>
 export const TASK_CREATED = routeCapability<TaskCreatedHook>('terminal.taskCreatedHook')
 
 const previewBody = z.object({ script: z.string() })
-const archiveBody = z.object({ deleteWorktree: z.boolean().optional(), force: z.boolean().optional(), skipTeardown: z.boolean().optional() })
+const archiveBody = z.object({
+  deleteWorktree: z.boolean().optional(),
+  force: z.boolean().optional(),
+  skipTeardown: z.boolean().optional(),
+  // Qualified concern ids, matched against the task-check registry before anything runs. Bounded so a
+  // client cannot make the node walk an arbitrarily long list; four checks per plugin is the manifest
+  // ceiling and no dialog has ever drawn thirty-two rows.
+  applyChecks: z.array(z.string().min(1).max(200)).max(32).optional(),
+})
 
 async function capturePreviewUrl(
   db: ReturnType<typeof getDb>,
@@ -103,6 +112,12 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
     killRunning: sessions.killRunning,
     dropTaskSessions: sessions.dropTaskSessions,
     runTeardown: sessions.runTeardown,
+    // Injected here rather than imported by main/archive.ts: the registry is a server-layer thing and
+    // the lifecycle module deliberately does not reach into it (main/archive.ts § ArchiveDeps).
+    applyTaskChecks: async (task, ids) => {
+      const row = await loadTask(db, task.id)
+      return row ? applyTaskChecks(toTaskRef(row), ids) : []
+    },
   })
 }
 
@@ -139,6 +154,14 @@ export const worktree = new Hono<AppEnv>()
     await resolveTaskCwd(db, task, project.path, null, c.env.CAPABILITIES).catch((e) => console.warn('[worktree] pre-create skipped:', e instanceof Error ? e.message : e))
     broadcastStatus() // rail/footer pick up the new worktree
     return c.json({ ok: true })
+  })
+  // What every plugin has to say about archiving this task, asked once when the dialog opens. Each
+  // check is bounded and contained on the way through, so this answers even when a plugin does not
+  // (server/plugin/taskChecks.ts).
+  .get('/tasks/:id/archive-concerns', async (c) => {
+    const task = await loadTask(getDb(c.env), c.req.param('id'))
+    if (!task) return c.json({ concerns: [] })
+    return c.json({ concerns: await collectTaskConcerns(toTaskRef(task)) })
   })
   .post('/tasks/:id/archive', async (c) => {
     const parsed = archiveBody.safeParse(await c.req.json().catch(() => ({})))

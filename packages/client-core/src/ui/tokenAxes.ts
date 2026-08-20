@@ -23,7 +23,7 @@ export const DERIVED_THEME_TOKENS = [
 ] as const
 
 /** SERIES IDENTITY, for a chart mark that is asking "which one is this" rather than "how is this
- * doing" (docs/future/dashboards/charts.md § 1). Colour, so theme axis — but neither primitive nor
+ * doing" (docs/dashboards.md § Views are derived, not chosen from a menu). Colour, so theme axis — but neither primitive nor
  * derived, and that is the whole point of the third group:
  *
  *   NOT a primitive: a plugin-contributed theme is validated against `THEME_PALETTE_TOKENS` in full,

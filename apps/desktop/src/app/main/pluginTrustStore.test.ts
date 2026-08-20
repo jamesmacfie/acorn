@@ -21,6 +21,7 @@ const ack = (over: Partial<PluginAck> = {}): PluginAck => ({
   keyClaims: [],
   extensions: [],
   schedules: [],
+  taskChecks: [],
   decision: 'accepted',
   decidedAt: 1_700_000_000_000,
   ...over,

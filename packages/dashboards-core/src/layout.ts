@@ -77,7 +77,7 @@ const SIZES: Record<string, PanelSize> = {
  *  card, which is a panel like any other and must not be zero-sized. */
 export const sizeFor = (kind: string): PanelSize => SIZES[kind] ?? SIZES.list
 
-/** The wizard's S/M/L footprints for a view kind (docs/future/dashboards/wizard.md § Foundation) —
+/** The wizard's S/M/L footprints for a view kind (docs/dashboards.md § The generated editor) —
  *  three widths over the per-kind defaults above, at that kind's own height.
  *
  *  A STARTING RECT, NOT STORED CONFIG. What the wizard commits goes through `firstFit` and

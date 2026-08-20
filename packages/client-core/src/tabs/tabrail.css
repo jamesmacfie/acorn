@@ -1,5 +1,5 @@
-/* Workspace tab rail: far-left full-height column. Square tabs (no radius — matches panes), a
-   bottom-pinned "+". Glyph popover anchors to the active tab. */
+/* Workspace tab rail: far-left full-height column. Square tabs with no radius, matching panes, and a
+   bottom-pinned "+". The glyph popover anchors to the active tab. */
 .tabrail {
   flex: none;
   width: var(--tabrail-w);
@@ -20,10 +20,10 @@
   position: relative;
 }
 
-/* Agent-working indicator: a small spinning glyph under the tab's icon. Centred with inset+
-   text-align, NOT transform: translateX(-50%) — `.spin` animates `transform`, and interpolating
-   a translate into rotate(360deg) goes through matrix decomposition, which reads a full turn as
-   no turn at all. The icon slid sideways instead of spinning. */
+/* Agent-working indicator: a small spinning glyph under the tab's icon. Centred with inset and
+   text-align rather than transform: translateX(-50%), because `.spin` animates `transform` and
+   interpolating a translate into rotate(360deg) goes through matrix decomposition, which reads a full
+   turn as no turn at all. The icon slid sideways instead of spinning. */
 .tabrail-spinner {
   position: absolute;
   bottom: 4px;
@@ -81,8 +81,8 @@
 .tabrail-zone { flex: none; }
 .tabrail-source { font-size: var(--fs-md); }
 
-/* Unicode source and status glyphs (railStatus.ts) stay on the mono stack in every style pack —
-   the box-drawing and dingbat characters only have consistent metrics there. */
+/* Unicode source and status glyphs (railStatus.ts) stay on the mono stack in every style pack: the
+   box-drawing and dingbat characters only have consistent metrics there. */
 .tabrail-source,
 .tabrail-spinner,
 .tabrail-needs,
@@ -107,13 +107,14 @@
 }
 .tabrail-add:hover { background: var(--bg-hover); color: var(--text); }
 
-/* Glyph picker / close popover, anchored just right of its tab. */
-/* Menu owns the surface (portal, position, elevation, dismissal) and the item vocabulary. All this
+/* Glyph picker and close popover, anchored just right of its tab. Menu owns the surface (portal,
+   position, elevation, dismissal) and the item vocabulary; all this keeps is the rail's own width cap
+   on the two title rows. */
    keeps is the rail's own width cap on the two title rows. */
 .tabrail-menu .ui-menu-label-row { max-width: 180px; }
 
-/* Workspace identity accent (docs/workspaces-and-tasks.md): task rows carry their workspace's colour as the 3px
-   left accent (the docs/ui-design.md active-accent convention, tinted per workspace). */
+/* Workspace identity accent (docs/workspaces-and-tasks.md): task rows carry their workspace's colour as
+   the 3px left accent, tinted per workspace. */
 .tabrail-task { border-left-width: var(--stripe-w); }
 
 /* Pin-to-top marker (docs/panes.md). */

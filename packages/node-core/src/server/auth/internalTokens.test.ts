@@ -30,14 +30,14 @@ describe('scoped internal tokens', () => {
   it('refuses a token signed with a different key', () => {
     const token = mintInternalToken(KEY, { scope: 'service' })
     expect(verifyInternalToken('another-key-0123456789', token)).toBeNull()
-    // Rotating the signing key is the revocation lever, since these tokens do not expire.
+    // Rotating the signing key is the revocation lever, since these tokens don't expire.
     expect(verifyInternalToken(KEY, token)).not.toBeNull()
   })
 
   it('refuses a tampered payload, a tampered signature, and a truncated token', () => {
     const token = mintInternalToken(KEY, { scope: 'task', taskId: 'task-1' })
     const [payload, signature] = token.replace('acorn_it_', '').split('.')
-    // Re-signing is the whole point: swapping the claims without the key must not verify.
+    // Re-signing is the point: swapping the claims without the key must not verify.
     const forged = Buffer.from(JSON.stringify({ s: 'service' })).toString('base64url')
     expect(verifyInternalToken(KEY, `acorn_it_${forged}.${signature}`)).toBeNull()
     expect(verifyInternalToken(KEY, `acorn_it_${payload}.${signature.slice(0, -2)}xy`)).toBeNull()
@@ -49,13 +49,13 @@ describe('scoped internal tokens', () => {
     for (const token of ['', 'nonsense', 'acorn_it_.', 'acorn_it_!!!.!!!', 'acorn_dt_abc.def']) {
       expect(verifyInternalToken(KEY, token)).toBeNull()
     }
-    // An unset key must never authenticate anything — a node with no signing key has no internal callers.
+    // An unset key must never authenticate anything: a node with no signing key has no internal callers.
     expect(verifyInternalToken('', mintInternalToken(KEY, { scope: 'service' }))).toBeNull()
     expect(() => mintInternalToken('', { scope: 'service' })).toThrow(/signing key/)
   })
 
   it('refuses an unknown scope and a task scope with no task', () => {
-    // Both are forgeable only WITH the key, so these are the shapes a future bug could mint — the
+    // Both are forgeable only with the key, so these are the shapes a future bug could mint. The
     // verifier rejecting them is what keeps 'task' meaning "bound to a task".
     const bad = (claims: object) => {
       const payload = Buffer.from(JSON.stringify(claims)).toString('base64url')

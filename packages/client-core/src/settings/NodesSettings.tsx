@@ -10,11 +10,10 @@ import { Alert, Button } from '../ui/primitives'
 
 // Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
 //
-// ONE component with three inline steps rather than a wizard framework. The steps are not a UX
-// flourish — step 2 exists because comparing the fingerprint against the one the node itself displays
-// IS the security of pairing (docs/api-reference.md § Pairing). Making it a deliberate screen with the
-// value in front of the owner, rather than a checkbox next to a URL field, is the whole point; a
-// checkbox is a thing people tick.
+// One component with three inline steps rather than a wizard framework. Step 2 exists because comparing
+// the fingerprint against the one the node itself displays is the security of pairing
+// (docs/api-reference.md § Pairing). Making it a deliberate screen with the value in front of the owner,
+// rather than a checkbox next to a URL field, is the point: a checkbox is a thing people tick.
 type Step = { kind: 'idle' } | { kind: 'endpoint' } | { kind: 'confirm'; probe: NodeProbeResult } | { kind: 'code'; probe: NodeProbeResult }
 
 const defaultDeviceName = (): string => {
@@ -69,8 +68,8 @@ export default function NodesSettings() {
       <Show
         when={fleetMutable()}
         fallback={
-          // `dev:node` in a browser: the serving origin IS the node, there is no broker to hold a
-          // pinned certificate, and so there is no fleet to manage.
+          // `dev:node` in a browser: the serving origin is the node, there's no broker to hold a pinned
+          // certificate, and so there's no fleet to manage.
           <p class="muted">This build talks to a single node directly and has no fleet to manage.</p>
         }
       >

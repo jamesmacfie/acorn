@@ -38,7 +38,7 @@ import { aggregateRows, boardColumns, groupField } from './shaping'
 // and wrong for identity: a line split by source, or a bar over categories nobody declared, is asking
 // "which series is this", and answering with status colours makes github permanently ok-green and
 // linear permanently warn-amber, which reads as a judgement nobody made
-// (docs/future/dashboards/charts.md § 1).
+// (docs/dashboards.md § Views are derived, not chosen from a menu).
 //
 // So a mark's colour comes from exactly one of two places:
 //

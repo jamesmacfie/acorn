@@ -155,7 +155,7 @@ export function scanContentRefs(texts: (string | null | undefined)[]): ContentRe
 // same prefix already CONFIRMED in the same surface, by a URL the owning plugin's own recogniser
 // claimed. The prefix was witnessed, so there is no ambiguity to resolve; the shape is host-owned, so
 // there is no pattern language to review. A plugin declaring `{prefix}-{num}` cold, with no witness,
-// is a different and later design (docs/third-party/cross-plugin-refs.md § piece 3 v2) that must not
+// is a different and later design (git history: docs/third-party/cross-plugin-refs.md § piece 3 v2) that must not
 // ship before candidates can be confirmed against a resolver.
 const BARE_REF_SHAPE = /^([A-Z][A-Z0-9]*)-\d+$/
 

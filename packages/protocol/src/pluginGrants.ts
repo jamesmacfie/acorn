@@ -1,4 +1,4 @@
-import type { PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginWebviewGrant } from './api'
+import type { PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from './api'
 import { isCoreExclusiveSlot, parseExtensionPointRef, qualifiedExtensionPointId } from './extensionPoints'
 import { isPluginKeyClaim } from './keybindings'
 import { normalizeWebviewHost } from './webview'
@@ -59,6 +59,15 @@ export const pluginExtensionGrants = (pluginId: string, contributions: PluginCon
 export const pluginScheduleGrants = (contributions: PluginContributions): PluginScheduleGrant[] =>
   (contributions.schedules ?? [])
     .map((schedule) => ({ id: schedule.id, label: schedule.name, cadence: schedule.cadence }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+/** What this package will say — and possibly do — when a task is archived. Neither route is part of
+ * the grant, for the reason the schedule grant states: both are the plugin's own, reachable from any
+ * of its surfaces already. What the owner is being told is that archiving a task now runs this
+ * package's code, and whether it will offer to change something. */
+export const pluginTaskCheckGrants = (contributions: PluginContributions): PluginTaskCheckGrant[] =>
+  (contributions.taskChecks ?? [])
+    .map((check) => ({ id: check.id, cleansUp: check.apply !== undefined }))
     .sort((a, b) => a.id.localeCompare(b.id))
 
 export const pluginKeyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>

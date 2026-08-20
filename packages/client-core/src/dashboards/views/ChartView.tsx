@@ -3,22 +3,20 @@ import { EmptyState } from '../../ui/primitives'
 import { buildChart, CHART_FRAME, TICK_GAP } from '../chart'
 import type { PanelViewProps } from './props'
 
-// The chart view. Deliberately almost nothing: every number on screen — the bar rects, the tick
-// positions, the path data, the labels — comes out of `chart.ts`, which is pure and tested. This
-// file turns that into SVG and picks a class name, and it must stay that way, because vitest here
-// runs in node with no Solid plugin and nothing written here is checked by anything.
+// The chart view, and deliberately almost nothing. Every number on screen comes out of `chart.ts`,
+// which is pure and tested. This file turns that into SVG and picks a class name, and it must stay that
+// way, because vitest here runs in node with no Solid plugin and nothing written here is checked.
 //
-// COLOUR IS AN ATTRIBUTE, NEVER A LITERAL. Each mark carries `data-tone` (the plugin declared what
-// this value means) or `data-series` (identity with no declared meaning — an ordinal slot), never
-// both, and `dashboards.css` turns either into a colour the appearance pack owns. No `fill="#…"` may
-// appear in this file. The legend's swatches wear the same two attributes on the same two classes,
-// which is what stops a swatch and its mark drifting to different colours.
+// Colour is an attribute, never a literal. Each mark carries `data-tone` (the plugin declared what this
+// value means) or `data-series` (an ordinal slot with no declared meaning), never both, and
+// `dashboards.css` turns either into a colour the appearance pack owns. No `fill="#…"` in this file.
+// The legend's swatches wear the same two attributes on the same two classes, which is what stops a
+// swatch and its mark drifting apart.
 //
-// ACCESSIBILITY FLOOR, and it is a floor: the SVG names the shape and both axes, every mark carries
-// a `<title>` tooltip, and the full data is one view flip away in `table`. A bespoke screen-reader
-// data table inside the chart is out of scope for v1. The legend is part of that floor rather than
-// polish — it is the secondary encoding the identity ramp's slot-2/slot-3 pair needs to be legal for
-// colour-vision-deficient readers (docs/future/dashboards/charts.md § 1).
+// Accessibility floor: the SVG names the shape and both axes, every mark carries a `<title>` tooltip,
+// and the full data is one view flip away in `table`. The legend is part of that floor rather than
+// polish, since it's the secondary encoding the identity ramp needs to be legal for
+// colour-vision-deficient readers (docs/dashboards.md § Views are derived, not chosen from a menu).
 
 const LABEL_DROP = 10
 
@@ -26,9 +24,9 @@ export default function ChartView(props: PanelViewProps) {
   const plot = createMemo(() =>
     buildChart(props.rows, props.schema, props.view, props.groupBy ? { groupBy: props.groupBy } : {}))
 
-  // EVERY coordinate comes off the plot's own frame, never a module constant: the left gutter is as
-  // wide as this chart's y axis labels turned out to need, so a chart counting to 200,000 sits further
-  // right than one counting to 9. `CHART_FRAME` is only the stand-in for the un-drawable case below.
+  // Every coordinate comes off the plot's own frame, never a module constant: the left gutter is as wide
+  // as this chart's y axis labels need, so a chart counting to 200,000 sits further right than one
+  // counting to 9. `CHART_FRAME` is only the stand-in for the un-drawable case below.
   const frame = () => plot()?.frame ?? CHART_FRAME
   const yTicks = () => plot()?.yTicks ?? []
   const bars = () => {

@@ -34,14 +34,14 @@ export default function CommandPalette() {
       const item = items()[index]
       if (item) void invoke(item).catch((error) => setActionError(error instanceof Error ? error.message : String(error)))
     },
-    // Refetch on open so config edits made while the app runs show up without a task switch — the reason this
-    // is a resource keyed on `palette.open()` rather than a mount-time fetch.
+    // Refetch on open so config edits made while the app runs show up without a task switch, which is why
+    // this is a resource keyed on `palette.open()` rather than a mount-time fetch.
     onOpen: () => void refetch(),
   })
 
   // Below `palette`, not above it: createFleetQuery reads its dependency during setup, so a fanTasks
-  // declared earlier would touch `palette` in its temporal dead zone and take the whole contribution
-  // down with "Cannot access 'palette' before initialization".
+  // declared earlier would touch `palette` in its temporal dead zone and take the whole contribution down
+  // with "Cannot access 'palette' before initialization".
   const fanTasks = () => palette.open() && nodes().length > 1
   const [fleetTasks] = createFleetQuery(
     () => ['tasks', 'palette', 'fleet'] as const,
@@ -49,10 +49,10 @@ export default function CommandPalette() {
     fanTasks,
   )
 
-  // Every eligible source, in parallel, keyed on the palette being open. A source that throws contributes an
-  // ERROR ROW rather than taking the palette down: a broken run-target fetch must not also hide the workflow
-  // rows, the pane commands and go-to-task. That is also why this is one resource over all sources instead of
-  // one resource each — a single fetch generation keeps the list internally consistent.
+  // Every eligible source, in parallel, keyed on the palette being open. A source that throws contributes
+  // an error row rather than taking the palette down: a broken run-target fetch must not also hide the
+  // workflow rows, the pane commands and go-to-task. That's also why this is one resource over all
+  // sources rather than one each, since a single fetch generation keeps the list consistent.
   const eligible = () => paletteRowSources().filter((source) => hasClientCapability(source.requires))
   const [contributed, { refetch }] = createResource(
     () => (palette.open() ? (activeTaskId() ?? '') : null),
@@ -74,7 +74,7 @@ export default function CommandPalette() {
     { initialValue: [] },
   )
 
-  // Which source produced a row, so `invoke` hands it back to its owner rather than switching on `kind` —
+  // Which source produced a row, so `invoke` hands it back to its owner rather than switching on `kind`,
   // which is what let this component stop knowing that a 'run' row means a terminal.
   const ownerOf = createMemo(() => {
     const map = new Map<string, PaletteRowSource>()
@@ -89,8 +89,8 @@ export default function CommandPalette() {
       .map((command) => ({ id: command.id, label: commandTitle(command), hint: commandHint(command) }))
 
   // Every task the fleet knows, with the node that owns it. Keyed `${nodeId}:${taskId}` because a task id
-  // is only unique WITHIN a node (docs/architecture-overview.md § Fleet semantics), and this list is the one place two
-  // nodes' ids sit side by side — a bare task id here would make one of two colliding rows unreachable.
+  // is only unique within a node, and this list puts two nodes' ids side by side, so a bare task id would
+  // make one of two colliding rows unreachable.
   const fleetTaskRows = createMemo(() => {
     const active = activeNodeId() ?? ''
     if (!fanTasks()) return (tasks.data ?? []).map((task) => ({ task, nodeId: active, nodeLabel: '' }))
@@ -100,7 +100,7 @@ export default function CommandPalette() {
   })
   const taskByKey = createMemo(() => new Map(fleetTaskRows().map((row) => [`${row.nodeId}:${row.task.id}`, row])))
 
-  // Go-to-task rows: every other task, jumpable by name (⌘1–9 covers the first nine by position).
+  // Go-to-task rows: every other task, jumpable by name. Cmd+1 to Cmd+9 covers the first nine by position.
   const taskItems = () => {
     const cur = activeTaskId()
     const active = activeNodeId() ?? ''
@@ -114,7 +114,7 @@ export default function CommandPalette() {
   }
 
   // Switch-workspace rows: every workspace on every node except the current one. Same key shape and the
-  // same reason — two nodes may hold the same workspace UUID.
+  // same reason, since two nodes may hold the same workspace UUID.
   const workspaceItems = () => {
     const active = workspaceForProject(fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace), params.projectId)
     const activeNode = activeNodeId() ?? ''
@@ -141,10 +141,10 @@ export default function CommandPalette() {
     if (item.kind === 'error') return // visible, not invocable
     palette.close()
     if (item.kind === 'task') {
-      // Navigation, not a task-scoped command — no active task required.
+      // Navigation, not a task-scoped command, so no active task is required.
       const row = taskByKey().get(item.id.slice('task:'.length))
       if (row) {
-        // The node FIRST: `activateTaskSignals` and the route both resolve against the active node, so a
+        // The node first: `activateTaskSignals` and the route both resolve against the active node, so a
         // remote task opened without switching addresses the wrong machine.
         if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
         activateTaskSignals(row.task)
@@ -153,7 +153,7 @@ export default function CommandPalette() {
       return
     }
     if (item.kind === 'workspace') {
-      // Navigation — mirror the topbar picker, including the node switch (fleetWorkspaces.ts explains the
+      // Navigation. Mirrors the topbar picker, including the node switch (fleetWorkspaces.ts explains the
       // order). The rail source is restored per-workspace by the activeWorkspace effect in App.tsx.
       const key = item.id.slice('workspace:'.length)
       const entry = fleetWorkspaces().entries.find((candidate) => `${candidate.nodeId}:${candidate.workspace.id}` === key)

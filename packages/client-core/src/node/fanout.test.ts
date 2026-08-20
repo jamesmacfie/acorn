@@ -3,9 +3,9 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { clientFor, refreshFleet, _resetFleet } from './fleet'
 import { cachedFleet, fetchFleet } from './fanout'
 
-// The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed page"
-// (docs/architecture-overview.md § Fleet semantics) true once instead of four times. These cases are the three
-// properties it exists to provide.
+// The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed
+// page" (docs/architecture-overview.md § Fleet semantics) true once instead of four times. These cases
+// are the three properties it exists to provide.
 
 const record = (nodeId: string, label: string, local = false): NodeRecord => ({
   nodeId,
@@ -21,7 +21,7 @@ function installFleet(nodes: NodeRecord[], statuses: NodeStatus[]): void {
     acorn: {
       desktop: true,
       // The "there is a broker" discriminator (platform/index.ts). fetchFleet takes its fetcher as a
-      // callback, so nothing here ever reaches it.
+      // callback, so nothing here reaches it.
       nodeFetch: () => Promise.reject(new Error('fetchFleet is driven by its callback, not by apiClient')),
       fleetList: () => Promise.resolve({ nodes, statuses }),
       onNodeStatus: () => () => {},
@@ -51,7 +51,7 @@ afterEach(() => {
 describe('fetchFleet', () => {
   it('merges every node in fleet order, not completion order', async () => {
     // Node B answers first. Rows must still come back A then B: a list that reshuffles because one node
-    // was quicker this time is unusable.
+    // was quicker is unusable.
     const result = await fetchFleet(KEY, async (nodeId) => {
       if (nodeId === 'a') await new Promise((resolve) => setTimeout(resolve, 20))
       return `from-${nodeId}`
@@ -72,8 +72,8 @@ describe('fetchFleet', () => {
   })
 
   it('bounds a hanging node by the deadline rather than the connection state', async () => {
-    // Node B's socket still reads `online` — a dropped VPN takes a while to surface — so the timeout is
-    // the only thing that stops the page spinning forever. docs/ui-design.md: "No infinite spinners."
+    // Node B's socket still reads `online`, because a dropped VPN takes a while to surface, so the
+    // timeout is the only thing that stops the page spinning forever.
     vi.useFakeTimers()
     try {
       const pending = fetchFleet(
@@ -84,8 +84,8 @@ describe('fetchFleet', () => {
       await vi.advanceTimersByTimeAsync(60)
       const result = await pending
       expect(result.rows.map((row) => row.nodeId)).toEqual(['a'])
-      // Milliseconds below a second. `Math.round(ms/1000)` rendered every sub-second deadline as
-      // "no answer within 0s" — a string the partial-result banner shows the owner verbatim.
+      // Milliseconds below a second. `Math.round(ms/1000)` rendered every sub-second deadline as "no
+      // answer within 0s", a string the partial-result banner shows the owner verbatim.
       expect(result.unavailable[0]).toMatchObject({ nodeId: 'b', reason: 'no answer within 50ms' })
     } finally {
       vi.useRealTimers()
@@ -93,8 +93,8 @@ describe('fetchFleet', () => {
   })
 
   it('renders a failed node from ITS OWN cache, marked stale', async () => {
-    // The payoff of the per-node QueryClient partition: there is exactly one place node B's last answer
-    // lives, so a row can be served from it instead of disappearing.
+    // The payoff of the per-node QueryClient partition: exactly one place node B's last answer lives, so
+    // a row can be served from it instead of disappearing.
     clientFor('b').client.setQueryData(KEY, 'remembered')
     const result = await fetchFleet(KEY, (nodeId) =>
       nodeId === 'b' ? Promise.reject(new Error('offline')) : Promise.resolve('fresh'),
@@ -127,7 +127,7 @@ describe('fetchFleet', () => {
     await fetchFleet(KEY, (nodeId) => Promise.resolve(`from-${nodeId}`))
     expect(clientFor('a').client.getQueryData(KEY)).toBe('from-a')
     expect(clientFor('b').client.getQueryData(KEY)).toBe('from-b')
-    // And the two caches are genuinely separate — the collision hazard the partition exists for.
+    // And the two caches are genuinely separate, which is the collision hazard the partition exists for.
     expect(clientFor('a').client.getQueryData(KEY)).not.toBe(clientFor('b').client.getQueryData(KEY))
   })
 
@@ -149,9 +149,8 @@ describe('fetchFleet', () => {
   })
 })
 
-// What a fleet surface draws on the tick it mounts. The remount case: navigating away and back drops
-// the resource but not the per-node QueryClient, so there is a real list to show while it revalidates
-// instead of "Loading…" on every return.
+// What a fleet surface draws on the tick it mounts. Navigating away and back drops the resource but not
+// the per-node QueryClient, so there's a real list to show while it revalidates.
 describe('cachedFleet', () => {
   it('serves each node\'s last answer, badged refreshing', () => {
     clientFor('a').client.setQueryData(KEY, 'remembered-a')

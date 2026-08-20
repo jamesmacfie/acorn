@@ -1,15 +1,15 @@
 import { isCodeRow, type CodeRow, type Row } from './model'
 
-// In-diff find (⌘F). The diff list is virtualized, so off-screen lines aren't in the DOM and the
-// browser/Electron native find can't see them. Instead we search the row *model* (every code row's
-// raw text), scroll the virtualizer to matches, and split tokens so the matched substring gets a
-// highlight class while keeping its syntax colour — like Monaco's in-file find.
+// In-diff find (Cmd+F). The diff list is virtualized, so off-screen lines aren't in the DOM and the
+// native find can't see them. Instead we search the row model, meaning every code row's raw text,
+// scroll the virtualizer to matches, and split tokens so the matched substring gets a highlight class
+// while keeping its syntax colour, like Monaco's in-file find.
 
 export type FindMatch = { row: CodeRow; rowIndex: number; start: number; end: number }
 export type FindHighlight = { ranges: [number, number][]; current: [number, number] | null }
 
-// Every occurrence of `query` across the code rows. Occurrences within a line never overlap (we
-// advance past each hit), so a row's ranges stay sorted — markTokens relies on that.
+// Every occurrence of `query` across the code rows. Occurrences within a line never overlap, because we
+// advance past each hit, so a row's ranges stay sorted and markTokens relies on that.
 export function collectMatches(rows: Row[], query: string, caseSensitive: boolean): FindMatch[] {
   if (!query) return []
   const needle = caseSensitive ? query : query.toLowerCase()
@@ -31,10 +31,10 @@ export function collectMatches(rows: Row[], query: string, caseSensitive: boolea
 
 export type MarkedTok<T> = T & { mark: 0 | 1 | 2 }
 
-// Split tokens at match boundaries so matched substrings can be wrapped separately. Tokens'
-// contents concatenate back to the line's raw text (both the syntax `toks` and word-diff tokens),
-// so char offsets from collectMatches line up. mark: 0 none, 1 hit, 2 current. `ranges` must be
-// sorted and non-overlapping.
+// Split tokens at match boundaries so matched substrings can be wrapped separately. Token contents
+// concatenate back to the line's raw text, for both the syntax `toks` and word-diff tokens, so char
+// offsets from collectMatches line up. mark is 0 for none, 1 for a hit, 2 for the current one. `ranges`
+// must be sorted and non-overlapping.
 export function markTokens<T extends { content: string }>(
   toks: T[],
   ranges: [number, number][],

@@ -1,6 +1,6 @@
-// Signals-only store for the docker surface: the container list + daemon availability, refreshed
-// on demand and on the `docker:changed` WS edge (event-driven — no client polling loop; the main
-// process's events watcher is the source of truth for freshness). Live daemon state deliberately
+// Signals-only store for the docker surface: the container list and daemon availability, refreshed on
+// demand and on the `docker:changed` WS edge. Event-driven, with no client polling loop, because the
+// main process's events watcher is the source of truth for freshness. Live daemon state deliberately
 // stays out of the persisted query cache.
 import { createSignal } from 'solid-js'
 import { latestOnly, type PollerContribution } from '@acorn/plugin-api/client'
@@ -37,8 +37,8 @@ export async function refreshDocker(): Promise<void> {
   return inflight
 }
 
-// First consumer wires the WS edge for the app's lifetime — the subscription is idempotent and the
-// socket is shared, so there's nothing to tear down per-component.
+// The first consumer wires the WS edge for the app's lifetime. The subscription is idempotent and the
+// socket is shared, so there's nothing to tear down per component.
 export function wireDockerRefresh(): void {
   if (wsWired) return
   wsWired = true
@@ -47,9 +47,9 @@ export function wireDockerRefresh(): void {
   })
 }
 
-// ── Task↔container summaries (rail/footer badges, pane gating, archive concern) ──────────────────
-// Polled like taskStatus.ts (containers can change without docker events reaching us after a
-// reconnect), plus the docker:changed edge for immediacy.
+// ── Task and container summaries: rail and footer badges, pane gating, archive concern ────────────
+// Polled like taskStatus.ts, because containers can change without docker events reaching us after a
+// reconnect, plus the docker:changed edge for immediacy.
 const [taskSummaries, setTaskSummaries] = createSignal<Record<string, DockerTaskSummary>>({})
 
 export const dockerTaskSummary = (taskId: string): DockerTaskSummary | undefined => taskSummaries()[taskId]

@@ -5,11 +5,10 @@ import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'
 
-// The ACTIVE node, which is apiClient's default target — not a home node. What survives in this store
-// after the device migration all describes one node's resources: a task's pane layout, a task's open
-// files, a repo's PR filters, what the agent running THERE may do, whether that node has been set up.
-// State follows the resource it describes (docs/state.md § Scope rules), so there is no home node to
-// pick and no divergence to explain.
+// The active node, which is apiClient's default target, not a home node. What survives in this store
+// after the device migration all describes one node's resources: a task's pane layout, its open files,
+// a repo's PR filters, what the agent running there may do. State follows the resource it describes
+// (docs/state.md § Scope rules), so there's no home node to pick.
 export const setPref = async (key: string, value: string) =>
   writeJson<{ key: string; value: string }>(prefsRoute, {
     method: 'PUT',
@@ -27,7 +26,7 @@ const writes = new Map<string, PrefWriteState>()
 
 // The query cache is the one client-side writer: update it optimistically so every reactive reader
 // moves together, serialize server writes per key, and roll back only if this attempt is still the
-// visible value. A failure always becomes a notice because most callers intentionally fire-and-forget.
+// visible value. A failure always becomes a notice, because most callers fire and forget.
 export async function savePref(
   qc: QueryClient,
   key: string,
@@ -42,15 +41,14 @@ export async function savePref(
     else pushBackgroundError('', `Could not save ${descriptor.id}`, `Persisted value exceeds ${descriptor.maxBytes} bytes.`)
     return false
   }
-  // A DEVICE pref never reaches a node (persistence/devicePrefs.ts): it is a property of this
-  // installation, `localStorage.setItem` cannot fail in a way a retry would fix, and the whole
-  // optimistic-write-and-roll-back dance below exists for a network round trip that no longer happens.
+  // A device pref never reaches a node (persistence/devicePrefs.ts): it's a property of this
+  // installation, and `localStorage.setItem` can't fail in a way a retry would fix.
   //
-  // localStorage FIRST, cache second. `prefsOptions.select` is `mergePrefs(raw, readDevicePrefs())`
-  // and device wins, so a cache write that lands before the localStorage write recomputes `select`
-  // against the OLD device value and throws the new one away — silently, because structural sharing
-  // then sees an unchanged result and notifies nobody. That is why picking a theme or style used to
-  // do nothing until some unrelated pref write happened to re-run `select` seconds later.
+  // localStorage first, cache second. `prefsOptions.select` is `mergePrefs(raw, readDevicePrefs())` and
+  // device wins, so a cache write landing first recomputes `select` against the old device value and
+  // throws the new one away. Silently, because structural sharing then sees an unchanged result and
+  // notifies nobody. That's why picking a theme used to do nothing until an unrelated pref write
+  // happened to re-run `select`.
   if (isDevicePref(key)) {
     writeDevicePref(key, value)
     qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
@@ -78,8 +76,8 @@ export async function savePref(
     await request
     return true
   } catch (error) {
-    // Equal values are not equal attempts: dark -> light -> dark can have three requests in flight.
-    // Only the latest attempt owns the optimistic cache value and is allowed to roll it back.
+    // Equal values aren't equal attempts: dark -> light -> dark can have three requests in flight. Only
+    // the latest attempt owns the optimistic cache value and may roll it back.
     if (state.latestAttempt === attempt) {
       const current = qc.getQueryData<Record<string, string>>(prefsKey)
       qc.setQueryData<Record<string, string>>(prefsKey, () => {

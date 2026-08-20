@@ -6,13 +6,14 @@ import { projectsOptions } from '@acorn/plugin-api/client'
 import { DiffLine, EmptyState, NonCodeRow } from '@acorn/plugin-api/ui'
 import { buildDiffRowsAsync, buildRenderableRows, type CodeRow, createDiffHydrator, isCodeRow, type ParsedFile, type Row, tokenizeDocument } from '@acorn/plugin-api/ui/diff'
 
-// Right (Diff) pane in create mode: read-only base..head preview. Reuses the diff engine
-// (createDiffHydrator + buildRenderableRows + Shiki) and the row components, but with no review
-// threads, line composers, or gap expansion — none of those exist before the PR does. Rows render
-// in normal flow (no virtualizer); the hydrator parses in small idle batches so branch changes do
-// not pin the main thread, and its generation counter cancels a stale run when the file set flips.
-// Every patch body arrives inline on the compare payload, so `cachedFile` serves them all (binary /
-// too-large files have a null patch and render the "No diff" row) and no fetchPatches is wired.
+// Right (Diff) pane in create mode: a read-only base..head preview. Reuses the diff engine
+// (createDiffHydrator, buildRenderableRows, Shiki) and the row components, but with no review threads,
+// line composers or gap expansion, none of which exist before the PR does.
+//
+// Rows render in normal flow with no virtualizer. The hydrator parses in small idle batches so branch
+// changes don't pin the main thread, and its generation counter cancels a stale run when the file set
+// flips. Every patch body arrives inline on the compare payload, so `cachedFile` serves them all and no
+// fetchPatches is wired. Binary and too-large files have a null patch and render the "No diff" row.
 const noop = async () => {}
 
 export default function ComparePreview() {
@@ -39,7 +40,7 @@ export default function ComparePreview() {
   })
   onCleanup(hydrator.dispose)
 
-  // Re-hydrate when the compared file set changes; reset() bumps the generation, cancelling any
+  // Re-hydrate when the compared file set changes. reset() bumps the generation, cancelling any
   // in-flight parse of the previous branch pair.
   createEffect(on(compareFiles, (list) => {
     setParsedByPath(new Map())

@@ -6,10 +6,10 @@ import { dirname, join } from 'node:path'
 // SESSION_ENC_KEY is stored with Electron safeStorage when available. The same key protects encrypted
 // provider credentials, so a decrypt failure is fatal rather than silently creating a second identity.
 //
-// Env always wins: `.env` (dev), the real environment, and tests can set SESSION_ENC_KEY directly.
-// When safeStorage is available, an env key is also persisted so env-only installations migrate
-// without changing identity. With no env or key file, an existing DB is a hard stop: only a genuinely
-// fresh data root may mint a new identity.
+// Env always wins: `.env`, the real environment, and tests can set SESSION_ENC_KEY directly. When
+// safeStorage is available an env key is also persisted, so env-only installations migrate without
+// changing identity. With no env and no key file, an existing DB is a hard stop: only a genuinely fresh
+// data root may mint a new identity.
 
 const KEY_FILE = 'session.key' // safeStorage-encrypted 64-hex-char key, mode 0600, under the data root
 const DB_FILE = 'core.sqlite' // must match serverPaths.ts's DATABASE_FILENAME
@@ -25,9 +25,8 @@ function persistKey(path: string, key: string): void {
   chmodSync(path, 0o600) // enforce perms when replacing a file created under a looser umask
 }
 
-// Resolve SESSION_ENC_KEY and publish it to process.env so makeBindings' plain `secret()` lookup
-// works unchanged (dev:node and tests keep their env-only path). Call AFTER app.whenReady() —
-// safeStorage.isEncryptionAvailable() is only meaningful once the app is ready.
+// Resolve SESSION_ENC_KEY and publish it to process.env so makeBindings' plain `secret()` lookup works
+// unchanged. Call after app.whenReady(): safeStorage.isEncryptionAvailable() is only meaningful then.
 export function resolveSessionKey(dataDir: string): void {
   const path = join(dataDir, KEY_FILE)
   const envKey = process.env.SESSION_ENC_KEY
@@ -41,7 +40,7 @@ export function resolveSessionKey(dataDir: string): void {
       try {
         persistedKey = safeStorage.decryptString(readFileSync(path))
       } catch {
-        // The explicit env key is the recovery authority for a corrupt/unreadable keychain copy.
+        // The explicit env key is the recovery authority for a corrupt or unreadable keychain copy.
       }
     }
     if (persistedKey !== envKey) persistKey(path, envKey)
@@ -50,8 +49,8 @@ export function resolveSessionKey(dataDir: string): void {
   }
 
   if (!safeStorage.isEncryptionAvailable()) {
-    // No OS keychain (e.g. a Linux session with no keyring). Refuse rather than fabricate a
-    // throwaway plaintext key that would silently change identity on the next launch.
+    // No OS keychain, such as a Linux session with no keyring. Refuse rather than fabricate a throwaway
+    // plaintext key that would silently change identity on the next launch.
     throw new Error(
       'safeStorage encryption is unavailable and SESSION_ENC_KEY is unset — set SESSION_ENC_KEY in the environment, or run where the OS keychain is reachable.',
     )
@@ -59,7 +58,7 @@ export function resolveSessionKey(dataDir: string): void {
 
   if (existsSync(path)) {
     // Existing identity: decrypt it. A failure here (keychain rotated, corrupt file) is fatal on
-    // purpose — regenerating would invalidate every session and encrypted provider token at once.
+    // purpose, because regenerating would invalidate every session and encrypted provider token.
     const key = safeStorage.decryptString(readFileSync(path))
     assertValidKey(key, `${KEY_FILE} decrypted value`)
     process.env.SESSION_ENC_KEY = key
@@ -67,7 +66,7 @@ export function resolveSessionKey(dataDir: string): void {
   }
 
   // Missing key material beside an existing database is an integrity failure, not a first run. The
-  // original key must be supplied so the database and provider credentials remain readable.
+  // original key must be supplied so the database and provider credentials stay readable.
   if (existsSync(join(dataDir, DB_FILE))) {
     throw new Error(
       `${KEY_FILE} is missing for an existing ${DB_FILE} — restore the original SESSION_ENC_KEY in the environment so it can be migrated to safeStorage.`,

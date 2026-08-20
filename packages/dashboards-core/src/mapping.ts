@@ -12,25 +12,24 @@ import {
   type PanelQuery,
 } from './model'
 
-// THE MAPPING LAYER (docs/dashboards.md § The mapping layer, and cross-source panels) — the layer that sits
-// between queries and shaping, is owned by the host, and is entirely declarative.
+// The mapping layer (docs/dashboards.md § The mapping layer, and cross-source panels). It sits between
+// queries and shaping, is owned by the host, and is entirely declarative.
 //
 // It exists for one scenario: a personal todo board whose columns are the user's own invention,
-// populated by github pull requests AND linear issues, with each provider's statuses mapped onto
-// those columns. Read the property that makes it work before reading the code — NEITHER PLUGIN KNOWS
-// THE OTHER EXISTS, AND NO WIRE FORMAT GREW. Cross-source composition is a CLIENT feature. Nothing
-// in this file is reachable from a manifest, and if a future change here wants a new protocol field,
-// that is the design failing rather than the protocol being short.
+// populated by github pull requests and linear issues, with each provider's statuses mapped onto those
+// columns. The property that makes it work: neither plugin knows the other exists, and no wire format
+// grew. Cross-source composition is a client feature. Nothing here is reachable from a manifest, and a
+// change here that wants a new protocol field is the design failing.
 //
 // Three sub-layers, in the order they apply to a row:
 //
-//   FIELD MAPPING   per source, which of its fields feeds each panel-local field. Pre-filled from
-//                   the declared ROLES — which is the only reason roles exist (docs/dashboards.md § The two vocabularies).
-//   VALUE MAPPING   per source, which of its enum values land in each of the panel's columns.
-//   DERIVED ENUM    the columns themselves: ids and labels the user invented, belonging to no plugin.
+//   field mapping   per source, which of its fields feeds each panel-local field. Pre-filled from the
+//                   declared roles, which is the only reason roles exist.
+//   value mapping   per source, which of its enum values land in each of the panel's columns.
+//   derived enum    the columns themselves: ids and labels the user invented, belonging to no plugin.
 //
-// Everything here is pure over `(sources, mapping)`, for the reason shaping.ts gives: vitest in this
-// repo runs in node with no Solid plugin, so anything living inside a component is unchecked.
+// Everything here is pure over `(sources, mapping)`, because vitest in this repo runs in node with no
+// Solid plugin, so anything inside a component is unchecked.
 
 /** One source's answer, as the mapping layer sees it. */
 export type PanelSourcePage = {
@@ -41,19 +40,20 @@ export type PanelSourcePage = {
 
 // ── The panel-local field vocabulary ──────────────────────────────────────────────────────────
 //
-// A mapped panel's fields are THE ROLE VOCABULARY and nothing else. That is a real ceiling and it is
-// the one the design pays for: a role is the only thing two independently-written collections agree
-// about, so it is the only thing the host can align without asking. github's `repo` and linear's
-// `identifier` are both text and both useful, and neither has a panel-local home.
+// ── The panel-local field vocabulary ──────────────────────────────────────────────────────────
 //
-// Five ROLE fields, fixed — and beside them, however many the user invented (`mapping.extraFields`,
-// model.ts § PanelFieldDef). The roles are what the host can align WITHOUT ASKING; an invented field
-// is the same matrix one row longer, with the person answering the question the role would have
+// A mapped panel's fields are the role vocabulary and nothing else. That's a real ceiling, and the one
+// the design pays for: a role is the only thing two independently-written collections agree about, so
+// it's the only thing the host can align without asking. github's `repo` and linear's `identifier` are
+// both text and both useful, and neither has a panel-local home.
+//
+// Five role fields, fixed, plus however many the user invented (`mapping.extraFields`). An invented
+// field is the same matrix one row longer, with the person answering the question the role would have
 // answered. Nothing about the wire changed to allow it.
 
 const ROLE_FIELDS = [
   { id: 'title', name: 'Title', type: 'text', role: 'title' },
-  // The one that is also the DERIVED enum. Its values are the user's columns rather than any
+  // The one that's also the derived enum. Its values are the user's columns rather than any
   // provider's, which is what makes a mapped board the user's board.
   { id: 'status', name: 'Status', type: 'enum', role: 'status' },
   { id: 'assignee', name: 'Assignee', type: 'person', role: 'assignee' },
@@ -66,32 +66,31 @@ export const PANEL_FIELDS: readonly PluginCollectionField[] = ROLE_FIELDS
 /** The panel-local field the derived enum lives on, and therefore what a mapped board groups by. */
 export const PANEL_STATUS_FIELD_ID = 'status'
 
-/** WHERE A ROW CAME FROM, as an ordinary panel-local field (docs/future/dashboards/charts.md § 4).
+/** Where a row came from, as an ordinary panel-local field (docs/dashboards.md § Provenance, and what a row may not claim).
  *
- *  A row's source is provenance, not a field, and "split this line by github vs linear" was
+ *  A row's source is provenance, not a field, so "split this line by github vs linear" was
  *  unexpressible because `series` names a field. Rather than a special case in the chart, provenance
- *  becomes a field where fields already grow — and then EVERYTHING DOWNSTREAM WORKS UNINVENTED:
- *  `series` can name it, `groupBy` can (a by-source board), filters can (hide one source without
- *  unmapping it), the projection can (the Source column, which used to be hardcoded in TableView).
+ *  becomes a field where fields already grow, and then everything downstream works uninvented:
+ *  `series` can name it, `groupBy` can, filters can (hide one source without unmapping it), and the
+ *  projection can (the Source column, which used to be hardcoded in TableView).
  *
- *  Three properties hold and each is deliberate:
+ *  Three properties hold, each deliberate:
  *
- *    FED BY THE HOST'S STAMP, never by a mapping row. The matrix has no row for it because there is
- *    nothing to answer — it is never absent and never user-fed.
+ *    Fed by the host's stamp, never by a mapping row. The matrix has no row for it because there's
+ *    nothing to answer: it's never absent and never user-fed.
  *
- *    NO TONE. Provenance is IDENTITY, not status: github is not "ok" and linear is not "warn"
- *    (charts.md § 1). The chart's series ramp colours it; the status vocabulary does not.
+ *    No tone. Provenance is identity, not status: github isn't "ok" and linear isn't "warn". The
+ *    chart's series ramp colours it; the status vocabulary doesn't.
  *
- *    MULTI-SOURCE ONLY. A split over one source is a no-op nobody should be offered, and the enum
- *    would carry a single value.
+ *    Multi-source only. A split over one source is a no-op, and the enum would carry a single value.
  *
- *  No id collision is possible: panel-local ids never cross the wire, so a plugin's field id cannot
- *  reach this namespace, and an invented field's id is MINTED (`newColumnId`) rather than typed. */
+ *  No id collision is possible: panel-local ids never cross the wire, and an invented field's id is
+ *  minted (`newColumnId`) rather than typed. */
 export const PANEL_SOURCE_FIELD_ID = 'source'
 
-/** ponytail: the plugin's id, and the collection alongside it only where one plugin provides two of
- *  this panel's sources. The registry's display name would read better and lives in client-core,
- *  which this package cannot import; pass one down if it ever matters. */
+/** The plugin's id, and the collection alongside it only where one plugin provides two of this panel's
+ *  sources. The registry's display name would read better but lives in client-core, which this package
+ *  can't import; pass one down if it ever matters. */
 const sourceLabel = (query: PanelQuery, queries: readonly PanelQuery[]): string =>
   queries.filter((other) => other.pluginId === query.pluginId).length > 1
     ? `${query.pluginId} · ${query.collectionId}`
@@ -110,30 +109,28 @@ const provenanceField = (queries: readonly PanelQuery[]): PluginCollectionField[
 const asField = (definition: PanelFieldDef): PluginCollectionField =>
   ({ id: definition.id, name: definition.label, type: definition.type })
 
-/** THE panel-local vocabulary for a given mapping: the five roles, then whatever the user invented,
- *  in the order they declared it, then `source` on a panel with more than one. Everything downstream
- *  — the schema, the union, the editor's matrix — walks this one list, so an invented field is never
- *  a special case anywhere.
+/** The panel-local vocabulary for a given mapping: the five roles, then whatever the user invented in
+ *  declaration order, then `source` on a panel with more than one. Everything downstream walks this one
+ *  list, so an invented field is never a special case.
  *
- *  `queries` is OPTIONAL and its absence is the mapping matrix's answer: the matrix asks "which of
+ *  `queries` is optional, and its absence is the mapping matrix's answer: the matrix asks "which of
  *  this source's fields feeds each panel field", and `source` has nothing to answer. Callers that
- *  render data pass the queries; the matrix does not. */
+ *  render data pass the queries; the matrix doesn't. */
 export const panelFieldsFor = (
   mapping: PanelMapping | undefined,
   queries: readonly PanelQuery[] = [],
 ): PluginCollectionField[] =>
   [...ROLE_FIELDS, ...(mapping?.extraFields ?? []).map(asField), ...provenanceField(queries)]
 
-/** An invented field's id is never a role's, so `undefined` here IS "this is one of the five". */
+/** An invented field's id is never a role's, so `undefined` here means "this is one of the five". */
 const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): PanelFieldDef | undefined =>
   mapping?.extraFields?.find((definition) => definition.id === panelFieldId)
 
 /** Does this panel use the mapping layer at all?
  *
- *  Three triggers, all explicit: more than one source (there is nothing to union otherwise), declared
- *  columns (the user invented an enum even over one source), or an invented field (same argument). A
- *  single-collection panel with none of them takes the untouched pre-mapping path — its rows and its
- *  schema pass through verbatim, which is what keeps the common case as simple as it was. */
+ *  Three explicit triggers: more than one source, declared columns (an enum the user invented even over
+ *  one source), or an invented field. A single-collection panel with none of them takes the untouched
+ *  pre-mapping path, so its rows and schema pass through verbatim. */
 export const isMapped = (queries: readonly PanelQuery[], mapping: PanelMapping | undefined): boolean =>
   queries.length > 1 || !!mapping?.columns?.length || !!mapping?.extraFields?.length
 
@@ -141,10 +138,10 @@ export const isMapped = (queries: readonly PanelQuery[], mapping: PanelMapping |
 
 /** Which of a source's fields feeds a panel-local field.
  *
- *  The ROLE is the default rather than a one-time copy into the config: a panel that never opened the
- *  mapping step still unions correctly, and a plugin that later moves a role onto a different field
+ *  The role is the default rather than a one-time copy into the config, so a panel that never opened
+ *  the mapping step still unions correctly, and a plugin that later moves a role onto a different field
  *  follows. `''` is the user saying "this source has nothing here", which is why an explicit empty
- *  string is distinguished from an absent key. */
+ *  string differs from an absent key. */
 export function sourceFieldFor(
   source: PanelSourcePage,
   panelFieldId: string,
@@ -153,20 +150,19 @@ export function sourceFieldFor(
   const declared = mapping?.fields?.[panelSourceKey(source.query)]?.[panelFieldId]
   if (declared !== undefined) return declared || undefined
   const role = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.role
-  // An invented field has no role, so there is nothing to fall back to and an unanswered one is
-  // simply unmapped for that source. The pre-fill is the payoff of the role vocabulary and an
-  // invented field is precisely the case where the host has no opinion to offer.
+  // An invented field has no role, so there's nothing to fall back to and an unanswered one is simply
+  // unmapped for that source. The pre-fill is the payoff of the role vocabulary, and an invented field
+  // is exactly where the host has no opinion to offer.
   if (!role) return undefined
   return source.schema.fields.find((field) => field.role === role)?.id
 }
 
 /** The suggestion the host shows its work for. "Both of these collections have a status-role enum,
- *  here is a mapping" is the entire argument for the role vocabulary existing (docs/dashboards.md § The two vocabularies), and
- *  this is where it is cashed.
+ *  here's a mapping" is the whole argument for the role vocabulary, and this is where it's cashed.
  *
- *  Only fields the user has not already answered for are filled, so pressing it twice is harmless and
- *  a hand-made choice is never overwritten. The result is written into the config rather than applied
- *  invisibly — the editor's selects then show exactly what the panel will do. */
+ *  Only fields the user hasn't already answered are filled, so pressing it twice is harmless and a
+ *  hand-made choice is never overwritten. The result is written into the config rather than applied
+ *  invisibly, so the editor's selects show exactly what the panel will do. */
 export function suggestFieldMapping(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,
@@ -186,10 +182,9 @@ export function suggestFieldMapping(
   return Object.keys(out).length ? out : undefined
 }
 
-/** The source fields a panel-local field may be pointed at: the ones whose SEMANTIC TYPE matches.
- *  Pointing the `updated` column at a text field would produce a column that sorts alphabetically on
- *  one source and chronologically on the other, which is precisely the thing the type vocabulary was
- *  bought to prevent. */
+/** The source fields a panel-local field may be pointed at: the ones whose semantic type matches.
+ *  Pointing the `updated` column at a text field would sort alphabetically on one source and
+ *  chronologically on the other, which is what the type vocabulary was bought to prevent. */
 export const candidateFieldsFor = (
   source: PanelSourcePage,
   panelFieldId: string,
@@ -220,9 +215,8 @@ export function mappedColumnId(
   return undefined
 }
 
-/** Put a source value in a column, or nowhere when `columnId` is undefined. A value belongs to at
- *  most ONE column of its source — a value in two columns would put the same card in two places, and
- *  the write-back shape below already assumes the reverse direction is the ambiguous one. */
+/** Put a source value in a column, or nowhere when `columnId` is undefined. A value belongs to at most
+ *  one column of its source: a value in two columns would put the same card in two places. */
 export function withMappedValue(
   mapping: PanelMapping,
   sourceKey: string,
@@ -234,8 +228,8 @@ export function withMappedValue(
     const entry = entryFor(mapping, sourceKey, column.id)
     const values = (entry?.values ?? []).filter((candidate) => candidate !== value)
     if (column.id === columnId) values.push(value)
-    // The entry survives an empty `values`, because it may already carry a `writeValue` and dropping
-    // it here would silently delete a write-back destination the user set.
+    // The entry survives an empty `values`, because it may already carry a `writeValue` and dropping it
+    // would silently delete a write-back destination the user set.
     const next = { ...(entry ?? {}), ...(values.length ? { values } : {}) }
     if (!values.length) delete next.values
     if (Object.keys(next).length) forSource[column.id] = next
@@ -250,9 +244,9 @@ export function withMappedValue(
 }
 
 /** Fill in the value mapping the host can honestly guess: a source value whose id or label matches a
- *  column's id or label, case-insensitively. linear's `completed` labelled "Done" finds a column
- *  called Done; github's `ready` finds nothing and stays unmapped, which is the correct answer — the
- *  host does not invent a destination and then hide that it guessed.
+ *  column's id or label, case-insensitively. linear's `completed` labelled "Done" finds a column called
+ *  Done; github's `ready` finds nothing and stays unmapped, which is correct. The host doesn't invent a
+ *  destination and then hide that it guessed.
  *
  *  Values the user already placed are left alone, so this is safe to press at any time. */
 export function suggestValueMapping(
@@ -275,9 +269,9 @@ export function suggestValueMapping(
   return next
 }
 
-/** The values of the source field feeding the panel's status — what the value-mapping matrix has
- *  rows for. Empty for a source whose status field declares none, which is a collection that
- *  describes itself in its answer and has not been read yet. */
+/** The values of the source field feeding the panel's status, which is what the value-mapping matrix
+ *  has rows for. Empty for a source whose status field declares none, meaning a collection that
+ *  describes itself in its answer and hasn't been read yet. */
 export function statusValuesOf(
   source: PanelSourcePage,
   mapping: PanelMapping | undefined,
@@ -293,9 +287,9 @@ const EMPTY_SCHEMA: PluginCollectionSchema = { fields: [] }
 
 /** The schema the shaping layer and the views actually see.
  *
- *  Unmapped: the single source's own schema, untouched. Mapped: the role fields at least one source
- *  can fill, with the status field carrying the user's columns as its declared values — which is what
- *  makes `boardColumns` draw the user's board without knowing that a mapping exists. */
+ *  Unmapped: the single source's own schema, untouched. Mapped: the role fields at least one source can
+ *  fill, with the status field carrying the user's columns as its declared values, which is what makes
+ *  `boardColumns` draw the user's board without knowing a mapping exists. */
 export function panelSchema(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,
@@ -309,29 +303,28 @@ export function panelSchema(
     if (field.id !== PANEL_STATUS_FIELD_ID) return [field]
     const columns = mapping?.columns ?? []
     // No columns yet means no derived enum, so the field carries no declared values and the board
-    // builds its columns out of whatever arrived — two providers' vocabularies side by side. Honest,
-    // and visibly the thing the mapping step is for.
+    // builds its columns out of whatever arrived: two providers' vocabularies side by side.
     return [columns.length ? { ...field, values: columns } : field]
   })
   return { fields }
 }
 
-/** Every source's rows as ONE list of panel-local rows.
+/** Every source's rows as one list of panel-local rows.
  *
- *  Three things hold across this rewrite and each is a rule rather than an implementation detail:
+ *  Three rules hold across this:
  *
- *    PROVENANCE IS THE HOST'S STAMP. `pluginId`/`collectionId` are copied off the row the host
- *    stamped when it parsed the response (plugins/chrome/data.ts), never off the response body — the
- *    wire schema does not carry the two fields at all, so a body that states them has them stripped
- *    before a row ever reaches here. It is what routes a card's click into the OWNING plugin's verb,
- *    so a plugin that could state it could capture another plugin's rows.
+ *    Provenance is the host's stamp. `pluginId` and `collectionId` are copied off the row the host
+ *    stamped when it parsed the response (plugins/chrome/data.ts), never off the response body. The
+ *    wire schema doesn't carry the two fields, so a body that states them has them stripped. It's what
+ *    routes a card's click into the owning plugin's verb, so a plugin that could state it could capture
+ *    another plugin's rows.
  *
- *    NO VALUE IS SILENTLY DROPPED. A value no column claims lands in the catch-all — `null`, which
- *    `boardColumns` already draws as one "Uncategorised" column — or is hidden, and hidden only
- *    because the user declared that destination.
+ *    No value is silently dropped. A value no column claims lands in the catch-all, `null`, which
+ *    `boardColumns` draws as one "Uncategorised" column, or is hidden only because the user declared
+ *    that destination.
  *
- *    ROW IDS ARE QUALIFIED BY SOURCE. A github row and a linear row may both be `42`; the wire
- *    promises uniqueness within a collection and nothing wider (@acorn/protocol/collections.ts). */
+ *    Row ids are qualified by source. A github row and a linear row may both be `42`; the wire promises
+ *    uniqueness within a collection and nothing wider (@acorn/protocol/collections.ts). */
 export function unionRows(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,
@@ -342,9 +335,8 @@ export function unionRows(
   const fields = panelSchema(sources, mapping).fields
   const columns = mapping?.columns ?? []
   const hideUnmapped = mapping?.unmapped === 'hidden'
-  // Present exactly when the panel unions more than one source, and written from the SAME host stamp
-  // the provenance badge reads — a plugin cannot state it, so a collection cannot file its rows under
-  // a stranger's source (charts.md § 4).
+  // Present exactly when the panel unions more than one source, and written from the same host stamp the
+  // provenance badge reads, so a collection can't file its rows under a stranger's source.
   const stampsSource = fields.some((field) => field.id === PANEL_SOURCE_FIELD_ID)
 
   return sources.flatMap((source) => {
@@ -367,15 +359,15 @@ export function unionRows(
       }
       return [{
         id: `${key}:${row.id}`,
-        // The row's own id BEFORE this qualification, because the qualification is for rendering and
-        // the action is not: a click hands the id to the plugin's pane as its selection, and a pane
-        // told to select `agents:sessions:<uuid>` finds nothing. `id` stays qualified — two sources
-        // can collide on `42` and the board dedupes on it.
+        // The row's own id before this qualification, because the qualification is for rendering and the
+        // action isn't: a click hands the id to the plugin's pane as its selection, and a pane told to
+        // select `agents:sessions:<uuid>` finds nothing. `id` stays qualified, because two sources can
+        // collide on `42` and the board dedupes on it.
         sourceRowId: row.id,
         values,
-        // Carried for the same reason `action` is: they are one thing. The action opens a pane and
-        // this says in WHICH task, so a mapped panel that dropped it would take every click to the
-        // "open a task first" refusal.
+        // Carried for the same reason `action` is: they're one thing. The action opens a pane and this
+        // says in which task, so a mapped panel that dropped it would send every click to the "open a
+        // task first" refusal.
         ...(row.taskId ? { taskId: row.taskId } : {}),
         ...(row.action ? { action: row.action } : {}),
         pluginId: row.pluginId,
@@ -387,10 +379,10 @@ export function unionRows(
 
 // ── Pruning ───────────────────────────────────────────────────────────────────────────────────
 
-/** The mapping with everything that names a source or a column the panel no longer has removed, and
- *  `undefined` when nothing is left. The counterpart of `normalizePanel`'s stale-shaping sweep: a
- *  value mapping written against a source that was then dropped is valid config addressing nothing,
- *  and it would come back the day a source with the same key was added again. */
+/** The mapping with everything naming a source or column the panel no longer has removed, and
+ *  `undefined` when nothing is left. The counterpart of `normalizePanel`'s stale-shaping sweep: a value
+ *  mapping written against a dropped source is valid config addressing nothing, and it would come back
+ *  the day a source with the same key was added again. */
 export function pruneMapping(
   mapping: PanelMapping | undefined,
   queries: readonly PanelQuery[],
@@ -400,9 +392,9 @@ export function pruneMapping(
   const columns = (mapping.columns ?? []).filter((column) => column.id && column.label)
   const columnIds = new Set(columns.map((column) => column.id))
   const extraFields = (mapping.extraFields ?? []).filter((field) => field.id && field.label)
-  // The five roles plus whatever survived above: anything else a `fields` entry names is a field the
-  // person deleted, and keeping it would bring the old mapping back the day they invented a field
-  // with the same id.
+  // The five roles plus whatever survived above. Anything else a `fields` entry names is a field the
+  // person deleted, and keeping it would bring the old mapping back the day they invented a field with
+  // the same id.
   const fieldIds = new Set([...PANEL_FIELDS.map((field) => field.id), ...extraFields.map((field) => field.id)])
 
   const bySource: Record<string, Record<string, PanelMappingColumn>> = {}
@@ -429,14 +421,14 @@ export function pruneMapping(
     ...(extraFields.length ? { extraFields } : {}),
     ...(mapping.unmapped === 'hidden' ? { unmapped: 'hidden' as const } : {}),
   }
-  // A panel that is not mapped has no use for any of it: the field mapping the editor pre-filled on
-  // the way in, and everything a second source left behind when it was removed, are config the
-  // untouched single-collection path never reads. Kept, they would come back the day a source was
-  // re-added and quietly reshape a panel somebody had since made their own.
+  // A panel that isn't mapped has no use for any of it: the field mapping the editor pre-filled on the
+  // way in, and everything a second source left behind, are config the single-collection path never
+  // reads. Kept, they'd come back the day a source was re-added and quietly reshape a panel somebody
+  // had since made their own.
   if (!isMapped(queries, next)) return undefined
   return Object.keys(next).length ? next : undefined
 }
 
-/** A fresh column id. Minted rather than slugged from the label, so renaming a column does not
- *  rebind every value mapped into it. */
+/** A fresh column id, minted rather than slugged from the label, so renaming a column doesn't rebind
+ *  every value mapped into it. */
 export const newColumnId = (): string => crypto.randomUUID().slice(0, 8)

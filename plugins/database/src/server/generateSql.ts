@@ -1,11 +1,11 @@
-// Prompt construction + response cleanup for AI SQL generation (docs/pg.md). Pure functions so the
-// contract with the model — "the reply IS the query" — is unit-testable without a provider.
+// Prompt construction and response cleanup for AI SQL generation (docs/pg.md). Pure functions, so the
+// contract with the model ("the reply is the query") is unit-testable without a provider.
 
 import type { DbSavedQuery } from '../shared/database'
 
 export const GENERATE_MAX_OUTPUT_TOKENS = 2048
-// Budget for the notes + examples block. The schema itself is capped at SCHEMA_CHAR_CAP (80k) in
-// main/database.ts, so 80k + 16k stays under the model runtime's MAX_SYSTEM_CHARS (100k).
+// Budget for the notes and examples block. The schema itself is capped at SCHEMA_CHAR_CAP (80k) in
+// main/database.ts, so 80k plus 16k stays under the model runtime's MAX_SYSTEM_CHARS (100k).
 export const GENERATE_MAX_CONTEXT_CHARS = 16_000
 
 export const SQL_SYSTEM_PREAMBLE = [
@@ -15,9 +15,10 @@ export const SQL_SYSTEM_PREAMBLE = [
   'Your entire reply must be executable as-is by PostgreSQL.',
 ].join(' ')
 
-// The schema is always sent; the repo's free-form notes (facts the schema can't express) and any
-// saved queries the user picked as worked examples are appended when present. Notes + examples share
-// one char budget, truncated as a block — schema fidelity matters more than the last example.
+// The schema is always sent. The repo's free-form notes, which are facts the schema can't express, and
+// any saved queries the user picked as worked examples, are appended when present. Notes and examples
+// share one char budget and are truncated as a block, because schema fidelity matters more than the last
+// example.
 export function buildSystemPrompt(schemaText: string, ctx?: { notes?: string; examples?: readonly DbSavedQuery[] }): string {
   const extras: string[] = []
   const notes = ctx?.notes?.trim()
@@ -33,7 +34,7 @@ export function buildSystemPrompt(schemaText: string, ctx?: { notes?: string; ex
   return `${SQL_SYSTEM_PREAMBLE}\n\nDatabase schema:\n\n${schemaText}${context ? `\n\n${context}` : ''}`
 }
 
-// Models occasionally fence the reply despite instructions — unwrap ``` / ```sql defensively.
+// Models occasionally fence the reply despite instructions, so unwrap ``` and ```sql defensively.
 export function stripSqlFences(text: string): string {
   const trimmed = text.trim()
   const match = trimmed.match(/^```[a-zA-Z]*\r?\n?([\s\S]*?)\r?\n?```$/)

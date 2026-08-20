@@ -69,7 +69,7 @@
 }
 
 /* SERIES IDENTITY — chart marks that answer "which series is this", never "how is this doing"
-   (docs/future/dashboards/charts.md § 1). Deliberately NOT the status tones: a line split by source
+   (docs/dashboards.md § Views are derived, not chosen from a menu). Deliberately NOT the status tones: a line split by source
    coloured ok-green and warn-amber reads as a judgement nobody made.
 
    Defaults, not primitives. A theme block may restate these; none has to, and a plugin-contributed

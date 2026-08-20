@@ -1,8 +1,8 @@
-/* MODERN — the shadcn / Tailwind-UI register: sans type, real radii, card surfaces, soft
- * elevation, roomier rows, sentence-case labels.
+/* MODERN - the shadcn / Tailwind-UI register: sans type, real radii, card surfaces, soft elevation,
+ * roomier rows, sentence-case labels.
  *
- * Colour is NOT set here. Every value below is either a scalar or a var() pointing at a theme
- * slot, so Modern composes with all 12 themes and styles/tokenAxes.test.ts enforces that.
+ * No colour here. Every value below is a scalar or a var() pointing at a theme slot, so Modern composes
+ * with all 12 themes. styles/tokenAxes.test.ts enforces that.
  */
 :root[data-style='modern'] {
   /* ── Shape ─────────────────────────────────────────────────────────────────────────────── */
@@ -16,8 +16,8 @@
   --radius-chip: var(--radius-md);
   --radius-marker: var(--radius-sm);
 
-  /* Structure moves from hairlines to surfaces: row dividers go, chrome rules stay. This is the
-     single most characteristic change, and it is one token. */
+  /* Structure moves from hairlines to surfaces: row dividers go, chrome rules stay. One token, and the
+     single most characteristic change. */
   --divider-w: var(--bw-0);
   --pane-bw: var(--bw);                 /* panes gain all four edges … */
   --pane-divider-w: var(--bw);
@@ -45,7 +45,7 @@
   --topbar-h: 52px;
   --pane-head-h: 44px;
 
-  /* Inset pane cards — no markup change, purely these three. */
+  /* Inset pane cards. No markup change, purely these three. */
   --shell-pad: var(--space-4);
   --pane-gap: var(--space-4);
   --pane-radius: var(--radius-surface);
@@ -58,7 +58,7 @@
   --fs-lg: 16px;
   --lh: 1.55;
 
-  /* Sentence case, no tracking, medium weight — the other half of "not a terminal". */
+  /* Sentence case, no tracking, medium weight: the other half of "not a terminal". */
   --label-transform: none;
   --label-tracking: 0;
   --label-weight: var(--fw-medium);

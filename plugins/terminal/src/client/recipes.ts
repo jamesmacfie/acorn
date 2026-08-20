@@ -1,7 +1,7 @@
 // Layout recipes (docs/workflows.md §3): a [layout.<id>] config block seeds a TaskLayout, auto-starts
 // its named run target in the drawer, and points the browser pane at a target's resolved URL
-// (`browser = "run:<id>"`). Pure executor over injected services — unit tested with stubs; the
-// palette wires the real runtime/layout/browser glue.
+// (`browser = "run:<id>"`). A pure executor over injected services, unit tested with stubs; the palette
+// wires the real runtime, layout and browser glue.
 import { isPaneId, paneContribution, type TaskLayout } from '@acorn/plugin-api/client'
 
 export type RecipeSpec = {
@@ -19,9 +19,9 @@ export type RecipeServices = {
   openTerminal(taskId: string): void
 }
 
-// Recipe panes → a validated TaskLayout: the known panes open left→right. Unknown/duplicate panes
-// dropped (configs may name ids we no longer model); none valid → null. Panes split equally —
-// main's parser dropped the old `ratio` key and this type followed.
+// Recipe panes to a validated TaskLayout: the known panes open left to right. Unknown and duplicate
+// panes are dropped, because configs may name ids we no longer model, and none valid means null. Panes
+// split equally: main's parser dropped the old `ratio` key and this type followed.
 export function recipeToLayout(recipe: RecipeSpec): TaskLayout | null {
   const panes = [...new Set(recipe.panes.filter((id) => isPaneId(id) && !!paneContribution(id)))]
   if (!panes.length) return null

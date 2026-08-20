@@ -17,13 +17,13 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
     ctx.capabilities.provide(NOTES_STORE, store)
     ctx.capabilities.provide(NOTES_SEED_TASK, (task) => seedTaskNotes(ctx.core, store, deps.internalEnv({ scope: 'service' }), task))
     ctx.routes.register(notes, { prefix: '', note: 'notes CRUD' })
-    // notes_list / notes_read / notes_write / notes_append, over the SAME store the pane and the context
+    // notes_list, notes_read, notes_write and notes_append, over the same store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.
     for (const tool of notesAgentTools(store, ctx.core)) ctx.tools.register(tool)
     // The `notes` context section. This closure is the whole body of what
-    // apps/node/src/wiring/contextSectionsWiring.ts held on this plugin's behalf — the three-scope walk,
-    // the empty-note skip and the workspace-note compatibility filter — moved verbatim to the plugin that
-    // owns the files. Core keeps the section's budget and compact formatter.
+    // apps/node/src/wiring/contextSectionsWiring.ts held on this plugin's behalf (the three-scope walk,
+    // the empty-note skip and the workspace-note compatibility filter), moved to the plugin that owns
+    // the files. Core keeps the section's budget and compact formatter.
     ctx.contextSections.register(
       notesSection(async (taskId) => {
         const workspaceId = await ctx.core.tasks.workspaceIdOrNull(taskId)
@@ -40,7 +40,8 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
             // structurally by their directory.
             if (scope === 'workspace' && summary.originTaskId && summary.originTaskId !== taskId) continue
             const note = await store.read(location, summary.slug).catch(() => null)
-            // Skip empty notes (an untouched scratchpad): they contribute only a `### title` of noise.
+            // Skip empty notes, such as an untouched scratchpad: they contribute only a `### title` of
+            // noise.
             if (note && note.body.trim()) {
               out.push({ slug: summary.slug, scope, title: `${note.title} (${note.kind})`, kind: note.kind, body: note.body, author: note.author })
             }

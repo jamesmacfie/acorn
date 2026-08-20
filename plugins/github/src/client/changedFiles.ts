@@ -4,17 +4,17 @@ import { useSearchParams } from '@solidjs/router'
 import { fileSummariesOptions } from './queries'
 import { type PullFile } from '../contract/api'
 
-// Single source for a PR's changed-file order and the `?file=` scroll target. `?file=` is written
-// from three places — the `/` finder and `[`/`]` cycling (Shortcuts.tsx) and the file list
-// (PullDetail) — all of which must agree on the file order, which is the summaries query's order.
-// DiffView only reads `?file=` (as its scroll anchor), so it keeps its own full-payload query.
+// Single source for a PR's changed-file order and the `?file=` scroll target. `?file=` is written from
+// three places (the `/` finder, `[` and `]` cycling in Shortcuts.tsx, and the file list in PullDetail),
+// all of which must agree on the file order, which is the summaries query's order. DiffView only reads
+// `?file=` as its scroll anchor, so it keeps its own full-payload query.
 export function useChangedFiles(
   route: () => { owner: string; repo: string; number: string } | null,
   options: { router?: boolean } = {},
 ) {
   // Registry-rendered PR panes receive a task and deliberately have no router provider in their
-  // conformance harness. Browse/detail routes keep URL-backed file selection; task panes keep the
-  // same behavior locally and use the typed file-scroll event to drive the diff.
+  // conformance harness. Browse and detail routes keep URL-backed file selection; task panes keep the
+  // same behaviour locally and use the typed file-scroll event to drive the diff.
   const router = options.router !== false ? useSearchParams() : null
   const [localFile, setLocalFile] = createSignal<string>()
   const query = createQuery(() => {
@@ -33,7 +33,7 @@ export function useChangedFiles(
     else setLocalFile(path)
   }
 
-  // Move ?file= to the next/prev changed file, wrapping. No-op when there are no files.
+  // Move ?file= to the next or previous changed file, wrapping. A no-op when there are no files.
   const cycleFile = (dir: 1 | -1) => {
     const list = files()
     if (!list.length) return

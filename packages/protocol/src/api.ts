@@ -8,14 +8,12 @@ import type {
 } from './integrations'
 import type { Cadence } from './schedules.ts'
 
-// The one error envelope every route returns — defined in ./errors.ts, re-exported here because
-// `ApiError` is the name 250-odd call sites already know. `error` was a bare string with a sibling
-// `detail: string[]`; it is now a nested object carrying requestId and retryable too
-// (docs/api-reference.md § Errors).
+// The one error envelope every route returns, defined in ./errors.ts and re-exported here because
+// `ApiError` is the name 250-odd call sites know. See docs/api-reference.md § Errors.
 export type { ApiError } from './errors.ts'
-// --- Integrations: multi-row per provider (docs/workspaces-and-tasks.md). GitHub appears as a synthesized
-// entry (id 'github') so it reads as "just another integration", while its encrypted token remains the
-// Node's active provider credential. ---
+// --- Integrations: multi-row per provider (docs/workspaces-and-tasks.md). GitHub appears as a
+// synthesized entry (id 'github') so it reads as just another integration, while its encrypted token
+// stays the node's active provider credential. ---
 export type IntegrationProvider = string
 export type Integration = {
   id: string // 'github' for the synthesized entry; opaque uuid otherwise
@@ -37,8 +35,8 @@ export type ConnectIntegrationRequest = { providerId: IntegrationProvider; crede
 export type RotateIntegrationRequest = { credentials: Record<string, string> }
 
 // --- Workspaces: named groups of Projects (docs/workspaces-and-tasks.md). The top-level unit. ---
-// When the worktree setup script runs: 'off' never, 'created' eagerly when the task is created,
-// 'terminal' lazily when its terminal first opens (the default). null is treated as 'terminal'.
+// When the worktree setup script runs: 'off' never, 'created' when the task is created, 'terminal'
+// when its terminal first opens (the default). null means 'terminal'.
 export type SetupTrigger = 'off' | 'created' | 'terminal'
 // How the browser-preview pane resolves its URL: a fixed URL, http://localhost:<port>, or the
 // stdout of a shell command run in the repo's worktree. null falls back to the dev-server port.
@@ -46,9 +44,9 @@ export type PreviewMode = 'url' | 'port' | 'script'
 // Where the Database pane's AI-generation schema text comes from: live introspection of the
 // connected Postgres, the stdout of a shell command, or a file in the worktree. null → 'auto'.
 export type DbSchemaMode = 'auto' | 'script' | 'file'
-// Preview-browser page rules (docs/panes.md): applied by the main process when a preview page
-// loads. Discriminated unions so future triggers ('navigate', …) and actions ('click', 'js', …)
-// extend without a schema change — stored as one JSON column on workspaces.
+// Preview-browser page rules (docs/panes.md), applied by the main process when a preview page loads.
+// Discriminated unions so future triggers and actions extend without a schema change. Stored as one
+// JSON column on workspaces.
 export type BrowserRuleAction = { type: 'fill'; selector: string; value: string }
 export type BrowserRule = {
   id: string
@@ -57,8 +55,9 @@ export type BrowserRule = {
   trigger: 'load'
   action: BrowserRuleAction
 }
-// Workspace identity (docs/workspaces-and-tasks.md): a small JSON-stored icon union (grows without migrations) and
-// a colour (preset token key or 6-hex). null → derived defaults (name-hash colour, initial glyph).
+// Workspace identity (docs/workspaces-and-tasks.md): a JSON-stored icon union, which grows without
+// migrations, and a colour (preset token key or 6-hex). null means derived defaults: a name-hash
+// colour and an initial glyph.
 export type WorkspaceIcon =
   | { kind: 'emoji'; value: string }
   | { kind: 'lucide'; value: string }
@@ -74,10 +73,10 @@ export type Workspace = {
 }
 export type WorkspaceSeed = { name: string }
 
-// --- Projects: a folder on the node's machine, the unit a workspace groups (docs/workspaces-and-tasks.md).
-// The successor to the (owner, name) repo keying. `vcs` and `github` are detected facets, not
-// requirements: a plain folder has neither; a git checkout without a GitHub remote has only `vcs`;
-// `path` is null for a project imported from GitHub but not yet cloned or mapped.
+// --- Projects: a folder on the node's machine, the unit a workspace groups
+// (docs/workspaces-and-tasks.md). The successor to (owner, name) repo keying. `vcs` and `github` are
+// detected facets, not requirements: a plain folder has neither, a git checkout without a GitHub
+// remote has only `vcs`, and `path` is null for a project imported from GitHub but not yet cloned.
 export type Project = {
   id: string
   name: string
@@ -128,22 +127,21 @@ export type ProjectConfigPatch = Partial<{
 }>
 export type ProjectConfigResponse = { projectId: string; config: ProjectConfig }
 
-// --- Tasks: the Project -> Task unit of work (docs/workspaces-and-tasks.md/03). Rail rows. ---
+// --- Tasks: the Project -> Task unit of work (docs/workspaces-and-tasks.md). Rail rows. ---
 // connectionId pins the link to a specific credential. providerId is stamped by core from that row.
 export type TaskLink = { connectionId: string; providerId: string; identifier: string; ref?: ExternalRef }
 export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>; providerId?: string }
 // A workspace's linked provider projects (docs/workspaces-and-tasks.md) — (integrationId, externalId) pairs.
 export type WorkspaceExternalProject = { integrationId: string; externalId: string }
 export type WorkspaceExternalProjectsResponse = { projects: WorkspaceExternalProject[] }
-// The projects ONE connection offers, for core's workspace picker. `id` is what a chosen row's
+// The projects one connection offers, for core's workspace picker. `id` is what a chosen row's
 // `externalId` becomes; `label` is display-only and already bounded by the node
-// (integrations/projectSource.ts) — the provider that produced it is not the authority on either.
+// (integrations/projectSource.ts). The provider that produced it is not the authority on either.
 export type IntegrationProject = { id: string; label: string }
 export type IntegrationProjectsResponse = { projects: IntegrationProject[] }
-// A Lucide icon name (see core/client/ui/Icon.tsx). Shape-checked only, deliberately: the
-// 1756-name map is client-side, and importing it into a route would breach the client↔node boundary
-// that core/boundaries.test.ts enforces. An unrecognised name degrades to Icon's render-as-is
-// fallback, so a bad value is cosmetic. Shared so the internal route and the public API agree.
+// A Lucide icon name (see core/client/ui/Icon.tsx). Shape-checked only, because the 1756-name map is
+// client-side and importing it into a route would breach the client/node boundary. An unrecognised
+// name falls back to Icon's render-as-is, so a bad value is cosmetic.
 export const ICON_NAME_RE = /^[a-z0-9-]{1,40}$/
 
 export type Task = {
@@ -161,8 +159,8 @@ export type Task = {
   sort: number
   links: TaskLink[]
 }
-// The non-derived columns a new task needs, plus initial links. One create path for every
-// Source (docs/workspaces-and-tasks.md/04). title is optional — the server seeds one from origin if absent.
+// The non-derived columns a new task needs, plus initial links. One create path for every source
+// (docs/workspaces-and-tasks.md). `title` is optional; the server seeds one from origin.
 export type TaskSeed = {
   title?: string
   icon?: string
@@ -217,8 +215,8 @@ export const taskContextRoute = (id: string, include?: TaskContextInclude[] | 'a
   `/v2/core/tasks/${id}/context${include === 'all' ? '?include=*' : include?.length ? `?include=${include.join(',')}` : ''}`
 
 // Agent tools (docs/agent-tools.md): the registry projects to the harness HTTP surface below and to
-// the MCP server. The permissions page reads the static catalog and persists per-tier/per-tool
-// toggles as ONE prefs slice under this key (JSON `{ tiers?, tools? }`).
+// the MCP server. The permissions page reads the static catalog and persists per-tier and per-tool
+// toggles as one prefs slice under this key (JSON `{ tiers?, tools? }`).
 export type ToolRisk = 'read' | 'write' | 'execute'
 export const AGENT_TOOLS_PERMS_PREF_KEY = 'agentTools.perms'
 export const agentToolsCatalogRoute = '/v2/core/agent-tools'
@@ -227,7 +225,7 @@ export const rendererAgentToolRoute = (taskId: string, name: string) => `/v2/cor
 
 
 // Run targets (docs/workflows.md §2): the renderer shares the RunBridge routes the MCP run tools use
-// (server/routes/harness.ts). Was the `run:*` IPC channels.
+// (server/routes/harness.ts). Replaced the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run/default-url`
 export const runStartRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
@@ -253,6 +251,9 @@ export const projectDetectRoute = (id: string) => `${projectRoute(id)}/detect`
 export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
 export const taskArchiveRoute = (id: string) => `/v2/core/tasks/${id}/archive`
+// What every plugin has to say about archiving this task, asked once when the dialog opens
+// (node-core/server/plugin/taskChecks.ts).
+export const taskArchiveConcernsRoute = (id: string) => `/v2/core/tasks/${id}/archive-concerns`
 export const taskPreviewUrlRoute = (id: string) => `/v2/core/tasks/${id}/preview-url`
 export const taskOnCreatedRoute = (id: string) => `/v2/core/tasks/${id}/on-created`
 export const taskMcpRoute = (id: string) => `/v2/core/tasks/${id}/mcp`
@@ -260,66 +261,57 @@ export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/sta
 
 
 export const prefsRoute = '/v2/core/prefs'
-// Settings → Plugins (docs/ui-design.md § New surfaces). Per NODE: which plugins a node runs decides
-// which routes exist and which SQLite files open, so this is node state and not a client preference.
+// Settings → Plugins (docs/ui-design.md § New surfaces). Per node: which plugins a node runs decides
+// which routes exist and which SQLite files open, so this is node state, not a client preference.
 //
-// `running` and `disabled` are separate answers, not one. A toggle takes effect at the node's next
-// start (plugins.md: "disabling unregisters contributions at next startup"), so between the save and the
-// restart the two differ — which is exactly the state the page has to render rather than lie about.
+// `running` and `disabled` are separate answers. A toggle takes effect at the node's next start, so
+// between the save and the restart the two differ, and the page has to render that rather than lie.
 //
-// `state` is the third answer and the only one a restart cannot change: a plugin loaded from disk
-// whose init threw is 'failed'. It is deliberately NOT folded into `running` — `restartRequired` is
-// computed from `running`, and a restart cannot fix a broken plugin, so a failed row must not make
-// the page demand one (docs/plugins.md).
+// `state` is the third answer and the only one a restart can't change: a plugin loaded from disk whose
+// init threw is 'failed'. Deliberately not folded into `running`, because `restartRequired` is computed
+// from `running` and a restart can't fix a broken plugin (docs/plugins.md).
 export type NodePluginRow = {
   name: string
   required: boolean
   disabled: boolean
   running: boolean
-  // 'pending-restart' is the fourth answer and the one phase 5 adds: a package sits on the node's disk
-  // that this process never loaded — freshly installed, updated to a different version, or uninstalled
-  // while still running. Like 'failed' it is about the package rather than the toggle, but unlike
-  // 'failed' a restart is exactly what fixes it, so it DOES raise the banner.
+  // 'pending-restart' means a package sits on the node's disk that this process never loaded: freshly
+  // installed, updated, or uninstalled while still running. Like 'failed' it's about the package
+  // rather than the toggle, but unlike 'failed' a restart fixes it, so it does raise the banner.
   state: 'active' | 'failed' | 'disabled' | 'pending-restart'
   // Epoch millis, present only on a failed row.
   failedAt?: number
-  // Why it failed, in the words of whatever broke: the thrown message from a contained init/ready, or the
-  // loader's own sentence for a manifest that does not parse, a bundle that will not import, an apiVersion
-  // this node does not speak. Present only on a failed row, and absent rather than empty when the node is
-  // older than this field — which is why it is optional, along with `stage` below: the per-node IndexedDB
-  // query cache (docs/caching.md) has no version buster, so a REQUIRED field on a persisted response type
-  // would have to arrive with a bumped query key. Optional avoids the whole question.
+  // Why it failed, in the words of whatever broke: the thrown message from a contained init or ready,
+  // or the loader's own sentence for a manifest that doesn't parse. Optional, along with `stage`,
+  // because the per-node IndexedDB query cache has no version buster and a required field on a
+  // persisted response type would need a bumped query key (docs/caching.md).
   //
-  // UNTRUSTED DISPLAY TEXT. It originates in a loaded plugin's own throw, so it crosses the trust boundary
-  // into the owner's UI: render it as text, never as markup, and expect it capped (the node caps it in
-  // node-core/server/plugin/pluginState.ts).
+  // Untrusted display text. It comes from a loaded plugin's own throw, so render it as text, never as
+  // markup. The node caps it in node-core/server/plugin/pluginState.ts.
   reason?: string
-  // Which pass it died in, so the UI can say "failed to load" rather than "failed to start" for a package
-  // that never got as far as running.
+  // Which pass it died in, so the UI can say "failed to load" rather than "failed to start".
   stage?: 'load' | 'init' | 'ready'
-  // Present exactly when this plugin came off the node's disk rather than out of the app binary,
-  // which also makes it the client's answer to "is this third-party?" (docs/third-party).
+  // Present exactly when this plugin came off the node's disk rather than the app binary, which makes
+  // it the client's answer to "is this third-party?" (docs/third-party).
   installed?: InstalledPluginRow
 }
 
-// The major of @acorn/plugin-api a bundle was built against. A manifest that does not name exactly
-// this value is skipped — "built for a newer/older acorn" is a clearer failure than a plugin that
-// loads and then calls a `ctx` member that no longer exists.
+// The major of @acorn/plugin-api a bundle was built against. A manifest that doesn't name exactly this
+// value is skipped: "built for a newer acorn" is a clearer failure than a plugin that loads and then
+// calls a `ctx` member that no longer exists.
 //
-// It lives here rather than being derived from packages/plugin-api/package.json: that manifest is
-// `private` and its version is decorative, while THIS constant is a compatibility contract that has
-// to change deliberately. @acorn/plugin-api re-exports it so plugin authors can assert against it.
+// Here rather than derived from packages/plugin-api/package.json, whose version is decorative because
+// the package is private. This constant is a compatibility contract that changes deliberately.
+// @acorn/plugin-api re-exports it so plugin authors can assert against it.
 //
-// In protocol rather than node-core because both sides hold it against the same manifest: the node
-// decides what to load, the device decides which of a fleet's bundles it can run.
+// In protocol because both sides hold it against the same manifest: the node decides what to load, the
+// device decides which of a fleet's bundles it can run.
 // ── The loaded-plugin manifest contract ───────────────────────────────────────────────────────────
 //
-// One declaration, two consumers. The manifest's shape — its permissions, its frame surfaces, its
-// declarative chrome — is the Zod schema in ./pluginContract.ts, and the types below are `z.infer` of
-// it. Until recently this file carried a hand-written twin of all of it, ~330 lines kept in step with
-// the node's schema by nothing at all, and the compiler could not help because the data crosses a
-// process boundary as `unknown`. Re-exported rather than moved so the 134 importers of this file keep
-// working; new code should import from ./pluginContract.ts directly.
+// One declaration, two consumers. The manifest's shape is the Zod schema in ./pluginContract.ts and
+// the types below are `z.infer` of it. This file used to carry a hand-written twin, ~330 lines kept in
+// step by nothing at all. Re-exported rather than moved so the 134 importers keep working; new code
+// should import from ./pluginContract.ts directly.
 export { PLUGIN_API_MAJOR } from './pluginApiVersion.ts'
 export type {
   NodePluginPermissions,
@@ -346,20 +338,20 @@ export type {
   PluginThemeDescriptor,
 } from './pluginContract.ts'
 
-// The two grants the DEVICE derives from a manifest's frame surfaces and records against a trust
-// decision. Not manifest shapes: they are what the owner consented to, one row per surface.
+// The two grants the device derives from a manifest's frame surfaces and records against a trust
+// decision. Not manifest shapes: they're what the owner consented to, one row per surface.
 export type PluginWebviewGrant = { surface: string; label: string; hosts: string[] }
 export type PluginKeyClaimGrant = { surface: string; label: string; chords: string[] }
 
-// The third: what this package's manifest says about OTHER packages and about core's own surfaces
-// (@acorn/protocol/extensionPoints.ts). One shape for all three kinds rather than three arrays, because
-// they are one question an owner asks once — "what does this reach that is not its own?" — and because a
-// trust record with three near-identical lists is three places for one of them to be forgotten.
+// The third grant: what this package's manifest says about other packages and about core's own
+// surfaces (@acorn/protocol/extensionPoints.ts). One shape for all three kinds rather than three
+// arrays, because they answer one question an owner asks once, "what does this reach that isn't its
+// own?", and three near-identical lists are three places to forget one.
 //
 //   hosts     this package opens one of its surfaces to other packages' rows.
 //   extends   this package puts its rows inside another package's surface. `target` names that package.
-//   replaces  this package offers to draw one of core's own surfaces. An OFFER: nothing is replaced
-//             until the owner picks it in settings.
+//   replaces  this package offers to draw one of core's own surfaces. Nothing is replaced until the
+//             owner picks it in settings.
 export type PluginExtensionGrant = {
   kind: 'hosts' | 'extends' | 'replaces'
   // A point reference, or a designated core slot id. Never free text.
@@ -367,37 +359,42 @@ export type PluginExtensionGrant = {
   label: string
 }
 
-// The fourth: periodic work the node will run for this package with no client open
-// (docs/schedules.md). Recorded like the three above rather than merely shown, for the reason stated
-// there — the update prompt's "what is new" mark is a set difference against what the owner last
-// approved, and a grant that is not stored can never read as newly requested. A package that starts
-// running itself every five minutes where it used to run daily has grown its reach.
+// The fourth grant: periodic work the node runs for this package with no client open
+// (docs/schedules.md). Recorded rather than merely shown, because the update prompt's "what's new"
+// mark is a set difference against what the owner last approved. A package that starts running itself
+// every five minutes where it used to run daily has grown its reach.
 export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence }
 
-// What the descriptor routes answer with. Host-defined, unlike everything else a plugin route
-// serves: the host is the one rendering these, so the shape is its contract and not the plugin's
-// (docs/architecture-overview.md § Who owns which contract). Re-exported from @acorn/plugin-api so a
-// plugin's node half types its handlers against the same declarations.
+// The fifth grant: a check this package runs when the owner archives a task, and whether it offers to
+// clean up after it (node-core/server/plugin/taskChecks.ts). Recorded for the same reason as the
+// fourth: `cleansUp` in the key is what lets the update prompt say a package that used to only warn
+// now does something.
+export type PluginTaskCheckGrant = { id: string; cleansUp: boolean }
+
+// What the descriptor routes answer with. Host-defined, unlike everything else a plugin route serves,
+// because the host renders these (docs/architecture-overview.md § Who owns which contract).
+// Re-exported from @acorn/plugin-api so a plugin's node half types its handlers against the same
+// declarations.
 //
-// The client still validates what arrives. These types describe the agreement; the roster row and the
-// route body are both bytes from a node, and a malformed row is dropped rather than thrown into the shell.
+// The client still validates what arrives: a roster row and a route body are both bytes from a node,
+// and a malformed row is dropped rather than thrown into the shell.
 export type PluginRailTask = {
-  // Optional so established providers can preserve their pre-loader task origin. Other plugins use
-  // the host-derived `<plugin>:item` value and never need to set it.
+  // Optional so established providers can keep their pre-loader task origin. Other plugins use the
+  // host-derived `<plugin>:item` value.
   origin?: string
   title?: string
   branch?: string
-  // Reserved seed text. The current task model has no body column; retaining it on the descriptor
-  // contract lets a future task-seed extension consume it without changing tracker row routes.
+  // Reserved seed text. The task model has no body column; keeping it on the descriptor contract lets
+  // a future task-seed extension consume it without changing tracker row routes.
   body?: string
   link?: Pick<TaskLinkSeed, 'connectionId' | 'identifier' | 'ref'>
 }
 export type PluginRailItem = {
   id: string
   title: string
-  /** One pre-joined line of secondary text. For SEVERAL facts use `fields`, which the host lays out
-   *  as columns — linear and rollbar both built a facts array and then flattened it with ` · `, and
-   *  the flattening is what stopped their lists reading like github's aligned one. */
+  /** One pre-joined line of secondary text. For several facts use `fields`, which the host lays out as
+   *  columns. linear and rollbar both built a facts array and flattened it with ` · `, and that's what
+   *  stopped their lists reading like github's aligned one. */
   subtitle?: string
   /** Ordered secondary facts, one per column. The host reserves the same track width for each, so
    *  the Nth fact lines up down the whole list. Wins over `subtitle` when both are present. */
@@ -408,15 +405,14 @@ export type PluginRailItem = {
 }
 export type PluginRailItems = { items: PluginRailItem[] }
 
-// A rail row's `id` has to survive a round trip the plugin does not control: the host hands it back
-// verbatim as the pane frame's `context.item`, and the frame has to recover the row's full identity
-// from that one string. Two halves, because a provider's own identifier is not globally unique — two
-// connected Linear workspaces can share a team prefix, two Rollbar projects an item number — so the
-// connection travels with it.
+// A rail row's `id` survives a round trip the plugin doesn't control: the host hands it back verbatim
+// as the pane frame's `context.item`, and the frame recovers the row's full identity from that one
+// string. Two halves, because a provider's own identifier isn't globally unique. Two connected Linear
+// workspaces can share a team prefix, so the connection travels with it.
 //
-// Percent-encoded around a single `:` because either half may legitimately contain the delimiter.
-// Here rather than in each plugin because round-tripping a rail id is the HOST's contract; linear and
-// rollbar had written the same twenty lines, and the second one's comment said so.
+// Percent-encoded around a single `:` because either half may contain the delimiter. Here rather than
+// in each plugin because round-tripping a rail id is the host's contract; linear and rollbar had each
+// written the same twenty lines.
 export const railItemId = (connectionId: string, identifier: string): string =>
   `${encodeURIComponent(connectionId)}:${encodeURIComponent(identifier)}`
 
@@ -433,8 +429,7 @@ export function parseRailItemId(value: string): [connectionId: string, identifie
     return null
   }
 }
-// `null` hides the badge, which is how a badge with nothing to say disappears without the host
-// needing a second route to ask.
+// `null` hides the badge, so a badge with nothing to say disappears without a second route.
 export type PluginSlotBadge = { text: string; tone?: 'neutral' | 'accent' | 'warn'; tooltip?: string } | null
 export type PluginAttentionWireItem = {
   id: string
@@ -455,44 +450,45 @@ export type InstalledPluginRow = {
   contributions: import('./pluginContract.ts').PluginContributions
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document. The
   // device registers `icon` as `brand:<pluginId>` and each `icons` key as `brand:<pluginId>/<key>`,
-  // stamping the prefix from the roster row so a package cannot claim another's mark. See
+  // stamping the prefix from the roster row so a package can't claim another's mark. See
   // client-core/ui/brandMarks.ts and docs/ui-design.md § Icons.
   icon?: { d: string }
   icons?: Record<string, { d: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
-  // the sha256 the node computed from the file; it is a CACHE KEY HINT and nothing more — the device
-  // hashes the bytes it received and refuses a mismatch, because a compromised node can lie here
-  // (docs/plugins.md § Trust binds to bytes, not to claims).
+  // the sha256 the node computed, and it's a cache-key hint only: the device hashes the bytes it
+  // received and refuses a mismatch, because a compromised node can lie here (docs/plugins.md § Trust
+  // binds to bytes, not to claims).
   client: { hash: string; bytes: number } | null
   // Where the package came from, as one line for the settings row ("github:owner/repo@v1.2.0",
   // "npm:acorn-board", a URL). Absent for a package that predates the installer or was copied in by
-  // hand, which is also why it is a display string and not the structured source: the roster's job is
-  // to say where this came from, and only the node's lockfile has to be able to re-resolve it.
+  // hand. A display string rather than the structured source, because only the node's lockfile has to
+  // re-resolve it.
   source?: string
   // Epoch millis.
   installedAt?: number
 }
-// An install the AGENT asked for and the OWNER has not answered yet (docs/plugins.md § Approval-mediated
-// install). Raised by the `plugin_request` agent tool, which cannot install anything: the record is inert
-// until a device reads it here and performs the install over the device-gated install route with its own
+// An install the agent asked for and the owner hasn't answered yet (docs/plugins.md §
+// Approval-mediated install). Raised by the `plugin_request` agent tool, which can't install anything:
+// the record is inert until a device reads it and installs over the device-gated route with its own
 // principal. A prompt-injected agent can produce this row and nothing else.
 export type PluginApprovalRequest = {
   requestId: string
-  // The task whose agent asked. The notification pipeline is task-scoped, and it is also the answer to
-  // "who asked for this" when the audit row is read back.
+  // The task whose agent asked. The notification pipeline is task-scoped, and this also answers "who
+  // asked for this" when the audit row is read back.
   taskId: string
   action: 'install' | 'update' | 'uninstall'
-  // Present for an install, exactly as the agent gave it. Nothing has been fetched at this point — see
+  // Present for an install, exactly as the agent gave it. Nothing has been fetched yet. See
   // docs/plugins.md § What the owner can know before the download.
   source?: PluginInstallSource
   // Present for an update or an uninstall.
   pluginId?: string
   // The agent asked for dev mode: on approval the device records a per-(plugin, node) grant that
-  // auto-trusts future bundles of this plugin until the owner ends it (docs/security.md § The dev grant).
+  // auto-trusts future bundles until the owner ends it (docs/security.md § The dev grant).
   dev: boolean
   purgeData?: boolean
-  // UNTRUSTED DISPLAY TEXT written by an agent that may be reading hostile content. Capped by the tool's
-  // input schema; render it as text, never as markup, and never let it stand in for reading the request.
+  // Untrusted display text written by an agent that may be reading hostile content. Capped by the
+  // tool's input schema. Render it as text, never as markup, and never let it stand in for reading the
+  // request.
   reason?: string
   requestedAt: number
 }
@@ -501,9 +497,9 @@ export type PluginApprovalRequest = {
 // response type can gain the field without a query-key bump (docs/caching.md).
 export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boolean; requests?: PluginApprovalRequest[] }
 
-// Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory on
-// the NODE's filesystem, allowed on every build and symlinked rather than copied, so it is the one source
-// whose bytes are not pinned (docs/security.md § Installing from a folder).
+// Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory
+// on the node's filesystem, allowed on every build and symlinked rather than copied, so it's the one
+// source whose bytes aren't pinned (docs/security.md § Installing from a folder).
 export type PluginInstallSource =
   | { github: string; tag?: string }
   | { npm: string; version?: string }
@@ -511,15 +507,14 @@ export type PluginInstallSource =
   | { path: string }
 
 // Always restart-required: a plugin's routes, tables and jobs are wired at init, so nothing an install
-// route can do makes the plugin live in the running process.
+// route does makes the plugin live in the running process.
 export type PluginInstallResult = { id: string; version: string; state: 'installed-restart-required' }
 export type PluginUpdateResult = { id: string; fromVersion: string; toVersion: string; state: 'installed-restart-required' }
 export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
 
-// The one exception to the line above, and only for a plugin the node LOADED from disk: a reload swaps
-// its node half in the running process (docs/plugins.md § The dev loop). `failed` is a 200, not an error:
-// candidate-then-commit means a failed reload changed nothing, the previous instance is still serving,
-// and `reason` is the same text the roster row now carries.
+// The one exception, and only for a plugin the node loaded from disk: a reload swaps its node half in
+// the running process (docs/plugins.md § The dev loop). `failed` is a 200, not an error, because
+// candidate-then-commit means a failed reload changed nothing and the previous instance still serves.
 export type PluginReloadResult = { id: string; version: string; state: 'reloaded' | 'failed'; reason?: string }
 
 export const corePluginsRoute = '/v2/core/plugins'
@@ -527,28 +522,27 @@ export const corePluginInstallRoute = '/v2/core/plugins/install'
 export const corePluginRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}`
 export const corePluginUpdateRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/update`
 export const corePluginReloadRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/reload`
-// The owner's answer to one agent-raised approval request. Device-only like the rest of this family, and
-// permanently unmappable from a plugin frame: an approval a frame could post would turn the request/decision
-// split back into an install route the agent can reach (client-core/plugins/frames/scopes.ts).
+// The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
+// from a plugin frame: an approval a frame could post would turn the request/decision split back into
+// an install route the agent can reach (client-core/plugins/frames/scopes.ts).
 export const corePluginRequestRoute = (requestId: string) => `/v2/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
-// task-scoped internal token cannot reach it (server/index.ts mounts requireDevice over both forms).
+// task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).
 export const corePluginBundleRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/client.js`
-// Every client paired with a node, and the revoke for one of them (docs/ui-design.md § New surfaces: "revoke this or
-// other devices"). Device-only, like the plugin list — this is node administration.
+// Every client paired with a node, and the revoke for one of them. Device-only, like the plugin list:
+// this is node administration.
 export const coreDevicesRoute = '/v2/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeURIComponent(deviceId)}`
 
 // Settings → Security (docs/security.md § Audit, § On-disk).
 //
-// `diskEncrypted` is deliberately three-valued. `null` means "this node cannot tell" — the honest answer
-// off macOS, where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count and
-// probing for them badly would produce a confident wrong answer. A security warning that cries wolf is
-// worse than no warning.
+// `diskEncrypted` is three-valued on purpose. `null` means "this node can't tell", the honest answer
+// off macOS, where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count.
+// A security warning that cries wolf is worse than no warning.
 export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
 export const coreSecurityRoute = '/v2/core/security'
 
-// The append-only audit trail. `details` is an allowlisted bag of scalars chosen per action — never a
+// The append-only audit trail. `details` is an allowlisted bag of scalars chosen per action: never a
 // request body, a credential, or a file's contents.
 export type AuditEntry = {
   id: string
@@ -559,21 +553,21 @@ export type AuditEntry = {
   subject: string | null
   details: Record<string, unknown> | null
 }
-// `nextBefore` is a TIMESTAMP cursor, not an offset: rows are only appended and pruned from the far end,
-// so an offset would skip or repeat entries whenever the 90-day prune ran under a paging reader.
+// `nextBefore` is a timestamp cursor, not an offset. Rows are only appended and pruned from the far
+// end, so an offset would skip or repeat entries whenever the 90-day prune ran under a paging reader.
 export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null }
 export const coreAuditRoute = '/v2/core/audit'
 
-// `POST /v2/core/backup` (docs/data-layer.md § Backup). `destPath` is a path on the NODE's filesystem,
-// which is why the client offers a native save dialog only for the local node. `excluded` is echoed back
-// — and written into the archive's manifest — because "why is my GitHub token gone" is a question the
-// backup itself should answer for whoever restores it a year later.
+// `POST /v2/core/backup` (docs/data-layer.md § Backup). `destPath` is a path on the node's filesystem,
+// which is why the client offers a native save dialog only for the local node. `excluded` is echoed
+// back and written into the archive's manifest, so "why is my GitHub token gone" is answered for
+// whoever restores it a year later.
 export type BackupResult = { path: string; bytes: number; files: string[]; excluded: string[] }
 export type BackupSuggestion = { suggestedPath: string }
 export const coreBackupRoute = '/v2/core/backup'
 
 // Schedules: periodic work owned by the node (docs/schedules.md). The row and cadence types live in
-// ./schedules.ts, which needs zod for the cadence parser this module deliberately does not carry.
+// ./schedules.ts, which needs zod for the cadence parser this module deliberately doesn't carry.
 //
 // A key contains a colon ('core:audit-prune'), so every builder below encodes it.
 export const schedulesRoute = '/v2/core/schedules'
@@ -583,17 +577,17 @@ export const scheduleRunsRoute = (key: string) => `${scheduleRoute(key)}/runs`
 /** What this node can actually run, for the creation picker. Only what resolves is offered, so a
  *  schedule can never be created against something that does not exist. */
 export const scheduleTargetsRoute = `${schedulesRoute}/targets`
-/** Re-take consent after a target's declared risk tier rose. The client cannot NAME a tier here — it
- *  posts nothing and the node re-stamps from the registry — so accepting is always accepting the tier
- *  the host just showed, which is what makes the confirmation impossible to talk out of asking. */
+/** Re-take consent after a target's declared risk tier rose. The client can't name a tier here: it
+ *  posts nothing and the node re-stamps from the registry, so accepting is always accepting the tier
+ *  the host just showed. */
 export const scheduleConfirmRoute = (key: string) => `${scheduleRoute(key)}/confirm`
 
-// Dashboards: the measure series behind a stat's trend (docs/dashboards.md § Trends). READ ONLY, and
-// that is the design rather than a phase — the sampler and the store share a process, so the only
-// writer is the `core:sample-measures` schedule and a write route would have nobody to serve.
+// Dashboards: the measure series behind a stat's trend (docs/dashboards.md § Trends). Read-only by
+// design, not by phase: the sampler and the store share a process, so the only writer is the
+// `core:sample-measures` schedule and a write route would have nobody to serve.
 //
-// An empty series answers 200 with an empty array, never 404: absence is data, and a panel that was
-// given a trend a minute ago has a cold state to render rather than an error to branch on.
+// An empty series answers 200 with an empty array, never 404. Absence is data, and a panel given a
+// trend a minute ago has a cold state to render rather than an error to branch on.
 export const dashboardHistoryRoute = '/v2/core/dashboards/history'
 export type DashboardMeasureSample = { bucket: number; value: number }
 export type DashboardHistoryResponse = { signature: string; samples: DashboardMeasureSample[] }
@@ -613,12 +607,12 @@ export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}
 export const integrationProjectsRoute = (id: string) => `/v2/core/integrations/${id}/projects`
 
 export const prefsKey = ['prefs'] as const
-// The suffixes identify the current response shapes and prevent unrelated query data from sharing keys.
+// The suffixes identify the current response shapes and stop unrelated query data sharing keys.
 export const workspacesKey = ['workspaces', 'groups', 'v2'] as const
 // The `v2` suffix identifies the current task response shape, including its required `icon` field.
 export const projectsKey = ['projects', 'v2'] as const
 // v3 removes the legacy repo pair and makes projectId/github/nullable branch explicit.
 export const tasksKey = ['tasks', 'v3'] as const
-// v3 adds descriptor metadata and normalized connection summaries. A distinct key prevents a
-// persisted v2 `{ provider, connected }` row from hiding registry-driven sources/settings.
+// v3 adds descriptor metadata and normalized connection summaries. A distinct key stops a persisted v2
+// `{ provider, connected }` row from hiding registry-driven sources and settings.
 export const integrationsKey = ['integrations', 'v3'] as const

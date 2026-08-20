@@ -6,23 +6,20 @@ import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPa
 import { Alert, Button, Input, Select } from '../ui/primitives'
 import './settings.css'
 
-// Settings → Security (docs/security.md § Audit: "Owner-readable in Settings"; § On-disk: "the app
-// warns once if the disk isn't encrypted").
+// Settings → Security (docs/security.md § Audit, § On-disk).
 //
-// Per NODE, with the same picker as Settings → Plugins and for the same reason: both answers are facts
-// about one machine. "Is the disk encrypted" is not a property a fleet has, and rolling the two nodes'
-// audit trails into one list would put two independent `at` sequences in one column and imply an ordering
-// across machines that nothing guarantees.
+// Per node, with the same picker as Settings → Plugins: both answers are facts about one machine. "Is
+// the disk encrypted" isn't a property a fleet has, and rolling two nodes' audit trails into one list
+// would put two independent `at` sequences in one column and imply an ordering nothing guarantees.
 //
-// Read-only. There is deliberately no "clear the log" button: an append-only table with a 90-day prune is
-// the design, and a control that could empty it would make the trail worth less than the prune already
-// makes it.
+// Read-only, with no "clear the log" button: an append-only table with a 90-day prune is the design, and
+// a control that could empty it would make the trail worth less than the prune already makes it.
 
 const PAGE = 50
 
 // Actions are a closed set on the node (server/audit.ts). Rendering the raw dotted verb would be honest
-// but unreadable; a lookup with a passthrough default is honest AND readable, and a new action added on
-// the node shows up as itself rather than disappearing.
+// but unreadable; a lookup with a passthrough default is both, and a new action added on the node shows
+// up as itself rather than disappearing.
 const ACTION_LABELS: Record<string, string> = {
   'pairing.window.opened': 'Pairing window opened',
   'pairing.window.closed': 'Pairing window closed',
@@ -52,8 +49,8 @@ export default function SecuritySettings() {
   const nodeId = () => target() ?? activeNodeId()
   const node = () => nodes().find((candidate) => candidate.nodeId === nodeId()) ?? null
   // Accumulated across pages rather than replaced, so "Load older" appends. Reset by the resource below
-  // whenever the node changes — a trail from the previous machine under the new one's heading would be a
-  // lie of exactly the kind this page exists to prevent.
+  // whenever the node changes, because a trail from the previous machine under the new one's heading
+  // would be exactly the lie this page exists to prevent.
   const [older, setOlder] = createSignal<AuditEntry[]>([])
   const [loadingMore, setLoadingMore] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -63,9 +60,9 @@ export default function SecuritySettings() {
     async (id) => (id ? await nodeSecurityPosture(id).catch(() => null) : null),
   )
 
-  // The node's suggestion, and whatever the owner has typed over it. Kept apart so switching nodes
-  // re-suggests without discarding a path the owner is halfway through editing for THIS node — and so
-  // an empty field means "use the suggestion" rather than "back up to nowhere".
+  // The node's suggestion, and whatever the owner typed over it. Kept apart so switching nodes
+  // re-suggests without discarding a path the owner is halfway through editing, and so an empty field
+  // means "use the suggestion" rather than "back up to nowhere".
   const [destPath, setDestPath] = createSignal('')
   const [backingUp, setBackingUp] = createSignal(false)
   const [backupDone, setBackupDone] = createSignal('')
@@ -87,7 +84,7 @@ export default function SecuritySettings() {
     try {
       const result = await createNodeBackup(target, nodeId() ?? undefined)
       setBackupDone(`Wrote ${Math.round(result.bytes / 1024).toLocaleString()} KB to ${result.path}`)
-      // The backup itself is an audited action, so the trail the page is showing is now out of date.
+      // The backup itself is an audited action, so the trail the page is showing is out of date.
       await refetch()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))

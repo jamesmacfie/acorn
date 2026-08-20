@@ -3,10 +3,9 @@ import { and, eq, lte } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 
-// Idempotency replay storage (docs/api-reference.md § HTTP conventions). Keyed (deviceId, key):
-// the same request replays the stored response, a different request under the same key is a
-// conflict, and 5xx is never stored so a genuine retry re-executes.
-//
+// Idempotency replay storage (docs/api-reference.md § HTTP conventions). Keyed on (deviceId, key): the
+// same request replays the stored response, a different request under the same key is a conflict, and
+// 5xx is never stored so a genuine retry re-executes.
 const TTL_MS = 24 * 60 * 60_000
 
 export const requestHash = (method: string, path: string, rawBody: string): string =>
@@ -29,8 +28,8 @@ export function idempotencyStore(db: AppDatabase, now: () => number = () => Date
         .where(and(eq(schema.idempotency.deviceId, deviceId), eq(schema.idempotency.key, key)))
         .limit(1)
       if (!row) return null
-      // Expired rows read as absent rather than being deleted here: a read path that writes would
-      // turn every GET-after-expiry into a transaction. cleanupExpired() sweeps them at boot.
+      // Expired rows read as absent rather than being deleted here: a read path that writes would turn
+      // every GET-after-expiry into a transaction. cleanupExpired() sweeps them at boot.
       if (row.expiresAt <= now()) return null
       return { requestHash: row.requestHash, responseStatus: row.responseStatus, responseBody: row.responseBody }
     },
@@ -40,8 +39,8 @@ export function idempotencyStore(db: AppDatabase, now: () => number = () => Date
       await db
         .insert(schema.idempotency)
         .values({ deviceId, key, requestHash: hash, responseStatus, responseBody, createdAt: at, expiresAt: at + TTL_MS })
-        // A concurrent duplicate may have stored first. Its response is the one already returned to
-        // the other caller, so keeping it is what makes the replay consistent.
+        // A concurrent duplicate may have stored first. Its response is the one already returned to the
+        // other caller, so keeping it is what makes the replay consistent.
         .onConflictDoNothing()
     },
 

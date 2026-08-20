@@ -5,14 +5,14 @@ import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copyWorktreeFiles, ensureWorktree, resolveBaseRef } from './worktrees'
 
-// Real git subprocesses per test/hook: the defaults (5s test, 10s hook) are too tight under a fully
-// parallel run. Matches the other git-backed suites (plugins/changes/main/localGitService.test.ts).
+// Real git subprocesses per test and hook: the defaults (5s test, 10s hook) are too tight under a fully
+// parallel run.
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' }).toString()
 
-// A checkout with a fake `origin/main` + `origin/develop` (remote-tracking refs written directly —
-// no network) whose HEAD is a *different* commit, so "created from base ref" is distinguishable.
+// A checkout with a fake `origin/main` and `origin/develop`, written directly as remote-tracking refs
+// with no network, whose HEAD is a different commit, so "created from base ref" is distinguishable.
 describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
   let dir: string
   let checkout: string
@@ -20,12 +20,10 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
   let mainSha: string
   let developSha: string
 
-  // Built ONCE, then copied per test. The assertions below genuinely need real git — they compare
-  // `git rev-parse HEAD` against specific SHAs to prove we branch off origin/main rather than HEAD,
-  // which no mock could show. What they do NOT need is rebuilding the fixture 13 git spawns at a
-  // time, six times over: that was ~78 subprocesses per file and the main reason this suite tipped
-  // over its timeouts under a fully parallel run. Copying a ~40 KB repo keeps per-test isolation at
-  // a fraction of the cost.
+  // Built once, then copied per test. These assertions genuinely need real git, since they compare
+  // `git rev-parse HEAD` against specific SHAs to prove we branch off origin/main rather than HEAD. What
+  // they don't need is rebuilding the fixture six times over, which was ~78 subprocesses per file and
+  // the main reason this suite tipped over its timeouts under a parallel run.
   let template: string
 
   beforeAll(() => {
@@ -42,15 +40,14 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
     git(src, 'add', '.')
     git(src, 'commit', '-q', '-m', 'two')
     developSha = git(src, 'rev-parse', 'HEAD').trim()
-    // Fake remote-tracking refs: origin/main at commit one, origin/develop at commit two; then
-    // advance local HEAD further so HEAD is neither.
+    // Fake remote-tracking refs: origin/main at commit one, origin/develop at commit two, then advance
+    // local HEAD so it's neither.
     git(src, 'update-ref', 'refs/remotes/origin/main', mainSha)
     git(src, 'update-ref', 'refs/remotes/origin/develop', developSha)
     writeFileSync(join(src, 'a.txt'), '3')
     git(src, 'add', '.')
     git(src, 'commit', '-q', '-m', 'three')
-    // A local 'origin' serving refs/pull/7/head at commit one, so the PR path can be exercised
-    // without a network. Fetched from the template copy, which outlives every test in this file.
+    // A local 'origin' serving refs/pull/7/head at commit one, so the PR path runs without a network.
     const origin = join(template, 'origin')
     execFileSync('git', ['clone', '-q', '--bare', src, origin])
     git(origin, 'update-ref', 'refs/pull/7/head', mainSha)
@@ -68,7 +65,7 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  // Several sequential git spawns — over vitest's 5s default when the whole suite runs in parallel.
+  // Several sequential git spawns, over vitest's 5s default when the whole suite runs in parallel.
   it('resolveBaseRef: preferred → origin/main → null', { timeout: 15_000 }, async () => {
     expect(await resolveBaseRef(checkout, 'origin/develop')).toBe('origin/develop')
     expect(await resolveBaseRef(checkout, 'missing/ref')).toBe('origin/main')
@@ -94,9 +91,9 @@ describe('worktree base-ref precedence (docs/terminal-and-agents.md)', () => {
     if (res.ok) expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(developSha)
   })
 
-  // The PR branch used to be created from FETCH_HEAD — a file in the repo's COMMON dir that every
+  // The PR branch used to be created from FETCH_HEAD, a file in the repo's common dir that every
   // concurrent fetch rewrites, so the branch could be born at another PR's head: right name, clean
-  // status, no diff, another task's tree. Asserting the private per-PR ref is what keeps it out.
+  // status, no diff, another task's tree. Asserting the private per-PR ref keeps it out.
   it('creates a PR branch from a private per-PR ref, not FETCH_HEAD', async () => {
     // A decoy FETCH_HEAD: whatever it says must not reach the new branch.
     writeFileSync(join(checkout, '.git', 'FETCH_HEAD'), `${developSha}\t\t'refs/pull/999/head' of nowhere\n`)

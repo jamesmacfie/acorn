@@ -28,8 +28,8 @@ class ServiceChild {
     this.child = spawn(process.execPath, ['--import', 'tsx', 'src/service/index.ts'], {
       cwd: appRoot,
       env: { ...process.env, ...env },
-      // fd 3 is the channel. stdout/stderr piped rather than inherited so a boot failure shows up in the
-      // test output instead of interleaving with vitest's reporter.
+      // fd 3 is the channel. stdout and stderr are piped rather than inherited, so a boot failure shows
+      // up in the test output instead of interleaving with vitest's reporter.
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     })
     this.child.stderr?.on('data', (chunk: Buffer) => console.error(`[service] ${chunk.toString().trimEnd()}`))
@@ -125,20 +125,20 @@ describe('the service as a spawned child process', () => {
   })
 
   // Spawn a service on a fresh temp data root and complete the boot handshake. Shared by both cases so
-  // each gets its own root, its own nodeId and its own certificate — a root reused between cases would
-  // make "the token this node issued at boot" ambiguous.
+  // each gets its own root, nodeId and certificate: a reused root would make "the token this node issued
+  // at boot" ambiguous.
   async function boot(): Promise<{ started: ServiceStartResult; service: ServiceChild }> {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-spawn-'))
     const service = new ServiceChild({
       SESSION_ENC_KEY: '0'.repeat(64),
       GITHUB_CLIENT_ID: 'test-client',
       GITHUB_CLIENT_SECRET: 'test-secret',
-      // The parent inherits vitest's environment; an ACORN_PORT leaking in would pin the port and hide
-      // the ephemeral path this whole phase depends on.
+      // The parent inherits vitest's environment, and an ACORN_PORT leaking in would pin the port and
+      // hide the ephemeral path this whole phase depends on.
       ACORN_PORT: '',
     })
     child = service
-    // No clientDir: the node serves no web assets, which is also why this test needs no renderer build.
+    // No clientDir: the node serves no web assets, which is why this test needs no renderer build.
     const result = await service.request('service.start', {
       dataDir,
       version: 'spawn-test',
@@ -157,9 +157,9 @@ describe('the service as a spawned child process', () => {
     expect(started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
     expect(started.deviceToken).toMatch(/^acorn_dt_/)
 
-    // A real request over the wire, validated against the pin the child just handed back — which is the
-    // one assertion that covers the whole chain at once: the certificate on disk, the listener serving
-    // it, the port in the result, and the IP SAN.
+    // A real request over the wire, validated against the pin the child just handed back, which covers
+    // the whole chain at once: the certificate on disk, the listener serving it, the port in the result,
+    // and the IP SAN.
     expect(await get(started, '/v2/node')).toBe(200)
 
     await service.waitForState('ready')
@@ -175,13 +175,13 @@ describe('the service as a spawned child process', () => {
   it('honours pairing, idempotency and revocation over the wire on a temp data root', async () => {
     const { started } = await boot()
 
-    // The boot token is a real credential on a real node, so the authenticated surface answers to it —
-    // and the device list shows exactly the one row the boot handshake created.
+    // The boot token is a real credential on a real node, so the authenticated surface answers to it, and
+    // the device list shows exactly the one row the boot handshake created.
     const listed = await call(started, '/v2/core/devices', { token: started.deviceToken })
     expect(listed.status).toBe(200)
     expect((JSON.parse(listed.body) as DevicesResponse).devices.map((device) => device.name)).toEqual(['This computer'])
 
-    // Idempotency-Key through the middleware createApp() mounts. POST /v2/core/pair/start mints a NEW
+    // Idempotency-Key through the middleware createApp() mounts. POST /v2/core/pair/start mints a new
     // code on every call, so an identical body back is only explicable as the stored response.
     const key = randomUUID()
     const opened = await call(started, '/v2/core/pair/start', { method: 'POST', token: started.deviceToken, idempotencyKey: key })
@@ -190,7 +190,7 @@ describe('the service as a spawned child process', () => {
     expect(replayed.status).toBe(200)
     expect(replayed.body).toBe(opened.body)
 
-    // Spend the code the owner just opened, UNAUTHENTICATED — a client that has never paired holds no
+    // Spend the code the owner just opened, unauthenticated: a client that has never paired holds no
     // credential, so this route is the only way in.
     const { code } = JSON.parse(opened.body) as PairingWindow
     const paired = await call(started, '/v2/pair', { method: 'POST', body: { code, deviceName: 'spawn-test laptop' } })
@@ -200,7 +200,7 @@ describe('the service as a spawned child process', () => {
     expect(result.deviceToken).toMatch(/^acorn_dt_/)
     expect((await call(started, '/v2/core/devices', { token: result.deviceToken })).status).toBe(200)
 
-    // ...and revocation takes it away on the very next request, envelope and all.
+    // And revocation takes it away on the very next request, envelope and all.
     const revoke = await call(started, `/v2/core/devices/${result.device.id}`, { method: 'DELETE', token: started.deviceToken })
     expect(revoke.status).toBe(204)
     const after = await call(started, '/v2/core/devices', { token: result.deviceToken })

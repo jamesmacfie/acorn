@@ -1,6 +1,6 @@
 import type { PanelDefinition } from './model'
 
-// What makes a recorded series still true (docs/future/dashboards/measure-history.md § Invalidation).
+// What makes a recorded series still true (docs/dashboards.md § Trends).
 //
 // A panel whose MEANING changed must not keep its old trend: a filter added yesterday makes last
 // week's samples a lie. So the sampler stamps every sample with a signature over the parts of the

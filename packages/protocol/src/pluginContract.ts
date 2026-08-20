@@ -1,17 +1,9 @@
-// The `acorn-plugin.json` contract — the manifest a loaded plugin ships, declared ONCE.
+// The schema for `acorn-plugin.json`, the manifest a loaded plugin ships.
+// See docs/plugins.md § Loaded plugins for what a manifest is and who reads it.
 //
-// It lives in protocol because both sides have a stake in it and neither may import the other. The
-// node parses a package's manifest off disk with this schema (node-core/main/pluginManifest.ts adds
-// the cross-field rules and the reader); the client receives the parsed result inside a roster row and
-// registers contributions from it. Before this file the shape was written twice — a Zod schema on the
-// node and a hand-written twin in api.ts — with nothing checking that the two agreed, because the data
-// crosses a process boundary as `unknown` and the compiler never sees both ends of the wire at once.
-// A field added to one and forgotten in the other failed silently, and the permissions block failing
-// that way meant showing an owner a security disclosure that did not match what was parsed.
-//
-// The wire projections are at the bottom. They are `z.infer` of these schemas, loosened in exactly the
-// places where an OLDER node's parser had fewer defaults to fill — a roster row is bytes a node sent,
-// and that node may be running a version of this schema that predates a field.
+// It lives in protocol because the node and the client both need it and neither can import the other.
+// node-core/main/pluginManifest.ts adds the cross-field rules and the reader. The wire projections at
+// the bottom are `z.infer` of these schemas, loosened where an older node's parser had fewer defaults.
 import { z } from 'zod'
 import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from './collections.ts'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from './contentLinkPattern.ts'
@@ -23,58 +15,46 @@ import { cadenceSchema } from './schedules.ts'
 import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from './themeTokens.ts'
 import { normalizeWebviewHost, WEBVIEW_HOST_MAX_COUNT, WEBVIEW_HOST_MAX_LENGTH } from './webview.ts'
 
-// Same shape as the route registry's and the plugin database factory's id rules, plus a length
-// bound, because this id becomes both the plugin's own route namespace and
-// `<dataRoot>/plugins/<id>.sqlite`. The prefix itself is not spelled in this package — an
-// architecture rule forbids it, and node-core/main/pluginManifest.ts is where the confining happens.
+// This id becomes the plugin's route namespace and `<dataRoot>/plugins/<id>.sqlite`. An architecture
+// rule keeps the prefix itself out of this package; node-core/main/pluginManifest.ts confines it.
 const ID_RE = /^[a-z][a-z0-9-]{1,31}$/
 
-// Node-half permissions. This block SHAPES `ctx` (main/pluginPermissions.ts) and is disclosed to the
-// user; it is not enforced, because a loaded bundle shares the Node's process and can import
-// `node:fs` directly. docs/security.md is blunt about that distinction and every
-// surface rendering this block has to preserve it.
+// Node-half permissions: shapes `ctx` (main/pluginPermissions.ts) and is shown to the user, but is not
+// enforced. Surfaces that render this block must keep saying "declared", not "enforced".
+// See docs/security.md.
 const nodePermissions = z.object({
-  // CoreServices facets. Tokens are validated in pluginPermissions.ts rather than here: an unknown
-  // token is a facet this acorn does not have, which is a skip-that-facet, not a bad manifest.
+  // pluginPermissions.ts validates these tokens. An unknown one means a facet this build doesn't
+  // have, so it's skipped rather than treated as a bad manifest.
   core: z.array(z.string().min(1)).max(64).default([]),
   capabilities: z.array(z.string().min(1)).max(64).default([]),
   // Use-scoped credential access through ctx.core.secrets.
   secrets: z.boolean().default(false),
   // The process broker (ctx.core.proc).
   exec: z.boolean().default(false),
-  // Intended egress hosts. Pure disclosure until the credential broker and rung 2/3 land.
+  // Intended egress hosts. Disclosure only, until the credential broker lands.
   net: z.array(z.string().min(1)).max(64).default([]),
 })
 
 
-// The plugin's logo: one SVG path's `d` attribute, and deliberately not an SVG document.
-//
-// A document would mean `<script>`, `<use href>`, `<image href>`, `<foreignObject>`, `on*` handlers
-// and CSS `@import` — an allowlist parser and a new trust boundary, for a logo. A `d` string has
-// none of that reachable from its grammar, so the check below is the whole check. The renderer
-// (client-core/ui/Icon.tsx) fills it with `currentColor`, which is why this shape themes and a
-// data-URI `<img>` would not. The retired docs/future/icons.md (git history) records the alternatives.
+// The plugin's logo, as one SVG path's `d` attribute rather than an SVG document, so the regex below is
+// the whole check. See docs/ui-design.md § Icons.
 const PATH_D_RE = /^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\s+-]+$/
 
 const brandMark = z.object({
-  // Authored in a 24x24 box, as simple-icons is throughout — the renderer hardcodes that viewBox.
+  // Authored in a 24x24 box, like simple-icons. The renderer hardcodes that viewBox.
   d: z.string().min(1).max(4_096).regex(PATH_D_RE, 'icon must be a single SVG path `d` string'),
 })
 
-// A relative entrypoint. Absolute paths and `..` escapes are rejected here so the loader's
-// confinement check never has to reason about a path that was hostile from the start.
+// Relative only. Rejecting `/` and `..` here keeps hostile paths away from the loader's confinement
+// check.
 const entry = z.string().min(1).max(256).refine(
   (value) => !value.startsWith('/') && !value.split(/[\\/]/).includes('..'),
   'entrypoint must be a relative path inside the plugin directory',
 )
 
-// A rectangle the plugin's client bundle draws, hosted by the shell in a sandboxed frame
-// (docs/plugins.md).
-//
-// Declared HERE and nowhere else. The shell's contribution registries are keyed by un-namespaced ids
-// that are persisted layout keys and chord targets, so who may claim `board` has to be decided by the
-// host reading this file — a plugin's client bundle cannot register a shell contribution at all. This
-// is the client-side twin of the route-namespace binding the node host already does.
+// A rectangle the plugin's client bundle draws, hosted by the shell in a sandboxed frame. Surfaces are
+// declared here and nowhere else, because the ids double as persisted layout keys and chord targets.
+// See docs/plugins.md § Loaded plugins: the client half.
 const webviewHost = z.string().min(1).max(WEBVIEW_HOST_MAX_LENGTH).superRefine((value, ctx) => {
   try {
     normalizeWebviewHost(value)
@@ -83,135 +63,86 @@ const webviewHost = z.string().min(1).max(WEBVIEW_HOST_MAX_LENGTH).superRefine((
   }
 })
 
-// A path the host will GET or POST on this plugin's behalf. Bounded here, confined in the
-// manifest-level refinement (which is where `id` is visible). Declared above the frame block because
-// a document region names two of them.
+// A path the host will GET or POST for this plugin. Bounded here, confined in the manifest-level
+// refinement where `id` is visible.
 const pluginRoute = z.string().min(1).max(256)
 
-// ── Host-owned document surfaces (docs/third-party/monaco.md) ──────────────────────────────────────────
+// ── Host-owned document surfaces ──────────────────────────────────────────────────────────────────
 //
-// The one class of surface the sandbox provably cannot serve. A Monaco frame measures 7.93 MiB
-// against an 8.00 MiB cap with a stub UI, and its language-service workers cannot be delivered at all:
-// a plugin origin serves one file and the frame CSP has no `worker-src`. The alternative to this block
-// was multi-file plugin origins plus `worker-src` — a permanent widening of the sandbox for every
-// installed plugin, forever, to serve two first-party panes.
-//
-// So the host owns the editor and the plugin supplies the DOCUMENT: an identity, a route that reads
-// it, optionally a route that writes it, and a language id from the vocabulary above. The plugin ships
-// no editor code and therefore cannot get theming, save semantics, dirty state or view state wrong,
-// because it never owns them.
-//
-// The bar for a host-owned region, and it is deliberately high: a region is host-owned only when the
-// sandbox CANNOT serve its content. Common is not the bar; impossible is. Master/detail is common —
-// every frame already draws its own with ordinary CSS — and the answer to "make that a region too"
-// stays no, because the host rendering a plugin's list from data means designing and eternally
-// versioning a widget toolkit in the wire format.
-// The first language capability, and the precedent for how the rest grow: LSP-SHAPED
-// REQUEST/RESPONSE ROUTES — position and text in, standard items out — never "run my code inside the
-// editor". The host POSTs `{ text, position }` and maps a small subset of LSP's CompletionItem back
-// onto its editor; it never learns the language. Context detection ("after FROM → tables, after
-// `alias.` → that table's columns") is the PLUGIN's, on its node half, where the schema knowledge
-// already lives — which is what lets a GraphQL console or a YAML config plugin reuse this with zero
-// host changes. Hover and diagnostics can follow the same shape when a consumer needs them; custom
-// widgets, decorations and inline UI cannot, and the test for any proposal is "is this an LSP method".
+// The host owns the editor and the plugin supplies the document: an identity, a read route, an optional
+// write route, and a language id. See docs/third-party/monaco.md for why the sandbox cannot serve one,
+// and for the bar a further host-owned region has to clear.
+
+// LSP-shaped request/response routes: position and text in, standard items out, never "run my code
+// inside the editor". See docs/third-party/monaco.md.
 const documentCompletions = z.object({
   route: pluginRoute,
-  // What re-opens the popup mid-word, beyond the editor's own identifier rule. Small and bounded:
-  // this is a list of punctuation, not a grammar.
+  // What re-opens the popup mid-word, beyond the editor's own identifier rule. Punctuation, not a
+  // grammar.
   triggerCharacters: z.array(z.string().min(1).max(2)).max(8).default([]),
 })
 
 const documentRegion = z.object({
   // From the published vocabulary, so an unknown id is a parse error rather than a document that
-  // silently renders as plain text. LSP's spellings (@acorn/protocol/languageIds.ts).
+  // quietly renders as plain text. LSP's spellings (@acorn/protocol/languageIds.ts).
   languageId: z.enum(LANGUAGE_IDS).default('plaintext'),
-  // GET -> { text }. `:taskId` and `:projectId` are substituted by the host from the pane's own scope;
-  // no other parameter is, because no other one is the host's to know.
+  // GET -> { text }. The host substitutes `:taskId` and `:projectId` from the pane's scope. No other
+  // parameter, because no other one is the host's to know.
   read: pluginRoute,
-  // PUT { text }. ABSENT MEANS READ-ONLY, which is a real mode rather than a degenerate one — a
-  // generated migration or a rendered template in a proper highlighted viewer wants exactly this.
+  // PUT { text }. Absent means read-only, which is a real mode: a generated migration or a rendered
+  // template in a highlighted viewer wants exactly that.
   write: pluginRoute.optional(),
   completions: documentCompletions.optional(),
 })
 
-// Which arrangement of regions the host draws for this pane, and what goes in each.
-//
-// REGION-ADDRESSED FROM DAY ONE even though only the degenerate template exists, and that is the single
-// one-way door in the design. Shipped whole-pane-addressed, a declaration means "this PANE is a document
-// surface"; under templates it means "this REGION of a template is one". Bolting regions on later would
-// change what every already-published declaration means, underneath third-party plugins we no longer
-// control. Carrying the region-capable shape now costs a nested object and keeps the door open.
-//
-// `document-over-frame` arrived with its consumer, which is the database pane: a document above the
-// plugin's own frame with a host-owned splitter between them. `frame-beside-document` (the editor
-// pane's) is the next entry and lands with ITS consumer rather than ahead of it. Orientation is encoded
-// in the NAME on purpose: an `orientation` field would imply the other values exist, which is the first
-// knob of a layout language. The generative rule, so future entries stay in the family:
-// `<host surface>` optionally arranged `<over|beside>` `frame`.
+// Which arrangement of regions the host draws for this pane, and what goes in each. Region-addressed
+// from the start because it is the one-way door, and orientation lives in the template name rather than
+// in a field. See docs/plugins.md § Loaded plugins: the client half.
 const paneLayout = z.object({
   template: z.enum(['document', 'document-over-frame']),
   document: documentRegion,
 })
 
 const frameSurface = z.object({
-  // Which registry this lands in. The shell renders them all the same way; what differs is the
-  // surrounding chrome it supplies.
+  // Which registry this lands in. The shell renders them all the same way; the surrounding chrome it
+  // supplies is what differs.
   //
-  // `overlay` is the full-screen picker slot — the one the editor's ⌘P file palette occupies as a
-  // compiled contribution, and the last component slot with no manifest form. It is a rectangle the
-  // HOST places (backdrop, box, close affordance), which is the same argument that makes `refPanel` a
-  // frame target: the frame draws its contents, not its own position. It has no click site of its own,
-  // so the only way to open one is the `openOverlay` verb below.
-  //
-  // `coreSlot` is the exclusive-slot target: a rectangle drawn where one of core's OWN surfaces normally
-  // is (@acorn/protocol/extensionPoints.ts holds the designated list). It is a separate target rather
-  // than a property of `pane` because it lands in a different registry and obeys a different rule —
-  // registering one SEIZES NOTHING. The user picks the provider in settings, and core is what a slot
-  // falls back to when nobody is chosen, when the chosen plugin is gone, or when its surface throws.
+  // `overlay` is the full-screen picker slot: the host places the rectangle and the frame draws its
+  // contents. It has no click site, so `openOverlay` is the only way to open one. `coreSlot` is drawn
+  // where one of core's own surfaces normally is; registering one seizes nothing, because the user
+  // picks the provider in settings. See docs/plugins.md § Replacing a core surface.
   target: z.enum(['pane', 'refPanel', 'settings', 'importer', 'webview', 'overlay', 'coreSlot']),
-  // TASK or PROJECT, and `pane` only. A pane has always meant "a rectangle in a task's layout", which is
-  // why that is the default: every manifest written before this field parses and behaves identically.
-  //
-  // `project` is the other scope the shell actually has. A rail Source's browse renders at
-  // `/p/:projectId` with no task anywhere near it, and a project-scoped pane is the DETAIL half of the
-  // one list every descriptor source draws through (client-core/plugins/chrome/ChromeSourcePanel.tsx) —
-  // the place a `SourceRouteContribution` used to put a compiled plugin's issue view. It is what lets a
-  // rail row click resolve outside a task instead of being refused.
-  //
-  // A property rather than a fifth `target`, because `target` says which registry a surface lands in and
-  // `scope` says which of two things a pane IS. As a target it would have had to be added to the `panes`
-  // set that `openPane`, `contentLinks` and the frame's own bridge allowlist each key on — four edits to
-  // carry one bit, in exchange for nothing a reader gains.
+  // Task or project, and `pane` only. `task` is the default, so every manifest written before this
+  // field behaves the same. A property rather than a fifth `target`, because `target` picks the
+  // registry and `scope` picks which of two things a pane is. See docs/panes.md § Pane scope.
   scope: z.enum(['task', 'project']).default('task'),
-  // The contribution id. Not namespaced by us: it becomes a persisted layout key the moment a user
-  // opens the pane, and prefixing it later would be a storage break (registries/plugin.ts).
+  // Not namespaced by us: it becomes a persisted layout key the moment a user opens the pane, so
+  // prefixing it later would break stored layouts (registries/plugin.ts).
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(80),
   // A Lucide name, resolved client-side; an unmatched name renders as-is.
   glyph: z.string().min(1).max(64).default('puzzle'),
   order: z.number().int().min(0).max(100_000).default(500),
-  // Costless now while the schema is unversioned, and what lets a future mobile shell skip a
-  // desktop-shaped pane instead of rendering it unusably (docs/future/remote.md).
+  // Lets a future mobile shell skip a desktop-shaped pane instead of rendering it unusably
+  // (docs/future/remote.md).
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
-  // `refPanel` only, and checked against the plugin id by the client adapter — a panel names the
-  // provider whose items it renders, and may only name its own.
+  // `refPanel` only. The client adapter checks it against the plugin id: a panel may only name its
+  // own provider.
   providerId: z.string().min(1).max(64).optional(),
   // `settings` only.
   group: z.enum(['general', 'workspace']).optional(),
-  // `coreSlot` only, and required there. Which of core's designated surfaces this offers to stand in
-  // for; an unknown one is a parse error rather than a surface that installs and never appears.
+  // `coreSlot` only, and required there. An unknown slot is a parse error.
   coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS).optional(),
-  // `webview` only. The URL may be static or resolved from the plugin's own node route; the declared
-  // hosts are the grant the device records and Electron enforces across redirects.
+  // `webview` only. The declared hosts are the grant the device records and Electron enforces across
+  // redirects.
   url: z.string().min(1).max(2_048).optional(),
   urlSource: z.string().min(1).max(256).optional(),
   hosts: z.array(webviewHost).min(1).max(WEBVIEW_HOST_MAX_COUNT).optional(),
-  // `pane` only. Absent is the shape every manifest written so far has: a plain frame filling the
-  // pane, exactly what http declares today. Present, it says the HOST draws some or all of this
-  // rectangle from the regions below.
+  // `pane` only. Absent means a plain frame fills the pane. Present, the host draws some or all of
+  // the rectangle from the regions below.
   layout: paneLayout.optional(),
-  // Chords the frame may keep instead of forwarding to the shell. Runtime code may narrow this
-  // list, never widen it; declaring the upper bound makes the capture visible before code runs.
+  // Chords the frame may keep instead of forwarding to the shell. Runtime code may narrow this list,
+  // never widen it; declaring the upper bound makes the capture visible before code runs.
   claimsKeys: z.array(z.string().min(1).max(64).superRefine((value, ctx) => {
     if (isReservedPluginKeyClaim(value)) {
       ctx.addIssue({ code: 'custom', message: `${value} is reserved by acorn and cannot be claimed` })
@@ -221,68 +152,48 @@ const frameSurface = z.object({
   })).max(32).default([]),
 })
 
-// ── Declarative chrome (docs/plugins.md) ───────────────────────────
+// ── Declarative chrome ────────────────────────────────────────────────────────────────────────────
 //
-// Small chrome — a rail source, a footer badge, palette rows, an attention item, a node stat — is
-// DATA, not a rectangle. An iframe for a 20px badge is absurd, and a badge has to be live when no
-// plugin frame is mounted anywhere, so its data cannot come from plugin UI code at all: it comes
-// from a route on the plugin's node half, which is always running, and the host draws the pixels
-// with its own components.
-//
-// Everything below is therefore either static data or a path into the plugin's own namespace. The
-// confinement check itself lives in the manifest-level refinement, because it needs `id`.
+// Everything below is static data or a path into the plugin's own namespace; the host draws the pixels
+// from a route on the plugin's always-running node half. The confinement check lives in the
+// manifest-level refinement, because it needs `id`.
+// See docs/plugins.md § Descriptors for chrome, frames for rectangles.
 
-// The closed verb set the host executes on a descriptor's behalf. Closed on purpose: it is the
-// flexibility dial, every plugin composes the same few verbs, and adding one later is additive.
-//
-// `invoke` — an RPC into the plugin's frame, mounting it if none is up — is deliberately NOT here in
-// v1. It needs a headless frame lifecycle the shell does not have, and a verb that parses but does
-// nothing is worse for an author than one that fails loudly.
+// The closed verb set the host executes for a descriptor. `invoke`, an RPC into the plugin's frame,
+// isn't here: it needs a headless frame lifecycle the shell doesn't have.
+
 const chromeAction = z.discriminatedUnion('verb', [
-  // A pane the SAME manifest declares under `frames`, checked below. The clicked row's id rides along
+  // A pane the same manifest declares under `frames`, checked below. The clicked row's id rides along
   // as a pane intent (client-core/registries/clientEvents.ts).
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
-  // A project-scoped pane the SAME manifest declares, reached by NAVIGATING to the route the manifest
-  // declared for it (`routes` below). The selected row's id becomes the addressed item.
-  //
-  // Separate from `openPane` rather than a scope-aware widening of it, because the two do different
-  // things: `openPane` mutates a task's persisted layout, this changes the URL. Keeping them apart is
-  // also what keeps `openPane`'s "open a task first" refusal honest — it goes on firing for a pane that
-  // really does need a task, and can no longer fire for one that does not.
+  // A project-scoped pane the same manifest declares, reached by navigating to the route declared for
+  // it. Separate from `openPane` because `openPane` mutates a task's persisted layout and this changes
+  // the URL, which also keeps `openPane`'s "open a task first" refusal honest.
   z.object({ verb: z.literal('navigate'), surface: z.string().min(1).max(64) }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
-  // Host-owned promotion. The selected rail row carries the seed; the verb itself carries no plugin
-  // callbacks and therefore survives the descriptor boundary.
+  // Host-owned promotion. The selected rail row carries the seed; the verb carries no plugin
+  // callbacks, so it survives the descriptor boundary.
   z.object({ verb: z.literal('createTask') }),
-  // https only, and opened in the real browser — never in-app (docs/electron.md § navigation policy).
+  // https only, opened in the real browser rather than in-app (docs/electron.md § navigation policy).
   z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
-  // An `overlay` surface the SAME manifest declares, checked below. This verb is in both unions rather
-  // than only the narrow one: an overlay covers the window and belongs to no task's layout, so it needs
-  // nothing from its click site — no row, no routed project, no task. The click site it will actually be
-  // used from is a command with a keybinding, which is what ⌘P is.
+  // An `overlay` surface the same manifest declares, checked below. It's in both unions because an
+  // overlay covers the window and belongs to no task's layout, so it needs nothing from its click
+  // site.
   z.object({ verb: z.literal('openOverlay'), overlay: z.string().min(1).max(64) }),
-  // A composed pane the SAME manifest declares, checked below. The only verb whose effect lands inside a
-  // plugin rather than on the shell, and it exists because of a chord the plugin cannot receive: in a
-  // `document-over-frame` pane ⌘Enter is pressed in the HOST's editor, where the frame has no keyboard at
-  // all. The host resolves it against the surface-scoped keybinding, flushes the document, and posts the
-  // command id over that frame's bridge.
-  //
-  // Naming the surface rather than deriving it from the keybinding keeps the command usable on its own —
-  // from the palette, from a footer badge — instead of being a thing only a chord can reach.
+  // A composed pane the same manifest declares, checked below. The only verb whose effect lands inside a
+  // plugin rather than on the shell. It exists for a chord the plugin can't receive: in a
+  // `document-over-frame` pane, Cmd+Enter is pressed in the host's editor where the frame has no
+  // keyboard. Naming the surface rather than deriving it from the keybinding keeps the command
+  // palette-usable.
   z.object({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
 ])
 
 // Seconds. A fallback for data that changes with no node-side trigger; the primary freshness path is
-// `ctx.events.status()` on the existing invalidation channel. Floored so a descriptor cannot turn
-// itself into a busy loop against a remote node.
+// `ctx.events.status()`. Floored so a descriptor can't busy-loop against a remote node.
 const refresh = z.number().int().min(30).max(86_400).optional()
 
-// The verbs that need NOTHING from their click site. `createTask` depends on a selected rail row and
-// its host-owned promotion callback; `navigate` needs a routed project to substitute into the
-// surface's path and the shell's navigator to follow it. A command registry row has none of those in
-// scope, and neither does a footer badge — the badge's click handler runs with only the plugin and
-// the node. A contribution that parses and can only toast is worse for an author than one the
-// manifest refuses, so both surfaces take this union rather than the full `chromeAction`.
+// `createTask` needs a selected rail row and `navigate` a routed project, and a command registry row
+// has neither in scope.
 const contextFreeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
@@ -291,63 +202,38 @@ const contextFreeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
 ])
 
-// What an empty rail says, and where it can send someone.
-//
-// The rail's fixed "Nothing here yet." is true and useless, and its uselessness had a cost: linear
-// answered a workspace with no linked projects by showing the viewer's own assigned issues instead,
-// because a wrong list looked better than a blank one. That is a rail-contract gap owed by every
-// source, not a linear feature (docs/third-party/README.md § known issues).
-//
-// `contextFreeAction`, because an empty rail has no row in scope — the same argument a slot badge and
-// a command make. Message length bounded, exactly ONE action, no markup: this is the field that
-// invites a source to grow an onboarding flow, and the tier's rule is that growth stops before the
-// descriptor vocabulary becomes a UI framework.
+// What an empty rail says, and where it can send someone. One action, no markup, bounded message: this
+// is the field that invites a source to grow an onboarding flow. See docs/plugins.md.
 const emptyStateDescriptor = z.object({
   message: z.string().min(1).max(160),
   action: contextFreeAction.optional(),
-  // The action's label. Absent means the message renders alone, which is a legitimate answer — see
-  // linear, whose empty state points at a settings page no verb in this union can reach.
+  // Absent means the message renders alone, which is legitimate: linear's empty state points at a
+  // settings page no verb in this union can reach.
   actionLabel: z.string().min(1).max(40).optional(),
 })
 
-// ── A reserved panel region (docs/future/dashboards/placements.md) ────────────────────────────────
+// ── A reserved panel region ───────────────────────────────────────────────────────────────────────
 //
-// The cooperative extension point with the USER in the contributor's seat: a plugin declares that part
-// of one of its surfaces is a dashboard, and what a person is allowed to compose there. It is one
-// object shared by every surface that can reserve one — a rail source's side panel and a pane's aside —
-// because "which collections, which views, how many" is the same question wherever the rectangle is.
-//
-// THE HOST DRAWS THE REGION. A plugin's layout RESERVES it and never renders into it: panels are host
-// Solid components and a sandboxed frame is a separate realm, so "a rectangle for dashboard items"
-// cannot mean "inside my iframe". The precedent is the document surface's `layout` templates, and no
-// bridge API may pretend otherwise.
-//
-// CONSTRAINTS ARE ENFORCED TWICE, the pattern the repo uses everywhere: the panel editor's selectors
-// simply do not offer a disallowed option (unrepresentable beats validated), and the host re-checks at
-// render time because a manifest-derived roster row is untrusted wire.
+// A plugin declares that part of one of its surfaces is a dashboard, and what a person may compose
+// there. The host draws the region; the plugin's layout only reserves it. Constraints are enforced
+// twice: the panel editor doesn't offer a disallowed option, and the host re-checks at render time
+// because a manifest-derived roster row is untrusted wire.
+// See docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension points.
 const panelRegion = z.object({
-  // Which collections a panel here may be composed over. ABSENT MEANS THIS PLUGIN'S OWN, which is the
-  // default a region gets by declaring nothing and the only allowance most will ever want — a source's
-  // side panel showing that source's data.
-  //
-  // Present, it is an explicit list of `<pluginId>:<collectionId>` references, which is how the whole
-  // app addresses a collection. Not validated against a registry here or anywhere: a reference to a
-  // collection that is not installed simply matches nothing, which is the same outcome as the plugin
-  // being disabled, and there is exactly one behaviour for both.
+  // Which collections a panel here may be composed over. Absent means this plugin's own; present, it's
+  // an explicit list of `<pluginId>:<collectionId>`. Not validated against a registry, so a reference
+  // to a collection that isn't installed matches nothing.
   collections: z.array(z.string().min(1).max(130)).max(16).optional(),
-  // …or, instead of a list, "any collection carrying a field with this role". The widest of the three
-  // allowances and the one a cross-provider region wants: `status` admits every provider that declares
-  // a status-role field, including ones installed after this manifest was written.
+  // Or, instead of a list, "any collection carrying a field with this role". `status` admits every
+  // provider that declares a status-role field, including ones installed after this manifest.
   fieldRole: z.enum(COLLECTION_FIELD_ROLES).optional(),
   // Which views may be composed here. Absent means all of them.
   views: z.array(z.enum(PANEL_VIEW_KINDS)).min(1).max(PANEL_VIEW_KINDS.length).optional(),
-  // How many panels fit. A region is a corner of somebody else's surface, not a Home tab, so it has a
-  // ceiling and the ceiling is the owner's to set.
+  // How many panels fit. A region is a corner of somebody else's surface, so the owner sets a ceiling.
   max: z.number().int().min(1).max(12).default(4),
 }).superRefine((region, ctx) => {
-  // Both halves are on the same object, so the rule lives here. They are alternatives — a list and a
-  // role requirement answer the same question two ways — and honouring both would mean inventing an
-  // and/or the declaration does not state.
+  // A list and a role requirement answer the same question two ways, so honouring both would mean
+  // inventing an and/or the declaration doesn't state.
   if (region.collections && region.fieldRole) {
     ctx.addIssue({ code: 'custom', path: ['fieldRole'], message: 'a panel region names collections or a fieldRole, never both' })
   }
@@ -357,53 +243,29 @@ const sourceDescriptor = z.object({
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(80),
   glyph: z.string().min(1).max(64).default('puzzle'),
-  // Required, exactly as SourceContribution.order is: rail position is DECLARED, never derived from
-  // plugin load order (registries/sources.ts states the argument at length).
+  // Required, like SourceContribution.order. Rail position is declared, never derived from plugin
+  // load order (registries/sources.ts).
   order: z.number().int().min(0).max(100_000),
   // Optional gate on a connected integration, same as a first-party source.
   providerId: z.string().min(1).max(64).optional(),
   // GET → { items: PluginRailItem[] }
   items: pluginRoute,
   onSelect: chromeAction.optional(),
-  // Shown when the route answered with no items. NOT when it failed — an unreachable node already has
-  // its own banner, and telling someone "nothing is assigned to you" because a fetch timed out is a
-  // lie the host would be telling on the plugin's behalf.
+  // Shown when the route answered with no items, not when it failed. An unreachable node has its own
+  // banner, and "nothing is assigned to you" after a timeout is a lie told on the plugin's behalf.
   emptyState: emptyStateDescriptor.optional(),
-  // A dashboard region BESIDE this source's rail list, composed by the user under the constraints
-  // above. The easy sibling of a pane's aside, because the surface it extends is already host-rendered
-  // — no frame boundary is involved anywhere. A source that declares nothing is pixel-identical to
-  // what it was before this key existed.
-  //
+  // A dashboard region beside this source's rail list, composed by the user under the constraints above.
   // Mutually exclusive with a `navigate` onSelect, checked in node-core/main/pluginManifest.ts: the
-  // detail half of a master/detail browse occupies the same rectangle, and a region that would parse
-  // and then never be drawn is the failure that file spends its length refusing.
+  // detail half of a master/detail browse occupies the same rectangle.
   panels: panelRegion.optional(),
   refresh,
 })
 
 const slotDescriptor = z.object({
   id: z.string().min(1).max(64),
-  // Enumerated host slots, so an unknown one is a parse error rather than a contribution that
-  // silently never appears — and the enum is short because A SLOT OPENED IS HARD TO CLOSE. What is
-  // here, and the argument for everything that is not:
-  //
-  //   footer  the TASK footer, the slot `docker-footer-badge` already occupies.
-  //   topbar  the topbar's right end, beside the node chip and the notification bell. This is the
-  //           status-bar of the app, and a status chip is the thing this descriptor already draws.
-  //
-  // REFUSED, on the record, so the next reader does not have to re-derive it:
-  //
-  //   `topbar.left` and `task.switcher.extra` are members of the client's `UiSlotId` union with NO
-  //     `SlotHost` anywhere in the tree. A manifest naming one would parse and never appear.
-  //   `overlay` is the full-window layer that holds the config-trust gate, the plugin-trust dialog
-  //     and the command palette. A contribution there draws OVER the shell, including over the very
-  //     prompts that ask an owner whether to trust this package. Never, at any tier.
-  //   `drawer` is a rectangle with real UI inside it, which is what a frame is for; its slot context
-  //     also carries shell callbacks (`toggleTerminal`, `closeTerminal`, the active task) that a
-  //     descriptor has no way to receive.
-  //   `tabrail.task-row` is per-TASK, and this descriptor's `data` is one node-scoped route with no
-  //     task in it. Opening it would mean either a badge that says the same thing on every row or one
-  //     fetch per visible row per plugin per tick, and neither is worth a slot.
+  // Enumerated host slots, so an unknown one is a parse error rather than a contribution that never
+  // appears. Short, because a slot opened is hard to close. docs/plugins.md § Descriptors for chrome,
+  // frames for rectangles has the table, including every slot that was refused and why.
   slot: z.enum(['footer', 'topbar']),
   icon: z.string().min(1).max(64).optional(),
   // GET → PluginSlotBadge | null, where null hides the badge.
@@ -412,20 +274,10 @@ const slotDescriptor = z.object({
   refresh,
 })
 
-// A row on a host-drawn context menu (@acorn/protocol/contextMenus.ts holds the location vocabulary
-// and the fact list a `when` may name).
-//
-// The descriptor tier's answer to "let a plugin add a right-click action", and the shape is chosen so
-// that a menu item can do EXACTLY what a command can do and nothing more: `contextFreeAction`, the
-// same narrow union a command and a slot badge take. It is the narrow one rather than the full
-// `chromeAction` even though a context menu obviously has a click site, because the thing under the
-// cursor is a CORE resource — a task row — and the two verbs missing from this union both need
-// something only a rail source has: `createTask` needs the host's promotion callback over a
-// `PluginRailItem`, and `navigate` needs a project-scoped surface of this plugin's own to address.
-//
-// What the verb DOES receive is the target's id, as the item id every other click site supplies. So a
-// `runNodeAction` learns which task the owner right-clicked and then chose this item on — a deliberate
-// act, the same disclosure a rail row click already makes.
+// A row on a host-drawn context menu (@acorn/protocol/contextMenus.ts holds the location vocabulary and
+// the facts a `when` may name). Takes the narrow `contextFreeAction` union: the thing under the cursor
+// is a core resource, and the two missing verbs both need something only a rail source has.
+// See docs/plugins.md § Context menus.
 const contextMenuDescriptor = z.object({
   id: z.string().min(1).max(64),
   location: z.enum(CONTEXT_MENU_LOCATIONS),
@@ -433,81 +285,57 @@ const contextMenuDescriptor = z.object({
   // A Lucide name or a `brand:` mark, resolved client-side, exactly as a source's `glyph` is.
   icon: z.string().min(1).max(64).optional(),
   order: z.number().int().min(0).max(100_000).default(500),
-  // All-must-equal over the location's own facts. Bounded on both sides: a handful of facts exist, and
-  // a value is a literal rather than a pattern.
+  // All-must-equal over the location's own facts. A value is a literal, not a pattern.
   when: z.record(z.string().min(1).max(32), z.union([z.string().max(64), z.boolean()])).optional(),
   action: contextFreeAction,
 }).superRefine((descriptor, ctx) => {
-  // Both fields are on the same object, so this rule can live here rather than in the manifest-level
-  // refinement. A `when` naming a fact the host never supplies can never match, which is the "installs
-  // and does nothing" failure that is worse than a parse error because it looks like it worked.
+  // A `when` naming a fact the host never supplies can never match, which is the "installs and does
+  // nothing" failure that's worse than a parse error because it looks like it worked.
   for (const fact of unknownWhenFacts(descriptor.location, descriptor.when ?? {})) {
     ctx.addIssue({ code: 'custom', path: ['when', fact], message: `'${descriptor.location}' has no fact named '${fact}'` })
   }
 })
 
-// ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ───────────────────────
+// ── Cooperative cross-plugin extension ────────────────────────────────────────────────────────────
 //
-// The gap this closes: plugin B could not add anything INSIDE plugin A's surfaces, even when A would
-// welcome it. The only way to do it was for A to import B, which is the coupling the registries were
-// built to remove.
-//
-// TWO-SIDED, DECLARATIVE, HOST-MEDIATED, and every word of that is load-bearing.
-//
-//   two-sided     A declares the point it hosts, B declares the contribution. A opted in. There is no
-//                 uncooperative extension, and there is no way to write one with these keys.
-//   declarative   what crosses is a DESCRIPTOR — an id, a label, an icon, an order — and a verb from the
-//                 closed set. Never a component, never a callback, never code. It is the same rule the
-//                 first-party-plugins doc gives for why in-realm composition is banned, applied one level
-//                 up: a plugin's realm is not somewhere another plugin's code may run.
-//   host-mediated the host fetches B's items from B's own node route, stamps the provenance, and draws
-//                 the pixels with its own components inside the strip A's layout reserved. A never
-//                 receives B's data and B never touches A's document.
-//
-// A ships NO CODE to be extendable beyond declaring the point. That is what makes the seam worth having:
-// the cost of opening a surface is one manifest entry.
+// A declares the point it hosts, B declares the contribution, and the host fetches B's items from B's
+// own node route and draws them inside the strip A's layout reserved. What crosses is a descriptor plus
+// a verb from the closed set: never a component, never a callback, never code.
+// See docs/plugins.md § Cooperative extension points and @acorn/protocol/extensionPoints.ts.
 
 const extensionPointDescriptor = z.object({
-  // Namespaced by the host into `<pluginId>:<id>`, which is the only name anyone else may use.
+  // Namespaced by the host into `<pluginId>:<id>`, the only name anyone else may use.
   id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'extension point id must be lower-case alphanumeric with dashes'),
-  // What the owner is opening, in the owner's words. Shown at trust time to BOTH sides — the plugin
-  // opening the point and the plugin filling it — because "this plugin extends that plugin" is a fact
-  // both owners are entitled to see before anything runs.
+  // What the owner is opening, in the owner's words. Shown at trust time to both sides.
   label: z.string().min(1).max(80),
   location: z.enum(EXTENSION_POINT_LOCATIONS),
-  // A surface THIS manifest declares, checked below. A point floating free of a surface would be a
-  // declaration with nowhere to draw.
+  // A surface this manifest declares, checked below. A point floating free of a surface would have
+  // nowhere to draw.
   surface: z.string().min(1).max(64),
-  // `pane.aside` only, and checked in node-core/main/pluginManifest.ts. The aside is the point whose
-  // contributor is THE USER rather than another plugin, so what it needs is not a route to read but the
-  // constraints a person's own composition must satisfy. Absent at `pane.aside` means the defaults —
-  // this plugin's own collections, every view, four panels — which is the whole opt-in for an owner
-  // with nothing particular to say.
+  // `pane.aside` only, checked in node-core/main/pluginManifest.ts. The aside's contributor is the
+  // user rather than another plugin, so it needs composition constraints rather than a route to read.
+  // Absent means the defaults: this plugin's own collections, every view, four panels.
   panels: panelRegion.optional(),
 })
 
 const extensionDescriptor = z.object({
   id: z.string().min(1).max(64),
   // `<ownerPluginId>:<pointId>`. Naming the owner out loud is the disclosure: an owner reading this
-  // manifest at install time can see which package this one reaches into.
+  // manifest at install time sees which package this one reaches into.
   point: z.string().min(1).max(130),
-  // The group heading the host draws above these rows. The plugin id rides beside it at render time and
-  // is stamped by the host, so this label cannot be used to pass the items off as somebody else's.
+  // The group heading the host draws above these rows. The host stamps the plugin id beside it, so
+  // this label can't pass the items off as somebody else's.
   label: z.string().min(1).max(80),
   order: z.number().int().min(0).max(100_000).default(500),
-  // GET → PluginExtensionItems, on this plugin's OWN namespace (confined below). The `refResolvers`
-  // pattern: the data lives on the node, the node is always running, and the host draws it.
+  // GET → PluginExtensionItems, on this plugin's own namespace (confined below).
   items: pluginRoute,
-  // Declared ONCE here rather than per item, exactly as a rail source's `onSelect` is, so the node can
-  // check it against this plugin's own declared surfaces at parse time. The clicked row's id rides along
-  // as the item. `contextFreeAction`, because the click site is inside ANOTHER plugin's pane: there is no
-  // rail row to promote and no project of this plugin's to navigate within.
+  // Declared once here rather than per item, so the node can check it against this plugin's declared
+  // surfaces at parse time. Narrow union, because the click site is inside another plugin's pane.
   onSelect: contextFreeAction.optional(),
   refresh,
 }).superRefine((descriptor, ctx) => {
-  // Both halves are on the same object, so this rule lives here rather than in the manifest-level
-  // refinement. A `point` that is not `<owner>:<point>` can never resolve, which is the "installs and
-  // does nothing" failure that is worse than a parse error because it looks like it worked.
+  // A `point` that isn't `<owner>:<point>` can never resolve: installs and does nothing, which looks
+  // like it worked.
   if (!parseExtensionPointRef(descriptor.point)) {
     ctx.addIssue({ code: 'custom', path: ['point'], message: `'${descriptor.point}' is not an extension point reference — use '<pluginId>:<pointId>'` })
   }
@@ -553,7 +381,7 @@ const attentionDescriptor = z.object({
 const nodeStatDescriptor = z.object({
   id: z.string().min(1).max(64),
   order: z.number().int().min(0).max(100_000).default(500),
-  // Singular/plural, so a card reads "1 card stuck" rather than "1 cards stuck".
+  // Singular and plural, so a card reads "1 card stuck" rather than "1 cards stuck".
   label: z.tuple([z.string().min(1).max(60), z.string().min(1).max(60)]),
   // GET → PluginNodeStatValue
   data: pluginRoute,
@@ -568,51 +396,31 @@ const contentLinkPattern = z.string().min(1).max(CONTENT_LINK_PATTERN_MAX_LENGTH
   }
 })
 
-// A RENDERER URL the host matches on this plugin's behalf, handing the matched value to the surface the
-// entry names. The manifest twin of `SourceContribution.routes` (client-core/registries/sources.ts).
-//
-// This had no manifest form until now, and the reason is recorded in client-core/plugins/chrome/
-// register.ts: a compiled plugin writes its own pattern, so github can declare `/p/:projectId/pulls`,
-// and a manifest allowed to do the same could claim `/p/:projectId`, `/settings`, or another plugin's
-// path — and would find out by silently taking over project navigation for the whole shell. Confinement
-// to a host-minted prefix is the answer, and it is the same answer `route()` gives for the node
-// namespace: one prefix per plugin id, checked below, so a collision is a parse error and never a race
-// between two loads.
-//
-// `item` is required. A route on this tier exists to ADDRESS something inside a surface — it does not
-// decide whether the surface appears, which is the rail's job — so a route with nothing to address has no
-// reason to exist. The HOST matches the URL and supplies the value; naming which capture carries it is
-// the same thing `contentLinks.item` already does over a pattern's captures, and it is the only part of
-// the match a manifest gets to name.
+// A renderer URL the host matches for this plugin, handing the matched value to the surface the entry
+// names. Confined to a host-minted prefix, one per plugin id, checked below, so a manifest can't claim
+// core's `/p/:projectId` and take over project navigation. `item` is required, because a route on this
+// tier exists to address something inside a surface rather than to decide whether it appears.
 const clientRouteDescriptor = z.object({
   id: z.string().min(1).max(64),
   // Confined below, because the check needs `id`.
   path: z.string().min(1).max(256),
-  // A `scope: 'project'` pane this same manifest declares — the precedent `contentLinks.openPane` and
-  // `chromeAction.openPane` already set.
+  // A `scope: 'project'` pane this same manifest declares, following the precedent
+  // `contentLinks.openPane` and `chromeAction.openPane` set.
   surface: z.string().min(1).max(64),
   // A `:param` of `path`, and never `projectId`: that one is core's, and the host has already bound it.
   item: z.string().min(1).max(32),
   // Registration order on the Router, so a static path can be declared ahead of a parameter path that
-  // would otherwise swallow it — the same job `SourceRouteContribution.order` does.
+  // would otherwise swallow it.
   order: z.number().int().min(0).max(100_000).default(500),
 })
 
 const contentLinkDescriptor = z.object({
   id: z.string().min(1).max(64),
   match: contentLinkPattern,
-  // A TASK-scoped pane this manifest declares, checked below. OPTIONAL, and the optionality is the whole
-  // point of the second destination: the host can also open the plugin's reference PANEL for the matched
-  // item (client-core/registries/contentLinks.ts § openContentTarget), which needs no task and no pane.
-  //
-  // Not a `destination: 'pane' | 'refPanel'` enum, because it is not the manifest's call. Which of the two
-  // fits depends on WHERE the link was clicked — a PR conversation wants the panel so the reader keeps
-  // their place, a note wants the pane — and the manifest cannot see the click. So a plugin declares what
-  // it CAN receive an item into and the clicking surface states its preference; declaring both is normal,
-  // and linear does.
-  //
-  // A panel is not named here either. It is addressed by PROVIDER, and a `refPanel` frame's provider must
-  // already equal the plugin id, so naming it again would only create a second thing to keep in step.
+  // A task-scoped pane this manifest declares, checked below. Optional, because the host can instead
+  // open the plugin's reference panel for the matched item, which needs no task and no pane. Which of
+  // the two a click gets is the clicking surface's call, not the manifest's.
+  // See docs/plugins.md § Loaded plugins: the client half.
   openPane: z.string().min(1).max(64).optional(),
   item: z.string().min(1).max(32),
 })
@@ -620,17 +428,9 @@ const contentLinkDescriptor = z.object({
 // An entry in the agent composer's "add Acorn context" list, served by two routes on the plugin's own
 // node half (@acorn/protocol/agentContext.ts holds the response schemas).
 //
-// The registry this lands in takes two async FUNCTIONS, which is what kept it off this list while
-// `http` and `database` waited — but the contract was already data-in/data-out, so a pair of routes
-// carries it with nothing lost. It follows the same argument as every descriptor above: the data lives
-// on the node anyway, the node is always running, and the host draws the picker with its own
-// components.
-//
-// `revision?()` gets NO manifest form, and that is a decision rather than an omission. It is a
-// synchronous number the composer reads while assembling its automatic-context cache key, and a
-// descriptor answers across a fetch — there is no value to return in time. The invalidation ping the
-// rest of the chrome already rides (client-core/plugins/chrome/data.ts) covers the same freshness
-// need, so a plugin loses nothing it could have used.
+// `revision?()` gets no manifest form: it's a synchronous number the composer reads while assembling
+// its cache key, and a descriptor answers across a fetch. The invalidation ping the rest of the chrome
+// rides covers the same freshness.
 const agentContextDescriptor = z.object({
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(80),
@@ -642,16 +442,10 @@ const agentContextDescriptor = z.object({
   capture: pluginRoute,
 })
 
-// One batch-enrichment route, so a surface holding identifiers of THIS plugin's items can turn them
-// into something displayable without importing this plugin (docs/third-party/README.md § cross-plugin references).
-// The host POSTs `{ identifiers }` and parses the answer against @acorn/protocol/refResolvers.ts.
-//
-// `kind` names the content-link kind these identifiers come from — `linear.issue` — so a caller that
-// scanned text knows which resolver its refs belong to. It is a claim like every other id here; what
-// binds the answer to a provider is the plugin the route belongs to, which the host stamps.
-//
-// There is no GET twin and no single-identifier form. A surface that has one identifier asks for an
-// array of one, and the cache key is the identifier set either way.
+// One batch-enrichment route, so a surface holding identifiers of this plugin's items can display them
+// without importing this plugin. The host POSTs `{ identifiers }` and parses the answer against
+// @acorn/protocol/refResolvers.ts. There's no single-identifier form: ask for an array of one.
+// See docs/third-party/README.md § cross-plugin references.
 const refResolverDescriptor = z.object({
   id: z.string().min(1).max(64),
   kind: z.string().min(1).max(64),
@@ -659,80 +453,51 @@ const refResolverDescriptor = z.object({
   resolve: pluginRoute,
 })
 
-// A typed set of records the host draws with its own components — the descriptor tier grown from
-// `nodeStats`' one integer with a label to a table of them (@acorn/protocol/collections.ts holds the
-// response schema and the argument for its size).
-//
-// It clears the master/detail refusal (docs/plugins.md) rather than reversing it. What was refused was
-// reproducing a plugin's BESPOKE UI from data, an unbounded fidelity chase; a collection feeds the
-// host's OWN generic surface, where uniformity across providers is the entire point — a board that
-// mixes two plugins' rows can only exist if neither of them draws anything.
-//
-// `(id, this plugin's id)` is the universal reference. Panels address a collection that way and no
-// other way, which is what lets a placement outlive the plugin being disabled and reinstalled.
+// A typed set of records the host draws with its own components (@acorn/protocol/collections.ts holds
+// the response schema). `(id, plugin id)` is the universal reference, which is what lets a placement
+// outlive the plugin being disabled and reinstalled. See docs/dashboards.md § Collections.
 const collectionDescriptor = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(80),
   // GET ?<declared params> → { schema, rows }
   items: pluginRoute,
   params: collectionParamsSchema.optional(),
-  // The STATIC promise about what `items` returns, so a panel editor can offer views before any data
-  // exists. Optional because a query-shaped collection — a saved SQL statement — cannot know its
-  // columns at manifest time; the response self-describes either way.
+  // The static promise about what `items` returns, so a panel editor can offer views before any data
+  // exists. Optional because a query-shaped collection, such as a saved SQL statement, can't know its
+  // columns at manifest time. The response self-describes either way.
   schema: collectionSchema.optional(),
   refresh,
 })
 
-// Periodic work the NODE runs for this plugin, with no client open (docs/schedules.md).
-//
-// The pair to `ctx.schedules.register` on the node plugin context: two feeders, one registry,
-// indistinguishable downstream. A manifest is how the loaded tier declares one, because a manifest is
-// also how the owner is told about it — a schedule is the one contribution that acts while nobody is
-// watching, and that is worth a line in the trust dialog even though it is disclosure rather than a new
-// capability (the run route is a route the plugin already owns and could already reach).
+// Periodic work the node runs for this plugin, with no client open. The pair to
+// `ctx.schedules.register`: two feeders, one registry, indistinguishable downstream. A manifest is also
+// how the owner is told, because a schedule acts while nobody is watching. See docs/schedules.md.
 const scheduleDescriptor = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(80),
-  // POST { scheduleId } → anything. Confined to the plugin's own route namespace at manifest parse and
-  // re-checked on the node before each run — verbatim the `items` rule, and the prefix itself is not
-  // spelled in this package for the reason ID_RE gives above. The response is ignored beyond ok/error:
-  // a schedule is not a data channel.
+  // POST { scheduleId }. Confined to the plugin's route namespace at parse and re-checked on the node
+  // before each run. The response is ignored beyond ok or error.
   run: pluginRoute,
-  // The cadence vocabulary, reused rather than re-declared. The plugin FLOOR (300s) is not spelled here
-  // because it is enforced where every other clamp is — on read, from the key's owner prefix
-  // (node-core/server/schedules/scheduler.ts § floorFor). Declaring under a plugin key IS opting into it.
+  // The plugin floor (300s) isn't spelled here. It's enforced on read from the key's owner prefix
+  // (node-core/server/schedules/scheduler.ts § floorFor), so declaring under a plugin key opts in.
   cadence: cadenceSchema,
-  // SECONDS, and the one unit trap in this feature: the engine's DeclaredSchedule.timeoutMs is
-  // milliseconds and the host converts. Absent means the engine default (60s).
+  // Seconds, and the one unit trap in this feature: the engine's DeclaredSchedule.timeoutMs is
+  // milliseconds and the host converts. Absent means the engine default of 60s.
   timeout: z.number().int().min(1).max(300).optional(),
 })
 
-// A COLOUR theme: a map of theme-token values the host validates and then generates a
-// `:root[data-theme="plugin:<pluginId>:<id>"]` block from itself (docs/ui-design.md § Appearance).
-//
-// No plugin-authored CSS reaches the shell, and that is the whole design rather than a precaution. A
-// raw stylesheet — which is what the obvious version of this feature accepts — can restyle anything,
-// so it would need an allowlist parser and would still be one clever selector away from breaking the
-// chrome. A map of named tokens cannot express anything but colour, so the worst a hostile or merely
-// wrong theme can do is look bad.
-//
-// `z.strictObject` over the palette does four jobs at once, which is why the shape is an object rather
-// than a `z.record`: every required token must be present, an unknown key is refused, a DERIVED token
-// (`--danger`, `--surface-sunken`, …) is refused because it is not a member — restating one on a theme
-// block would break the `var()` derivation it exists for — and each value goes through the colour
-// check. All four are parse-time, so an author learns at install rather than by seeing no theme.
-//
-// The three self-description tokens (`--is-dark`, `--color-scheme`, `--syntax-fg`) are NOT declarable.
-// They are not colours, and the host writes all three from `dark` below — a theme states what it IS
-// and the host states what follows.
+// A colour theme: a map of theme-token values the host validates, then generates a
+// `:root[data-theme="plugin:<pluginId>:<id>"]` block from. No plugin-authored CSS reaches the shell.
+// `z.strictObject` rather than `z.record` so every check happens at parse time.
+// See docs/ui-design.md § Plugin themes for the token contract and what each group may declare.
 const themeDescriptor = z.object({
-  // Namespaced by the host into `plugin:<pluginId>:<id>`; the alphabet is bounded because the result is
-  // written into a CSS attribute selector.
+  // Namespaced by the host into `plugin:<pluginId>:<id>`. The alphabet is bounded because the result
+  // is written into a CSS attribute selector.
   id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'theme id must be lower-case alphanumeric with dashes'),
   label: z.string().min(1).max(80),
-  // Drives `--is-dark`, `--color-scheme` and `--syntax-fg`, which is everything in the app that asks a
-  // theme whether it is dark: the terminal and editor bridges read `--is-dark`, and the diff and check
-  // logs pick their syntax palette off `--syntax-fg`.
+  // Drives `--is-dark`, `--color-scheme` and `--syntax-fg`, which is everything that asks a theme
+  // whether it's dark: the terminal and editor bridges read `--is-dark`, and the diff and check logs
+  // pick their syntax palette off `--syntax-fg`.
   dark: z.boolean().default(false),
   tokens: z.strictObject(Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [
     name,
@@ -743,9 +508,29 @@ const themeDescriptor = z.object({
   ]))),
 })
 
-// `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` is
-// still a loose object even now that phase 4's keys are named: a manifest written for a newer acorn
-// should contribute less on an older one rather than fail to parse.
+// A check the host runs before it archives a task, and the cleanup the owner may opt into. The pair to
+// `ctx.taskChecks.register`. Node-side, because the question is about a worktree and the processes
+// around it. See docs/plugins.md § Task checks.
+const taskCheckDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  // GET ?taskId=… → { concern } | { concern: null }. Confined to this plugin's own namespace at parse
+  // time and re-confined on every dispatch, exactly like `items` and `run`.
+  check: pluginRoute,
+  // POST { taskId }, run only when the concern offered an action and the owner left it ticked. Absent
+  // means advisory: the host draws no checkbox even if the check's answer asks for one, because a
+  // checkbox with nothing behind it is worse than none.
+  apply: pluginRoute.optional(),
+  // Seconds, for the check only. Absent means the host default, and the host ceiling wins either way:
+  // the owner is waiting on a dialog (node-core/server/plugin/taskChecks.ts).
+  timeout: z.number().int().min(1).max(10).optional(),
+})
+
+// `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` stays
+// loose: a manifest written for a newer acorn should contribute less on an older one rather than fail
+// to parse.
+//
+// The caps are product judgements, not storage limits. Eight is "as many as a plugin has rail sources"
+// and four is "a handful"; a package that wants more is describing an app rather than an integration.
 const contributions = z.looseObject({
   frames: z.array(frameSurface).max(32).default([]),
   sources: z.array(sourceDescriptor).max(8).default([]),
@@ -756,44 +541,22 @@ const contributions = z.looseObject({
   attention: z.array(attentionDescriptor).max(4).default([]),
   nodeStats: z.array(nodeStatDescriptor).max(4).default([]),
   contentLinks: z.array(contentLinkDescriptor).max(16).default([]),
-  // Eight, matching `sources`: a route addresses something inside a project-scoped surface, and a plugin
-  // with more addressable surfaces than rail sources is describing an app rather than an integration.
   routes: z.array(clientRouteDescriptor).max(8).default([]),
-  // Four, the same ceiling as attention and nodeStats. A composer list with more than a couple of
-  // entries from one plugin is a picker inside a picker, not a richer integration.
   agentContexts: z.array(agentContextDescriptor).max(4).default([]),
-  // Four. A plugin with more than a handful of resolvable item kinds is describing a whole product
-  // surface, and the vocabulary a resolver answers in is deliberately one shape for all of them.
   refResolvers: z.array(refResolverDescriptor).max(4).default([]),
-  // Eight, matching `sources`. Each entry is a full palette the owner can read at install time, and a
-  // package offering more than a handful of them is a gallery rather than a plugin with a look.
   themes: z.array(themeDescriptor).max(8).default([]),
-  // Eight across every location, not eight per location. A context menu is a short list someone reads
-  // while holding a mouse button down; a plugin that wants nine rows on it wants a pane.
   contextMenus: z.array(contextMenuDescriptor).max(8).default([]),
-  // Four, the same ceiling as attention and nodeStats. A package offering more than a handful of places
-  // for other packages to appear inside it is describing a platform, and acorn is the platform here.
   extensionPoints: z.array(extensionPointDescriptor).max(4).default([]),
-  // Eight, matching `sources`. A plugin reaching into more than a handful of other plugins' surfaces is
-  // decorating the app rather than integrating with it.
   extensions: z.array(extensionDescriptor).max(8).default([]),
-  // Eight, matching `sources` and `routes` rather than the four `attention` and `nodeStats` take. A
-  // collection is a saved question over data the plugin already holds, and a plugin with several
-  // record types honestly has several — "my PRs", "PRs awaiting my review", "repos I own" are three
-  // questions, not one integration describing an app.
   collections: z.array(collectionDescriptor).max(8).default([]),
-  // Four. A plugin with more than a handful of distinct periodic jobs is describing a daemon, and the
-  // daemon here is the node.
   schedules: z.array(scheduleDescriptor).max(4).default([]),
+  taskChecks: z.array(taskCheckDescriptor).max(4).default([]),
 }).prefault({})
 
 
-// The permissions block as a whole, named so the wire projection can be inferred from it: this is the
-// object the trust dialog renders and the owner consents to.
-//
-// `api` scopes are unvalidated as strings for the same reason the node block's `core` list is: an
-// unknown scope is one this acorn cannot grant, which the bridge handles by denying it
-// (client-core/plugins/frames/scopes.ts), not by rejecting the manifest.
+// The permissions block as a whole, named so the wire projection can be inferred from it. This is what
+// the trust dialog renders and the owner consents to. `api` scopes stay unvalidated strings: an unknown
+// scope is one this acorn can't grant, which the bridge denies rather than the manifest rejecting.
 const manifestPermissions = z.object({
   api: z.array(z.string().min(1).max(64)).max(64).default([]),
   events: z.array(z.string().min(1).max(64).regex(/^[a-z][a-z0-9:._-]*$/i)).max(64).default([]),
@@ -807,11 +570,8 @@ const manifestShape = z.object({
   // manifest can name it as a `glyph`. Top level beside `name` because it identifies the package,
   // where `glyph` stays per-contribution.
   icon: brandMark.optional(),
-  // The plural feeder, for a package that is home to several brands (model-providers hosts two).
-  // Keys become the suffix in `brand:<pluginId>/<key>`; the prefix is stamped by the host, so the
-  // key namespace is private to the plugin and needs no global uniqueness — and `icons` can no more
-  // claim another plugin's mark than `icon` can. Capped because a manifest is wire input and every
-  // entry becomes a registry row.
+  // The plural feeder, for a package that hosts several brands. Keys become the suffix in
+  // `brand:<pluginId>/<key>`; the host stamps the prefix, so the key namespace is private to the plugin.
   icons: z.record(z.string().min(1).max(32).regex(/^[a-z0-9][a-z0-9-]*$/), brandMark)
     .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
     .optional(),
@@ -825,31 +585,27 @@ const manifestShape = z.object({
   permissions: manifestPermissions.prefault({}),
   contributions,
 })
-// The manifest's structural schema. `pluginManifestSchema` in node-core/main/pluginManifest.ts wraps
-// this with the cross-field refinements — route confinement, surface reachability, id uniqueness —
-// which need `id` and the frame list and so cannot live on the fields.
+// `pluginManifestSchema` in node-core/main/pluginManifest.ts wraps this with the cross-field
+// refinements (route confinement, surface reachability, id uniqueness), which need `id` and the frame
+// list and so can't live on the fields.
 export const pluginManifestShape = manifestShape
 export type PluginManifestShape = z.infer<typeof manifestShape>
 
-// The permissions block on its own, because the desktop parses it a second time. It arrives there over
-// IPC and is written into the trust store, where it used to be accepted by `z.custom<...>()` — a cast
-// wearing a Zod costume, which accepts anything. That is the one place where a wrong shape does not
+// The permissions block on its own, because the desktop parses it a second time. It arrives there
+// over IPC and is written into the trust store, where it used to be accepted by `z.custom<...>()`, a
+// cast wearing a Zod costume that accepts anything. That's the one place where a wrong shape doesn't
 // crash: it shows the owner a security disclosure and records their consent against it.
 export const pluginPermissionsSchema = manifestPermissions
 
 // ── Surface classification ────────────────────────────────────────────────────────────────────────
 //
-// Which of the three kinds a declared frame is. Both sides of the wire ask, and they must agree: the
-// node's parser uses these to check that an `openPane` names a pane the manifest actually declared,
-// and the client uses them to build the runtime allowlist for the same verb. A manifest that passes
-// one spelling and fails the other is a surface that installs and then cannot be opened, or worse an
-// allowlist wider than the set of real surfaces.
+// Both sides of the wire ask which of the three kinds a declared frame is, and they must agree: the
+// node checks that an `openPane` names a pane the manifest declared, and the client builds the runtime
+// allowlist for the same verb.
 //
-// `scope !== 'project'` rather than `scope === 'task'`, and the difference is not stylistic. `scope`
-// is defaulted to `'task'` by the schema, so the two agree on parsed input — but the client reads
-// these off a ROSTER ROW, where the field is absent whenever the node that sent it predates the
-// field. Only the negative spelling is correct before defaults are applied, so it is the one both
-// sides use.
+// `scope !== 'project'` rather than `scope === 'task'`: the client reads these off a roster row, where
+// the field is absent whenever the sending node predates it. Only the negative spelling is correct
+// before defaults are applied.
 export const isTaskPaneSurface = (frame: { target: string; scope?: string }): boolean =>
   frame.target === 'webview' || (frame.target === 'pane' && frame.scope !== 'project')
 
@@ -860,35 +616,28 @@ export const isProjectPaneSurface = (frame: { target: string; scope?: string }):
 /** A full-screen picker the host places. Not a pane — it belongs to no task's layout. */
 export const isOverlaySurface = (frame: { target: string }): boolean => frame.target === 'overlay'
 
-/** A replacement for a designated CORE surface. Not a pane and not an overlay: it has no layout key, no
- *  click site of its own and no verb that opens it — the user's arbitration is the only thing that ever
- *  puts one on screen (@acorn/protocol/extensionPoints.ts). */
+/** A replacement for a designated core surface. Not a pane and not an overlay: it has no layout key,
+ *  no click site of its own and no verb that opens it. The user's arbitration is the only thing that
+ *  ever puts one on screen (@acorn/protocol/extensionPoints.ts). */
 export const isCoreSlotSurface = (frame: { target: string }): boolean => frame.target === 'coreSlot'
 
-// ── The wire projection (docs/plugins.md) ─────────────────────────────────────────────────────────
+// ── The wire projection ───────────────────────────────────────────────────────────────────────────
 //
-// What a plugin's manifest DECLARED, as it reaches a device inside a roster row. Not what is enforced:
-// until loaded plugins move out of process the node block is context-shaping plus disclosure
-// (docs/security.md § Design rules, rule 6), so every surface that renders this says "declared" and
-// flips to "enforced" with no vocabulary change when the boundary lands.
+// What a plugin's manifest declared, as it reaches a device inside a roster row. Not what is enforced;
+// see docs/security.md § Design rules, rule 6.
 //
-// ── The rule for writing one of these ──────────────────────────────────────────────────────────────
+// `z.infer` gives the shape after a parse, with defaults filled. A roster row isn't that: it's bytes
+// some node sent, possibly running an older copy of this schema. So two loosenings apply, and the test
+// for each is "could a node this shell still talks to have produced a row without it":
 //
-// `z.infer` gives the shape AFTER a parse, where every default has been filled. A roster row is not
-// that: it is bytes some node sent, and that node may be running a copy of this schema that predates a
-// field. So two loosenings are applied deliberately, and the test for each is "could a node this shell
-// still talks to have produced a row without it":
+//   optional  where the field was added to a shape that already shipped, such as `scope` and
+//     `claimsKeys` on `frameSurface`. A field present since its shape was introduced stays required.
+//   wider  where the value is re-checked on arrival anyway. `languageId` is a plain string here,
+//     because believing the narrow type of a value a node asserted is the mistake this file exists
+//     to stop making.
 //
-//   OPTIONAL where the field was ADDED to a shape that already shipped. `scope` and `claimsKeys` were
-//     added to `frameSurface`; `triggerCharacters` was optional on the wire before this schema owned
-//     the projection. A field that has existed since its shape was introduced stays required — every
-//     node that can send the shape at all fills its default.
-//   WIDER where the value is re-checked on arrival anyway. `languageId` is one of LANGUAGE_IDS after a
-//     parse and a plain string here, because believing the narrow type of a value a node asserted is
-//     the mistake this whole file exists to stop making.
-//
-// Getting this wrong is silent in both directions: too strict and the client dereferences something an
-// older node never sent, too loose and every reader grows a `??` it does not need.
+// Getting this wrong is silent both ways: too strict and the client dereferences something an older
+// node never sent, too loose and every reader grows a `??` it doesn't need.
 export type NodePermissions = z.infer<typeof nodePermissions>
 export type NodePluginPermissions = z.infer<typeof manifestPermissions>
 
@@ -904,9 +653,7 @@ export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'c
   scope?: 'task' | 'project'
   claimsKeys?: string[]
   layout?: PluginPaneLayout
-  // WIDER than the parse: the client re-checks the slot name against its own designated list before it
-  // registers a provider, so believing the narrow union here would only mean a reader that cannot check
-  // the value it is about to check.
+  // Wider than the parse: the client re-checks the slot name before registering a provider.
   coreSlot?: string
 }
 export type PluginChromeAction = z.infer<typeof chromeAction>
@@ -914,10 +661,8 @@ export type PluginChromeAction = z.infer<typeof chromeAction>
 // `navigate` on a routed project, and a command registry row has neither in scope.
 export type PluginCommandAction = z.infer<typeof contextFreeAction>
 export type PluginSourceEmptyState = z.infer<typeof emptyStateDescriptor>
-// `views` and `fieldRole` are WIDER than the parse, by the rule stated above. Both are FILTERS: a
-// newer node naming a view kind or a field role this build has no renderer for must NARROW what is
-// offered, never fail to register, and the client intersects against its own vocabulary
-// (client-core/dashboards/region.ts). `collections` needed no widening — it was already opaque strings.
+// `views` and `fieldRole` are wider than the parse. Both are filters: a newer node naming a view kind or
+// field role this build can't render must narrow what's offered, never fail to register.
 export type PluginPanelRegion = Omit<z.infer<typeof panelRegion>, 'views' | 'fieldRole'> & {
   views?: string[]
   fieldRole?: string
@@ -936,22 +681,17 @@ export type PluginContentLinkDescriptor = z.infer<typeof contentLinkDescriptor>
 export type PluginClientRouteDescriptor = z.infer<typeof clientRouteDescriptor>
 export type PluginAgentContextDescriptor = z.infer<typeof agentContextDescriptor>
 export type PluginRefResolverDescriptor = z.infer<typeof refResolverDescriptor>
-// `tokens` is WIDER than the parse, by the rule stated above: the client re-checks every name and
-// every value before it writes one into a stylesheet, so believing the narrow per-token key type here
-// would only mean a reader that cannot iterate the map it is about to validate.
+// `tokens` is wider than the parse: the client re-checks every name and value before writing one into
+// a stylesheet.
 export type PluginThemeDescriptor = Omit<z.infer<typeof themeDescriptor>, 'tokens'> & {
   tokens: Record<string, string>
 }
-// `location` is WIDER than the parse, by the rule stated above: the client re-checks the location and
-// every `when` key against its own copy of the vocabulary before it registers anything, so believing
-// the narrow union here would only mean a reader that cannot check the value it is about to check.
+// `location` is wider than the parse: the client re-checks it and every `when` key against its own
+// copy of the vocabulary before registering anything.
 export type PluginContextMenuDescriptor = Omit<z.infer<typeof contextMenuDescriptor>, 'location'> & {
   location: string
 }
-// `location` is WIDER than the parse, by the rule stated above, and for the reason the context-menu
-// descriptor gives one type up: the client re-checks it against its own copy of the vocabulary before it
-// registers anything, so believing the narrow union here would only mean a reader that cannot check the
-// value it is about to check.
+// `location` is wider than the parse, for the reason the context-menu descriptor gives above.
 export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointDescriptor>, 'location' | 'panels'> & {
   location: string
   panels?: PluginPanelRegion
@@ -959,12 +699,11 @@ export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointD
 export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
 export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>
 export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
+export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
 
-// Still loose on the wire as well as in the schema: a client that does not know a future sibling key
-// should contribute less rather than fail to parse. Every list but `frames` is optional for the same
-// reason the two frame fields above are — an older node's roster row will not carry it — and every
-// reader uses `?? []`. The MEMBER types are derived, so a field added to a descriptor cannot go missing
-// here; only a whole new contribution key is a two-line edit, and that is a decision, not a drift.
+// Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
+// contribute less rather than fail to parse. Every list but `frames` is optional because an older node's
+// roster row won't carry it, and every reader uses `?? []`.
 export type PluginContributions = {
   frames: PluginFrameSurface[]
   sources?: PluginSourceDescriptor[]
@@ -984,4 +723,5 @@ export type PluginContributions = {
   extensions?: PluginExtensionDescriptor[]
   collections?: PluginCollectionDescriptor[]
   schedules?: PluginScheduleDescriptor[]
+  taskChecks?: PluginTaskCheckDescriptor[]
 } & Record<string, unknown>

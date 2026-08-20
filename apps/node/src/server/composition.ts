@@ -58,6 +58,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
         schedules: entry.manifest.contributions.schedules,
         collections: entry.manifest.contributions.collections,
         commands: entry.manifest.contributions.commands,
+        taskChecks: entry.manifest.contributions.taskChecks,
       },
     ])),
     installed,

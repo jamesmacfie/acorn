@@ -2,7 +2,7 @@
 //
 // `client/model.ts` filtered, sorted, grouped and faceted the loaded issue set client-side. A rail row
 // is data the host renders — no filter inputs, no facet selects, no state columns — so the filter,
-// group and facet halves lost their only caller and are gone (docs/third-party/linear.md records the
+// group and facet halves lost their only caller and are gone (docs/integrations.md § Linear records the
 // trade-off). Ordering and the priority projection did NOT: the rail is still a list, so somebody has
 // to decide row order, and it moved to the node because that is where the rows are now built.
 //

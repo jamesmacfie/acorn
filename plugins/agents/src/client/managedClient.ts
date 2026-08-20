@@ -35,9 +35,8 @@ export const managedAgentApi = {
   providers: (force = false) =>
     readJson<AgentProviderDescriptor[]>(`${ROOT}/providers${force ? '?force=true' : ''}`),
   async uploadAttachment(taskId: string, file: File): Promise<AgentAttachment> {
-    // The parts are described rather than encoded: main builds the real multipart body, so nothing
-    // here has to hand-roll a boundary and the upload rides the same pinned connection as every
-    // other request.
+    // The parts are described rather than encoded: main builds the real multipart body, so nothing here
+    // hand-rolls a boundary and the upload rides the same pinned connection as every other request.
     return sendForm<AgentAttachment>(
       `${ROOT}/attachments?taskId=${encodeURIComponent(taskId)}`,
       [{ name: 'file', filename: file.name, type: file.type || 'application/octet-stream', bytes: new Uint8Array(await file.arrayBuffer()) }],
@@ -52,14 +51,14 @@ export const managedAgentApi = {
     readJson<AgentArtifact[]>(sessionRoute(sessionId, '/artifacts')),
   artifact: (artifactId: string) =>
     readJson<AgentArtifact>(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}`),
-  // Bytes, not a URL. There is no origin the browser could fetch an artifact from: under app:// a
+  // Bytes, not a URL. There's no origin the browser could fetch an artifact from: under app:// a
   // route-builder path resolves against the renderer's own protocol handler, and only the broker holds
   // the device bearer. The caller turns this into a blob URL for the download.
   artifactContent: (artifactId: string) =>
     readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to download artifact.'),
   // `nodeId` and `signal` are the fleet escape hatch (client-core's node/fanout.ts). Every other method
-  // here addresses the AMBIENT active node, which is right for a surface bound to one task; these two feed
-  // Fleet home and the aggregated Agent Center, whose whole job is to ask several nodes at once.
+  // here addresses the ambient active node, which is right for a surface bound to one task; these two
+  // feed Fleet home and the aggregated Agent Center, whose job is to ask several nodes at once.
   sessions: (
     filter: { taskId?: string; workspaceId?: string; attention?: boolean; archived?: boolean } = {},
     options: { nodeId?: string; signal?: AbortSignal } = {},

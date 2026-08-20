@@ -33,7 +33,7 @@
  *
  * `pane.aside` is a COLUMN beside that frame, and it is the same seam with THE USER in the contributor's
  * seat: what the host draws there is a dashboard the person composed, under constraints the owner
- * declared (docs/future/dashboards/placements.md). It is a location rather than a parallel mechanism
+ * declared (docs/dashboards.md § Placements). It is a location rather than a parallel mechanism
  * because every word of the footer's contract already holds — two-sided, declarative, host-mediated —
  * and only the identity of the contributor changes.
  *

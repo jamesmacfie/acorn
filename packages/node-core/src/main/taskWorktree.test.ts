@@ -28,9 +28,9 @@ describe('baseRefPref identity scope', () => {
   })
 })
 
-// The onWorktreeCreated hook is the single choke point that runs the workspace setup script: it
-// must fire exactly once per task, on whichever path creates the worktree first — including two
-// surfaces (a pane poll + a terminal open) racing in the same second.
+// The onWorktreeCreated hook is the single choke point that runs the workspace setup script: it must
+// fire exactly once per task, on whichever path creates the worktree first, including two surfaces (a
+// pane poll and a terminal open) racing in the same second.
 describe('resolveTaskCwd onWorktreeCreated hook', () => {
   let t: TestDb
   let dir: string
@@ -58,9 +58,8 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     t = makeTestDb()
     dir = mkdtempSync(join(tmpdir(), 'acorn-taskwt-'))
     checkout = join(dir, 'checkout')
-    // Base repo copied from a template built once (beforeAll): six fewer git spawns per test. The
-    // worktrees these tests create are still real — the subject is the created-hook firing exactly
-    // once per task across concurrent resolution paths.
+    // Base repo copied from a template built once in beforeAll: six fewer git spawns per test. The
+    // worktrees these tests create are still real.
     cpSync(join(template, 'checkout'), checkout, { recursive: true })
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
@@ -89,7 +88,7 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     expect(b.cwd).toBe(a.cwd)
     expect(created).toEqual([`${TASK}:${a.cwd}`])
 
-    // Reuse — both via the persisted worktreePath and via a stale row that predates it.
+    // Reuse, both via the persisted worktreePath and via a stale row that predates it.
     const fresh = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
     const stale = await resolveTaskCwd(t.db, task, checkout, null, capabilities)
     expect(fresh).toMatchObject({ cwd: a.cwd, created: false })
@@ -122,8 +121,9 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
   })
 
   // The directory is keyed by owner/repo/branch and was trusted forever once persisted, so a worktree
-  // that drifted kept serving the task another branch's files — what put an agent in a tree that was
-  // not its task's. Both drifts (wrong branch, pruned admin dir) must refuse, not degrade.
+  // that drifted kept serving the task another branch's files, which is what put an agent in a tree
+  // that wasn't its task's. Both drifts, wrong branch and pruned admin dir, must refuse rather than
+  // degrade.
   it('refuses a worktree that has drifted onto another branch', async () => {
     const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
     git(res.cwd, 'checkout', '-b', 'someone-elses-branch')

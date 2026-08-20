@@ -7,7 +7,7 @@ import { aggregateRows, shapeRows } from './shaping'
 // It exists as its own module because two very different callers need the same answer: the renderer
 // composes these four steps as memos (client-core/dashboards/data.ts § createPanelData), and the
 // node's measure sampler composes them once per pass with no reactivity anywhere in sight
-// (docs/future/dashboards/measure-history.md § Sampling). Written twice, they would agree until the
+// (docs/dashboards.md § Trends). Written twice, they would agree until the
 // day someone changed one — and the whole point of recording history is that a stored number means
 // the same thing as the number on screen.
 //

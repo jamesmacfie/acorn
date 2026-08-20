@@ -1,11 +1,10 @@
 /* Plugin-trust dialog (PluginTrustDialog.tsx): the per-device acknowledgement for running a client
    bundle a node served.
 
-   Three quiet groups rather than three panels. The tier a line belongs to is carried by one coloured
-   dot and one uppercase label, because the enforced/declared distinction has to survive a skim
-   without the loud half of the dialog being the part that is merely disclosed. Every colour is a
-   token — see the note in config-trust.css about what hardcoded fallbacks did under the light
-   themes. */
+   Three quiet groups rather than three panels. One coloured dot and one uppercase label carry the tier
+   a line belongs to, so the enforced/declared distinction survives a skim without the loud half of the
+   dialog being the part that is merely disclosed. Every colour is a token: see the note in
+   config-trust.css about what hardcoded fallbacks did under the light themes. */
 .plugin-trust-dialog { width: min(520px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 32px)); }
 .plugin-trust-body { overflow: auto; }
 
@@ -48,7 +47,7 @@
   color: var(--text-muted);
 }
 .plugin-trust-dot { width: var(--space-3); height: var(--space-3); border-radius: var(--radius-circle); background: var(--text-faint); }
-/* The only place the tiers differ in colour, and the reason the label can stay one word. */
+/* The only place the tiers differ in colour, and why the label can stay one word. */
 .plugin-trust-group[data-tier='enforced'] .plugin-trust-dot { background: var(--success); }
 .plugin-trust-group[data-tier='declared'] .plugin-trust-dot { background: var(--warn); }
 .plugin-trust-group[data-tier='new'] .plugin-trust-dot { background: var(--danger); }
@@ -65,23 +64,23 @@
 .plugin-trust-permissions li { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); }
 .plugin-trust-permissions li + li { border-top: var(--divider); }
 .plugin-trust-permissions svg { flex: none; width: var(--icon-size); height: var(--icon-size); color: var(--text-faint); }
-/* The grants that must survive a skim: credentials, running commands, and the two that hand over
-   where code lives on disk (plugins/permissions.ts owns the list). */
+/* The grants that must survive a skim: credentials, running commands, and the two that hand over where
+   code lives on disk (plugins/permissions.ts owns the list). */
 .plugin-trust-permissions li.high { font-weight: var(--fw-medium); }
 .plugin-trust-permissions li.high svg { color: var(--warn); }
 .plugin-trust-permissions .ui-badge { margin-left: auto; flex: none; }
-/* Only ever set on an update, for a permission the previously trusted version did not declare. */
+/* Only set on an update, for a permission the previously trusted version didn't declare. */
 .plugin-trust-permissions li.added::before { content: '+'; color: var(--danger-fg); font-weight: var(--fw-bold); }
 
 .plugin-trust-unchanged summary { cursor: pointer; padding: var(--space-2) 0; font-size: var(--fs-sm); color: var(--text-muted); }
 .plugin-trust-unchanged summary:hover { color: var(--text); }
 .plugin-trust-unchanged[open] > .plugin-trust-group { margin-top: var(--space-4); }
 
-/* The vocabulary, once, at the foot — where a reader lands before deciding. */
+/* The vocabulary, once, at the foot, where a reader lands before deciding. */
 .plugin-trust-legend { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-xs); }
 .plugin-trust-legend strong { color: var(--text); font-weight: var(--fw-semibold); }
 /* The canonical disclosure about the declared half. Full contrast inside otherwise muted fine print:
-   it is the strongest statement in the dialog and must not read as the faintest. */
+   it's the strongest statement in the dialog and must not read as the faintest. */
 .plugin-trust-plain { color: var(--text); }
 
 /* .ui-modal-actions has no top padding, so the separator that anchors the buttons needs one. */

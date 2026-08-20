@@ -112,7 +112,7 @@ export const contextInjectionEnabled = async (db: AppDatabase, userId: string): 
   return row?.value !== 'false'
 }
 
-// Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md/05):
+// Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md):
 // dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
 export async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]> {
   const rows = await db

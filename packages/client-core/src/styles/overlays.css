@@ -56,6 +56,8 @@
 .will-concerns { display: flex; flex-direction: column; gap: var(--space-4); margin: 0 0 var(--space-8); padding: 0; list-style: none; }
 .will-concerns li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-4); align-items: baseline; }
 .will-concerns li[data-severity='danger'] { color: var(--del-marker); }
+.will-concern-details { grid-column: 2 / -1; display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); color: var(--text-muted); }
+.will-concern-details li { overflow-wrap: anywhere; }
 .will-concern-option { grid-column: 2 / -1; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
 
 

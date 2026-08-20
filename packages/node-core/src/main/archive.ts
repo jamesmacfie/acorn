@@ -43,6 +43,12 @@ export type ArchiveDeps = {
   dropTaskSessions: (taskId: string) => Promise<void>
   // Teardown runner — the app streams it through a drawer session; tests use runTeardownProcess.
   runTeardown: (script: string, cwd: string, env: Record<string, string>, taskId: string) => Promise<TeardownResult>
+  // The plugin cleanups the owner ticked in the archive dialog, resolved and run by the caller
+  // (server/plugin/taskChecks.ts). Injected rather than imported for the reason every other dep here
+  // is: this module is the lifecycle, testable under plain Node against a temp git repo, and it does
+  // not reach into the server layer. Returns the plugin ids whose cleanup failed — the archive still
+  // completes, because a failed cleanup is not a reason to strand the task, but the owner is told.
+  applyTaskChecks?: (task: { id: string; worktreePath: string | null }, ids: readonly string[]) => Promise<string[]>
 }
 
 // The repo-level teardown script, paired with repoSetup in taskWorktree.ts, is read from repo settings.
@@ -88,6 +94,15 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
   }
 
   if (running) deps.killRunning(id)
+
+  // Plugin cleanups, at the same point in the lifecycle and for the same reason as the teardown
+  // script above: the worktree still exists, so a check that needs it has it. Docker's container
+  // teardown used to fire from the client alongside the archive request, racing it; here it is a step
+  // with a known position and a result.
+  const checkFailures = opts.applyChecks?.length
+    ? await deps.applyTaskChecks?.({ id: t.id, worktreePath: t.worktreePath }, opts.applyChecks) ?? []
+    : []
+
   if (deleteWorktree && ownsWorktree && t.worktreePath && project?.path && project.vcs === 'git') {
     const res = await removeWorktree(project.path, t.worktreePath, force) // force discards a dirty tree
       if (!res.ok) return res
@@ -98,5 +113,7 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
     .update(schema.tasks)
     .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
     .where(eq(schema.tasks.id, id))
-  return { ok: true }
+  // Archived, but say what did not happen. `ok` stays true: the task IS archived, and reporting it as
+  // a failure would have the caller offering a retry for something already done.
+  return checkFailures.length ? { ok: true, cleanupFailed: checkFailures } : { ok: true }
 }

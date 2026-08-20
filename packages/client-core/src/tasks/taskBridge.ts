@@ -1,7 +1,8 @@
-import type { ArchiveOpts, ArchiveResult, TaskStatus } from '@acorn/protocol/terminal.ts'
+import type { ArchiveOpts, ArchiveResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/terminal.ts'
 import {
   projectConfigRoute,
   projectRunTargetsRoute,
+  taskArchiveConcernsRoute,
   taskArchiveRoute,
   taskOnCreatedRoute,
   taskPreviewUrlRoute,
@@ -32,6 +33,9 @@ export type TaskBridge = {
   sendToAgent(sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft'): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   task: {
     archive(id: string, opts?: ArchiveOpts): Promise<ArchiveResult>
+    // Every plugin's answer about archiving this task, asked once when the dialog opens. Never
+    // rejects into the caller: a node that cannot answer means no plugin rows, not no dialog.
+    archiveConcerns(id: string): Promise<TaskArchiveConcern[]>
     onCreated(id: string): Promise<void>
     statuses(): Promise<TaskStatus[]>
   }
@@ -58,6 +62,12 @@ export const taskBridge = (): TaskBridge => {
     sendToAgent: (sessionId, text, submit) => post<{ ok: boolean; queued?: boolean; reason?: string }>(terminalSessionActionRoute(sessionId, 'send'), { text, submit }),
     task: {
       archive: (id, opts) => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}),
+      archiveConcerns: (id) => readJson<{ concerns?: TaskArchiveConcern[] }>(taskArchiveConcernsRoute(id))
+        .then((body) => body?.concerns ?? [])
+        .catch((error) => {
+          console.warn('[tasks] archive concerns unavailable:', error)
+          return []
+        }),
       onCreated: (id) => post<{ ok: boolean }>(taskOnCreatedRoute(id)).then(() => undefined),
       statuses: () => readJson<TaskStatus[]>(taskStatusesRoute),
     },

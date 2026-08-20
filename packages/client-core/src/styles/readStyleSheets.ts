@@ -2,10 +2,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Test-only helper: read every stylesheet in the renderer as text. The appearance contract is
-// expressed in CSS, so the tests that enforce it (settings/themes.test.ts, styles/tokenAxes.test.ts)
-// parse the sheets rather than booting a browser — jsdom does not resolve var() cascades reliably,
-// so a computed-style assertion there would give false confidence.
+// Test-only helper: read every stylesheet in the renderer as text. The appearance contract is expressed
+// in CSS, so the tests that enforce it parse the sheets rather than booting a browser. jsdom doesn't
+// resolve var() cascades reliably, so a computed-style assertion there would give false confidence.
 
 export type StyleSheetFile = { path: string; name: string; text: string }
 
@@ -13,9 +12,7 @@ export type StyleSheetFile = { path: string; name: string; text: string }
 export const stripComments = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, '')
 
 /**
- * Nearest ancestor holding pnpm-workspace.yaml. Anchor on the one file that marks the repository root so
- * the helper works from every package.
- */
+/** Nearest ancestor holding pnpm-workspace.yaml, so the helper works from every package. */
 export function workspaceRoot(): string {
   let dir = fileURLToPath(new URL('.', import.meta.url))
   for (;;) {
@@ -60,13 +57,14 @@ function walk(dir: string): StyleSheetFile[] {
 }
 
 /**
- * Custom properties DECLARED (not merely referenced) by each `:root…` block in a sheet, keyed by
- * the block's selector. Deliberately a small hand-rolled scanner rather than a CSS parser
- * dependency: the axis files are flat `:root { … }` blocks with no nesting.
+/**
+ * Custom properties declared, not merely referenced, by each `:root…` block, keyed by the block's
+ * selector. A hand-rolled scanner rather than a CSS parser dependency: the axis files are flat
+ * `:root { … }` blocks with no nesting.
  */
 export function declaredByBlock(text: string): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>()
-  // Strip comments so a commented-out declaration or a `--token` mentioned in prose is not counted.
+  // Strip comments so a commented-out declaration or a `--token` mentioned in prose isn't counted.
   const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '')
   for (const match of stripped.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     const selector = match[1].trim()

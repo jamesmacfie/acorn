@@ -9,9 +9,9 @@ import {
   type TaskRowTarget,
 } from './contextMenus'
 
-// The registry, its ordering and its `when` evaluation — everything about a context menu that is NOT
-// pixels. The host is a `<For>` in ./contextMenuHost.tsx and this suite deliberately cannot reach it:
-// the repo's vitest has no Solid transform, so anything worth proving has to be here.
+// The registry, its ordering and its `when` evaluation: everything about a context menu that isn't
+// pixels. The host is a `<For>` in ./contextMenuHost.tsx and this suite deliberately can't reach it,
+// because the repo's vitest has no Solid transform.
 
 const target = (over: Partial<TaskRowTarget> = {}): TaskRowTarget => ({
   location: 'task.row',
@@ -81,8 +81,8 @@ describe('what a location offers', () => {
 })
 
 describe('a declared `when`, compiled', () => {
-  // The plugin half: a manifest cannot carry a function, so the map it does carry has to evaluate to
-  // the same thing core's predicates do.
+  // The plugin half: a manifest can't carry a function, so the map it does carry has to evaluate to the
+  // same thing core's predicates do.
   it('reads the target’s own facts', () => {
     expect(compileWhen({ origin: 'github' })(target({ origin: 'github' }))).toBe(true)
     expect(compileWhen({ origin: 'github' })(target({ origin: 'local' }))).toBe(false)
@@ -104,7 +104,7 @@ describe('running a row', () => {
 
   it('does not let a throwing row escape into the click handler', () => {
     // The menu has already closed by the time this runs, so the alternative to swallowing is an
-    // unhandled error from a component that is no longer on screen.
+    // unhandled error from a component that's no longer on screen.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(() => runContextMenuItem(item({ id: 'boom', run: () => { throw new Error('nope') } }), target())).not.toThrow()
     expect(warn).toHaveBeenCalled()

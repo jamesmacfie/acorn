@@ -205,7 +205,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
   // A source can author its own empty state now (`emptyState` in acorn-plugin.config.mjs), so the rail
   // says "no linked Linear projects" instead of showing a list that answers a question nobody asked —
   // one whose rows belong to no project in this workspace and whose emptiness meant nothing either way.
-  // docs/third-party/linear.md § finding 1 records the decision.
+  // docs/integrations.md § Linear records the decision.
   .get('/rail-items', async (c) => {
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)

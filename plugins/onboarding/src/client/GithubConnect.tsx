@@ -5,13 +5,12 @@ import { createDeviceFlow, integrationsOptions, type Project, projectImporterReg
 import { Alert, Button, CopyButton } from '@acorn/plugin-api/ui'
 
 // The GitHub branch of the wizard: the device grant, then whatever GitHub registered as a project
-// importer. Neither half is written here — the grant is core's shared createDeviceFlow (the same one
-// Settings → Integrations runs) and the repo list is the github plugin's own component, reached
-// through projectImporterRegistry so this plugin never imports another plugin.
+// importer. Neither half is written here. The grant is core's shared createDeviceFlow, the same one
+// Settings → Integrations runs, and the repo list is the github plugin's own component, reached through
+// projectImporterRegistry so this plugin never imports another plugin.
 //
-// The screen does not leave on its own after an import. An account has many repositories and taking
-// several is the normal case, so the list stays put, says what has been added so far, and waits for
-// the owner to say they are done.
+// The screen doesn't leave on its own after an import. An account has many repositories and taking
+// several is normal, so the list stays put, says what has been added so far, and waits for the owner.
 export default function GithubConnect(props: {
   onImported: (projectIds?: readonly string[]) => void
   onBack: () => void

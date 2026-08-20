@@ -5,7 +5,7 @@ import type { PanelDefinition, PanelViewKind } from './model'
 import type { PlacementScope } from './persist'
 
 // A PANEL REGION — a rectangle a plugin reserved in one of its own surfaces for panels the USER composes
-// (docs/future/dashboards/placements.md). Two surfaces feed this today: a rail source's side panel, and a
+// (docs/dashboards.md § Placements). Two surfaces feed this today: a rail source's side panel, and a
 // pane's `pane.aside` extension point. Neither has any code here; both hand over the same declaration.
 //
 // JSX-FREE, exactly as registries/extensionPoints.ts is, and for the same reason: vitest in this repo
@@ -116,7 +116,7 @@ export const regionAllows = (
   return panel.queries.every((query) => {
     const entry = lookup(query.pluginId, query.collectionId)
     // An UNRESOLVED collection is admitted. The panel then draws as the inert "source unavailable" body
-    // it already draws everywhere else (docs/future/dashboards/placements.md § Survival rules) — which
+    // it already draws everywhere else (docs/dashboards.md § Placements) — which
     // is a plugin-lifecycle answer, and turning it into "not allowed here" would make a disabled plugin
     // look like a policy refusal.
     return !entry || regionAdmits(region, entry)

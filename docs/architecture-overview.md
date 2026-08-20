@@ -62,6 +62,80 @@ Only serializable values cross a boundary. Product requests and streams use the 
 the service protocol is reserved for lifecycle messages and narrow, task-addressed native
 capabilities such as preview/browser operations.
 
+## Package boundaries
+
+`tools/arch/boundaries.test.ts` enforces the rules below over the import graph of every package in
+`apps/`, `packages/`, `plugins/` and `tools/`. It exists because `"exports": { "./*": "./src/*" }` gives
+the module system no encapsulation at all — any package can reach any file in any other — so the
+boundaries have to be a test rather than a build error. Package kind comes from where a package lives,
+never from its name.
+
+Test files follow the same rules as production files unless a rule names an exception, and several
+rules carry a **shrinking baseline**: a list of survivors that may only get shorter. Adding to one is a
+decision someone has to write down.
+
+**Graph shape.** No cycles. `packages/*` never imports `plugins/*` — the inversion that made
+client-core cyclic, and one acyclicity alone does not catch, because a plugin whose only upstream is
+`@acorn/protocol` closes no cycle. Apps never import each other.
+
+**What a plugin may import.** The facade (`@acorn/plugin-api`), the wire types, another plugin's
+`contract/`, and its own files. Nothing else in `packages/`. `contract/` is the one cross-plugin import
+surface, and it may not re-export a package's internals even transitively — `contract/x.ts ->
+shared/y.ts -> main/heavy.ts` would drag the implementation into every consumer. Types a contract needs
+live in `contract/` or `shared/`.
+
+**What an app may import.** A plugin's four public entrypoints (`node/`, `client/`, `main/index.ts`,
+`contract/`) and no internal module, so a composition root cannot come to depend on something never
+meant to be load-bearing. Tests are exempt.
+
+**Test scaffolding stays out of production.** No production file imports any package's `testkit/`,
+which is how a temp-directory SQLite factory ends up shipped. Deep imports past
+`@acorn/plugin-api/testkit` are a shrinking baseline; migrate a test as you touch it, and widen the
+testkit rather than adding a root.
+
+**The node stays bootable.** Nothing outside `apps/desktop` statically imports Electron *values*. A
+type-only import is erased and a lazy `createRequire(import.meta.url)('electron')` only resolves when
+called; a static value import fails Node's linker before a line runs. `export … from 'electron'` counts,
+and is the likelier form on a barrel.
+`apps/node/test/integration/mainBarrelLoad.test.ts` is the durable check — it loads every plugin's main
+barrel in plain Node — and the arch rule is the fast first line that also catches an *unused* static
+import, which esbuild elides before Node ever sees it.
+
+**The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/platform/`.
+The global is read rather than imported, so this is a source scan rather than a graph edge. Tests are
+permanently exempt: stubbing `globalThis.window` is how the platform implementation gets exercised.
+
+**Core seams are not reachable around.** The raw identity store is confined to `packages/node-core`
+plus the two composition roots that construct it — the node's identity used to be *written* by
+`plugins/github`, which made "who is the user" a side effect of connecting one provider. The plugin
+trust and bundle stores are confined to `apps/desktop`, because trust binds to a hash the main process
+computed and the renderer must stay inert. A plugin's production code never imports core's `db` module.
+Every child process goes through the process broker, with a written list of considered exceptions — a
+PTY, a long-lived agent driver, a `docker logs -f` stream and a pg client are none of the things the
+broker models.
+
+**`@acorn/protocol` owns no plugin's wire surface.** Every plugin route lives under `/v2/p/<plugin>/`
+and core's under `/v2/core/`, so one literal catches a route builder protocol does not own. api.ts was
+701 lines of nine plugins' route builders, which meant no plugin could define its own wire surface
+without editing core. Plugin-named *type* modules that remain are an explicit list with a stated reason
+each.
+
+**The facade stays boring.** `@acorn/plugin-api` is re-exports only: no declarations, no plain imports.
+Only the two UI barrels may re-export a `.tsx` module, so every other entrypoint stays loadable from a
+plugin's node-environment test suite. `ui/` may import only pure or presentation modules, from an
+allowlist of destinations rather than a denylist of data modules.
+
+**Two spellings that must not drift.** `PLUGIN_ROUTE_SEGMENT` is declared in client-core and re-spelled
+as a literal in `node-core/main/pluginManifest.ts`, because the client is downstream of the node and
+cannot share the constant. The test turns that edit into a failure rather than a route the device
+refuses after the node accepted it.
+
+**Two renderer traps.** A contribution's props may not declare `ref` as data anywhere in
+`client-core/src/registries/`: Solid rewrites `ref={value}` on a component into a callback, so the panel
+reads `props.ref.displayId` as `undefined`, and TypeScript cannot see it because `ref` lives on
+`IntrinsicAttributes`. And a CSS class defined in a plugin's stylesheet may not be worn by markup
+outside that plugin, or a pane silently loses its styling when an unrelated plugin is switched off.
+
 ## Node API and client flow
 
 The Node exposes one Hono application:

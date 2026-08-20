@@ -4,27 +4,24 @@ import type { PanelDraft } from './draft'
 import PanelBody from './views/PanelBody'
 import './dashboards.css'
 
-// THE WIZARD'S LIVE PREVIEW (docs/future/dashboards/wizard.md § The live preview) — the draft panel,
-// drawn by the REAL view components over the real compose/mapping/shaping pipeline, in a fixed slot.
-// Not a thumbnail renderer: there is exactly one way to draw a panel (views/PanelBody.tsx) and this is
-// that way, which is what makes "the committed panel is what you were looking at" true by
-// construction rather than by care.
+// The wizard's live preview (docs/dashboards.md § The generated editor): the draft panel, drawn by the real view
+// components over the real compose, mapping and shaping pipeline, in a fixed slot. Not a thumbnail
+// renderer: there's exactly one way to draw a panel (views/PanelBody.tsx) and this is that way, which
+// makes "the committed panel is what you were looking at" true by construction.
 //
-// Three things it deliberately is not:
+// Three things it deliberately isn't:
 //
-//   IT FETCHES NOTHING. Its rows are whatever this device has cached, reactive to the cache revision
-//   so an answer landing mid-compose fills it in place (draft.ts § pages). Whether an editor may RUN a
-//   collection to learn its shape is the run-once-and-pin question and it is answered once, by a
-//   person pressing a button (docs/future/dashboards/dynamic-collections.md). When that ships its
-//   button belongs on the Data step, not here.
+//   It fetches nothing. Its rows are whatever this device has cached, reactive to the cache revision so
+//   an answer landing mid-compose fills it in place (draft.ts § pages). Whether an editor may run a
+//   collection to learn its shape is the run-once-and-pin question, answered by a person pressing a
+//   button (docs/future/dashboards/dynamic-collections.md), and that button belongs on the Data step.
 //
-//   IT DOES NOT POLL AND IT DOES NOT ACT. No refresh timer, no freshness badge, no risk strip, and
-//   row actions are inert — a preview is a rendering of a draft, not a placed panel. `panelId` is
-//   withheld for the same reason: a stat's recorded trend is a read keyed by it, and a draft that has
-//   never existed has no series to ask for.
+//   It doesn't poll and it doesn't act. No refresh timer, no freshness badge, no risk strip, and row
+//   actions are inert. `panelId` is withheld for the same reason: a stat's recorded trend is a read
+//   keyed by it, and a draft that has never existed has no series to ask for.
 //
-//   IT IS NOT A SECOND EMPTY-STATE VOCABULARY. The cold case says what the sheet's own notice says,
-//   because it is the same fact about the same collection.
+//   It isn't a second empty-state vocabulary. The cold case says what the sheet's own notice says,
+//   because it's the same fact about the same collection.
 
 export default function PanelPreview(props: { draft: PanelDraft }) {
   const draft = () => props.draft

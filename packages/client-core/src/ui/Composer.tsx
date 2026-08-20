@@ -3,12 +3,12 @@ import { cx } from './cx'
 import MentionTextarea from './MentionTextarea'
 import { Alert, Button, Textarea, Toolbar } from './primitives'
 
-// The comment box: textarea, submit, error line, and the ⌘↵ chord — which github documented only
-// inside a placeholder string, so it was undiscoverable anywhere else.
+// The comment box: textarea, submit, error line, and the Cmd+Enter chord, which github documented only
+// inside a placeholder string.
 //
-// `mentions` decides which textarea renders. The mention data sources are host-side, so a frame
-// leaves the prop unset and gets a plain Textarea; making that a prop rather than a runtime check
-// keeps the difference legible at the call site.
+// `mentions` decides which textarea renders. The mention data sources are host-side, so a frame leaves
+// the prop unset and gets a plain Textarea. Making that a prop rather than a runtime check keeps the
+// difference legible at the call site.
 export function Composer(props: {
   value: string
   onInput: (value: string) => void
@@ -18,7 +18,7 @@ export function Composer(props: {
   error?: string
   placeholder?: string
   submitLabel?: string
-  /** A Cancel button, a "resolve thread" checkbox — rendered before submit. */
+  /** A Cancel button, a "resolve thread" checkbox, rendered before submit. */
   secondary?: JSX.Element
   /** Logins to complete on `@`. Unset renders a plain Textarea. */
   mentions?: string[]
@@ -31,7 +31,7 @@ export function Composer(props: {
     if (props.busy || props.disabled || !props.value.trim()) return
     props.onSubmit()
   }
-  // ⌘↵ on macOS, Ctrl↵ elsewhere. Implemented once, here.
+  // Cmd+Enter on macOS, Ctrl+Enter elsewhere. Implemented once, here.
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return
     event.preventDefault()

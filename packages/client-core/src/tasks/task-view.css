@@ -168,7 +168,7 @@
    glyph, the label chip and the workspace project picker. Linear is a loaded package now: the list is a
    host-drawn descriptor rail (client-core/plugins/chrome/ChromeSourcePanel.tsx, styled by the shell's own
    primitives) and the detail is the plugin's frame, so none of it had a caller left. The project picker
-   went with it and has nowhere to come back to, which is written up in docs/third-party/linear.md. */
+   went with it and has nowhere to come back to, which is written up in docs/integrations.md § Linear. */
 
 /* Run-target buttons (docs/workflows.md §2): one ▶ per named target, id shown under the glyph. */
 .pane-switch-run { flex-direction: column; gap: 1px; }

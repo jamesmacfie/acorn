@@ -41,15 +41,15 @@ export function activateManagedAgentNoticeTargets(): () => void {
   })
 }
 
-// The other way in: a dashboard row for a session, whose click the HOST resolves — it activates the
-// row's task, navigates there and opens this pane with the row's id as a selection intent
-// (client-core/plugins/chrome/actions.ts § openPane). All that is left is what the id MEANS, which is
-// the one thing the host cannot know.
+// The other way in: a dashboard row for a session, whose click the host resolves. It activates the row's
+// task, navigates there and opens this pane with the row's id as a selection intent
+// (client-core/plugins/chrome/actions.ts § openPane). All that's left is what the id means, which is the
+// one thing the host can't know.
 //
-// A listener rather than a read inside the pane, and that is deliberate: the selection lives in a
-// module signal keyed by task, not in the pane's own state, so setting it works whether the pane is
-// mounted, mounting, or about to be. The intent is consumed all the same — a retained intent nobody
-// collects would be replayed at whatever mounts into that slot next.
+// A listener rather than a read inside the pane, because the selection lives in a module signal keyed by
+// task rather than in the pane's own state, so setting it works whether the pane is mounted, mounting,
+// or about to be. The intent is consumed all the same: a retained intent nobody collects would be
+// replayed at whatever mounts into that slot next.
 export function activateManagedAgentPaneIntents(): () => void {
   return clientEvents.on('presentation:pane-intent', (event) => {
     if (event.paneId !== AGENT_PANE_ID || event.intent.kind !== 'plugin:select') return

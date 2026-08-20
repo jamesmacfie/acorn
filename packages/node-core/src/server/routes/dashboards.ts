@@ -4,7 +4,7 @@ import type { AppEnv } from '../middleware/auth'
 import { readSeries, type MeasureSeries } from '../dashboards/history'
 import { respondError } from '../respond'
 
-// The measure-history read route (docs/future/dashboards/measure-history.md § The read route).
+// The measure-history read route (docs/dashboards.md § Trends).
 //
 // One route, GET only. There is deliberately NO WRITE ROUTE: the sampler and the store share a
 // process, so the only writer is `core:sample-measures`. An earlier design had clients PUT samples

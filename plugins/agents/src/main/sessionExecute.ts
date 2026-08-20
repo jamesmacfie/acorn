@@ -1,8 +1,8 @@
 // The agents.sessionExecute implementation (contract/sessionExecute.ts).
 //
-// Moved verbatim-in-behaviour from apps/node/src/wiring/managedWorkflowStep.ts, which existed in the
-// app only because workflows could not import agents. It is agents' code: every line touches
-// ManagedAgentRuntime, its session store, and its turn lifecycle.
+// Moved from apps/node/src/wiring/managedWorkflowStep.ts, which existed in the app only because
+// workflows couldn't import agents. It's agents' code: every line touches ManagedAgentRuntime, its
+// session store and its turn lifecycle.
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import type { AgentEventRecord, AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
@@ -55,8 +55,8 @@ function parseStructuredResult(text: string, schema: object | undefined): unknow
     try {
       return JSON.parse(candidate) as unknown
     } catch {
-      // Try the next bounded representation. The provider remains responsible for satisfying the
-      // advertised schema; Acorn rejects output that is not JSON instead of guessing.
+      // Try the next bounded representation. The provider stays responsible for satisfying the
+      // advertised schema; acorn rejects output that isn't JSON instead of guessing.
     }
   }
   return null
