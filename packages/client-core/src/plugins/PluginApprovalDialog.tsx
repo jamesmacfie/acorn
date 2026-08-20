@@ -20,26 +20,13 @@ import { setPluginDevGrant } from './host'
 import { nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
 import './plugin-trust.css'
 
-// The owner's side of an agent's install request (docs/plugins.md § Approval-mediated install).
+// The owner's side of an agent's install request (docs/plugins.md § Approval-mediated install and
+// § What the owner can know before the download own the two-screen design and why the split exists).
 //
-// Drawn in the SHELL, in the overlay slot beside the two other trust prompts, which is the part that
+// Drawn in the shell, in the overlay slot beside the two other trust prompts, which is the part that
 // matters most: a plugin frame is an iframe inside a pane and can never paint over this. The agent that
 // raised the request holds a task-scoped internal token and cannot reach the install route, the roster
-// route, or the decision route below — every one of them is device-only by mount.
-//
-// Two screens, because there are two different questions and only one of them can be asked up front.
-//
-//   ask     What the AGENT asked for: the action, the source string, its own stated reason. This is
-//           everything that is knowable before anything is fetched, and it is deliberately the gate on
-//           the fetch itself — a node reaching out to a URL an agent chose is a network action taken on
-//           an agent's say-so, so a No here means nothing is downloaded at all.
-//   review  What the PACKAGE declares, read back off the node's roster after the install landed. Install
-//           runs no plugin code (docs/plugins.md: every result is `installed-restart-required`), so this
-//           screen still happens before anything executes, and its No removes the package again.
-//
-// A plugin's client half gets a third look regardless: the per-hash bundle trust prompt fires from the
-// distribution pass below. What this second screen adds is the NODE half, which has no other disclosure —
-// it would otherwise start at the next restart with nobody having read what it declared.
+// route, or the decision route below: every one of them is device-only by mount.
 
 type Screen = 'ask' | 'review'
 
@@ -139,7 +126,7 @@ export default function PluginApprovalDialog() {
       setScreen('review')
     })
 
-  // The second No. Nothing has run — install never starts a plugin — so removing the package leaves the
+  // The second No. Nothing has run (install never starts a plugin), so removing the package leaves the
   // node exactly as it was, minus a directory. Its database is kept, which is what every other uninstall
   // path in the product does by default.
   const removeIt = () =>
@@ -156,7 +143,7 @@ export default function PluginApprovalDialog() {
       const current = request()
       const target = landed()
       if (!current || !target) return
-      // The dev grant is recorded BEFORE the distribution pass, because the pass is what fetches the
+      // The dev grant is recorded before the distribution pass, because the pass is what fetches the
       // bundle and main applies the grant as the bytes land (main/pluginIpc.ts). The other order would
       // queue a trust prompt for the first bundle and auto-trust every one after it.
       if (current.dev) {
@@ -188,8 +175,8 @@ export default function PluginApprovalDialog() {
   // stays in the node's queue, the bell still points at it, and an owner who wants to read the package
   // before answering is not trapped in a modal.
   //
-  // Escaping the REVIEW screen leaves the package installed and unreviewed, which lands the owner exactly
-  // where a hand-typed install in Settings → Plugins leaves them — its client half still faces the
+  // Escaping the review screen leaves the package installed and unreviewed, which lands the owner exactly
+  // where a hand-typed install in Settings → Plugins leaves them: its client half still faces the
   // per-hash prompt, and its node half starts at the next node restart. That is the pre-existing floor,
   // not a hole this dialog opened, and it is why the screen is an improvement rather than a fence.
   const dismiss = createDismissable({ onDismiss: () => { reset(); closePluginApproval() }, container: () => dialog })

@@ -17,11 +17,11 @@ import {
 import { recordPluginTrust } from './host'
 import { syncPluginContributions } from './syncContributions'
 
-// What the trust prompt SAYS and what answering it DOES (PluginTrustDialog.tsx draws it).
+// What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
 // A plain module rather than two memos inside the dialog, for the reason documentSurfaces.ts gives:
 // the repo's client suites run in bare Node with no Solid transform, so anything in a `.tsx` file is
-// structurally untestable — and the two things here are the ones worth pinning. The tier split is a
+// structurally untestable, and the two things here are the ones worth pinning. The tier split is a
 // security claim (docs/security.md § Design rules, rule 6): `Enforced` is a fence the UI bridge holds,
 // `Declared` is a disclosure the plugin can ignore entirely, and the three lists may never be merged,
 // because a strong claim must not lend credibility to a weaker one sitting beside it. And `decide` is
@@ -41,10 +41,11 @@ export type TrustLine = PermissionLine & {
 export type TrustTier = { key: TierKey; lines: TrustLine[] }
 
 /**
- * Every declared line, decorated with the tier that owns it and — on an update — whether the version
+/**
+ * Every declared line, decorated with the tier that owns it and, on an update, whether the version
  * the owner last approved had it.
  *
- * The diff runs over the grant KEY, never the sentence, so a copy edit is a copy edit rather than a
+ * The diff runs over the grant key, never the sentence, so a copy edit is a copy edit rather than a
  * fleet-wide "asks for more" (plugins/permissions.ts).
  */
 export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[] {
@@ -58,8 +59,8 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         ...uiPermissionLines(installed.permissions),
         ...keyClaimPermissionLines(keyClaimGrants(installed.contributions)),
         // Both directions of the cooperative seam plus any core-surface offer. `request.row.name` is the
-        // plugin id the host read the manifest under — the same value every other namespace is minted
-        // from — so a point's public name here is the one the rest of the app will address it by.
+        // plugin id the host read the manifest under, the same value every other namespace is minted
+        // from, so a point's public name here is the one the rest of the app will address it by.
         ...extensionPermissionLines(extensionGrants(request.row.name, installed.contributions)),
       ],
       was: previous
@@ -73,7 +74,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
     {
       key: 'declared',
       // Schedules sit here rather than under `Enforced` for the reason the legend gives: the host does
-      // hold the cadence and the route confinement, but what RUNS is the plugin's own node code, and a
+      // hold the cadence and the route confinement, but what runs is the plugin's own node code, and a
       // claim about that can never be stronger than the group it is in.
       now: [
         ...nodePermissionLines(installed.permissions),
@@ -106,7 +107,8 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
 }
 
 /**
- * Record an ANSWER — accepted or rejected — and let the shell catch up.
+/**
+ * Record an answer, accepted or rejected, and let the shell catch up.
  *
  * Both answers are remembered (main/pluginTrustStore.ts keeps a rejection so a turned-away plugin does
  * not ask every boot), which is exactly why dismissal must not come through here: Escape is "not now"
@@ -144,7 +146,7 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
   if (decision === 'accepted') {
     noteBundleAccepted(request.row.name, request.hash)
     // Both passes, because a bundle-bearing plugin's chrome is gated on the same acceptance as its
-    // rectangles — so it appears with the rest of its surfaces rather than at the next boot.
+    // rectangles, so it appears with the rest of its surfaces rather than at the next boot.
     syncPluginContributions()
   }
 }

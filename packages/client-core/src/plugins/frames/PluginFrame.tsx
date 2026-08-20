@@ -19,20 +19,14 @@ const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${
 //
 // Everything security-relevant is either in the frame's origin (main/pluginScheme.ts serves the CSP) or
 // in the broker (scopes.ts decides every call). What is left here is wiring, and one rule: the frame is
-// created from values the HOST holds, and the only thing that crosses into it is a MessagePort.
+// created from values the host holds, and the only thing that crosses into it is a MessagePort.
 //
-// On the `sandbox` attribute, which is defence in depth on top of the separate origin and not the
-// mechanism. It carries `allow-same-origin` alongside `allow-scripts`, which reads alarming and is not:
-// the pair is only dangerous when the framed document shares the EMBEDDER's origin, because then it can
-// reach `parent.document` and rewrite the iframe that sandboxes it. Here the embedder is app://acorn and
-// the frame is app-plugin://<hash>, so `allow-same-origin` means "keep your own hash origin" and nothing
-// more. Dropping it makes the origin opaque, which costs three things and buys none: `'self'` in the
-// served CSP stops matching, the frame's own module script becomes a cross-origin fetch on a scheme with
-// no CORS (so the document renders blank), and frame-local storage disappears. What the attribute still
-// buys with both tokens is real: no popups, no top-level navigation, no form submission, no downloads.
+// docs/electron.md describes why the `sandbox` attribute carries `allow-same-origin` alongside
+// `allow-scripts`: the pair is only dangerous when the framed document shares the embedder's origin,
+// which is `app://acorn` here, not the frame's own `app-plugin://<hash>`.
 
 const currentAxes = (): { theme: string; style: string } => ({
-  // Both axes default to an ATTRIBUTE-LESS state: `light` and `terminal` have no [data-theme]/[data-style]
+  // Both axes default to an attribute-less state: `light` and `terminal` have no [data-theme]/[data-style]
   // block at all (settings/uiStyles.ts), so reading the dataset legitimately gives undefined.
   theme: document.documentElement.dataset.theme ?? 'light',
   style: document.documentElement.dataset.style ?? 'terminal',
@@ -50,10 +44,10 @@ const currentTokens = (): Record<string, string> => {
 
 // How long a frame gets to say anything at all after the host transfers its port. The bundle is local
 // bytes out of a content-addressed cache and the ack is the first line the SDK runs, so this is generous
-// by an order of magnitude — it is a deadline for "did this code evaluate", not a performance budget.
+// by an order of magnitude: a deadline for "did this code evaluate", not a performance budget.
 //
 // Any message counts as the ack, so a bundle built before the SDK started sending one still
-// clears this as soon as it calls the bridge. A bundle that was built before the ack existed AND never
+// clears this as soon as it calls the bridge. A bundle that was built before the ack existed and never
 // calls the bridge (a purely static frame) will show the placeholder wrongly until it is rebuilt. Every
 // package in this repo is rebuilt by scripts/build-plugin.mjs; an installed third-party copy is not.
 const HANDSHAKE_DEADLINE_MS = 10_000
@@ -61,7 +55,7 @@ const HANDSHAKE_DEADLINE_MS = 10_000
 export default function PluginFrame(props: PluginFrameProps) {
   const qc = useQueryClient()
   const [misbehaving, setMisbehaving] = createSignal<string | null>(null)
-  // The frame took the port and never said a word — a bundle that threw at module scope, or one that was
+  // The frame took the port and never said a word: a bundle that threw at module scope, or one that was
   // never a frame bundle. Until this existed the surface was a blank rectangle and the only evidence was
   // a console error inside an iframe nobody opens devtools on.
   const [silent, setSilent] = createSignal(false)
@@ -118,9 +112,9 @@ export default function PluginFrame(props: PluginFrameProps) {
   // an iframe load event, which is outside the component's reactive owner.
   let port: MessagePort | null = null
 
-  // Every routed selection after the one the frame connected with. `defer` skips the initial value
-  // deliberately — that one already crossed in `context`, and posting it again would tell the frame to
-  // reload the ticket it is in the middle of loading. A change that lands BEFORE the frame connects needs
+  // Every routed selection after the one the frame connected with. `defer` skips the initial value:
+  // that one already crossed in `context`, and posting it again would tell the frame to
+  // reload the ticket it is in the middle of loading. A change that lands before the frame connects needs
   // nothing either, because `context()` is built at load time and reads whatever is current then.
   createEffect(on(() => props.item, (next, previous) => {
     if (!port || !next || next === previous) return
@@ -173,8 +167,8 @@ export default function PluginFrame(props: PluginFrameProps) {
       consumePaneIntent(event.taskId, event.paneId)
       postSelect(channel.port1, event.intent.item)
     })
-    // Surface-scoped commands the host resolved for this frame — the chord was pressed in the sibling
-    // editor, or the row was picked in the palette. Addressed by plugin AND surface, because a task can
+    // Surface-scoped commands the host resolved for this frame: the chord was pressed in the sibling
+    // editor, or the row was picked in the palette. Addressed by plugin and surface, because a task can
     // have two composed panes open and each one's chord belongs to its own frame.
     const unaction = clientEvents.on('plugin:surface-action', (event) => {
       if (event.pluginId !== props.binding.pluginId || event.surface !== props.binding.surface) return
@@ -210,7 +204,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       }
     >
       <iframe
-        // The bundle hash is the origin, so a plugin update is a new origin and a new frame — there is
+        // The bundle hash is the origin, so a plugin update is a new origin and a new frame. There is
         // nothing cached under the old one to reason about.
         src={`${pluginFrameOrigin(props.hash)}/index.html`}
         title={props.binding.surface}
