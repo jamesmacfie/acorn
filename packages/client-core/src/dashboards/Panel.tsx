@@ -11,36 +11,37 @@ import type { PanelDefinition } from './model'
 import PanelBody from './views/PanelBody'
 import './dashboards.css'
 
-// ONE panel, wherever it is placed (docs/dashboards.md § Placements). Placement-agnostic on
-// purpose: the surface owns the grid and the add/remove chrome, this owns a panel's own frame,
-// freshness and body, so a task pane or a plugin-reserved region is a container away.
+// One panel, wherever it is placed. Placement-agnostic: the surface owns the grid and the add and remove
+// chrome, this owns a panel's own frame, freshness and body, so a task pane or a plugin-reserved region
+// is a container away. See docs/dashboards.md § Placements.
 //
-// The inert case is the interesting one. A panel whose collections are not registered — the plugin is
-// disabled, uninstalled, or simply not on this node — renders as "source unavailable" and SURVIVES:
-// its definition is untouched and it comes back when the plugin does. The registry lookup happens
-// here, at render, precisely so persistence never had to make that judgement (tasks/layout.ts).
+// The inert case is the interesting one. A panel whose collections are not registered, because the
+// plugin is disabled, uninstalled or simply not on this node, renders as "source unavailable" and
+// survives: its definition is untouched and it comes back when the plugin does. The registry lookup
+// happens here, at render, precisely so persistence never had to make that judgement (tasks/layout.ts).
 //
-// On a panel over SEVERAL collections that becomes a partial state rather than a binary one, and
-// every degradation below is per source: a missing plugin, a node that could not answer for one
-// collection, and a stale answer beside a live one all name the source they are about and leave the
-// rest rendering. Only a panel with nothing resolvable at all goes inert.
+// On a panel over several collections that becomes a partial state rather than a binary one, and every
+// degradation below is per source: a missing plugin, a node that could not answer for one collection,
+// and a stale answer beside a live one all name the source they are about and leave the rest rendering.
+// Only a panel with nothing resolvable at all goes inert.
 
 export type PanelProps = {
   definition: PanelDefinition
-  /** Surface chrome — a remove button, a drag handle. The panel does not know what it is placed in. */
+  /** Surface chrome, such as a remove button or a drag handle. The panel does not know what it is placed
+   *  in. */
   actions?: JSX.Element
-  /** Spread onto the header. The HEADER is the placement's drag surface and the body is not: the
-   *  body scrolls, selects and clicks, and a drag starting on a row would fight the row's own
-   *  action. It also keeps a press inside a board body free for a future card gesture
-   *  (docs/future/dashboards/write-back.md) — the two must never be ambiguous.
+  /** Spread onto the header. The header is the placement's drag surface and the body is not: the body
+   *  scrolls, selects and clicks, and a drag starting on a row would fight the row's own action. It also
+   *  keeps a press inside a board body free for a future card gesture
+   *  (docs/future/dashboards/write-back.md), and the two must never be ambiguous.
    *
-   *  Opaque here on purpose. The panel does not know whether its surface offers dragging. */
+   *  Opaque here, because the panel does not know whether its surface offers dragging. */
   headProps?: JSX.HTMLAttributes<HTMLDivElement>
 }
 
-/** What the host says before dispatching a risky row action. The plugin declares a TIER, never a
- *  sentence — a plugin that could write the prompt could write a reassuring one over a destructive
- *  call. `read` is not risky and never reaches here. */
+/** What the host says before dispatching a risky row action. The plugin declares a tier, never a
+ *  sentence: a plugin that could write the prompt could write a reassuring one over a destructive call.
+ *  `read` is not risky and never reaches here. */
 const RISK_PROMPT: Record<string, string> = {
   write: 'change something',
   execute: 'run something',
@@ -54,31 +55,31 @@ export default function Panel(props: PanelProps) {
 
   const dispatch = (row: PluginCollectionRow): void => {
     if (!row.action) return
-    // `pluginId` is the HOST's stamp on the row, never a field the plugin sent, so a collection
-    // cannot route its clicks into a stranger's pane (plugins/chrome/data.ts § readCollection).
+    // `pluginId` is the host's stamp on the row, never a field the plugin sent, so a collection cannot
+    // route its clicks into a stranger's pane (plugins/chrome/data.ts, `readCollection`).
     //
     // `navigate` is what lets an `openUrl` row land on acorn's own surface for that item instead of in
-    // the browser — the dispatcher asks the recogniser registry, and a URL with no in-app route still
-    // opens externally. A panel row has no ROUTED PROJECT, which is why the row declares `openUrl` in the
-    // first place; resolving the project from the URL is the missing step.
+    // the browser: the dispatcher asks the recogniser registry, and a URL with no in-app route still
+    // opens externally. A panel row has no routed project, which is why the row declares `openUrl` in
+    // the first place, and resolving the project from the URL is the missing step.
     //
-    // A task it may have, and only the row knows: an agent session runs in one (`PluginCollectionRow.taskId`).
-    // The dispatcher takes the reader there before opening the pane, and `item` is what tells that pane
-    // WHICH row was clicked — the same retained selection intent a rail row's click carries.
+    // A task it may have, and only the row knows: an agent session runs in one
+    // (`PluginCollectionRow.taskId`). The dispatcher takes the reader there before opening the pane, and
+    // `item` is what tells that pane which row was clicked, the same retained selection intent a rail
+    // row's click carries.
     //
-    // `prefer: 'route'` is the dashboard saying what it IS. A panel row is a jumping-off point — you are
-    // looking at a list precisely in order to leave it — so the full surface is the destination and a
-    // glance panel over a list you were abandoning would be the wrong shape. Surfaces you are working
-    // INSIDE ask for the opposite, and get it (plugins/github § makeContentLinkHandler).
+    // `prefer: 'route'` is the dashboard saying what it is. A panel row is a jumping-off point, since you
+    // are looking at a list precisely in order to leave it. Surfaces you are working inside ask for the
+    // opposite and get it (plugins/github, `makeContentLinkHandler`).
     runChromeAction(row.action, {
       pluginId: row.pluginId,
       nodeId,
       navigate,
       prefer: 'route',
       ...(row.taskId ? { taskId: row.taskId } : {}),
-      // Only the id is load-bearing — it is what the target pane selects on. The title is what a rail
-      // row would have carried and nothing on this path reads it, so the row's own id stands in rather
-      // than a guess at which column is its name.
+      // Only the id is load-bearing, because it is what the target pane selects on. The title is what a
+      // rail row would have carried and nothing on this path reads it, so the row's own id stands in
+      // rather than a guess at which column is its name.
       item: { id: row.sourceRowId ?? row.id, title: row.id },
     })
   }
@@ -86,12 +87,12 @@ export default function Panel(props: PanelProps) {
   const riskOf = (action: PluginCollectionRowAction | undefined): string | undefined =>
     action?.risk && action.risk !== 'read' ? action.risk : undefined
 
-  // The row's own declared verb, through the host's dispatcher — the same closed set a rail row's
-  // click runs, and the same refusals. A view never acts on its own, and there is no second path.
+  // The row's own declared verb, through the host's dispatcher: the same closed set a rail row's click
+  // runs, and the same refusals. A view never acts on its own, and there is no second path.
   //
-  // THE CONFIRMATION IS THE HOST'S, drawn from the declared tier and drawn HERE rather than in a
-  // view, so no view and no plugin can route around it. An action with no tier behaves exactly as it
-  // always did — which is every action any plugin ships today.
+  // The confirmation is the host's, drawn from the declared tier and drawn here rather than in a view, so
+  // no view and no plugin can route around it. An action with no tier behaves exactly as it always did,
+  // which is every action any plugin ships today.
   const activate = (row: PluginCollectionRow): void => {
     if (!row.action) return
     if (riskOf(row.action)) {
@@ -107,8 +108,8 @@ export default function Panel(props: PanelProps) {
     if (row) dispatch(row)
   }
 
-  /** The sources whose collection this device can actually resolve. A panel is inert only when NONE
-   *  of them are — one plugin going away must not take a mixed panel's other half with it. */
+  /** The sources whose collection this device can actually resolve. A panel is inert only when none of
+   *  them are: one plugin going away must not take a mixed panel's other half with it. */
   const resolved = () => data.sources().filter((source) => source.contribution())
 
   const viewProps = () => ({

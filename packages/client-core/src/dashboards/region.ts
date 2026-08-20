@@ -4,22 +4,18 @@ import { collectionKey, type CollectionContribution } from '../registries/collec
 import type { PanelDefinition, PanelViewKind } from './model'
 import type { PlacementScope } from './persist'
 
-// A PANEL REGION — a rectangle a plugin reserved in one of its own surfaces for panels the USER composes
-// (docs/dashboards.md § Placements). Two surfaces feed this today: a rail source's side panel, and a
-// pane's `pane.aside` extension point. Neither has any code here; both hand over the same declaration.
+// A panel region: a rectangle a plugin reserved in one of its own surfaces for panels the user composes.
+// What an owner may declare, and why it is enforced twice, are in docs/dashboards.md § Placements. Two
+// surfaces feed this today, a rail source's side panel and a pane's `pane.aside` extension point.
+// Neither has any code here; both hand over the same declaration.
 //
-// JSX-FREE, exactly as registries/extensionPoints.ts is, and for the same reason: vitest in this repo
+// JSX-free, exactly as registries/extensionPoints.ts is, and for the same reason: vitest in this repo
 // runs in a bare Node environment with no Solid transform, so every rule worth pinning has to live
 // somewhere a test can import. What is left in the components is a `<PanelGrid scope=… region=…>`.
 //
-// THE HOST BINDS `pluginId`, always, from the manifest it read — never from a descriptor field. It is
-// what "own-plugin collections only" means, so a manifest able to state it could claim another
-// package's data as its own default.
-//
-// THE SAME CONSTRAINTS RUN TWICE. `regionCollections` and `regionViews` narrow what the editor OFFERS,
-// so a disallowed panel is unrepresentable rather than validated; `regionAllows` re-checks at RENDER
-// time, because the declaration arrived inside a roster row and a plugin can narrow its own region in
-// an update, long after somebody composed against the wider one.
+// The host binds `pluginId`, always, from the manifest it read, and never from a descriptor field. It is
+// what "own-plugin collections only" means, so a manifest able to state it could claim another package's
+// data as its own default.
 
 export type PanelRegion = {
   /** The plugin whose surface this region sits in. Host-bound. */
@@ -34,7 +30,7 @@ export type PanelRegion = {
 }
 
 /** The default a surface gets by declaring the key and nothing inside it: own collections, every view,
- *  four panels. Spelled once so the manifest's `max` default and this cannot drift — the schema fills
+ *  four panels. Spelled once so the manifest's `max` default and this cannot drift. The schema fills
  *  `max` on parse, and this is the answer for a roster row from a node that predates the field. */
 const DEFAULT_MAX = 4
 
@@ -45,14 +41,15 @@ const isViewKind = (value: string): value is PanelViewKind =>
   (PANEL_VIEW_KINDS as readonly string[]).includes(value)
 
 /**
- * The host's own reading of what a manifest declared. Every closed vocabulary is INTERSECTED with this
+/**
+ * The host's own reading of what a manifest declared. Every closed vocabulary is intersected with this
  * build's, never trusted: a newer node can name a view kind or a field role this shell has no renderer
- * for, and the honest answer to that is a narrower offer rather than a refusal — the same posture
- * chrome/data.ts takes toward everything a roster row claims.
+ * for, and the honest answer is a narrower offer rather than a refusal, the same posture chrome/data.ts
+ * takes toward everything a roster row claims.
  *
- * `views` intersecting to nothing falls back to every kind, which is deliberate. A region whose entire
- * allow-list is unknown to this build has told this build nothing, and offering nothing would strand a
- * person in front of a picker with no options and no reason given.
+ * `views` intersecting to nothing falls back to every kind. A region whose entire allow-list is unknown
+ * to this build has told this build nothing, and offering nothing would strand a person in front of a
+ * picker with no options and no reason given.
  */
 export function panelRegion(pluginId: string, declared: PluginPanelRegion | undefined): PanelRegion {
   const views = (declared?.views ?? []).filter(isViewKind)
@@ -70,9 +67,9 @@ export function panelRegion(pluginId: string, declared: PluginPanelRegion | unde
  *  (persist.ts), so this is a constant and not a key format. */
 export const regionScope = (ownerId: string): PlacementScope => ({ surface: 'plugin-region', ownerId })
 
-/** The owner id of a rail source's side panel, and of a pane's aside — the qualified extension point id
- *  in that case, which is already `<pluginId>:<pointId>`. Both are `<pluginId>:<somethingId>`, which is
- *  why `placementScopeKey` percent-encodes its segments. */
+/** The owner id of a rail source's side panel, and of a pane's aside, which is the qualified extension
+ *  point id and already `<pluginId>:<pointId>`. Both are `<pluginId>:<somethingId>`, which is why
+ *  `placementScopeKey` percent-encodes its segments. */
 export const sourceRegionOwner = (pluginId: string, sourceId: string): string => `${pluginId}:${sourceId}`
 
 /** True when this collection may be composed into this region. The one predicate the other three
@@ -83,9 +80,9 @@ export const regionAdmits = (region: PanelRegion, entry: CollectionContribution)
   return entry.pluginId === region.pluginId
 }
 
-/** What the panel editor may offer here — the EDIT-time half. A region declaring a `fieldRole` over a
- *  self-describing collection offers nothing, and that is correct rather than unfortunate: the host has
- *  never seen that collection's fields, so admitting it would be a claim nobody has checked. */
+/** What the panel editor may offer here, the edit-time half. A region declaring a `fieldRole` over a
+ *  self-describing collection offers nothing, and that is correct: the host has never seen that
+ *  collection's fields, so admitting it would be a claim nobody has checked. */
 export const regionCollections = (
   region: PanelRegion,
   all: readonly CollectionContribution[],
@@ -95,17 +92,18 @@ export const regionCollections = (
 export const regionViews = (region: PanelRegion): readonly PanelViewKind[] => region.views ?? PANEL_VIEW_KINDS
 
 /**
- * The RENDER-time half: may this already-composed panel be drawn here?
+/**
+ * The render-time half: may this already-composed panel be drawn here?
  *
- * EVERY query must be admitted, not merely one. A panel unions the rows of several collections and the
+ * Every query must be admitted, not merely one. A panel unions the rows of several collections and the
  * region's allowance is about what a person may see in this rectangle, so one disallowed source is a
  * disallowed panel.
  *
- * A panel refused here is simply not drawn, and nothing is deleted: its definition survives in the
- * library and on every other surface it is placed in, which is the whole point of the placement split.
- * That is the one place this differs from an unresolvable panel, which draws inert — "the plugin that
- * owns this rectangle no longer allows it" is a statement about the RECTANGLE, and an inert box
- * explaining somebody else's policy inside somebody else's pane helps nobody.
+ * A panel refused here is not drawn, and nothing is deleted: its definition survives in the library and
+ * on every other surface it is placed in, which is the point of the placement split. That is the one
+ * place this differs from an unresolvable panel, which draws inert. "The plugin that owns this rectangle
+ * no longer allows it" is a statement about the rectangle, and an inert box explaining somebody else's
+ * policy inside somebody else's pane helps nobody.
  */
 export const regionAllows = (
   region: PanelRegion,
@@ -115,14 +113,13 @@ export const regionAllows = (
   if (!regionViews(region).includes(panel.view.kind as PanelViewKind)) return false
   return panel.queries.every((query) => {
     const entry = lookup(query.pluginId, query.collectionId)
-    // An UNRESOLVED collection is admitted. The panel then draws as the inert "source unavailable" body
-    // it already draws everywhere else (docs/dashboards.md § Placements) — which
-    // is a plugin-lifecycle answer, and turning it into "not allowed here" would make a disabled plugin
-    // look like a policy refusal.
+    // An unresolved collection is admitted. The panel then draws as the inert "source unavailable" body
+    // it already draws everywhere else, which is a plugin-lifecycle answer. Turning it into "not allowed
+    // here" would make a disabled plugin look like a policy refusal.
     return !entry || regionAdmits(region, entry)
   })
 }
 
-/** Is there room for another? The cap is the owner's, and the affordance goes away rather than failing
- *  on click — the same rule `PanelGrid` already applies to "no plugin provides a collection". */
+/** Is there room for another? The cap is the owner's, and the affordance goes away rather than failing on
+ *  click, the same rule `PanelGrid` applies to "no plugin provides a collection". */
 export const regionHasRoom = (region: PanelRegion, placed: number): boolean => placed < region.max

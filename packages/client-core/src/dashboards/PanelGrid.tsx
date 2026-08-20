@@ -41,33 +41,15 @@ import {
 } from './persist'
 import './dashboards.css'
 
-// One PLACEMENT (docs/dashboards.md § Placements): the grid of panels a person put somewhere, plus
-// the chrome for putting one there, arranging it and taking it away. Panel itself is
-// placement-agnostic and owns a panel's frame, freshness and body; this owns the arrangement.
+// One placement: the grid of panels a person put somewhere, plus the chrome for putting one there,
+// arranging it and taking it away. `Panel` is placement-agnostic and owns a panel's frame, freshness
+// and body; this owns the arrangement. See docs/dashboards.md § Placements and § The grid.
 //
-// It takes a scope rather than assuming home because `panelsAt` / `layoutAt` already do — a task
-// pane or a plugin-reserved region is this component with a different scope, not a second one.
+// It takes a scope rather than assuming home because `panelsAt` and `layoutAt` already do. A task pane
+// or a plugin-reserved region is this component with a different scope, not a second one.
 //
-// ALL LAYOUT ARITHMETIC IS IN `layout.ts`. This file turns pixels into a candidate rect and renders
-// what the pure functions answer; it decides nothing about where a panel lands. THE PREVIEW DURING A
-// GESTURE IS THE REAL LAYOUT ALGORITHM RUNNING ON THE CANDIDATE POSITION, not a separate visual
-// effect — release persists exactly what was on screen, so there is no commit computation that could
-// disagree with the preview, and cancel is free because nothing was written.
-//
-// EVERY POINTER GESTURE HAS A KEYBOARD EQUIVALENT DRIVEN THROUGH THE SAME FUNCTIONS. That was a
-// commitment made when reorder shipped as menu items: drag lands ON TOP of the accessible path,
-// never instead of it. Move up / move down survive, reinterpreted onto geometry, and "Move / resize"
-// is the arrow-key form of the drag.
-//
-// TWO THINGS IT DELIBERATELY DOES NOT DO:
-//
-//   It never announces itself. With nothing placed there is no heading, no empty grid and no
-//   invitation — just one ghost button under whatever the surface already showed. A person who
-//   never asked for dashboards should not be able to tell this shipped.
-//
-//   It offers nothing when no plugin provides a collection. An "Add panel" that opens an empty
-//   picker is worse than no button, so the affordance is gated on there being something to add.
-//   Panels already placed still render — a plugin going away must not take a composition with it.
+// All layout arithmetic is in `layout.ts`. This file turns pixels into a candidate rect and renders
+// what the pure functions answer, and decides nothing about where a panel lands.
 
 /** Below this the cells are too small to mean anything, so the grid collapses to one column. */
 const MIN_CELL_PX = 44
@@ -82,8 +64,8 @@ type Gesture = {
   kind: GestureKind
   /** `apply`'s output for the current candidate. This is what renders. */
   layout: PanelLayout
-  /** How far the dragged panel is from the cell it currently occupies, so it tracks the pointer
-   *  between snaps instead of jumping a whole cell at a time. */
+  /** How far the dragged panel is from the cell it currently occupies, so it tracks the pointer between
+   *  snaps instead of jumping a whole cell at a time. */
   offset?: { x: number; y: number }
 }
 
@@ -96,21 +78,20 @@ const ARROWS: Record<string, readonly [number, number]> = {
 
 export default function PanelGrid(props: {
   scope: PlacementScope
-  /** Replaces the "Panels" heading in the same seat. Home's tab bar takes it when there is more than
-   *  one dashboard — tabs ARE the heading then (docs/dashboards.md § Persistence). Its presence is
-   *  also what keeps the header row on an EMPTY placement, so a freshly created tab still has a bar. */
+  /** Replaces the "Panels" heading in the same seat. Home's tab bar takes it when there is more than one
+   *  dashboard, because tabs are the heading then. Its presence is also what keeps the header row on an
+   *  empty placement, so a freshly created tab still has a bar. See docs/dashboards.md § Placements. */
   heading?: JSX.Element
   /** `role="tabpanel"` wiring for the grid, when something above it is a tablist. */
   panelAria?: { id: string; labelledBy: string }
-  /** Present when this grid is a rectangle a PLUGIN reserved, carrying what the owner allows there
+  /** Present when this grid is a rectangle a plugin reserved, carrying what the owner allows there
    *  (region.ts). Absent for Home and the task pane, which are the user's own surfaces and constrain
-   *  nothing. Every rule it carries is applied in exactly two places below — the offer and the
-   *  render — and nowhere else in this file. */
+   *  nothing. Every rule it carries is applied in exactly two places below, the offer and the render. */
   region?: PanelRegion
 }) {
   // The sheet's session. The wrapper distinguishes "open" from "closed", which a bare
-  // `PanelDefinition | undefined` cannot — it is opened with no panel by nothing today, and with a
-  // draft the wizard handed over (`creating`) or a placed panel being edited.
+  // `PanelDefinition | undefined` cannot. It is opened with no panel by nothing today, and otherwise
+  // with a draft the wizard handed over (`creating`) or a placed panel being edited.
   const [editing, setEditing] = createSignal<{ panel?: PanelDefinition; creating?: boolean } | undefined>()
   const [adding, setAdding] = createSignal(false)
   const [gesture, setGesture] = createSignal<Gesture | undefined>()
@@ -120,24 +101,24 @@ export default function PanelGrid(props: {
   const [announcement, setAnnouncement] = createSignal('')
   const confirmDelete = createArmedConfirm()
 
-  // The RENDER-time half of a region's constraints. A panel the owner no longer allows here is dropped
+  // The render-time half of a region's constraints. A panel the owner no longer allows here is dropped
   // from this grid and from nowhere else: its definition, and every other placement of it, survive
-  // (region.ts § regionAllows). The hole it leaves in the geometry is cosmetic and only appears when a
+  // (region.ts, `regionAllows`). The hole it leaves in the geometry is cosmetic and only appears when a
   // plugin narrows its own region after somebody composed against the wider one.
   const panels = () => {
     const region = props.region
     const placed = panelsAt(props.scope)
     return region ? placed.filter((panel) => regionAllows(region, panel, collectionContribution)) : placed
   }
-  /** The EDIT-time half: the editor's selectors simply do not offer what the region disallows, which is
-   *  what makes a disallowed panel unrepresentable rather than validated. */
+  /** The edit-time half: the editor's selectors do not offer what the region disallows, which is what
+   *  makes a disallowed panel unrepresentable rather than validated. */
   const collections = () => {
     const region = props.region
     return region ? regionCollections(region, collectionContributions()) : collectionContributions()
   }
   const views = () => props.region && regionViews(props.region)
-  /** A region's cap is the owner's, and it takes the affordance away rather than failing on click — the
-   *  same rule the "no plugin provides a collection" gate below already applies. */
+  /** A region's cap is the owner's, and it takes the affordance away rather than failing on click, the
+   *  same rule the "no plugin provides a collection" gate below applies. */
   const hasRoom = () => !props.region || regionHasRoom(props.region, panels().length)
   const committed = createMemo(() => layoutAt(props.scope))
   /** What the grid draws: the live candidate while a gesture is running, else what is stored. */
@@ -149,16 +130,18 @@ export default function PanelGrid(props: {
 
   // ── Measurement ─────────────────────────────────────────────────────────────────────────────
   //
-  // The one pixel measurement in the whole feature, and it exists to make cells SQUARE — which is
-  // what makes the overlay read as graph paper and "3 wide, 2 tall" mean something visually. The
-  // browser owns every other pixel via CSS grid.
+  // ── Measurement ─────────────────────────────────────────────────────────────────────────────
   //
-  // The gap is read off the RESOLVED `column-gap` rather than by token name: the grid and the
-  // overlay then agree to the pixel whatever a style pack sets, and nothing here joins the
-  // JS-reads-a-token list (ui/tokenAxes.ts § BRIDGE_TOKENS).
+  // The one pixel measurement in the whole feature, and it exists to make cells square, which is what
+  // makes the overlay read as graph paper and "3 wide, 2 tall" mean something visually. The browser owns
+  // every other pixel through CSS grid.
   //
-  // The accepted consequence: panel heights breathe with window width. If that proves annoying the
-  // knob is one line — clamp `size` to a range — and the persisted model does not change.
+  // The gap is read off the resolved `column-gap` rather than by token name, so the grid and the overlay
+  // agree to the pixel whatever a style pack sets and nothing here joins the JS-reads-a-token list
+  // (ui/tokenAxes.ts, `BRIDGE_TOKENS`).
+  //
+  // The accepted consequence: panel heights breathe with window width. If that proves annoying the knob
+  // is one line, clamping `size` to a range, and the persisted model does not change.
   const measure = () => {
     const el = gridEl
     if (!el) return
@@ -181,11 +164,12 @@ export default function PanelGrid(props: {
 
   // ── Pointer gestures ────────────────────────────────────────────────────────────────────────
   //
-  // Pointer events with capture, not HTML5 drag-and-drop: the house mechanic (ui/split.ts) is
-  // already pointer-capture with rAF coalescing and user-select suppression, and HTML5 DnD brings a
-  // ghost image we would fight, no `pointercancel`, and worse coordinates. `createSplitDrag` itself
-  // is not extended — its own comment says its three call sites are delta-in-pixels, and this one is
-  // rect-in-cells.
+  // ── Pointer gestures ────────────────────────────────────────────────────────────────────────
+  //
+  // Pointer events with capture, not HTML5 drag-and-drop. The house mechanic (ui/split.ts) is already
+  // pointer-capture with rAF coalescing and user-select suppression, and HTML5 DnD brings a ghost image
+  // we would fight, no `pointercancel`, and worse coordinates. `createSplitDrag` itself is not extended:
+  // its own comment says its three call sites are delta-in-pixels, and this one is rect-in-cells.
 
   // A gesture that outlives its component would keep arranging panels that no longer exist.
   let release: (() => void) | undefined
@@ -340,9 +324,11 @@ export default function PanelGrid(props: {
 
   // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
   //
-  // Move up / move down survive because they are the path that works with no pointer at all. On a
-  // one-column window they behave exactly as they did before geometry existed, which is the
-  // continuity that matters; on a wide one they swap toward the neighbour in reading order.
+  // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
+  //
+  // Move up and move down survive because they are the path that works with no pointer at all. On a
+  // one-column window they behave exactly as they did before geometry existed, which is the continuity
+  // that matters; on a wide one they swap toward the neighbour in reading order.
 
   const moveTo = (id: PanelId, delta: -1 | 1) => {
     const current = committed()
@@ -362,20 +348,22 @@ export default function PanelGrid(props: {
 
   // ── Moving between placements ───────────────────────────────────────────────────────────────
   //
-  // The Home tabs other than this one (docs/dashboards.md § Persistence). A flat labelled group
-  // rather than a submenu: `Menu` has no submenu and one is not worth inventing for a list of at most
-  // seven names that is already keyboard-operable as rows.
+  // ── Moving between placements ───────────────────────────────────────────────────────────────
   //
-  // Only tabs. Moving to a TASK PANE is the same two calls and a different destination, and it waits
-  // for someone to want it (README § smaller items) — aiming at a pane from Home would put a panel
+  // The Home tabs other than this one (docs/dashboards.md § Placements). A flat labelled group rather
+  // than a submenu: `Menu` has no submenu and one is not worth inventing for a list of at most seven
+  // names that is already keyboard-operable as rows.
+  //
+  // Only tabs. Moving to a task pane is the same two calls and a different destination, and it waits for
+  // someone to want it (docs/future/dashboards/README.md). Aiming at a pane from Home would put a panel
   // where nobody is looking, which is the argument the wizard's Where control already makes.
 
   const moveTargets = () => props.scope.surface !== 'home'
     ? []
     : homeTabs(dashboards()).filter((tab) => tab.id !== (props.scope.ownerId ?? ''))
 
-  /** Keeps the DEFINITION and takes a fresh rect at the destination — a rect is per (scope, panel),
-   *  so there is nothing to carry across. */
+  /** Keeps the definition and takes a fresh rect at the destination. A rect is per (scope, panel), so
+   *  there is nothing to carry across. */
   const moveToTab = (id: PanelId, tabId: string) => {
     unplacePanel(props.scope, id)
     placePanelAt(homeTabScope(tabId), id, sizePresets(panelDefinition(id)?.view.kind ?? 'list').m)
@@ -393,9 +381,9 @@ export default function PanelGrid(props: {
           variant="ghost"
           iconOnly
           aria-label={`${definition.title} panel actions`}
-          // Header actions fade out when the pointer leaves the panel — and opening this menu moves
-          // both pointer and focus into a portal, so without this the trigger vanishes under its own
-          // open menu.
+          // Header actions fade out when the pointer leaves the panel, and opening this menu moves both
+          // pointer and focus into a portal, so without this the trigger vanishes under its own open
+          // menu.
           {...(open() ? { 'data-open': '' } : {})}
           onClick={toggle}
         >
@@ -467,21 +455,23 @@ export default function PanelGrid(props: {
 
   // ── Rendering ───────────────────────────────────────────────────────────────────────────────
   //
-  // Twelve columns, rows one square cell tall — but slots are positioned ABSOLUTELY from the same
-  // measurement rather than by `grid-area`. The reason is motion: `grid-area` cannot be transitioned,
-  // so push-down and compaction jumped between frames and a drag read as a reshuffle rather than a
-  // chain reaction. `top/left/width/height` can be transitioned, and computing them is `measure` run
-  // backwards, so the browser and this file cannot disagree about where a cell is. FLIP transforms
-  // over CSS grid were the alternative and were refused: they are fragile under the re-layout this
-  // grid does every frame, and they fight the sub-cell translate the dragged panel already carries.
+  // ── Rendering ───────────────────────────────────────────────────────────────────────────────
+  //
+  // Twelve columns, rows one square cell tall, but slots are positioned absolutely from the same
+  // measurement rather than by `grid-area`. The reason is motion: `grid-area` cannot be transitioned, so
+  // push-down and compaction jumped between frames and a drag read as a reshuffle rather than a chain
+  // reaction. `top`, `left`, `width` and `height` can be transitioned, and computing them is `measure`
+  // run backwards, so the browser and this file cannot disagree about where a cell is. FLIP transforms
+  // over CSS grid were the alternative and were refused: they are fragile under the re-layout this grid
+  // does every frame, and they fight the sub-cell translate the dragged panel already carries.
   //
   // The container therefore has no in-flow children and must state its own height, which follows the
-  // LIVE layout — so a mid-gesture preview resizes the container, which the ResizeObserver above
-  // sees. That is only safe because `measure` reads the width and writes nothing back into the
-  // layout. An observer that re-applied the committed model would stomp the preview every frame.
+  // live layout, so a mid-gesture preview resizes the container and the ResizeObserver above sees it.
+  // That is only safe because `measure` reads the width and writes nothing back into the layout. An
+  // observer that re-applied the committed model would stomp the preview every frame.
   //
   // The collapsed state emits none of it and the slots fall back into ordinary block flow, stacked in
-  // document order — which `placements` is kept sorted to on every commit.
+  // document order, which `placements` is kept sorted to on every commit.
 
   /** The gap, back out of the two measurements: pitch is a cell plus one gap. */
   const gap = () => pitch() - cell()
@@ -493,7 +483,7 @@ export default function PanelGrid(props: {
     height: `${rect.h * pitch() - gap()}px`,
   })
 
-  /** How deep the live layout reaches — the grid's height, since nothing inside it is in flow. */
+  /** How deep the live layout reaches, which is the grid's height since nothing inside it is in flow. */
   const gridHeight = () => {
     const current = layout()
     const rows = panels().reduce((deepest, entry) => {
@@ -510,16 +500,16 @@ export default function PanelGrid(props: {
     const offset = active?.id === id ? active.offset : undefined
     return {
       ...boxOf(rect),
-      // A hair of lift composed with the tracking translate, so the payload and the cells it came
-      // from never look like the same object.
+      // A hair of lift composed with the tracking translate, so the payload and the cells it came from
+      // never look like the same object.
       ...(offset ? { transform: `translate(${offset.x}px, ${offset.y}px) scale(1.015)` } : {}),
     }
   }
 
-  /** The cells a dragged panel would land in, under the panel floating above them. Kept as a STYLE
-   *  rather than a rect the placeholder is `Show`n by, because a `Show` on the rect would be keyed on
-   *  a fresh object every frame and rebuild the element — and a rebuilt element does not transition
-   *  between the cells it is supposed to glide across. */
+  /** The cells a dragged panel would land in, under the panel floating above them. Kept as a style
+   *  rather than a rect the placeholder is `Show`n by: a `Show` on the rect would be keyed on a fresh
+   *  object every frame and rebuild the element, and a rebuilt element does not transition between the
+   *  cells it is supposed to glide across. */
   const placeholderStyle = (): JSX.CSSProperties => {
     const active = gesture()
     const rect = active && layout().rects[active.id]
@@ -529,8 +519,8 @@ export default function PanelGrid(props: {
   const handle = (id: PanelId, edge: 'e' | 's' | 'se') => (
     <div
       class={`dash-resize dash-resize-${edge}`}
-      // Not a button: it is a grabbable edge, and the keyboard path to the same outcome is the
-      // menu's layout mode rather than nine tab stops per panel.
+      // Not a button: it is a grabbable edge, and the keyboard path to the same outcome is the menu's
+      // layout mode rather than nine tab stops per panel.
       aria-hidden="true"
       onPointerDown={(event) => beginResize(id, edge, event)}
     />
@@ -644,9 +634,9 @@ export default function PanelGrid(props: {
               onClose={() => setEditing(undefined)}
               onSave={(panel) => {
                 savePanel(panel)
-                // Placed only when it is not already here. An edit that re-placed the panel would
-                // silently move it to the end of the grid every time somebody changed its title —
-                // and now would also throw away its rect.
+                // Placed only when it is not already here. An edit that re-placed the panel would move
+                // it to the end of the grid every time somebody changed its title, and would now also
+                // throw away its rect.
                 if (!panels().some((entry) => entry.id === panel.id)) placePanel(props.scope, panel.id)
               }}
             />
