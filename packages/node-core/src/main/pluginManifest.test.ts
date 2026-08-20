@@ -4,9 +4,9 @@ import { pluginManifestSchema } from './pluginManifest'
 
 // The declarative-chrome half of the manifest (docs/plugins.md).
 //
-// What is worth pinning here is not the field list — Zod holds that — but the three cross-field rules,
-// because each one is a place a manifest could otherwise name something outside itself: a route in
-// someone else's namespace, a pane it never declared, a non-https URL the shell would hand to the OS.
+// What is worth pinning here is not the field list, since Zod holds that, but the three cross-field
+// rules, because each one is a place a manifest could otherwise name something outside itself: a route
+// in someone else's namespace, a pane it never declared, a non-https URL the shell would hand to the OS.
 
 const manifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', contributions })
@@ -21,8 +21,8 @@ const PANE = { target: 'pane', id: 'board', label: 'Board' }
 
 // A webview needs a client bundle to steer it, so every webview case declares one. `manifest()` stays
 // bundle-less because most surfaces do not need one.
-// A schedule runs a node route, so every schedule case declares a node half — the same reason the
-// webview cases declare a client one.
+// A schedule runs a node route, so every schedule case declares a node half, the same reason the webview
+// cases declare a client one.
 const nodeManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
     id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', node: './dist/node.js', contributions,
@@ -43,8 +43,8 @@ describe('brand marks', () => {
   })
 
   it('refuses anything the `d` grammar cannot express', () => {
-    // The whole trust argument for shipping path data instead of an SVG document rests on this: if a
-    // mark cannot carry a tag, a url() or an event handler, there is nothing in it to sanitise.
+    // The whole trust argument for shipping path data instead of an SVG document rests on this: if a mark
+    // cannot carry a tag, a url() or an event handler, there is nothing in it to sanitise.
     expect(withIcons({ icon: { d: '<script>alert(1)</script>' } }).success).toBe(false)
     expect(withIcons({ icon: { d: 'M0 0 url(https://evil.example/x)' } }).success).toBe(false)
     expect(withIcons({ icon: { d: '' } }).success).toBe(false)
@@ -54,8 +54,8 @@ describe('brand marks', () => {
   it('bounds the plural feeder, whose every entry becomes a registry row', () => {
     expect(withIcons({ icons: { openai: { d: 'M0 0Z' }, anthropic: { d: 'M1 1Z' } } }).success).toBe(true)
     expect(withIcons({ icons: { 'Not A Key': { d: 'M0 0Z' } } }).success).toBe(false)
-    // A key cannot reach out of the plugin's own namespace: the host stamps `brand:<pluginId>/` in
-    // front of it, so a slash here would be a second segment, not an escape — but bound it anyway.
+    // A key cannot reach out of the plugin's own namespace: the host stamps `brand:<pluginId>/` in front
+    // of it, so a slash here would be a second segment, not an escape, but bound it anyway.
     expect(withIcons({ icons: { 'other/mark': { d: 'M0 0Z' } } }).success).toBe(false)
     expect(withIcons({ icons: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`m${i}`, { d: 'M0 0Z' }])) }).success).toBe(false)
   })
@@ -85,8 +85,8 @@ describe('overlay surfaces', () => {
   })
 
   it('refuses an overlay nothing opens, and an openOverlay naming something else', () => {
-    // The same rule a project-scoped pane is held to: a surface that parses and can never appear is
-    // worse than a parse error, because it looks installed.
+    // The same rule a project-scoped pane is held to: a surface that parses and can never appear is worse
+    // than a parse error, because it looks installed.
     expect(messages(manifest({ frames: [overlay] })))
       .toContain(`overlay 'files' needs an action that opens it; a command with a keybinding is the usual one`)
     expect(messages(manifest({ frames: [PANE], commands: [opener({ verb: 'openOverlay', overlay: 'board' })] })))
@@ -143,9 +143,9 @@ describe('webview surfaces', () => {
 
   it('refuses a webview from a package with no client bundle', () => {
     // Two reasons, and the second is the one with teeth. The host mounts the bundle controller-only to
-    // drive the view, so without one nothing steers it — and the trust queue holds BUNDLES, so a
-    // bundle-less package never reaches the prompt at all. Its declared hosts would be a disclosure
-    // nobody was ever shown, for a surface that displays arbitrary web content.
+    // drive the view, so without one nothing steers it, and the trust queue holds bundles, so a
+    // bundle-less package never reaches the prompt at all. Its declared hosts would be a disclosure nobody
+    // was ever shown, for a surface that displays arbitrary web content.
     const declared = { target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }
     expect(messages(manifest({ frames: [declared] }))).toContain('a webview surface needs a client bundle; declare `client` in the manifest')
     expect(webviewManifest({ frames: [declared] }).success).toBe(true)
@@ -155,8 +155,8 @@ describe('webview surfaces', () => {
 describe('document surfaces', () => {
   // The host draws the editor and the plugin supplies the document, because a Monaco frame cannot be
   // served at all (docs/third-party/monaco.md). What is worth pinning is the same class of rule as every
-  // other cross-field check here: a plugin may not name a route outside its own namespace, and a
-  // surface that parses and can never do anything is refused rather than shipped.
+  // other cross-field check here: a plugin may not name a route outside its own namespace, and a surface
+  // that parses and can never do anything is refused rather than shipped.
   const layout = (document: Record<string, unknown>) => ({ ...PANE, layout: { template: 'document', document } })
 
   it('accepts a read/write document and defaults the language', () => {
@@ -192,8 +192,8 @@ describe('document surfaces', () => {
       .toContain("the 'document' template draws no frame, so there is nothing here to claim keys")
   })
 
-  // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them.
-  // The template that arrived with its consumer (the database pane), which is what shipping the region
+  // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them. The
+  // template that arrived with its consumer, the database pane, which is what shipping the region
   // addressing on day one was for.
   const composed = (document: Record<string, unknown>) => ({ ...PANE, layout: { template: 'document-over-frame', document } })
 
@@ -214,8 +214,8 @@ describe('document surfaces', () => {
 
 describe('surface actions', () => {
   // A command delivered into the frame region of a composed pane, because its chord is pressed in the
-  // HOST's editor where the frame has no keyboard. The rule worth pinning is the one every other verb
-  // has: it may only name a surface this same manifest declares, and only one that can receive it.
+  // host's editor where the frame has no keyboard. The rule worth pinning is the one every other verb has:
+  // it may only name a surface this same manifest declares, and only one that can receive it.
   const composedPane = {
     target: 'pane',
     id: 'query',
@@ -229,10 +229,10 @@ describe('surface actions', () => {
   })
 
   it('refuses a surface with no frame region to receive it', () => {
-    // A plain frame pane has no document to flush and no host chord to have resolved the command…
+    // A plain frame pane has no document to flush and no host chord to have resolved the command,
     expect(messages(manifest({ frames: [PANE], commands: [execute('board')] })))
       .toContain("surfaceAction names 'board', which this manifest does not declare as a document-over-frame pane")
-    // …and the degenerate template draws no frame at all, so there is nothing on the other side.
+    // and the degenerate template draws no frame at all, so there is nothing on the other side.
     const wholePane = { ...PANE, layout: { template: 'document', document: { read: '/v2/p/board/doc' } } }
     expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] })))
       .toContain("surfaceAction names 'board', which this manifest does not declare as a document-over-frame pane")
@@ -280,7 +280,7 @@ describe('chrome descriptors', () => {
     expect(result.success && result.data.contributions.commands).toEqual([])
     expect(result.success && result.data.contributions.keybindings).toEqual([])
     expect(result.success && result.data.contributions.routes).toEqual([])
-    // And a pane written before `scope` existed is still a TASK pane, which is the compatibility promise
+    // And a pane written before `scope` existed is still a task pane, which is the compatibility promise
     // the whole field rests on: rollbar's manifest has to keep behaving identically.
     expect(result.success && result.data.contributions.frames[0]?.scope).toBe('task')
   })
@@ -288,7 +288,8 @@ describe('chrome descriptors', () => {
   it('confines every route to the plugin’s own namespace', () => {
     expect(messages(manifest({ sources: [{ id: 's', label: 'S', order: 1, items: '/v2/core/tasks' }] })))
       .toEqual(['route must be inside /v2/p/board/'])
-    // Another plugin's namespace is the interesting case: it looks legal and is the whole point of the check.
+    // Another plugin's namespace is the interesting case: it looks legal and is the whole point of the
+    // check.
     expect(messages(manifest({ attention: [{ id: 'a', items: '/v2/p/github/attention' }] })))
       .toEqual(['route must be inside /v2/p/board/'])
     // A prefix match is not a namespace match.
@@ -327,8 +328,8 @@ describe('chrome descriptors', () => {
 
   it('rejects an unknown slot and an unknown verb', () => {
     expect(manifest({ slots: [{ id: 'x', slot: 'statusbar', data: '/v2/p/board/badge' }] }).success).toBe(false)
-    // `invoke` is a v1 non-verb (it needs a frame lifecycle the shell does not have). Failing here is the
-    // point: an author is told, rather than shipping a palette row that silently does nothing.
+    // `invoke` is a v1 non-verb, since it needs a frame lifecycle the shell does not have. Failing here is
+    // the point: an author is told, rather than shipping a palette row that silently does nothing.
     expect(manifest({ palette: [{ id: 'p', title: 'P', action: { verb: 'invoke', id: 'new-card' } }] }).success).toBe(false)
   })
 
@@ -390,8 +391,8 @@ describe('chrome descriptors', () => {
     expect(parsed.success && parsed.data.contributions.sources[0]!.panels)
       .toEqual({ fieldRole: 'status', views: ['list', 'board'], max: 6 })
 
-    // A source panel has ONE rectangle beside its rail list, and the detail half of a master/detail
-    // browse already claims it. Declaring both would parse and then draw one of them.
+    // A source panel has one rectangle beside its rail list, and the detail half of a master/detail browse
+    // already claims it. Declaring both would parse and then draw one of them.
     expect(messages(manifest({
       frames: [PROJECT_PANE],
       routes: [PROJECT_ROUTE],
@@ -411,9 +412,9 @@ describe('chrome descriptors', () => {
     expect(source({ message: 'No linked projects yet.' }).success).toBe(true)
     expect(source({ message: 'Nothing to show.', action: { verb: 'openPane', pane: 'board' }, actionLabel: 'Open board' }).success).toBe(true)
 
-    // The two verbs an empty rail cannot carry, and the reason is the rail being EMPTY: `createTask`
-    // promotes a selected row and `navigate` substitutes a routed project into a surface path, and a
-    // state that renders in place of the list has neither.
+    // The two verbs an empty rail cannot carry, and the reason is the rail being empty: `createTask`
+    // promotes a selected row and `navigate` substitutes a routed project into a surface path, and a state
+    // that renders in place of the list has neither.
     expect(source({ message: 'x', action: { verb: 'createTask' } }).success).toBe(false)
     expect(source({ message: 'x', action: { verb: 'navigate', surface: 'board' } }).success).toBe(false)
     // The same route confinement every action gets, and the same url policy.
@@ -436,7 +437,7 @@ describe('chrome descriptors', () => {
     expect(good.success).toBe(true)
     expect(good.success && good.data.contributions.refResolvers[0]?.resolve).toBe('/v2/p/board/refs')
 
-    // The escape that matters here is naming ANOTHER plugin's resolver: the host POSTs identifiers to
+    // The escape that matters here is naming another plugin's resolver: the host POSTs identifiers to
     // whatever this says and stamps the answer with the declaring plugin's provider, so an unconfined
     // route is how a plugin would publish someone else's items under its own name.
     expect(messages(manifest({
@@ -477,12 +478,12 @@ describe('chrome descriptors', () => {
     expect(good.success).toBe(true)
     expect(good.success && good.data.contributions.collections[0]?.schema?.fields).toHaveLength(2)
 
-    // A collection with no static schema is the query-shaped case: its columns cannot be known at
-    // manifest time, so the response describes itself instead.
+    // A collection with no static schema is the query-shaped case: its columns cannot be known at manifest
+    // time, so the response describes itself instead.
     expect(manifest({ collections: [{ id: 'q', name: 'Query', items: '/v2/p/board/collections/q' }] }).success).toBe(true)
 
     // The route is the whole reason confinement exists here: the host fetches it and stamps the answer
-    // with THIS plugin's id, so an unconfined one is how a plugin would put another's rows on a board
+    // with this plugin's id, so an unconfined one is how a plugin would put another's rows on a board
     // under its own badge.
     expect(messages(manifest({
       collections: [{ id: 'c', name: 'C', items: '/v2/p/linear/collections/issues-mine' }],
@@ -509,7 +510,7 @@ describe('chrome descriptors', () => {
     })
     expect(good.success && good.data.contributions.schedules[0]?.cadence).toEqual({ every: 600 })
 
-    // The whole grammar, reused rather than re-declared — a schedule says when in the same three forms
+    // The whole grammar, reused rather than re-declared: a schedule says when in the same three forms
     // core's own do.
     expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { daily: '03:30' } }] }).success).toBe(true)
     expect(nodeManifest({ schedules: [{ id: 's', name: 'S', run: '/v2/p/board/s', cadence: { weekly: { day: 1, at: '09:00' } } }] }).success).toBe(true)
@@ -551,8 +552,8 @@ describe('chrome descriptors', () => {
     // `apply` is optional: a check that only warns is a real mode, not a degenerate one.
     expect(nodeManifest({ taskChecks: [{ id: 'c', check: '/v2/p/board/c' }] }).success).toBe(true)
 
-    // Both halves are confined, and neither may be another plugin's or core's — a check is a route the
-    // HOST calls, so an unconfined one would be a way to make the node read anything on archive.
+    // Both halves are confined, and neither may be another plugin's or core's: a check is a route the host
+    // calls, so an unconfined one would be a way to make the node read anything on archive.
     expect(messages(nodeManifest({
       taskChecks: [{ id: 'c', check: '/v2/p/linear/c' }],
     }))).toEqual(['route must be inside /v2/p/board/'])
@@ -609,9 +610,9 @@ describe('chrome descriptors', () => {
   })
 
   it('accepts a content link whose only destination is this plugin reference panel', () => {
-    // `openPane` is optional because a plugin can have items worth glancing at and no task pane at all. The
-    // panel is addressed by provider, and a refPanel's provider is already the plugin id, so declaring one is
-    // the whole declaration.
+    // `openPane` is optional because a plugin can have items worth glancing at and no task pane at all.
+    // The panel is addressed by provider, and a refPanel's provider is already the plugin id, so declaring
+    // one is the whole declaration.
     expect(manifest({
       frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', providerId: 'board' }],
       contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
@@ -657,7 +658,7 @@ describe('project-scoped surfaces and their routes', () => {
       .toContain('route must be inside /p/:projectId/x/board/')
     expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '/p/:projectId/x/board/../../settings' }] })))
       .toContain('route must be inside /p/:projectId/x/board/')
-    // Not a path at all, and a path leaving the origin, both report the same confinement failure.
+    // Not a path at all, and a path leaving the origin both report the same confinement failure.
     expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: 'cards/:key' }] })))
       .toContain('route must be inside /p/:projectId/x/board/')
     expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, path: '//evil.example/p/:projectId/x/board/cards/:key' }] })))
@@ -667,7 +668,7 @@ describe('project-scoped surfaces and their routes', () => {
   it('rejects a route naming a surface this manifest does not declare as project-scoped', () => {
     expect(messages(manifest({ routes: [PROJECT_ROUTE] })))
       .toContain(`route names 'board-card', which this manifest does not declare as a project-scoped pane`)
-    // A TASK pane is not addressable this way either: its selection lives in the task's layout, and the
+    // A task pane is not addressable this way either: its selection lives in the task's layout, and the
     // surface it would mount into does not exist outside one.
     expect(messages(manifest({
       frames: [PANE],
@@ -678,7 +679,7 @@ describe('project-scoped surfaces and their routes', () => {
   it('requires the addressed item to be a parameter of the path, and never projectId', () => {
     expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, item: 'identifier' }] })))
       .toContain(`route item 'identifier' must be a :param of its path other than projectId`)
-    // `projectId` IS a parameter of every such path, and it is the host's — bound before a plugin sees it.
+    // `projectId` is a parameter of every such path, and it is the host's, bound before a plugin sees it.
     expect(messages(manifest({ frames: [PROJECT_PANE], sources: [PROJECT_SOURCE], routes: [{ ...PROJECT_ROUTE, item: 'projectId' }] })))
       .toContain(`route item 'projectId' must be a :param of its path other than projectId`)
   })
@@ -795,9 +796,9 @@ describe('plugin commands and keybindings', () => {
 })
 
 describe('themes', () => {
-  // The parse-time half of "a plugin theme cannot break the app" (docs/ui-design.md § Appearance).
-  // The client re-checks all of it before generating CSS, because a roster row is bytes a node sent —
-  // but this is where an AUTHOR finds out, so each rule is pinned at the door it is enforced at.
+  // The parse-time half of "a plugin theme cannot break the app" (docs/ui-design.md § Appearance). The
+  // client re-checks all of it before generating CSS, because a roster row is bytes a node sent, but this
+  // is where an author finds out, so each rule is pinned at the door it is enforced at.
   const palette = Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [name, '#123456']))
   const theme = (over: Record<string, unknown> = {}) => ({ id: 'nightfall', label: 'Nightfall', tokens: palette, ...over })
 
@@ -814,9 +815,9 @@ describe('themes', () => {
   })
 
   it('refuses unknown, derived, self-description and cross-axis token names', () => {
-    // Derived tokens are `var()` references declared once on :root; the self-description three are
-    // written by the host from `dark`; `--radius` belongs to the other axis entirely. All four kinds
-    // of overreach are the same refusal, because the map is a strict object over one closed list.
+    // Derived tokens are `var()` references declared once on :root; the self-description three are written
+    // by the host from `dark`; `--radius` belongs to the other axis entirely. All four kinds of overreach
+    // are the same refusal, because the map is a strict object over one closed list.
     for (const name of ['--made-up', '--danger', '--surface-sunken', '--is-dark', '--syntax-fg', '--radius']) {
       expect(manifest({ themes: [theme({ tokens: { ...palette, [name]: '#fff' } })] }).success, name).toBe(false)
     }
@@ -855,9 +856,9 @@ describe('slots', () => {
   })
 
   it('refuses every client slot id that is not one of them', () => {
-    // Each of these is a real member of the client's own slot union, and each is refused for its own
-    // reason (@acorn/protocol/pluginContract.ts § slotDescriptor). A parse error is the point: a
-    // manifest naming one would otherwise install and never appear.
+    // Each of these is a real member of the client's own slot union, and each is refused for its own reason
+    // (@acorn/protocol/pluginContract.ts, slotDescriptor). A parse error is the point: a manifest naming
+    // one would otherwise install and never appear.
     for (const name of ['overlay', 'drawer', 'topbar.left', 'topbar.right', 'task.footer', 'tabrail.task-row']) {
       expect(manifest({ slots: [slot({ slot: name })] }).success, name).toBe(false)
     }
@@ -873,8 +874,8 @@ describe('slots', () => {
 
 describe('context menus', () => {
   // The declarative right-click contribution. Two things are worth pinning at this door: the closed
-  // location vocabulary, and that a `when` may only name facts the location actually supplies —
-  // because a predicate that can never match is a contribution that installs and does nothing.
+  // location vocabulary, and that a `when` may only name facts the location actually supplies, because a
+  // predicate that can never match is a contribution that installs and does nothing.
   const menu = (over: Record<string, unknown> = {}) => ({
     id: 'open-card',
     location: 'task.row',
@@ -899,16 +900,16 @@ describe('context menus', () => {
     expect(manifest({ contextMenus: [menu({ when: { origin: 'github', pinned: true, projectId: 'p1' } })] }).success).toBe(true)
     expect(messages(manifest({ contextMenus: [menu({ when: { branch: 'main' } })] })))
       .toContain("'task.row' has no fact named 'branch'")
-    // The identity fields are on the target and still not facts: a menu row keyed to one task id is
-    // not an extension point.
+    // The identity fields are on the target and still not facts: a menu row keyed to one task id is not an
+    // extension point.
     expect(messages(manifest({ contextMenus: [menu({ when: { id: 't1' } })] })))
       .toContain("'task.row' has no fact named 'id'")
   })
 
   it('takes the context-free verb set only, and confines its route', () => {
-    // The two verbs missing from this union need something a right-clicked CORE row cannot supply:
-    // `createTask` the host's promotion callback over a rail item, `navigate` a project-scoped surface
-    // of this plugin's own.
+    // The two verbs missing from this union need something a right-clicked core row cannot supply:
+    // `createTask` the host's promotion callback over a rail item, `navigate` a project-scoped surface of
+    // this plugin's own.
     expect(manifest({ contextMenus: [menu({ action: { verb: 'createTask' } })] }).success).toBe(false)
     expect(manifest({ contextMenus: [menu({ action: { verb: 'navigate', surface: 'board' } })] }).success).toBe(false)
     expect(manifest({ contextMenus: [menu({ action: { verb: 'teleport' } })] }).success).toBe(false)
@@ -927,10 +928,10 @@ describe('context menus', () => {
 
 // ── Cooperative cross-plugin extension, and the exclusive slot ─────────────────────────────────────
 //
-// Two manifest keys and one frame target, and every rule below turns the same failure into a parse
-// error: a declaration that installs, looks fine, and can never do anything. That failure is worse than
-// a rejection here because it looks like it worked — and with two manifests involved it would be
-// debugged from the WRONG one, since the author of the guest sees nothing but an empty strip.
+// Two manifest keys and one frame target, and every rule below turns the same failure into a parse error:
+// a declaration that installs, looks fine, and can never do anything. That failure is worse than a
+// rejection here because it looks like it worked, and with two manifests involved it would be debugged
+// from the wrong one, since the author of the guest sees nothing but an empty strip.
 
 describe('extension points', () => {
   const point = (over: Record<string, unknown> = {}) =>
@@ -962,14 +963,14 @@ describe('extension points', () => {
     }))).toContain("'board' already has an extension point at 'pane.footer'")
   })
 
-  // ── The aside: a region the USER fills (docs/dashboards.md § Placements) ────────────────────
+  // ── The aside: a region the user fills (docs/dashboards.md § Placements) ────────────────────
 
   it('accepts an aside beside the same pane that has a footer, and defaults its allowances', () => {
     const parsed = manifest({
       frames: [PANE],
       extensionPoints: [point(), point({ id: 'panels', location: 'pane.aside' })],
     })
-    // Two locations, two contributors — so the one-per-(surface, location) rule leaves room for both.
+    // Two locations, two contributors, so the one-per-(surface, location) rule leaves room for both.
     expect(parsed.success && parsed.data.contributions.extensionPoints[1]!.panels).toBeUndefined()
     const declared = manifest({
       frames: [PANE],
@@ -1009,7 +1010,7 @@ describe('extensions', () => {
   })
 
   it('refuses a point reference that is not one', () => {
-    // An unqualified name can never resolve — a point's public id is minted by the host from the OWNER's
+    // An unqualified name can never resolve. A point's public id is minted by the host from the owner's
     // plugin id, so a contribution that does not name the owner is naming nothing.
     for (const point of ['card-links', 'tracker:', ':card-links', 'Tracker:Card-Links', 'a:b:c']) {
       expect(manifest({ extensions: [extension({ point })] }).success, point).toBe(false)
@@ -1026,7 +1027,7 @@ describe('extensions', () => {
   })
 
   it('takes the context-free verb set only, checked against this manifest’s own surfaces', () => {
-    // The click site is inside ANOTHER plugin's pane: there is no rail row to promote and no project of
+    // The click site is inside another plugin's pane: there is no rail row to promote and no project of
     // this plugin's to navigate within.
     expect(manifest({ extensions: [extension({ onSelect: { verb: 'createTask' } })] }).success).toBe(false)
     expect(messages(manifest({ extensions: [extension({ onSelect: { verb: 'openPane', pane: 'ghost' } })] })))
@@ -1064,7 +1065,7 @@ describe('the exclusive slot', () => {
   })
 
   it('needs a client bundle, because the host mounts one here', () => {
-    // Without one there is nothing to draw in core's place — and the trust queue holds BUNDLES, so a
+    // Without one there is nothing to draw in core's place, and the trust queue holds bundles, so a
     // bundle-less package offering to replace a core surface would never reach the prompt disclosing it.
     expect(messages(manifest({ frames: [coreSlot()] })))
       .toContain('a coreSlot surface needs a client bundle; declare `client` in the manifest')
@@ -1076,8 +1077,8 @@ describe('the exclusive slot', () => {
   })
 
   it('is not a pane, so no verb can name it', () => {
-    // `openPane` opens into a task's layout and a core surface belongs to no task. A verb that could
-    // name one would be an offer that can only fail.
+    // `openPane` opens into a task's layout and a core surface belongs to no task. A verb that could name
+    // one would be an offer that can only fail.
     expect(withBundle({
       frames: [coreSlot()],
       commands: [{ id: 'go', title: 'Go', action: { verb: 'openPane', pane: 'board-rail' } }],
