@@ -51,8 +51,8 @@ describe('eligiblePlugins', () => {
 
   it('never marks a package with no client half as trusted, but withholds nothing from it', () => {
     // Two answers, not one, and collapsing them is what let a bundle-less manifest mount a webview.
-    // `trusted` is "may this device EXECUTE this plugin's code", and the answer for a package with no
-    // code is no — a webview surface is not host-drawn, so `trusted: true` here would mount external
+    // `trusted` is "may this device execute this plugin's code", and the answer for a package with no
+    // code is no. A webview surface is not host-drawn, so `trusted: true` here would mount external
     // web content behind a prompt that can never fire (the trust queue only holds bundles).
     // `hasWithheldCode` is the weaker question the chrome pass asks, and the answer there is also no:
     // there are no bytes being withheld, so its descriptors must still contribute.
@@ -75,7 +75,7 @@ describe('eligiblePlugins', () => {
 
   it('does not let a stale acceptance clear a bundle that lost resolution', () => {
     // The apiVersion bump case. resolveBundles drops a candidate this shell cannot speak, so there is
-    // no runnable bundle — but the roster row still carries its `client.hash`, and an acceptance
+    // no runnable bundle, but the roster row still carries its `client.hash`, and an acceptance
     // recorded against those bytes in an older shell is still on file. Falling back to the row's own
     // claimed hash would mark it trusted and mount a bundle that was never re-fetched.
     _seedPluginDistribution(
@@ -90,7 +90,7 @@ describe('eligiblePlugins', () => {
 
   it('takes manifest, hash and trust from the row whose bundle won resolution', () => {
     // A mixed-version fleet. Node A offers v1 first and node B's v2 wins resolution, so the manifest
-    // registered has to be v2's — taking v1's contributions while trusting v2's bytes means drawing
+    // registered has to be v2's: taking v1's contributions while trusting v2's bytes means drawing
     // surfaces declared by bytes nobody accepted.
     _seedPluginDistribution(
       [
@@ -136,7 +136,7 @@ describe('eligiblePlugins', () => {
   it('withdraws trust when a reload moves the winning hash to bytes nobody accepted', () => {
     // The reload path re-pins `activeBundles` when the node says its plugin set changed
     // (plugins/reload.ts), and this is the reason that cannot be a silent activation: consent was given
-    // to a HASH, so the new bundle arrives untrusted and its code-bearing surfaces are withheld until
+    // to a hash, so the new bundle arrives untrusted and its code-bearing surfaces are withheld until
     // the owner answers the prompt the distribution pass queues for it.
     _seedPluginDistribution([['node-a', [row('board', { client: { hash: HASH, bytes: 12 } })]]], [`board ${HASH}`])
     expect(eligiblePlugins()[0]).toMatchObject({ trusted: true })
@@ -150,7 +150,7 @@ describe('eligiblePlugins', () => {
   it('is the same answer for a dev grant: an acceptance is an acceptance, and losing it withholds code', () => {
     // The dev grant does not change eligibility, and that is the design (docs/security.md § The dev
     // grant). It writes an ordinary accepted acknowledgement in main as the bytes land, so the new hash
-    // arrives here already trusted and no prompt is queued for it — and ending dev mode DELETES those
+    // arrives here already trusted and no prompt is queued for it, and ending dev mode deletes those
     // acknowledgements, which is what makes "revoke" mean something on this side of the seam.
     _seedPluginDistribution([['node-a', [row('board', { client: { hash: HASH_B, bytes: 12 } })]]], [`board ${HASH_B}`])
     expect(eligiblePlugins()[0]).toMatchObject({ hash: HASH_B, trusted: true })
@@ -164,7 +164,7 @@ describe('eligiblePlugins', () => {
 })
 
 describe('isTaskPane', () => {
-  // The `openPane` allowlist — which pane ids a sandboxed frame may ask the host to open — is built
+  // The `openPane` allowlist (which pane ids a sandboxed frame may ask the host to open) is built
   // from this predicate on both sides of the frames/chrome split. It was copy-paste until now.
   it('counts task panes and webviews, and nothing else', () => {
     expect(isTaskPane({ target: 'pane' })).toBe(true)

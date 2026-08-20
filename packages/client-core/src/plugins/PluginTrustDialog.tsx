@@ -11,14 +11,14 @@ import { Alert, Badge, Button, Kbd } from '../ui/primitives'
 // (docs/plugins.md).
 //
 // Modelled on ConfigTrustDialog: same overlay slot, same alertdialog semantics, same "not now"
-// escape. The difference is scope. Config trust binds a project to the hash of a config the NODE will
-// execute; this binds a plugin to the hash of a bundle THIS DEVICE will execute, which is why the
+// escape. The difference is scope. Config trust binds a project to the hash of a config the node will
+// execute; this binds a plugin to the hash of a bundle this device will execute, which is why the
 // acknowledgement lives beside the device token rather than in the node's database and why pairing a
 // new laptop asks again.
 //
 // Three groups, and the split between them is the whole point (docs/security.md § Design rules,
 // rule 6). `Enforced` is a fence: the UI bridge refuses anything undeclared. `Declared` is a
-// disclosure and nothing more — that code shares the node's process and can ignore its manifest
+// disclosure and nothing more: that code shares the node's process and can ignore its manifest
 // entirely. `Web pages` is enforced by Electron but reaches the live internet, so it is neither of
 // the other two. The vocabulary is defined once in the legend rather than being spelled out on every
 // heading, and the groups may never be rendered as one list: a strong claim must not lend
@@ -58,9 +58,9 @@ export default function PluginTrustDialog() {
   }
 
   let dialog!: HTMLElement
-  // Escape is "not now", and it records NOTHING. It used to call decide('rejected'), which is a
+  // Escape is "not now", and it records nothing. It used to call decide('rejected'), which is a
   // remembered answer (main/pluginTrustStore.ts: a rejection is kept so a turned-away plugin does not
-  // ask every boot) — so a stray keypress permanently disabled a plugin, with no surface anywhere to
+  // ask every boot), so a stray keypress permanently disabled a plugin, with no surface anywhere to
   // undo it. Dropping the queue entry leaves the bundle undecided, which is what brings it back at the
   // next boot pass, and is what the footer promises.
   const dismiss = createDismissable({
@@ -79,7 +79,7 @@ export default function PluginTrustDialog() {
             ref={(el) => {
               dialog = el
               // This prompt appears on its own at the end of a boot pass rather than from a click, so
-              // nothing has moved focus into it — and Escape is handled ON this element, as is the Tab
+              // nothing has moved focus into it, and Escape is handled on this element, as is the Tab
               // trap. Without this the footer's promise is simply false and Tab walks the page behind.
               // Bare `autofocus` is unreliable under Solid; queueMicrotask is the pattern that holds.
               queueMicrotask(() => el.focus())
@@ -164,13 +164,9 @@ export default function PluginTrustDialog() {
                 </Show>
               </Show>
 
-              {/* The vocabulary, once. `Declared` is the honest half and says so here rather than in a
-                  heading nobody reads twice (docs/security.md § Node-half plugin security).
-
-                  The second sentence on that line is canonical and must not be softened or dropped:
-                  it is the whole truth about the list above, and the one thing standing between an
-                  owner and a plugin that reads ~/.ssh. It is drawn at full contrast for the same
-                  reason — the strongest statement in this dialog must not also be its faintest. */}
+              {/* The vocabulary, once. `Declared`'s second sentence is the canonical wording
+                  docs/security.md § Node-half plugin security requires: it must not be softened,
+                  dropped, or drawn as fine print. */}
               <p class="muted plugin-trust-legend">
                 <Show when={has('enforced')}>
                   <span><strong>Enforced</strong> — acorn checks these; its interface runs in a sandbox and anything not listed is refused.</span>
