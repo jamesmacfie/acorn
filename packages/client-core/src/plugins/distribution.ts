@@ -7,17 +7,12 @@ import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './h
 import { resolveActiveBundles, type ActiveBundle, type BundleCandidate } from './resolveBundles'
 
 // Getting third-party plugin bundles from every node in the fleet onto this device, and asking the
-// owner about each one before anything runs it (docs/plugins.md).
+// owner about each one before anything runs it (docs/plugins.md § Loaded plugins: the client half;
+// docs/security.md § Third-party plugin bundles for the trust model).
 //
-// Three pieces of state, all fleet-wide rather than active-node-scoped:
-//
-//   installedByNode  which plugins each node carries. Distinct from node/nodePlugins.ts, which holds
-//                    the ACTIVE node's roster and is cleared on every node switch — presence has to
-//                    survive a switch, because a pane rendered against node B still needs to know
-//                    node A has the plugin.
-//   pendingTrust     the queue the dialog drains. One entry per (plugin, bundle) this device has
-//                    never decided about.
-//   activeBundles    which single bundle wins per plugin id, snapshotted ONCE (see below).
+// Three fleet-wide signals: `installedByNode` (each node's roster, unlike node/nodePlugins.ts which
+// tracks only the active node and clears on switch), `pendingTrust` (the queue the dialog drains), and
+// `activeBundles` (which single bundle wins per plugin id, pinned once per session; see below).
 //
 // Nothing here loads or executes a bundle: phase 3 does that. What this file guarantees is that by
 // the time it can, the bytes are cached, the hash was computed locally, and the owner has said yes.
@@ -44,8 +39,7 @@ export function noteBundleAccepted(pluginId: string, hash: string): void {
 }
 
 // What the trust dialog renders. `previous` is the last bundle of this plugin the owner accepted,
-// present only when this is an update — it is what turns "do you trust this?" into "here is what
-// changed".
+// present only when this is an update: it turns "do you trust this?" into "here is what changed".
 export type PluginTrustRequest = {
   row: NodePluginRow
   hash: string
@@ -53,8 +47,8 @@ export type PluginTrustRequest = {
   previous?: PluginAckRecord
 }
 
-// The predicate phases 3 and 4 gate their surfaces on: does THIS node run this plugin? Deliberately
-// per-node and never ambient — a plugin enabled on the node you are looking at says nothing about the
+// The predicate phases 3 and 4 gate their surfaces on: does this node run this plugin? Deliberately
+// per-node and never ambient. A plugin enabled on the node you are looking at says nothing about the
 // node whose pane is open beside it. Sits alongside the `providerId` gate in tabs/sources.ts, which
 // answers the same shape of question for integrations.
 export const pluginEnabledOnNode = (nodeId: string, pluginId: string): boolean =>
@@ -82,7 +76,7 @@ const candidatesFrom = (rosters: ReadonlyMap<string, readonly NodePluginRow[]>):
   )
 
 // Read one node's roster. A node that does not answer contributes nothing rather than clearing what
-// we already knew about it: the same stance node/nodePlugins.ts takes, for the same reason — an
+// we already knew about it, the same stance node/nodePlugins.ts takes for the same reason: an
 // offline node is not a node with no plugins.
 const rosterFor = async (nodeId: string): Promise<readonly NodePluginRow[] | null> => {
   try {
@@ -96,8 +90,8 @@ const rosterFor = async (nodeId: string): Promise<readonly NodePluginRow[] | nul
 // The boot pass: ask every node what it carries, cache anything new, and queue whatever this device
 // has never decided about.
 //
-// Fire-and-forget from the composition root. It must never be able to fail a boot — a fleet where
-// every node is offline, or a build with no plugin host at all, simply ends with nothing pending.
+// Fire-and-forget from the composition root. It must never fail a boot: a fleet where every node is
+// offline, or a build with no plugin host at all, simply ends with nothing pending.
 export async function syncPluginDistribution(options: { repin?: boolean } = {}): Promise<void> {
   if (!pluginHostAvailable()) return
 
@@ -111,8 +105,8 @@ export async function syncPluginDistribution(options: { repin?: boolean } = {}):
   setInstalledByNode(rosters)
 
   // Fetch first, decide second. The hash the owner is asked about has to be one this device computed
-  // from bytes it holds, not one a node asserted — so a bundle is cached before it is ever named in a
-  // prompt, and a node that lies about its hash is refused here rather than at the dialog.
+  // from bytes it holds, not one a node asserted, so a bundle is cached before it is ever named in a
+  // prompt and a node that lies about its hash is refused here rather than at the dialog.
   const cached = new Set(Object.keys((await readPluginHostState()).cached))
   for (const [nodeId, rows] of rosters) {
     for (const row of rows) {
@@ -124,14 +118,10 @@ export async function syncPluginDistribution(options: { repin?: boolean } = {}):
     }
   }
 
-  // Chosen once per session and never recomputed. A better candidate appearing later — a node coming
-  // online with a newer version — applies at the next boot: re-initialising a plugin's UI underneath
-  // panes the user has open is churn with no payoff, and contribution ids are persisted layout keys.
-  //
-  // `repin` is the one exception, and only the node's own "plugins changed" event asks for it
-  // (plugins/reload.ts): a reload replaced the BYTES behind a plugin id, so the pinned winner names a
-  // bundle the node no longer offers. That is the churn being paid for deliberately rather than the churn
-  // the pin exists to avoid.
+  // Chosen once per session and never recomputed (docs/plugins.md § The dev loop describes the one
+  // place this pin is deliberately dropped). `repin` is that exception: only the node's own
+  // "plugins changed" event asks for it (plugins/reload.ts), because a reload replaces the bytes
+  // behind a plugin id and the pinned winner would otherwise name a bundle the node no longer offers.
   if (options.repin || !activeBundles()) {
     setActiveBundles(resolveActiveBundles(candidatesFrom(rosters), { apiVersion: PLUGIN_API_MAJOR }))
   }
@@ -160,7 +150,7 @@ async function refreshPendingTrust(rosters: ReadonlyMap<string, readonly NodePlu
       queued.add(key)
       // `partial` rows are skipped: their snapshot is known-incomplete, so a diff against one would
       // mark grants as newly requested that the owner had in fact already accepted. With no baseline
-      // the prompt degrades to a plain first-time decision, which is honest — it says "here is what
+      // the prompt degrades to a plain first-time decision, which is honest: it says "here is what
       // this asks for" rather than a wrong "here is what it gained".
       const previous = acks
         .filter((ack) => ack.pluginId === row.name && ack.hash !== client.hash && ack.decision === 'accepted' && !ack.partial)
@@ -178,7 +168,7 @@ export function resolvePendingTrust(pluginId: string, hash: string): void {
 }
 
 // Test seam. Standing in for a boot pass: `syncPluginDistribution` needs a plugin host, a fleet and a
-// broker, and the surfaces that read these signals — phase 3's frames, phase 4's chrome — are testable
+// broker, and the surfaces that read these signals (phase 3's frames, phase 4's chrome) are testable
 // without any of that.
 export function _seedPluginDistribution(
   rosters: Iterable<readonly [string, readonly NodePluginRow[]]>,
@@ -195,8 +185,8 @@ export function _seedPluginDistribution(
 }
 
 // Test seam, for the half of the boot pass above that `_seedPluginDistribution` does not stand in for:
-// the queue the trust dialog drains. What is worth asserting about an ANSWER is which entry it removes
-// and — when the host could not store it — that it removes none.
+// the queue the trust dialog drains. What is worth asserting about an answer is which entry it
+// removes, and, when the host could not store it, that it removes none.
 export function _seedPendingTrust(requests: readonly PluginTrustRequest[]): void {
   setPendingTrust(requests)
 }
