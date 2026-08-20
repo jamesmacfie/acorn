@@ -46,6 +46,7 @@ Core owns data shared by multiple features:
 | External item projection | `issues`, `issue_resources`, provider `sync_state` markers |
 | Node preferences | `prefs` |
 | Schedules | `schedule_state`, `user_schedules`, `schedule_runs` |
+| Dashboard measure history | `dashboard_measure_samples` |
 
 Core table definitions are in `packages/node-core/src/server/db/schema.ts`. `devices` stores only
 token hashes. `integrations` stores encrypted provider credentials plus non-secret provider metadata.
@@ -53,6 +54,13 @@ token hashes. `integrations` stores encrypted provider credentials plus non-secr
 three schedule tables split state from definition by owner: a schedule declared by core or a plugin
 keeps its definition in the registry and only its overrides and run state in `schedule_state`, while a
 user-created one is a full row in `user_schedules` (`docs/schedules.md`).
+
+`dashboard_measure_samples` is its own table rather than a row in the `core.dashboards` prefs slice,
+for three reasons. The slice has a 64 KB cap and this is an unbounded-ish time series; every sample
+would rewrite and re-sync the whole blob; and an old client round-trips a slice by writing back what
+it parsed, which would make any old client a history-eraser. History is data with a retention policy,
+not a preference. One sample per hour bucket per panel, machine-scoped like every other newer
+app-state table; the sampler is `core:sample-measures` (`docs/dashboards.md § Trends`).
 
 ## Plugin databases
 

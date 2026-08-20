@@ -11,12 +11,12 @@ export const syncState = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.resource] })],
 )
 
-// --- App-state tables: data GitHub doesn't have, we are the source of truth ---
+// ── App-state tables: data GitHub does not have, so acorn is the source of truth ────────────────
 //
-// user_id on prefs is the SINGLE canonical user id: the node's opaque owner id, minted at boot
+// `user_id` on `prefs` is the single canonical user id: the node's opaque owner id, minted at boot
 // (main/core/identity/identity.ts). Installs that predate boot-minting carry their old GitHub login as
-// the value — same column, same semantics, never rewritten. Single-user app, so the column isn't
-// multi-tenancy. Newer app-state tables (tasks, projects, …) are machine-scoped and drop it.
+// the value, same column, same semantics, never rewritten. Single-user app, so the column is not
+// multi-tenancy. Newer app-state tables (tasks, projects, and so on) are machine-scoped and drop it.
 
 export const prefs = sqliteTable(
   'prefs',
@@ -28,11 +28,11 @@ export const prefs = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.key] })],
 )
 
-// Per-user third-party credentials. First-class, MULTI-ROW per provider (docs/workspaces-and-tasks.md): a
-// user can connect several Linears / Rollbars, so the key is an opaque `id`, not (userId, provider).
-// `label` disambiguates them in the UI ("Linear – work"). authRef is ENCRYPTED at rest (JWE via
-// SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server — same posture as the
-// GitHub token. GitHub also *appears* as a synthesized entry in the list endpoint.
+// Per-user third-party credentials. First-class, multi-row per provider (docs/workspaces-and-tasks.md):
+// a user can connect several Linears or Rollbars, so the key is an opaque `id`, not (userId, provider).
+// `label` disambiguates them in the UI ("Linear – work"). `authRef` is encrypted at rest (JWE via
+// SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server, the same posture as the
+// GitHub token. GitHub also appears as a synthesized entry in the list endpoint.
 export const integrations = sqliteTable('integrations', {
   id: text('id').primaryKey(), // opaque uuid
   userId: text('user_id').notNull(),
@@ -51,10 +51,10 @@ export const integrations = sqliteTable('integrations', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-// Machine-scoped acknowledgement of project-authored executable configuration. The hash identifies
-// the exact committed config snapshot; retaining that snapshot lets the next prompt show a diff.
-// Multiple hashes are kept as a small audit trail and make changing back to a previously approved
-// config trusted without another prompt.
+// Machine-scoped acknowledgement of project-authored executable configuration. The hash identifies the
+// exact committed config snapshot; retaining that snapshot lets the next prompt show a diff. Multiple
+// hashes are kept as a small audit trail and make changing back to a previously approved config trusted
+// without another prompt.
 export const configAcks = sqliteTable(
   'config_acks',
   {
@@ -80,10 +80,10 @@ export const workspaces = sqliteTable('workspaces', {
 
 // A project: a folder on this machine a workspace groups and tasks run in.
 //
-// The VCS and GitHub facets are nullable columns, not side tables — both are strictly 1:1 — and
-// they are a CACHE of disk truth: `vcs`/`remote_url`/`default_branch` are re-detected on demand,
-// never authoritative. `path` is null for a project imported from a remote (GitHub) that has not
-// been cloned or mapped to a folder yet. Machine-scoped, no user_id.
+// The VCS and GitHub facets are nullable columns, not side tables, because both are strictly 1:1, and
+// they are a cache of disk truth: `vcs`, `remote_url` and `default_branch` are re-detected on demand,
+// never authoritative. `path` is null for a project imported from a remote (GitHub) that has not been
+// cloned or mapped to a folder yet. Machine-scoped, no `user_id`.
 export const projects = sqliteTable(
   'projects',
   {
@@ -96,7 +96,7 @@ export const projects = sqliteTable(
     // VCS facet: 'git' when a .git entry was detected at `path`, null for a plain folder.
     vcs: text('vcs'),
     defaultBranch: text('default_branch'), // cached from origin/HEAD or the GitHub API; null when unknown
-    // GitHub facet: parsed from the origin remote and/or stamped by the GitHub import flow.
+    // GitHub facet: parsed from the origin remote and, or stamped by the GitHub import flow.
     remoteUrl: text('remote_url'),
     githubOwner: text('github_owner'),
     githubName: text('github_name'),
@@ -127,9 +127,10 @@ export const projects = sqliteTable(
   ],
 )
 
-// External projects (Linear/Rollbar/…) linked to a workspace. One workspace can link many local projects
-// workspace grouping. `integrationId` records which connection the project belongs to, so a workspace
-// can link projects across several integrations (docs/workspaces-and-tasks.md).
+// External projects (Linear, Rollbar and so on) linked to a workspace. One workspace can link many
+// local projects into one workspace grouping. `integrationId` records which connection the project
+// belongs to, so a workspace can link projects across several integrations
+// (docs/workspaces-and-tasks.md).
 export const workspaceExternalProjects = sqliteTable(
   'workspace_external_projects',
   {
@@ -141,9 +142,9 @@ export const workspaceExternalProjects = sqliteTable(
   (t) => [primaryKey({ columns: [t.workspaceId, t.integrationId, t.externalId] })],
 )
 
-// A Task is the single-project unit of work (docs/workspaces-and-tasks.md): a project +
-// optional branch + optional worktree + optional linked PR + its panes/terminals. Shown as a row in the rail.
-// `project_id` is the authoritative owner.
+// A task is the single-project unit of work (docs/workspaces-and-tasks.md): a project, an optional
+// branch, an optional worktree, an optional linked PR, and its panes and terminals. Shown as a row in
+// the rail. `project_id` is the authoritative owner.
 export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(), // opaque uuid
   title: text('title').notNull(), // editable label; seeded from origin (PR title, ticket, …)
@@ -161,10 +162,10 @@ export const tasks = sqliteTable('tasks', {
   archivedAt: integer('archived_at'), // set on archive; row kept for history/teardown audit
 })
 
-// Zero-or-more external items a task references (Linear tickets, Rollbar errors). `integrationId`
-// pins the item to a specific connection (two Linears could each have an `ENG-42`); `provider` is
-// kept denormalized for cheap filtering. (integrationId, identifier) matches the PK tail of `issues`,
-// so a link resolves straight to cached detail.
+// Zero or more external items a task references (Linear tickets, Rollbar errors). `integrationId` pins
+// the item to a specific connection, since two Linears could each have an `ENG-42`; `provider` is kept
+// denormalized for cheap filtering. (integrationId, identifier) matches the PK tail of `issues`, so a
+// link resolves straight to cached detail.
 export const taskLinks = sqliteTable(
   'task_links',
   {
@@ -193,8 +194,8 @@ export const issues = sqliteTable(
 
 // Provider-owned child resources for an external issue. A Rollbar item, for example, has an
 // independently-fresh occurrence list and individually-fetched occurrence details. Keeping those
-// payloads out of `issues.data` prevents one large occurrence from evicting the item summary and
-// gives the provider-resource runtime a natural freshness row per lazy tab/read.
+// payloads out of `issues.data` prevents one large occurrence from evicting the item summary and gives
+// the provider-resource runtime a natural freshness row per lazy tab or read.
 export const issueResources = sqliteTable(
   'issue_resources',
   {
@@ -210,13 +211,13 @@ export const issueResources = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.issueIdentifier, t.resource, t.identifier] })],
 )
 
-// HTTP request and variable tables are owned by plugins/http (docs/data-layer.md § Plugin DBs).
+// HTTP request and variable tables are owned by plugins/http (docs/data-layer.md § Plugin databases).
 
-// --- Device identity: the node authentication root (docs/api-reference.md § Pairing) ---
-
-// One row per paired client. Every paired device has full owner authority — a disclosed product
-// decision (docs/security.md § Threat model), so there are no scopes and no per-device
-// authorization; the row exists to name a device and to be revocable.
+// ── Device identity: the node authentication root (docs/api-reference.md § Pairing) ───────────────
+//
+// One row per paired client. Every paired device has full owner authority, a disclosed product decision
+// (docs/security.md § Threat model), so there are no scopes and no per-device authorization. The row
+// exists to name a device and to be revocable.
 //
 // Only sha256(secret) is stored. A 256-bit random secret makes offline hash guessing infeasible, so
 // nothing reversible is layered on and the plaintext is returned exactly once, at pairing.
@@ -227,18 +228,18 @@ export const devices = sqliteTable(
     name: text('name').notNull(), // user-supplied ("James's laptop")
     secretHash: blob('secret_hash').notNull(), // sha256 of the token secret — never the secret
     createdAt: integer('created_at').notNull(),
-    // Best-effort telemetry for the device list, written at most once per throttle window and off
-    // the request path; a failed write must never fail authentication.
+    // Best-effort telemetry for the device list, written at most once per throttle window and off the
+    // request path. A failed write must never fail authentication.
     lastSeenAt: integer('last_seen_at'),
-    // Set once, never unset. Revocation is permanent: the row stays so the device list can show
-    // what was revoked and when, and so a replayed token can never be resurrected.
+    // Set once, never unset. Revocation is permanent: the row stays so the device list can show what was
+    // revoked and when, and so a replayed token can never be resurrected.
     revokedAt: integer('revoked_at'),
   },
   (t) => [index('devices_revoked_idx').on(t.revokedAt)],
 )
 
-// Idempotency replay (docs/api-reference.md § HTTP conventions). Stores (deviceId, key) → request
-// hash + response for 24h: the same request replays the stored response, a different request under
+// Idempotency replay (docs/api-reference.md § HTTP conventions). Stores (deviceId, key) to request hash
+// plus response for 24 hours: the same request replays the stored response, a different request under
 // the same key is a 409, and 5xx is never stored so a genuine retry re-executes.
 export const idempotency = sqliteTable(
   'idempotency',
@@ -254,21 +255,18 @@ export const idempotency = sqliteTable(
   (t) => [primaryKey({ columns: [t.deviceId, t.key] }), index('idempotency_expiry_idx').on(t.expiresAt)],
 )
 
-// --- Schedules: periodic work owned by the node (docs/schedules.md) ---
+// ── Schedules: periodic work owned by the node (docs/schedules.md) ───────────────────────────────
 //
-// Machine-scoped like every newer app-state table. State and DEFINITION split by owner, which is the
+// Machine-scoped like every newer app-state table. State and definition split by owner, which is the
 // whole shape of these three: a declared schedule (core, plugin) already has a home for its definition
 // with a lifecycle the host manages, so copying it into a row would mean reconciling two sources of
-// truth on every boot. Storing only state means the plugin's lifecycle IS the schedule's lifecycle for
+// truth on every boot. Storing only state means the plugin's lifecycle is the schedule's lifecycle for
 // free.
-
-// Run state + owner overrides for DECLARED schedules, whose definitions live in the registry rather
-// than here. A state row whose schedule is no longer registered is RETAINED UNREAD: disabling a plugin
-// must not delete the owner's pause or its run history, both of which should survive the plugin's return.
 //
-// One reserved key, '*', holds the global pause switch in `enabled_override` (0 = paused). A registry
-// key always carries a colon, so it can never collide — and a switch that stops the loop without
-// touching any schedule's row is the "something is wrong and I don't know what yet" lever.
+// Run state and owner overrides for declared schedules, whose definitions live in the registry rather
+// than here. A state row whose schedule is no longer registered is retained unread: disabling a plugin
+// must not delete the owner's pause or its run history, both of which should survive the plugin's
+// return. See docs/schedules.md for the reserved `'*'` global pause key.
 export const scheduleState = sqliteTable('schedule_state', {
   key: text('key').primaryKey(), // 'core:<id>' | '<pluginId>:<scheduleId>' | 'user:<uuid>' | '*'
   enabledOverride: integer('enabled_override'), // null = declared default; 0/1 = the owner's word wins
@@ -280,7 +278,7 @@ export const scheduleState = sqliteTable('schedule_state', {
   backoffUntil: integer('backoff_until'),
 })
 
-// USER-created schedules: full definitions, database-truth. `kind`/`target` parse tolerantly and an
+// User-created schedules: full definitions, database-truth. `kind` and `target` parse tolerantly and an
 // unknown kind survives inert (the settings list renders "this version cannot run it"), exactly like an
 // unknown panel view kind.
 export const userSchedules = sqliteTable('user_schedules', {
@@ -293,9 +291,8 @@ export const userSchedules = sqliteTable('user_schedules', {
   createdAt: integer('created_at').notNull(),
 })
 
-// Ring of recent runs per schedule: the observability floor, because a run that wrote nothing did not
-// happen. Capped at 20 per key on write (delete-oldest), so the table cannot grow unbounded and nobody
-// needs a vacuum job for the job-runner's own bookkeeping.
+// Ring of recent runs per schedule, the observability floor. See docs/schedules.md § Observability for
+// the retention rule.
 export const scheduleRuns = sqliteTable(
   'schedule_runs',
   {
@@ -308,36 +305,24 @@ export const scheduleRuns = sqliteTable(
   (t) => [primaryKey({ columns: [t.key, t.startedAt] })],
 )
 
-// --- Measure history: what a panel's number WAS (docs/dashboards.md § Trends) ---
+// ── Measure history: what a panel's number was (docs/dashboards.md § Trends) ─────────────────────
 //
-// The collections wire carries CURRENT ROWS ONLY. "6 open now" is derivable; "▲ 2 vs last week" is
-// not, and neither is a sparkline — there is no history anywhere in the system. Rather than growing
-// the plugin contract with a time-series obligation every provider would inherit forever (most
-// cannot answer it: GitHub does not serve "how many PRs were open last Tuesday"), the HOST records
-// what it already knows, on a schedule. Sampling is machinery over existing reads, invisible to
-// every plugin.
-//
-// Its OWN TABLE, not the `core.dashboards` prefs slice, for three reasons each sufficient: the slice
-// has a 64KB cap and this is unbounded-ish time series; every sample would rewrite and re-sync the
-// whole blob; and old clients round-trip slices by re-writing what they parsed, which would make any
-// old client a history-eraser. History is DATA WITH A RETENTION POLICY, not preferences.
-//
-// Machine-scoped like every newer app-state table. One sample per hour bucket per panel — the
-// primary key makes finer granularity unrepresentable rather than merely discouraged.
+// Why the host samples on a schedule rather than growing the plugin contract, and why this is its own
+// table rather than the `core.dashboards` prefs slice, are in docs/data-layer.md § Core database.
 export const dashboardMeasureSamples = sqliteTable(
   'dashboard_measure_samples',
   {
     panelId: text('panel_id').notNull(),
-    // A hash of the parts of the definition that change what the measure MEANS — queries, mapping,
+    // A hash of the parts of the definition that change what the measure means: queries, mapping,
     // filters, aggregate, field (@acorn/dashboards-core/signature.ts). A panel whose meaning changed
-    // must not keep its old trend: a filter added yesterday makes last week's samples a lie. The
-    // sampler computes it each pass and deletes the series when it differs, so drift is never
-    // papered over — the UI consequence is a trend that visibly restarts, which is honest.
+    // must not keep its old trend, since a filter added yesterday makes last week's samples a lie. The
+    // sampler computes it each pass and deletes the series when it differs, so drift is never papered
+    // over. The UI consequence is a trend that visibly restarts, which is honest.
     signature: text('signature').notNull(),
-    // UTC hour start, epoch ms.
+    // UTC hour start, epoch milliseconds.
     bucket: integer('bucket').notNull(),
     value: real('value').notNull(),
-    // When the node LOOKED. Deliberately not the value's age, which is the plugin mirror's and is
+    // When the node looked. Deliberately not the value's age, which is the plugin mirror's and is
     // recorded nowhere: sampling never forces revalidation, so a sample is "what this node knew".
     recordedAt: integer('recorded_at').notNull(),
   },
@@ -349,17 +334,17 @@ export const audit = sqliteTable(
   {
     id: text('id').primaryKey(), // uuid
     at: integer('at').notNull(),
-    // WHO: 'device' is a paired client (actorId is its device id), 'internal' is a child process this
+    // Who: 'device' is a paired client (actorId is its device id), 'internal' is a child process this
     // node spawned, 'system' is the node acting on its own behalf (boot-time decisions).
     actor: text('actor').notNull(),
     actorId: text('actor_id'),
-    // WHAT, as a dotted verb from a closed set (server/audit.ts's AuditAction). A closed set rather than
+    // What, as a dotted verb from a closed set (server/audit.ts's AuditAction). A closed set rather than
     // free text because the settings surface groups and filters on it, and because an action nobody can
     // enumerate is one nobody reviews.
     action: text('action').notNull(),
-    // WHICH THING: a device id, an `owner/repo`, a plugin name, a connection id. Deliberately one opaque
-    // string rather than a typed reference — the rows outlive what they point at, which is the whole
-    // point of keeping them after a delete.
+    // Which thing: a device id, an `owner/repo`, a plugin name, a connection id. Deliberately one opaque
+    // string rather than a typed reference, since the rows outlive what they point at, which is the
+    // whole point of keeping them after a delete.
     subject: text('subject'),
     details: text('details'),
   },
