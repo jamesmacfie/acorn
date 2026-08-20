@@ -1,18 +1,18 @@
-// `acorn-plugin.json` — the file at the root of an installed plugin package, and the only thing the
+// `acorn-plugin.json`, the file at the root of an installed plugin package and the only thing the
 // loader trusts about it (docs/plugins.md).
 //
-// The STRUCTURE is declared once, in @acorn/protocol/pluginContract.ts, because the client needs the
+// The structure is declared once, in @acorn/protocol/pluginContract.ts, because the client needs the
 // same shape to register contributions from a roster row and neither side may import the other. What
-// stays here is the half that is the node's alone: the cross-field rules below, which need `id` and
-// the frame list, and the reader that turns a directory into a manifest or into nothing.
+// stays here is the half that is the node's alone: the cross-field rules below, which need `id` and the
+// frame list, and the reader that turns a directory into a manifest or into nothing.
 //
-// It arrives from disk rather than from the wire, and it is still parsed with a module-level Zod
-// schema and `safeParse` (docs/architecture-overview.md § wire validation). Disk is a trust boundary
-// here for the same reason a request body is: the bytes were written by someone other than us, and
-// everything downstream — a route namespace, a SQLite filename, a set of CoreServices facets — is
-// bound from what this file says.
+// It arrives from disk rather than from the wire, and it is still parsed with a module-level Zod schema
+// and `safeParse` (docs/architecture-overview.md § Wire validation). Disk is a trust boundary here for
+// the same reason a request body is: the bytes were written by someone other than us, and everything
+// downstream, a route namespace, a SQLite filename, a set of CoreServices facets, is bound from what
+// this file says.
 //
-// The HOST binds every namespace from `id`. `plugin.name` inside the bundle is checked to match and
+// The host binds every namespace from `id`. `plugin.name` inside the bundle is checked to match and
 // otherwise ignored, so a bundle cannot mount itself under another plugin's prefix by lying.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -29,8 +29,8 @@ import {
 } from '@acorn/protocol/pluginContract.ts'
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The declarations
-// themselves live in @acorn/protocol: the node uses them to decide what to LOAD, the client to decide
-// which of a fleet's bundles it can RUN (client-core/plugins/resolveBundles.ts), and one compatibility
+// themselves live in @acorn/protocol: the node uses them to decide what to load, the client to decide
+// which of a fleet's bundles it can run (client-core/plugins/resolveBundles.ts), and one compatibility
 // contract cannot live on one side.
 export { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 export type {
@@ -49,41 +49,41 @@ export type {
   PluginTaskCheckDescriptor,
 } from '@acorn/protocol/pluginContract.ts'
 
-// Cross-field checks, which is why they are here and not on the fields: every one of them needs
-// either `id` or the frame list, and neither is visible from inside a nested schema.
+// Cross-field checks, which is why they are here and not on the fields: every one of them needs either
+// `id` or the frame list, and neither is visible from inside a nested schema.
 //
-// All three are the same idea the rest of the file already applies — THE HOST BINDS EVERY NAMESPACE
-// — moved to the one place a manifest can name things outside itself. A descriptor route is the
-// parse-time twin of the bridge's runtime confinement (client-core/plugins/frames/scopes.ts): a
-// plugin may address its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read
-// core routes, or another plugin's, on its behalf.
+// All three follow the rule the rest of the file already applies, that the host binds every namespace,
+// moved to the one place a manifest can name things outside itself. A descriptor route is the parse-time
+// twin of the bridge's runtime confinement (client-core/plugins/frames/scopes.ts): a plugin may address
+// its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read core routes, or another
+// plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
   const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
-  // The RENDERER twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
+  // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
   // client-core/registries/corePaths.ts, and node-core does not depend on the client.
   //
   // `x` is a reserved segment, and reserving it is what makes collision a parse error instead of a race.
-  // It cannot collide with core's `/p/:projectId` or `/p/:projectId/new`, nor with a compiled plugin's
-  // own pattern (github's `/p/:projectId/pulls`); and because exactly one bundle wins per plugin id, two
+  // It cannot collide with core's `/p/:projectId` or `/p/:projectId/new`, nor with a compiled plugin's own
+  // pattern (github's `/p/:projectId/pulls`), and because exactly one bundle wins per plugin id, two
   // loaded plugins cannot land on the same prefix either.
   const ownPath = `/p/:projectId/x/${manifest.id}/`
-  // Classified by the contract's own predicates, which the CLIENT also uses to build the runtime
-  // `openPane` allowlist (@acorn/protocol/pluginContract.ts). This used to be a third hand-spelling of
-  // the same rule, excused by a comment saying the node could not import the client's — true when the
-  // shape lived in two places, and false since the manifest became one declaration both sides read.
+  // Classified by the contract's own predicates, which the client also uses to build the runtime
+  // `openPane` allowlist (@acorn/protocol/pluginContract.ts). This used to be a third hand-spelling of the
+  // same rule, excused by a comment saying the node could not import the client's, true when the shape
+  // lived in two places and false since the manifest became one declaration both sides read.
   //
-  // It was also subtly the wrong rule: this spelled task panes `scope === 'task'` where the client
-  // spelled them `scope !== 'project'`. Identical here, because the schema has already applied the
-  // `'task'` default by the time a refinement runs — and different on the client, which reads the
-  // field off a roster row where an older node may never have set it.
+  // It was also subtly the wrong rule: this spelled task panes `scope === 'task'` where the client spelled
+  // them `scope !== 'project'`. Identical here, because the schema has already applied the `'task'`
+  // default by the time a refinement runs, and different on the client, which reads the field off a
+  // roster row where an older node may never have set it.
   const taskPanes = new Set(frames.filter(isTaskPaneSurface).map((frame) => frame.id))
   const projectPanes = new Set(frames.filter(isProjectPaneSurface).map((frame) => frame.id))
   const overlays = new Set(frames.filter(isOverlaySurface).map((frame) => frame.id))
-  // Panes with BOTH a host region and a frame region, which is the only place a surface action has to
-  // land. The degenerate `document` template is excluded on purpose: it draws no frame, so a command
-  // targeting it would parse and then post into nothing.
+  // Panes with both a host region and a frame region, which is the only place a surface action has to
+  // land. The degenerate `document` template is excluded: it draws no frame, so a command targeting it
+  // would parse and then post into nothing.
   const composedPanes = new Set(
     frames.filter((frame) => frame.target === 'pane' && frame.layout?.template === 'document-over-frame').map((frame) => frame.id),
   )
@@ -107,10 +107,10 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   const openedOverlays = new Set<string>()
 
   const action = (value: PluginChromeAction, at: (string | number)[]): void => {
-    // A pane the manifest did not declare is a manifest error, not a runtime surprise — and it cannot
-    // name another plugin's pane, because the host only ever registers panes this manifest declared.
+    // A pane the manifest did not declare is a manifest error, not a runtime surprise, and it cannot name
+    // another plugin's pane, because the host only ever registers panes this manifest declared.
     //
-    // TASK-scoped only, because that is what this verb does: it pushes a pane into a task's layout. A
+    // Task-scoped only, because that is what this verb does: it pushes a pane into a task's layout. A
     // project-scoped surface has `navigate`, and the two sets are disjoint, so neither verb can reach a
     // surface it would only fail on.
     if (value.verb === 'openPane' && !taskPanes.has(value.pane)) {
@@ -123,8 +123,8 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       if (overlays.has(value.overlay)) openedOverlays.add(value.overlay)
       else ctx.addIssue({ code: 'custom', path: [...at, 'overlay'], message: `openOverlay names '${value.overlay}', which this manifest does not declare as an overlay surface` })
     }
-    // The frame region is what receives it, so the degenerate template is not a candidate — and neither
-    // is a plain frame pane, which has no document to flush and no host chord to have resolved this.
+    // The frame region is what receives it, so the degenerate template is not a candidate, and neither is
+    // a plain frame pane, which has no document to flush and no host chord to have resolved this.
     if (value.verb === 'surfaceAction' && !composedPanes.has(value.surface)) {
       ctx.addIssue({
         code: 'custom',
@@ -135,8 +135,8 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     if (value.verb === 'runNodeAction') route(value.path, [...at, 'path'])
     // `openUrl` reaches the real browser. Anything but https is either a downgrade or a scheme handler,
     // and neither is a thing a descriptor gets to choose for the user. Shared with the frame bridge's
-    // `ui.openUrl` verb rather than restated, because a plugin asking the host to open a URL is one
-    // policy however it asks (@acorn/protocol/externalUrl.ts).
+    // `ui.openUrl` verb rather than restated, because a plugin asking the host to open a URL is one policy
+    // however it asks (@acorn/protocol/externalUrl.ts).
     if (value.verb === 'openUrl' && !isPluginOpenableUrl(value.url)) {
       ctx.addIssue({ code: 'custom', path: [...at, 'url'], message: 'openUrl must be https' })
     }
@@ -150,9 +150,9 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: [...at, 'scope'], message: 'only a pane surface can be project-scoped' })
     }
     if (frame.layout) {
-      // A template splits a PANE rectangle. A settings page, an importer, a reference panel and an
-      // overlay are all chrome the host already draws around a frame, and a webview's pixels are not
-      // the renderer's at all — none of them has a rectangle to split.
+      // A template splits a pane rectangle. A settings page, an importer, a reference panel and an
+      // overlay are all chrome the host already draws around a frame, and a webview's pixels are not the
+      // renderer's at all. None of them has a rectangle to split.
       if (frame.target !== 'pane') {
         ctx.addIssue({ code: 'custom', path: [...at, 'layout'], message: 'layout is only valid on a pane surface' })
       }
@@ -161,11 +161,11 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       if (frame.layout.document.completions) {
         route(frame.layout.document.completions.route, [...at, 'layout', 'document', 'completions', 'route'])
       }
-      // The degenerate template has no frame region, so this plugin's bundle draws nothing in this
-      // pane — there is no iframe to hold a chord and forward the rest. Declaring claims here would
-      // parse and then capture nothing, which is the failure this file spends its length refusing.
-      // The check is on the template rather than on `layout`, because `document-over-frame` DOES have
-      // a frame and its claims will be real.
+      // The degenerate template has no frame region, so this plugin's bundle draws nothing in this pane:
+      // there is no iframe to hold a chord and forward the rest. Declaring claims here would parse and
+      // then capture nothing, which is the failure this file spends its length refusing. The check is on
+      // the template rather than on `layout`, because `document-over-frame` does have a frame and its
+      // claims will be real.
       if (frame.layout.template === 'document' && frame.claimsKeys.length) {
         ctx.addIssue({
           code: 'custom',
@@ -186,15 +186,15 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     if (!frame.hosts?.length) {
       ctx.addIssue({ code: 'custom', path: [...at, 'hosts'], message: 'a webview must declare at least one host' })
     }
-    // A webview needs the package's client bundle: the host mounts it controller-only to drive the
-    // view (client-core/plugins/frames/PluginWebview.tsx), so without one the surface renders a view
-    // nothing steers.
+    // A webview needs the package's client bundle: the host mounts it controller-only to drive the view
+    // (client-core/plugins/frames/PluginWebview.tsx), so without one the surface renders a view nothing
+    // steers.
     //
     // It is also the only reason the owner is ever asked about the host grant. The trust queue holds
-    // BUNDLES, so a bundle-less package never reaches the prompt — and its declared `hosts` would then
-    // be a disclosure nobody was shown, for a surface displaying arbitrary web content. The device
-    // refuses to mount one either way (client-core/plugins/contributions.ts); refusing it here turns a
-    // pane that silently never appears into an error the author sees at install time.
+    // bundles, so a bundle-less package never reaches the prompt, and its declared `hosts` would then be a
+    // disclosure nobody was shown, for a surface displaying arbitrary web content. The device refuses to
+    // mount one either way (client-core/plugins/contributions.ts); refusing it here turns a pane that
+    // silently never appears into an error the author sees at install time.
     if (!manifest.client) {
       ctx.addIssue({ code: 'custom', path: at, message: 'a webview surface needs a client bundle; declare `client` in the manifest' })
     }
@@ -211,10 +211,10 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])
     if (entry.emptyState?.action) action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
-    // A source panel has ONE rectangle beside its rail list, and both of these want it: a `navigate`
-    // onSelect is the DETAIL half of a master/detail browse, and a reserved panel region is a dashboard
-    // in the same seat (docs/dashboards.md § Placements). Declaring both would parse and then draw
-    // one of them, which is the "installs and does nothing" failure this file exists to refuse.
+    // A source panel has one rectangle beside its rail list, and both of these want it: a `navigate`
+    // onSelect is the detail half of a master/detail browse, and a reserved panel region is a dashboard in
+    // the same seat (docs/dashboards.md § Placements). Declaring both would parse and then draw one of
+    // them, which is the "installs and does nothing" failure this file exists to refuse.
     if (entry.panels && entry.onSelect?.verb === 'navigate') {
       ctx.addIssue({
         code: 'custom',
@@ -227,8 +227,9 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.data, ['contributions', 'slots', i, 'data'])
     if (entry.onClick) action(entry.onClick, ['contributions', 'slots', i, 'onClick'])
   })
-  // The location and the `when` keys were checked on the descriptor itself (@acorn/protocol/contextMenus.ts);
-  // what is left is the verb, which needs the frame list only this refinement can see.
+  // The location and the `when` keys were checked on the descriptor itself
+  // (@acorn/protocol/contextMenus.ts); what is left is the verb, which needs the frame list only this
+  // refinement can see.
   contextMenus.forEach((entry, i) => action(entry.action, ['contributions', 'contextMenus', i, 'action']))
   palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
   commands.forEach((entry, i) => action(entry.action, ['contributions', 'commands', i, 'action']))
@@ -277,20 +278,20 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.check, [...at, 'check'])
     if (entry.apply !== undefined) route(entry.apply, [...at, 'apply'])
     // Verbatim the schedule rule above, and for the identical reason: only a node half serves
-    // `/v2/p/<id>/`, so a check declared by a client-only package would be asked on every archive and
-    // 404 every time. The owner would see a plugin that installed and does nothing.
+    // `/v2/p/<id>/`, so a check declared by a client-only package would be asked on every archive and 404
+    // every time. The owner would see a plugin that installed and does nothing.
     if (!manifest.node) {
       ctx.addIssue({ code: 'custom', path: at, message: 'a task check calls a node route; declare `node` in the manifest' })
     }
   })
   // ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ──────────────────────
   //
-  // A point is a promise that somebody else's rows will appear inside one of THIS manifest's surfaces,
-  // so the surface has to be one this manifest declares — and it has to be a surface with a rectangle
-  // the strip can hang off. `pane.footer` draws under a PANE's frame; a settings page, importer, overlay,
-  // reference panel or webview is not a candidate, because each is chrome the host already draws around
-  // a frame (or, for a webview, pixels that are not the renderer's at all) with nowhere to reserve a
-  // strip of its own. The surface list grows when a host for one appears, not before.
+  // A point is a promise that somebody else's rows will appear inside one of this manifest's surfaces, so
+  // the surface has to be one this manifest declares, and it has to be a surface with a rectangle the
+  // strip can hang off. `pane.footer` draws under a pane's frame; a settings page, importer, overlay,
+  // reference panel or webview is not a candidate, because each is chrome the host already draws around a
+  // frame (or, for a webview, pixels that are not the renderer's at all) with nowhere to reserve a strip
+  // of its own. The surface list grows when a host for one appears, not before.
   const pointSurfaces = new Set(frames.filter((frame) => frame.target === 'pane').map((frame) => frame.id))
   const claimedPoints = new Set<string>()
   extensionPoints.forEach((entry, i) => {
@@ -299,16 +300,16 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `extension point names '${entry.surface}', which this manifest does not declare as a pane surface` })
     }
     // One point per (surface, location). A second would be a strip the host has no second place to draw,
-    // so it would parse and never appear — the failure this file spends its length refusing.
+    // so it would parse and never appear, the failure this file spends its length refusing.
     const claim = `${entry.surface} ${entry.location}`
     if (claimedPoints.has(claim)) {
       ctx.addIssue({ code: 'custom', path: at, message: `'${entry.surface}' already has an extension point at '${entry.location}'` })
     }
     claimedPoints.add(claim)
-    // The two locations take two different contributors, so their keys are not interchangeable. A
-    // footer is filled by other plugins' `extensions` and has no composition to constrain; an aside is
-    // filled by THE USER, and `panels` is the whole of what the owner gets to say about it. A `panels`
-    // block on a footer would parse and never be read.
+    // The two locations take two different contributors, so their keys are not interchangeable. A footer
+    // is filled by other plugins' `extensions` and has no composition to constrain; an aside is filled by
+    // the user, and `panels` is the whole of what the owner gets to say about it. A `panels` block on a
+    // footer would parse and never be read.
     if (entry.panels && entry.location !== 'pane.aside') {
       ctx.addIssue({ code: 'custom', path: [...at, 'panels'], message: "panels is only valid on a 'pane.aside' extension point" })
     }
@@ -317,8 +318,8 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     const at = ['contributions', 'extensions', i] as (string | number)[]
     route(entry.items, [...at, 'items'])
     if (entry.onSelect) action(entry.onSelect, [...at, 'onSelect'])
-    // A plugin extending its OWN point is legal and pointless — it can put the rows there itself. It is
-    // not refused, because refusing it would mean a rule whose only effect is on a plugin harming nobody.
+    // A plugin extending its own point is legal and pointless: it can put the rows there itself. It is not
+    // refused, because refusing it would mean a rule whose only effect is on a plugin harming nobody.
   })
   // A `coreSlot` surface is the exclusive-slot half. Two rules, both of which turn a surface that would
   // silently never appear into an error the author sees at install time.
@@ -329,7 +330,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
         ctx.addIssue({ code: 'custom', path: [...at, 'coreSlot'], message: 'a coreSlot surface must name which core surface it replaces' })
       }
       // The host mounts the plugin's own bundle here, exactly as it does for a pane. Without one there is
-      // nothing to draw in place of core's list, and the trust queue holds BUNDLES — so a bundle-less
+      // nothing to draw in place of core's list, and the trust queue holds bundles, so a bundle-less
       // package offering to replace a core surface would never reach the prompt that discloses it.
       if (!manifest.client) {
         ctx.addIssue({ code: 'custom', path: at, message: 'a coreSlot surface needs a client bundle; declare `client` in the manifest' })
@@ -375,8 +376,8 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: at, message: `project-scoped pane '${frame.id}' needs a source whose onSelect navigates to it; it has nowhere else to mount` })
     }
   })
-  // A reference panel is addressed by provider and a panel's provider must be the plugin itself, so
-  // "this manifest declares a panel" is all a content link needs to have that destination available.
+  // A reference panel is addressed by provider and a panel's provider must be the plugin itself, so "this
+  // manifest declares a panel" is all a content link needs to have that destination available.
   const declaresRefPanel = frames.some((frame) => frame.target === 'refPanel')
   contentLinks.forEach((entry, i) => {
     const at = ['contributions', 'contentLinks', i] as (string | number)[]
@@ -437,17 +438,17 @@ export type PluginManifestResult = { ok: true; manifest: PluginManifest } | { ok
 /** The schema, run against an already-parsed object, with the issue paths kept.
  *
  * Split out of the reader below so there is one place that turns Zod issues into a sentence a human can
- * act on. The other caller is testkit/manifest.ts, which validates a plugin's `acorn-plugin.config.mjs`
- * at `pnpm test` time — the same rules, one step earlier, against the source the author edits rather
- * than the JSON the builder writes.
+ * act on. The other caller is testkit/manifest.ts, which validates a plugin's `acorn-plugin.config.mjs` at
+ * `pnpm test` time, the same rules, one step earlier, against the source the author edits rather than the
+ * JSON the builder writes.
  *
  * `source` only names the file in the message; the rules are the same wherever the bytes came from. */
 export function parsePluginManifest(json: unknown, source: string = MANIFEST_FILE): PluginManifestResult {
   const parsed = pluginManifestSchema.safeParse(json)
   if (parsed.success) return { ok: true, manifest: parsed.data }
-  // `path + message`, which is the whole point: `contributions.commands[2].run: ...` tells an author
-  // which line to open. A path-less issue (the schema's own cross-field refinements sometimes are) reads
-  // as the bare message rather than as an empty prefix.
+  // `path + message`, which is the whole point: `contributions.commands[2].run: ...` tells an author which
+  // line to open. A path-less issue (the schema's own cross-field refinements sometimes are) reads as the
+  // bare message rather than as an empty prefix.
   const issues = parsed.error.issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => {
     const path = issue.path.map((part) => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`)).join('').replace(/^\./, '')
     return path ? `${path}: ${issue.message}` : issue.message
@@ -481,8 +482,8 @@ export function readPluginManifestResult(dir: string): PluginManifestResult {
   return parsePluginManifest(json)
 }
 
-// Never throws. A missing, unreadable, non-JSON or schema-violating manifest is all one outcome —
-// "this directory is not a plugin we can run" — and the loader turns that into a skip plus a report.
+// Never throws. A missing, unreadable, non-JSON or schema-violating manifest is all one outcome, "this
+// directory is not a plugin we can run", and the loader turns that into a skip plus a report.
 // Callers that have somewhere to PUT the reason use readPluginManifestResult above instead.
 export function readPluginManifest(dir: string): PluginManifest | null {
   const result = readPluginManifestResult(dir)

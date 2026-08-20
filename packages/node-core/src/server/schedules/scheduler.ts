@@ -16,58 +16,58 @@ import { BridgeError } from '../bridge'
 import { type AppDatabase, schema } from '../db'
 import { nextRunAt } from './cadence'
 
-// The node's one scheduler (docs/schedules.md). A schedule is a promise to run when nobody is looking,
-// so it lives in the long-lived process — never in a client, which closes, hides and sleeps.
+// The node's one scheduler. See docs/schedules.md for the cadence, consent and catch-up rules.
+// A schedule is a promise to run when nobody is looking, so it lives in the long-lived process, never in
+// a client, which closes, hides and sleeps.
 //
-// Everything below is one class on purpose: the registry, the store and the loop are the same fact
-// (what runs next, and what happened last time), and splitting them would mean three files passing the
-// same three tables between each other. The pure arithmetic that CAN be separated already is
-// (./cadence.ts).
+// Everything below is one class on purpose: the registry, the store and the loop are the same fact, what
+// runs next and what happened last time, and splitting them would mean three files passing the same
+// three tables between each other. The pure arithmetic that can be separated already is (./cadence.ts).
 
-/** What a runner is handed and what it gives back: an abort signal it is expected to honour, and one
- *  line for the run row. The same signal shape collection fetches already take. */
+/** What a runner is handed and what it gives back: an abort signal it is expected to honour, and one line
+ *  for the run row. The same signal shape collection fetches already take. */
 export type ScheduleRunner = (signal: AbortSignal) => Promise<string | void>
 
-/** A schedule declared in code (core) or by a plugin. Registry-truth: this object IS the definition,
- *  and the database stores only the owner's overrides and the run state. */
+/** A schedule declared in code (core) or by a plugin. Registry-truth: this object is the definition, and
+ *  the database stores only the owner's overrides and the run state. */
 export type DeclaredSchedule = {
   /** 'core:<id>' or '<pluginId>:<scheduleId>'. */
   key: string
   name: string
   cadence: Cadence
-  /** The declared default. The owner's pause/resume overrides it and outlives a reload. */
+  /** The declared default. The owner's pause and resume overrides it and outlives a reload. */
   enabled?: boolean
   /** Default 60s, capped at 300s. Past that a scheduled job is a service. */
   timeoutMs?: number
   run: ScheduleRunner
 }
 
-/** What a USER schedule may do. Phase 1 registers none, which is why an unknown kind has to render
- *  inert rather than fail: the row is created by a later version of this node and read by this one. */
+/** What a user schedule may do. Phase 1 registers none, which is why an unknown kind has to render inert
+ *  rather than fail: the row is created by a later version of this node and read by this one. */
 export type ScheduleTarget = {
   kind: string
-  /** The tier stamped onto the row at creation — the consent record, taken once, over the PARSED
-   *  target. A function rather than a constant because a tier belongs to the thing being scheduled
-   *  and not to the kind: two `node-action` schedules can point at a read and at an execute, and one
-   *  tier for the whole vocabulary would either over-warn about every one of them or under-warn about
-   *  the dangerous ones. Absent, or returning undefined, stamps nothing. */
+  /** The tier stamped onto the row at creation, the consent record, taken once, over the parsed target. A
+   *  function rather than a constant because a tier belongs to the thing being scheduled and not to the
+   *  kind: two `node-action` schedules can point at a read and at an execute, and one tier for the whole
+   *  vocabulary would either over-warn about every one of them or under-warn about the dangerous ones.
+   *  Absent, or returning undefined, stamps nothing. */
   risk?(target: unknown): ToolRisk | undefined
-  /** Validate a proposed target. `null` refuses the CREATE, which is the one non-tolerant edge here. */
+  /** Validate a proposed target. `null` refuses the create, which is the one non-tolerant edge here. */
   parse(target: unknown): unknown | null
-  /** Throw `ScheduleSkipped` to record a run that deliberately did nothing — a target that no longer
+  /** Throw `ScheduleSkipped` to record a run that deliberately did nothing: a target that no longer
    *  resolves, or one whose declared risk has risen past the consent stamped on the row. That is a
-   *  different fact from a failure: it must not start a backoff, and it must not read as broken. */
+   *  different fact from a failure. It must not start a backoff, and it must not read as broken. */
   run(target: unknown, signal: AbortSignal, consent: ScheduleConsent): Promise<string | void>
 }
 
-/** What the row remembers about the one time the owner was asked. Handed to every run because a
- *  target cannot see its own row, and checking that the stamp still covers the target's CURRENT
- *  declared tier is the whole of "consent is taken once and honoured forever". */
+/** What the row remembers about the one time the owner was asked. Handed to every run because a target
+ *  cannot see its own row, and checking that the stamp still covers the target's current declared tier is
+ *  the whole of "consent is taken once and honoured forever". */
 export type ScheduleConsent = { risk?: ToolRisk }
 
-/** "I ran, and deliberately did nothing." Recorded as `skipped` with the message as the reason, and
- *  pointedly NOT as an error: a schedule failing closed on a risk change is behaving correctly, and
- *  backing it off exponentially would punish the owner for the plugin author's edit. */
+/** "I ran, and deliberately did nothing." Recorded as `skipped` with the message as the reason, and not
+ *  as an error: a schedule failing closed on a risk change is behaving correctly, and backing it off
+ *  exponentially would punish the owner for the plugin author's edit. */
 export class ScheduleSkipped extends Error {}
 
 export type Clock = {
@@ -96,14 +96,15 @@ const CONCURRENCY = 4
 const DEFAULT_TIMEOUT_MS = 60_000
 const MAX_TIMEOUT_MS = 300_000
 const MAX_BACKOFF_MS = 6 * 60 * 60 * 1000
-/** Recent runs kept per schedule. Twenty is enough to see a pattern and small enough to never need a vacuum. */
+/** Recent runs kept per schedule. Twenty is enough to see a pattern and small enough to never need a
+ *  vacuum. */
 const RUN_RING = 20
 /** The reserved state key holding the global pause switch (server/db/schema.ts). */
 const PAUSE_KEY = '*'
 
 type Owner = { owner: 'core' | 'user' } | { owner: 'plugin'; pluginId: string }
 
-/** Which of the three parties declared a key. The format is the whole mechanism — one registry, one
+/** Which of the three parties declared a key. The format is the whole mechanism: one registry, one
  *  settings list, and an owner badge that needs no extra column. */
 export function keyOwner(key: string): Owner {
   const separator = key.indexOf(':')
@@ -142,8 +143,8 @@ export class Scheduler {
   readonly #clock: Clock
   readonly #declared = new Map<string, DeclaredSchedule>()
   readonly #targets = new Map<string, ScheduleTarget>()
-  /** Serialization per schedule: a run whose predecessor is still going is skipped, not overlapped —
-   *  two concurrent runs of one retention job is how a retention job corrupts its own table. */
+  /** Serialization per schedule: a run whose predecessor is still going is skipped, not overlapped. Two
+   *  concurrent runs of one retention job is how a retention job corrupts its own table. */
   readonly #inflight = new Map<string, Promise<void>>()
   #abort = new AbortController()
   #timer: unknown = null
@@ -155,8 +156,8 @@ export class Scheduler {
     this.#clock = options.clock ?? systemClock
   }
 
-  /** Declare a schedule. Callable before or after start(); a late registration (a plugin reload) mints
-   *  its state row and re-arms the timer. */
+  /** Declare a schedule. Callable before or after start(); a late registration (a plugin reload) mints its
+   *  state row and re-arms the timer. */
   register(entry: DeclaredSchedule): { dispose(): void } {
     if (!entry.key.includes(':')) throw new Error(`A schedule key must be '<owner>:<id>': '${entry.key}'.`)
     if (this.#declared.has(entry.key)) throw new Error(`Schedule already registered: ${entry.key}`)
@@ -164,16 +165,16 @@ export class Scheduler {
     if (this.#started) void this.#sync()
     return {
       dispose: () => {
-        // The definition goes; the STATE row stays. That retention is what makes a plugin's lifecycle
-        // non-destructive — its pause and its history are waiting when it comes back.
+        // The definition goes; the state row stays. That retention is what makes a plugin's lifecycle
+        // non-destructive: its pause and its history are waiting when it comes back.
         this.#declared.delete(entry.key)
         if (this.#started) this.#arm()
       },
     }
   }
 
-  /** Register what a user schedule of `kind` actually does. Phase 3 fills this; until then every user
-   *  row is inert and says so. */
+  /** Register what a user schedule of `kind` actually does. Phase 3 fills this; until then every user row
+   *  is inert and says so. */
   registerTarget(target: ScheduleTarget): { dispose(): void } {
     if (this.#targets.has(target.kind)) throw new Error(`Schedule target already registered: ${target.kind}`)
     this.#targets.set(target.kind, target)
@@ -231,9 +232,9 @@ export class Scheduler {
     }))
   }
 
-  /** Create a user schedule. The one NON-tolerant edge in this module: a create names a target that must
-   *  resolve NOW, and the risk tier is read off that target and stamped onto the row here. That stamp is
-   *  the consent record — 3am cannot answer a confirmation strip, so consent is taken once, at creation. */
+  /** Create a user schedule. The one non-tolerant edge in this module: a create names a target that must
+   *  resolve now, and the risk tier is read off that target and stamped onto the row here. That stamp is
+   *  the consent record. 3am cannot answer a confirmation strip, so consent is taken once, at creation. */
   async create(input: CreateScheduleInput): Promise<ScheduleRow> {
     const target = this.#targets.get(input.kind)
     if (!target) throw new BridgeError(400, 'bad_request', `This node has nothing that can run a '${input.kind}' schedule.`)
@@ -266,24 +267,24 @@ export class Scheduler {
     if (input.enabled !== undefined) patch.enabledOverride = input.enabled ? 1 : 0
     if (input.cadence !== undefined) {
       const cadence = clampCadence(input.cadence, floorFor(key))
-      // Retuning re-times the NEXT run from now. Leaving nextRunAt alone would mean "every 5 minutes"
+      // Retuning re-times the next run from now. Leaving nextRunAt alone would mean "every 5 minutes"
       // changed to "every hour" still fires in the next few minutes, once, for no reason.
       patch.cadenceOverride = JSON.stringify(cadence)
       patch.nextRunAt = nextRunAt(cadence, this.#clock.now(), this.#clock.random)
     }
     // Resuming a schedule that has been off for a week must not fire the moment it comes back for every
-    // interval it slept through — catch-up-once applies, and the tick loop is where that happens.
+    // interval it slept through. Catch-up-once applies, and the tick loop is where that happens.
     if (Object.keys(patch).length > 0) await this.#writeState(key, { ...patch, nextRunAt: patch.nextRunAt ?? entry.state.nextRunAt })
     this.#arm()
     return this.#row(key)
   }
 
-  /** Re-take consent for a user schedule whose target now declares a higher tier, by re-stamping the
-   *  row from the registry's CURRENT answer.
+  /** Re-take consent for a user schedule whose target now declares a higher tier, by re-stamping the row
+   *  from the registry's current answer.
    *
-   *  Deliberately takes no tier from the caller. The client's part is to show what the host says and
-   *  relay that the owner accepted it; letting it post a tier would make the confirmation something a
-   *  client could quietly widen, which is the one property the arming rule exists to prevent. */
+   *  Deliberately takes no tier from the caller. The client's part is to show what the host says and relay
+   *  that the owner accepted it; letting it post a tier would make the confirmation something a client
+   *  could quietly widen, which is the one property the arming rule exists to prevent. */
   async confirm(key: string): Promise<ScheduleRow> {
     if (keyOwner(key).owner !== 'user') throw new BridgeError(409, 'conflict', 'Only a schedule you created carries a consent stamp.')
     const row = (await this.#db.select().from(schema.userSchedules).where(eq(schema.userSchedules.id, key.slice(5))))[0]
@@ -307,7 +308,7 @@ export class Scheduler {
     this.#arm()
   }
 
-  /** Run now. Subject to serialization and the concurrency cap, NOT to backoff — a human pressing the
+  /** Run now. Subject to serialization and the concurrency cap, not to backoff: a human pressing the
    *  button is how you test your way out of a backoff. */
   async runNow(key: string): Promise<ScheduleRun> {
     const entry = await this.#entry(key)
@@ -322,7 +323,9 @@ export class Scheduler {
 
   // ── the loop ────────────────────────────────────────────────────────────────────────────────────
   //
-  // ONE timer, armed for the earliest nextRunAt and re-armed after every run and every mutation. Not one
+  // ── The loop ────────────────────────────────────────────────────────────────────────────────────
+  //
+  // One timer, armed for the earliest nextRunAt and re-armed after every run and every mutation. Not one
   // timer per schedule: a single timer cannot leak, and "what fires next" is one comparison.
 
   #arm(): void {
@@ -339,8 +342,8 @@ export class Scheduler {
       // until a slot frees. Completions re-arm anyway, so this only covers the case where every slot is
       // held by a long run.
       if (this.#inflight.size >= CONCURRENCY) delay = Math.max(delay, 1_000)
-      // Last arm wins, with the freshest read. Two arms can be in flight (a mutation racing a
-      // completion) and the one that resolves second is the one that saw the newer state.
+      // Last arm wins, with the freshest read. Two arms can be in flight (a mutation racing a completion)
+      // and the one that resolves second is the one that saw the newer state.
       if (this.#timer !== null) this.#clock.clearTimeout(this.#timer)
       this.#timer = this.#clock.setTimeout(() => void this.#tick(), delay)
     })
@@ -355,8 +358,8 @@ export class Scheduler {
       .sort((a, b) => a.state.nextRunAt - b.state.nextRunAt)
     for (const entry of due) {
       if (this.#inflight.size >= CONCURRENCY) break // the rest stay due and are picked up on the next arm
-      // Catch-up, NOT backfill: a schedule the node slept through runs ONCE and then resumes from now.
-      // Replaying a week of missed hourly samples would fabricate history the node did not witness.
+      // Catch-up, not backfill: a schedule the node slept through runs once and then resumes from now. See
+      // docs/schedules.md.
       const late = now - entry.state.nextRunAt > cadencePeriodMs(entry.cadence)
       void this.#execute(entry, late ? 'catch-up' : 'due')
     }
@@ -385,7 +388,7 @@ export class Scheduler {
     let detail = reason === 'catch-up' ? 'catch-up' : undefined
     try {
       // Failures are contained per run: the run row and lastError are the blast radius, never a crashed
-      // node. A timed-out runner is not killed — nothing here can kill it — so the signal is a contract
+      // node. A timed-out runner is not killed, since nothing here can kill it, so the signal is a contract
       // it is expected to honour, and the slot is released either way.
       const result = await Promise.race([
         entry.run!(signal),
@@ -393,9 +396,9 @@ export class Scheduler {
       ])
       if (typeof result === 'string' && result) detail = detail ? `${detail}; ${result}` : result
     } catch (error) {
-      // A deliberate no-op is not a failure. It resumes on the normal cadence — no backoff, no red
-      // row — because the reason (a plugin gone, a risk tier raised) is a thing the owner fixes, not
-      // a thing retrying more slowly would help with.
+      // A deliberate no-op is not a failure. It resumes on the normal cadence, no backoff and no red row,
+      // because the reason (a plugin gone, a risk tier raised) is a thing the owner fixes, not a thing
+      // retrying more slowly would help with.
       status = error instanceof ScheduleSkipped ? 'skipped' : timeout.aborted ? 'timeout' : 'error'
       detail = oneLine(error)
       if (status !== 'skipped') console.warn(`[schedules] ${entry.key} ${status}: ${detail}`)
@@ -405,12 +408,12 @@ export class Scheduler {
     await this.#writeState(entry.key, await this.#afterRun(entry, status, finishedAt, detail))
   }
 
-  /** What the state row becomes after a run: the next fire time, the last-run facts, and — on failure —
-   *  a VISIBLE backoff, because a silent retry loop is how rate limits die. */
+  /** What the state row becomes after a run: the next fire time, the last-run facts, and on failure a
+   *  visible backoff, because a silent retry loop is how rate limits die. */
   async #afterRun(entry: Entry, status: ScheduleStatus, finishedAt: number, detail?: string): Promise<Partial<StateRow>> {
     const normal = nextRunAt(entry.cadence, finishedAt, this.#clock.random)
-    // A skip takes the ok path for TIMING and keeps its reason visible: the row says why it did
-    // nothing, and the next run is the one the cadence would have produced anyway.
+    // A skip takes the ok path for timing and keeps its reason visible: the row says why it did nothing,
+    // and the next run is the one the cadence would have produced anyway.
     if (status === 'ok' || status === 'skipped') {
       return {
         nextRunAt: normal,
@@ -421,8 +424,8 @@ export class Scheduler {
       }
     }
     const failures = await this.#consecutiveFailures(entry.key)
-    // Never EARLIER than the cadence would have fired anyway: a failing daily job must not start
-    // retrying every six hours just because the cap is six hours.
+    // Never earlier than the cadence would have fired anyway: a failing daily job must not start retrying
+    // every six hours just because the cap is six hours.
     const backoffUntil = Math.max(normal, finishedAt + Math.min(cadencePeriodMs(entry.cadence) * 2 ** failures, MAX_BACKOFF_MS))
     return {
       nextRunAt: backoffUntil,
@@ -454,8 +457,8 @@ export class Scheduler {
     await this.#db
       .insert(schema.scheduleRuns)
       .values({ key, startedAt: run.startedAt, finishedAt: run.finishedAt, status: run.status, detail: run.detail ?? null })
-      // Two runs of one key inside the same millisecond cannot overlap (serialization), but a fast job
-      // run twice by hand can land on the same timestamp — overwrite rather than lose the newer one.
+      // Two runs of one key inside the same millisecond cannot overlap (serialization), but a fast job run
+      // twice by hand can land on the same timestamp. Overwrite rather than lose the newer one.
       .onConflictDoUpdate({
         target: [schema.scheduleRuns.key, schema.scheduleRuns.startedAt],
         set: { finishedAt: run.finishedAt, status: run.status, detail: run.detail ?? null },
@@ -489,8 +492,8 @@ export class Scheduler {
       .onConflictDoUpdate({ target: schema.scheduleState.key, set: patch })
   }
 
-  /** Mint a state row for anything that has just become declarable, then re-arm. Idempotent, and the
-   *  only place a nextRunAt is invented. */
+  /** Mint a state row for anything that has just become declarable, then re-arm. Idempotent, and the only
+   *  place a nextRunAt is invented. */
   async #sync(): Promise<void> {
     const known = new Set((await this.#db.select({ key: schema.scheduleState.key }).from(schema.scheduleState)).map((row) => row.key))
     const now = this.#clock.now()
@@ -501,8 +504,8 @@ export class Scheduler {
     this.#arm()
   }
 
-  /** The merged view, rebuilt per read. The three tables hold tens of rows between them, so re-reading
-   *  is cheaper than any cache that could go stale behind a plugin reload or a second writer. */
+  /** The merged view, rebuilt per read. The three tables hold tens of rows between them, so re-reading is
+   *  cheaper than any cache that could go stale behind a plugin reload or a second writer. */
   async #entries(): Promise<Entry[]> {
     const [stateRows, userRows] = await Promise.all([
       this.#db.select().from(schema.scheduleState).where(notInArray(schema.scheduleState.key, [PAUSE_KEY])),
@@ -533,7 +536,7 @@ export class Scheduler {
         name: row.name,
         kind: row.kind,
         // A stored cadence that no longer parses falls back to the floor rather than making the row
-        // unreadable — tolerant codec, same as an unknown panel view kind.
+        // unreadable, the tolerant codec, same as an unknown panel view kind.
         cadence: parseCadence(safeJson(row.cadence)) ?? { every: CADENCE_MIN_SECONDS },
         enabled: true,
         registered: target !== undefined,
@@ -545,9 +548,9 @@ export class Scheduler {
       }))
     }
 
-    // Retained state rows whose declaration is currently absent: a disabled plugin, an uninstalled one,
-    // a core schedule this version no longer declares. Listed, never run, never deleted — the pause and
-    // the history are waiting for the plugin's return.
+    // Retained state rows whose declaration is currently absent: a disabled plugin, an uninstalled one, a
+    // core schedule this version no longer declares. Listed, never run, never deleted. The pause and the
+    // history are waiting for the plugin's return.
     for (const row of stateRows) {
       if (seen.has(row.key)) continue
       entries.push(this.#entryFor(row.key, row, {
@@ -571,8 +574,8 @@ export class Scheduler {
       key,
       enabledOverride: null,
       cadenceOverride: null,
-      // Not persisted here — #sync mints the real one. Until then the entry reads as "not due yet",
-      // which is the safe direction for the sliver of time before a row exists.
+      // Not persisted here; #sync mints the real one. Until then the entry reads as "not due yet", which
+      // is the safe direction for the sliver of time before a row exists.
       nextRunAt: this.#clock.now() + cadencePeriodMs(declared.cadence),
       lastRunAt: null,
       lastStatus: null,
