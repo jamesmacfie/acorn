@@ -11,7 +11,7 @@ vi.mock('../../apiClient', () => ({
   writeJson: vi.fn(),
 }))
 
-// The host ladder, as ONE call now. It used to be `parseInAppTarget` then `openContentTarget`, and the
+// The host ladder, as one call now. It used to be `parseInAppTarget` then `openContentTarget`, and the
 // frame side had to hold the target in between; `openInAppUrl` owns the whole question, including the
 // route rung this surface previously had no way to reach.
 const openInAppUrl = vi.fn((..._args: unknown[]) => false)
@@ -36,9 +36,9 @@ const { createFrameServices } = await import('./frameServices')
 
 // The host half of the frame bridge (docs/plugins.md).
 //
-// broker.test.ts pins what the CHECKER refuses; this pins what the host then actually does with a call
+// broker.test.ts pins what the checker refuses; this pins what the host then actually does with a call
 // that got through. The two halves used to sit on opposite sides of a `.tsx` boundary, so only one of
-// them could be tested — and the effects are the half that pins a node, hand-parses the prefs cache and
+// them could be tested. The effects are the half that pins a node, hand-parses the prefs cache and
 // decides where a link goes.
 
 const binding = (over: Partial<FrameBinding> = {}): FrameBinding => ({
@@ -103,9 +103,9 @@ describe('fetch', () => {
 
 describe('subscribe', () => {
   it('refuses a real shell channel that is not on the frame list', () => {
-    // `presentation:pane-intent` exists and is emitted constantly — it is simply the shell's own
+    // `presentation:pane-intent` exists and is emitted constantly. It is simply the shell's own
     // intent traffic, which a plugin has no business watching (./channels.ts). The broker checks the
-    // manifest DECLARED a channel; this checks the shell offers it, and neither check creates one.
+    // manifest declared a channel; this checks the shell offers it, and neither check creates one.
     expect(() => build().subscribe('presentation:pane-intent', () => {})).toThrow(/not a channel a plugin frame can subscribe to/)
   })
 
@@ -167,11 +167,11 @@ describe('openUrl', () => {
 
   it('prefers the reference panel from inside one, and states nothing from everywhere else', () => {
     // The reader is looking sideways and asked to look sideways again; pushing a pane behind an overlay
-    // they would then have to dismiss is not what they meant. Which rung wins comes from the SURFACE,
+    // they would then have to dismiss is not what they meant. Which rung wins comes from the surface,
     // which is why the frame is never consulted.
     //
-    // Stating NOTHING is the meaningful half of the second case. A pane or a project surface takes the
-    // host's default order — pane, then panel, then route — rather than asking to be moved, so a link
+    // Stating nothing is the meaningful half of the second case. A pane or a project surface takes the
+    // host's default order (pane, then panel, then route) rather than asking to be moved, so a link
     // clicked inside one cannot navigate the shell out from under the reader.
     openInAppUrl.mockReturnValue(true)
     build({ binding: binding({ target: 'refPanel', taskId: 'task-1' }) }).openUrl('https://linear.app/x/ENG-1')
@@ -182,7 +182,7 @@ describe('openUrl', () => {
   })
 
   it('offers the shell navigator, so a frame’s link can reach a plugin route', () => {
-    // The rung that made this surface reachable at all. The frame still names only a URL — where it goes
+    // The rung that made this surface reachable at all. The frame still names only a URL. Where it goes
     // is the recogniser's answer, and the navigator is the host's.
     openInAppUrl.mockReturnValue(true)
     build().openUrl('https://github.com/runn/acorn/pull/9')
@@ -192,7 +192,7 @@ describe('openUrl', () => {
   it('never pushes a pane into a task the frame is not bound to', () => {
     // A project surface and a ref panel both sit beside something that is not a task layout, while a
     // task may well still be selected in the rail behind them. Reading the ambient one here would put a
-    // pane into a background task's PERSISTED layout, where the reader is not and will not see it.
+    // pane into a background task's persisted layout, where the reader is not and will not see it.
     build().openUrl('https://board.example/cards/ENG-1')
     expect(openInAppUrl).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ taskId: undefined }))
     expect(windowOpen).toHaveBeenCalled()
@@ -201,7 +201,7 @@ describe('openUrl', () => {
 
 describe('the structural grants', () => {
   it('offers no document verb unless a host editor shares the rectangle', () => {
-    // The absence IS the permission check the broker applies — there is no scope to declare, because
+    // The absence is the permission check the broker applies. There is no scope to declare, because
     // the grant is structural.
     expect(build().document).toBeUndefined()
     expect(build({ document: () => ({ read: () => 'x', write: () => {}, flush: async () => {} }) }).document).toBeDefined()
