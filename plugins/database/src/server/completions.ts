@@ -1,24 +1,24 @@
 import type { PluginCompletionItem } from '@acorn/protocol/documentSurface.ts'
 import type { DbCatalogTable } from '../shared/database'
 
-// Table/column completions for the query editor (docs/third-party/monaco.md § Language smarts).
+// Table and column completions for the query editor. See docs/third-party/monaco.md § Language smarts.
 //
-// THE HOST NEVER LEARNS SQL. It POSTs `{ text, position }` to the route this file backs and maps the
-// items straight onto its editor; every line below — what counts as a keyword, what `alias.` means,
-// which clause wants tables — is this plugin's, because this is where the schema knowledge already
-// lives. That boundary is the reason the same host provider serves a GraphQL console or a YAML config
-// plugin with no host change at all.
+// The host never learns SQL. It POSTs `{ text, position }` to the route this file backs and maps the
+// items straight onto its editor; every line below, what counts as a keyword, what `alias.` means, which
+// clause wants tables, is this plugin's, because this is where the schema knowledge already lives. That
+// boundary is the reason the same host provider serves a GraphQL console or a YAML config plugin with no
+// host change at all.
 //
-// Worth recording, because it looks like the host is shirking: SQL is not one of Monaco's language-
-// service workers. The 14.58 MiB of workers cover TypeScript, JSON, CSS and HTML; for SQL, Monaco ships
+// Worth recording, because it looks like the host is shirking: SQL is not one of Monaco's language-service
+// workers. The 14.58 MiB of workers cover TypeScript, JSON, CSS and HTML; for SQL, Monaco ships
 // tokenization only and completions are a provider someone has to write. So the host-owned document
-// surface loses nothing here — every path, including the frame-bundled Monaco that was measured dead,
+// surface loses nothing here: every path, including the frame-bundled Monaco that was measured dead,
 // would have had to write this exact function.
 //
-// Pure, and takes the catalog as an argument, because this is the part worth testing and a live
-// Postgres is not.
+// Pure, and takes the catalog as an argument, because this is the part worth testing and a live Postgres
+// is not.
 
-// Enough to be useful in an editor whose author knows SQL; deliberately not a dialect reference. The
+// Enough to be useful in an editor whose author knows SQL, deliberately not a dialect reference. The
 // long tail is what the reader types anyway, and a completion list that offers three hundred keywords
 // is one people learn to dismiss.
 const KEYWORDS = [
@@ -28,7 +28,7 @@ const KEYWORDS = [
   'COUNT(*)', 'WITH', 'UNION', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'ASC', 'DESC',
 ]
 
-// The clauses after which a name is a TABLE. `INTO` covers `INSERT INTO`, `UPDATE` its own target.
+// The clauses after which a name is a table. `INTO` covers `INSERT INTO`, `UPDATE` its own target.
 const TABLE_CLAUSES = /\b(from|join|into|update|table)\s+(?:[a-z_][\w$]*\.)?[\w$"]*$/i
 
 // `alias.` or `schema.table.` immediately before the cursor. Captured without the trailing dot so the
@@ -38,8 +38,8 @@ const QUALIFIER = /([a-z_][\w$]*)\.\s*$/i
 /** The text on this line up to (and excluding) the cursor. Column is 1-based, as it is on the wire. */
 export function textBeforeCursor(text: string, position: { line: number; column: number }): string {
   const lines = text.split('\n')
-  // A position past the end of the document is not an error worth failing a popup over — it is what a
-  // race between a keystroke and a fetch looks like. Clamp and answer.
+  // A position past the end of the document is not an error worth failing a popup over. It is what a race
+  // between a keystroke and a fetch looks like. Clamp and answer.
   const index = Math.min(Math.max(position.line, 1), lines.length) - 1
   const line = lines[index] ?? ''
   return line.slice(0, Math.max(position.column - 1, 0))
@@ -54,16 +54,16 @@ export function textBeforeCursor(text: string, position: { line: number; column:
  */
 export function resolveQualifier(text: string, qualifier: string, tables: readonly DbCatalogTable[]): DbCatalogTable | null {
   const lower = qualifier.toLowerCase()
-  // `FROM <schema.>?<table> <alias>` / `JOIN <table> AS <alias>`. Bounded by the statement text the
-  // caller already holds; no backtracking risk, because every quantifier is over a character class.
+  // `FROM <schema.>?<table> <alias>` or `JOIN <table> AS <alias>`. Bounded by the statement text the caller
+  // already holds; no backtracking risk, because every quantifier is over a character class.
   const alias = new RegExp(`\\b(?:from|join|update|into)\\s+(?:([a-z_][\\w$]*)\\.)?([a-z_][\\w$]*)(?:\\s+as)?\\s+${lower}\\b`, 'i').exec(text)
   if (alias) {
     const [, schema, name] = alias
     const match = tables.find((t) => t.name.toLowerCase() === name.toLowerCase() && (!schema || t.schema.toLowerCase() === schema.toLowerCase()))
     if (match) return match
   }
-  // Not an alias, then: a bare table name, or a schema the reader is drilling into. A schema qualifier
-  // has no columns of its own, so it resolves to nothing and the caller falls through to tables.
+  // Not an alias, then: a bare table name, or a schema the reader is drilling into. A schema qualifier has
+  // no columns of its own, so it resolves to nothing and the caller falls through to tables.
   return tables.find((t) => t.name.toLowerCase() === lower) ?? null
 }
 
