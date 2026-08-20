@@ -4,14 +4,14 @@ import type { FrameBinding } from './broker'
 import { Button, Toolbar } from '../../ui/primitives'
 import RefPanelTaskLink from '../../registries/RefPanelTaskLink'
 
-// The host's chrome around a plugin reference panel — the backdrop, the box, the title and the
+// The host's chrome around a plugin reference panel: the backdrop, the box, the title and the
 // dismiss affordance (docs/plugins.md § Frame contribution kind).
 //
-// The overlay is the HOST's here, unlike a first-party panel that draws its own. Two reasons, both
+// The overlay is the host's here, unlike a first-party panel that draws its own. Two reasons, both
 // structural rather than stylistic. A frame is an iframe: it cannot Portal out of the box the consumer
 // put it in, so `position: fixed` inside the frame positions against the frame, and a ref panel
 // rendered inline into a PR conversation would be a 150px letterbox in the middle of a page. And a
-// refPanel frame has no way to CALL `onClose` — the bridge's close verb is gated to importer surfaces
+// refPanel frame has no way to call `onClose`: the bridge's close verb is gated to importer surfaces
 // (frames/broker.ts), deliberately, so the dismiss affordance has to live on this side of the port
 // too. Same classes the first-party panels use, so the two look identical.
 //

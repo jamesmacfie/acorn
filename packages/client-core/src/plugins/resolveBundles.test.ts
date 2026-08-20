@@ -10,7 +10,7 @@ const candidate = (over: Partial<BundleCandidate> = {}): BundleCandidate => ({
   ...over,
 })
 
-// Hermetic on purpose — this file is about resolution, not about which major the app happens to speak — so
+// Hermetic on purpose: this file is about resolution, not about which major the app happens to speak, so
 // the supported major is a local literal and the unspeakable one is '99', which no real build will ever be.
 const resolve = (candidates: BundleCandidate[]) => resolveActiveBundles(candidates, { apiVersion: '1' })
 
@@ -38,7 +38,7 @@ describe('picking one bundle per plugin', () => {
   })
 
   it('treats the same bytes from two nodes as one bundle with two sources', () => {
-    // The plugin's UI renders against every node that has it, whatever version each carries — so the
+    // The plugin's UI renders against every node that has it, whatever version each carries, so the
     // node list is plural, and it is what phase 3 instantiates a frame per.
     const winners = resolve([candidate({ nodeId: 'node-a' }), candidate({ nodeId: 'node-b' })])
     expect(winners.get('sparkline')?.nodeIds).toEqual(['node-a', 'node-b'])
@@ -56,7 +56,7 @@ describe('picking one bundle per plugin', () => {
   })
 
   it('resolves two builds of one version the same way every boot', () => {
-    // Arbitrary but STABLE is the requirement: a fleet that picked differently on each boot would
+    // Arbitrary but stable is the requirement: a fleet that picked differently on each boot would
     // move a user's panes between machines for no visible reason.
     const forward = resolve([candidate({ hash: 'a'.repeat(64), nodeId: 'node-a' }), candidate({ hash: 'f'.repeat(64), nodeId: 'node-b' })])
     const reversed = resolve([candidate({ hash: 'f'.repeat(64), nodeId: 'node-b' }), candidate({ hash: 'a'.repeat(64), nodeId: 'node-a' })])
