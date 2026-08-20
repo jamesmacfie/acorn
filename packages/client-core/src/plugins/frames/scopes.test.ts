@@ -4,7 +4,7 @@ import { allowApi, classifyPath, describeScope, GRANTABLE_SCOPES } from './scope
 
 // The exhaustive sweep is the point of this file. Everything else here is a spot check on a case the
 // phase doc calls out by name (docs/plugins.md
-// checklist); the sweep is what makes a NEW core route fail the build until someone decides whether a
+// checklist); the sweep is what makes a new core route fail the build until someone decides whether a
 // sandboxed plugin frame may reach it.
 
 const ID = 'x'
@@ -18,7 +18,7 @@ const routePaths = (): { name: string; path: string }[] =>
       if (typeof value === 'string') return { name, path: value }
       // One argument, whatever the builder's arity: a missing second id interpolates as the literal
       // "undefined", which is a perfectly good opaque segment for matching purposes. Passing a second
-      // is what breaks — some builders take an array there, not an id.
+      // is what breaks: some builders take an array there, not an id.
       if (typeof value === 'function') return { name, path: (value as (id: string) => string)(ID) }
       return { name, path: '' }
     })
@@ -33,7 +33,7 @@ describe('the route table covers every core route', () => {
 
   it('classifies every core route the protocol declares', () => {
     const unclassified = routePaths().filter((entry) => classifyPath(entry.path) === null)
-    // A route here is not a bug in this test — it is a decision nobody has made yet. Add it to RULES
+    // A route here is not a bug in this test. It is a decision nobody has made yet. Add it to RULES
     // in scopes.ts, with an empty `scopes` and a note if a plugin must never reach it.
     expect(unclassified.map((entry) => `${entry.name} ${entry.path}`)).toEqual([])
   })
@@ -50,8 +50,8 @@ describe('the route table covers every core route', () => {
   })
 
   it('has owner-written consent copy for every grantable scope, and names the risky ones', () => {
-    // The copy is free to change — the update diff keys on the scope name, not the sentence
-    // (plugins/permissions.ts). What must not drift is that every grantable scope HAS a description,
+    // The copy is free to change: the update diff keys on the scope name, not the sentence
+    // (plugins/permissions.ts). What must not drift is that every grantable scope has a description,
     // and that the three handing over where code lives on disk are marked high.
     expect(GRANTABLE_SCOPES.map((scope) => [scope, describeScope(scope)?.text])).toEqual([
       ['core.projects:config', 'Read every project’s build, dev and database scripts'],
