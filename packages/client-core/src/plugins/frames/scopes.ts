@@ -1,7 +1,7 @@
 // Which node routes a sandboxed plugin frame may reach, and under which declared scope
 // (docs/plugins.md).
 //
-// This is the choke point. A frame has no token, no origin and no network — every call it makes is a
+// This is the choke point. A frame has no token, no origin and no network. Every call it makes is a
 // `path` on this table, forwarded by the broker through the host's per-node client. So the whole of
 // "what can a third-party plugin do to my machine" is decided here, and the table is deliberately an
 // allowlist of (path shape, method) pairs rather than a prefix match.
@@ -21,13 +21,13 @@
 //   unknown       not on the table at all: denied, and the test fails until someone classifies it.
 //
 // The two project-config PUTs are the sharpest entry in the unmappable group and worth stating twice:
-// they write `setup_script`, `dev_script`, `teardown_script` and `db_url_script` — shell commands the
+// they write `setup_script`, `dev_script`, `teardown_script` and `db_url_script`: shell commands the
 // Node executes on the next task. A bridge that mapped them would let a frame with no network and no
 // token achieve arbitrary code execution on the Node by writing a script and waiting.
 
 // The plugin route namespace, spelled out here rather than imported. node-core owns the constant
 // (server/routeRegistry.ts) and the client may not import node code; @acorn/protocol is not an option
-// either — an architecture rule forbids protocol from naming a plugin route at all, on the grounds
+// either. An architecture rule forbids protocol from naming a plugin route at all, on the grounds
 // that plugin wire surfaces belong to the plugin.
 const PLUGIN_NAMESPACE = '/v2/p/'
 
@@ -74,7 +74,7 @@ const RULES: readonly RouteRule[] = [
     path: shape(`/v2/core/tasks/${SEG}/archive-concerns`),
     scopes: {},
     note: 'Every plugin\'s answer about archiving this task, in one list. No scope, because reading '
-      + 'it would hand a frame the other installed plugins\' warnings about the owner\'s work — a '
+      + 'it would hand a frame the other installed plugins\' warnings about the owner\'s work, a '
       + 'cross-plugin read this profile refuses. The dialog that shows it is the host\'s own.',
   },
 
@@ -107,7 +107,7 @@ const RULES: readonly RouteRule[] = [
   {
     path: shape(`/v2/core/workspaces/${SEG}`),
     scopes: { GET: 'core.workspaces:read' },
-    note: 'Every workspace mutation is unmappable — a workspace is the top-level unit a user organises by hand.',
+    note: 'Every workspace mutation is unmappable: a workspace is the top-level unit a user organises by hand.',
   },
   { path: shape(`/v2/core/workspaces/${SEG}/external-projects`), scopes: { GET: 'core.workspaces:read' } },
 
@@ -134,11 +134,11 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v2/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },
   { path: shape(`/v2/core/plugins/${SEG}/client.js`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
   // Permanently unmapped, and the sharpest case in this table. A frame that could reach these would let
-  // a sandboxed plugin fetch and install arbitrary code that runs unsandboxed inside the node — every
+  // a sandboxed plugin fetch and install arbitrary code that runs unsandboxed inside the node. Every
   // other line here would stop mattering (docs/security.md).
   { path: shape('/v2/core/plugins/install'), scopes: {}, note: 'Installs code that runs with the Node’s own access.' },
   { path: shape(`/v2/core/plugins/${SEG}/update`), scopes: {} },
-  // The one route in this family that makes code run RIGHT NOW rather than after a restart, which is
+  // The one route in this family that makes code run right now rather than after a restart, which is
   // exactly why a frame must not be able to reach it: a prompt-injected agent driving a frame could
   // otherwise re-run a plugin's node half on its own timing.
   { path: shape(`/v2/core/plugins/${SEG}/reload`), scopes: {} },
@@ -169,7 +169,7 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v2/core/integrations/${SEG}/test`), scopes: {}, note: 'Spends another plugin’s credential.' },
   // Read-shaped and still unmappable, for both halves of the rule above it: the call spends another
   // plugin's credential on an outbound request, and what it returns is the project names inside someone
-  // else's connected account. A provider reaches its OWN projects through its own descriptor, which is
+  // else's connected account. A provider reaches its own projects through its own descriptor, which is
   // where it declared them; nothing needs to read a sibling's through the bridge.
   { path: shape(`/v2/core/integrations/${SEG}/projects`), scopes: {} },
 ]
@@ -184,7 +184,7 @@ const pathOnly = (path: string): string => path.split(/[?#]/, 1)[0]
 
 /**
  * Is this frame allowed to make this call? `api` is the plugin's manifest-declared scope list, read by
- * the host from disk — never anything the frame sent.
+ * the host from disk, never anything the frame sent.
  */
 export function allowApi(
   binding: { pluginId: string; api: readonly string[] },
@@ -193,7 +193,7 @@ export function allowApi(
 ): ApiDecision {
   if (!isApiMethod(method)) return DENY(`unsupported method ${method}`)
 
-  // Shape first. A path that is not an absolute node path is not a path we can classify at all — and a
+  // Shape first. A path that is not an absolute node path is not a path we can classify at all, and a
   // protocol-relative `//host/x` would be a URL wearing a path's clothes.
   if (!path.startsWith('/') || path.startsWith('//')) return DENY('path must be absolute')
   const target = pathOnly(path)
@@ -233,11 +233,11 @@ export const GRANTABLE_SCOPES: readonly string[] = [
 ].sort()
 
 // Consent copy for every scope this table can grant, with how the trust prompt draws it. The severity
-// and the icon live HERE, beside the grant, rather than being guessed back from the sentence: this
+// and the icon live here, beside the grant, rather than being guessed back from the sentence: this
 // table is the only place that knows how serious `core.projects:read` is.
 //
-// The copy is free to change. It used to be the update-diff key — a rewording marked the line as newly
-// requested for every owner of every installed plugin — and the scope name is the key now
+// The copy is free to change. It used to be the update-diff key: a rewording marked the line as newly
+// requested for every owner of every installed plugin. The scope name is the key now
 // (plugins/permissions.ts).
 const SCOPE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   'core.projects:config': { text: 'Read every project’s build, dev and database scripts', icon: 'file-cog', high: true },

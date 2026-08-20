@@ -8,29 +8,21 @@ import Icon from '../../ui/Icon'
 import { chromeKey, chromeRevision } from './data'
 import './extension-points.css'
 
-// The one place another plugin's rows are drawn inside a plugin's surface — and they are drawn by the
-// HOST, with the shell's own primitives, from data.
+// The one place another plugin's rows are drawn inside a plugin's surface, by the host, with the
+// shell's own primitives, from data (docs/plugins.md § Cooperative extension points).
 //
 // `Row`, `Badge`, `SectionHeader` and `Icon` are the same primitives the descriptor rail list uses, so a
-// contributed section is pixel-identical to a first-party one under every appearance pack. That is the
-// argument for descriptors over any in-realm alternative at this size: not the cost, but that nothing
-// running inside the owner's frame could look like this, and nothing running inside the owner's frame
-// should be somebody else's code in the first place.
+// contributed section is pixel-identical to a first-party one under every appearance pack.
 //
-// PROVENANCE IS DRAWN, not just recorded. Every group carries the contributing plugin's id beside its
-// label, because a section appearing inside another plugin's pane is exactly the situation where "whose
-// is this?" has to have an answer on screen. The id comes off the registry entry, which the chrome pass
-// stamped from the manifest it read — never from anything the contribution's route returned.
-//
-// The DECISIONS are all in registries/extensionPoints.ts, which is JSX-free and has a test: which point
+// The decisions are all in registries/extensionPoints.ts, which is JSX-free and has a test: which point
 // resolves, whether either side is running, the ordering. This file is a `<For>` over the answer.
 
 function ExtensionGroup(props: { contribution: ExtensionContribution }) {
   const nodeId = activeNodeId() ?? ''
   const [result] = createFleetQuery(
     () => chromeKey(props.contribution.pluginId, props.contribution.id),
-    // The node is already bound into `fetch` by the chrome pass, from the surface's own active node —
-    // the fan-out's parameter is the same value and is not read again here.
+    // The node is already bound into `fetch` by the chrome pass, from the surface's own active node.
+    // The fan-out's parameter is the same value and is not read again here.
     //
     // A contributor whose node is unreachable contributes nothing, which is the same answer as a
     // contributor with nothing to say. The owner's pane is not the place to report somebody else's
@@ -46,8 +38,8 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
       <section class="extension-group">
         <SectionHeader
           level="group"
-          // The stamp. Not a decoration and not shortenable to an icon: the whole promise of the seam is
-          // that an owner can tell which package put a row in front of them.
+          // The stamp: not a decoration and not shortenable to an icon. See docs/plugins.md §
+          // Cooperative extension points for why provenance is drawn rather than only recorded.
           actions={<span class="muted extension-group-owner">{props.contribution.pluginId}</span>}
         >
           {props.contribution.label}
@@ -71,7 +63,7 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
 }
 
 /** Everything delivered into one point, or nothing at all. Renders no chrome of its own when the point
- *  has no deliveries — an owner who reserved a strip nobody fills sees their pane exactly as it was. */
+ *  has no deliveries: an owner who reserved a strip nobody fills sees their pane exactly as it was. */
 export default function ExtensionPointHost(props: { pointId: string }) {
   return (
     <Show when={extensionDeliveries(props.pointId).length}>

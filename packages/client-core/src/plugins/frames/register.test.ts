@@ -29,9 +29,9 @@ const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = aw
 // The frame host pass (docs/plugins.md § Frame contribution kind).
 //
 // The sibling of chrome/register.test.ts, and it exists because this module stopped being a `.tsx`
-// file. What is pinned is the pass's CONTRACT rather than the rectangles: which registry each target
-// lands in, the trust gate (stronger than chrome's, deliberately), the routes it re-confines on
-// arrival, per-node presence, and dispose-then-register.
+// file. What is pinned is the pass's contract rather than the rectangles: which registry each target
+// lands in, the trust gate (stronger than chrome's), the routes it re-confines on arrival, per-node
+// presence, and dispose-then-register.
 
 const HASH = 'a'.repeat(64)
 
@@ -59,7 +59,7 @@ const row = (name: string, declared: Partial<PluginContributions> = {}, over: Pa
   ...over,
 })
 
-// One accepted plugin on node-a. Everything below starts here, because a frame mounts BYTES: an
+// One accepted plugin on node-a. Everything below starts here, because a frame mounts bytes: an
 // unaccepted bundle registers nothing at all, which is the first test rather than a precondition.
 const seedTrusted = (...rows: NodePluginRow[]): void =>
   _seedPluginDistribution([['node-a', rows]], rows.map((entry) => `${entry.name} ${HASH}`))
@@ -113,7 +113,7 @@ describe('syncFrameContributions', () => {
   it('a coreSlot surface registers an OFFER, and replaces nothing until the owner picks it', () => {
     // The exclusive slot (registries/exclusiveSlots.ts owns the arbitration and its own test). What this
     // one pins is the wiring: the target lands in its own registry rather than in `panes`, so a
-    // replacement never appears in the pane switcher — and registering it changes nothing on screen.
+    // replacement never appears in the pane switcher, and registering it changes nothing on screen.
     seedTrusted(row('board', {
       frames: [surface({ target: 'coreSlot', id: 'board-rail', coreSlot: 'rail.taskList' })],
     }))
@@ -137,7 +137,7 @@ describe('syncFrameContributions', () => {
 
   it('registers nothing at all until this device has accepted the exact bytes', () => {
     // The gate that makes "never auto-run code a Node pushed" hold at the registration boundary rather
-    // than at the iframe. Stronger than the chrome pass's, which only asks whether code was WITHHELD.
+    // than at the iframe. Stronger than the chrome pass's, which only asks whether code was withheld.
     _seedPluginDistribution([['node-a', [row('board', ALL_TARGETS)]]])
     syncFrameContributions()
     expect(ids().panes).toEqual([])
@@ -198,7 +198,7 @@ describe('syncFrameContributions', () => {
     seedTrusted(row('board', ALL_TARGETS))
     _seedPluginDistribution([['node-a', [row('board', ALL_TARGETS)]], ['node-b', []]], [`board ${HASH}`])
     syncFrameContributions()
-    // Each registry hands its gate something different — a task, nothing, the shell's render context —
+    // Each registry hands its gate something different (a task, nothing, the shell's render context),
     // and a plugin surface reads none of it, which is the point: presence on the node is the whole
     // question, so the same predicate is correct in all three places.
     const task = { id: 'task-1' } as Task
@@ -225,7 +225,7 @@ describe('syncFrameContributions', () => {
     seedTrusted(row('board', ALL_TARGETS))
     syncFrameContributions()
     // The registries throw on a duplicate id, so a pass that failed to dispose would not merely double
-    // the list — it would take the plugin's surfaces away entirely.
+    // the list. It would take the plugin's surfaces away entirely.
     syncFrameContributions()
     expect(ids().panes).toEqual(['board-pane', 'board-web'])
     expect(ids().slots).toEqual(['board-picker'])
@@ -270,7 +270,7 @@ describe('syncFrameContributions', () => {
     })
 
     it('refuses a panel that claims another plugin’s items', () => {
-      // How a plugin would get its own rows rendered as somebody else's — the same line the content-link
+      // How a plugin would get its own rows rendered as somebody else's, the same line the content-link
       // stamp holds one registry over.
       seedTrusted(row('board', { frames: [surface({ target: 'refPanel', id: 'board-ref', providerId: 'linear' })] }))
       syncFrameContributions()
@@ -302,7 +302,7 @@ describe('syncFrameContributions', () => {
     })
 
     it('re-confines the route on arrival', () => {
-      // The node confined these when it parsed the manifest — but the manifest reached this device as a
+      // The node confined these when it parsed the manifest, but the manifest reached this device as a
       // roster row, which is bytes a node sent.
       const refused = [
         { frames: [projectPane] },
@@ -383,7 +383,7 @@ describe('frameBindingFor', () => {
   }
 
   it('allows openPane to name this plugin’s task panes and nothing else', () => {
-    // The allowlist for the one verb that drives the shell's layout from inside a sandbox. A webview IS
+    // The allowlist for the one verb that drives the shell's layout from inside a sandbox. A webview is
     // a task pane; a project-scoped pane and an overlay are not, and an `openPane` naming either would
     // be an offer that can only fail.
     const board = row('board', declared)
@@ -392,7 +392,7 @@ describe('frameBindingFor', () => {
   })
 
   it('re-applies the closed key-claim policy to a roster row', () => {
-    // The node parsed these already. The device checks again, because a roster row is wire input — and
+    // The node parsed these already. The device checks again, because a roster row is wire input, and
     // a plugin that could claim Escape or ⌘K would take the shell's own way out.
     const claimed = surface({ target: 'pane', id: 'board-pane', claimsKeys: ['meta+shift+b', 'escape', 'meta+k', 'b'] })
     const board = row('board', { frames: [claimed] })
@@ -410,7 +410,7 @@ describe('frameBindingFor', () => {
     const board = row('board', declared)
     expect(frameBindingFor('board', declared.frames![0]!, board).nodeId).toBe('node-a')
     setActiveNode(null)
-    // The browser-served `dev:node` mode, where the origin IS the node.
+    // The browser-served `dev:node` mode, where the origin is the node.
     expect(frameBindingFor('board', declared.frames![0]!, board).nodeId).toBe('')
   })
 })

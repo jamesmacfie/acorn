@@ -16,22 +16,10 @@ const { extensionDeliveries, extensionPointFor, extensionPointRegistry, extensio
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
 const { _resetChromeContributions, syncChromeContributions } = await import('./register')
 
-// The cooperative cross-plugin seam, end to end through the pass that builds it
-// (docs/plugins.md § Cooperative extension points).
-//
-// What is worth pinning is not that two registries hold rows — it is the four promises the design makes
-// and the one it refuses:
-//
-//   the host mints the names           a point is `<owner>:<id>`, a contribution `plugin:<who>:<id>`.
-//   the host stamps the provenance     every delivery carries the contributing plugin's id.
-//   an unmatched contribution is quiet A point that is not there — never declared, plugin absent,
-//                                      disabled on this node, or dropped in an update — delivers
-//                                      nothing, with no error and nothing to catch.
-//   both ends must be live             either plugin missing from the node being looked at is the same
-//                                      silent nothing.
-//   B cannot reach past its own routes a contribution reading somebody else's namespace is refused, so
-//                                      "reading another plugin's routes" is impossible rather than
-//                                      merely forbidden.
+// The cooperative cross-plugin seam, end to end through the pass that builds it. Pins the four
+// promises and the one refusal docs/plugins.md § Cooperative extension points describes: the host
+// mints both names, the host stamps provenance, an unmatched contribution is quiet, both ends must be
+// live, and B cannot reach past its own routes.
 
 const HASH = 'a'.repeat(64)
 
@@ -119,8 +107,8 @@ describe('cooperative extension points', () => {
   })
 
   it('delivers nothing when the point was never declared', () => {
-    // The guest alone. Its contribution still REGISTERS — a point comes from another manifest in a pass
-    // whose order nobody controls, so refusing here would make delivery depend on roster order — and it
+    // The guest alone. Its contribution still registers: a point comes from another manifest in a pass
+    // whose order nobody controls, so refusing here would make delivery depend on roster order. It
     // simply has nowhere to go.
     _seedPluginDistribution([['node-a', [row('tracker', GUEST_PLUGIN)]]])
     syncChromeContributions()
@@ -145,7 +133,7 @@ describe('cooperative extension points', () => {
       row('tracker', GUEST_PLUGIN),
     ]]])
     syncChromeContributions()
-    // Both rows are registered — the roster still describes them — and the gate is at delivery.
+    // Both rows are registered (the roster still describes them), and the gate is at delivery.
     expect(pointIds()).toEqual(['board:card-links'])
     expect(extensionDeliveries('board:card-links')).toEqual([])
 
@@ -177,7 +165,7 @@ describe('cooperative extension points', () => {
         point: 'board:card-links',
         label: 'Linear issues',
         order: 500,
-        // The point OWNER's namespace. This is the shape of "read another plugin's routes", and it is
+        // The point owner's namespace. This is the shape of "read another plugin's routes", and it is
         // refused by the same confinement every descriptor route gets.
         items: '/v2/p/board/cards',
       }],
