@@ -29,19 +29,10 @@ import { readJson, writeJson } from '../../apiClient'
 import { wsOnStatus } from '../../wsClient'
 import { ownsTaskOrigin } from './ownership'
 
-// Reading a descriptor's route, and knowing when to read it again
-// (docs/plugins.md).
-//
-// Two things this module is responsible for, and they are both about not trusting the far end.
-//
-//   CONFINEMENT. The manifest's routes were confined to `/v2/p/<id>/` when the node parsed it — but
-//   the manifest reaches this device as a ROSTER ROW, and a roster row is bytes a node sent. The same
-//   argument that makes the device hash bundle bytes itself applies to a path it is about to fetch on
-//   a plugin's behalf, so the check is repeated here rather than assumed.
-//
-//   SHAPE. A route body is the plugin's own output. A malformed row is dropped and logged; nothing
-//   from a plugin route is allowed to throw into the shell, because the shell drawing this chrome is
-//   the whole point of the phase — a bad badge must not take the task footer with it.
+// Reads a plugin's descriptor routes (badges, rail items, collections, agent context). The manifest's
+// routes were confined to `/v2/p/<id>/` at parse time, but this arrives as a roster row, so the path is
+// re-checked here and a malformed body is dropped rather than thrown into the shell chrome
+// (docs/security.md § Third-party plugin bundles; docs/plugins.md § Cooperative extension points).
 
 // Re-spelled rather than imported, for the reason plugins/frames/scopes.ts gives at length: the
 // namespace is node-core's (server/routeRegistry.ts) and @acorn/protocol is forbidden from naming a
@@ -62,7 +53,7 @@ export const ownsRoute = (pluginId: string, path: string): boolean => {
 
 // ── Freshness ─────────────────────────────────────────────────────────────────────────────────────
 
-// One revision for ALL chrome, bumped by the node's content-free status ping and by the polling
+// One revision for all chrome, bumped by the node's content-free status ping and by the polling
 // fallback. `ctx.events.status()` carries no payload by design (node-core/server/plugin/types.ts
 // calls the channel "an invalidation channel, not an event log"), so there is nothing finer to key on
 // without inventing an event type the phase doc explicitly says not to invent.
@@ -103,8 +94,8 @@ export function unwatchChrome(): void {
 
 // Private to chrome. The fan-out writes through the node's QueryClient (node/fanout.ts states the
 // rule), so a key shared with a domain reader would have to share its value shape; nothing else in
-// the app has this shape. `nodeId` is absent on purpose — the cache is already partitioned per node.
-// `scope` is whatever else went INTO the path — today only the rail's project, which
+// the app has this shape. `nodeId` is absent on purpose: the cache is already partitioned per node.
+// `scope` is whatever else went into the path, today only the rail's project that
 // `scopedSourceItemsPath` appends. It has to be in the key because the cache is served on mount now: a
 // key that names only the source would hand the next project the previous project's rows.
 export const chromeKey = (pluginId: string, contributionId: string, scope?: string): readonly unknown[] =>
@@ -211,7 +202,7 @@ export async function readAttention(pluginId: string, path: string, nodeId: stri
   return rows.filter((row) => isAttentionItem(row) || (drop(pluginId, 'attention item', row), false)) as PluginAttentionWireItem[]
 }
 
-// One row a cooperative extension point delivers. Display strings only — there is no `action` on the
+// One row a cooperative extension point delivers. Display strings only: there is no `action` on the
 // wire, because the verb was declared once on the contribution and checked when the node parsed the
 // manifest. That is the difference between a descriptor crossing a plugin boundary and a plugin handing
 // another plugin's surface something to run.
@@ -228,7 +219,7 @@ export const sanitizeExtensionItem = (row: unknown): PluginExtensionItem | null 
   }
 }
 
-/** A contribution's rows, read from the CONTRIBUTOR's own namespace. Per-row sanitising rather than
+/** A contribution's rows, read from the contributor's own namespace. Per-row sanitising rather than
  *  all-or-nothing, exactly as the rail list is: these are drawn inside somebody else's surface, and one
  *  malformed row must not blank a section the owner reserved. */
 export async function readExtensionItems(
@@ -283,7 +274,7 @@ export async function readAgentContextOptions(
   return parsed.data
 }
 
-/** What the HOST binds on a captured snapshot, none of it readable from the plugin's response. */
+/** What the host binds on a captured snapshot, none of it readable from the plugin's response. */
 export type AgentContextBinding = {
   // Derived from the plugin id by the caller, never taken from the manifest. The composer groups and
   // replaces snapshots by `source`, so a plugin naming another's would evict its context.
@@ -349,10 +340,10 @@ export async function captureAgentContext(
 
 // ── Ref resolution ────────────────────────────────────────────────────────────────────────────────
 //
-// The cross-plugin enrichment POST (@acorn/protocol/refResolvers.ts). Same posture as the capture above
-// — real parser, host-bound provenance — with one extra reason for care: this route spends the
-// provider's credentials on a cache miss, which is why the identifier list is capped HERE as well as in
-// the schema. It is already behind `requireProviderAccess` through the provider mount on the node; that
+// The cross-plugin enrichment POST (@acorn/protocol/refResolvers.ts). Same posture as the capture
+// above: a real parser, host-bound provenance, with one extra reason for care. This route spends the
+// provider's credentials on a cache miss, so the identifier list is capped here as well as in the
+// schema. It is already behind `requireProviderAccess` through the provider mount on the node; that
 // gate is the authorisation and this cap is the budget, and neither replaces the other.
 export async function resolveRefs(
   pluginId: string,
@@ -409,14 +400,14 @@ export async function readCollection(
   const parsed = pluginCollectionResponseSchema.safeParse(body)
   if (!parsed.success) {
     // All-or-nothing, like the ref resolutions above and unlike the per-row rail sanitiser. A
-    // half-parsed collection is the worst of the three outcomes: it renders SOME rows and silently
+    // half-parsed collection is the worst of the three outcomes: it renders some rows and silently
     // drops the rest, so a person reads a complete-looking list that is missing the thing they were
     // looking for. An empty panel at least says nothing rather than saying something false.
     drop(pluginId, `collection '${collectionId}'`, body)
     return emptyCollectionPage()
   }
-  // Provenance is stamped from the contribution whose route answered, never read from the row — the
-  // same rule `resolveRefs` applies to `providerId`. A mixed board renders source badges and routes row
+  // Provenance is stamped from the contribution whose route answered, never read from the row, the
+  // same rule `resolveRefs` applies to `providerId`. A mixed board renders source badges and row
   // actions on this stamp, so a row that could name its own plugin could put its items behind a
   // stranger's badge and its clicks into a stranger's pane. The schema does not carry the two fields at
   // all, so a body that states them has them stripped before this line ever runs.
@@ -428,7 +419,7 @@ export async function readCollection(
 
 export async function readStat(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<number> {
   const body = await read<PluginNodeStatValue>(pluginId, path, nodeId, signal)
-  // A stat that is not a number is hidden the same way a failed fetch is — Fleet home already treats
+  // A stat that is not a number is hidden the same way a failed fetch is. Fleet home already treats
   // `0` as "nothing to report" (registries/nodeStats.ts).
   if (!Number.isFinite(body?.value)) {
     drop(pluginId, 'stat', body)

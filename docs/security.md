@@ -90,6 +90,12 @@ machine's to make. This mirrors repo-config trust one level out: that binds a pr
 a config the Node will execute and is stored on the Node; this binds a plugin to the hash of a bundle
 the device will execute and is stored beside the device token.
 
+**What "gained" means.** Each rendered permission line carries a stable grant key, separate from its
+sentence (`packages/client-core/src/plugins/permissions.ts`). The update diff compares keys, not
+copy, so tightening a sentence's wording never re-prompts an existing owner as though the plugin had
+grown its reach. Only a key that did not exist before does that. A grant's severity (`icon`, `high`)
+rides beside the key as data, not something parsed back out of the copy.
+
 The threats this closes, and the ones it does not:
 
 - **A compromised or hostile paired Node serving malicious JavaScript** — hash-verified bytes, a
