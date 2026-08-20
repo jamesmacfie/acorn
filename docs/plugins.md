@@ -1072,6 +1072,41 @@ kinds of contribution come out of one manifest:
   }
   ```
 
+### One shared eligibility and trust check
+
+Both registration passes (frames and chrome) need the same answer to "who may contribute, and what did
+they declare": identity and trust. That answer used to be written out twice, in `frames/register.ts`
+and `chrome/register.ts`, including a byte-identical task-pane predicate that feeds the `openPane`
+allowlist, the list deciding which pane ids a sandboxed frame may ask the host to open. A security
+check maintained in two copies, connected by nothing, fails silently in whichever direction an author
+updates only one of them, and `tsc` stays quiet because each copy is locally consistent on its own.
+`packages/client-core/src/plugins/contributions.ts` now owns that shared half; the passes keep their
+own job, rendering a sandboxed iframe versus registering a command palette row.
+
+`eligiblePlugins()` returns one row per plugin id, and each row's `hash` and `trusted` come from the
+same place: the bundle that **won fleet resolution**, not the first one a roster happened to list. In a
+mixed-version fleet, node A might offer v1 while node B's v2 wins; taking the manifest from one row and
+the hash from another would register contributions declared by bytes nobody accepted. A package with no
+client half anywhere in the fleet never enters resolution, so it falls back to the first row seen; such
+a package contributes only descriptors and host-drawn surfaces, whose behaviour does not depend on which
+node described them. `trusted` is true only when the device has accepted the exact bytes that won
+resolution, never the row's own claimed hash: a candidate dropped at resolution can still carry a
+`client.hash` in its roster row, and honoring that would let an acceptance recorded against an older,
+runnable build clear a bundle this device has already decided not to run.
+
+Frames and chrome ask different-strength questions of the same row. Frames gate code-bearing surfaces
+on `trusted` outright. Chrome asks the weaker `hasWithheldCode`: does this package carry code the device
+has not been cleared to run? A descriptor-only package has no such code, so withholding its rail rows
+and commands would hide a plugin that executes nothing.
+
+`declaredSurfaces()` classifies a manifest's frames into three disjoint sets, kept apart because folding
+them together would let `openPane` accept an id it must not: `panes` (task-scoped, the only surfaces a
+task's layout can hold, and the `openPane` allowlist itself), `projectPanes` (a rail source's detail
+view, addressed by URL rather than held in a task's layout), and `overlays` (full-screen pickers that
+belong to no task at all). The task-scoped predicate is re-exported from
+`@acorn/protocol/pluginContract.ts` rather than written a third time here, because the node's manifest
+parser checks the same thing when it validates that an `openPane` names a pane the manifest declares.
+
 ### Descriptors for chrome, frames for rectangles
 
 The rule of thumb, and it is a refusal as much as a guideline. **A frame is for a rectangle with real
