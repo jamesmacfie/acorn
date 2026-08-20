@@ -3,7 +3,7 @@ import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
 import { AcornBridgeError, connect, mountFrame, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
 
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node
-// (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it — something
+// (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it: something
 // to hear one `message` event on, and a port. Both are stubbed; the port is a real MessageChannel.
 
 type Hello = { data: unknown; ports: MessagePort[] }
@@ -261,7 +261,7 @@ describe('events', () => {
         : undefined,
     )
     const acorn = await handshake()
-    // `on` is synchronous by design — a plugin registers listeners at startup and should not have to
+    // `on` is synchronous by design. A plugin registers listeners at startup and should not have to
     // await each one.
     expect(() => acorn.events.on('runtime:node-removed', vi.fn())).not.toThrow()
     await new Promise((r) => setTimeout(r, 5))
@@ -285,7 +285,7 @@ describe('the shared document and surface actions', () => {
   })
 
   // The chord landed in the host's editor, where this frame has no keyboard at all. What arrives is the
-  // command id and nothing else — the frame is not told which gesture produced it, deliberately, so it
+  // command id and nothing else. The frame is not told which gesture produced it, so it
   // handles a chord and a palette row through one path.
   it('fans a surface action out to its listeners and stops on unsubscribe', async () => {
     host(() => undefined)
@@ -346,7 +346,7 @@ describe('state and ui', () => {
 
 describe('openLinkOnClick', () => {
   // A stand-in for the one thing the helper touches: `event.target.closest('a')`. There is no DOM here
-  // (client-core's suite is plain Node) and the helper needs none — it reads an href and calls a verb.
+  // (client-core's suite is plain Node) and the helper needs none: it reads an href and calls a verb.
   const clickOn = (href: string | null, over: Partial<MouseEvent> = {}): MouseEvent & { prevented: boolean } => {
     const event = {
       defaultPrevented: false,
@@ -361,12 +361,12 @@ describe('openLinkOnClick', () => {
     return event as unknown as MouseEvent & { prevented: boolean }
   }
 
-  // The helper is fire-and-forget by design — a click handler cannot await — so the port hop has to be
+  // The helper is fire-and-forget by design (a click handler cannot await), so the port hop has to be
   // let through before `sent` can be read.
   //
   // A poll and not a single `setTimeout(0)`, which is what this was. A MessagePort is its own task source,
-  // so a zero-delay timer is not a barrier for it: under real load — the whole workspace's suites running
-  // at once — the timer fired first and the assertion read an empty `sent`. It passed in isolation every
+  // so a zero-delay timer is not a barrier for it: under real load, with the whole workspace's suites
+  // running at once, the timer fired first and the assertion read an empty `sent`. It passed in isolation every
   // time, which is the worst version of this bug.
   const delivered = async (op: string): Promise<Record<string, unknown> | undefined> => {
     for (let attempt = 0; attempt < 200; attempt++) {
@@ -399,7 +399,7 @@ describe('openLinkOnClick', () => {
 
   it('takes a MODIFIED click too, unlike the shell handler it mirrors', async () => {
     // In the shell a cmd-click is the reader asking for a browser tab, so the anchor keeps its default.
-    // Inside a frame there is no default to keep — the sandbox has no `allow-popups` — so bailing here
+    // Inside a frame there is no default to keep: the sandbox has no `allow-popups`, so bailing here
     // would make cmd-click the one gesture that does nothing at all.
     const acorn = await connected()
     const event = clickOn('https://example.com/', { metaKey: true, shiftKey: true })
@@ -418,7 +418,7 @@ describe('openLinkOnClick', () => {
       expect(event.prevented, String(href)).toBe(false)
     }
     await flushed()
-    // Filtered, because the handshake ack is the one message that arrives unasked — the SDK posts it on
+    // Filtered, because the handshake ack is the one message that arrives unasked. The SDK posts it on
     // `ready` and the port delivers it a tick later, which is after `before` was read.
     expect(sent.filter((message) => message.kind !== 'connected').length).toBe(before)
   })
@@ -517,7 +517,7 @@ describe('mountFrame', () => {
     host(() => undefined)
     const rendered: { bridge: AcornBridge; root: unknown }[] = []
     mountFrame({ styles: '.rb-row { color: red }' }, (bridge, node) => void rendered.push({ bridge, root: node }))
-    // The stylesheet is injected before the handshake — a frame that never connects still has its CSS,
+    // The stylesheet is injected before the handshake, so a frame that never connects still has its CSS,
     // which is what makes the failure banner below legible.
     expect(head.children.map((child) => child.textContent)).toEqual(['.rb-row { color: red }'])
     expect(root()).toBeTruthy()
@@ -528,7 +528,7 @@ describe('mountFrame', () => {
 
   it('paints the alert primitive on the root when the bridge never arrives', async () => {
     // No window to hear the handshake on, which is what `connect` refuses. There is no framework at this
-    // point — that is the thing that failed — so the Alert primitive's classes go on the root by hand,
+    // point (that is the thing that failed), so the Alert primitive's classes go on the root by hand,
     // and the reader gets a sentence instead of a blank rectangle.
     vi.stubGlobal('addEventListener', undefined)
     let rendered = false

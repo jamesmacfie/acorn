@@ -29,9 +29,9 @@ const { _resetChromeContributions, syncChromeContributions, usableEmptyState } =
 
 // The chrome host pass (docs/plugins.md).
 //
-// What is worth pinning is the pass's CONTRACT rather than the descriptors themselves: the trust gate
-// (which is different from the frame host's, deliberately), per-node presence, dispose-then-register,
-// and that a plugin route's answer can be garbage without the shell noticing.
+// What is worth pinning is the pass's contract rather than the descriptors themselves: the trust gate
+// (different from the frame host's), per-node presence, dispose-then-register, and that a plugin
+// route's answer can be garbage without the shell noticing.
 
 const HASH = 'a'.repeat(64)
 
@@ -124,14 +124,14 @@ describe('syncChromeContributions', () => {
       nodeStats: ['board-count'],
       agentContexts: ['board-context'],
       refResolvers: ['board-refs'],
-      // The registry id is the host's, minted from the plugin id — the descriptor only named its half.
+      // The registry id is the host's, minted from the plugin id. The descriptor only named its half.
       collections: ['board:board-cards'],
     })
   })
 
   it('keeps an empty state’s message but drops an action the device cannot honour', () => {
     // A roster row is wire input, so the empty state's action is re-checked here exactly as a command's
-    // is — the node's parse is not evidence about the bytes that arrived. Dropping the action rather
+    // is: the node's parse is not evidence about the bytes that arrived. Dropping the action rather
     // than the whole state is deliberate: the sentence is the part the rail was missing.
     const message = 'No boards linked yet.'
     const authored = (action: PluginSourceEmptyState['action']): PluginSourceEmptyState =>
@@ -195,7 +195,7 @@ describe('syncChromeContributions', () => {
 
     expect(contentLinkRegistry.entries().map((entry) => entry.id)).toEqual(['first.card', 'second.card'])
     // `providerId` is stamped from the plugin id, which is what lets a link resolve into that plugin's own
-    // reference panel — a manifest never states it, so it cannot point at another plugin's panel.
+    // reference panel. A manifest never states it, so it cannot point at another plugin's panel.
     expect(parseInAppTarget('https://tracker.example/cards/ENG-42')).toEqual({
       kind: 'first.card', key: 'ENG-42', pane: 'first-pane', item: 'ENG-42', providerId: 'first',
     })
@@ -207,7 +207,7 @@ describe('syncChromeContributions', () => {
 
   it('registers a content link whose only destination is the plugin reference panel', () => {
     // A plugin can have items worth glancing at and no task pane at all. `openPane` is optional for exactly
-    // that shape, and the target it produces carries no `pane` — so the host's pane rung declines it and the
+    // that shape, and the target it produces carries no `pane`, so the host's pane rung declines it and the
     // panel rung, resolved by the stamped provider, takes it.
     _seedPluginDistribution([['node-a', [row('board', {}, {
       frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', glyph: 'puzzle', order: 500, formFactor: ['desktop'], providerId: 'board' }],
@@ -238,7 +238,7 @@ describe('syncChromeContributions', () => {
     _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])
     syncChromeContributions()
     // The registries throw on a duplicate id, so a pass that failed to dispose would not merely
-    // double the list — it would take the plugin's chrome away entirely. The reload path calls this
+    // double the list: it would take the plugin's chrome away entirely. The reload path calls this
     // on every `plugins:changed`, so a leaked registration shows up here as a missing contribution.
     syncChromeContributions()
     expect(ids().sources).toEqual(['board'])
@@ -248,7 +248,7 @@ describe('syncChromeContributions', () => {
   })
 
   it('routes each manifest slot name to its own registry and skips one it does not know', () => {
-    // `footer` is a TASK slot and `topbar` a SHELL one. A roster row is bytes a node sent, so a slot
+    // `footer` is a task slot and `topbar` a shell one. A roster row is bytes a node sent, so a slot
     // name from a newer schema is dropped rather than defaulted into whichever registry is handy.
     const slots: Partial<PluginContributions> = {
       slots: [
@@ -339,8 +339,8 @@ describe('syncChromeContributions', () => {
     syncChromeContributions()
     expect(ids().sources).toEqual([])
 
-    // …and everything once it has. Chrome is data, but a plugin whose CODE the owner declined does not
-    // get to decorate the shell — its panes were never registered, so its `openPane` could not land.
+    // ...and everything once it has. Chrome is data, but a plugin whose code the owner declined does not
+    // get to decorate the shell. Its panes were never registered, so its `openPane` could not land.
     _seedPluginDistribution([['node-a', [withBundle]]], [`board ${HASH}`])
     syncChromeContributions()
     expect(ids().sources).toEqual(['board'])
@@ -372,7 +372,7 @@ describe('syncChromeContributions', () => {
     syncChromeContributions()
     readJson.mockResolvedValue({ schema: { fields: [] }, rows: [] })
     // `project` is what a placement will want to add later, and a plugin that never declared it has
-    // not agreed to answer for it — a caller inventing a scope is how a panel would quietly widen a
+    // not agreed to answer for it. A caller inventing a scope is how a panel would quietly widen a
     // route's contract without the manifest saying so.
     await collectionRegistry.get('board:board-cards')!
       .fetch('node-a', { lane: 'doing', project: 'p-1' }, new AbortController().signal)
@@ -397,7 +397,7 @@ describe('syncChromeContributions', () => {
     const hostile: Partial<PluginContributions> = { attention: [{ id: 'a', order: 500, items: '/v2/core/tasks' }] }
     _seedPluginDistribution([['node-a', [row('board', {}, hostile)]]])
     syncChromeContributions()
-    // The node's parser already rejected this — but the manifest reaches the device as a roster row,
+    // The node's parser already rejected this, but the manifest reaches the device as a roster row,
     // and a roster row is bytes a node sent.
     await expect(attentionRegistry.get('a')!.fetch('node-a', new AbortController().signal)).rejects.toThrow(/may not read/)
     expect(readJson).not.toHaveBeenCalled()
@@ -545,7 +545,7 @@ describe('syncChromeContributions', () => {
     })
 
     it('resolves nothing rather than partly when the answer does not parse', async () => {
-      // Including the shape the route used to answer with, `{ issues: [...] }` — a wrapped body is
+      // Including the shape the route used to answer with, `{ issues: [...] }`. A wrapped body is
       // exactly what a plugin written against the old contract would send.
       for (const body of [{ issues: [row1] }, [{ identifier: 'ENG-1' }], [{ ...row1, label: 'x'.repeat(400) }], null]) {
         writeJson.mockResolvedValue(body)

@@ -7,23 +7,23 @@ import type { AcornBridge } from './sdk'
 // A sandboxed frame's whole ability to affect the world is a small set of verbs, and until now each
 // one had to be written into five modules by hand: the wire union (@acorn/protocol/pluginBridge.ts),
 // the author-facing type and its implementation (sdk.ts), the host-side contract (`FrameServices`)
-// and the host-side implementation (PluginFrame.tsx). TypeScript stitches SOME of those pairs
-// together — the sdk's `api` literal is typed `AcornBridge`, so it cannot be short — but never the
-// chain end to end, because the MessagePort in the middle is untyped traffic.
+// and the host-side implementation (PluginFrame.tsx). TypeScript stitches some of those pairs together
+// (the sdk's `api` literal is typed `AcornBridge`, so it cannot be short), but never the chain end to
+// end, because the MessagePort in the middle is untyped traffic.
 //
 // That gap has already cost something real: `sdk.ts` records that the protocol and the broker both
 // carried `PUT` from the start and only the SDK facade did not, so plugin authors simply could not
 // make PUT requests, for no reason anyone had decided, until someone noticed.
 //
-// This module is TYPES ONLY plus one list. It changes no runtime behaviour and moves no validation:
-// the broker's switch stays exactly as readable and auditable as it was, which is the right trade at
-// a security membrane — a table that made the denial paths implicit would be worse than the
-// duplication it removed. What it buys is that a verb present on the wire and absent from either
-// surface is a compile error rather than a bug report from a third-party author.
+// This module is types only, plus one list. It changes no runtime behaviour and moves no validation:
+// the broker's switch stays exactly as readable and auditable as it was, which is the right trade at a
+// security membrane. A table that made the denial paths implicit would be worse than the duplication
+// it removed. What it buys is that a verb present on the wire and absent from either surface is a
+// compile error rather than a bug report from a third-party author.
 
 // ── The wire vocabulary, derived rather than restated ──────────────────────────────────────────────
 //
-// One name per thing a frame can send. `api` is keyed by METHOD because that is the granularity the
+// One name per thing a frame can send. `api` is keyed by method because that is the granularity the
 // author surface has (and the granularity the PUT scar happened at); everything else is `kind:op`,
 // or bare `kind` where there is no op.
 type VerbName<R> = R extends { kind: 'api'; method: infer M extends string }
@@ -36,7 +36,7 @@ type VerbName<R> = R extends { kind: 'api'; method: infer M extends string }
 
 export type FrameVerb = VerbName<PluginBridgeRequest>
 
-// Sent BY the SDK on the author's behalf, never called by them: `cancel` rides an AbortSignal,
+// Sent by the SDK on the author's behalf, never called by them: `cancel` rides an AbortSignal,
 // `keydown` is forwarded from a key handler the SDK installs, and `connected` is the handshake ack the
 // SDK posts the moment `connect()` resolves. They are wire verbs with no author surface, on purpose.
 type SdkInternalVerb = 'cancel' | 'keydown' | 'connected'
@@ -45,7 +45,8 @@ export type AuthoredVerb = Exclude<FrameVerb, SdkInternalVerb>
 // ── The two projections ───────────────────────────────────────────────────────────────────────────
 //
 // Each member below is a real member access. If a verb lands on the wire and the surface never grew a
-// method for it, the reference on the right-hand side fails to compile — which is the PUT bug, made
+// Each member below is a real member access. If a verb lands on the wire and the surface never grew a
+// method for it, the reference on the right-hand side fails to compile, which is the PUT bug, made
 // unwriteable. Adding a wire variant without adding a row here fails too, via the coverage checks at
 // the bottom.
 

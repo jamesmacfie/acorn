@@ -5,7 +5,7 @@ import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
 import { createFrameBridge, type FrameBinding, type FrameServices } from './broker'
 
-// Over a REAL MessageChannel, not a hand-rolled fake pair: the thing under test is what happens when
+// Over a real MessageChannel, not a hand-rolled fake pair: the thing under test is what happens when
 // untrusted data arrives on a port, and a fake that only ever delivers well-formed messages would test
 // the happy path of the protocol rather than the enforcement.
 
@@ -329,7 +329,7 @@ describe('ui verbs', () => {
 
   it('refuses openUrl while the frame is not focused', async () => {
     // A navigation is a person's act. A click or keypress inside the frame's document focuses the
-    // iframe, so a frame whose document does NOT hold focus is code acting on its own — a background
+    // iframe, so a frame whose document does not hold focus is code acting on its own. A background
     // surface must not be able to move the reader.
     const h = withBridge({}, services({ frameHasFocus: vi.fn(() => false) }))
     h.send({ id: 50, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
@@ -339,8 +339,8 @@ describe('ui verbs', () => {
   })
 
   it('throttles a second openUrl inside the minimum gap', async () => {
-    // The focus check is a raised bar, not a wall — a visible frame's own script can pull focus to
-    // itself — so the throttle is what caps how fast a hostile frame can push the reader around.
+    // The focus check is a raised bar, not a wall (a visible frame's own script can pull focus to
+    // itself), so the throttle is what caps how fast a hostile frame can push the reader around.
     const h = withBridge()
     h.send({ id: 51, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
     h.send({ id: 52, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/2' })
@@ -353,7 +353,7 @@ describe('ui verbs', () => {
   it('survives an effect that disposes the bridge, which is what a refPanel swap does', async () => {
     // Not gated by surface, unlike the importer verbs: every frame renders content and every frame's
     // content can contain a link. The refPanel case is the interesting one because resolving the link
-    // can replace the panel this frame IS — so the host's handler tears the port down from inside the
+    // can replace the panel this frame is, so the host's handler tears the port down from inside the
     // call, and the broker must not fall over or keep answering afterwards.
     const svc = services()
     const h = withBridge({ target: 'refPanel', taskId: undefined }, svc)
@@ -403,9 +403,9 @@ describe('webview verbs', () => {
 })
 
 describe('the shared document', () => {
-  // A composed pane's frame reaching the editor beside it. The permission check is STRUCTURAL rather
-  // than a declared scope — a frame either has a document beside it or it does not, and which one is a
-  // fact about the manifest the host already read — so the absence of `services.document` is the whole
+  // A composed pane's frame reaching the editor beside it. The permission check is structural rather
+  // than a declared scope. A frame either has a document beside it or it does not, and which one is a
+  // fact about the manifest the host already read, so the absence of `services.document` is the whole
   // gate, and that is what these pin.
   const doc = (over: Partial<NonNullable<FrameServices['document']>> = {}) => ({
     read: vi.fn(() => 'SELECT 1;'),
@@ -474,7 +474,7 @@ describe('malformed and hostile traffic', () => {
     const h = withBridge()
     await h.settled(1)
     expect(h.connects).toBe(0)
-    // The SDK's ack. Not a request — no id — so it is consumed here and never answered.
+    // The SDK's ack. Not a request (no id), so it is consumed here and never answered.
     h.send({ kind: 'connected' })
     await new Promise((r) => setTimeout(r, 10))
     expect(h.connects).toBe(1)
