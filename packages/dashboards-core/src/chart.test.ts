@@ -15,8 +15,8 @@ import {
 } from './chart'
 import { viewsForSchema } from './model'
 
-// The chart's arithmetic. `ChartView.tsx` cannot be tested here — vitest runs in node with no Solid
-// plugin — so everything that can be wrong lives in `chart.ts` and is checked below.
+// The chart's arithmetic. `ChartView.tsx` cannot be tested here, because vitest runs in node with no
+// Solid plugin, so everything that can be wrong lives in `chart.ts` and is checked below.
 
 const DAY = 86_400_000
 
@@ -83,10 +83,10 @@ describe('type-inferred defaults', () => {
   })
 
   it('always counts rows, and never pre-picks a number field to sum', () => {
-    // The field vocabulary cannot tell a QUANTITY from an IDENTIFIER — `number` covers a size in MB and
-    // github's pull request number alike — so summing "the first number there is" opened the PR panel
-    // on the sum of PR numbers, an axis reaching 200,000 that meant nothing. A count always means
-    // something, and the sum is one select away.
+    // The field vocabulary cannot tell a quantity from an identifier, since `number` covers a size in
+    // MB and github's pull request number alike. Summing "the first number there is" opened the PR
+    // panel on the sum of PR numbers, an axis reaching 200,000 that meant nothing. A count always
+    // means something, and the sum is one select away.
     expect(defaultChartView(schema(status, size), {})).toMatchObject({ aggregate: 'count' })
     expect(defaultChartView(schema(status, size), {}).field).toBeUndefined()
     expect(defaultChartView(schema(status), {})).toMatchObject({ aggregate: 'count' })
@@ -149,7 +149,7 @@ describe('bar charts', () => {
     const plot = buildChart(rows, schema(status), { kind: 'chart', shape: 'bar', x: 'state' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.bars.map((bar) => bar.tone)).toEqual(['warn', 'ok'])
-    // A declared value carries NO series slot: identity colour has no job where meaning is declared.
+    // A declared value carries no series slot: identity colour has no job where meaning is declared.
     expect(plot.bars.every((bar) => bar.series === undefined)).toBe(true)
   })
 
@@ -158,8 +158,8 @@ describe('bar charts', () => {
     const undeclared = ['a', 'b', 'c', 'd', 'e'].map((value, index) => row(`${index}`, { kind: value }))
     const plot = buildChart(undeclared, schema(kind), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
-    // Three slots then the fold — and not one of them borrows ok/warn/bad, which is the whole point
-    // of the decision (charts.md § 1).
+    // Three slots then the fold, and not one of them borrows ok, warn or bad. See
+    // docs/dashboards.md § Views are derived, not chosen from a menu.
     expect(plot.bars.map((bar) => bar.series)).toEqual([1, 2, 3, 'other', 'other'])
     expect(plot.bars.every((bar) => bar.tone === undefined)).toBe(true)
   })
@@ -174,7 +174,7 @@ describe('bar charts', () => {
   it('keeps every bar inside the plot area', () => {
     const plot = buildChart(rows, schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
-    // Against the plot's OWN frame, not a module constant: the left gutter is as wide as this chart's
+    // Against the plot's own frame, not a module constant. The left gutter is as wide as this chart's
     // labels needed, so a bounds check against a fixed number would pass for the wrong reason.
     for (const bar of plot.bars) {
       expect(bar.x).toBeGreaterThanOrEqual(plot.frame.plotLeft)
@@ -193,9 +193,9 @@ describe('bar charts', () => {
   })
 
   it('gives a value DECLARED WITHOUT A TONE an identity slot, not the muted default', () => {
-    // The plugin declared that the value exists, not what it means, so there is no meaning to keep —
-    // and colouring every value of an untoned enum `muted` would make them all the same bar
-    // (charts.md § 1: the ramp is for identity with no declared tone).
+    // The plugin declared that the value exists, not what it means, so there is no meaning to keep.
+    // Colouring every value of an untoned enum `muted` would make them all the same bar: the identity
+    // ramp is for identity with no declared tone.
     const kind = { id: 'kind', name: 'Kind', type: 'enum' as const, values: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }
     const plot = buildChart([row('1', { kind: 'a' })], schema(kind), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
@@ -238,10 +238,10 @@ describe('the grouped bar', () => {
   it('clusters one bar per series inside each category, on the shared measure scale', () => {
     const plot = buildChart(rows, schema(status, kind), grouped, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
-    // Two categories × two series, and the arithmetic is the intersection of both bucketings.
+    // Two categories and two series, and the arithmetic is the intersection of both bucketings.
     expect(plot.bars.map((bar) => [bar.label, bar.value]))
       .toEqual([['Open', 1], ['Merged', 1], ['Open', 2], ['Merged', 0]])
-    // The x axis still names the CATEGORY once, at the centre of its cluster.
+    // The x axis still names the category once, at the centre of its cluster.
     expect(plot.xTicks.map((tick) => tick.label)).toEqual(['Open', 'Merged'])
   })
 
@@ -264,8 +264,8 @@ describe('the grouped bar', () => {
   it('colours by SERIES once split, and leaves the categories to the axis', () => {
     const plot = buildChart(rows, schema(status, kind), grouped, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
-    // `kind` declares no tones, so the two series take identity slots — and the status enum's own
-    // warn/ok never reach the marks, because the category is no longer what the colour answers.
+    // `kind` declares no tones, so the two series take identity slots, and the status enum's own warn
+    // and ok never reach the marks because the category is no longer what the colour answers.
     expect(plot.bars.map((bar) => bar.series)).toEqual([1, 1, 2, 2])
     expect(plot.bars.every((bar) => bar.tone === undefined)).toBe(true)
   })
@@ -288,8 +288,9 @@ describe('the grouped bar', () => {
   })
 
   it('is INVISIBLE to a client that does not draw it — the old ungrouped bar, never nothing', () => {
-    // The acceptance test charts.md § 3 set. `series` is a key the codec already round-trips, and the
-    // pre-grouped-bar `buildBar` simply never read it: the same definition still answers a bar.
+    // The compatibility case the grouped bar was designed around. `series` is a key the codec already
+    // round-trips, and the pre-grouped-bar `buildBar` never read it, so the same definition still
+    // answers a bar.
     const plot = buildChart(rows, schema(status, kind), grouped, {})
     expect(plot?.shape).toBe('bar')
   })
@@ -325,8 +326,8 @@ describe('the legend', () => {
   })
 
   it('stands for the lines that DREW, not the columns that exist', () => {
-    // `merged` is declared, so `boardColumns` keeps it — but no row carries it and no line is drawn,
-    // so a swatch for it would stand for nothing on screen.
+    // `merged` is declared, so `boardColumns` keeps it, but no row carries it and no line is drawn, so
+    // a swatch for it would stand for nothing on screen.
     const rows = [row('1', { updated: day(1), state: 'open' })]
     const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
     expect(plot?.legend).toBeUndefined()
@@ -427,7 +428,7 @@ describe('a day with no rows', () => {
   it('is a zero on the path, not a straight line across the gap', () => {
     const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated' }, {})
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
-    // Three days in the span, three vertices — the middle one on the floor. Joining day 1 straight to
+    // Three days in the span, three vertices, the middle one on the floor. Joining day 1 straight to
     // day 3 drew "steady at 1" across a day on which nothing happened.
     expect(vertices(plot.lines[0].path)).toBe(3)
     const middle = plot.lines[0].path.split(/[ML]/).filter(Boolean)[1]
@@ -451,7 +452,7 @@ describe('a day with no rows', () => {
       const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated', aggregate, field: 'size' }, {})
       if (plot?.shape !== 'line') throw new Error('expected a line chart')
       // Two real days, two vertices. A filled zero here would draw a dip to the floor that no row says
-      // happened — "the average size on a day with no rows" has no answer, and 0 is not it.
+      // happened: "the average size on a day with no rows" has no answer, and 0 is not it.
       expect(vertices(plot.lines[0].path)).toBe(2)
     }
   })
@@ -500,7 +501,7 @@ describe('the axis gutter', () => {
   })
 
   it('anchors an end label inward rather than letting half of it hang outside the box', () => {
-    // The last tick sits on the last gridline, a few units from the right edge — centred, "Aug 18" lost
+    // The last tick sits on the last gridline, a few units from the right edge. Centred, "Aug 18" lost
     // its second digit off the side of the SVG.
     const rows = [row('1', { updated: day(1) }), row('2', { updated: day(40) })]
     const plot = buildChart(rows, schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})

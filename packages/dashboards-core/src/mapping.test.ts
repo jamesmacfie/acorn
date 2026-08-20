@@ -23,13 +23,13 @@ import type { PanelMapping, PanelQuery } from './model'
 import { boardColumns, shapeRows, UNGROUPED_COLUMN_ID } from './shaping'
 
 // The mapping layer, which is the whole cross-source phase. The editor that drives it cannot be
-// rendered here — vitest runs in node with no Solid plugin — so everything that can actually be wrong
-// lives in these functions and is checked here.
+// rendered here, because vitest runs in node with no Solid plugin, so everything that can actually be
+// wrong lives in these functions and is checked here.
 //
-// The two source schemas below are the real ones, trimmed: github declares its status statically
+// The two source schemas below are the real ones, trimmed. github declares its status statically
 // (plugins/github/src/contract/collections.ts) and linear folds the workspace's own state names into
-// its RESPONSE (plugins/linear/src/shared/collections.ts). That difference is the reason the scenario
-// is hard and the reason it is worth testing against.
+// its response (plugins/linear/src/shared/collections.ts). That difference is why the scenario is hard
+// and why it is worth testing against.
 
 const githubSchema: PluginCollectionSchema = {
   fields: [
@@ -90,7 +90,7 @@ const linear: PanelSourcePage = {
 
 const sources = [github, linear]
 
-/** The user's own four columns — the whole point of the derived enum. */
+/** The user's own four columns, which is the point of the derived enum. */
 const todoColumns = [
   { id: 'c1', label: 'Todo', tone: 'muted' as const },
   { id: 'c2', label: 'Doing', tone: 'accent' as const },
@@ -127,8 +127,8 @@ describe('field mapping is pre-filled from the declared ROLES', () => {
   it('suggests every role both sides declare, which is the only reason roles exist', () => {
     expect(suggestFieldMapping(sources, undefined)).toEqual({
       'github:pulls-mine': { title: 'title', status: 'status', assignee: 'author', updated: 'updated', url: 'url' },
-      // Linear's status field is called `state` and its person field `assignee`; the role is what
-      // makes those line up with github's without either plugin knowing the other exists.
+      // Linear's status field is called `state` and its person field `assignee`. The role is what makes
+      // those line up with github's without either plugin knowing the other exists.
       'linear:issues-mine': { title: 'title', status: 'state', assignee: 'assignee', updated: 'updated', url: 'url' },
     })
   })
@@ -175,8 +175,9 @@ describe('the panel-local schema', () => {
 })
 
 describe('`source` as a panel-local field', () => {
-  // charts.md § 4: a row's source is provenance, not a field — so it becomes a field where fields
-  // already grow, and every downstream feature works uninvented rather than by a chart special case.
+  // A row's source is provenance, not a field, so it becomes a field where fields already grow and
+  // every downstream feature works without a chart special case. See docs/dashboards.md § Provenance,
+  // and what a row may not claim.
 
   it('appears on a multi-source panel as an ordinary enum over the panel’s own source keys', () => {
     const field = panelSchema(sources, todoBoard).fields.find((entry) => entry.id === 'source')!
@@ -185,8 +186,8 @@ describe('`source` as a panel-local field', () => {
       { id: 'github:pulls-mine', label: 'github' },
       { id: 'linear:issues-mine', label: 'linear' },
     ])
-    // NO TONE anywhere: provenance is identity, not status. github is not "ok" and linear is not
-    // "warn" — the chart's series ramp colours these, the status vocabulary does not.
+    // No tone anywhere: provenance is identity, not status. github is not "ok" and linear is not
+    // "warn". The chart's series ramp colours these; the status vocabulary does not.
     expect(field.values!.every((value) => value.tone === undefined)).toBe(true)
   })
 
@@ -249,7 +250,7 @@ describe('the union', () => {
     const fromLinear = united.find((entry) => entry.pluginId === 'linear')!
     expect(fromLinear.values.title).toBe('Ship the board')
     expect(fromLinear.values.assignee).toBe('grace')
-    // `identifier` has no role and therefore no panel-local home — the recorded ceiling.
+    // `identifier` has no role and therefore no panel-local home, which is the recorded ceiling.
     expect(fromLinear.values.identifier).toBeUndefined()
   })
 
@@ -262,9 +263,9 @@ describe('the union', () => {
   })
 
   it('keeps the task the row named, and the id the plugin gave it, beside the qualified one', () => {
-    // The two halves an `openPane` click needs: WHICH task to go to, and which row to select once
-    // there. `id` is qualified by source — two providers may both call a row `1` — so the plugin's own
-    // id has to survive separately or the pane is handed an id it has never seen.
+    // The two halves an `openPane` click needs: which task to go to, and which row to select once
+    // there. `id` is qualified by source, since two providers may both call a row `1`, so the plugin's
+    // own id has to survive separately or the pane is handed an id it has never seen.
     const withTask: PanelSourcePage = {
       ...github,
       rows: [{ ...github.rows[0], taskId: '0f1a4d5e-4a0e-4a3c-8f6b-2f5f4b7a1c9d', action: { verb: 'openPane', pane: 'agents' } }],
@@ -278,8 +279,8 @@ describe('the union', () => {
 
 describe('provenance is the HOST’s stamp and survives the whole pipeline', () => {
   it('cannot be overridden by the response body claiming a different plugin', () => {
-    // The wire schema does not carry `pluginId`/`collectionId` at all, so a body that states them has
-    // them stripped before the host stamps its own (@acorn/protocol/collections.ts).
+    // The wire schema does not carry `pluginId` or `collectionId` at all, so a body that states them
+    // has them stripped before the host stamps its own (@acorn/protocol/collections.ts).
     const parsed = pluginCollectionResponseSchema.parse({
       schema: linearSchema,
       rows: [{ id: 'ENG-1', values: { title: 'Impostor', state: 'started' }, pluginId: 'github', collectionId: 'pulls-mine' }],
@@ -287,7 +288,7 @@ describe('provenance is the HOST’s stamp and survives the whole pipeline', () 
     expect(parsed.rows[0]).not.toHaveProperty('pluginId')
 
     // The host then stamps from the contribution whose route answered, and the mapping layer carries
-    // that stamp through untouched — badge and click both resolve to linear.
+    // that stamp through untouched, so badge and click both resolve to linear.
     const stamped: PanelSourcePage = {
       ...linear,
       rows: parsed.rows.map((entry) => ({ ...entry, pluginId: 'linear', collectionId: 'issues-mine' })),
@@ -326,7 +327,7 @@ describe('value mapping onto the user’s own columns', () => {
     expect(columns.map((column) => column.label)).toEqual(['Todo', 'Doing', 'Waiting', 'Done'])
     expect(columns.map((column) => column.tone)).toEqual(['muted', 'accent', 'warn', 'ok'])
     expect(columns.every((column) => column.declared)).toBe(true)
-    // Doing holds one row from EACH provider, which is the scenario.
+    // Doing holds one row from each provider, which is the scenario.
     expect(columns[1].rows.map((entry) => entry.pluginId).sort()).toEqual(['github', 'linear'])
   })
 
@@ -340,7 +341,7 @@ describe('value mapping onto the user’s own columns', () => {
     const columns = boardColumns(unionRows([withDraft, linear], todoBoard), statusField)
     const catchAll = columns.find((column) => column.id === UNGROUPED_COLUMN_ID)
     expect(catchAll?.rows.map((entry) => entry.id)).toEqual(['github:pulls-mine:3'])
-    // Every row still lands somewhere — the rule inherited from `boardColumns` rather than re-derived.
+    // Every row still lands somewhere, the rule inherited from `boardColumns` rather than re-derived.
     expect(columns.reduce((total, column) => total + column.rows.length, 0)).toBe(5)
   })
 
@@ -363,7 +364,7 @@ describe('value mapping onto the user’s own columns', () => {
   })
 
   it('keeps a reserved writeValue when the values under it are emptied', () => {
-    // Read-only today; the shape has to survive being edited or it is not reserved at all
+    // Nothing writes it yet, and the shape has to survive being edited or it is not reserved at all
     // (docs/future/dashboards/write-back.md).
     const reserved: PanelMapping = {
       columns: todoColumns,
@@ -381,7 +382,7 @@ describe('the value-mapping suggestion', () => {
       { id: 'c4', label: 'Done' },
     ]
     const suggested = suggestValueMapping(sources, { columns })
-    // Linear labels `unstarted` "Todo" and `completed` "Done" — both land.
+    // Linear labels `unstarted` "Todo" and `completed` "Done", and both land.
     expect(mappedColumnId(suggested, 'linear:issues-mine', 'unstarted')).toBe('c1')
     expect(mappedColumnId(suggested, 'linear:issues-mine', 'completed')).toBe('c4')
     // Nothing github calls anything matches, and the host does not invent a destination.
@@ -398,8 +399,8 @@ describe('the value-mapping suggestion', () => {
   })
 
   it('has nothing to offer for a source whose values are not known yet', () => {
-    // A collection that describes itself in its answer and has not been read: no declared values, so
-    // no matrix rows. The editor says so rather than showing an empty one.
+    // A collection that describes itself in its answer and has not been read: no declared values, so no
+    // matrix rows. The editor says so rather than showing an empty one.
     const cold: PanelSourcePage = { query: linearQuery, schema: { fields: [] }, rows: [] }
     expect(statusValuesOf(cold, undefined)).toEqual([])
     expect(statusValuesOf(linear, undefined).map((value) => value.label)).toEqual(['Todo', 'In progress', 'Done'])
@@ -407,8 +408,8 @@ describe('the value-mapping suggestion', () => {
 })
 
 describe('the fields the user invented', () => {
-  // The exact case the role ceiling was recorded against: github's `repo` and linear's `identifier`
-  // are both text, both useful on a mixed board, and neither carries a role.
+  // The case the role ceiling was recorded against: github's `repo` and linear's `identifier` are both
+  // text, both useful on a mixed board, and neither carries a role.
   const withRef: PanelMapping = {
     ...todoBoard,
     extraFields: [{ id: 'ref', label: 'Ref', type: 'text' }],
@@ -510,9 +511,9 @@ describe('pruning', () => {
 
 describe('partial availability', () => {
   it('renders one source’s rows when the other answered with nothing', () => {
-    // What a failed source looks like to this layer: an empty page. The fan-out reports WHY
-    // separately (data.ts § PanelUnavailable), so the panel says which source is missing and still
-    // draws the rest rather than blanking.
+    // What a failed source looks like to this layer: an empty page. The fan-out reports why separately
+    // (data.ts, `PanelUnavailable`), so the panel says which source is missing and still draws the rest
+    // rather than blanking.
     const down: PanelSourcePage = { ...linear, rows: [] }
     const united = unionRows([github, down], todoBoard)
     expect(united.map((entry) => entry.pluginId)).toEqual(['github', 'github'])

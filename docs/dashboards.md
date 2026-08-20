@@ -752,6 +752,14 @@ All of the arithmetic is pure functions in `dashboards/layout.ts`, exhaustively 
 `PanelGrid.tsx` turns pixels into a candidate rect and renders the answer, and contains no layout
 arithmetic of its own.
 
+**A rect is client machinery, and no plugin can influence one.** Nothing about the grid crosses the
+node and client contract, so a collection provider cannot know or set where its panel sits. A
+"preferred size" hint from a plugin was considered and refused: the view kind already implies a
+sensible default, and a plugin with opinions about the user's grid is a plugin with a say over pixels.
+The per-kind minimums and arrival sizes are a tuning table in `layout.ts`, enforced in `normalize` and
+in the resize clamp rather than in the codec, so lowering one needs no migration. A persisted rect
+below the minimum renders at the minimum without being rewritten.
+
 ## What is deliberately not here
 
 Reasoning and revisit conditions for each are in
