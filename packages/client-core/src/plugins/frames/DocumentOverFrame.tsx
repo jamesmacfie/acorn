@@ -19,14 +19,14 @@ import { createSplitDrag } from '../../ui/split'
 //
 // The reason the host composes this rather than the plugin: the frame CSP has `frame-src 'none'`, so a
 // plugin can never embed host content inside its own layout. The restriction binds the plugin, not the
-// host — the host is free to place its editor and the plugin's iframe side by side in its own DOM, and
+// host. The host is free to place its editor and the plugin's iframe side by side in its own DOM, and
 // that inversion is the whole shape of the design.
 //
-// What is deliberately NOT a region: the button bar. Look at what database's bar actually holds — a
-// searchable saved-queries picker with per-row delete chips, a Generate button visible only when a
-// model connection exists, an Execute button disabled on connection status — and a host-drawn "action
-// bar" descriptor stops being cheap immediately. The bar is COMMON, not impossible, so it is the
-// plugin's, drawn as the first row of its own frame region. That is the same bar the litmus test in
+// What is not a region: the button bar. Look at what database's bar actually holds: a searchable
+// saved-queries picker with per-row delete chips, a Generate button visible only when a model
+// connection exists, an Execute button disabled on connection status. A host-drawn "action bar"
+// descriptor stops being cheap immediately. The bar is common, not impossible, so it is the plugin's,
+// drawn as the first row of its own frame region. That is the same bar the litmus test in
 // docs/plugins.md states: a region is host-owned only when the sandbox cannot serve its content.
 //
 // The two regions share no DOM and no JavaScript realm. Everything between them goes through the host:
@@ -79,7 +79,7 @@ export default function DocumentOverFrame(props: DocumentOverFrameProps) {
           nodeId={props.binding.nodeId}
           region={props.region}
           scope={props.scope}
-          // The updater form, because a Solid setter given a bare value it can call would call it — and
+          // The updater form, because a Solid setter given a bare value it can call would call it, and
           // a document handle is a bag of methods.
           onHandle={(next) => setHandle(() => next)}
         />

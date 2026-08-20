@@ -1,10 +1,10 @@
 // Which client bundle wins when a fleet disagrees (docs/plugins.md).
 //
-// Two nodes may carry different versions of one plugin. Contribution IDs are deliberately NOT
-// namespaced — `pr`, `changes`, `palette.files` are persisted layout keys and user-visible chord
-// targets (see the comment block in registries/plugin.ts) — so two versions of one plugin registering
-// at once would collide on ids that a user's saved layout points at. Exactly one bundle per plugin id
-// may be active, and this is where that one is chosen.
+// Two nodes may carry different versions of one plugin. Contribution IDs are not namespaced (`pr`,
+// `changes`, `palette.files` are persisted layout keys and user-visible chord targets, see the comment
+// block in registries/plugin.ts), so two versions of one plugin registering at once would collide on
+// ids that a user's saved layout points at. Exactly one bundle per plugin id may be active, and this is
+// where that one is chosen.
 //
 // Pure on purpose: everything about it is a decision over a candidate list, and a decision worth
 // getting right is worth testing without a fleet.
@@ -39,9 +39,9 @@ export function compareVersions(a: string, b: string): number {
 // support are dropped rather than deferred: a bundle built for a plugin API this shell does not have
 // cannot be run, and pretending otherwise would fail at import time instead of here.
 //
-// Ties — the same version offered by several nodes, or two builds of one version — resolve on the
-// hash, lexicographically. Arbitrary but STABLE, which is what matters: the same fleet must pick the
-// same bundle on every boot, or a user's panes would move between machines for no visible reason.
+// Ties (the same version offered by several nodes, or two builds of one version) resolve on the hash,
+// lexicographically. Arbitrary but stable, which is what matters: the same fleet must pick the same
+// bundle on every boot, or a user's panes would move between machines for no visible reason.
 export function resolveActiveBundles(
   candidates: readonly BundleCandidate[],
   options: { apiVersion: string },
@@ -55,7 +55,7 @@ export function resolveActiveBundles(
       continue
     }
     if (current.hash === candidate.hash) {
-      // The same bytes from a second node. One bundle, two sources — and the plugin's UI renders
+      // The same bytes from a second node. One bundle, two sources, and the plugin's UI renders
       // against both, which is why the node list is plural.
       if (!current.nodeIds.includes(candidate.nodeId)) current.nodeIds.push(candidate.nodeId)
       continue

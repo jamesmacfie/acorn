@@ -4,23 +4,23 @@ import type { FrameBinding } from './broker'
 import { closePluginOverlay } from './overlays'
 import { Button } from '../../ui/primitives'
 
-// The host's chrome around a plugin overlay — the full-screen picker slot, what the editor's ⌘P file
+// The host's chrome around a plugin overlay: the full-screen picker slot, what the editor's ⌘P file
 // palette occupies as a compiled contribution (docs/plugins.md § Frame contribution kind).
 //
-// Same division of labour as PluginRefPanel: the HOST draws the backdrop, the box and the dismiss
+// Same division of labour as PluginRefPanel: the host draws the backdrop, the box and the dismiss
 // affordance, because an iframe cannot position itself against anything outside its own rectangle. And
-// the same reason for being its own file — ./register.ts must stay importable from a bare-Node suite.
+// the same reason for being its own file: ./register.ts must stay importable from a bare-Node suite.
 //
-// Nothing here decides WHEN it appears. An overlay has no click site of its own: the only thing that
+// Nothing here decides when it appears. An overlay has no click site of its own: the only thing that
 // opens one is the `openOverlay` verb (plugins/chrome/actions.ts).
 
 export type PluginOverlayProps = {
   label: string
   hash: string
   open: () => boolean
-  // An accessor, not a value, because it is read when the overlay OPENS rather than when the slot
+  // An accessor, not a value, because it is read when the overlay opens rather than when the slot
   // mounts: the binding carries the active task, and a picker's job is usually to put something into
-  // one — so it has to be the task that was on screen when the reader asked for the picker.
+  // one, so it has to be the task that was on screen when the reader asked for the picker.
   binding: () => FrameBinding
 }
 
