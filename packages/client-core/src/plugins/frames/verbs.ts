@@ -2,7 +2,8 @@ import type { PluginBridgeRequest } from '@acorn/protocol/pluginBridge.ts'
 import type { FrameServices } from './broker'
 import type { AcornBridge } from './sdk'
 
-// The frame bridge's vocabulary, declared once so the five places that spell it cannot drift apart.
+// The frame bridge's vocabulary, declared once so the five places that spell it cannot drift apart
+// (docs/plugins.md § Loaded plugins: the client half, the paragraph on the bridge's `api` surface).
 //
 // A sandboxed frame's whole ability to affect the world is a small set of verbs, and until now each
 // one had to be written into five modules by hand: the wire union (@acorn/protocol/pluginBridge.ts),

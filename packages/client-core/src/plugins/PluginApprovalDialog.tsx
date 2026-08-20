@@ -64,7 +64,7 @@ export default function PluginApprovalDialog() {
     return [
       ...nodePermissionLines(installed.permissions),
       // The node half is what this screen exists for, and a schedule is the part of it that acts with
-      // nobody here — so it belongs on the one disclosure a node-only package ever gets.
+      // nobody here, so it belongs on the one disclosure a node-only package ever gets.
       ...schedulePermissionLines(scheduleGrants(installed.contributions)),
       ...uiPermissionLines(installed.permissions),
       ...webviewPermissionLines(webviewGrants(installed.contributions)),

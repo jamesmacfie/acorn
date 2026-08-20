@@ -24,7 +24,7 @@
 .extended-pane-frame { flex: 1 1 auto; min-height: 0; display: flex; }
 .extended-pane-frame > * { flex: 1 1 auto; min-width: 0; }
 
-/* A THIRD of the pane, capped, and it may not squeeze the owner's frame to nothing however many panels
+/* A third of the pane, capped, and it may not squeeze the owner's frame to nothing however many panels
    somebody composes. Below twelve usable cells the grid collapses to one column on its own, which is
    what makes a column this narrow work rather than something this file has to arrange. */
 .extended-pane-aside {

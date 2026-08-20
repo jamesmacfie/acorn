@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { PluginApprovalRequest } from '@acorn/protocol/api.ts'
 import { describePluginRequest, describePluginSource, pluginRequestOutcomeMessage } from './approval'
 
-// The two sentences that cross the boundary in opposite directions: what the OWNER is shown about a
-// request an agent raised, and what the AGENT is told once they answer. The dialog that draws them is a
+// The two sentences that cross the boundary in opposite directions: what the owner is shown about a
+// request an agent raised, and what the agent is told once they answer. The dialog that draws them is a
 // `.tsx` and therefore untestable here (docs/testing.md), which is exactly why they live in a plain
 // module.
 
@@ -43,7 +43,7 @@ describe('what the agent is told', () => {
   })
 
   it('distinguishes installed-and-running from installed-and-waiting', () => {
-    // The difference matters to the agent: a reloaded plugin's tools and routes exist NOW, and a
+    // The difference matters to the agent: a reloaded plugin's tools and routes exist now, and a
     // restart-pending one's do not. Getting it wrong sends the agent looking for a route that is not there.
     expect(pluginRequestOutcomeMessage(request(), { decision: 'approved', version: '1.0.0', reloaded: true })).toBe(
       'github:acorn/board at 1.0.0 is installed and reloaded; its node half is running now.',

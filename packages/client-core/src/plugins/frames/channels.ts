@@ -1,5 +1,5 @@
 // Channels a frame may subscribe to. A hand-written subset of ClientEventMap rather than its keys,
-// because that map is a type with no runtime form — and because most of it should not be reachable
+// because that map is a type with no runtime form, and because most of it should not be reachable
 // anyway: `presentation:*` are the shell's own intents, while the `runtime:*` family says something a
 // plugin may be showing has gone or moved.
 // A type-only import, so it is erased and creates no runtime edge back to the module that consumes

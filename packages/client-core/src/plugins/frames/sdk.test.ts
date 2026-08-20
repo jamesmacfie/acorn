@@ -5,6 +5,10 @@ import { AcornBridgeError, connect, mountFrame, openLinkOnClick, _resetConnectio
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node
 // (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it: something
 // to hear one `message` event on, and a port. Both are stubbed; the port is a real MessageChannel.
+//
+// docs/plugins.md § Loaded plugins: the client half owns the behaviour this suite pins: the handshake
+// deadline and its placeholder, the content-link ladder and rung preference, the two browser affordances
+// a frame does not have, and the once-a-second/focus-gated `openUrl` throttle.
 
 type Hello = { data: unknown; ports: MessagePort[] }
 

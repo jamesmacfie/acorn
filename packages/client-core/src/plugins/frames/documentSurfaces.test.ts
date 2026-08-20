@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PluginDocumentRegion, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { documentRegionFor, isHostOwnedSurface } from './documentSurfaces'
 
-// The line between a surface that RUNS plugin code and one the host draws (docs/third-party/monaco.md).
+// The line between a surface that runs plugin code and one the host draws (docs/third-party/monaco.md).
 // It is the trust gate for a whole class of surface, so it is worth pinning in both directions: a
 // frame stays behind the bytes-hash prompt, a document surface does not need one, and neither gets to
 // name a route outside its own plugin.
@@ -17,7 +17,7 @@ const withDocument = (document: Omit<PluginDocumentRegion, 'languageId'>) =>
 describe('isHostOwnedSurface', () => {
   it('is true only for a pane whose whole rectangle the host draws', () => {
     expect(isHostOwnedSurface(withDocument({ read: '/v2/p/board/doc' }))).toBe(true)
-    // A plain frame — every manifest written before this contract existed.
+    // A plain frame: every manifest written before this contract existed.
     expect(isHostOwnedSurface(surface())).toBe(false)
     expect(isHostOwnedSurface(surface({ target: 'overlay' }))).toBe(false)
     expect(isHostOwnedSurface(surface({ target: 'webview', url: 'https://x.test', hosts: ['x.test'] }))).toBe(false)

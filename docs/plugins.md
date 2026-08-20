@@ -632,7 +632,11 @@ kinds of contribution come out of one manifest:
   `PluginBridgeApiRequest.method` exactly. That last part is the rule rather than a coincidence: a method
   missing from the SDK facade is a method no plugin can reach, however permissive the scope table
   underneath, and `put` was missing for exactly that reason until http (whose own updates take a
-  full-replacement body) could not call its own routes from its own frame.
+  full-replacement body) could not call its own routes from its own frame. `frames/verbs.ts` is what
+  makes that class of bug a compile error now: it derives the wire union, the author-facing surface
+  (`sdk.ts`) and the host-facing surface (`PluginFrame.tsx`, through `FrameServices`) from one verb list,
+  with two `Covers<>` assertions that fail the build the moment a verb lands on the wire without a row on
+  either surface, or gains a surface row the wire does not carry.
 
   Two browser affordances a frame does NOT have, both worth knowing before writing one. `window.confirm`
   and `alert` are suppressed: the iframe is sandboxed `allow-scripts allow-same-origin` and deliberately

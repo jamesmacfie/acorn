@@ -194,7 +194,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       fallback={
         <section class="pane contribution-failed" role="status">
           {/* Two failures, one placeholder, because the reader's situation is the same either way: this
-              rectangle is not going to render. The wording separates them because the remedies differ —
+              rectangle is not going to render. The wording separates them because the remedies differ:
               misbehaving is the host cutting a running plugin off, silent is a plugin's UI that never
               started at all. */}
           <strong>{misbehaving() ? 'Plugin misbehaving' : 'This plugin’s UI failed to start'}</strong>

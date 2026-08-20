@@ -318,7 +318,7 @@ export function createFrameBridge(input: {
         // move the reader, which the SDK's `openLinkOnClick` satisfies for free. See OPEN_URL_MIN_GAP_MS
         // above for why the throttle backs the focus check up.
         if (!services.frameHasFocus()) {
-          return void post(denied(id, 'openUrl works from a click or key handler — the frame must be focused'))
+          return void post(denied(id, 'openUrl works from a click or key handler: the frame must be focused'))
         }
         const now = Date.now()
         if (now - lastOpenUrlAt < OPEN_URL_MIN_GAP_MS) {

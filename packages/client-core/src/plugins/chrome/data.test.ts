@@ -59,8 +59,8 @@ describe('collection reads', () => {
   })
 
   it('cannot be talked out of the stamp by a row that names its own source', async () => {
-    // The schema does not carry the two fields at all, so a body stating them loses them at the parse
-    // — the stamp is not overwritten, it is the only thing that was ever there. A row that could name
+    // The schema does not carry the two fields at all, so a body stating them loses them at the parse.
+    // The stamp is not overwritten, it is the only thing that was ever there. A row that could name
     // its own plugin could put its items behind a stranger's badge and its clicks into a stranger's pane.
     readJson.mockResolvedValueOnce(body([{
       id: 'card-1', values: { title: 'Ship it' }, pluginId: 'linear', collectionId: 'issues-mine',

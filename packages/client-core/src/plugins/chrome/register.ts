@@ -44,14 +44,9 @@ import { refResolverRegistry } from '../../registries/refResolvers'
 //
 // Same shape as that file: one module-level map of per-plugin disposables, a dispose-then-register pass
 // so a re-run replaces a plugin's whole contribution set rather than reconciling it, and a per-surface
-// try/catch so one duplicate id doesn't cost the plugin its other chrome. What differs is the gate,
-// because chrome is data:
-//
-//   frames  gate on `bundleAccepted`. Bytes execute, and this device said yes to these exact bytes.
-//   chrome  gate on "no client bundle, or its bundle was accepted". A descriptor executes nothing, so a
-//           plugin that ships no code needs no trust prompt and gets its chrome. A plugin whose code
-//           this device refused gets none: its panes were never registered, so its chrome would offer an
-//           `openPane` that can't land.
+// try/catch so one duplicate id doesn't cost the plugin its other chrome. What differs is the gate:
+// frames asks `trusted`, chrome asks the weaker `hasWithheldCode` (docs/plugins.md § One shared
+// eligibility and trust check).
 //
 // Per-node presence stays the render-time gate. A plugin installed on node A contributes nothing to a
 // surface looking at node B, because its routes aren't there.
@@ -227,7 +222,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
       component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }),
       // A row's `task` block is the promotion capability. Registered independently of row selection, so
-      // an integration can use the row click for detail navigation and a separate host-drawn +TASK
+      // an integration can use the row click for detail navigation and a separate host-drawn "+Task"
       // affordance for promotion.
       promotion: descriptorPromotion(pluginId),
       // Still no `routes` on the source contribution, and that's a placement decision rather than a
@@ -429,11 +424,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 export function syncChromeContributions(): void {
   disposeAll()
   const refreshes: number[] = []
-  // A package with code this device hasn't been cleared to run drops out here: a descriptor is a click
-  // site, and a rail row that opens a pane which will never mount is worse than no rail row. But the
-  // question is `hasWithheldCode`, not `!trusted`: a descriptor-only package, as model-providers ships,
-  // has no bytes to accept and must still contribute, and the frames pass asks the stronger question
-  // because it's the one that mounts code.
+  // Gated on `hasWithheldCode`, not `!trusted` (docs/plugins.md § One shared eligibility and trust
+  // check): a descriptor-only package, as model-providers ships, has no bytes to accept and must still
+  // contribute, so a rail row that opens a pane which will never mount is worse than no rail row.
   for (const entry of eligiblePlugins()) {
     if (hasWithheldCode(entry)) continue
     registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.row, refreshes))

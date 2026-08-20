@@ -88,7 +88,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       if (!isSubscribable(channel)) throw new Error(`${channel} is not a channel a plugin frame can subscribe to`)
       return clientEvents.on(channel, (payload) => listener(payload))
     },
-    // Prefs are a flat string map on the wire, and `saveJsonPref` is what wrote this one — so reading it
+    // Prefs are a flat string map on the wire, and `saveJsonPref` is what wrote this one, so reading it
     // back means parsing. A value that is not JSON is a value some other writer put there under this key,
     // which is not this plugin's state and is reported as absent rather than handed over as a string.
     stateGet: (key) => {
