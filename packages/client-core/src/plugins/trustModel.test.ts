@@ -92,10 +92,10 @@ describe('trustTiers', () => {
   })
 
   it('discloses cross-plugin reach in both directions, and a core-surface offer', () => {
-    // Both directions is the requirement rather than a nicety. The owner of the EXTENDING package must
-    // see whose surface its rows land in; the owner of the EXTENDED package must see that it opened a
-    // door. Neither is inferable from the other side's manifest at trust time — they are two installs,
-    // possibly weeks apart — so each manifest discloses its own half.
+    // Both directions is the requirement rather than a nicety. The owner of the extending package must
+    // see whose surface its rows land in; the owner of the extended package must see that it opened a
+    // door. Neither is inferable from the other side's manifest at trust time (they are two installs,
+    // possibly weeks apart), so each manifest discloses its own half.
     //
     // Under `enforced`, and that is a claim about what the host does: it delivers only to points a
     // manifest declared, draws only descriptor shapes it knows, and never puts a replacement on screen
@@ -123,8 +123,8 @@ describe('trustTiers', () => {
   })
 
   it('marks a version that starts reaching into a different plugin as newly requested', () => {
-    // The whole reason the grants are RECORDED as well as shown. A constant key, or no key at all,
-    // would let a package quietly change which plugin it reaches into between versions — which is the
+    // The whole reason the grants are recorded as well as shown. A constant key, or no key at all,
+    // would let a package quietly change which plugin it reaches into between versions, which is the
     // one growth an owner has least ability to reason about.
     const tiers = trustTiers(request({
       contributions: {

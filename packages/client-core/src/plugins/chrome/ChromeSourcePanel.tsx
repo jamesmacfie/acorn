@@ -18,25 +18,17 @@ import { PromoteToTaskModal } from '../../integrations/PromoteToTaskModal'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '../../registries/projectSurfaces'
 import { activateTaskSignals, pathForTask } from '../../tasks/activate'
 
-// The ONE rail list every descriptor source renders through
-// (docs/plugins.md).
-//
-// Native by construction: `Row`, `Badge` and `Icon` are the shell's own primitives, so a third-party
-// rail list is pixel-identical to a first-party one under every appearance pack, and stays that way
-// when a pack changes. That is the argument for descriptors over frames at this size — not the cost of
-// an iframe, but that the iframe could never look like this.
+// The one rail list every descriptor source renders through. Native by construction: `Row`, `Badge`
+// and `Icon` are the shell's own primitives, so a third-party rail list is pixel-identical to a
+// first-party one under every appearance pack (docs/plugins.md § Descriptors for chrome, frames for
+// rectangles).
 
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
 
-// "Nothing here yet." is true and tells nobody anything, and its uselessness had a real cost: linear
-// answered an unmapped workspace by showing the viewer's own assigned issues instead, because a wrong
-// list beat a blank one (docs/integrations.md § Linear). A source can now say what empty means
-// here and offer one place to go.
+// A source's `emptyState` replaces the host's fixed "Nothing here yet." (docs/plugins.md, the
+// paragraph on `emptyState`, for why it's fetch-success-only and bounded to a sentence and one action).
 //
-// One action, no markup, no per-facet variants. The action is optional and NOT a gap to be filled later
-// by widening the verb set: linear's own empty state points at a settings page, which no context-free
-// verb can reach, and shipping the message alone is the honest answer to that.
-// Named SourceEmpty, not EmptyState: it is the descriptor→primitive adapter, and the primitive owns
+// Named SourceEmpty, not EmptyState: it is the descriptor-to-primitive adapter, and the primitive owns
 // the name. It contributes the plugin's message and its one action; the geometry comes from shared CSS.
 function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSourceEmptyState }) {
   return (
@@ -66,7 +58,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   const params = useParams()
   const queryClient = useQueryClient()
   // Captured at creation, not read per render. A node switch swaps the QueryClient provider this panel
-  // sits under, which remounts it — the same reasoning plugins/frames/register.ts gives for reading
+  // sits under, which remounts it, the same reasoning plugins/frames/register.ts gives for reading
   // `activeNodeId()` at frame construction.
   const nodeId = activeNodeId() ?? ''
 
@@ -74,9 +66,9 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   // that already has a per-node deadline, a cache fallback and the live/stale/offline vocabulary. An
   // offline node shows the list it last had, badged stale, exactly like every native surface.
   //
-  // The project rides in the DEP rather than being read from `params` inside the fetch, so it reaches
-  // the cache key as well as the path. Both halves of the pair have to agree on scope now that the
-  // fan-out serves its last answer on mount.
+  // The project rides in the dependency rather than being read from `params` inside the fetch, so it
+  // reaches the cache key as well as the path. Both halves of the pair have to agree on scope now that
+  // the fan-out serves its last answer on mount.
   const scope = () => ({ revision: chromeRevision(), projectId: params.projectId })
   const [result] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
@@ -121,20 +113,20 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
     })
   }
 
-  // The DETAIL half, for a source whose row click addresses a project-scoped surface rather than opening a
+  // The detail half, for a source whose row click addresses a project-scoped surface rather than opening a
   // task pane. Master/detail exactly as every other Source browse is (plugins/github GithubBrowse.tsx),
   // which is the layout a compiled plugin's issue view used to get from a `SourceRouteContribution` and the
   // one the descriptor tier had no way to ask for.
   //
   // `onSelect` is where the binding comes from, and no second manifest field is needed for it: `navigate`
   // already names the surface, and the manifest refuses a project-scoped surface that no source navigates
-  // to — so if there is one, this is where it mounts.
+  // to, so if there is one, this is where it mounts.
   const detail = () => {
     const onSelect = props.descriptor.onSelect
     return onSelect?.verb === 'navigate' ? projectSurfaceRegistry.get(onSelect.surface) : undefined
   }
   // The selection, read back out of the URL. There is no local signal shadowing it on purpose: a
-  // project-scoped surface has no task layout to keep a selection in, so the address IS the state — which
+  // project-scoped surface has no task layout to keep a selection in, so the address is the state, which
   // is what makes the row click, a pasted deep link and the back button all the same thing.
   const detailItem = () => {
     const surface = detail()
