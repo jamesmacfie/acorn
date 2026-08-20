@@ -14,10 +14,10 @@ import { isSubscribable } from './channels'
 // The fourteen host effects a plugin frame's bridge is allowed to cause (docs/plugins.md).
 //
 // The other side of the seam `broker.ts` opened. That module took `FrameServices` as a parameter
-// specifically so the message-CHECKING half could be tested in bare Node — and it worked, at the cost of
-// relocating every implementation into PluginFrame.tsx, where the repo's node-environment suites cannot
-// follow it. So the seam moved the untestable surface rather than shrinking it, and the implementations
-// are the half that reads prefs by hand, decides where a link goes and pins which node a call reaches.
+// specifically so the message-checking half could be tested in bare Node, at the cost of relocating
+// every implementation into PluginFrame.tsx, where the repo's node-environment suites cannot follow it.
+// So the seam moved the untestable surface rather than shrinking it, and the implementations are the
+// half that reads prefs by hand, decides where a link goes, and pins which node a call reaches.
 //
 // They live here instead. PluginFrame.tsx keeps the component shell: the iframe, the port handshake, the
 // lifecycle. This file is a plain function of the frame's props, so a test supplies a props literal and
@@ -32,7 +32,7 @@ export type PluginFrameProps = {
   // Project-scoped pane surfaces only: which item the URL addresses. A task-scoped pane gets the same
   // thing as a retained pane intent, because its selection lives in the task's layout state; a
   // project-scoped one has no such store, so the URL is the selection and it arrives as a prop the host
-  // updates. Both feed the same two channels — whatever is set when the frame connects rides in
+  // updates. Both feed the same two channels: whatever is set when the frame connects rides in
   // `context`, and every change after that is a `select` message rather than a remount.
   item?: string
   // Importer surfaces only. The host owns the modal chrome and the post-import refresh; the frame only
@@ -64,7 +64,8 @@ export type FrameServiceHost = {
 }
 
 /**
- * Build one frame's services. Rebuilt per frame rather than shared: every closure below reads THIS
+/**
+ * Build one frame's services. Rebuilt per frame rather than shared: every closure below reads this
  * frame's binding, which is what pins its node and forbids the importer verbs on a pane.
  */
 export function createFrameServices(props: PluginFrameProps, host: FrameServiceHost): FrameServices {
@@ -101,8 +102,8 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     },
     stateSet: async (key, value) => void (await saveJsonPref(qc, key, value)),
     // Into the shared transient stack, not the notification inbox. `bridge.ui.toast('Copied to the
-    // clipboard')` used to leave a permanent bell entry — the frames and the shell now share one
-    // stack and one look, which is what the API always claimed.
+    // clipboard')` used to leave a permanent bell entry; the frames and the shell now share one stack
+    // and one look, which is what the API always claimed.
     toast: (title, detail) => toast(detail ? `${title} — ${detail}` : title),
     copy: (text) => void navigator.clipboard.writeText(text),
     openPane: (paneId) => {
@@ -110,30 +111,19 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       const taskId = props.binding.taskId
       if (taskId) openPane(taskId, paneId)
     },
-    // A link inside a frame's own rendered content. The frame handed over a URL and nothing else; where
-    // it goes is decided here, on the host's side of the port, with the same ladder every shell surface
-    // uses (registries/contentLinks.ts) and the same external fall-through the descriptor `openUrl` verb
-    // takes (chrome/actions.ts). There is no third path: a frame cannot navigate the shell to an address
-    // of its choosing, only offer a URL and let the host recognise it or not — including the route rung,
-    // where the destination comes from the OWNING plugin's recogniser and never from this frame.
-    //
-    // Which rung is PREFERRED comes from the surface, which is why this lives here and not in the broker:
-    // this side knows what the frame is. A link clicked inside a reference panel wants to swap that
-    // panel's subject — the reader is looking sideways and asked to look sideways again, and pushing a
-    // pane behind an overlay they would then have to dismiss is not what they meant. Every other surface
-    // is a pane or a modal sitting in a task, where the pane is the richer destination and the one those
-    // surfaces have always used. Identical reasoning to registries/refPanelHost.tsx and github's PR
-    // conversation, and the frame is not consulted in either case.
+    // A link clicked inside a frame's rendered content, resolved on the host's side of the port through
+    // the same content-link ladder and rung-preference rule every shell surface follows
+    // (docs/plugins.md § Loaded plugins: the client half).
     openUrl: (url) => {
-      // The BOUND task, never `activeTaskId()`, even though the shell's own content handlers use the
+      // The bound task, never `activeTaskId()`, even though the shell's own content handlers use the
       // ambient one. A frame the host did not give a task is not looking at one: a project-scoped surface
       // and a ref panel both sit beside or over something that is not a task layout, while a task may well
       // still be selected in the rail behind them. Reading it here would let a link clicked on a project
-      // page push a pane into a background task's PERSISTED layout, where the reader is not and will not
+      // page push a pane into a background task's persisted layout, where the reader is not and will not
       // see it. With no bound task the pane rung is simply unavailable, and the URL falls to the browser.
       // `openInAppUrl` rather than `openContentTarget`, so the plugin's own route is a destination here
-      // too. It is the LAST one tried for a frame — the surfaces below either asked for the panel or said
-      // nothing — which is what makes a github link clicked inside a Linear issue open github's panel
+      // too. It is the last one tried for a frame: the surfaces below either asked for the panel or said
+      // nothing, which is what makes a github link clicked inside a Linear issue open github's panel
       // beside it rather than replacing the issue the reader is in the middle of.
       if (openInAppUrl(url, {
         taskId: props.binding.taskId,
@@ -141,15 +131,15 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
         ...(props.binding.target === 'refPanel' ? { prefer: 'refPanel' as const } : {}),
       })) return
       // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
-      // the URL to `shell.openExternal` behind the scheme allowlist — so this opens in the owner's
-      // browser and never in-app, and there is no second policy to keep in step
+      // the URL to `shell.openExternal` behind the scheme allowlist, so this opens in the owner's
+      // browser and never in-app, with no second policy to keep in step
       // (apps/desktop/src/app/main/electron.ts, docs/electron.md § navigation policy).
       window.open(url, '_blank', 'noopener,noreferrer')
     },
     frameHasFocus: () => host.frameHasFocus(),
     importerDone: () => props.onImported?.(),
     importerClose: () => props.onClose?.(),
-    // Present only for a composed pane, and its absence IS the permission check the broker applies —
+    // Present only for a composed pane, and its absence is the permission check the broker applies:
     // there is no scope to declare, because the grant is structural. The indirection through the
     // accessor is what makes the two regions' mount order a non-issue: the frame can connect before the
     // editor has loaded its document, and its first `document.read()` still lands on the real thing.
