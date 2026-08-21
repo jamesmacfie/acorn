@@ -1,19 +1,8 @@
-// Rung 1 of the containment ladder (docs/security.md): a loaded plugin's
-// NodePluginContext is built from its manifest's `permissions.node` block instead of being handed
-// the full context a built-in gets.
-//
-// Be precise about what this is. It is LEAST PRIVILEGE FOR COOPERATIVE CODE: it stops honest plugins
-// over-reaching by accident, it makes phase 5's trust prompt truthful for the well-behaved majority,
-// and it trains authors to write minimal manifests — which matters because rung 2 turns these same
-// declarations into hard grants, and manifests that were always minimal migrate without breaking.
-// It is NOT a security boundary: a loaded bundle shares the Node's process and can `import('node:fs')`
-// or open core.sqlite and ignore `ctx` entirely. Only moving plugins out of process changes that.
-//
-// Two rules the whole file follows:
-//   - Gate by OMISSION, never by throwing. An absent facet fails with a TypeError the author sees the
-//     first time they run it, and the runtime shape of `ctx` becomes the documentation of the grant.
-//   - Keep the facet→permission mapping HERE, in one module, with exhaustive tests. A grant decided
-//     in two places is a grant nobody can audit.
+// Rung 1 of the containment ladder (docs/security.md § Rung 1, permission-shaped context): a loaded
+// plugin's NodePluginContext is built from its manifest's `permissions.node` block instead of being
+// handed the full context a built-in gets. It is least privilege for cooperative code, not a security
+// boundary: a loaded bundle shares the Node's process and can `import('node:fs')` or open core.sqlite
+// and ignore `ctx` entirely.
 import type { CoreServices } from './core'
 import type { PrefService } from './core/identity/preferences'
 import type { ProjectService } from './core/projects'
@@ -22,10 +11,8 @@ import type { NodePermissions } from './pluginManifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
 import { connectionProviderRegistry } from '../server/integrations/connectionRegistry'
 
-// What `projects:read` grants. `checkouts()` is in here, and it returns the local filesystem path of
-// EVERY mapped project on the machine — where the user keeps their code, how many codebases they
-// have, often their employer's project names. "Read projects" does not sound like that, so phase 5's
-// trust prompt has to name the disclosure explicitly.
+// What `projects:read` grants (docs/security.md § Rung 1, on why `checkouts()` needs its own
+// disclosure line in the trust prompt).
 const PROJECT_READS = ['byId', 'byGithub', 'checkouts', 'externalProjects'] as const
 // Kept behind its own token because config() and setup() return the shell commands acorn executes.
 // The trust assertion belongs to the same surface: code with no reason to inspect project config has
@@ -68,9 +55,10 @@ const pick = <T extends object, K extends keyof T>(source: T, keys: readonly K[]
 
 const utf8Bytes = (text: string): number => new TextEncoder().encode(text).byteLength
 
-// Loaded plugins share the same `plugin:<id>:*` preference namespace as their sandboxed frames.
-// Built-ins never pass through scopeCore and retain the raw service because several core-owned
-// preference keys predate loaded plugins and are intentionally shared with client surfaces.
+// Loaded plugins share the same `plugin:<id>:*` preference namespace as their sandboxed frames
+// (docs/security.md § Rung 1). Built-ins never pass through scopeCore and retain the raw service
+// because several core-owned preference keys predate loaded plugins and are intentionally shared
+// with client surfaces.
 const prefsFor = (prefs: PrefService, pluginId: string): PrefService => ({
   read: (userId, key) => prefs.read(userId, pluginStateKey(pluginId, key)),
   write: async (userId, key, value) => {
@@ -98,11 +86,11 @@ const projectsFor = (
     : {}),
 })
 
-// The returned object is TYPED as a full CoreServices and is not one. That is deliberate: widening
+// The returned object is typed as a full CoreServices and is not one. Widening
 // NodePluginContext['core'] to a partial would make every facet optional for the fifteen built-in
-// plugins that legitimately have all of them, to describe a shape only loaded plugins see. The lie
-// is contained to this one cast, and the failure mode it produces — a TypeError on the first call to
-// an undeclared facet — is exactly the one this module is trying to produce.
+// plugins that legitimately have all of them, to describe a shape only loaded plugins see. The lie is
+// contained to this one cast, and the failure mode it produces, a TypeError on the first call to an
+// undeclared facet, is the one this module is trying to produce.
 export function scopeCore(
   core: CoreServices,
   permissions: NodePermissions,
@@ -143,11 +131,11 @@ export function scopeCore(
 }
 
 // Undeclared capability ids read as absent, which is indistinguishable from the providing plugin
-// being disabled — a state every consumer already has to degrade around (docs/plugins.md). `require`
+// being disabled, a state every consumer already has to degrade around (docs/plugins.md). `require`
 // keeps throwing, because a loaded plugin calling `require` on something it never declared is a bug
 // in the plugin, and a loud one is better than a silent undefined.
 //
-// `provide` is NOT filtered: exporting a capability is a contribution, not an access grant, and the
+// `provide` is not filtered: exporting a capability is a contribution, not an access grant, and the
 // host binds nothing to the plugin's name through it that the plugin could not already publish.
 export function scopeCapabilities(
   registry: CapabilityRegistry,

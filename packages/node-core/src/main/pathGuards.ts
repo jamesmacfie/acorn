@@ -1,4 +1,4 @@
-// Path and checkout guards for worktree-backed tasks. Pure string functions — no electron / node-pty
+// Path and checkout guards for worktree-backed tasks. Pure string functions, no electron / node-pty
 // imports, so they're unit-testable under plain Node (pathGuards.test.ts). Core owns the worktree
 // primitives (see core/main/worktrees.ts), so the guards that protect them live here rather than in
 // the terminal plugin that also happens to use them.
@@ -8,10 +8,11 @@ import { resolve, sep } from 'node:path'
 // PR worktree directory name (docs/workspaces-and-tasks.md): `<owner>-<repo>-pr-<number>` under the worktrees root.
 export const worktreeDirName = (owner: string, repo: string, number: number | string) => `${owner}-${repo}-pr-${number}`
 
-// The filesystem/DNS-safe branch slug (docs/terminal-and-agents.md): shared by the worktree dir name and the
-// ACORN_TASK_SLUG env var — the isolation handle for parallel tasks (compose -p, derived names).
-// NB: plugins/docker/main/matcher.ts deliberately duplicates this one-liner to keep its plugin
-// boundary frozen; keep the two in sync.
+// The filesystem/DNS-safe branch slug (docs/terminal-and-agents.md): shared by the worktree dir name
+// and the ACORN_TASK_SLUG env var, the isolation handle for parallel tasks (compose -p, derived
+// names).
+// NB: plugins/docker/main/matcher.ts duplicates this one-liner to keep its plugin boundary frozen;
+// keep the two in sync.
 export const branchSlug = (branch: string) => branch.replace(/[^A-Za-z0-9._-]/g, '-')
 
 // Workspace worktree directory name (docs/workspaces-and-tasks.md): keyed by branch, since a workspace is

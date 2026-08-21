@@ -38,7 +38,7 @@ const manifest = (id: string, over: Record<string, unknown> = {}) => ({
 })
 
 beforeEach(() => {
-  // A path with a SPACE on purpose: the loader must reach the bundle through pathToFileURL, and a
+  // A path with a space on purpose: the loader must reach the bundle through pathToFileURL, and a
   // bare `import('/a b/c.js')` fails on exactly this input (and on every Windows path).
   root = mkdtempSync(join(tmpdir(), 'acorn loader-'))
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -64,7 +64,7 @@ describe('the loader gate', () => {
     expect(await loadExternalPlugins(root, { builtins: [] })).toEqual({ loaded: [], installed: [], failures: [] })
   })
 
-  // A `{ path }` dev install is a symlink, and Dirent.isDirectory() is lstat-shaped — it answers false
+  // A `{ path }` dev install is a symlink, and Dirent.isDirectory() is lstat-shaped: it answers false
   // for one. Without the symlink branch the author's whole dogfood loop silently loads nothing.
   it('follows a symlinked package directory', async () => {
     const elsewhere = mkdtempSync(join(tmpdir(), 'acorn linked-'))
@@ -103,7 +103,7 @@ describe('loading a plugin', () => {
     install('widget', manifest('widget', { node: undefined, client: './dist/client.js' }), undefined, 'export default {}')
     const { loaded, installed, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect({ loaded, failures }).toEqual({ loaded: [], failures: [] })
-    // Nothing to run, but everything to distribute — which is why `installed` is a separate list.
+    // Nothing to run, but everything to distribute, which is why `installed` is a separate list.
     expect(installed.map((entry) => entry.manifest.id)).toEqual(['widget'])
   })
 
@@ -140,8 +140,8 @@ describe('loaded-plugin migration ownership', () => {
   })
 })
 
-// What the node offers to devices (docs/plugins.md). The hash here is
-// a claim the device cross-checks against the bytes it receives; it is never the thing trust binds to.
+// What the node offers to devices (docs/plugins.md § Loaded plugins). The hash here is a claim the
+// device cross-checks against the bytes it receives; it is never the thing trust binds to.
 describe('the installed enumeration', () => {
   it('reports the client bundle hash and size', async () => {
     install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default {}')
@@ -160,8 +160,8 @@ describe('the installed enumeration', () => {
   })
 
   it('reports no bundle for a client entrypoint that symlinks out of the plugin directory', async () => {
-    // The manifest schema catches a literal `..`; this is the case only the symlink gate catches, and
-    // it is the one that matters — a package can ship a link, not just a path.
+    // The manifest schema catches a literal `..`; this is the case only the symlink gate catches,
+    // since a package can ship a link, not just a path.
     const outside = join(root, 'outside.js')
     writeFileSync(outside, 'export default {}')
     const dir = install('sneak', manifest('sneak', { client: './dist/client.js' }), BUNDLE('sneak'))
@@ -172,8 +172,8 @@ describe('the installed enumeration', () => {
   })
 
   it('leaves a package whose node half failed to import out of the enumeration entirely', async () => {
-    // Broken, not client-only. Distributing its UI would put a row on every paired device for a plugin
-    // whose routes exist nowhere.
+    // Broken, not client-only. Distributing its UI would put a row on every paired device for a
+    // plugin whose routes exist nowhere.
     install('broken', manifest('broken', { client: './dist/client.js' }), 'nonsense(((\n', 'export default {}')
     const { installed, failures } = await loadExternalPlugins(root, { builtins: [] })
     expect(installed).toEqual([])
@@ -186,8 +186,8 @@ describe('the installed enumeration', () => {
     writeFileSync(join(dir, 'dist', 'client.js'), 'export default { changed: true }')
     const served = await readClientBundle(installed, 'ntfy')
     expect(new TextDecoder().decode(served!.bytes)).toBe('export default { changed: true }')
-    // Deliberately disagrees with installed[0].client.hash: the device hashes what arrived, sees the
-    // mismatch against the listing, and refuses. Fail closed.
+    // Disagrees with installed[0].client.hash: the device hashes what arrived, sees the mismatch
+    // against the listing, and refuses. Fail closed.
     expect(served!.hash).toBe(sha256('export default { changed: true }'))
     expect(served!.hash).not.toBe(installed[0].client!.hash)
   })
@@ -201,7 +201,7 @@ describe('the installed enumeration', () => {
 })
 
 // The manifest is the only place a shell contribution can be declared, so what it parses is the whole
-// vocabulary a third-party plugin's UI has (docs/plugins.md).
+// vocabulary a third-party plugin's UI has (docs/plugins.md § Loaded plugins).
 describe('declared frame contributions', () => {
   const withFrames = (frames: unknown[]) =>
     manifest('board', { client: './dist/client.js', contributions: { frames } })
@@ -210,8 +210,8 @@ describe('declared frame contributions', () => {
     install('board', withFrames([{ target: 'pane', id: 'board', label: 'Board' }]), BUNDLE('board'), 'export default {}')
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     expect(installedPluginInfo(installed[0]).contributions.frames).toEqual([
-      // `scope: 'task'` is part of the default set: a pane written before the field existed is a pane in a
-      // task's layout, which is the only thing a pane has ever been.
+      // `scope: 'task'` is part of the default set: a pane written before the field existed is a pane
+      // in a task's layout, which is the only thing a pane has ever been.
       { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, scope: 'task', formFactor: ['desktop'], claimsKeys: [] },
     ])
   })
@@ -241,7 +241,7 @@ describe('declared frame contributions', () => {
   })
 })
 
-// Every case here is a SKIP plus a report. The loader must never throw: one broken installed plugin
+// Every case here is a skip plus a report. The loader must never throw: one broken installed plugin
 // cannot be allowed to stop a node from booting.
 describe('rejections', () => {
   const reasonFor = async (dir: string, builtins: readonly string[] = []) => {
@@ -332,8 +332,8 @@ describe('rejections', () => {
 })
 
 // The half of the reload path that lives in this file: defeating Node's ES module cache, which is
-// permanent and keyed on the resolved URL. Without this, "reload" would re-run the FIRST load's module
-// object forever and every assertion about candidate-then-commit would be about nothing.
+// permanent and keyed on the resolved URL. Without this, "reload" would re-run the first load's
+// module object forever and every assertion about candidate-then-commit would be about nothing.
 describe('re-importing a package for a reload', () => {
   const marked = (name: string, marker: string) =>
     `export default { name: ${JSON.stringify(name)}, init: () => {}, marker: ${JSON.stringify(marker)} }\n`
@@ -357,10 +357,10 @@ describe('re-importing a package for a reload', () => {
     writeFileSync(join(dir, 'dist', 'dep.js'), `export const marker = 'dep-v1'\n`)
     expect(await markerOf({ builtins: [] })).toBe('dep-v1')
 
-    // The generation stamp goes on the ENTRY's URL, and a relative specifier resolves against the URL's
-    // path rather than inheriting its query — so the child comes back from the cache with the code it had
-    // at boot. Pinned here so the limit cannot quietly change in either direction: a multi-file node half
-    // needs a restart until a resolve hook stamps the whole subgraph.
+    // The generation stamp goes on the entry's URL, and a relative specifier resolves against the
+    // URL's path rather than inheriting its query, so the child comes back from the cache with the
+    // code it had at boot. Pinned here so the limit cannot quietly change in either direction: a
+    // multi-file node half needs a restart until a resolve hook stamps the whole subgraph.
     writeFileSync(join(dir, 'dist', 'dep.js'), `export const marker = 'dep-v2'\n`)
     expect(await markerOf({ builtins: [], reimport: ['acme'] })).toBe('dep-v1')
   })

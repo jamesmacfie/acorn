@@ -25,7 +25,7 @@ describe('which hosts a node answers to', () => {
   it('is loopback-only until someone says otherwise', () => {
     delete process.env.ACORN_ADVERTISE_HOST
     expect(advertisedHosts(fakeRoot())).toEqual([])
-    // '' is a RECORDED answer ("none"), not an unanswered one — it must not become a host.
+    // '' is a recorded answer ("none"), not an unanswered one. It must not become a host.
     expect(advertisedHosts(fakeRoot(''))).toEqual([])
   })
 

@@ -1,25 +1,13 @@
-// Where a BUILT-IN plugin's Drizzle chain lives at runtime, which is three different layouts.
-//
-//   source (tests, dev:node)   plugins/<name>/migrations/
-//   built  (pnpm dev, e2e)     apps/desktop/out/migrations/<name>/   — beside core's at out/migrations/
-//   packaged (.app)            <resources>/migrations/<name>/
-//
-// The walk starts from the PLUGIN's own module, not from this one — resolving from here would find
-// node-core's chain at packages/node-core/migrations. A built-in declares that module as
-// `migrationsModule: import.meta.url` on its NodePlugin and the host passes it in (server/plugin/host.ts);
-// nothing here is reachable from a plugin, which is what stops a plugin choosing a chain by proximity.
-// A loaded plugin never needs an ancestor search at all: its manifest names the directory, confined to
-// its package, and pluginMigrationsChain below only validates it.
-//
-// The plugin-scoped candidate is checked first at every level. Built and packaged layouts place core
-// and plugin chains beside one another, so selecting a bare migrations directory could apply the wrong
-// schema. The same ordering is used for source, staged, and packaged runtimes.
+// Resolves a built-in plugin's Drizzle migration chain across the three runtime layouts
+// (docs/data-layer.md § Migrations). The module URL passed in is always the plugin's own
+// (server/plugin/host.ts passes `migrationsModule: import.meta.url`), never this file's, which is what
+// stops a plugin from finding node-core's own chain by proximity.
 import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// resourcesPath is an Electron addition to `process`, and node-core compiles against plain Node types
-// by design — read it defensively rather than widening the package's type surface.
+// resourcesPath is an Electron addition to `process`. node-core compiles against plain Node types,
+// so this reads it defensively rather than widening the package's type surface.
 const electronResourcesPath = (process as { resourcesPath?: string }).resourcesPath
 
 // `meta/_journal.json` rather than the directory alone: a chain without a journal silently applies
@@ -38,9 +26,9 @@ export function pluginMigrationsChain(plugin: string, dir: string): string {
   return dir
 }
 
-// Source packages and loaded packages both have a `plugins/<id>/...` shape. When the start URL has
-// that shape, never walk above the package root: a missing chain must not adopt dataRoot/migrations,
-// a checkout-level core chain, or any other ancestor's DDL.
+// Source packages and loaded packages both have a `plugins/<id>/...` shape. The walk below stops here
+// rather than continuing past it, so a missing chain cannot adopt dataRoot/migrations, a checkout-level
+// core chain, or any other ancestor's DDL (docs/data-layer.md § Migrations).
 const pluginPackageRoot = (plugin: string, start: string): string | null => {
   let dir = start
   for (;;) {

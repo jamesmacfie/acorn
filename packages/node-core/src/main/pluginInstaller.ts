@@ -1,14 +1,14 @@
-// Putting a third-party plugin on this node, and taking it off again
-// (docs/plugins.md).
+// Putting a third-party plugin on this node, and taking it off again (docs/plugins.md § Loaded
+// plugins).
 //
-// Install is PER NODE. A fleet is a set of independently administered nodes, so there is no
+// Install is per node. A fleet is a set of independently administered nodes, so there is no
 // cross-node transaction here and no attempt at one: this module answers "make this node carry this
 // package", and every device that pairs with the node picks the bundle up through phase 2's
 // distribution path afterwards.
 //
-// This is also the node's only outbound HTTP consumer (docs/http-client.md says there is deliberately
-// no shared client). The fetch usage stays inside this file rather than becoming a general helper —
-// same posture node-security.md asks of the future credential broker.
+// This is also the node's only outbound HTTP consumer (docs/http-client.md says there is no shared
+// client). The fetch usage stays inside this file rather than becoming a general helper, the same
+// posture docs/security.md asks of the future credential broker.
 //
 // Nothing here loads or executes plugin code. The package is validated, hashed and placed; the loader
 // runs it at the node's next start (pluginLoader.ts), which is why every result says
@@ -39,12 +39,12 @@ const DOWNLOAD_TIMEOUT_MS = 60_000
 const UNPACK_TIMEOUT_MS = 120_000
 
 // The convention this phase establishes: a GitHub release carries the package as one asset with this
-// exact name. A public authoring guide documents it with the ecosystem work (README § Future work).
+// exact name.
 export const RELEASE_ASSET = 'acorn-plugin.tgz'
 
 // Everything a caller can be told about why an install did not happen. One class rather than a code
-// union because every one of these is the same outcome for the owner — "that package was refused, and
-// here is the sentence explaining it" — and the route turns them all into one 400.
+// union because every one of these is the same outcome for the owner, "that package was refused, and
+// here is the sentence explaining it", and the route turns them all into one 400.
 export class PluginInstallError extends Error {}
 
 const fail = (message: string): never => {
@@ -55,12 +55,12 @@ export type PluginProvenance = Record<string, string>
 
 // What was installed, pinned. `archiveSha256` answers "are these the bytes that were reviewed"; the
 // entrypoint hashes answer the same question for the two files that actually execute; `provenance`
-// records what the source resolved TO (a release tag, an npm integrity value) so "what exactly is
-// running" survives the source moving underneath it (node-security.md § Supply chain).
+// records what the source resolved to (a release tag, an npm integrity value) so "what exactly is
+// running" survives the source moving underneath it (docs/security.md § Supply chain).
 export type PluginLockfile = {
   source: PluginInstallSource
   resolvedVersion: string
-  // null for a `{ path }` folder install, where there was no archive — and nothing to pin, since the
+  // null for a `{ path }` folder install, where there was no archive and nothing to pin, since the
   // directory is symlinked and stays editable. `entrypoints` is empty for the same reason.
   archiveSha256: string | null
   entrypoints: { node?: string; client?: string }
@@ -203,10 +203,10 @@ function packageRoot(unpacked: string): string {
   return fail(`That archive has no ${MANIFEST_FILE} at its root.`)
 }
 
-// tar refuses `..` members, but a symlink INSIDE the package pointing at ~/.ssh survives extraction and
-// would make the plugin directory a window onto the rest of the disk — for the loader, for the bundle
-// route, and for a backup. Reject the whole package rather than pruning: a package that ships one is
-// not one to run half of.
+// tar refuses `..` members, but a symlink inside the package pointing at ~/.ssh survives extraction
+// and would make the plugin directory a window onto the rest of the disk, for the loader, for the
+// bundle route, and for a backup. Reject the whole package rather than pruning: a package that ships
+// one is not one to run half of.
 function assertConfined(root: string): void {
   const realRoot = realpathSync(root)
   const walk = (dir: string): void => {
@@ -290,7 +290,7 @@ function writeLockfile(dataRoot: string, id: string, lock: PluginLockfile): void
 }
 
 // The swap. Two renames on one filesystem with a rename-back on failure, which is why staging lives
-// under the data root and not in tmpdir — a cross-device rename would fail here rather than in a test.
+// under the data root and not in tmpdir. A cross-device rename would fail here rather than in a test.
 //
 // The window between the renames is real but tiny, and a crash inside it leaves `<id>.old-*` beside a
 // missing `<id>`; `sweepDebris` reclaims it at the next boot instead of leaving the node one directory
@@ -393,19 +393,9 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
   }
 }
 
-// A folder install, and the one source whose bytes are not pinned: the directory is SYMLINKED rather
-// than copied, so whatever is in that tree at the node's next start is what runs. That is the point —
-// it is what makes the author's edit-in-place loop worth having — and it is why the lockfile below
-// records no archive hash and no entrypoint digests. There is nothing to pin.
-//
-// Allowed on every build, packaged included (docs/security.md § Installing from a folder). The bytes
-// are the owner's own, named by absolute path on the node's own filesystem, and for a folder only this
-// user can write the symlink hands out no authority that account did not already have. The mode of the
-// folder is NOT checked, and that is the one real cost: a group-writable or shared directory is a wider
-// write surface than the `0700` install root, so pointing at one turns write access there into durable
-// code execution as the node's user. The security doc says so in those words; a mode check here would be
-// a boundary shaped like advice. The client half is unaffected either way — distribution is keyed on the
-// hash of the bytes that arrive, so an in-place edit re-prompts the device on its own.
+// A folder install (docs/security.md § Installing from a folder). The directory is symlinked rather
+// than copied, so whatever is in that tree at the node's next start is what runs, and the lockfile
+// below records no archive hash and no entrypoint digests because there is nothing to pin.
 function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): PluginInstallResult {
   if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
   const manifest = validate(source.path, expectId)
@@ -425,9 +415,9 @@ function linkLocal(dataRoot: string, source: { path: string }, expectId: string 
   return { id: manifest.id, version: manifest.version, state: 'installed-restart-required' }
 }
 
-// Refuse to go backwards. An update is the attack window (node-security.md § Supply chain), and a
-// source that suddenly resolves to an older version is either a mistake or someone re-pointing a tag at
-// a version whose vulnerability is already public.
+// Refuse to go backwards. An update is the attack window (docs/security.md § Supply chain), and a
+// source that suddenly resolves to an older version is either a mistake or someone re-pointing a tag
+// at a version whose vulnerability is already public.
 function guardDowngrade(existing: PluginLockfile | null, next: string, options: InstallOptions): void {
   if (!existing || options.allowDowngrade) return
   if (compareVersions(next, existing.resolvedVersion) === -1) {

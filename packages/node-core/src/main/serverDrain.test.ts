@@ -18,7 +18,7 @@ function listen(): Promise<{ server: Server; port: number }> {
   })
 }
 
-// Can a fresh server take this port? The only honest test of "the listener really closed" — `listening`
+// Can a fresh server take this port? The only honest test of "the listener really closed": `listening`
 // is a flag the server sets on itself, whereas binding is the operating system agreeing.
 function rebindable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -87,7 +87,7 @@ describe('drainWithDeadline', () => {
     )
     expect(outcome).toBe('timeout')
     expect(ran).toEqual([])
-    // The deadline covers the SEQUENCE, so a hung first step cannot buy the second one its own budget.
+    // The deadline covers the sequence, so a hung first step cannot buy the second one its own budget.
     expect(Date.now() - started).toBeLessThan(2_000)
   })
 })

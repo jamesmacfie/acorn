@@ -19,14 +19,32 @@ killing its live agent and terminal sessions.
 
 ## Reaching a node from another machine
 
-A node answers on loopback only until someone says otherwise. On first boot at a terminal it lists
-this machine's IPv4 addresses and asks which to advertise; pressing Enter keeps it private. The
-answer is recorded as `advertiseHost` in the data root's `node.json`, so it is asked once.
+A node answers on loopback only until someone says otherwise. Binding beyond `127.0.0.1` puts a
+service that runs PTYs, spawns agents, and executes repo-configured commands onto a network, so
+nothing infers the answer: a node advertises an address only because someone said so, either by
+answering the first-boot question below or by setting `ACORN_ADVERTISE_HOST`. A machine with three
+interfaces and a VPN has no obvious answer to guess at, and guessing wrong would fail as a bare 403
+from the Host guard with nothing to debug against.
+
+On first boot at a terminal it lists this machine's IPv4 addresses and asks which to advertise;
+pressing Enter keeps it private, one keystroke away from exposure rather than something that happens
+because an installer's return key was held down. Only IPv4 addresses are offered: the answer ends up
+in a URL the operator types and in a Host header comparison, and a bracketed IPv6 literal is a worse
+first experience than the v4 address every one of these machines also has. The answer is recorded as
+`advertiseHost` in the data root's `node.json`, so it is asked once; recording "none" (an empty
+string) is what stops it reappearing every boot.
+
+The prompt is skipped, without recording anything, when there is no TTY to ask at (launchd, systemd,
+Docker, the e2e harness) or when the machine has no network address to offer — a laptop booted off the
+network still gets asked once it is plugged in, because that case alone is not treated as an answer.
 
 Set `ACORN_ADVERTISE_HOST` for an install with no terminal to answer — launchd, systemd, Docker, CI.
-It accepts a comma-separated list when a machine is reached by both an IP and a hostname, and it
-overrides the recorded answer. With it set the listener binds `0.0.0.0` and accepts that Host as well
-as loopback; every other Host still gets a 403, which is what keeps a DNS-rebinding page out.
+It takes priority over the recorded answer, so a service manager or container can set it without
+touching the data root, and an operator who already answered "none" can still override it for one run
+without editing `node.json`. It accepts a comma-separated list when a machine is reached by both an IP
+and a hostname, since that is a real case and the alternative would be two settings that have to agree.
+With it set the listener binds `0.0.0.0` and accepts that Host as well as loopback; every other Host
+still gets a 403, which is what keeps a DNS-rebinding page out.
 
 Understand what this exposes before setting it. A node runs PTYs, spawns agents and executes
 repo-configured commands, and what stands between the network and all of that is a device bearer

@@ -201,7 +201,7 @@ describe('validation', () => {
   it("refuses a package whose id is not the one being updated", async () => {
     serve(tarball(packageDir()))
     await installPlugin(root, { url: 'https://example.test/acorn-plugin.tgz' })
-    // The lockfile's source now resolves to a DIFFERENT plugin — the classic re-pointed-tag shape.
+    // The lockfile's source now resolves to a different plugin, the classic re-pointed-tag shape.
     serve(tarball(packageDir({ id: 'other', node: './dist/node.js' })))
     await expect(updatePlugin(root, 'ntfy')).rejects.toThrow(/is 'other', not 'ntfy'/)
   })
@@ -236,7 +236,7 @@ describe('updating', () => {
     await install('2.0.0')
     serve(tarball(packageDir({ version: '1.0.0' })))
     await expect(updatePlugin(root, 'ntfy')).rejects.toThrow(/older than the installed 2\.0\.0/)
-    // The old version is still the installed one — a refused downgrade must not have replaced anything.
+    // The old version is still the installed one. A refused downgrade must not have replaced anything.
     expect(readLockfile(root, 'ntfy')!.resolvedVersion).toBe('2.0.0')
 
     serve(tarball(packageDir({ version: '1.0.0' })))
@@ -293,7 +293,7 @@ describe('uninstalling', () => {
 })
 
 describe('folder installs', () => {
-  // The gate this used to assert — `allowLocalPath`, dev builds only — is gone. A folder is a
+  // The gate this used to assert, `allowLocalPath`, dev builds only, is gone. A folder is a
   // first-class source on every build (docs/security.md § Installing from a folder), so the absence of
   // any option at all is the assertion: nothing left for a composition root to get wrong.
   it('need no option to say which kind of build this is', async () => {
@@ -338,7 +338,7 @@ describe('debris', () => {
     sweepDebris(root)
 
     // The crash window: the live directory had been renamed away and the new one never arrived. Putting
-    // it back beats deleting it — the node was serving that version a moment ago.
+    // it back beats deleting it. The node was serving that version a moment ago.
     expect(existsSync(join(plugins, 'ntfy', 'marker'))).toBe(true)
     expect(existsSync(join(plugins, '.staging-deadbeef'))).toBe(false)
     expect(existsSync(join(plugins, 'other.incoming-feedface'))).toBe(false)
