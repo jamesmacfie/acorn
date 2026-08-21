@@ -137,6 +137,35 @@ describe('primitive adoption', () => {
     expect(CSS_CLASH()).toEqual([])
   })
 
+  // `.ui-check` lays the box beside its label with no `flex-direction` of its own, so a caller class
+  // that says `column` wins on cascade order and stacks the label under the box. Docker and Terminal
+  // both passed `.settings-field` and got that. CSS_CLASH above only reads the `.ui-x[data-…]` rules,
+  // so it cannot see this one.
+  it('no class handed to a Checkbox stacks the box above its label', () => {
+    const columnClasses = new Set<string>()
+    for (const file of allCss()) {
+      for (const rule of readFileSync(file, 'utf8').matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+        if (!/flex-direction\s*:\s*column/.test(rule[2])) continue
+        for (const selector of rule[1].split(',')) {
+          const m = /^\s*\.([\w-]+)\s*$/.exec(selector)
+          if (m) columnClasses.add(m[1])
+        }
+      }
+    }
+    const offenders: string[] = []
+    for (const file of tsx()) {
+      for (const m of readFileSync(file, 'utf8').matchAll(/<Checkbox\b((?:[^<>]|\{[^{}]*\})*?)\/?>/gs)) {
+        const cls = /\bclass="([^"]+)"/.exec(m[1])
+        if (!cls) continue
+        const names = cls[1].split(/\s+/)
+        // A later `row` class in the same list puts the direction back.
+        if (names.some((n) => n.endsWith('-row'))) continue
+        for (const name of names) if (columnClasses.has(name)) offenders.push(`${rel(file)} .${name}`)
+      }
+    }
+    expect([...new Set(offenders)].sort()).toEqual([])
+  })
+
   // Files fully converted to the primitive components. Add a file here when you migrate it; the
   // list may only grow. It is not "all files": migration is incremental.
   const CONVERTED = [
