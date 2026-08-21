@@ -52,9 +52,9 @@ const build = (make: (name: RegistryName) => readonly string[]): Snapshot => {
   return out
 }
 
-// Ids in registration order, NOT sorted: the order is part of what must survive a sibling's disable.
-// Two slot registries hold entries whose ids only differ by which slot they fill, so the slot is folded
-// into the key.
+// Ids in registration order, not sorted: the order is part of what must survive a sibling's disable.
+// Two slot registries hold entries whose ids only differ by which slot they fill, so the slot is
+// folded into the key.
 const snapshot = (): Snapshot =>
   build((name) =>
     REGISTRIES[name].entries().map((entry) => {
@@ -63,8 +63,8 @@ const snapshot = (): Snapshot =>
     }),
   )
 
-// Multiset subtraction — remove ONE occurrence per expected id, so a duplicate vanishing is visible — and
-// report what never matched.
+// Multiset subtraction: remove one occurrence per expected id, so a duplicate vanishing is visible,
+// and report what never matched.
 const minus = (from: readonly string[], take: readonly string[]): { rest: string[]; unmatched: string[] } => {
   const remaining = [...take]
   const rest: string[] = []
@@ -95,29 +95,32 @@ const NAMES = clientPlugins.map((plugin) => plugin.name)
 const OPTIONAL = clientPlugins.filter((plugin) => !plugin.required).map((plugin) => plugin.name)
 const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) => plugin.name)
 
-// The complete contribution set, plus what each OPTIONAL plugin owns — the entries that must vanish when it
-// is disabled and, by omission, the ones that must not. A GOLDEN LIST in `clientPluginDisable.snapshot.json`
-// now, derived by the loop below and regenerated with the one command in ./golden.ts.
+// The complete contribution set, plus what each optional plugin owns: the entries that must vanish
+// when it is disabled and, by omission, the ones that must not. A golden list in
+// `clientPluginDisable.snapshot.json` now, derived by the loop below and regenerated with the one
+// command in ./golden.ts.
 //
-// `panes` and `sources` are docs/ui-design.md contracts in their own right, so `full` doubles as the parity
-// assertion for the compiled graph. Loaded packages are covered through their manifest adapters and do not
-// belong in this static ownership ledger. `refPanels` held exactly one compiled entry when this was
-// written — none — and the note here said that a compiled panel reappearing would be a real change. It
-// did: `github-pull` is github's own pull-request panel, so a PR link clicked inside someone else's
-// content can be glanced at instead of leaving the app. Linear's panel is still absent from this ledger
-// and still correct, because linear is a loaded package and its panel reaches the registry through the
-// manifest adapter in client-core/plugins/frames/register.ts rather than through a compiled roster line.
+// `panes` and `sources` are docs/ui-design.md contracts in their own right, so `full` doubles as the
+// parity assertion for the compiled graph. Loaded packages are covered through their manifest adapters
+// and do not belong in this static ownership ledger. `refPanels` held exactly one compiled entry, none,
+// when this was written, and the note here said that a compiled panel reappearing would be a real
+// change. It did: `github-pull` is github's own pull-request panel, so a PR link clicked inside
+// someone else's content can be glanced at instead of leaving the app. Linear's panel is still absent
+// from this ledger and still correct, because linear is a loaded package and its panel reaches the
+// registry through the manifest adapter in client-core/plugins/frames/register.ts rather than through
+// a compiled roster line.
 //
-// Derived, but not therefore toothless, and the distinction matters because a snapshot you can regenerate
-// looks like one you can launder a regression past. What regeneration CANNOT hide:
-//   - a plugin whose disable removes a SIBLING's entry still shows up, as that entry appearing in the wrong
-//     plugin's slice — a one-line diff a reviewer reads, which is the same review surface the facade's
+// Derived, but not therefore toothless: a snapshot you can regenerate looks like one you can launder a
+// regression past. What regeneration cannot hide:
+//   - a plugin whose disable removes a sibling's entry still shows up, as that entry appearing in the
+//     wrong plugin's slice, a one-line diff a reviewer reads, the same review surface the facade's
 //     surface snapshot has;
-//   - a plugin whose disable ADDS something cannot be recorded at all. The derivation only records what a
-//     boot LOST, so an addition leaves the exact equality below failing however often you regenerate;
+//   - a plugin whose disable adds something cannot be recorded at all. The derivation only records
+//     what a boot lost, so an addition leaves the exact equality below failing however often you
+//     regenerate;
 //   - a plugin that contributes nothing gets an empty slice, which the anti-vacuity case rejects.
-// The ledger stays deliberately brittle: a plugin gaining or losing a contribution SHOULD fail this file and
-// be re-recorded, because that is the same edit that could take a sibling's contribution with it.
+// The ledger stays brittle: a plugin gaining or losing a contribution should fail this file and be
+// re-recorded, because that is the same edit that could take a sibling's contribution with it.
 type Golden = { full: Snapshot; owned: Record<string, Partial<Snapshot>> }
 
 const derive = (): Golden => {
@@ -147,12 +150,12 @@ describe('disabling a client plugin', () => {
   afterEach(() => void activate())
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
-    // Down one per plugin that ships loaded instead of compiled — linear, then http, then database.
+    // Down one per plugin that ships loaded instead of compiled: linear, then http, then database.
     expect(NAMES.length).toBeGreaterThanOrEqual(12)
     expect([...REQUIRED].sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     expect(OPTIONAL.length).toBeGreaterThanOrEqual(8)
     // Every optional plugin is in the ledger, and every ledger entry claims something. A plugin
-    // contributing nothing would make its own case below pass vacuously — this fails instead.
+    // contributing nothing would make its own case below pass vacuously; this fails instead.
     expect(Object.keys(OWNED).sort()).toEqual([...OPTIONAL].sort())
     for (const name of OPTIONAL) {
       const owned = OWNED[name]
@@ -169,7 +172,7 @@ describe('disabling a client plugin', () => {
 
   it('re-activation is idempotent rather than a duplicate-id throw', () => {
     // The registries throw on a duplicate id, so this is the property that makes the whole cycle
-    // possible — and the reason the host disposes a plugin's prior contributions before re-registering.
+    // possible, and the reason the host disposes a plugin's prior contributions before re-registering.
     // Settings → Plugins re-runs the host on every node switch, so it is a production path now.
     expect(() => activate()).not.toThrow()
     expect(snapshot()).toEqual(FULL)

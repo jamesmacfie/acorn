@@ -6,14 +6,14 @@ import { terminalApi } from '@acorn/plugin-terminal/client/terminalClient.ts'
 
 // The probe split (git history: docs/future/node-first/platform-seam.md § The fix, item 3).
 //
-// This file used to assert the opposite: that `window.acorn.terminal` — a preload key whose entire
-// contents were a native folder dialog — was "the single probe behind BOTH typed accessors and core's
-// capability map", and it pinned all three together so they could not drift. They agreed, and they were
-// all wrong. The terminal drawer, agents, run targets and workflows are `/v2` + WebSocket surfaces
-// against the node; gating them on an Electron dialog hid them from every other host and left them
-// visible on a desktop whose node had the terminal plugin turned off.
+// This file used to assert the opposite: that `window.acorn.terminal`, a preload key whose entire
+// contents were a native folder dialog, was "the single probe behind both typed accessors and core's
+// capability map", and it pinned all three together so they could not drift. They agreed, and they
+// were all wrong. The terminal drawer, agents, run targets and workflows are `/v2` + WebSocket
+// surfaces against the node; gating them on an Electron dialog hid them from every other host and left
+// them visible on a desktop whose node had the terminal plugin turned off.
 //
-// So the thing to pin now is that the two questions stay SEPARATE:
+// So the thing to pin now is that the two questions stay separate:
 //   "can this host open a folder dialog"  → the platform seam, per-host
 //   "does this node run terminals"        → the node's plugin roster, per-node
 // and that neither one can quietly start gating the other again.

@@ -73,7 +73,7 @@ describe('scoped lifecycle eviction', () => {
 
   it('clears the live per-node rosters when the active node changes', () => {
     // The per-node QueryClient partition covers cached queries and nothing else. These three live in
-    // module-level signals, so before this they carried node A's data into node B's shell — against ids
+    // module-level signals, so before this they carried node A's data into node B's shell, against ids
     // two nodes may hold in common by construction.
     const off = activateScopedStateEviction()
     rememberActiveTerminal('task-on-a', 'session-1')
@@ -92,7 +92,7 @@ describe('scoped lifecycle eviction', () => {
   })
 
   it('leaves the rosters alone when a node is merely removed', () => {
-    // `runtime:node-removed` drops that node's cache; it must not also wipe the ACTIVE node's live
+    // `runtime:node-removed` drops that node's cache; it must not also wipe the active node's live
     // rosters, which is what a single shared handler would have done.
     const off = activateScopedStateEviction()
     rememberActiveTerminal('task-on-a', 'session-1')

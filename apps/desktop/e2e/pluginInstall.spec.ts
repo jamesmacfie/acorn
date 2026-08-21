@@ -6,13 +6,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
-// The exit criteria for docs/plugins.md, as assertions: the full lifecycle from
-// Settings with no terminal involved — install, trust, restart, update with a permission change,
-// uninstall.
+// The exit criteria for docs/plugins.md, as assertions: the full lifecycle from Settings with no
+// terminal involved. Install, trust, restart, update with a permission change, uninstall.
 //
 // The package is fetched over a real socket rather than copied into place, because "download it and
-// unpack it" is the half of the installer a fixture directory would never exercise. The installer takes
-// https everywhere plus http on loopback, and this server is why that exception exists.
+// unpack it" is the half of the installer a fixture directory would never exercise. The installer
+// takes https everywhere plus http on loopback, and this server is why that exception exists.
 //
 // Local node rather than a paired one, for the same reason pluginFrame.spec.ts gives: distribution is
 // phase 2's test, and pairing would add ninety seconds to every assertion here.
@@ -25,9 +24,9 @@ const roots: string[] = []
 const apps: ElectronApplication[] = []
 const servers: Server[] = []
 
-// A node half with one route, and a client half that exists only so there are BYTES for this device to
-// acknowledge — the trust prompt is keyed on a bundle hash, so a package with no client bundle would
-// install silently and prove nothing about consent.
+// A node half with one route, and a client half that exists only so there are bytes for this device
+// to acknowledge. The trust prompt is keyed on a bundle hash, so a package with no client bundle
+// would install silently and prove nothing about consent.
 const NODE_BUNDLE = `
 export default {
   name: ${JSON.stringify(PLUGIN_ID)},
@@ -60,8 +59,8 @@ function buildPackage(workshop: string, version: string, permissions: Record<str
       }],
       keybindings: [{ command: 'ping', defaultChord: 'meta+alt+n', when: 'global' }],
     },
-    // Deliberately well-formed but unknown: the trust prompt must count this as ignored and never
-    // repeat plugin-authored text as an enforced grant.
+    // Well-formed but unknown to acorn: the trust prompt must count this as ignored and never repeat
+    // plugin-authored text as an enforced grant.
     permissions: { api: ['core.quantum:read'], node: permissions },
   }))
   const archive = join(dir, 'acorn-plugin.tgz')
@@ -138,10 +137,11 @@ async function launch(dataDir: string): Promise<{ app: ElectronApplication; page
 }
 
 const dismissOnboarding = async (page: Page): Promise<void> => {
-  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
-  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
-  // its own button can no longer land. So record the preference on the node, which survives the
-  // reloads these specs do, and close the wizard directly if it has already painted.
+  // These fixtures are first-run nodes with zero projects, so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it, a click on
+  // its own button can no longer land. Recording the preference on the node settles it, since it
+  // survives the reloads these specs do; closing the wizard directly here only helps when it has
+  // already painted.
   await page.evaluate(async () => {
     const bridge = (window as BridgeWindow).acorn
     if (!bridge) return
@@ -157,8 +157,8 @@ const dismissOnboarding = async (page: Page): Promise<void> => {
     })
   })
   // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
-  // it this click cannot land. The preference above is what actually settles it — this is only here to
-  // close a wizard that is already reachable.
+  // it, this click cannot land. The preference above is what actually settles it; this click only
+  // closes a wizard that is already reachable.
   const skip = page.getByRole('button', { name: 'skip for now' })
   if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
@@ -216,7 +216,7 @@ async function restartAndSettle(page: Page, expected: (row: Awaited<ReturnType<t
   await expect(page.locator('.shell')).toBeVisible({ timeout: 120_000 })
   await expect
     .poll(async () => {
-      // The node has to ANSWER before its answer means anything. While it is restarting nodeJson
+      // The node has to answer before its answer means anything. While it is restarting nodeJson
       // throws, and folding that into "the row is absent" would let the uninstall assertion pass on
       // the outage rather than on the uninstall.
       const roster = await nodeJson<Roster>(page, '/v2/core/plugins').catch(() => null)
@@ -247,7 +247,7 @@ test('installs, trusts, updates and uninstalls a plugin from Settings', async ()
   // Straight after boot: these fixtures have zero projects, so the first-run wizard opens over them.
   await dismissOnboarding(page)
   await settleOverlays(page)
-  // Nothing installed yet — the assertion that the rest of this test is about an install and not about
+  // Nothing installed yet: the assertion that the rest of this test is about an install and not about
   // a package that happened to be lying in the data root.
   expect(await rosterRow(page)).toBeUndefined()
 
@@ -289,12 +289,12 @@ test('installs, trusts, updates and uninstalls a plugin from Settings', async ()
   await page.locator('.plugin-row', { hasText: PLUGIN_ID }).getByRole('button', { name: 'Update' }).click()
   await expect.poll(async () => (await rosterRow(page))?.installed?.version, { timeout: 60_000 }).toBe('1.1.0')
 
-  // A different bundle is a different decision, and this one is framed as an update — which is what
+  // A different bundle is a different decision, and this one is framed as an update, which is what
   // makes the added permission visible instead of arriving inside a version bump.
   const dialog = page.locator('.plugin-trust-dialog')
   await expect(dialog).toBeVisible({ timeout: 60_000 })
   await expect(dialog.locator('.overlay-title')).toHaveText('Plugin update')
-  // The update leads with the diff, and each new line carries the tier that owns it — the added
+  // The update leads with the diff, and each new line carries the tier that owns it: the added
   // permission here is a node one, which is declared rather than enforced.
   const newLine = dialog.locator('.plugin-trust-permissions[data-tier="new"] li.added')
   await expect(newLine).toHaveCount(1)

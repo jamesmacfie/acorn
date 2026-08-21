@@ -50,7 +50,7 @@ import { availableSources } from '@acorn/client-core/tabs/sources.ts'
 // compete with the first interactive paint.
 const SettingsModal = lazy(() => import('@acorn/client-core/settings/SettingsModal.tsx'))
 
-// Layout root (Router root): top bar + three panes. Panes are params-driven — PullList (left)
+// Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
 export default function App() {
   const queryClient = useQueryClient()
@@ -78,9 +78,10 @@ export default function App() {
     const id = activeTaskId()
     if (id) setTerminalOpen(id, !isTerminalOpen(id))
   }
-  // Idempotent, unlike the toggle. The drawer contribution closes itself when its last tab goes, and that path
-  // can fire twice (TerminalPanel.closeTab decides after two awaits, so two racing closes both see an empty
-  // roster) — a second toggle would reopen the drawer and auto-launch a profile into it.
+  // Idempotent, unlike the toggle. The drawer contribution closes itself when its last tab goes, and
+  // that path can fire twice (TerminalPanel.closeTab decides after two awaits, so two racing closes
+  // both see an empty roster). A second toggle would reopen the drawer and auto-launch a profile into
+  // it.
   const closeTerm = () => {
     const id = activeTaskId()
     if (id) setTerminalOpen(id, false)
@@ -134,7 +135,7 @@ export default function App() {
     // (node-core/server/plugin/taskChecks.ts). The docker, changes and terminal warnings that used to
     // be registered here and in the docker client bundle all arrive through this.
     //
-    // Mapped rather than passed through because a NODE concern carries no callback: the cleanup the
+    // Mapped rather than passed through because a node concern carries no callback: the cleanup the
     // owner ticks is a route the node runs at the right point in the archive, and the id below is
     // what the archive request hands back to name it.
     const offNode = registerWillHandler('task:archive', 'plugins', async ({ taskId }) =>
@@ -147,7 +148,7 @@ export default function App() {
         ...(concern.detailsMore ? { detailsMore: concern.detailsMore } : {}),
         ...(concern.action ? { checkbox: concern.action } : {}),
       })))
-    // Quitting has no node meaning — a node does not know a window is closing — so this one stays a
+    // Quitting has no node meaning: a node does not know a window is closing, so this one stays a
     // client handler over the session store.
     const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
       const active = sessions().filter((session) => session.status === 'running')
@@ -176,17 +177,17 @@ export default function App() {
 
   // Which plugins the node this shell is showing runs.
   //
-  // NOT `on(activeNodeId, …, { defer: true })`, which is what this was and which never fired. index.tsx
-  // mounts App inside a `<Show keyed>` on the active node, so a switch DISPOSES this component and builds a
-  // new one: the fresh effect records the new node and defers, the dying one is disposed during Solid's pure
-  // pass before user effects flush, and `applyNodePlugins` ran exactly once per window — at boot, from
-  // index.tsx. Every node after the first kept the previous node's contributions, so a plugin disabled on
-  // node B still had its pane, source, poller and settings page. The comment claiming "for the second one
-  // onwards" was precisely backwards.
+  // Not `on(activeNodeId, …, { defer: true })`, which is what this was and which never fired. index.tsx
+  // mounts App inside a `<Show keyed>` on the active node, so a switch disposes this component and
+  // builds a new one: the fresh effect records the new node and defers, the dying one is disposed
+  // during Solid's pure pass before user effects flush, and `applyNodePlugins` ran exactly once per
+  // window, at boot, from index.tsx. Every node after the first kept the previous node's
+  // contributions, so a plugin disabled on node B still had its pane, source, poller and settings
+  // page. The comment claiming "for the second one onwards" was precisely backwards.
   //
-  // A plain effect reading the signal is right BECAUSE of that remount: it runs once on mount, which is once
-  // per node. The duplicate for the first node is a no-op — `applyNodePlugins` skips a node whose list it has
-  // already applied.
+  // A plain effect reading the signal is right because of that remount: it runs once on mount, which
+  // is once per node. The duplicate for the first node is a no-op: `applyNodePlugins` skips a node
+  // whose list it has already applied.
   createEffect(() => {
     const nodeId = activeNodeId()
     if (nodeId) void applyNodePlugins(nodeId)
@@ -236,7 +237,7 @@ export default function App() {
     setCollapsed,
   })
 
-  // `/t/:taskId?pane=…&item=…` — open a pane on a selected item, once, then strip the params
+  // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
   // (tasks/taskDeepLink.ts). The address a plugin pane could not previously be given.
   createTaskDeepLink({
     taskId: () => activeTaskId(),
@@ -244,9 +245,9 @@ export default function App() {
     navigate,
   })
 
-  // Active workspace is derived from the current project. The ACTIVE
-  // node's list, deliberately: the route carries no node, so the workspace the shell is showing is
-  // whichever one the active node has for this repo.
+  // Active workspace is derived from the current project. The active node's list, because the route
+  // carries no node, so the workspace the shell is showing is whichever one the active node has for
+  // this repo.
   const activeWorkspace = () => workspaceForProject(workspaces.data, params.projectId)
   // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
   // exactly one node, and two nodes both having a "Default" is the normal case.
@@ -438,21 +439,21 @@ export default function App() {
       <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
       <WillConfirmationHost />
       {/* A referenced item from another provider, opened by any surface that renders content
-          (client-core/registries/refPanels.ts). Mounted at the shell because the STATE is the shell's —
-          before this, the only place in the app that could open one was github's PR conversation. */}
+          (client-core/registries/refPanels.ts). Mounted at the shell because the state is the shell's.
+          Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
       <Show when={settingsOpen()}>
         <SettingsModal initialTab={settingsTab()} onClose={() => setSettingsOpen(false)} />
       </Show>
       {/* The terminal drawer arrives as a contribution (plugins/terminal's drawerContribution.tsx). The
-          shell still owns the per-task `terminalOpen` flag — the tab rail and topbar badge read it too — and
-          passes it through slotContext; it no longer knows what fills the drawer. Order matters: this host
-          sits BEFORE the overlay host, so a dialog still paints above the drawer. */}
+          shell still owns the per-task `terminalOpen` flag, which the tab rail and topbar badge read
+          too, and passes it through slotContext; it no longer knows what fills the drawer. Order
+          matters: this host sits before the overlay host, so a dialog still paints above the drawer. */}
       <SlotHost slot="drawer" context={slotContext()} />
       <SlotHost slot="overlay" context={slotContext()} />
     </div>
     <Tips />
-    {/* One transient-feedback stack for the whole app, frames included — the bridge's ui.toast
+    {/* One transient-feedback stack for the whole app, frames included. The bridge's ui.toast
         lands here too. */}
     <ToastHost />
     </div>

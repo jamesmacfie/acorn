@@ -74,8 +74,8 @@ async function nodeJson<T>(page: Page, nodeId: string, path: string, init: { met
 }
 
 // A request straight to the second node from the test process, pinned to the certificate it printed.
-// This is the "other machine" side of the fixture: seeding it must NOT go through the client, or the
-// test would be asserting that the client agrees with itself.
+// This is the "other machine" side of the fixture. Seeding it does not go through the client; that
+// would make the test assert the client agrees with itself.
 function remoteJson<T>(node: StandaloneHandshake, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const payload = init.body === undefined ? undefined : JSON.stringify(init.body)
   const url = new URL(path, node.endpoint)
@@ -202,8 +202,8 @@ async function launch(): Promise<RunningApp> {
   return { app, page, dataDir, repoDir }
 }
 
-// The same workspace / repo / task shape on both nodes, so the ONLY difference between what the two
-// answer is the title — which is what makes the cache assertion below meaningful.
+// The same workspace, repo, and task shape on both nodes, so the only difference between what the two
+// answer is the title. That is what makes the cache assertion below meaningful.
 type Seed = { workspaceId: string; projectId: string; taskId: string }
 
 async function seedLocal(page: Page, nodeId: string, repoDir: string, title: string): Promise<Seed> {
@@ -238,7 +238,7 @@ function makeRepo(dir: string): string {
   return dir
 }
 
-// A fixture that boots the app and a second node and pairs them — the setup four of the five scenarios
+// A fixture that boots the app and a second node and pairs them, the setup four of the five scenarios
 // below share. Returns everything each needs to address either node explicitly.
 type TwoNodes = {
   running: RunningApp
@@ -284,13 +284,11 @@ async function pairTwoNodes(options: { seedNode?: (dataDir: string) => void } = 
 const stateOf = async (page: Page, nodeId: string): Promise<NodeStatus['state'] | undefined> =>
   (await fleet(page)).statuses.find((status) => status.nodeId === nodeId)?.state
 
-// Force the second node's workspace and task onto the FIRST node's UUIDs.
-//
-// docs/architecture-overview.md § Fleet semantics: "Two nodes may coincidentally hold the same UUID; that must never
-// collide in the client." Coincidence cannot be arranged through the API — both routes mint their ids
-// with randomUUID() server-side, which is correct — so the collision is manufactured on disk, the same
-// way the smoke suite seeds agent rows with sqlite3. The database is WAL, so an external writer is fine
-// while the node is running; busy_timeout covers the moment a request holds the write lock.
+// Force the second node's workspace and task onto the first node's UUIDs: the collision
+// docs/architecture-overview.md § Client state and fleet behavior guards against. The API cannot
+// produce it, since both routes mint ids with randomUUID() server side, so it is manufactured on
+// disk, the way the smoke suite seeds agent rows with sqlite3. The database is WAL, so an external
+// writer is safe while the node runs; busy_timeout covers the moment a request holds the write lock.
 function collideIds(dataDir: string, from: Seed, to: Seed): void {
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`
   execFileSync('sqlite3', [join(dataDir, 'core.sqlite'), `
@@ -304,10 +302,11 @@ function collideIds(dataDir: string, from: Seed, to: Seed): void {
 }
 
 async function dismissOnboarding(page: Page): Promise<void> {
-  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
-  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
-  // its own button can no longer land. So record the preference on the node, which survives the
-  // reloads these specs do, and close the wizard directly if it has already painted.
+  // These fixtures are first-run nodes with zero projects, so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it, a click on
+  // its own button can no longer land. Recording the preference on the node settles it, since it
+  // survives the reloads these specs do; closing the wizard directly here only helps when it has
+  // already painted.
   await page.evaluate(async () => {
     const bridge = (window as BridgeWindow).acorn
     if (!bridge) return
@@ -323,8 +322,8 @@ async function dismissOnboarding(page: Page): Promise<void> {
     })
   })
   // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
-  // it this click cannot land. The preference above is what actually settles it — this is only here to
-  // close a wizard that is already reachable.
+  // it, this click cannot land. The preference above is what actually settles it; this click only
+  // closes a wizard that is already reachable.
   const skip = page.getByRole('button', { name: 'skip for now' })
   if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
@@ -373,10 +372,10 @@ test('drives the bundled node and a second node concurrently, with per-node cach
   const seeded = await seedRemote(remote, 'Task on B', makeRepo(join(remoteRoot, 'repo')))
   collideIds(join(remoteRoot, 'data'), seeded, local)
 
-  // Pairing, through the bridge: the renderer holds no token and no certificate, so probe and pair are
-  // both main's to perform (docs/architecture-overview.md § How the client talks to nodes). The
-  // fingerprint assertion stands in for the human comparing it against what the node displays — the
-  // step that IS the security of pairing.
+  // Pairing goes through the bridge: the renderer holds no token and no certificate
+  // (docs/architecture-overview.md § Node API and client flow), so probe and pair are both main's to
+  // perform. The fingerprint assertion stands in for the human comparing it against what the node
+  // displays; that comparison is the security of pairing.
   const { code } = await remoteJson<PairingWindow>(remote, '/v2/core/pair/start', { method: 'POST' })
   const paired = await running.page.evaluate(async ({ endpoint, code }) => {
     const bridge = (window as BridgeWindow).acorn
@@ -391,15 +390,15 @@ test('drives the bundled node and a second node concurrently, with per-node cach
   expect(paired.node.nodeId).toBe(remote.nodeId)
   expect(paired.node.local).toBe(false)
 
-  // Membership lives in main's fleet.json, and the renderer's copy is a projection refreshed at boot —
-  // so a reload is also the proof that the pairing survived being written down.
+  // Membership lives in main's fleet.json, and the renderer's copy is a projection refreshed at boot.
+  // A reload is also the proof that the pairing survived being written down.
   await running.page.reload()
   await expect(running.page.locator('.shell')).toBeVisible()
   await dismissOnboarding(running.page)
 
-  // Both connections up AT THE SAME TIME, which is the exit criterion. `online` is only reported once
-  // the authenticated WebSocket has opened (main/nodeBroker.ts), so this covers TLS pinning, the device
-  // bearer and the upgrade for both nodes at once.
+  // Both connections up at the same time is the exit criterion. `online` is only reported once the
+  // authenticated WebSocket has opened (main/nodeBroker.ts), so this covers TLS pinning, the device
+  // bearer, and the upgrade for both nodes at once.
   await expect.poll(async () => {
     const { statuses } = await fleet(running.page)
     return [localNodeId, remote.nodeId].map((nodeId) => statuses.find((status) => status.nodeId === nodeId)?.state)
@@ -438,12 +437,13 @@ test('hides the fleet surfaces with one node and shows them with two', async () 
 
   const running = await launch()
   await dismissOnboarding(running.page)
-  // docs/ui-design.md § New surfaces: "With only the bundled local node, this view stays out of the way; first-run
-  // never mentions nodes at all."
+  // Fleet surfaces exist only once more than one node is paired
+  // (docs/architecture-overview.md § Client state and fleet behavior); with the bundled local node
+  // alone, first-run never mentions nodes at all.
   await expect(running.page.locator('.tabrail-source[aria-label="Fleet"]')).toHaveCount(0)
   await expect(running.page.locator('.node-switcher')).toHaveCount(0)
 
-  // Pair a second node into the SAME running app, rather than launching a fresh two-node one: what is
+  // Pair a second node into the same running app, rather than launching a fresh two-node one: what is
   // under test is that these surfaces appear when the fleet grows, which a second launch would hide
   // behind a fresh render.
   const remoteRoot = mkdtempSync(join(tmpdir(), 'acorn-node-b-'))
@@ -466,7 +466,7 @@ test('hides the fleet surfaces with one node and shows them with two', async () 
 
   await expect(running.page.locator('.tabrail-source[aria-label="Fleet"]')).toBeVisible()
   await expect(running.page.locator('.node-switcher')).toBeVisible()
-  // The picker lists both nodes by label — the switcher existing is not the same as it being useful.
+  // The picker lists both nodes by label. The switcher existing is not the same as it being useful.
   const labels = await running.page.locator('.node-switcher option').evaluateAll((options) => options.map((o) => o.textContent))
   expect(labels).toHaveLength(2)
   expect(labels).toContain('Node B')
@@ -478,8 +478,9 @@ test('renders the fleet with one node down: a banner, and every other node still
   test.setTimeout(120_000)
   const { running, localNodeId, remote, child } = await pairTwoNodes()
 
-  // Fleet home only exists with more than one node paired (`SourceContribution.when`), so its presence in the
-  // rail is itself part of the assertion — with a single node the button must not be there at all.
+  // Fleet home exists only with more than one node paired (`SourceContribution.when`,
+  // docs/architecture-overview.md § Client state and fleet behavior); its presence in the rail is
+  // itself part of the assertion.
   await expect(running.page.locator('.tabrail-source[aria-label="Fleet"]')).toBeVisible()
   await running.page.locator('.tabrail-source[aria-label="Fleet"]').click()
   await expect(running.page.locator(`.fleet-card[data-node-id="${localNodeId}"]`)).toBeVisible()
@@ -489,31 +490,26 @@ test('renders the fleet with one node down: a banner, and every other node still
   try {
     await expect.poll(() => stateOf(running.page, remote.nodeId), { timeout: 60_000 }).not.toBe('online')
 
-    // The criterion: "aggregated surfaces with one node down". BOTH cards stay rendered — never a failed
-    // page (docs/architecture-overview.md § Fleet semantics) — and the one that went away says so.
-    //
-    // It is NOT asserted that a `.fleet-banner` appears, and that is a correction to this test's first
-    // version rather than a gap. `createFleetQuery` falls back to the dead node's OWN QueryClient, which is
-    // warm from the successful render above, so the honest rendering here is a STALE ROW and the banner is
-    // reserved for a node that has never answered. That fallback is the whole point of partitioning the cache
-    // per node, so asserting the banner instead would have been asserting the weaker behaviour. The banner
-    // path is covered directly, with an empty cache, in client-core's fanout.test.ts.
+    // Both cards stay rendered, never a failed page (docs/architecture-overview.md § Client state and
+    // fleet behavior): the dead node reads as a stale row rather than a banner, since createFleetQuery
+    // falls back to its own warm QueryClient from the successful render above. The banner path, with
+    // an empty cache, is covered directly in client-core's fanout.test.ts.
     await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"] .node-chip`))
       .toHaveAttribute('data-freshness', 'offline', { timeout: 30_000 })
     await expect(running.page.locator(`.fleet-card[data-node-id="${localNodeId}"] .node-chip`))
       .toHaveAttribute('data-freshness', 'live')
     await expect(running.page.locator(`.fleet-card[data-node-id="${localNodeId}"]`)).toBeVisible()
     await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"]`)).toBeVisible()
-    // Served from cache, not blanked: the task count is still a number rather than the em dash the card shows
-    // when a node has said nothing at all. docs/ui-design.md: "reads come from cache with badges."
+    // Served from cache, not blanked: the task count is still a number, not the em dash the card shows
+    // for a node that has said nothing at all (docs/ui-design.md § States).
     await expect(running.page.locator(`.fleet-card[data-node-id="${remote.nodeId}"] .fleet-card-stats dd`).first())
       .not.toHaveText('—')
 
-    // The other half of this criterion — a mutation to an offline node failing fast with `node_offline` and
-    // the user's text kept as a draft — is NOT asserted here, deliberately. It lives inside `apiClient.send`,
-    // and reaching it from Playwright would mean either importing a renderer module by specifier (which the
-    // bundle does not expose at runtime) or driving a whole compose form. It is covered directly, with
-    // non-vacuity checks, in packages/client-core/src/apiClient.test.ts and by PullDetail's `runThenClear`.
+    // A mutation to an offline node failing fast with `node_offline`, with the user's text kept as a
+    // draft, is not asserted here. It lives inside `apiClient.send`, and reaching it from Playwright
+    // would mean either importing a renderer module by specifier, which the bundle does not expose at
+    // runtime, or driving a whole compose form. It is covered directly, with non-vacuity checks, in
+    // packages/client-core/src/apiClient.test.ts and by PullDetail's `runThenClear`.
   } finally {
     // afterEach kills it again, harmlessly.
   }
@@ -524,16 +520,16 @@ test('reports a node as revoked when it revokes this client mid-session', async 
   test.setTimeout(120_000)
   const { running, remote } = await pairTwoNodes()
 
-  // Revoked FROM the node, by the test process — not through the client, or this would be asserting that
-  // the client agrees with itself. docs/api-reference.md § Pairing: "deleting a device row invalidates its token
-  // immediately — open sockets are closed, in-flight requests fail."
+  // Revoked from the node, by the test process, not through the client: doing it through the client
+  // would make this assert that the client agrees with itself. docs/api-reference.md § Pairing covers
+  // what revoking a device does.
   const devices = await remoteJson<{ devices: { id: string; name: string }[] }>(remote, '/v2/core/devices')
   const ours = devices.devices.find((device) => device.name === 'Two-node e2e client')
   if (!ours) throw new Error('The node does not list the device it just paired.')
   await remoteJson(remote, `/v2/core/devices/${ours.id}`, { method: 'DELETE' })
 
-  // `revoked`, specifically — not `offline`. The broker distinguishes them (a 401 whose envelope says
-  // `unauthenticated` stops the reconnect loop entirely), and the distinction is what stops the app
+  // `revoked`, specifically, not `offline`. The broker distinguishes them: a 401 whose envelope says
+  // `unauthenticated` stops the reconnect loop entirely, and the distinction is what stops the app
   // retrying forever against a node that has torn up its credential.
   await expect.poll(() => stateOf(running.page, remote.nodeId), { timeout: 60_000 }).toBe('revoked')
   // The local node is untouched, which is the fleet property under test: one node's credential failing is
@@ -542,9 +538,9 @@ test('reports a node as revoked when it revokes this client mid-session', async 
   await running.app.close()
 })
 
-// A client-only plugin package: a manifest and one ESM file. Enough to be distributed, which is the
-// whole of what phase 2 does — nothing renders it until phase 3. Written straight to disk rather than
-// built, because what is under test is the transfer and the acknowledgement, not a bundler.
+// A client-only plugin package: a manifest and one ESM file, enough to be distributed. Written
+// straight to disk rather than built, because what is under test is the transfer and the
+// acknowledgement, not a bundler.
 const PLUGIN_ID = 'e2e-widget'
 const PLUGIN_BUNDLE = 'export default { name: "e2e-widget" }\n'
 
@@ -568,8 +564,8 @@ const pluginState = (page: Page) => page.evaluate(() => (window as BridgeWindow)
 
 test('asks before running a plugin a paired node serves, then caches it for offline boots', async () => {
   test.setTimeout(150_000)
-  // The exit criterion for docs/plugins.md: a plugin installed on a
-  // paired node reaches a second device, is hash-verified there, and does not run until the owner
+  // The exit criterion, per docs/plugins.md § Loaded plugins: the client half: a plugin installed on
+  // a paired node reaches a second device, is hash-verified there, and does not run until the owner
   // agrees. `pairTwoNodes` reloads after pairing, and the boot pass runs on that reload.
   const { running, remote } = await pairTwoNodes({ seedNode: installPluginOn })
 
@@ -581,24 +577,22 @@ test('asks before running a plugin a paired node serves, then caches it for offl
   expect(row?.installed?.version).toBe('1.4.0')
   expect(row?.installed?.client?.hash).toMatch(/^[0-9a-f]{64}$/)
 
-  // The prompt names the plugin, its version, the NODE it came from, and what it declared. Naming the
-  // node is the part that matters: the owner is being asked to run code one specific machine handed
-  // this one.
+  // The prompt names the plugin, its version, and the node it came from, plus what it declared. Naming
+  // the node matters: the owner is being asked to run code one specific machine handed this one.
   const dialog = running.page.locator('.plugin-trust-dialog')
   await expect(dialog).toBeVisible({ timeout: 30_000 })
   await expect(dialog).toContainText(PLUGIN_ID)
   await expect(dialog).toContainText('1.4.0')
   await expect(dialog).toContainText('Second node')
-  // Two separate groups, labelled by enforcement level (phase 5). The node block is *declared*; the UI
-  // scopes are enforced by the bridge. Asserting the two lists exist SEPARATELY, because collapsing
-  // them back into one is the specific regression that would matter here — a strong claim must not
-  // lend credibility to a weaker one. The legend is where the two words are defined.
+  // Declared (node permissions) and enforced (UI scopes) are two separate groups, never merged into
+  // one (docs/security.md § Node-half plugin security): collapsing them would let the enforced claim
+  // lend credibility to the unverified one.
   await expect(dialog.locator('.plugin-trust-permissions[data-tier="declared"]')).toContainText(
     'Read projects, including where every codebase lives on disk',
   )
   await expect(dialog.locator('.plugin-trust-permissions[data-tier="enforced"]')).toContainText('Read tasks')
-  // The legend defines both words and carries the canonical disclosure. Asserted because losing that
-  // sentence is a silent regression: nothing else in the dialog says the node half is uncontained.
+  // The legend carries the canonical disclosure that the node half is unverified
+  // (docs/security.md § Node-half plugin security); losing it is a silent regression this test catches.
   await expect(dialog.locator('.plugin-trust-legend')).toContainText('acorn can’t check it')
   await expect(dialog.locator('.plugin-trust-legend')).toContainText(
     'This plugin’s server code runs with the same access as acorn itself.',
@@ -607,7 +601,7 @@ test('asks before running a plugin a paired node serves, then caches it for offl
   await dialog.getByRole('button', { name: /^Trust/ }).click()
   await expect(dialog).toHaveCount(0)
 
-  // Main computed the hash from the bytes it received, and the acknowledgement is bound to THAT.
+  // Main computed the hash from the bytes it received, and the acknowledgement is bound to that hash.
   const afterAccept = await pluginState(running.page)
   const hash = row!.installed!.client!.hash
   expect(Object.keys(afterAccept.cached)).toContain(hash)
@@ -633,8 +627,8 @@ test('runs a terminal and opens a preview tunnel on a remote task, over the LAN'
   test.setTimeout(180_000)
   const { running, remote, remoteRoot } = await pairTwoNodes()
 
-  // A checkout on the OTHER machine, which is what makes this a remote-task test rather than a local one
-  // with an extra hop: the worktree, the PTY and the dev server all live beside the node.
+  // A checkout on the other machine, which is what makes this a remote-task test rather than a local
+  // one with an extra hop: the worktree, the PTY and the dev server all live beside the node.
   const seeded = await seedRemote(remote, 'Task on B', makeRepo(join(remoteRoot, 'repo')))
 
   const output = await running.page.evaluate(async ({ nodeId, taskId }) => {
@@ -664,9 +658,9 @@ test('runs a terminal and opens a preview tunnel on a remote task, over the LAN'
   }, { nodeId: remote.nodeId, taskId: seeded.taskId })
   expect(output).toContain('ACORN_REMOTE_ECHO')
 
-  // The preview tunnel. A plain HTTP server stands in for a dev server on the node's host — in this fixture
-  // that is the same machine, but nothing in the path knows it: the bytes still cross the pinned WebSocket
-  // to `/v2/tunnel` and come back through a loopback listener main created.
+  // The preview tunnel. A plain HTTP server stands in for a dev server on the node's host. In this
+  // fixture that is the same machine, but nothing in the path knows it: the bytes still cross the
+  // pinned WebSocket to `/v2/tunnel` and come back through a loopback listener main created.
   const server = createHttpServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'text/plain' })
     response.end('ACORN_TUNNEL_OK')
@@ -674,8 +668,8 @@ test('runs a terminal and opens a preview tunnel on a remote task, over the LAN'
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
   const devPort = (server.address() as { port: number }).port
   try {
-    // Declared, which is what makes it tunnellable at all — "Only declared ports; no general SOCKS".
-    // Project configuration is keyed by the project identity.
+    // Declared, which is what makes it tunnellable at all (docs/security.md § Host-owned webviews and
+    // browser automation). Project configuration is keyed by the project identity.
     await remoteJson(remote, `/v2/core/projects/${seeded.projectId}/config`, {
       method: 'PUT',
       body: { patch: { previewMode: 'port', previewValue: String(devPort) } },
@@ -687,16 +681,17 @@ test('runs a terminal and opens a preview tunnel on a remote task, over the LAN'
       if (!bridge) throw new Error('The node broker bridge is missing.')
       return (await bridge.nodeTunnelOpen({ nodeId, taskId, port: devPort })).port
     }, { nodeId: remote.nodeId, taskId: seeded.taskId, devPort })
-    // A LOCAL port, not the node's — the whole point. The renderer never learns the node's endpoint.
+    // A local port, not the node's: the whole point is that the renderer never learns the node's
+    // endpoint.
     expect(tunnelPort).not.toBe(devPort)
 
     await running.page.evaluate(
       ({ taskId, tunnelPort }) => (window as BridgeWindow).acorn!.preview.ensure(taskId, `http://127.0.0.1:${tunnelPort}/`),
       { taskId: seeded.taskId, tunnelPort },
     )
-    // Read from MAIN, because a WebContentsView is not a Playwright page: it is a separate guest contents
-    // with no window of its own, so `electronApp.evaluate` and `webContents.getAllWebContents()` are how a
-    // test sees what it rendered.
+    // Read from main, because a WebContentsView is not a Playwright page: it is a separate guest
+    // contents with no window of its own, so `electronApp.evaluate` and
+    // `webContents.getAllWebContents()` are how a test sees what it rendered.
     const rendered = await running.app.evaluate(async ({ webContents }, port) => {
       const deadline = Date.now() + 20_000
       while (Date.now() < deadline) {

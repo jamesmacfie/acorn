@@ -43,7 +43,7 @@ export const settingsPageContributions: SettingsContribution[] = [
   // disk-encryption posture § On-disk asks the app to surface.
   { id: 'security', label: 'Security', group: 'general', order: 90, component: () => <SecuritySettings /> },
   // With the other three per-node administration pages, and sharing their node picker: a schedule is a
-  // promise ONE machine makes (docs/schedules.md).
+  // promise one machine makes (docs/schedules.md).
   { id: 'schedules', label: 'Schedules', group: 'general', order: 95, component: () => <SchedulesSettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV

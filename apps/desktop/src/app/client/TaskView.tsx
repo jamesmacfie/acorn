@@ -31,10 +31,11 @@ export default function TaskView(props: {
   onToggleTerminal: () => void
   onOpenTerminal: () => void
 }) {
-  // "Does this NODE run terminals", from the node's plugin roster — not "is this Electron", which is what
-  // it used to mean and why the whole run-target/agent block vanished off-desktop. `terminalSessions` is
-  // terminal's CONTRACT surface (create + list), not its renderer client — the shell has no business holding
-  // write/attach/kill/resize, which is what importing client/terminalClient handed it.
+  // "Does this node run terminals", from the node's plugin roster, not "is this Electron", which is
+  // what it used to mean and why the whole run-target/agent block vanished off-desktop.
+  // `terminalSessions` is terminal's contract surface (create + list), not its renderer client: the
+  // shell has no business holding write/attach/kill/resize, which is what importing
+  // client/terminalClient handed it.
   const hasEngine = () => capabilities().terminal
   const bridge = taskBridge()
   const navigate = useNavigate()
@@ -98,7 +99,7 @@ export default function TaskView(props: {
     if (!hasEngine()) return
     const session = await terminalSessions.create({ taskId: props.task.id, profileId })
     props.onOpenTerminal()
-    addSession(session) // create returns the session — no list round trip before focusing it
+    addSession(session) // create returns the session, no list round trip before focusing it
     requestTerminalFocus(props.task.id, session.id)
   }
 
@@ -167,7 +168,7 @@ export default function TaskView(props: {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // While the guarded teardown runs (it can take seconds — teardown script + worktree removal),
+  // While the guarded teardown runs (it can take seconds: teardown script plus worktree removal),
   // the pane-switcher's close button shows a spinner so the archive visibly has feedback.
   const [archiving, setArchiving] = createSignal(false)
   // The plugin cleanups this archive is carrying, from the dialog to the request (and to the retry).
@@ -191,7 +192,7 @@ export default function TaskView(props: {
           setCloseError(result.output ? `${result.reason}\n${result.output}` : result.reason)
           return
         }
-        // Archived either way — `ok` is true — but the owner ticked something that did not happen.
+        // Archived either way (`ok` is true), but the owner ticked something that did not happen.
         if (result.cleanupFailed?.length) console.warn('[tasks] cleanup failed for:', result.cleanupFailed.join(', '))
         setPendingChecks([])
       } finally {
