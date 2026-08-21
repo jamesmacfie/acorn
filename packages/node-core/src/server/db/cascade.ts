@@ -2,9 +2,9 @@ import { and, eq, like } from 'drizzle-orm'
 import * as schema from './schema'
 import type { AppDatabase } from './index'
 
-// Application-level cascade for disconnecting an integration. The schema declares no foreign
-// keys (docs/data-layer.md), so every table keyed by integrationId must be cleaned up here —
-// if you add one, delete its rows below before the integrations row.
+// Application-level cascade for disconnecting an integration (docs/data-layer.md § External-item
+// read model: the schema declares no foreign keys). If you add a table keyed by integrationId,
+// delete its rows below before the integrations row.
 export const cascadeDeleteIntegration = async (db: AppDatabase, userId: string, id: string) => {
   await db.batch([
     db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.integrationId, id)),

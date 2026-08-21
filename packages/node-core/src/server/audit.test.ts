@@ -11,8 +11,8 @@ beforeEach(() => {
 })
 afterEach(() => test.cleanup())
 
-// recordAudit is deliberately fire-and-forget (a logging failure must never fail a revoke), so a
-// caller cannot await it. One microtask turn is enough for the insert it already started.
+// recordAudit is fire-and-forget (a logging failure must never fail a revoke), so a caller cannot
+// await it. One microtask turn is enough for the insert it already started.
 const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
 
 describe('recordAudit', () => {
@@ -39,8 +39,8 @@ describe('recordAudit', () => {
 
   it('never throws into its caller, even against a closed database', async () => {
     test.db.close()
-    // The whole reason for the void-and-catch shape: refusing to revoke a stolen device because a
-    // logging insert failed would be strictly worse for the owner than a missing row.
+    // Refusing to revoke a stolen device because a logging insert failed would be strictly worse for
+    // the owner than a missing row.
     expect(() => recordAudit(test.db, { actor: 'system', action: 'device.revoked', subject: 'd1' })).not.toThrow()
     await settled()
   })
@@ -108,7 +108,7 @@ describe('pruneAudit', () => {
   })
 })
 
-// The producers, driven through the real services rather than by calling recordAudit directly — the
+// The producers, driven through the real services rather than by calling recordAudit directly. The
 // question is whether the actions security.md names actually reach the table, and a test that called
 // recordAudit itself would answer a different one.
 describe('what gets recorded', () => {

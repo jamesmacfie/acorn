@@ -31,8 +31,8 @@ export const prefs = sqliteTable(
 // Per-user third-party credentials. First-class, multi-row per provider (docs/workspaces-and-tasks.md):
 // a user can connect several Linears or Rollbars, so the key is an opaque `id`, not (userId, provider).
 // `label` disambiguates them in the UI ("Linear – work"). `authRef` is encrypted at rest (JWE via
-// SESSION_ENC_KEY, see session.ts encryptSecret) and never leaves the server, the same posture as the
-// GitHub token. GitHub also appears as a synthesized entry in the list endpoint.
+// SESSION_ENC_KEY, see secretBox.ts encryptSecret) and never leaves the server, the same posture as
+// the GitHub token. GitHub also appears as a synthesized entry in the list endpoint.
 export const integrations = sqliteTable('integrations', {
   id: text('id').primaryKey(), // opaque uuid
   userId: text('user_id').notNull(),
@@ -255,18 +255,12 @@ export const idempotency = sqliteTable(
   (t) => [primaryKey({ columns: [t.deviceId, t.key] }), index('idempotency_expiry_idx').on(t.expiresAt)],
 )
 
-// ── Schedules: periodic work owned by the node (docs/schedules.md) ───────────────────────────────
+// ── Schedules: periodic work owned by the node ────────────────────────────────────────────────────
 //
-// Machine-scoped like every newer app-state table. State and definition split by owner, which is the
-// whole shape of these three: a declared schedule (core, plugin) already has a home for its definition
-// with a lifecycle the host manages, so copying it into a row would mean reconciling two sources of
-// truth on every boot. Storing only state means the plugin's lifecycle is the schedule's lifecycle for
-// free.
-//
-// Run state and owner overrides for declared schedules, whose definitions live in the registry rather
-// than here. A state row whose schedule is no longer registered is retained unread: disabling a plugin
-// must not delete the owner's pause or its run history, both of which should survive the plugin's
-// return. See docs/schedules.md for the reserved `'*'` global pause key.
+// Machine-scoped like every newer app-state table. State and definition split by owner
+// (docs/data-layer.md § Core database): a state row whose schedule is no longer registered is
+// retained unread, since disabling a plugin must not delete the owner's pause or its run history.
+// See docs/schedules.md for the reserved `'*'` global pause key.
 export const scheduleState = sqliteTable('schedule_state', {
   key: text('key').primaryKey(), // 'core:<id>' | '<pluginId>:<scheduleId>' | 'user:<uuid>' | '*'
   enabledOverride: integer('enabled_override'), // null = declared default; 0/1 = the owner's word wins
@@ -287,7 +281,7 @@ export const userSchedules = sqliteTable('user_schedules', {
   kind: text('kind').notNull(), // a registered target kind (docs/schedules.md § Targets)
   target: text('target').notNull(), // JSON, kind-shaped
   cadence: text('cadence').notNull(), // JSON, clamped on read
-  risk: text('risk'), // ToolRisk, stamped at CREATION from the target's declared tier — the consent record
+  risk: text('risk'), // ToolRisk, stamped at creation from the target's declared tier: the consent record
   createdAt: integer('created_at').notNull(),
 })
 
@@ -342,9 +336,9 @@ export const audit = sqliteTable(
     // free text because the settings surface groups and filters on it, and because an action nobody can
     // enumerate is one nobody reviews.
     action: text('action').notNull(),
-    // Which thing: a device id, an `owner/repo`, a plugin name, a connection id. Deliberately one opaque
-    // string rather than a typed reference, since the rows outlive what they point at, which is the
-    // whole point of keeping them after a delete.
+    // Which thing: a device id, an `owner/repo`, a plugin name, a connection id. One opaque string
+    // rather than a typed reference, since the rows outlive what they point at, which is the whole
+    // point of keeping them after a delete.
     subject: text('subject'),
     details: text('details'),
   },

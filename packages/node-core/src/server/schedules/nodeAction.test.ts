@@ -10,11 +10,12 @@ import { nodeActions } from '../nodeActions/registry'
 import { consentStillCovers, registerNodeActionTarget } from './nodeAction'
 import { type Clock, Scheduler } from './scheduler'
 
-// The `node-action` target: what a user schedule may do, and where consent lives.
+// The `node-action` target: what a user schedule may do, and where consent lives
+// (docs/schedules.md § `node-action`, § Consent, and the two ways it fails closed).
 //
-// Consent is taken ONCE, at creation, and stamped onto the row. So the two cases worth a test are the
-// two ways that stamp can stop being true — the action's tier rising, and the action disappearing —
-// and both have to fail CLOSED and read as `skipped` rather than as a broken schedule.
+// The two cases worth testing are the ones where the stamp stops being true: the action's tier
+// rising, and the action disappearing. Both fail closed and read as `skipped`, not as a broken
+// schedule.
 
 const PLUGIN = 'acme'
 const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
@@ -95,7 +96,7 @@ describe('what the picker may offer', () => {
   it('reports an undeclared tier as `execute`, not as nothing', async () => {
     const { core, scheduler } = await world(declare(), () => new Response(null, { status: 204 }))
     try {
-      // Fail in the SAFE direction: an undeclared tier means nobody has said what this does, and
+      // Fail in the safe direction: an undeclared tier means nobody has said what this does, and
       // arming the strongest confirmation for that cannot be wrong in a way that matters.
       expect(nodeActions().map((a) => ({ id: a.actionId, risk: a.risk }))).toEqual([{ id: 'prune-merged', risk: undefined }])
     } finally {
@@ -230,7 +231,8 @@ describe('creating and running one', () => {
       })
       clearRegistrations(PLUGIN)
       await scheduler.runNow(row.key)
-      // The ROW survives — dashboards-style — rather than being deleted by a plugin going missing.
+      // The row survives, the same as a dashboards contribution, rather than being deleted by a
+      // plugin going missing.
       expect((await scheduler.runs(row.key))[0]).toMatchObject({ status: 'skipped' })
       expect((await scheduler.runs(row.key))[0]?.detail).toMatch(/not available on this node/)
     } finally {

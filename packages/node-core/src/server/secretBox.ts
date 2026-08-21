@@ -1,8 +1,8 @@
 import { EncryptJWT, jwtDecrypt } from 'jose'
 
-// Encryption at rest for single secret strings — integration credentials, HTTP-client fields,
-// stored provider tokens. JWE A256GCM under SESSION_ENC_KEY, no expiry: an integration credential
-// lives until the owner disconnects it.
+// Encryption at rest for single secret strings: integration credentials, HTTP-client fields, stored
+// provider tokens (docs/security.md § Credential handling). JWE A256GCM under SESSION_ENC_KEY, no
+// expiry: an integration credential lives until the owner disconnects it.
 //
 // This module owns secret encryption independently of authentication. The environment variable keeps
 // its established name, SESSION_ENC_KEY, while the value protects integration credentials and other

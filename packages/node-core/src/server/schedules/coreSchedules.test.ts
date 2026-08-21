@@ -6,11 +6,9 @@ import { schema } from '../db'
 import { createScheduler } from './index'
 
 // What core itself puts on the scheduler, and the one thing that decides it: whether the composition
-// root handed over the node's bindings.
-//
-// This exists because the list is the whole of phase 4 (docs/future/cron/engine.md § migration). Every
-// entry here replaced a boot-time call or an invisible interval, and the failure mode of getting it
-// wrong is silence — a node that boots fine and quietly stops doing its housekeeping.
+// root handed over the node's bindings (docs/schedules.md § What is registered today). Every entry
+// here replaced a boot-time call or an invisible interval, and the failure mode of getting it wrong
+// is silence: a node that boots fine and quietly stops doing its housekeeping.
 
 let test: TestDb
 beforeEach(() => (test = makeTestDb()))
@@ -21,8 +19,8 @@ const keys = async (scheduler: { list: () => Promise<{ key: string }[]> }): Prom
 
 describe('what core declares', () => {
   it('declares only the pure-database job without env', async () => {
-    // A scheduler built without bindings is a test's scheduler. The three jobs below all reach OUT of
-    // the process — into plugin routes and the identity store — so declaring them here would mean a
+    // A scheduler built without bindings is a test's scheduler. The three jobs below all reach out of
+    // the process, into plugin routes and the identity store, so declaring them here would mean a
     // suite firing real work at a temp data root.
     expect(await keys(createScheduler(test.db))).toEqual(['core:audit-prune'])
   })
@@ -39,10 +37,10 @@ describe('what core declares', () => {
 
   it('actually reclaims expired replay rows when the sweep runs', async () => {
     // The point of the migration, in one assertion: this used to be a boot-time call, so a node left
-    // running for months never reclaimed a single row. Expired rows already READ as absent, which is
+    // running for months never reclaimed a single row. Expired rows already read as absent, which is
     // why this is about space and why it went unnoticed.
     const now = Date.now()
-    // `testEnv` fills in secrets and nothing else, so the store is supplied explicitly — the same one
+    // `testEnv` fills in secrets and nothing else, so the store is supplied explicitly, the same one
     // `makeBindings` constructs, over this suite's database.
     const env = testEnv({ DB: test.db, ACTIVE_IDENTITY: memoryIdentityStore('owner-1'), IDEMPOTENCY: idempotencyStore(test.db) })
     await test.db.insert(schema.idempotency).values([

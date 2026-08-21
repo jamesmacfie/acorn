@@ -12,7 +12,7 @@ export type AppDatabase = BetterSQLite3Database<typeof schema> & {
 }
 
 // One runtime: the client is built once at bootstrap and handed in via env.DB. getDb is an
-// identity function today, but it stays as THE single documented access point — routes never
+// identity function today, but it stays as the single documented access point. Routes never
 // reach for c.env.DB directly, so how the handle is provisioned can change in one place.
 export const getDb = (env: Env): AppDatabase => env.DB
 

@@ -8,12 +8,9 @@ import { clearRegistrations, initPlugins } from '../plugin/host'
 import type { NodePlugin, PluginStorage } from '../plugin/types'
 import { CollectionReadError, collectionReads, readCollection } from './registry'
 
-// Seam 1 (docs/future/cron/targets.md): the node reading a collection with no client attached.
-//
-// The design rests on every collection ultimately being a node route answering, with the only missing
-// piece a registry mapping `(pluginId, collectionId)` to it. So this suite proves both feeders land in
-// that one registry and come back through one parse: a loaded plugin's manifest descriptor and a
-// compiled plugin's `ctx.collections.register`, indistinguishable downstream.
+// The node-side collection read registry (docs/schedules.md § Reading a collection from the node):
+// both feeders, a loaded plugin's manifest descriptor and a compiled plugin's
+// `ctx.collections.register`, land in one registry and come back through one parse.
 
 const LOADED = 'acme'
 const COMPILED = 'builtin'

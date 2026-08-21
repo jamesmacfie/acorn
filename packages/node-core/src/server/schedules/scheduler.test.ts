@@ -6,7 +6,7 @@ import { nextRunAt } from './cadence'
 import { type Clock, Scheduler } from './scheduler'
 
 // The loop takes a clock, so nothing here sleeps. `advance` moves the fake now forward and drains the
-// single armed timer until nothing is due, which is exactly what the real event loop does — only
+// single armed timer until nothing is due, which is exactly what the real event loop does, only
 // instantly, and with the arming re-read (an async DB read) flushed in between.
 
 const flush = async (): Promise<void> => {
@@ -109,8 +109,8 @@ describe('scheduler', () => {
         return new Promise<void>((resolve) => (release = resolve))
       },
     })
-    // A second, fast schedule keeps the timer armed while the slow one overruns its own cadence —
-    // which is the only way the loop ever looks at a schedule that is already running.
+    // A second, fast schedule keeps the timer armed while the slow one overruns its own cadence.
+    // That is the only way the loop ever looks at a schedule that is already running.
     scheduler.register({ key: 'core:fast', name: 'Fast', cadence: { every: 30 }, run: async () => {} })
     await scheduler.start()
     await time.advance(60_000)
@@ -273,7 +273,7 @@ describe('scheduler', () => {
       /nothing that can run/,
     )
 
-    // A row written by a version that HAD the kind: listed, never run, never deleted.
+    // A row written by a version that had the kind: listed, never run, never deleted.
     await test.db.insert(schema.userSchedules).values({
       id: 'abc',
       name: 'Nightly prune',
