@@ -13,7 +13,7 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import type { Env } from '../../main/bindings'
 
 // The end-to-end shape of the host-owned mapping surface, over the real routes and a real database:
-// enumerate a connection's projects, write the mapping, and — the invariant the whole design turns on —
+// enumerate a connection's projects, write the mapping, and, the invariant the whole design turns on,
 // edit one provider's selection without disturbing anyone else's rows.
 //
 // Written at the route level because the picker itself is a component and vitest here cannot render one.
@@ -72,7 +72,7 @@ describe('workspace external projects, end to end', () => {
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()
 
-    // One provider that fetches a list, one whose connection IS a project, one that fails — the three
+    // One provider that fetches a list, one whose connection is a project, one that fails: the three
     // shapes the picker has to render side by side.
     connectionProviderRegistry.register(provider('tracker', {
       list: () => Promise.resolve([{ id: 'proj-1', label: 'Platform' }, { id: 'proj-2', label: 'Mobile' }]),
@@ -169,7 +169,7 @@ describe('workspace external projects, end to end', () => {
       { integrationId: 'broken-1', externalId: 'legacy-project' },
     ])
 
-    // Exactly what the picker does on a tick: take the CURRENT set, add or remove one pair, write it
+    // Exactly what the picker does on a tick: take the current set, add or remove one pair, write it
     // all back. Nothing has to remember to preserve the other rows, because they are never rebuilt.
     const current = await linked(workspace.id)
     const next = [

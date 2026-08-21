@@ -15,7 +15,7 @@ vi.mock('../db', async (importOriginal) => {
   return { ...actual, getDb: vi.fn() }
 })
 
-// One fixture registry drives BOTH projections' tests (the agent-tool registry acceptance: "covered by table-driven
+// One fixture registry drives both projections' tests (the agent-tool registry acceptance: "covered by table-driven
 // tests from the same contribution fixture"). The MCP projection is proven in mcp/server.test.ts;
 // this is the harness HTTP projection over the identical shapes.
 const OWNER = 'test'
@@ -98,7 +98,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     t = makeTestDb()
     vi.mocked(getDb).mockReturnValue(t.db)
     // Incremental registration under one owner, which is what a plugin's init does through ctx.tools.
-    // Removed first so the fixture is idempotent across cases — the registry is a module singleton.
+    // Removed first so the fixture is idempotent across cases: the registry is a module singleton.
     removeAgentTools(OWNER)
     for (const tool of FIXTURE) registerAgentTool(OWNER, tool)
     app = new Hono<AppEnv>()

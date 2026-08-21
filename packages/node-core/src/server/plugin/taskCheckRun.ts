@@ -1,9 +1,9 @@
-// What a MANIFEST-declared task check actually does when the owner opens the archive dialog
+// What a manifest-declared task check actually does when the owner opens the archive dialog
 // (docs/plugins.md § Task checks).
 //
 // The same move ./scheduleRun.ts makes, for the same reason: a loaded plugin declares its check as a
 // route rather than as a function, because a manifest is data and a manifest is what the owner reads
-// at install. So the node calls one of its own plugin routes with no client in sight — ./dispatch.ts,
+// at install. So the node calls one of its own plugin routes with no client in sight: ./dispatch.ts,
 // shared with schedules and the measure sampler.
 //
 // Neither half throws on a bad answer. A check that 500s or answers with nonsense has nothing to say
@@ -15,8 +15,8 @@ import type { TaskRef } from '../../main/core'
 import { dispatchPluginRoute } from './dispatch'
 import type { TaskConcern } from './taskChecks'
 
-/** The task rides as a query parameter minted HERE, so a plugin route cannot see a task the host did
- *  not name — the rule `scopedContextPath` follows on the client for agent-context captures. */
+/** The task rides as a query parameter minted here, so a plugin route cannot see a task the host did
+ *  not name. The rule `scopedContextPath` follows on the client for agent-context captures. */
 const scopedPath = (path: string, taskId: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}taskId=${encodeURIComponent(taskId)}`
 

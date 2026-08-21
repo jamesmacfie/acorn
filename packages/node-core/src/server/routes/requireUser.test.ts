@@ -4,12 +4,12 @@ import { createApp } from '../index'
 import type { Env } from '../../main/bindings'
 
 // One representative path per mounted /v2 router. requireUser is a global `/v2/*` gate, so an
-// unauthenticated request to any of these must 401 with the ApiError envelope — before routing,
-// before any handler. That the gate is one glob over BOTH namespaces is the point: core at
+// unauthenticated request to any of these must 401 with the ApiError envelope, before routing, before
+// any handler. That the gate is one glob over both namespaces is the point: core at
 // /v2/core/* and every plugin at /v2/p/<plugin>/* are covered by the same middleware, so a plugin
 // cannot mount itself outside it. This table is the mount contract: a router added outside `/v2/*`
 // (or a public hole) would not appear here and would silently escape the gate, so keep it
-// exhaustive. (docs/security.md §3, §7 · docs/api-reference.md § HTTP conventions)
+// exhaustive. (docs/security.md § Transport and auth · docs/api-reference.md § Request processing)
 const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v2/core/prefs'],
   ['GET', '/v2/core/workspaces'],
@@ -17,7 +17,7 @@ const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v2/core/tasks/t1/context'],
   ['GET', '/v2/core/tasks/t1/tools'], // harness — internal-token surface, still gated
   ['GET', '/v2/core/integrations'],
-  // Device administration sits BELOW the gate even though pairing sits above it: a device route that
+  // Device administration sits below the gate even though pairing sits above it: a device route that
   // drifted above requireUser would be an unauthenticated hole (routes/pairing.ts).
   ['GET', '/v2/core/devices'],
   ['GET', '/v2/core/plugins'], // node administration: which plugins this node runs (routes/plugins.ts)
@@ -45,7 +45,7 @@ describe('requireUser gate over the protected router table', () => {
 
   it('leaves the two pairing routes outside the gate (they are how a client gets a credential)', async () => {
     // GET /v2/node is the one /v2 route an unpaired client may read; it answers 200 with the
-    // pairing-only projection. Behaviour lives in apps/node/test/integration/pairing.test.ts — here we
+    // pairing-only projection. Behaviour lives in apps/node/test/integration/pairing.test.ts; here we
     // only assert it is not behind requireUser, because that is this file's contract.
     const res = await createApp().fetch(new Request('http://127.0.0.1:4317/v2/node'), {} as Env)
     expect(res.status).toBe(200)

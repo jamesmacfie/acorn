@@ -4,8 +4,8 @@ import type { PluginRosterEntry } from './host'
 import { pluginState, type PluginsBridge } from './pluginState'
 
 // Objects in, rows out. This logic used to live inside the route, so reaching it meant a Hono app and a
-// nine-member fixture; the judgement calls it makes — what counts as stale, which gaps raise the restart
-// banner — deserve a test that is only about them.
+// nine-member fixture. The judgement calls it makes, what counts as stale, which gaps raise the restart
+// banner, deserve a test that is only about them.
 const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
 const NO_CONTRIBUTIONS = {
   frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [],
@@ -145,7 +145,7 @@ describe('pluginState', () => {
   it('reports a package whose bundle would not import as failed, not pending-restart', () => {
     // The trap this whole seam exists for. The package is on disk with a parseable manifest, so it is in
     // `installed()`; the loader could not import it, so it is absent from `booted()`. That pair used to
-    // read as "waiting for a restart" — with a Restart banner that restarting could never clear, because
+    // read as "waiting for a restart", with a Restart banner that restarting could never clear, because
     // restarting re-runs the same failing import.
     const result = pluginState(
       bridge({
@@ -181,8 +181,8 @@ describe('pluginState', () => {
   it('reports a broken package whose name a running plugin already answers to', () => {
     // The dogfooding case: `build:plugin rollbar` installs a disk copy of a compiled-in plugin, and the
     // built-in steps aside only if the disk copy actually loads. When it does not, the built-in keeps
-    // running and the roster row for that name is honestly 'active' — so this failure used to be dropped
-    // on the floor, and the owner had no way to learn that the code running is not the copy they built.
+    // running and the roster row for that name is honestly 'active', so this failure used to be dropped
+    // on the floor and the owner had no way to learn that the code running is not the copy they built.
     const result = pluginState(
       bridge({
         roster: [{ name: 'rollbar', required: false, disabled: false, state: 'active' }],

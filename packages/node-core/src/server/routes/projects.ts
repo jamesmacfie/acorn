@@ -7,7 +7,7 @@ import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
-// /v2/core/projects — the first-class folder-project surface (docs/workspaces-and-tasks.md).
+// /v2/core/projects, the first-class folder-project surface (docs/workspaces-and-tasks.md).
 // Unlike the removed pair-keyed route, this demands nothing of the folder: facets are detected, not
 // validated. Project ids are the only live core identity for local folders and remote candidates.
 
@@ -108,7 +108,7 @@ export const projects = new Hono<AppEnv>()
   .delete('/:id', async (c) => {
     const db = getDb(c.env)
     if (!(await getProject(db, c.req.param('id')))) return respondError(c, 404, 'not_found', ['No such project.'])
-    // Row only — the folder and any worktrees on disk are never touched from here.
+    // Row only. The folder and any worktrees on disk are never touched from here.
     await deleteProject(db, c.req.param('id'))
     return c.json({ ok: true })
   })

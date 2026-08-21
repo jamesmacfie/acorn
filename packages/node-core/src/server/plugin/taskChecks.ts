@@ -1,33 +1,14 @@
 // What a plugin has to say about a task the owner is about to archive, and the cleanup they may opt
-// into (docs/plugins.md § Task checks).
-//
-// ── Why this is node-side ──────────────────────────────────────────────────────────────────────
-//
-// The archive dialog used to be fed by a client-side seam (client-core/registries/willPhase.tsx),
-// which is still there for the two events that have no node meaning — quitting the app, removing a
-// workspace. A LOADED plugin ships no client bundle, so it could never reach that seam, and the one
-// compiled plugin that used it registered a live closure the host had no disposable for and so ran
-// twice per boot. Both problems dissolve here: a check is a registration the host owns, and its
-// answer is plain data.
-//
-// ── What crosses ───────────────────────────────────────────────────────────────────────────────
-//
-// A CONCERN, and never a callback. The action a concern offers is a route declared once — on the
-// context for a built-in, in the manifest for a loaded plugin — where the node can confine it to the
-// plugin's own namespace and re-confine it on every call. This is verbatim the rule
-// @acorn/protocol/extensionPoints.ts gives for why an extension item carries no per-item verb: an
-// action arriving inside a response body is an action nothing checked.
+// into (docs/plugins.md § Task checks: why this lives node-side, and why a concern carries no
+// callback).
 import type { TaskArchiveConcern } from '@acorn/protocol/terminal.ts'
 import type { TaskRef } from '../../main/core'
 
-/** How long one check may take before the fan-out gives up on it. Two seconds because the owner is
- *  waiting on a dialog: a check that has to shell out (docker ps, git status) fits, and one that
- *  wants a network round-trip is being asked the wrong question. */
+/** How long one check may take before the fan-out gives up on it (docs/plugins.md § Task checks). */
 export const CHECK_TIMEOUT_MS = 2_000
 
-/** And how long its cleanup may take once the owner has opted in. Sixty because by then the dialog is
- *  gone and the archive is running — the same order as the repo teardown script it runs beside,
- *  though an order of magnitude below it (main/archive.ts § TEARDOWN_TIMEOUT_MS). */
+/** How long a cleanup may take once the owner has opted in (docs/plugins.md § Task checks). An order
+ *  of magnitude below main/archive.ts's TEARDOWN_TIMEOUT_MS, which runs alongside it. */
 export const APPLY_TIMEOUT_MS = 60_000
 
 /** How much of a plugin's own text reaches the dialog. Display-only strings, capped by the node, the
@@ -43,10 +24,10 @@ export type TaskConcern = {
   /** Unique within the check. The host qualifies it with the plugin and check ids before it leaves. */
   id: string
   message: string
-  /** The plugin's to declare, unlike a context-menu `tone`: a plugin saying "danger" is making that
-   *  claim about its OWN data, not about a core resource. */
+  /** The plugin's to declare, unlike a context-menu `tone` (docs/plugins.md § Task checks: this is a
+   *  claim about the plugin's own data, not a core resource). */
   severity: 'warn' | 'danger'
-  /** Up to five lines under the message — changed paths, container names. */
+  /** Up to five lines under the message: changed paths, container names. */
   details?: string[]
   /** What the plugin knows it did not send, so the host draws "+7 more" and no plugin has to invent
    *  that string for itself. */
@@ -61,7 +42,7 @@ export type TaskCheck = {
   /** Unique within the plugin, and stable: it is half of the id the client hands back to say which
    *  cleanups the owner accepted. */
   id: string
-  /** Answers for one task, or `null` when it has nothing to say — which is the common case and must
+  /** Answers for one task, or `null` when it has nothing to say, which is the common case and must
    *  stay cheap. The signal fires at CHECK_TIMEOUT_MS. */
   check(task: TaskRef, signal: AbortSignal): Promise<TaskConcern | null>
   /** Run at archive time, once, for a concern whose checkbox the owner left ticked. */
@@ -109,7 +90,7 @@ const text = (value: unknown, max: number): string | null =>
  *
  * Per-field rather than all-or-nothing, matching how the client sanitises plugin chrome
  * (client-core/plugins/chrome/data.ts): a concern with one unusable detail loses the detail, not the
- * warning. `null` means there is nothing here worth a row — no message, or a check that answered with
+ * warning. `null` means there is nothing here worth a row: no message, or a check that answered with
  * something that is not a concern at all.
  */
 export function sanitizeConcern(pluginId: string, checkId: string, value: unknown, canApply: boolean): WireTaskConcern | null {
@@ -144,13 +125,12 @@ export function sanitizeConcern(pluginId: string, checkId: string, value: unknow
 
 /**
  * One check, bounded and contained. Resolves to `null` for a check that was slow, threw, or answered
- * with something unusable — a plugin cannot stop the owner archiving a task by being broken.
+ * with something unusable. A plugin cannot stop the owner archiving a task by being broken.
  *
- * The deadline is a RACE and not merely an abort. The signal is a courtesy: a check that watches it
- * can stop early, and a check that ignores it — which is most of them, and every one written by
- * someone who did not think about it — would otherwise leave this promise pending forever and hold
- * the dialog open with it. The abandoned work still runs to completion in the background; what the
- * deadline guarantees is that nobody is waiting for it.
+ * The deadline races the check rather than merely signaling an abort. The signal is a courtesy: a
+ * check that watches it can stop early, but most checks ignore it, and an ignored signal would leave
+ * this promise pending forever and hold the dialog open with it. The abandoned work still runs to
+ * completion in the background; the deadline only guarantees that nobody is waiting for it.
  */
 function runOne(check: RegisteredTaskCheck, task: TaskRef): Promise<WireTaskConcern | null> {
   return new Promise<WireTaskConcern | null>((resolve) => {
@@ -189,11 +169,11 @@ export async function collectTaskConcerns(task: TaskRef): Promise<WireTaskConcer
 /**
  * Run the cleanups the owner accepted, by qualified concern id.
  *
- * Ids are matched against the REGISTRY, never trusted as a route: an id naming a check this node does
+ * Ids are matched against the registry, never trusted as a route: an id naming a check this node does
  * not have is dropped, which is also what happens when the owner archives from a stale dialog after
- * disabling the plugin. Each apply is bounded and contained for the same reason a check is — a
- * cleanup that hangs must not hold the archive open — and the names that failed come back so the
- * caller can say so rather than reporting a clean archive.
+ * disabling the plugin. Each apply is bounded and contained for the same reason a check is: a
+ * cleanup that hangs must not hold the archive open. The names that failed come back so the caller
+ * can report them instead of reporting a clean archive.
  */
 export async function applyTaskChecks(task: TaskRef, ids: readonly string[]): Promise<string[]> {
   const wanted = new Set(ids)

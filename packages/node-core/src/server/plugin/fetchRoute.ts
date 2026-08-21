@@ -31,7 +31,7 @@ export async function servePluginFetch(
  *
  * A handler rather than a mount per contribution, because a reload replaces a plugin's entries in the
  * route registry while the app's mount table stays as it was built at boot: closing over
- * `contribution.fetch` made every request reach the PREVIOUS instance
+ * `contribution.fetch` made every request reach the previous instance
  * (routeRegistry.ts § resolvePluginFetch).
  *
  * Falls through with `next()` when no plugin claims the path, which is what makes it invisible: built-in

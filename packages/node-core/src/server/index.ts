@@ -26,28 +26,26 @@ import { dispatchPluginFetch } from './plugin/fetchRoute'
 
 // One server, one namespace: /v2. createApp() is a factory so the bootstrap can build a fresh instance.
 // Core mounts only core routers by name, under /v2/core; every plugin-owned router arrives through the
-// route registry (populated by app/server/routes.ts before this runs) and mounts under /v2/p/<plugin> —
-// core imports no product route module directly (docs/plugins.md).
+// route registry (populated by app/server/routes.ts before this runs) and mounts under /v2/p/<plugin>.
+// Core imports no product route module directly (docs/plugins.md).
 export function createApp() {
   // Per-instance state (the pairing rate ceiling), so it must be built here rather than imported as a
   // module-level router.
   const pairing = pairingRoutes()
 
   const app = new Hono<AppEnv>()
-    // First, unconditionally: every response — success, error, public or authenticated — carries a
+    // First, unconditionally. Every response, success, error, public, or authenticated, carries a
     // request id, so a user-reported failure is findable in the log.
     .use('*', requestIdMiddleware)
     .use('/v2/*', authMiddleware) // resolve ctx.principal from a device bearer or the internal token
     .route('/v2', pairing.open) // GET /v2/node + POST /v2/pair — pre-auth by construction (see above)
     .use('/v2/*', requireUser) // single 401 gate over the protected router table
-    // Below the gate on purpose: replay is keyed on the caller's deviceId, which only exists once the
-    // principal is resolved and enforced (docs/api-reference.md § HTTP conventions).
+    // Below the gate: replay is keyed on the caller's deviceId, which only exists once the
+    // principal is resolved (docs/api-reference.md § Request processing).
     .use('/v2/*', idempotency)
-    // Device-only, not merely authenticated: these mint credentials and administer devices, which
-    // docs/security.md forbids an internal (agent-spawned) caller from touching. requireUser
-    // accepts either kind by design, so the narrower gate has to be explicit and has to sit here,
-    // before the router — an agent that reaches pair/start can read the code out of the response and
-    // mint itself an owner-authority token.
+    // Device-only: mints credentials and administers devices (docs/security.md § Transport and auth).
+    // Must sit here, before the router, or a route added under this prefix would be reachable
+    // ungated.
     .use(`${CORE_NAMESPACE}/pair`, requireDevice)
     .use(`${CORE_NAMESPACE}/pair/*`, requireDevice)
     .use(`${CORE_NAMESPACE}/devices`, requireDevice)
@@ -57,16 +55,14 @@ export function createApp() {
     // enumerates the surface) or write it (it could disable the plugin whose gate it is standing behind
     // and get a different node on the next restart).
     .use(`${CORE_NAMESPACE}/plugins`, requireDevice)
-    // Both forms, like `pair` and `devices` above. There is no subpath today (the router is `GET|PUT /`),
-    // so this is insurance — but the point of gating by MOUNT is that a route added later inherits it, and a
-    // `GET /v2/core/plugins/:name` under a one-form mount would be an ungated node-administration route
-    // reachable by a task-scoped agent. (Hono's trailing `/*` matches zero segments, so this one covers the
-    // bare path too — the pair above is belt and braces, exactly as it is for pair/devices.)
+    // Both forms, like `pair` and `devices` above (docs/security.md § Transport and auth: gating by
+    // mount rather than per route). There is no subpath today, so this is insurance against a route
+    // added later under a one-form mount. Hono's trailing `/*` does not match the bare path, which is
+    // why both forms are needed everywhere this pattern repeats.
     .use(`${CORE_NAMESPACE}/plugins/*`, requireDevice)
     // The audit trail, same class again: it names every device that has ever paired and every credential
     // that has been connected to this node, which is exactly the enumeration security.md forbids an
-    // agent-spawned child. Both path forms, like every sibling above — the point of gating by MOUNT is
-    // that a route added later inherits it.
+    // agent-spawned child. Both path forms, like every sibling above.
     .use(`${CORE_NAMESPACE}/audit`, requireDevice)
     .use(`${CORE_NAMESPACE}/audit/*`, requireDevice)
     // The node's own security posture, same class again: it describes the machine, which is
@@ -82,18 +78,13 @@ export function createApp() {
     // Even with the credentials scrubbed out, that is an exfiltration primitive in an agent's hands.
     .use(`${CORE_NAMESPACE}/backup`, requireDevice)
     .use(`${CORE_NAMESPACE}/backup/*`, requireDevice)
-    // Task scope, enforced by MOUNT rather than per handler. A 'task'-scoped internal credential may act
-    // only on the task it names (server/auth/internalTokens.ts). An adversarial review confirmed that a
-    // per-route guard had been applied at one site out of six, leaving arbitrary shell execution in
-    // another task's worktree reachable via /tasks/<other>/preview-url — so the gate sits here, above
-    // every task-scoped core router, where a newly added route inherits it instead of forgetting it.
+    // Task scope, enforced by mount rather than per handler (docs/security.md § Transport and auth).
     .use(`${CORE_NAMESPACE}/tasks/:id`, requireTaskScope)
     .use(`${CORE_NAMESPACE}/tasks/:id/*`, requireTaskScope)
     .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id`, requireTaskScope)
     .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id/*`, requireTaskScope)
-    // Administering or spending the owner's provider connections: device or the service scope, never a
-    // task-scoped child. Without this an agent could list, rotate, test and DELETE the owner's
-    // integrations (confirmed by probe), which is squarely what security.md forbids it.
+    // Administering or spending the owner's provider connections: device principals plus the node's own
+    // service-scope calls (docs/security.md § Credential handling), never a task-scoped child.
     .use(`${CORE_NAMESPACE}/integrations`, requireProviderAccess)
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices — owner-only device administration
@@ -115,16 +106,16 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/agent-tools`, agentToolsCatalog) // static tool catalog for the permissions settings page
     .route(`${CORE_NAMESPACE}/integrations`, integrations) // connect/disconnect/status for third-party providers
     // Provider-owned routes projected from the integration registry. Mounted at the plugin namespace
-    // root, not a core one: the projection already prefixes each router with its provider id, which
-    // IS the plugin id for the integration plugins (server/integrations/providerRoutes.ts).
+    // root, not a core one: the projection already prefixes each router with its provider id, which is
+    // the plugin id for the integration plugins (server/integrations/providerRoutes.ts).
     //
-    // The provider-credential gate lives INSIDE that projection, not as a `/v2/p/:provider/*` mount
-    // here: such a mount would match every plugin route (terminal's sessions, the editor's files), and
+    // The provider-credential gate lives inside that projection, not as a `/v2/p/:provider/*` mount
+    // here. Such a mount would match every plugin route (terminal's sessions, the editor's files), and
     // Hono applies `.use()` by path regardless of registration order, so it would have locked
     // task-scoped agents out of surfaces they legitimately use.
     .route(PLUGIN_NAMESPACE, buildIntegrationProviderRoutes())
 
-  // Plugin-owned routes, projected from the registry AFTER the auth gate above (still inside the
+  // Plugin-owned routes, projected from the registry after the auth gate above (still inside the
   // authMiddleware/requireUser envelope). See app/server/routes.ts for the contributions.
   //
   // Built-ins only: a Hono instance is a live object, so mounting it is the only thing to do with it, and
@@ -133,15 +124,15 @@ export function createApp() {
     if (contribution.router) app.route(routeMountPath(contribution), contribution.router)
   }
 
-  // Fetch-shaped contributions (loaded plugins) are DISPATCHED, not mounted. One handler pair over the
+  // Fetch-shaped contributions (loaded plugins) are dispatched, not mounted. One handler pair over the
   // whole plugin namespace, resolving the current contribution per request, because a reload replaces a
   // plugin's registry entries while this mount table stays as it was built (routeRegistry.ts
   // § resolvePluginFetch). Two mounts because Hono's `/*` does not match the bare path itself, and a
   // plugin owning its whole namespace has to answer `/v2/p/<id>`.
   //
-  // Registered LAST and falling through with next() when nothing matches, which is what keeps it
-  // invisible: a built-in's router, and the provider routes above, are earlier in the chain and answer
-  // first, and a path no plugin claims reaches the app's own 404 exactly as it did before.
+  // Registered last, falling through with next() when nothing matches: a built-in's router, and the
+  // provider routes above, are earlier in the chain and answer first, and a path no plugin claims
+  // reaches the app's own 404 exactly as it did before.
   app.all(`${PLUGIN_NAMESPACE}/:plugin`, dispatchPluginFetch)
   app.all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
 

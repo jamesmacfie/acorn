@@ -80,7 +80,7 @@ describe('capability registry', () => {
 
 describe('plugin host', () => {
   // One real database for the whole block: CoreServices.tasks needs a handle, and these cases never
-  // touch it — they exercise ordering, disabling and failure propagation.
+  // touch it. They exercise ordering, disabling and failure propagation.
   let shared: ReturnType<typeof makeTestDb> | null = null
   const coreDb = () => (shared ??= makeTestDb()).db
   afterAll(() => shared?.cleanup())
@@ -215,14 +215,15 @@ describe('plugin host', () => {
     expect(disposed).toEqual(['second', 'first'])
   })
 
-  // The compiled tier's half of ctx.storage. Six built-ins used to open, migrate and close their own
-  // SQLite file — a five-line migrations module, a hand-wired openPluginDb call and an identical dispose
-  // block each. All the host needs now is the module the chain sits beside.
+  // The compiled tier's half of ctx.storage (docs/data-layer.md § Migrations). Six built-ins used to
+  // open, migrate and close their own SQLite file, a five-line migrations module, a hand-wired
+  // openPluginDb call and an identical dispose block each. All the host needs now is the module the
+  // chain sits beside.
   it("opens, reuses and closes a built-in's database from its declared chain", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-builtin-storage-'))
     try {
       // A chain with an empty journal: what is under test is the lifecycle, not anyone's schema. It sits
-      // where the plugin's own does — beside the module that declared it, found by the ancestor walk.
+      // where the plugin's own does, beside the module that declared it, found by the ancestor walk.
       mkdirSync(join(dir, 'migrations/meta'), { recursive: true })
       writeFileSync(join(dir, 'migrations/meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
       let opened: PluginDatabase | null = null
@@ -236,7 +237,7 @@ describe('plugin host', () => {
             again = ctx.storage.open()
           },
           // The ordering the conversion had to preserve: agents flushes transcripts, workflows aborts
-          // steps and database drains pools THROUGH this handle on the way out, so it has to still be
+          // steps and database drains pools through this handle on the way out, so it has to still be
           // open here. The host closes it after this returns, at the same point in the drain the plugins'
           // own `db.close()` used to sit.
           dispose: () => {
@@ -250,7 +251,7 @@ describe('plugin host', () => {
           dataDir: dir,
         },
       )
-      // Bound to the plugin id, under the one plugins directory — the same file and filename the plugin
+      // Bound to the plugin id, under the one plugins directory: the same file and filename the plugin
       // used to open for itself, so adopting the seam moves nobody's rows.
       expect(existsSync(join(dir, 'plugins/widgets.sqlite'))).toBe(true)
       // One handle per boot however many times a plugin asks. Two openPluginDb calls used to mean two
@@ -258,7 +259,7 @@ describe('plugin host', () => {
       expect(again).toBe(opened)
       await result.dispose()
       expect(liveInDispose).toBe(true)
-      // Closed by the HOST rather than by the plugin: node:sqlite refuses a second close, so this
+      // Closed by the host rather than by the plugin: node:sqlite refuses a second close, so this
       // throwing is the proof the WAL file was drained inside the `plugins` drain step.
       expect(() => opened!.close()).toThrow()
     } finally {
@@ -268,7 +269,7 @@ describe('plugin host', () => {
 
   // The twin of the case above, and the one whose absence let the bug through: everything the built-in
   // case proves has to hold for a plugin off disk too, because http and database deleted their own
-  // dispose-close on the strength of the host doing it. It did not — the context threw away the host's
+  // dispose-close on the strength of the host doing it. It did not: the context threw away the host's
   // memoizing wrapper for this tier (server/plugin/context.ts), so the `opened` map never saw a loaded
   // handle, closing was a no-op, and a WAL handle outlived the plugins drain, the sqlite drain and the
   // data-root lock release. Same assertions, other tier.
@@ -305,8 +306,8 @@ describe('plugin host', () => {
         },
       )
       expect(existsSync(join(dir, 'plugins/ntfy.sqlite'))).toBe(true)
-      // The binding's `open` is unmemoized on purpose above — it returns a fresh connection every call.
-      // So this passing is specifically the host's wrapper doing its job, not the binding's.
+      // The binding's `open` is unmemoized above: it returns a fresh connection every call. So this
+      // passing is specifically the host's wrapper doing its job, not the binding's.
       expect(again).toBe(opened)
       await result.dispose()
       expect(liveInDispose).toBe(true)
@@ -347,7 +348,7 @@ describe('plugin host', () => {
 
   it('clears a plugin contributions even when it is DISABLED on this boot', async () => {
     // The clear has to happen before the disabled check. Otherwise a plugin disabled on the second boot
-    // of one process keeps the FIRST boot's routes and tools — served through a handle its own dispose
+    // of one process keeps the first boot's routes and tools, served through a handle its own dispose
     // already closed. That is the exact trap the disable flag exists to avoid.
     const router = new Hono<AppEnv>()
     const tool = { name: 'probe_tool', title: 'Probe', risk: 'read', input: z.object({}), handler: async () => null } as never
