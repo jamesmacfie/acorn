@@ -1,10 +1,10 @@
 // Managed agent sessions as a dashboard collection (docs/dashboards.md § Collections).
 //
-// The third reader of the same list route the Fleet stat and the attention inbox already read
-// (index.ts) — one integer, then the blocked rows, and now the whole roster with a schema on it, which
-// is what lets a user compose "what is running right now" as a board grouped by state or a table sorted
-// by last update. No new endpoint and no new wire format: `/sessions?archived=false` already answers
-// this, and the panel's own filters do the narrowing an extra param would have.
+// The third reader of the same list route the Fleet stat and the attention inbox already read (index.ts):
+// one integer, then the blocked rows, and now the whole roster with a schema on it. That is what lets a
+// user compose "what is running right now" as a board grouped by state or a table sorted by last update.
+// No new endpoint and no new wire format: `/sessions?archived=false` already answers this, and the panel's
+// own filters do the narrowing an extra param would have.
 import type { AgentAttentionReason, AgentRuntimeState, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type {
   PluginCollectionEnumValue,
@@ -47,8 +47,8 @@ const ATTENTION_LABELS: Record<AgentAttentionReason, string> = {
 const stateValues: PluginCollectionEnumValue[] = Object.entries(STATE_LABELS)
   .map(([id, label]) => ({ id, label, tone: runtimeTone(id) }))
 
-// Only the two that block the owner get a warning tone; `completed` is a nudge and the rest are quiet —
-// the same split ATTENTION_COPY makes for the inbox.
+// Only the two that block the owner get a warning tone. `completed` is a nudge and the rest are quiet, the
+// same split ATTENTION_COPY makes for the inbox.
 const attentionValues: PluginCollectionEnumValue[] = Object.entries(ATTENTION_LABELS).map(([id, label]) => ({
   id,
   label,
@@ -70,14 +70,13 @@ const sessionsSchema = {
   ],
 } satisfies PluginCollectionSchema
 
-// Exported for the drift check in the test beside this: a renamed field id on one side and not the
-// other renders empty cells and throws nowhere.
+// Exported for the drift check in the test beside this: a renamed field id on one side and not the other
+// renders empty cells and throws nowhere.
 //
-// The click goes to the agent IN ITS OWN TASK, which is the whole reason the row names one: a session
-// belongs to a task, a dashboard is drawn outside every task, and `openPane` on its own would have
-// opened the Agent pane of whichever task happened to be on screen. The host activates the named task,
-// navigates to it, and hands the row's id to the pane as its selection — which `paneIntentSelection`
-// below turns into "this session".
+// The click opens the agent in its own task: a session belongs to a task, a dashboard is drawn outside
+// every task, and `openPane` alone would open the Agent pane of whichever task happened to be on screen.
+// The host activates the named task, navigates to it, and hands the row's id to the pane as its selection,
+// which `paneIntentSelection` below turns into "this session".
 export const sessionRow = (session: AgentSession): PluginCollectionRow => ({
   id: session.id,
   pluginId: 'agents',

@@ -3,39 +3,36 @@ import { claudeCodeProfile } from './claudeCode'
 
 // The argv this profile hands the process broker.
 //
-// The one thing worth pinning in a profile package, and it is not ceremony: these arrays ARE the command line
-// acorn spawns, so a renamed or dropped flag is a silently broken agent — the CLI accepts the invocation and
-// behaves differently, rather than failing in a way a boot check would notice. Nothing else here needs a test:
-// the descriptor is otherwise data, and `streamJson` is core's shared adapter with its own suite.
+// Worth pinning because these arrays are the actual command line acorn spawns: a renamed or dropped flag
+// produces a silently different invocation, not a boot-check failure. The rest of the descriptor is data,
+// and `streamJson` is core's shared adapter with its own test suite, so neither needs a test here.
 
 describe('the claude-code profile', () => {
   it('declares the identity terminal and workflows resolve it by', () => {
-    // `id` is persisted (a session row's profileId, a workflow step's `profile =`), so it is a compatibility
-    // surface rather than a label.
+    // `id` is persisted; see docs/managed-agents.md § Providers.
     expect(claudeCodeProfile).toMatchObject({ id: 'claude-code', label: 'Claude Code', kind: 'agent', command: 'claude', transport: 'pty' })
   })
 
-  // THE WHOLE ARRAY, not `toContain` per flag. `toContain` was the original shape and it could not see the two
-  // failures that matter most here: `-p` and `--verbose` were in this argv and neither was asserted, so
-  // dropping `-p` (the headless runner then waits forever on an interactive prompt) or `--verbose` (which
-  // `-p --output-format stream-json` requires, so claude exits with a usage error) both passed. Nor could it
-  // see an INSERTION — `--dangerously-skip-permissions --add-dir /` survived it untouched, which is the worst
-  // case of the three because it silently widens what a headless agent may do.
+  // Asserts the whole array, not `toContain` per flag. A per-flag check missed dropping `-p` (the headless
+  // runner then waits forever on a prompt) or `--verbose` (required by `-p --output-format stream-json`, so
+  // claude exits with a usage error), and it missed an inserted `--dangerously-skip-permissions --add-dir /`
+  // surviving untouched, which silently widens what a headless agent may do.
   //
-  // The equality is on the no-options invocation deliberately: it is the only form with a fixed answer, and the
-  // option-threading cases below stay as membership checks because their job is presence/absence, not order.
+  // Only the no-options invocation gets full equality, since it is the one case with a fixed answer; the
+  // option-threading cases below stay as membership checks because they test presence or absence, not
+  // order.
   it('builds a headless turn that streams JSON and never prompts for permission', () => {
     const { file, args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'do the thing' })
     expect(file).toBe('claude')
     // `-p` is headless mode itself; `--verbose` is required BY `-p --output-format stream-json`; dontAsk is why
     // a headless agent does not block on the first tool approval with nobody there to answer it. The prompt is
-    // last and positional — a flag inserted after it would be read as part of it.
+    // last and positional; a flag inserted after it would be read as part of it.
     expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', 'do the thing'])
   })
 
   it('resumes a headless turn by prepending --resume, leaving the rest of the invocation identical', () => {
-    // The one branch the no-options equality above cannot cover, and it goes FIRST: after `-p` claude reads the
-    // session ref as part of the prompt.
+    // The one branch the no-options equality above cannot cover, and it comes first: after `-p`
+    // claude reads the session ref as part of the prompt.
     const { args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'again', resumeSessionId: 'sess-1' })
     expect(args).toEqual(['--resume', 'sess-1', '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', 'again'])
   })
@@ -58,10 +55,10 @@ describe('the claude-code profile', () => {
   })
 
   it('disables tools for a one-shot decision, so an AI call cannot act', () => {
-    // `aiArgv` is the structured-decision path (a workflow gate policy, an AI SQL draft). The EMPTY `--tools` is
-    // the whole difference from a headless turn: a decision reads, it does not edit. Pinned as a whole array for
-    // the same reason as above — the previous `args[indexOf('--tools') + 1] === ''` check would have accepted a
-    // second, non-empty `--tools` appended later, and an inserted `--add-dir` alongside it.
+    // `aiArgv` is the structured-decision path (a workflow gate policy, an AI SQL draft). An empty
+    // `--tools` is the whole difference from a headless turn: a decision reads, it does not edit. Pinned as
+    // a whole array for the same reason as above: a check for `args[indexOf('--tools') + 1] === ''` would
+    // still pass if a second, non-empty `--tools` or an inserted `--add-dir` were appended later.
     const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide' })
     expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', 'decide'])
   })

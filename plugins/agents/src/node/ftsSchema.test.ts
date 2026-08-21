@@ -3,13 +3,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { agentEvents } from './schema'
 
-// agent_events_fts is a hand-written FTS5 virtual table with three triggers over `agent_events`
-// (drizzle cannot model either), kept in step with the table by migration discipline alone. This guard
-// opens a real migrated DB and asserts the projection is installed and shaped the way
-// main/sessionRepository.ts's search path reads it, so a drifted migration edit fails CI.
+// FTS5 schema drift guard: see docs/data-layer.md § Migrations for why this table and its triggers
+// are hand-written into the migration instead of the Drizzle schema, and why this file is the
+// pattern to copy for another plugin's virtual table.
 //
-// The chain that creates these four objects is this plugin's migration chain (migrations/0000_*.sql),
-// so the guard uses a per-plugin database rather than a core database.
+// Uses a per-plugin database rather than a core one, since the migration chain that creates these
+// four objects (migrations/0000_*.sql) is this plugin's own.
 describe('agent_events_fts schema drift guard', () => {
   let t: TestPluginDb
 
@@ -46,10 +45,10 @@ describe('agent_events_fts schema drift guard', () => {
     for (const column of ['id', 'session_id', 'search_text']) expect(eventColumns).toContain(column)
   })
 
-  // The projection is only useful if the triggers actually fire, and a virtual table with no rows
-  // answers every MATCH with an empty set — which looks exactly like "nothing matched". So this asserts
-  // the whole path: insert an event row through Drizzle, then find it through FTS5, then delete it and
-  // confirm the projection was swept.
+  // The projection is only useful if the triggers actually fire, and a virtual table with no rows answers
+  // every MATCH with an empty set, which looks exactly like "nothing matched". So this asserts the whole
+  // path: insert an event row through Drizzle, find it through FTS5, then delete it and confirm the
+  // projection was swept.
   it('projects and unprojects an event row through the triggers', async () => {
     await t.db.insert(agentEvents).values({
       id: 'event-1',

@@ -142,7 +142,7 @@ describe('capturePty', () => {
       spawnPty,
     })
     pty.emitData('usage output\n')
-    // Deliberately never emitExit(): this is the ignored-SIGHUP case.
+    // Never calls emitExit(): this is the ignored-SIGHUP case.
     await capture
     expect(pty.signals).toEqual([undefined]) // SIGHUP only, so far
     await vi.waitFor(() => expect(pty.signals).toEqual([undefined, 'SIGKILL']))

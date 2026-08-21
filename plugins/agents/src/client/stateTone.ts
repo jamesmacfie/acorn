@@ -1,10 +1,8 @@
-// The plugin's domain→StatusDot mapping, declared once.
+// The plugin's domain-to-StatusDot tone mapping, declared once.
 //
-// StatusDot takes a semantic tone rather than a domain state, deliberately: the shared layer has no
-// business knowing what "reconnecting" means. What it asks in return is that the plugin decide once.
-// Before this, the same runtimeState vocabulary was mapped to colours in three separate stylesheets
-// (managed-agents.css, agent-center.css twice) with --add-marker/--warn/--del-marker, while docker's
-// visually identical dots used --state-ok/warn/bad.
+// StatusDot takes a semantic tone, not a domain state: the shared component has no business
+// knowing what "reconnecting" means, so the plugin decides once, here. See docs/ui-design.md §
+// Primitive adoption ratchet for why StatusDot replaced each plugin's own colour vocabulary.
 
 type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
 
@@ -17,14 +15,14 @@ export const runtimeTone = (state: string): Tone => {
   return 'muted'
 }
 
-/* A tool call's dot is NOT here: its status is a protocol type and the changes plugin renders it
-   too, so `agentToolTone` lives beside the renderer contract in client-core. */
+/* A tool call's dot lives elsewhere: its status is a protocol type the changes plugin also renders,
+   so `agentToolTone` sits beside the renderer contract in client-core instead. */
 
 /** A provider's install/auth health in the Agent Center header. */
 export const providerTone = (health: 'ok' | 'error' | 'missing'): Tone => {
   if (health === 'ok') return 'ok'
-  // Authentication required is recoverable, so it is a warning rather than a failure — which is what
-  // the old CSS said too (--warn), despite the state being named 'error'.
+  // Authentication required is recoverable, so it is a warning rather than a failure. The old CSS said
+  // the same thing (--warn), despite the state being named 'error'.
   if (health === 'error') return 'warn'
   return 'muted'
 }

@@ -67,8 +67,8 @@ export class AgentAttachmentStore {
   readonly root: string
 
   // `tasks` is core's, so the "does this task exist" guard below dereferences the plain id through
-  // CoreServices instead of joining. Only `upload` needs it — every other method here keys on an
-  // attachment id this file owns.
+  // CoreServices instead of joining. Only `upload` needs it; every other method here keys on an attachment
+  // id this file owns.
   constructor(
     private readonly db: PluginDatabase,
     dataDir: string,

@@ -24,7 +24,7 @@ export default function AgentMarkdown(props: { text: string; taskId: string; cla
 
   createEffect(() => {
     const text = props.text
-    // A prop is a getter, not a memo, so this effect re-runs whenever anything upstream ticks — even
+    // A prop is a getter, not a memo, so this effect re-runs whenever anything upstream ticks, even
     // when the text is identical. Assigning innerHTML replaces every text node underneath, which throws
     // away the reader's selection, so compare before writing.
     if (!root || text === rendered) return
@@ -32,7 +32,8 @@ export default function AgentMarkdown(props: { text: string; taskId: string; cla
     const current = ++generation
     root.innerHTML = renderAgentMarkdown(text)
     // Grammars load on demand now (client-core/highlight/langs.ts), so each fence has to ask for its
-    // own before `codeToHtml` can route to it — the highlighter starts with none loaded.
+    // Grammars load on demand now (client-core/highlight/langs.ts), so each fence has to ask for its
+    // own before `codeToHtml` can route to it. The highlighter starts with none loaded.
     const languagesInPost = new Set(
       [...(root.querySelectorAll<HTMLElement>('pre > code[data-language]') ?? [])]
         .map((node) => LANGUAGE_ALIASES[node.dataset.language ?? 'text'] ?? node.dataset.language ?? 'text')

@@ -1,17 +1,17 @@
 // The ManagedAgentsBridge, built over a ManagedAgentRuntime.
 //
 // Moved out of apps/node/src/wiring/managedAgentsWiring.ts, where it lived because the app was what
-// constructed the runtime. It lands beside the routes rather than in the plugin's node/index.ts on
-// purpose: what it really is, is the error taxonomy that turns the runtime's thrown messages into the
-// status codes managed.ts's handlers promise. Keeping that next to the router is what makes the mapping
-// reviewable against the surface it shapes; node/index.ts owns composition, not HTTP semantics.
+// constructed the runtime. It lands beside the routes rather than in the plugin's node/index.ts because it
+// really is the error taxonomy that turns the runtime's thrown messages into the status codes managed.ts's
+// handlers promise. Keeping that next to the router makes the mapping reviewable against the surface it
+// shapes; node/index.ts owns composition, not HTTP semantics.
 import { BridgeError } from '@acorn/plugin-api/node'
 import type { ManagedAgentRuntime } from '../../main/runtime'
 import type { ManagedAgentsBridge } from './managed'
 
-// The runtime throws plain Errors — it has no idea it is behind HTTP — so the mapping is by message
-// shape. Deliberately unchanged in this move, including its bluntness: an unmatched error rethrows and
-// becomes a 500, which is the honest answer for a bug rather than a guessed 4xx.
+// The runtime throws plain Errors; it has no idea it is behind HTTP, so the mapping is by message shape.
+// Unchanged in this move, including its bluntness: an unmatched error rethrows and becomes a 500, the
+// honest answer for a bug rather than a guessed 4xx.
 function bridgeFailure(error: unknown): never {
   const message = error instanceof Error ? error.message : 'Managed agent operation failed.'
   if (/not found/i.test(message)) throw new BridgeError(404, 'agent_not_found', message)
@@ -33,10 +33,10 @@ const guarded = async <T>(operation: () => Promise<T>): Promise<T> => {
 }
 
 export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgentsBridge {
-  // Deliberately NOT wrapped in `guarded`: these answer the router's authorization question, and
-  // bridgeFailure turns a "not found" into a thrown BridgeError(404). That would be the right status by
-  // accident and the wrong control flow — the guard needs a value it can compare, and a 404 raised from
-  // inside the resolver would bypass the comparison entirely.
+  // Not wrapped in `guarded`: these answer the router's authorization question, and bridgeFailure turns a
+  // "not found" into a thrown BridgeError(404). That would be the right status by accident and the wrong
+  // control flow: the guard needs a value it can compare, and a 404 raised from inside the resolver would
+  // bypass the comparison entirely.
   const taskIdForSession = async (sessionId: string) => (await runtime.store.getSession(sessionId))?.taskId ?? null
   return {
     taskIdForSession,
