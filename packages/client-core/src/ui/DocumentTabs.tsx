@@ -6,7 +6,7 @@ import { Button, StatusDot } from './primitives'
 export type DocTabDef = {
   id: string
   label: string
-  /** Unsaved changes — a dot, not an asterisk in the label. */
+  /** Unsaved changes: a dot, not an asterisk in the label. */
   dirty?: boolean
   /** Run state, for a tab that owns a process (a terminal session). */
   status?: 'ok' | 'warn' | 'muted'
@@ -18,13 +18,13 @@ export type DocTabDef = {
 }
 
 // The closable tab strip: editor documents and terminal sessions. Distinct from `Tabs`, which
-// switches PANELS within one view — these tabs each own a document, can be closed, and carry state.
+// switches panels within one view; these tabs each own a document, can be closed, and carry state.
 //
-// Same contract shape as Tabs on purpose (tablist only, panels are the caller's, ids follow the
-// `${idPrefix}-tab-${id}` convention) so the two read as siblings.
+// Same contract shape as `Tabs` (tablist only, panels are the caller's, ids follow the
+// `${idPrefix}-tab-${id}` convention), so the two read as siblings.
 //
-// The close buttons are separate focusables INSIDE each tab, which is what lets a keyboard user
-// reach them at all; the terminal's ✕ was mouse-only.
+// The close buttons are separate focusables inside each tab, which lets a keyboard user reach them
+// at all; the terminal's close control used to be mouse-only.
 export function DocumentTabs(props: {
   tabs: readonly DocTabDef[]
   active: string

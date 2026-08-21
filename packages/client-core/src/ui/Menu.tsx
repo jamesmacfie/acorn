@@ -4,35 +4,21 @@ import { createAnchoredPopover, type AnchoredPopover, type Placement } from './a
 import { cx } from './cx'
 import { nextListIndex } from './focus'
 
-// A dropdown menu: Popover plus menu semantics. Four hand-rolled menus existed and none had the
-// full behaviour set — TabRail's task menu had neither outside-click nor Escape nor roles, and
-// terminal's had no portal at all, so any overflow ancestor clipped it.
-//
-// What Menu adds over Popover: role="menu"/"menuitem", arrow-key roving with Home/End,
-// close-on-select, and focus returning to the trigger on dismiss (a menu that drops focus on the
-// body leaves a keyboard user at the top of the document).
-//
-// Items are buttons, not Rows. primitives.tsx warns against forcing every clickable through one
-// component, and menus are their own semantics.
-//
-// Right-click positioning turned out to be exactly what this file predicted: the same hook anchored to
-// a point rather than a rect (anchor.ts § AnchorTarget). `ContextMenu` below is that, and it is not a
-// second menu — the surface, the roles, the roving focus, the Escape and the outside-click are one
-// component (`MenuSurface`) both trigger forms mount. A right-click menu that had its own markup would
-// be a second place for the accessibility to be wrong.
+// A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for
+// why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
 
 export type MenuContext = { close: () => void; register: (element: HTMLElement | undefined) => void }
 
 // A `display: contents` wrapper has no box of its own, so getBoundingClientRect on it returns an
-// empty rect. Measure the trigger the wrapper contains instead — that is the element the surface is
+// empty rect. Measure the trigger the wrapper contains instead; that is the element the surface is
 // meant to be anchored to anyway.
 const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
   (wrapper?.firstElementChild as HTMLElement | null) ?? wrapper
 
 
 /** The menu itself: portal, `role="menu"`, roving focus, and first-item focus on open. Mounted only
- *  while the popover is open, which is also what keeps the registered-item list honest — it used to
- *  live for the lifetime of the Menu and grew by one copy of every item on each re-open. */
+ *  while the popover is open, which also keeps the registered-item list honest. It used to live for
+ *  the lifetime of the Menu and grew by one copy of every item on each re-open. */
 function MenuSurface(props: {
   popover: AnchoredPopover
   ariaLabel: string
@@ -54,8 +40,7 @@ function MenuSurface(props: {
     list[index]?.focus()
   }
 
-  // A menu opens focused on its first item, however it was opened. That is what makes a right-click
-  // menu keyboard-operable the moment it appears rather than a thing you have to Tab into.
+  // See docs/ui-design.md § Menus and right-click for why this focuses the first item on mount.
   onMount(() => queueMicrotask(() => focusAt(0)))
 
   return (
@@ -86,7 +71,7 @@ export function Menu(props: {
   placement?: Placement
   ariaLabel: string
   /** Controlled visibility. Supply both when the surrounding component already owns which menu is
-   *  open — see createAnchoredPopover's note. */
+   *  open; see createAnchoredPopover's note. */
   open?: () => boolean
   onOpenChange?: (open: boolean) => void
   class?: string
@@ -119,22 +104,15 @@ export function Menu(props: {
 }
 
 /**
- * The same menu, opened at a point instead of under a trigger.
- *
- * Visibility is the CALLER's state, because a right-click menu belongs to whichever row was
- * right-clicked and that decision cannot live inside one menu instance — the same argument
- * `createAnchoredPopover`'s controlled mode already makes. `at` going non-null opens it; picking an
- * item, pressing Escape or clicking outside calls `onClose`, and focus returns to `returnFocus` so a
- * keyboard user is left on the row they were on rather than at the top of the document.
- *
- * Keyed on the `at` object, so right-clicking a second row while the first menu is open remounts the
- * surface instead of leaving the previous row's items registered on it.
+/**
+ * The same menu, opened at a point instead of under a trigger. See docs/ui-design.md
+ * § Menus and right-click for why visibility is the caller's state and why this is keyed on `at`.
  */
 export function ContextMenu(props: {
   at: () => { x: number; y: number } | null
   ariaLabel: string
   onClose: () => void
-  /** The element focus returns to on dismiss — normally the row that was right-clicked. */
+  /** The element focus returns to on dismiss: normally the row that was right-clicked. */
   returnFocus?: () => HTMLElement | undefined
   class?: string
   children: (context: MenuContext) => JSX.Element
@@ -164,13 +142,9 @@ export function ContextMenu(props: {
   )
 }
 
-/** One action. `onSelect` fires and the menu closes — a menu item that leaves the menu open is
- *  almost always a checkbox in disguise.
- *
- *  The one exception, and the reason `closeOnSelect` exists: ARM-TO-CONFIRM. An item whose first
- *  press arms and whose second commits has to survive its own first press, because the confirmation
- *  IS the item's changed label (`createArmedConfirm`, ui/confirm.ts). Closing the menu under it
- *  would leave the armed state on a surface nobody can see. */
+/** One action. `onSelect` fires and the menu closes; a menu item that leaves the menu open is
+ *  almost always a checkbox in disguise. See docs/ui-design.md § Menus and right-click for the
+ *  `closeOnSelect` exception. */
 Menu.Item = (props: {
   context: MenuContext
   onSelect: () => void
@@ -203,7 +177,7 @@ Menu.Item = (props: {
   </button>
 )
 
-/** A non-interactive heading row — TabRail's menu opened with two of these naming the task. */
+/** A non-interactive heading row: TabRail's menu opened with two of these naming the task. */
 Menu.Label = (props: { class?: string; children: JSX.Element }) => (
   <div class={cx('ui-menu-label-row', props.class)} role="presentation">{props.children}</div>
 )

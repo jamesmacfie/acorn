@@ -1,23 +1,15 @@
 import { trapOverlayFocus } from './focus'
 
-// Dismissal plumbing for modal surfaces: Escape, backdrop click, and Tab focus containment.
-//
-// This was hand-written at nine call sites, and inconsistently — SettingsModal, willPhase and the
-// two Database modals had the full pattern; ConfigTrustDialog, PromoteToTaskModal, TabRail,
-// LinearBrowse and the former compiled Rollbar browser had a backdrop click and nothing else, so Tab
-// walked straight out of the dialog into the page behind it and Escape did nothing.
-//
-// The overlay PALETTES (⌘K, ⌘P, workspace) deliberately do not use this: createOverlayPalette
-// already owns their dismissal, plus focus restore and single-active-overlay coordination.
-//
-// Markup stays at the call site. This is a hook returning handlers, not a component.
+// Dismissal plumbing for modal surfaces: Escape, backdrop click, and Tab focus containment. See
+// docs/ui-design.md § Chrome and overlays for why this exists and why the overlay palettes don't
+// use it.
 
 export type Dismissable = {
   /** Backdrop element's onClick. */
   onBackdropClick: () => void
-  /** Dialog element's onClick — stops a click inside from reaching the backdrop. */
+  /** Dialog element's onClick: stops a click inside from reaching the backdrop. */
   onContainerClick: (event: MouseEvent) => void
-  /** Dialog element's onKeyDown — Escape to dismiss, Tab to cycle within. */
+  /** Dialog element's onKeyDown: Escape to dismiss, Tab to cycle within. */
   onKeyDown: (event: KeyboardEvent) => void
 }
 

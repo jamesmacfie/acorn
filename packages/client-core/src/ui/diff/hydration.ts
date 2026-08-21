@@ -9,8 +9,9 @@ const BACKGROUND_BATCH_DELAY_MS = 80
 
 type HydratorOptions = {
   /**
+  /**
    * Turn a file's patch into rows. Async because tokenizing happens in a worker now
-   * (highlight/worker.ts) — this used to be a synchronous call plus a separate `tokenizerForFile`
+   * (highlight/worker.ts). This used to be a synchronous call plus a separate `tokenizerForFile`
    * hook, and the two collapsed into one when picking the tokenizer stopped being the hydrator's
    * business.
    */

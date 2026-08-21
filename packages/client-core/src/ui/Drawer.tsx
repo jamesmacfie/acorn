@@ -6,8 +6,8 @@ import { Button } from './primitives'
 // Modal's sibling, not its child: the same behaviour core, different geometry. Edge-anchored,
 // full-extent along that edge, slides in.
 //
-// Behaviour is createDismissable verbatim — that hook exists precisely so surfaces like this stay
-// "purely cosmetic and therefore safely reviewable" (see Modal.tsx's note).
+// Behaviour is createDismissable verbatim. See docs/ui-design.md § Chrome and overlays for why
+// that hook exists.
 export function Drawer(props: {
   onClose: () => void
   side?: 'right' | 'left' | 'bottom'

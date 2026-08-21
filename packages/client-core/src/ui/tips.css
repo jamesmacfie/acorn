@@ -1,5 +1,4 @@
-/* Shared rail tooltip: a small floating bubble with a title and optional muted description. Fixed so
-   it escapes the rails' clipping; centred on its button and flying left/right toward the content. */
+/* Shared rail tooltip. See docs/ui-design.md § Tooltips for the positioning rules. */
 .rail-tip {
   position: fixed;
   z-index: var(--z-tooltip);
@@ -27,7 +26,7 @@
   font-weight: 600;
   color: var(--text);
   line-height: 1.3;
-  /* Rail labels are short, but a tip may now carry a filesystem path — one unbroken token that would
+  /* Rail labels are short, but a tip may now carry a filesystem path: one unbroken token that would
      otherwise run straight out of the bubble. */
   overflow-wrap: anywhere;
 }
@@ -39,8 +38,8 @@
   line-height: 1.35;
 }
 
-/* Status-icon legend (docs/workspaces-and-tasks.md): the rail markers active on this task, each
-   glyph re-shown next to its meaning so the tooltip both reports state and teaches the icons. */
+/* Status-icon legend: see docs/ui-design.md § Tooltips for why it re-shows each active marker
+   next to its meaning. */
 .rail-tip-legend {
   display: flex;
   flex-direction: column;

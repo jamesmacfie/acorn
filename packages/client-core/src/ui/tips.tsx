@@ -4,33 +4,13 @@ import { Kbd, StatusDot } from './primitives'
 import type { RailStatusItem } from '../tasks/railStatus'
 import './tips.css'
 
-// THE APP'S TOOLTIP CONTRACT.
+// The app's tooltip contract: four data attributes, honoured on any element anywhere. See
+// docs/ui-design.md § Tooltips for the attributes, why they replace a wrapper component, and the
+// positioning rules.
 //
-// Four attributes, honoured on any element anywhere:
-//
-//   data-tip         the tip text (required — no attribute, no tip)
-//   data-tip-sub     a second, muted line
-//   data-tip-key     a keyboard chord, rendered as a key cap
-//   data-tip-legend  JSON array of status markers: { g: icon name, d: StatusDot tone,
-//                    t: colour tone, l: meaning } — see tasks/railStatus.ts
-//
-// Attributes rather than a <Tooltip> wrapper component, deliberately: a wrapper adds an element
-// around every trigger, which changes layout. This works on plugin-contributed markup, needs no
-// per-site listener, and costs one delegated listener for the whole document.
-//
-// This outgrew the task rail long ago — it was `tooltip/RailTips.tsx`, used by four core surfaces
-// and exactly one plugin, while ~50 other sites fell back to native `title=`, which is slow,
-// unstyled, and invisible to keyboard users on some platforms. Native `title` remains acceptable
-// only where the styled tip cannot reach — inside xterm's canvas, for instance.
-//
-// A singleton, and `position: fixed` so it escapes the left rail's scrolling list (which clips
-// absolutely-positioned children). Side is auto: the right rail (`.pane-switcher`) flies left,
-// everything else flies right.
-// `anchor` is the CSS offset for the side the bubble is pinned to: `left` when flying right off the
-// left rail, `right` when flying left off the right rail. Anchoring with `right` (rather than `left`
-// + a transform) is what gives the bubble real layout width instead of squeezing it to the edge.
-// A legend row mirrors one rail status marker: its glyph (`g`) or StatusDot tone (`d`), a colour tone
-// (`t`), and its meaning (`l`). Serialised into `data-tip-legend` by the rail; see railStatus.ts.
+// A legend row mirrors one rail status marker: its glyph (`g`) or StatusDot tone (`d`), a colour
+// tone (`t`), and its meaning (`l`). Serialised into `data-tip-legend` by the rail; see
+// railStatus.ts.
 type LegendItem = { g?: string; d?: RailStatusItem['dotTone']; t?: 'accent' | 'warn' | 'del'; l: string }
 type Tip = { title: string; sub?: string; key?: string; legend?: LegendItem[]; anchor: number; y: number; side: 'left' | 'right' }
 
@@ -41,7 +21,8 @@ export const tip = (text: string, opts?: { sub?: string; key?: string }) => ({
   ...(opts?.key === undefined ? {} : { 'data-tip-key': opts.key }),
 })
 
-// Our own attribute, but JSON.parse can still throw on a malformed value — never let that kill the tip.
+// Our own attribute, but JSON.parse can still throw on a malformed value. Never let that kill the
+// tip.
 function parseLegend(raw: string | null): LegendItem[] | undefined {
   if (!raw) return undefined
   try {
@@ -93,7 +74,7 @@ export default function Tips() {
     document.addEventListener('mouseout', onOut)
     document.addEventListener('focusin', onFocus)
     document.addEventListener('focusout', hide)
-    // Positions go stale on scroll (the task rail scrolls) — just drop the tip.
+    // Positions go stale on scroll (the task rail scrolls); just drop the tip.
     window.addEventListener('scroll', hide, true)
   })
   onCleanup(() => {

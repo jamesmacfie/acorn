@@ -1,8 +1,8 @@
-// Row rendering for the shared diff viewer — see model.ts for why the viewer lives in client-core.
-// The whole file came across, threads and composers included: a "generic rows here, review rows in
-// github" split would be a redesign of the component, and the changes pane already renders
-// NonCodeRow today. What each surface actually varies is passed in as props (composers, resolve/
-// reply callbacks, gap expansion), so nothing here reaches back into a plugin.
+// Row rendering for the shared diff viewer (see docs/diff-rendering.md for why it lives in
+// client-core). The whole file came across, threads and composers included: a "generic rows here,
+// review rows in github" split would be a redesign of the component, and the changes pane already
+// renders NonCodeRow today. What each surface actually varies is passed in as props (composers,
+// resolve/reply callbacks, gap expansion), so nothing here reaches back into a plugin.
 import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-js'
 import CopyButton from '../CopyButton'
 import { fileStatusMeta } from '../displayMeta'

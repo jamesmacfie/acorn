@@ -238,9 +238,9 @@ describe('diff model', () => {
     expect(maxLineCols([code('abc'), code('abcdefgh')])).toBe(8)
     // Non-code rows carry no line, and a header longer than any line must not widen the canvas.
     expect(maxLineCols([{ kind: 'hunk', text: '@@ a very long hunk header @@' }, code('ab')])).toBe(2)
-    // One tab from column 0 advances to 8, not to 1 — under-measuring is what clips a line.
+    // One tab from column 0 advances to 8, not to 1; under-measuring is what clips a line.
     expect(maxLineCols([code('\tx')])).toBe(9)
-    // A tab mid-column advances to the NEXT stop rather than adding a full eight.
+    // A tab mid-column advances to the next stop rather than adding a full eight.
     expect(maxLineCols([code('ab\tx')])).toBe(9)
     expect(maxLineCols([])).toBe(0)
   })
@@ -276,9 +276,9 @@ describe('diff model', () => {
   })
 })
 
-// The batched tokenizer, which is the whole reason buildDiffRowsAsync exists. What it has to get
-// right is the SPLIT: a hunk is two documents interleaved, and tokenizing them in display order
-// hands the grammar a text that never existed on disk.
+// The batched tokenizer, which is why buildDiffRowsAsync exists. What it has to get right is the
+// split: a hunk is two documents interleaved, and tokenizing them in display order hands the
+// grammar a text that never existed on disk.
 describe('buildDiffRowsAsync', () => {
   // A patch whose deletions and insertions would corrupt each other's grammar state if they were fed
   // to the highlighter in display order: the deleted line closes a block comment, the inserted one

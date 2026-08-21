@@ -4,10 +4,9 @@ import { createArmedConfirm } from './confirm'
 import type { SplitDrag } from './split'
 import { cx } from './cx'
 
-/* ── Button ──────────────────────────────────────────────────────────────────────────────────
-   Replaces the action buttons only. Rows, tabs, tree nodes and popover triggers that happen to be
-   <button> belong to Row/Tabs/Picker, not here — forcing them through Button is what makes a
-   primitive layer feel like a straitjacket. */
+/* Button: the action buttons only. Rows, tabs, tree nodes and popover triggers that happen to be
+   <button> belong to Row, Tabs, or Picker instead; forcing them through Button would make the
+   primitive layer a straitjacket. */
 export type ButtonProps = ComponentProps<'button'> & {
   variant?: 'solid' | 'outline' | 'ghost' | 'bare'
   tone?: 'neutral' | 'accent' | 'danger' | 'warn'
@@ -15,8 +14,9 @@ export type ButtonProps = ComponentProps<'button'> & {
   size?: 'xs' | 'sm' | 'md'
   iconOnly?: boolean
   busy?: boolean
-  /** Renders an <a class="ui-btn">. A control that NAVIGATES is a link, not a button — middle-click,
-   *  copy-link and screen-reader semantics all depend on it. Hand-written at one site before this. */
+  /** Renders an <a class="ui-btn">. A control that navigates is a link, not a button: middle-click,
+   *  copy-link, and screen-reader semantics depend on it. One site hand-wrote this before Button
+   *  existed. */
   href?: string
   target?: string
   rel?: string
@@ -60,18 +60,18 @@ export function Button(props: ButtonProps) {
   )
 }
 
-/* ── Form controls ───────────────────────────────────────────────────────────────────────────
-   `.integration-key-input` was the de-facto shared input — 33 uses across 11 files, defined in an
-   *integrations* stylesheet and reached for by settings pages, the tab rail and two plugins. */
+/* Form controls. `.integration-key-input` was the de-facto shared input: 33 uses across 11 files,
+   defined in an integrations stylesheet and reached for by settings pages, the tab rail, and two
+   plugins. */
 type ControlOwn = {
   size?: 'sm' | 'md'
   invalid?: boolean
   width?: 'full' | 'auto' | 'narrow'
   /* `filter` is the boxed list-narrowing input (was `.pr-filter`, `.docker-search`, `.notes-filter`,
-     `.db-filter`, `.search-input` — seven bespoke rules, three byte-identical). `bare` is the
+     `.db-filter`, `.search-input`: seven bespoke rules, three byte-identical). `bare` is the
      borderless underline that heads a palette or popover (was `.palette-input`, `.finder-input`,
-     `.repo-picker-filter`). Needing a different look was the whole reason sites hand-rolled
-     `.ui-input`'s tokens instead of using it. */
+     `.repo-picker-filter`). Sites hand-rolled `.ui-input`'s tokens instead of using it because they
+     needed a different look. */
   kind?: 'filter' | 'bare'
 }
 
@@ -102,19 +102,17 @@ export function Textarea(props: ComponentProps<'textarea'> & ControlOwn & { mono
 
 /** Label + control + optional hint/error. Replaces `.settings-field` / `.settings-label`.
  *
- *  `group` is for the case a `<label>` cannot hold: SEVERAL controls under one caption, each with a
- *  label of its own (a row of checkboxes). Nested labels are invalid, and the browser's repair is to
- *  point the outer one at the first control — so clicking the caption toggles the first checkbox, which
- *  is a click nobody meant. `role="group"` with the same caption as its accessible name says the true
- *  thing and stays keyboard- and screen-reader-correct. */
+ *  `group` covers the case a `<label>` cannot hold: several controls under one caption, each with a
+ *  label of its own, such as a row of checkboxes. Nested labels are invalid, and the browser's repair
+ *  is to point the outer one at the first control, so clicking the caption toggles a checkbox nobody
+ *  meant to toggle. `role="group"` with the same caption as its accessible name avoids that and stays
+ *  keyboard- and screen-reader-correct. */
 export function Field(props: {
   label?: string
   hint?: string
   error?: string
-  /** `stack` is label over control. `row` is label then control, sized to content — an inline chip in a
-   *  strip of them. `split` is label LEFT and control at a fixed column RIGHT, which is the one to reach
-   *  for in a stack of fields: the control column is the same width for every sibling, so they line up
-   *  on both edges instead of each starting wherever its label happened to end. */
+  /** `stack` is label over control. See docs/ui-design.md § How the primitives are built (Field) for
+   *  `row` and `split`. */
   layout?: 'stack' | 'row' | 'split'
   group?: boolean
   class?: string
@@ -142,10 +140,9 @@ export function Field(props: {
   )
 }
 
-/* ── Badge ───────────────────────────────────────────────────────────────────────────────────
-   `shape='tag'` is the aesthetic default (a pack may round it); `shape='pill'` is semantic — a
-   capsule in every pack. `dashed` exists because the Database example-picker's "add" chip is the
-   codebase's only non-solid border and would otherwise stay a one-off. */
+/* Badge. See docs/ui-design.md § How the primitives are built (Badge / Chip) for `shape`. `dashed`
+   exists because the Database example-picker's "add" chip is the codebase's only non-solid border
+   and would otherwise stay a one-off. */
 export function Badge(props: {
   tone?: 'neutral' | 'accent' | 'add' | 'del' | 'warn'
   shape?: 'tag' | 'pill'
@@ -194,7 +191,7 @@ export function SectionHeader(props: {
   class?: string
   children: JSX.Element
 }) {
-  // Emits the EXISTING `.section-header` class rather than a parallel `.ui-*` one: that class is
+  // Emits the existing `.section-header` class rather than a parallel `.ui-*` one: that class is
   // already a single shared rule used at 18 sites, so a pack can reach it today. Duplicating it
   // would mean two rules doing one job. The primitive's value here is the count/actions slots.
   return (
@@ -210,15 +207,16 @@ export function SectionHeader(props: {
   )
 }
 
-/* ── Row ─────────────────────────────────────────────────────────────────────────────────────
-   Navigational list rows. This is the primitive with the most STRUCTURAL style leverage: Terminal
-   is a full-bleed square dense row with a 3px left accent bar, Modern an inset rounded card, Cute
-   a pill — differences no token substitution can express across 18 separate `-row` selectors.
-   Also absorbs the role/tabindex/Enter/Space wiring that DockerBrowse hand-writes twice.
+/* Row: navigational list rows. This is the primitive with the most structural style leverage.
+   Terminal renders a full-bleed square dense row with a 3px left accent bar, Modern an inset
+   rounded card, Cute a pill, differences no token substitution can express across 18 separate
+   `-row` selectors. It also absorbs the role/tabindex/Enter/Space wiring that DockerBrowse used
+   to hand-write twice.
 
-   Still NOT for the tabular rows (.diff-row, .dbgrid-row, …): those are measured geometry where a
-   changed box model silently corrupts scroll math. A virtualized LIST row is fine — github's PR list
-   is one, and it takes its measured height through `style` while opting out of `min-height`. */
+   Not for the tabular rows (.diff-row, .dbgrid-row, and similar): those are measured geometry
+   where a changed box model silently corrupts scroll math. A virtualized list row is fine, github's
+   PR list is one, and it takes its measured height through `style` while opting out of
+   `min-height`. */
 export function Row(props: {
   /** Number of `.ui-row-field` cells inside `meta`, so the row can reserve a track for each. */
   metaFields?: number
@@ -230,15 +228,15 @@ export function Row(props: {
   reveal?: boolean
   density?: 'compact' | 'default' | 'roomy'
   onActivate?: () => void
-  /** Renders an <a class="ui-row">. github's PR rows are links, so they were an <A> with the row's
-   *  classes hand-applied — which lost middle-click and copy-link everywhere else.
+  /** Renders an <a class="ui-row">. github's PR rows are links, so they used to be an <A> with the
+   *  row's classes hand-applied, which lost middle-click and copy-link everywhere else.
    *
-   *  With `onActivate` it behaves exactly as the router's <A> does, and for the same reason: a plain
-   *  left-click is intercepted and routed, while middle-click, ⌘-click and "copy link address" fall
-   *  through to the real href. Reimplemented rather than imported because primitives.tsx is served
-   *  to plugin frames, and a frame is a separate document with no Router above it. */
+   *  With `onActivate` it behaves exactly as the router's <A> does: a plain left-click is intercepted
+   *  and routed, while middle-click, cmd-click and "copy link address" fall through to the real href.
+   *  Reimplemented rather than imported, because primitives.tsx is served to plugin frames, and a
+   *  frame is a separate document with no Router above it. */
   href?: string
-  /** Absolute placement from a virtualizer. The one prop a measured list cannot express as a class —
+  /** Absolute placement from a virtualizer. The one prop a measured list cannot express as a class;
    *  github's PR list is why Row's own note used to exclude virtualized rows. */
   style?: JSX.CSSProperties
   /** Pointer or keyboard focus entered/left the row. One callback rather than four handlers because
@@ -307,7 +305,7 @@ export function Row(props: {
       onClick={props.onActivate ? activate : undefined}
       onKeyDown={props.onActivate
         ? (event) => {
-          // Only when the row itself has focus — a button nested inside owns its own keys.
+          // Only when the row itself has focus; a button nested inside owns its own keys.
           if (event.target !== event.currentTarget) return
           if (event.key !== 'Enter' && event.key !== ' ') return
           event.preventDefault()
@@ -320,17 +318,15 @@ export function Row(props: {
   )
 }
 
-/* ── Alert ───────────────────────────────────────────────────────────────────────────────────
-   The most duplicated pattern in the codebase, and the one place the dependency graph was
-   inverted: `.action-error` was used by 32 files (17 in client-core) but DEFINED in the GitHub
-   plugin's stylesheet, so disabling that plugin unstyled every error message in the shell.
+/* Alert. `.ui-alert` replaces `.action-error`; see docs/ui-design.md § How the primitives are built
+   for the migration history.
 
-   `variant='inline'` is `.action-error` class-for-class — red text, no box — so a migrated call
-   site renders identically. `variant='banner'` is the bordered callout that `.settings-notice` /
-   `.fleet-banner` / `.docker-stale-banner` each invented separately.
+   `variant='inline'` is `.action-error` class-for-class (red text, no box), so a migrated call
+   site renders identically. `variant='banner'` is the bordered callout that `.settings-notice`,
+   `.fleet-banner`, and `.docker-stale-banner` each invented separately.
 
-   `role` is DERIVED, not a prop: three values were in circulation (alert/status/none) chosen at
-   random. A danger alert interrupts, everything else is polite. */
+   `role` is derived rather than a prop: three values were in circulation (alert/status/none) chosen
+   at random. A danger alert interrupts; everything else is polite. */
 export function Alert(props: {
   tone?: 'danger' | 'warn' | 'info' | 'success'
   variant?: 'inline' | 'banner'
@@ -360,15 +356,16 @@ export function Alert(props: {
   )
 }
 
-/* ── EmptyState ──────────────────────────────────────────────────────────────────────────────
-   ~35 sites in ten class vocabularies, three of them borrowing another plugin's stylesheet
-   (notes → editor's `.editor-empty`; preview and docker → core's `.workspace-empty-inner`).
+/* EmptyState: about 35 sites across ten class vocabularies, three of them borrowing another
+   plugin's stylesheet (notes -> editor's `.editor-empty`; preview and docker -> core's
+   `.workspace-empty-inner`).
 
    `busy` folds loading into the same component rather than a sibling: rollbar's PageStatus already
-   proved "loading…", "no data" and "unconfigured, do X" are one box with different contents.
+   showed that "loading...", "no data", and "unconfigured, do X" are one box with different
+   contents.
 
-   Deliberately dumb — no illustration library, no built-in reasons. The call site supplies the
-   *why*, which is what docs/ui-design.md asks for; this supplies consistent geometry. */
+   No illustration library and no built-in reasons; the call site supplies the why (see
+   docs/ui-design.md § States), and this component supplies consistent geometry. */
 export function EmptyState(props: {
   icon?: JSX.Element
   title?: string
@@ -396,19 +393,17 @@ export function EmptyState(props: {
   )
 }
 
-/* ── StatusDot ───────────────────────────────────────────────────────────────────────────────
-   Drawn ten independent times with TWO competing colour vocabularies: docker used
-   --state-ok/warn/bad while agents' identical dots used --add-marker/--warn/--del-marker. This
-   settles on the status trio — they read as status, which is what this is, and they already exist
-   as derived theme tokens so no theme block needs restating.
+/* StatusDot. See docs/ui-design.md § How the primitives are built for why this settled on the
+   status trio instead of one of the two prior colour vocabularies.
 
-   Tones are semantic, not domain states: the call site maps running→ok, exited→muted, failed→bad.
-   No children — a dot with a label beside it is Row/Badge composition, not a layout component. */
+   Tones are semantic, not domain states: the call site maps running to ok, exited to muted, failed
+   to bad. No children; a dot with a label beside it is Row/Badge composition, not a layout
+   component. */
 export function StatusDot(props: {
-  /* `mixed` (half-bad, half-warn) is here rather than left to a call-site class because TWO
-     independent owners render it — core's rail status and github's PR rows — so a local rule would
+  /* `mixed` (half-bad, half-warn) is here rather than left to a call-site class because two
+     independent owners render it, core's rail status and github's PR rows, so a local rule would
      have to live in one of them and be reached for by the other. That is the inversion this
-     migration exists to remove. */
+     migration removes. */
   tone: 'ok' | 'warn' | 'bad' | 'muted' | 'accent' | 'mixed'
   pulse?: boolean
   label?: string
@@ -428,15 +423,10 @@ export function StatusDot(props: {
   )
 }
 
-/* ── Checkbox ────────────────────────────────────────────────────────────────────────────────
-   The one control class no style pack could reach: every checkbox in the app was a raw
+/* Checkbox: the one control class no style pack could reach. Every checkbox in the app was a raw
    <input type="checkbox"> with a hand-rolled label wrapper, twice with an inline padding-left
-   nesting hack.
-
-   Styles the NATIVE input — `accent-color` gets 90% of the way and keeps native keyboard and
-   screen-reader behaviour. Rebuilding the control out of divs is how a checkbox stops being
-   announced as one. `switch` is presentation on the same element and the same events, so it is a
-   prop rather than a second component. */
+   nesting hack. See docs/ui-design.md § How the primitives are built for why it styles the native
+   input rather than rebuilding it, and how `switch` reuses the same element. */
 export function Checkbox(props: ComponentProps<'input'> & {
   label?: JSX.Element
   hint?: string
@@ -447,8 +437,8 @@ export function Checkbox(props: ComponentProps<'input'> & {
 }) {
   const [own, rest] = splitProps(props, ['label', 'hint', 'indeterminate', 'switch', 'size', 'nested', 'class'])
   let ref: HTMLInputElement | undefined
-  // Tri-state cannot be expressed as an attribute — it is a DOM property only. One site needed it
-  // (AgentToolsSettings) and hand-wrote this effect.
+  // Tri-state cannot be expressed as an attribute; it is a DOM property only. One site needed it
+  // (AgentToolsSettings), so this effect sets it directly.
   createEffect(() => {
     if (ref) ref.indeterminate = !!own.indeterminate
   })
@@ -479,16 +469,15 @@ export function Checkbox(props: ComponentProps<'input'> & {
   )
 }
 
-/* ── ConfirmButton ───────────────────────────────────────────────────────────────────────────
-   Arm-to-confirm, which this codebase converged on organically in five places and then
-   implemented five different ways — three of them smuggling the prompt through the *error*
-   channel ("Click discard again…"), which puts a red banner on a UI that has no error.
+/* ConfirmButton: arm-to-confirm, which this codebase converged on organically in five places and
+   then implemented five different ways, three of them smuggling the prompt through the error
+   channel ("Click discard again..."), which puts a red banner on a UI that has no error.
 
-   The armed button IS the prompt. Frame-safe by construction: no window.confirm, which a
-   sandboxed frame silently returns false from (the reason http had to build this itself).
+   The armed button is the prompt. It never calls window.confirm, which a sandboxed frame silently
+   returns false from; that is why http had to build this itself.
 
-   `skipConfirm` exists for docker's `confirmDestructive` pref gate. Where the armed state must
-   live outside one button (a group header arming a row key), use createArmedConfirm directly. */
+   `skipConfirm` exists for docker's `confirmDestructive` pref gate. Where the armed state must live
+   outside one button, such as a group header arming a row key, use createArmedConfirm directly. */
 export function ConfirmButton(props: ButtonProps & {
   confirmLabel?: string
   timeoutMs?: number
@@ -532,14 +521,13 @@ export function Kbd(props: { size?: 'xs' | 'sm'; class?: string; children: JSX.E
   return <kbd class={cx('ui-kbd', props.class)} data-size={props.size ?? 'sm'}>{props.children}</kbd>
 }
 
-/* ── Toolbar ─────────────────────────────────────────────────────────────────────────────────
-   The bar strip, drawn at least fifteen times: flex row + gap + border-bottom + --bg-subtle. Almost
-   no behaviour and high leverage — before this, a style pack had zero say over fifteen separately
-   authored bars, so a density pack could not compress any of them.
+/* Toolbar: the bar strip, drawn at least fifteen times as flex row + gap + border-bottom +
+   --bg-subtle. Almost no behaviour and high leverage: before this, a style pack had zero say over
+   fifteen separately authored bars, so a density pack could not compress any of them.
 
-   `bar` is the bordered pane strip; `actions` is the borderless end-aligned form/modal footer.
-   Deliberately no arrow-key roving: most of these mix inputs and buttons, where roving hurts.
-   Not for tab strips (own semantics) or the topbar (shell chrome on a grid). */
+   `bar` is the bordered pane strip; `actions` is the borderless end-aligned form/modal footer. It
+   has no arrow-key roving, because most of these mix inputs and buttons, where roving hurts. Not for
+   tab strips (own semantics) or the topbar (shell chrome on a grid). */
 export function Toolbar(props: {
   variant?: 'bar' | 'actions'
   size?: 'sm' | 'md'
@@ -561,7 +549,7 @@ export function Toolbar(props: {
   )
 }
 
-/** flex:1 filler. This is the `margin-left: auto` killer — that idiom was inline-styled twice. */
+/** flex:1 filler. This replaces the `margin-left: auto` idiom, which was inline-styled twice. */
 Toolbar.Spacer = () => <span class="ui-toolbar-spacer" />
 
 /** A gap-tightened cluster, for pairs that read as one control (a find bar's prev/next). */
@@ -569,16 +557,14 @@ Toolbar.Group = (props: { class?: string; children: JSX.Element }) => (
   <span class={cx('ui-toolbar-group', props.class)}>{props.children}</span>
 )
 
-/* ── Chip ────────────────────────────────────────────────────────────────────────────────────
-   Badge's interactive sibling. Rule of thumb for call sites, because the survey showed this is the
-   distinction people kept re-deciding: **static label → Badge; interactive or data-coloured → Chip.**
+/* Chip: Badge's interactive sibling. See docs/ui-design.md § How the primitives are built
+   (Badge / Chip) for the Badge-vs-Chip rule of thumb and `data-colored`.
 
-   `color` takes an arbitrary provider colour (a Linear state, a GitHub label) and drives a dot plus
-   a tinted border, which is what `.ln-state` and github's `.integration-row-state` each did with the
-   same inline-var trick — two implementations of one visual.
+   `.ln-state` and github's `.integration-row-state` each drove a coloured dot with the same
+   inline-var trick before this; two implementations of one visual.
 
    The element switches on interactivity: `onActivate` renders a <button>, otherwise a <span> whose
-   × is its own small button. */
+   x is its own small button. */
 export function Chip(props: {
   tone?: 'neutral' | 'accent' | 'add' | 'del' | 'warn'
   color?: string
@@ -637,15 +623,14 @@ export function Chip(props: {
 // colour in the codebase and nothing that can close a style attribute.
 const SAFE_COLOR = /^(#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.,%\s/]+\)|[a-zA-Z-]+)$/
 
-/* ── DescriptionList ─────────────────────────────────────────────────────────────────────────
-   Label/value pairs: response headers, container info, usage stats, issue facts, fingerprints,
-   shortcut tables — the same grid written at least nine times, split between <dl> markup and bare
-   div pairs. Two layouts covered all of them: `columns` (label left, value right) and `facts`
-   (auto-fit tiles, label above value).
+/* DescriptionList: label/value pairs for response headers, container info, usage stats, issue
+   facts, fingerprints, and shortcut tables, the same grid written at least nine times split
+   between <dl> markup and bare div pairs. Two layouts covered all of them: `columns` (label left,
+   value right) and `facts` (auto-fit tiles, label above value).
 
-   A real <dl>/<dt>/<dd>, so the pairing is announced — half the hand-rolled sites had no accessible
-   pairing at all. Children composition rather than an `items` array, because that is how every
-   current site builds them and it keeps the component out of formatting values.
+   A real <dl>/<dt>/<dd> announces the pairing; half the hand-rolled sites had no accessible pairing
+   at all. It takes children rather than an `items` array, because that is how every current site
+   builds them, and it keeps the component out of formatting values.
 
    A site that needs sorting or filtering has outgrown this and wants a table. */
 export function DescriptionList(props: {
@@ -670,10 +655,10 @@ DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; class?: str
   </div>
 )
 
-/* ── SegmentedControl / ToggleButton ─────────────────────────────────────────────────────────
-   Six hand-rolled segment groups. Two components rather than one because the semantics genuinely
-   differ: segments switch a VALUE (radiogroup, arrow keys), a toggle flips one boolean
-   (aria-pressed). Neither is Tabs — tabs switch PANELS and get tablist semantics. */
+/* SegmentedControl / ToggleButton: six hand-rolled segment groups. Two components rather than one,
+   because the semantics genuinely differ. Segments switch a value (radiogroup, arrow keys); a
+   toggle flips one boolean (aria-pressed). Neither is Tabs, since tabs switch panels and get
+   tablist semantics. */
 export function SegmentedControl<T extends string>(props: {
   options: readonly { value: T; label: JSX.Element; title?: string; disabled?: boolean }[]
   value: T
@@ -727,8 +712,8 @@ export function SegmentedControl<T extends string>(props: {
 /** A Button that stays in. Separate name so call sites are greppable; `data-pressed` is what packs
  *  style, and it must read differently from hover in every one of them.
  *
- *  `onPressedChange`, not `onToggle`: ButtonProps extends ComponentProps<'button'>, which already has
- *  a DOM `onToggle` event — the same silent collision as a prop named `ref`. */
+ *  `onPressedChange`, not `onToggle`: ButtonProps extends ComponentProps<'button'>, which already
+ *  has a DOM `onToggle` event. That is the same silent collision as a prop named `ref`. */
 export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedChange: (pressed: boolean) => void }) {
   const [own, rest] = splitProps(props, ['pressed', 'onPressedChange', 'onClick'])
   return (
@@ -741,14 +726,13 @@ export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedC
   )
 }
 
-/* ── Card ────────────────────────────────────────────────────────────────────────────────────
-   A bordered grouping surface, written ten times. No mandated Header/Body/Footer slots: acorn's
-   cards are small and dense, and slots would mostly get in the way.
+/* Card: a bordered grouping surface, written ten times. No mandated Header/Body/Footer slots.
+   acorn's cards are small and dense, and slots would mostly get in the way.
 
-   Distinct from Row on purpose. Row's own note says a style pack may render list rows AS cards
-   (Modern's inset rounded row), so the two share surface tokens but keep separate semantics —
-   grouping versus list item. This is where packs win big: Modern's rounded inset cards against
-   Terminal's flat squares is one selector per pack instead of ten. */
+   Distinct from Row. Row's own note says a style pack may render list rows as cards (Modern's
+   inset rounded row), so the two share surface tokens but keep separate semantics: grouping versus
+   list item. This is where packs win big. Modern's rounded inset cards against Terminal's flat
+   squares is one selector per pack instead of ten. */
 export function Card(props: {
   interactive?: boolean
   selected?: boolean
@@ -779,15 +763,13 @@ export function Card(props: {
   )
 }
 
-/* ── Meter ───────────────────────────────────────────────────────────────────────────────────
-   A ratio bar. Div-based rather than a native <meter> so a style pack can actually restyle it —
-   docker's two native meters are the argument, being the only controls in the app a pack cannot
-   touch at all.
+/* Meter: a ratio bar. See docs/ui-design.md § How the primitives are built for why it is a div and
+   not a native <meter>.
 
    `label` is required because all three existing bars had no accessible name, so a screen reader
    announced a number with nothing attached to it.
 
-   `auto` implements context's 80/95% thresholds once. If a second site needs different cutoffs it
+   `auto` implements context's 80/95% thresholds once. If a second site needs different cutoffs, it
    can take them as a prop then. */
 const METER_WARN = 0.8
 const METER_DANGER = 0.95
@@ -822,11 +804,10 @@ export function Meter(props: {
   )
 }
 
-/* ── CodeBlock ───────────────────────────────────────────────────────────────────────────────
-   The mono sunken block, written nine times. Syntax highlighting stays out: callers that highlight
-   (Shiki in the agents transcript, the diff toolkit) pass tokenized children.
+/* CodeBlock: the mono sunken block, written nine times. Syntax highlighting stays out; callers
+   that highlight (Shiki in the agents transcript, the diff toolkit) pass tokenized children.
 
-   A code *textarea* is not this — that is `Textarea mono`, which retires `.settings-script`.
+   A code textarea is not this; that is `Textarea mono`, which retires `.settings-script`.
 
    Logs that stream keep their own scroll-follow logic. This is the box, not the tail. */
 export function CodeBlock(props: {
@@ -881,13 +862,12 @@ function CopyButtonSlot(props: { text: () => string; onCopy?: (text: string) => 
   )
 }
 
-/* ── Table ───────────────────────────────────────────────────────────────────────────────────
-   Deliberately thin: real <table> semantics, token styling, and the horizontal-scroll wrapper both
-   existing sites hand-rolled and one of them forgot. No column defs, no sorting, no virtualization
-   — when a consumer needs sorting it can grow a `Table.SortHeader`.
+/* Table: kept thin. Real <table> semantics, token styling, and the horizontal-scroll wrapper both
+   existing sites hand-rolled, and one of them forgot. No column defs, no sorting, no
+   virtualization; a consumer that needs sorting can grow a `Table.SortHeader`.
 
    Not for the virtualized grids (.diff-row, .dbgrid-row): those are measured geometry where a
-   changed box model silently corrupts scroll math, which is the same reason Row excludes them. */
+   changed box model silently corrupts scroll math, the same reason Row excludes them. */
 export function Table(props: {
   size?: 'sm' | 'md'
   stickyHead?: boolean
@@ -910,16 +890,15 @@ export function Table(props: {
   )
 }
 
-/* ── TreeRow ─────────────────────────────────────────────────────────────────────────────────
-   A Row with a disclosure twist and a depth. A wrapper rather than more Row props, so Row's API
-   stays flat.
+/* TreeRow: a Row with a disclosure twist and a depth. A wrapper rather than more Row props, so
+   Row's API stays flat.
 
    `depth` generalises Row's single `nested` boolean; the twist renders from the marker token rather
    than a glyph literal, and carries `aria-expanded`.
 
-   Tree CONTAINER semantics (role="tree"/"treeitem"/aria-level) stay at the call site: a row cannot
-   know its tree. Wire the container yourself — full roving-focus tree navigation is a later layer,
-   and the editor's file tree is the candidate that would need it. */
+   Tree container semantics (role="tree"/"treeitem"/aria-level) stay at the call site, since a row
+   cannot know its tree. Wire the container yourself; full roving-focus tree navigation is a later
+   layer, and the editor's file tree is the candidate that would need it. */
 export function TreeRow(props: {
   expandable?: boolean
   expanded?: boolean
@@ -929,10 +908,10 @@ export function TreeRow(props: {
   onActivate?: () => void
   leading?: JSX.Element
   trailing?: JSX.Element
-  /** Trailing metadata — Row's slot, forwarded. A tree row wants a size or a count as much as a
+  /** Trailing metadata: Row's slot, forwarded. A tree row wants a size or a count as much as a
    *  flat one does, and without this a caller has to hand-roll `.ui-row-meta` in the body. */
   meta?: JSX.Element
-  /** Hide `trailing` until hover or focus — the idiom five stylesheets implemented separately. */
+  /** Hide `trailing` until hover or focus, the idiom five stylesheets implemented separately. */
   reveal?: boolean
   title?: string
   class?: string
@@ -978,32 +957,16 @@ export function TreeRow(props: {
   )
 }
 
-/* ── SplitHandle ─────────────────────────────────────────────────────────────────────────────
-   The drag-resize grip. Behaviour is createSplitDrag (ui/split.ts) — this is the markup, which is a
-   wide hit area around a hairline, lifted from `.pane-divider`.
+/* SplitHandle: the drag-resize grip. Behaviour lives in createSplitDrag (ui/split.ts); this is the
+   markup, a wide hit area around a hairline, lifted from `.pane-divider`.
 
-   Three surfaces hand-rolled this and none had keyboard support, so a split was mouse-only. */
+   Three surfaces hand-rolled this and none had keyboard support, so a split used to be mouse-only. */
 export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag; class?: string }) {
   return <div {...props.drag.handleProps} class={cx('ui-split-handle', props.class)} data-axis={props.axis} />
 }
 
-/* ── ListDetail ──────────────────────────────────────────────────────────────────────────────
-   List on the left, detail on the right. Four panes each invented one — two grids (rollbar,
-   linear), a flex row (database) and a third grid (http) — with four column widths and two
-   different border ROLES, which is why they read as slightly-different versions of the same pane
-   rather than the same pane. The widths collapse to two genres: a compact switcher rail and a
-   browse list.
-
-   NOT for a Source that claims the whole shell — docker's browse is `.panes` + `.pane`, the inset
-   card genre with a gap between columns, and that layout belongs to the shell (styles/shell.css).
-   The test is whether the two columns are one surface split by a divider or two separate surfaces.
-
-   `list` omitted renders a single full-width column, because rollbar and linear both drop the
-   switcher when a task links exactly one item, and a two-column grid holding one child is not that.
-
-   Scrolling is the caller's to declare: `scrollDetail` makes the detail column one scroller (a
-   document view), and its absence means the children own their own (a toolbar over a grid). Every
-   consumer had this, and nobody had it the same way, but neither answer is wrong. */
+/* ListDetail: list beside detail. See docs/ui-design.md § Two-column panes for what it replaces,
+   the layout rules, and when not to use it. */
 export function ListDetail(props: {
   list?: JSX.Element
   /** aria-label for the list column. It is a landmark; name it. */
@@ -1012,8 +975,9 @@ export function ListDetail(props: {
   listWidth?: 'narrow' | 'default'
   /** Detail column scrolls as one region. Otherwise its children own their scrolling. */
   scrollDetail?: boolean
-  /** `main` when this split IS the document — a plugin frame, where nothing else claims the
-   *  landmark. A pane inside the shell leaves it a div, because the shell owns the page's `main`. */
+  /** `main` when this split is the document itself, such as a plugin frame where nothing else
+   *  claims the landmark. A pane inside the shell leaves it a div, because the shell owns the
+   *  page's `main`. */
   detailAs?: 'div' | 'main'
   class?: string
   listClass?: string

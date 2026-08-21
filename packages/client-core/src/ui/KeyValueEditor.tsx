@@ -5,20 +5,20 @@ import { Button, Checkbox, Input } from './primitives'
 
 export type KVRow = { enabled?: boolean; key: string; value: string }
 
-// The editable name/value grid, lifted from the http plugin's — which was the correct
+// The editable name/value grid, lifted from the http plugin's, which was the correct
 // implementation, including the two things that are easy to get wrong:
 //
 //   1. `<Index>`, not `<For>`. `<For>` keys rows by object reference, so replacing a row on every
-//      keystroke tears down its input and drops focus. `<Index>` keys by position. This is a
-//      recorded repo gotcha and the port must not lose it.
-//   2. The trailing blank row that materialises as you type, so there is always somewhere to type,
-//      and rows the user empties out are dropped — except the one being typed in.
+//      keystroke tears down its input and drops focus. `<Index>` keys by position. This gotcha
+//      recurs across the codebase and the port must not lose it.
+//   2. The trailing blank row that materialises as you type, so there is always somewhere to type;
+//      rows the user empties out are dropped, except the one being typed in.
 //
 // Controlled and dumb: the blank-row invariant lives inside, everything else is the caller's data.
 export function KeyValueEditor(props: {
   rows: readonly KVRow[]
   onChange: (rows: KVRow[]) => void
-  /** Extra columns between value and the remove button — http's variable-kind select. */
+  /** Extra columns between value and the remove button: http's variable-kind select. */
   columns?: readonly {
     id: string
     header: string

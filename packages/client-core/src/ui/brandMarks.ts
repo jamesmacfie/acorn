@@ -1,17 +1,8 @@
 import { Registry } from '../registries/registry'
 
-// A brand logo, as one SVG path's `d` attribute in a 24x24 box — deliberately not an SVG document.
-//
-// A document would mean `<script>`, `<use href>`, `<image href>`, `<foreignObject>`, `on*` handlers
-// and CSS `@import`: an allowlist parser and a new trust boundary, for a logo. There is nothing in
-// `d`'s grammar to sanitise, which is why a manifest-supplied mark needs only a character-class
-// check (node-core/main/pluginManifest.ts) and why this can render through the same `<path>`
-// machinery Icon.tsx already had. Icon fills it with `currentColor`, so a plugin's mark themes
-// across every theme exactly as a first-party one does — which a data-URI `<img>` could not, since
-// CSS does not cross into its document.
-//
-// See docs/ui-design.md § Icons; the retired docs/future/icons.md (git history) records the
-// alternatives this rules out.
+// A brand logo, as one SVG path's `d` attribute in a 24x24 box, not an SVG document. See
+// docs/ui-design.md § Icons for why, and docs/future/icons.md (git history) for the alternatives
+// this rules out.
 export type BrandMark = {
   // Bare for a core mark, `<pluginId>` or `<pluginId>/<key>` for a plugin's. Icon looks it up under
   // a `brand:` prefix; the prefix keeps these out of ICON_NAMES and stays unambiguous if Lucide ever
@@ -25,13 +16,10 @@ export type BrandMark = {
 // catches. Its `get` reads a signal, so a mark registering after first paint re-renders the icon.
 export const brandMarkRegistry = new Registry<BrandMark>('brand mark')
 
-// CORE'S OWN MARKS. A mark is here if and only if a core surface renders it — core cannot name a
-// mark and hope some plugin registered it, because Icon's fallback would print the literal string
-// `brand:github` into a settings row. Everything else belongs to the plugin that draws it.
+// Core's own marks. See docs/ui-design.md § Icons for the "core iff a core surface renders it"
+// rule.
 const CORE: BrandMark[] = [
-  // Core draws this for `project.github` in workspaces/WorkspaceProjectAssignments.tsx, and the
-  // field is first-class on the project row. The mark follows the data model, not the plugin
-  // boundary, so this stays core's even if GitHub becomes a plugin. Replaces the hand-inlined
+  // See docs/ui-design.md § Icons for why this stays core's. Replaces the hand-inlined
   // ui/GithubMark.tsx. From simple-icons (CC0 artwork; the trademark remains GitHub's).
   {
     id: 'github',

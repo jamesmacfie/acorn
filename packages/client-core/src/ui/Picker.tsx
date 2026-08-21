@@ -3,19 +3,13 @@ import { Portal } from 'solid-js/web'
 import { createAnchoredPopover } from './anchor'
 
 // Searchable popover picker: a button showing the current value opens a filter input + scrollable
-// list. Presentational chrome only — the parent supplies results(query) so it owns filtering and
-// ordering (pinned-first projects, substring branches, …). Shared by project pickers and the create-PR
-// branch selectors so they look and behave identically. Esc / outside-click close it.
+// list. Presentational chrome only; the parent supplies results(query) so it owns filtering and
+// ordering (pinned-first projects, substring branches, and so on). Shared by project pickers and
+// the create-PR branch selectors so they look and behave identically. Esc / outside-click close it.
 //
-// The popover is rendered through a Portal and positioned `fixed` to the button's rect: panes set
-// `overflow`, and an absolutely-positioned child can't escape an overflow-clipped ancestor — it'd
-// be clipped at the pane edge instead of overlaying the next column. The Portal lifts it out of
-// every overflow/stacking context so it floats above the rest of the app.
-//
-// Anchoring, dismissal and reflow now come from ui/anchor.ts. They used to live here, with a
-// comment saying to extract them once a second element-anchored popover appeared; several did, each
-// re-solving less of the problem. Picker keeps the filter/list semantics and owns nothing about
-// geometry.
+// Anchoring, dismissal and reflow come from ui/anchor.ts; see docs/ui-design.md § Menus and
+// right-click for why (this file was the extraction's starting point) and for the portal/fixed
+// positioning it relies on. Picker keeps only the filter/list semantics.
 export default function Picker<T>(props: {
   label: string | JSX.Element // JSX so a picker can show its current value as an icon, not just text
   ariaLabel?: string

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDismissable } from './dismissable'
 
-// Node environment, no jsdom (see vitest.config.ts) — so the focus-trap case uses the same
+// Node environment, no jsdom (see vitest.config.ts), so the focus-trap case uses the same
 // hand-rolled fakes as palette/overlay.test.ts rather than pulling in a DOM implementation.
 const keyEvent = (k: string, shiftKey = false) => {
   const preventDefault = vi.fn()

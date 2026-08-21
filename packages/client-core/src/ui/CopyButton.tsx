@@ -5,7 +5,7 @@ import Icon from './Icon'
 // (see styles/copy.css). `text` is read lazily on click so callers can pass live accessors
 // (e.g. a ref's textContent). Shows a brief check on success.
 //
-// `onCopy` exists because a sandboxed plugin frame has no `navigator.clipboard` — it copies through
+// `onCopy` exists because a sandboxed plugin frame has no `navigator.clipboard`; it copies through
 // the bridge instead. That was the documented reason two frames could not use this component at all.
 export default function CopyButton(props: {
   text: () => string
