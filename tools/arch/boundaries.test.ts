@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 // Architecture boundary enforcement. Every rule below is stated, with the failure it prevents, in
-// docs/architecture-overview.md § Package boundaries — read that first, then this for the mechanics.
+// docs/architecture-overview.md § Package boundaries. Read that first, then this for the mechanics.
 //
 // The scanner resolves relative and bare @acorn/* specifiers, so the package graph is checked across
 // intra-package and cross-package imports alike. Test files follow the same rules as production files
@@ -35,8 +35,9 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
   })
   .map((dir) => {
     const name = (JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string }).name
-    // Kind comes from where a package lives, not what it's called. The `@acorn/plugin-` name prefix
-    // classified `@acorn/plugin-api`, a shared library every plugin imports, as a plugin.
+    // Kind comes from where a package lives, not its name (docs/architecture-overview.md § Package
+    // boundaries): the `@acorn/plugin-` name prefix would classify `@acorn/plugin-api`, a shared
+    // library every plugin imports, as a plugin.
     const base = basename(dirname(dir))
     const kind: Pkg['kind'] = base === 'apps' ? 'app' : base === 'plugins' ? 'plugin' : 'lib'
     return { name, dir, src: join(dir, 'src'), kind }
@@ -215,9 +216,9 @@ describe('architecture boundaries', () => {
   })
 
   it('spawning a child process is an enumerated exception to the broker', () => {
-    // Every entry is a considered exception with its reason beside it. The broker models a short-lived
-    // child with bounded output and a killable process group; a PTY, a long-lived JSON-RPC agent driver,
-    // a `docker logs -f` stream and a pg client are none of those.
+    // Every entry below is a considered exception to the broker, with its reason inline
+    // (docs/architecture-overview.md § Package boundaries, docs/security.md § Process, path, and
+    // configuration controls).
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
       'packages/node-core/src/main/core/exec/proc.ts', // IS the broker
@@ -274,12 +275,8 @@ describe('architecture boundaries', () => {
   })
 
   it('plugin TESTS reach core through @acorn/plugin-api/testkit (shrinking baseline)', () => {
-    // Deep imports still to migrate, which may only shrink. @acorn/plugin-api/testkit is the seam that
-    // replaced them: its makeTestNodeContext calls the same context assembly the host calls at boot.
-    //
-    // Migrate as you touch. Remove a root when its last file goes. Never add a root: a new deep seam
-    // means the testkit is missing something, so widen it instead. Lower the ceiling below when you
-    // migrate a file.
+    // Shrinking baseline (docs/architecture-overview.md § Package boundaries). Migrate a test as you
+    // touch it; never add a root. Lower MAX_DEEP_IMPORTS below when you migrate a file.
     const TESTKIT_BASELINE = [
       '@acorn/client-core/node',
       '@acorn/client-core/palette',
@@ -337,8 +334,8 @@ describe('architecture boundaries', () => {
   })
 
   it('apps reach plugins through entrypoints or contract/ (shrinking baseline)', () => {
-    // A plugin's public surface is node/index.ts, client/index.ts, main/index.ts and contract/. Empty,
-    // and keep it that way. Tests are exempt: a test may reach into whatever it's testing.
+    // Empty, and stays that way (docs/architecture-overview.md § Package boundaries: what an app may
+    // import). Tests are exempt.
     const APP_DEEP_IMPORT_BASELINE: string[] = []
     const ENTRYPOINTS = ['/node/index.ts', '/client/index.ts', '/main/index.ts']
     const deep = EDGES.filter((e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile))
@@ -352,8 +349,8 @@ describe('architecture boundaries', () => {
   })
 
   it('protocol declares no plugin route', () => {
-    // One literal does the whole job: every plugin route lives under /v2/p/<plugin>/ and core's under
-    // /v2/core/, so protocol containing the plugin prefix means it's building a route it doesn't own.
+    // docs/architecture-overview.md § Package boundaries: @acorn/protocol owns no plugin's wire
+    // surface.
     const proto = byName.get('@acorn/protocol')!
     const files = walk(proto.src)
     // Anti-vacuity: the suite's own guard counts packages and edges, not protocol's files, so a walk
@@ -364,9 +361,7 @@ describe('architecture boundaries', () => {
   })
 
   it('the reserved plugin route segment is spelled the same on both sides of the client/node boundary', () => {
-    // corePaths.ts declares PLUGIN_ROUTE_SEGMENT and node-core/main/pluginManifest.ts re-spells it,
-    // because the client is downstream of the node. This turns the drift into a failure here rather
-    // than a route the device refuses after the node accepted it.
+    // Two spellings that must not drift (docs/architecture-overview.md § Package boundaries).
     const client = byName.get('@acorn/client-core')!
     const node = byName.get('@acorn/node-core')!
     const corePaths = readFileSync(join(client.src, 'registries/corePaths.ts'), 'utf8')
@@ -405,8 +400,7 @@ describe('architecture boundaries', () => {
   })
 
   it('only core reaches the machine identity store', () => {
-    // The allowlist is node-core, which owns the store, plus the two composition roots that construct
-    // it. A plugin appearing here means someone went around the seam again.
+    // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
     const IDENTITY_STORE_OK = new Set(['packages/node-core', 'apps/node'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
@@ -420,9 +414,9 @@ describe('architecture boundaries', () => {
   })
 
   it('only main touches the third-party plugin cache and trust store', () => {
-    // Trust binds to bytes, and the renderer stays inert. Both hold only while nothing outside main can
-    // name the stores: a renderer module touching either would be a second place a hash could enter the
-    // system, and client-core/plugins/host.ts is the one door, speaking hashes and decisions only.
+    // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
+    // client-core/plugins/host.ts is the one door on the renderer side, speaking hashes and
+    // decisions only.
     const PLUGIN_STORE_OK = new Set(['apps/desktop'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
@@ -586,7 +580,7 @@ describe('architecture boundaries', () => {
       }
       for (const spec of specs) {
         const target = resolveSpec(file, spec)
-        if (!target.file) continue // external, or @acorn/protocol resolved elsewhere — both fine
+        if (!target.file) continue // external, or @acorn/protocol resolved elsewhere, both fine
         if (target.pkg && target.pkg.name !== '@acorn/client-core') continue // protocol and friends
         if (!UI_MAY_IMPORT(target.file)) offenders.push(`${rel(file)}: ${spec}`)
       }
@@ -776,7 +770,7 @@ describe('architecture boundaries', () => {
     //
     // The two survivors are context's vocabulary: `.context-tray-kind` and `.context-tray-label` are
     // worn by ContextPane too. They don't go until memory's section stops being a component in context's
-    // realm, and the cooperative extension point can't take it — the section renders editable inputs, a
+    // realm. The cooperative extension point can't take it: the section renders editable inputs, a
     // select, a textarea and a per-proposal accept/reject gate, which is UI rather than a descriptor.
     const BASELINE = [
       'plugins/agents defines .agent-path-link, worn by plugins/changes/src/client/agentToolRenderer.tsx',

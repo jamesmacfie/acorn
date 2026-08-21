@@ -1,11 +1,6 @@
 // Test-only helper: a real SQLite DB (node:sqlite, main/sqlite.ts) in a tmp dir with all Drizzle
-// migrations applied — no native build to match, whichever runtime hosts the tests.
-//
-// In testkit/ rather than server/routes/, where it and its two siblings used to live. It was never a
-// route; it sat there because that is where it was first needed, and eleven packages then imported a
-// test helper through a path that reads like production surface. The directory is the documentation
-// now: every `@acorn/node-core/testkit/...` import says out loud that it is test scaffolding, and the
-// arch suite fails one from a production file.
+// migrations applied, no native build to match whichever runtime hosts the tests. See
+// docs/testing.md § Testkit for why this lives in its own directory.
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -31,46 +26,34 @@ export function makeTestDb(): TestDb {
       try {
         rmSync(dir, { recursive: true, force: true })
       } catch {
-        // best-effort — tmpdir is reaped by the OS anyway
+        // best effort. tmpdir is reaped by the OS anyway.
       }
     },
   }
 }
 
-// The secret-bearing half of a test `Env`. Two fields, always together: the raw key and the
-// SecretService every credential read goes through
-// (main/core/secrets.ts). A test that sets only one of them compiles and then fails at the first
-// credential read, so they are minted as a pair here rather than spelled out at each mount site.
+// The secret-bearing half of a test `Env`: the raw key and the SecretService binding every
+// credential read goes through (main/core/secrets.ts). docs/testing.md § Testkit has why these are
+// minted together.
 export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService } {
   return { SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey) }
 }
 
-// The 64-hex session key every test in the repo spells as `'0'.repeat(64)`. Named here so a test can
-// seal a credential with the same key the Env it built is using.
+// The 64-hex session key every test in the repo uses (docs/testing.md § Testkit).
 export const TEST_ENCRYPTION_KEY = '0'.repeat(64)
 
-// The `c.env` bindings a route test needs, in one place. Route tests have been hand-writing
-// `{ DB: db, ...testSecretEnv('0'.repeat(64)) } as unknown as Env` — twenty plugin test files import
-// main/bindings.ts for no reason other than to name the type of that cast.
+// The `c.env` bindings a route test needs, in one place. Route tests used to hand-write
+// `{ DB: db, ...testSecretEnv('0'.repeat(64)) } as unknown as Env`, and twenty plugin test files
+// imported main/bindings.ts only to name the type of that cast.
 //
-// The cast is real and stays deliberate: `Env` is the full runtime binding set (devices, idempotency,
-// pairing codes, blobs, the capability resolver), and a test that exercises one route needs the two or
-// three of them that route touches. Nothing here invents a binding — pass what the route reads.
+// The cast is real and stays: `Env` is the full runtime binding set (devices, idempotency, pairing
+// codes, blobs, the capability resolver), and a test that exercises one route needs only the two or
+// three of them that route touches. Nothing here invents a binding; pass what the route reads.
 export function testEnv(overrides: Partial<Env> = {}): Env {
   return { ...testSecretEnv(TEST_ENCRYPTION_KEY), ...overrides } as unknown as Env
 }
 
-// A workspace plugin's Drizzle chain, by id — `<checkout>/plugins/<id>/migrations`.
-//
-// Test-only, and deliberately dumber than main/pluginMigrations.ts: a suite only ever runs from a source
-// checkout, so there is no built or packaged layout to search and no need for the plugin to hand over its
-// `import.meta.url`. It replaced twenty `makeTestPluginDb('x', migrationsDir())` call sites whose only
-// purpose was to name a path the id already implies, and the eight per-plugin migrations.ts modules
-// behind them.
-//
-// The `plugins/<id>/` segment is spelled out rather than searched for, so this can never resolve to
-// core's own chain at packages/node-core/migrations — which a bare ancestor walk from this file would
-// find first. A plugin developed outside this checkout passes its folder explicitly instead.
+// A workspace plugin's Drizzle chain, by id (docs/testing.md § Testkit).
 export function workspacePluginMigrations(plugin: string): string | null {
   let dir = dirname(fileURLToPath(import.meta.url))
   for (;;) {
@@ -84,10 +67,9 @@ export function workspacePluginMigrations(plugin: string): string | null {
 
 export type TestPluginDb = { db: PluginDatabase; dataDir: string; cleanup: () => void }
 
-// A real per-plugin SQLite file in a temp data root, migrated with that plugin's own chain — resolved
-// from the id for a plugin in this checkout, or passed explicitly for one outside it.
-//
-// Keeping the schemas separate ensures plugin tests exercise the same ownership boundary as production.
+// A real per-plugin SQLite file in a temp data root (docs/testing.md § Testkit has how the migration
+// chain resolves). Keeping the schemas separate means a plugin's tests exercise the same ownership
+// boundary production does.
 export function makeTestPluginDb(plugin: string, migrationsFolder: string | null = workspacePluginMigrations(plugin)): TestPluginDb {
   if (!migrationsFolder) {
     throw new Error(`makeTestPluginDb('${plugin}') found no migration chain at plugins/${plugin}/migrations; pass the folder if it lives elsewhere.`)
@@ -106,7 +88,7 @@ export function makeTestPluginDb(plugin: string, migrationsFolder: string | null
       try {
         rmSync(dataDir, { recursive: true, force: true })
       } catch {
-        // best-effort — tmpdir is reaped by the OS anyway
+        // best effort. tmpdir is reaped by the OS anyway.
       }
     },
   }

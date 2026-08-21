@@ -18,7 +18,7 @@ describe('use-scoped access', () => {
     await expect(attempt(null)).rejects.toThrow(SecretUnavailableError)
     await expect(attempt('')).rejects.toThrow(SecretUnavailableError)
     await expect(attempt('not-a-jwe')).rejects.toThrow(SecretUnavailableError)
-    // A ref sealed under a DIFFERENT key is indistinguishable from tampering, and both are "no
+    // A ref sealed under a different key is indistinguishable from tampering, and both are "no
     // usable credential" rather than an error the owner can act on differently.
     await expect(attempt(await encryptSecret(TOKEN, 'b'.repeat(64)))).rejects.toThrow(SecretUnavailableError)
   })
@@ -138,8 +138,8 @@ describe('scrub cannot become the leak', () => {
   it('does not let a FROZEN error turn the redaction into a disclosure', async () => {
     const ref = await service.seal(TOKEN)
     // Assigning to a frozen Error's message throws a TypeError whose own message embeds the original
-    // error's stringification — including the token — and it is thrown from inside use()'s catch, where
-    // no caller can intercept it.
+    // error's stringification, including the token, and it is thrown from inside use()'s catch,
+    // where no caller can intercept it.
     const failure = await service
       .use(ref, 'github', () => {
         throw Object.freeze(new Error(`leaked ${TOKEN}`))

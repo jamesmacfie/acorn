@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { schema } from '../server/db'
 import { makeTestNodeContext, makeTestRequestContext } from './pluginContext'
 
-// The testkit's own suite, and the argument for it is the argument for the testkit: what is being
-// asserted here is that a TEST context and the BOOT context are the same object, so these expectations
-// break when server/plugin/context.ts changes. A plugin's forged literal never could.
+// The testkit's own suite: what it asserts is that a test context and the boot context are the
+// same object, so these expectations break when server/plugin/context.ts changes. A plugin's
+// forged literal never could.
 const plugin = { name: 'testkit-probe' }
 
 describe('makeTestNodeContext', () => {
@@ -46,8 +46,8 @@ describe('makeTestNodeContext', () => {
   })
 
   it('says which knob is missing when there is no migration chain to find', () => {
-    // 'testkit-probe' is not a plugin in this checkout, so the id-based default finds nothing — which is
-    // also what a plugin developed outside this repo hits, and the message has to name the way out.
+    // 'testkit-probe' is not a plugin in this checkout, so the id-based default finds nothing. That
+    // is also what a plugin developed outside this repo hits, and the message has to name the way out.
     const ctx = makeTestNodeContext({ plugin, permissions: {} })
     try {
       expect(() => ctx.storage.open()).toThrow(/plugins\/testkit-probe\/migrations/)

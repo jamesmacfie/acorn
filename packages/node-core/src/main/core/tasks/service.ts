@@ -17,10 +17,10 @@ export type TaskRunConfig =
   | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] }
   | { error: string }
 
-// The three columns a `task_links` row is actually read for outside core: which provider, through which
-// stored connection, under which identifier. Deliberately narrower than the row — `refJson` is parsed
-// through the integration provider registry (server/routes/tasks.ts), which is core's job, not a
-// consumer's.
+// The three columns a `task_links` row is actually read for outside core: which provider, through
+// which stored connection, under which identifier. This is narrower than the row: `refJson` is
+// parsed through the integration provider registry (server/routes/tasks.ts), which is core's job,
+// not a consumer's.
 export type TaskLinkRef = { provider: string; integrationId: string; identifier: string }
 
 // What a fan-out child needs to exist at all. `branch` is a suggestion, not a value: it is slugged and
@@ -29,32 +29,32 @@ export type TaskLinkRef = { provider: string; integrationId: string; identifier:
 export type ChildTaskSeed = { title: string; branch: string }
 
 export type TaskService = {
-  // The task's plugin-facing projection (main/taskWorktree.ts § TaskRef), or undefined when the id does
-  // not resolve — the "validated by the owning plugin" half of a plain-ID reference. A TaskRef, not the
-  // `tasks` row: a drizzle-inferred row here would have made core's column names part of the plugin
-  // contract, which is the same mistake `ProjectRef` exists to avoid.
+  // The task's plugin-facing projection (main/taskWorktree.ts § TaskRef), or undefined when the id
+  // does not resolve, the "validated by the owning plugin" half of a plain-id reference. A TaskRef,
+  // not the `tasks` row (docs/plugins.md § What is published, and what acorn promises about it).
   load(taskId: string): Promise<TaskRef | undefined>
   // The task's worktree root, resolving through the project checkout and creating the worktree
   // lazily if needed. null when no checkout is mapped.
   //
-  // `userId` is not decoration: creating a worktree consults the per-project base-ref preference
-  // preference, which is user-owned state, and a missing identity fails closed to git's origin/main
-  // fallback rather than selecting another login's preference. Callers that HAVE an authorizing
-  // identity (plugins/http's send resolves it from the request principal) must pass it.
+  // `userId` is not decoration: creating a worktree consults the per-project base-ref preference,
+  // which is user-owned state, and a missing identity fails closed to git's origin/main fallback
+  // rather than selecting another login's preference. A caller that has an authorizing identity
+  // (plugins/http's send resolves it from the request principal) must pass it.
   root(taskId: string, userId?: string | null): Promise<string | null>
-  // The cwd a task's commands run in, creating the worktree on first use (docs/workspaces-and-tasks.md
-  // Flow C). Takes the row rather than the id because the one caller — plugins/terminal's spawn path —
-  // already loaded it to derive the session's project/PR context, and re-reading would be a second query
-  // across a database boundary.
+  // The cwd a task's commands run in, creating the worktree on first use
+  // (docs/workspaces-and-tasks.md § Worktrees and setup). Takes the row rather than the id because
+  // the one caller, plugins/terminal's spawn path, already loaded it to derive the session's
+  // project/PR context, and re-reading would be a second query across a database boundary.
   //
-  // `userId` carries the same weight it does on `root` above — worktree creation consults the per-repo
-  // `base_ref` preference, which is user-owned — so a caller that HAS an authorizing identity (the
-  // workflow runner resolves it from the node's active owner identity) passes it, and one that does not
-  // (terminal's spawn path, which runs for whoever is at the keyboard) omits it and gets git's fallback.
+  // `userId` carries the same weight it does on `root` above: worktree creation consults the
+  // per-repo `base_ref` preference, which is user-owned. A caller that has an authorizing identity
+  // (the workflow runner resolves it from the node's active owner identity) passes it, and one that
+  // does not (terminal's spawn path, which runs for whoever is at the keyboard) omits it and gets
+  // git's fallback.
   resolveCwd(task: TaskRef | undefined, baseCheckout: string | undefined, userId?: string | null): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
   // Run targets + cwd for a task: project settings merged with the project's committed
   // `.acorn/config.toml`. plugins/terminal's RuntimeService is the only consumer, and it cannot read
-  // either source itself — one is a core table, the other needs the lazily-created worktree.
+  // either source itself: one is a core table, the other needs the lazily-created worktree.
   runConfig(taskId: string): Promise<TaskRunConfig>
   // Every non-archived task. Two plugins need the whole set rather than one id: docker matches every
   // live container against every active task's worktree/branch to build the rail badge, and memory
@@ -68,26 +68,28 @@ export type TaskService = {
   // directory named after a real workspace, and inventing one would silently write notes nobody reads.
   //
   workspaceId(taskId: string): Promise<string>
-  // The same lookup, with "no workspace" as a VALUE rather than a throw.
+  // The same lookup, with "no workspace" as a value rather than a throw.
   //
-  // Added for plugins/notes' context section, which walks task → workspace → global and must skip the middle
-  // scope when the task's project has no workspace yet. It was written as
-  // `ctx.core.tasks.workspaceId(taskId).catch(() => null)`, and that catch is too wide: `workspaceId` throws for
-  // "task not found", for "no membership", AND for any genuine database failure, so a broken query degraded into
-  // "this task has no workspace" and every included workspace note silently vanished from the prompt with no
-  // error anywhere. A prompt quietly missing its context is the worst kind of failure this seam can produce.
+  // Added for plugins/notes' context section, which walks task → workspace → global and must skip
+  // the middle scope when the task's project has no workspace yet. It was written as
+  // `ctx.core.tasks.workspaceId(taskId).catch(() => null)`, and that catch is too wide: `workspaceId`
+  // throws for "task not found", for "no membership", and for any genuine database failure, so a
+  // broken query degraded into "this task has no workspace" and every included workspace note
+  // silently vanished from the prompt with no error anywhere. A prompt quietly missing its context
+  // is the worst kind of failure this seam can produce.
   //
-  // So: null means the two answers that really are "no workspace", and a real failure still throws. Kept as a
-  // second method rather than changing `workspaceId`'s signature, because the `notes_*` tools' caller genuinely
-  // has no degraded answer — a workspace-scoped note must land in a directory named after a real workspace — and
-  // making the type nullable there would push a decision onto a call site that has already made it.
+  // So null means the two answers that really are "no workspace", and a real failure still throws.
+  // This stays a second method rather than a change to `workspaceId`'s signature, because the
+  // `notes_*` tools' caller has no degraded answer at all: a workspace-scoped note must land in a
+  // directory named after a real workspace, and making the type nullable there would push a decision
+  // onto a call site that has already made it.
   workspaceIdOrNull(taskId: string): Promise<string | null>
   // The inverse of `workspaceId`: return every task id in a workspace. Callers use the IDs to filter
   // their own data, and an empty array means the workspace has no tasks.
   //
-  // Deliberately NOT status-filtered. The joins it replaces had no `status` predicate either: an
-  // archived task's agent transcripts still belong to the workspace, and the session's own
-  // `archivedAt` is what the list and search queries filter on.
+  // Not status-filtered. The joins it replaces had no `status` predicate either: an archived task's
+  // agent transcripts still belong to the workspace, and the session's own `archivedAt` is what the
+  // list and search queries filter on.
   idsForWorkspace(workspaceId: string): Promise<string[]>
   // The external tickets/errors linked to a task (`task_links`). plugins/notes' seeding pass renders one
   // note per linked Linear ticket, and it needs the connection id as well as the identifier: the same
@@ -95,16 +97,16 @@ export type TaskService = {
   // name which one.
   links(taskId: string): Promise<TaskLinkRef[]>
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
-  // Materialise a fan-out child task under a parent (docs/workflows.md, 14 P4) and return its id. Its
-  // worktree is deliberately NOT created here — `resolveCwd` does that lazily the moment the child's
-  // first step runs, which is the same path every other surface takes.
+  // Materialise a fan-out child task under a parent (docs/workflows.md) and return its id. Its
+  // worktree is not created here: `resolveCwd` does that lazily the moment the child's first step
+  // runs, the same path every other surface takes.
   //
   // A write on CoreServices: plugins ask core to create a task rather than writing core-owned rows.
   // Throws when the parent does not resolve.
   createChild(parentTaskId: string, seed: ChildTaskSeed): Promise<string>
-  // Cancel a task — the child-task half of cancelling a fan-out run. A distinct verb rather than a
-  // general `setStatus`, so the seam cannot become a way for a plugin to archive or un-archive a task
-  // behind core's lifecycle routes.
+  // Cancel a task, the child-task half of cancelling a fan-out run. A distinct verb rather than a
+  // general `setStatus`, so the seam cannot become a way for a plugin to archive or restore a task
+  // outside core's own routes.
   cancel(taskId: string): Promise<void>
 }
 
@@ -136,7 +138,7 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
           : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(eq(schema.tasks.id, task.id))]
       })
       if (!updates.length) return 0
-      // One batch WITHIN core's file, which is all the atomicity docs/data-layer.md permits here.
+      // One batch within core's file, which is all the atomicity docs/data-layer.md permits here.
       await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
       return updates.length
     },
@@ -174,7 +176,7 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
       if (!parent) throw new Error('Parent task not found.')
       const project = await projectForTask(db, parent)
       if (!project) throw new Error('Parent task has no project.')
-      // Branch names are de-duped against EVERY task, not just this parent's children: a worktree is
+      // Branch names are de-duped against every task, not just this parent's children: a worktree is
       // keyed on the branch, so a collision with an unrelated task would hand two tasks one checkout.
       const existing = (await db.select({ branch: schema.tasks.branch }).from(schema.tasks)).flatMap((row) => row.branch ? [row.branch] : [])
       const branch = project.vcs === 'git'

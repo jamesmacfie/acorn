@@ -1,31 +1,5 @@
-// The process broker. See docs/security.md § Process, path, and configuration controls for the guarantee
-// this gives every caller: an explicit cwd inside the task worktree (or a declared exception), env
-// allowlists with no ambient ACORN_* tokens, process-group kill, bounded output capture.
-//
-// Short-lived task work goes through here. Long-lived engines do not, and cannot: this model is "run a
-// bounded command, capture its output, kill its group", which does not describe a PTY, a JSON-RPC agent
-// driver, a `docker logs -f` stream, a ripgrep scan or a pg client. They own their children under the
-// same environment hygiene. That set is enumerated in tools/arch/boundaries.test.ts, each entry with its
-// reason, so a new direct spawn is a decision rather than a drift.
-//
-// This header used to quote the docs claiming all child processes came through here. Nineteen production
-// modules did not, and a claim that is both untrue and unenforceable is worse than none.
-//
-// Before this existed there were about 16 independent spawn or execFile sites with inconsistent
-// behaviour, and the inconsistency was not cosmetic:
-//
-//   - plugins/terminal's previewUrl ran `execFile('/bin/sh', ['-c', script])` with no `env` option, so a
-//     repo-configured capture command inherited the node's entire environment, SESSION_ENC_KEY and
-//     INTERNAL_TOKEN included, and with no maxBuffer.
-//   - plugins/agents' claudeDriver spawned with `{ ...process.env, ...options.env }`, same leak.
-//   - plugins/docker filtered secrets with a denylist of six known names, whose "keep in sync" comment
-//     pointed at a file that no longer exists. A denylist leaks every binding nobody thought to add to it.
-//   - exactly one site (main/headless.ts) killed the process group; everywhere else a hung child's
-//     grandchildren survived, holding the stdio pipes open.
-//
-// So the env is built from an allowlist here and `process.env` is never spread. A caller that needs more
-// than the allowlist declares it (`passthrough: ['DOCKER_*']`), visible in the call, reviewable, and
-// additive rather than "everything except what we remembered".
+// The process broker. See docs/security.md § Process, path, and configuration controls for the
+// guarantee this gives every caller and the incidents that led to it.
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import { childEnv } from '../../taskEnv'

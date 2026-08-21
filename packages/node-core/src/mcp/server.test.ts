@@ -7,21 +7,19 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ensureCert } from '../main/tls'
 
-// Integration test over REAL stdio JSON-RPC (docs/agent-tools.md): the MCP server is now a generic
-// PROJECTION of the agent-tool registry — it fetches the manifest (GET /:id/tools) and proxies calls
-// (POST /:id/tools/:name). This test stubs that loopback surface and asserts the projection: list
-// mirrors the manifest, a call proxies the arguments (with the internal bearer + session header),
-// and env-absent / acorn-down degrade to structured results, never protocol errors. The per-tool
-// behaviour (git, notes provenance, memory PROPOSE-only) is covered at the registry/route layer.
+// Integration test over real stdio JSON-RPC (docs/mcp.md, docs/agent-tools.md § Projections). This
+// test stubs the loopback surface the server proxies to and asserts the projection: list mirrors the
+// manifest, a call proxies the arguments with the internal bearer and session header, and
+// env-absent / acorn-down degrade to structured results, never protocol errors. Per-tool behaviour
+// is covered at the registry/route layer.
 //
-// The stub is HTTPS with a real acorn certificate, and the child is given ACORN_DATA_DIR +
-// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/service/runtime.ts). That is the
-// whole transport contract for an out-of-boot child: resolve the port from node.json, trust the node's
-// certificate as a CA, validate FULLY.
+// The stub is HTTPS with a real acorn certificate, and the child gets ACORN_DATA_DIR and
+// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/service/runtime.ts): resolve
+// the port from node.json, trust the node's certificate as a CA, and validate fully.
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-// A tiny fixture manifest — two tools, one with args — projected as JSON schema by the registry.
+// A tiny fixture manifest, two tools, one with args, projected as JSON schema by the registry.
 const MANIFEST = {
   tools: [
     { name: 'task_current', description: 'the task', risk: 'read', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -53,7 +51,7 @@ class McpClient {
           const msg = JSON.parse(line) as { id?: number }
           if (msg.id != null) this.pending.get(msg.id)?.(msg)
         } catch {
-          // non-JSON stdout noise — ignore
+          // non-JSON stdout noise, ignore
         }
       }
     })
@@ -96,7 +94,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   // the port out of.
   let dataDir: string
   let caPath: string
-  // A certificate the stub does NOT serve — the "some other node is on that port" case.
+  // A certificate the stub does not serve: the case where some other node is on that port.
   let strangerCaPath: string
   const posts: { url: string; body: unknown; internal: string; session: string; ceiling: string }[] = []
 
@@ -150,8 +148,8 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   it('tools/list mirrors the manifest; tools/call proxies args with bearer + session header', async () => {
     const client = new McpClient({
       ACORN_TASK_ID: 't1',
-      // A STALE url from a previous boot, deliberately: the point is that node.json wins. A reattached
-      // tmux agent really does carry one of these, and it really does point at a port nobody holds.
+      // A stale url from a previous boot: the point is that node.json wins. A reattached tmux agent
+      // really does carry one of these, and it really does point at a port nobody holds.
       ACORN_API_URL: 'https://127.0.0.1:1',
       ACORN_DATA_DIR: dataDir,
       NODE_EXTRA_CA_CERTS: caPath,
@@ -206,9 +204,9 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     }
   }, 30_000)
 
-  // A node answering on the remembered port under an identity this child does not trust. The child must
-  // degrade to the same structured 'acorn-not-running' it uses for "nothing is listening" — NOT connect
-  // anyway, and not die with a TLS stack trace an agent would surface as a tool crash.
+  // A node answering on the remembered port under an identity this child does not trust. The child
+  // must degrade to the same structured 'acorn-not-running' it uses for "nothing is listening", not
+  // connect anyway, and not die with a TLS stack trace an agent would surface as a tool crash.
   it('with a certificate it does not trust → the same structured acorn-not-running', async () => {
     const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: strangerCaPath, ACORN_API_TOKEN: 'x' })
     try {
