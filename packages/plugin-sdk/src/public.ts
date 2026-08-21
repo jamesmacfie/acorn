@@ -1,29 +1,13 @@
-// The PUBLISHED declaration, hand-written, copied to `dist/sdk.d.ts` by the build.
-//
-// Hand-written rather than rolled up, and that is the same call `packages/plugin-api/src/surface.test.ts`
-// already made for the same reason: every package in this repository is consumed as TypeScript SOURCE,
-// `noEmit` is set globally, and nothing here emits declarations. A real rollup would mean adding a
-// declaration build and API Extractor to a monorepo that deliberately has neither — to describe six
-// functions.
-//
-// It is also the better artifact for what this file IS. Everything below is a compatibility promise
-// under `PLUGIN_API_MAJOR` (docs/plugins.md § Compatibility), so it should be a thing somebody wrote and
-// somebody reviewed, not a thing that fell out of a compiler and grew a name nobody noticed. An emitted
-// rollup would also drag `ErrorEnvelope` — and therefore Zod — into the published types for a shape that
-// never appears on this surface.
-//
-// Drift is caught, not trusted: `contract.test.ts` asserts each type below is mutually assignable with
-// the real one, so `tsc --noEmit` fails the moment an upstream shape moves underneath a stable name.
-// That is the exact gap the surface snapshot cannot see, and it is closed here for the one surface that
-// leaves the building.
+// Published declaration, hand-written and copied verbatim to dist/sdk.d.ts. See docs/plugins.md §
+// What is published, and what acorn promises about it.
 
-/** What this frame was opened to look at. A snapshot, not reactive — the host recreates a frame when
+/** What this frame was opened to look at. A snapshot, not reactive: the host recreates a frame when
  * its subject changes, so nothing here updates in place. */
 export type PluginFrameContext = {
   /** The contribution id this frame is rendering, as declared in the manifest. */
   surface: string
-  /** Which kind of rectangle this is. It grants nothing — the bridge's allowlist is keyed on the
-   * manifest's scopes, never on this field — but a frame may want to lay out differently. */
+  /** Which kind of rectangle this is. It grants nothing (the bridge's allowlist is keyed on the
+   * manifest's scopes, never on this field), but a frame may want to lay out differently. */
   target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot'
   nodeId: string
   taskId?: string
@@ -81,8 +65,8 @@ export type AcornBridge = {
   }
   ui: {
     toast(title: string, detail?: string): Promise<void>
-    /** `navigator.clipboard` refuses to write from a frame — its document is not the focused one — so
-     * this is the only copy that works. */
+    /** `navigator.clipboard` refuses to write from a frame, since its document is not the focused
+     * one, so this is the only copy that works. */
     copy(text: string): Promise<void>
     /** Open another of this plugin's own panes. */
     openPane(paneId: string): Promise<void>
@@ -96,7 +80,7 @@ export type AcornBridge = {
     close(): Promise<void>
   }
   /** The document this frame shares its pane with, when its manifest declared a `document-over-frame`
-   * layout. Denied from any other surface, structurally. Nothing about the EDITOR crosses — no cursor,
+   * layout. Denied from any other surface, structurally. Nothing about the editor crosses: no cursor,
    * no selection, no decorations. */
   document: {
     read(): Promise<string>
@@ -120,23 +104,23 @@ export type AcornBridge = {
    * by the time it runs; this is for anything you draw yourself that has to be repainted. */
   onAppearance(listener: (appearance: { theme: string; style: string }) => void): () => void
   /** A row was selected on this plugin's rail source while this pane was already open. The selection
-   * that OPENED the pane is `context.item` instead. */
+   * that opened the pane is `context.item` instead. */
   onSelect(listener: (item: string) => void): () => void
   /** One of this surface's declared commands fired. The host has already flushed the shared document,
    * so reading it back through your own route is safe. */
   onSurfaceAction(listener: (command: string) => void): () => void
 }
 
-/** Wait for the host's handshake and resolve the bridge. Resolves once — a frame has exactly one port
- * for its lifetime — and posts the acknowledgement the host's 10-second deadline is waiting for. */
+/** Wait for the host's handshake and resolve the bridge. Resolves once, since a frame has exactly one
+ * port for its lifetime, and posts the acknowledgement the host's 10-second deadline is waiting for. */
 export declare function connect(): Promise<AcornBridge>
 
 /**
  * Everything between your bundle evaluating and your UI being on screen: inject your stylesheet, make
- * the root element, mount the frame-side tooltip listener, connect, render — and draw the failure if
+ * the root element, mount the frame-side tooltip listener, connect, render, and draw the failure if
  * the handshake never lands.
  *
- * It takes a render CALLBACK rather than a component so this package stays framework-free. Inside your
+ * It takes a render callback rather than a component so this package stays framework-free. Inside your
  * own frame you may bundle anything.
  *
  * `styles` is your stylesheet as a string, injected rather than linked: a plugin origin serves exactly

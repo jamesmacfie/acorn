@@ -28,7 +28,7 @@ describe('historyPoints', () => {
 
     expect(points).toHaveLength(TREND_DAYS)
     expect(points[TREND_DAYS - 1]).toEqual({ day: day(0), value: 9 })
-    // The day's LAST value, not its first and not an average: a stat shows point-in-time state.
+    // The day's last value, not its first and not an average: a stat shows point-in-time state.
     expect(points[TREND_DAYS - 2]).toEqual({ day: day(1), value: 7 })
   })
 
@@ -42,7 +42,7 @@ describe('activityPoints', () => {
   it('counts the rows that changed each day, and a quiet day is a zero rather than a gap', () => {
     const points = activityPoints([row(day(0)), row(day(0)), row(day(2))], schema, { kind: 'stat' }, NOW)
     expect(points[TREND_DAYS - 1].value).toBe(2)
-    // Nothing changed yesterday — that is a fact about the rows, not an absence of knowledge.
+    // Nothing changed yesterday: that is a fact about the rows, not an absence of knowledge.
     expect(points[TREND_DAYS - 2].value).toBe(0)
     expect(points[TREND_DAYS - 3].value).toBe(1)
   })

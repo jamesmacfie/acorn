@@ -39,9 +39,7 @@ export type PanelQuery = {
  *  keeps no dependency on the registry; the two strings are the same by construction. */
 export const panelSourceKey = (query: PanelQuery): string => `${query.pluginId}:${query.collectionId}`
 
-// Shaping is generic and identical for every collection, and it runs client-side over the returned
-// rows as the baseline. Declared server-side params are an optimisation a collection may offer, never
-// a requirement, which keeps the plugin obligation at "answer with your rows".
+// Shaping is generic and identical for every collection. See docs/dashboards.md § Panels.
 
 /** Small and all-AND. An OR or nested predicate tree is a query language, and a panel that needs one
  *  has outgrown the generic shaping layer. */
@@ -115,11 +113,11 @@ export type PanelView = {
  *
  *  A record per column rather than a bare value-to-column lookup, and that shape was fixed before
  *  anything read it. Value mappings are many-to-one and so not invertible: github's `merged` and
- *  `closed` may both land in a `Done` column, so dropping a card on `Done` has no unique answer. The
- *  eventual answer is a designated write value per (source, column), with drag disabled wherever none
- *  is set (docs/future/dashboards/write-back.md). A lookup has nowhere to put that; this has a field to
- *  grow, and `writeValue` is that field. Nothing writes or reads it in this read-only build, and the
- *  codec carries it across unread so the shape is real rather than promised. */
+ *  `closed` may both land in a `Done` column, so dropping a card on `Done` has no unique answer. A
+ *  future write-back design would need a designated write value per (source, column), with drag
+ *  disabled wherever none is set. A lookup has nowhere to put that; this has a field to grow, and
+ *  `writeValue` is that field. Nothing writes or reads it in this read-only build, and the codec
+ *  carries it across unread so the shape is real rather than promised. */
 export type PanelMappingColumn = {
   /** The source's own enum values that land in this column. */
   values?: string[]
@@ -178,8 +176,6 @@ export type PanelDefinition = {
   refresh?: number
 }
 
-// ── Views ─────────────────────────────────────────────────────────────────────────────────────
-//
 // ── Views ─────────────────────────────────────────────────────────────────────────────────────
 //
 // Views are derived from the schema, not chosen from a widget menu: a kanban is not a component, it is

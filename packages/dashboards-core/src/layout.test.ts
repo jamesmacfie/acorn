@@ -16,7 +16,7 @@ import {
   type Rect,
 } from './layout'
 
-// The layout algorithms are where the risk of the whole grid lives — the components above them are
+// The layout algorithms are where the risk of the whole grid lives. The components above them are
 // pointer arithmetic and CSS, which this repo's vitest (node, no Solid plugin) cannot check anyway.
 
 const size = (over: Partial<PanelSize> = {}): PanelSize => ({ minW: 1, minH: 1, w: 2, h: 2, ...over })

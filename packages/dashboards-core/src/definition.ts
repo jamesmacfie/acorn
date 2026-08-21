@@ -14,23 +14,8 @@ import type {
   PanelView,
 } from './model'
 
-// The panel-definition codec (docs/dashboards.md § Persistence).
-//
-// It lived in client-core/dashboards/persist.ts, beside the store and the slice registration, until
-// the node needed it: the measure sampler reads the SAME prefs blob the clients write, and has to
-// parse it through the same parser rather than a second one that agrees today
-// (docs/future/cron/targets.md § seam 2). persist.ts keeps the store, the slice and the GEOMETRY
-// codec — a rect is a client rendering concern and the node has no use for one.
-//
-// Hand-written rather than a Zod schema, matching every other slice: a codec must TOLERATE malformed
-// input and never throw (the conformance suite calls it with `'{not-json'` and with a string the size
-// of the whole budget), and the shapes are shallow enough that a parser is shorter than a schema plus
-// its error handling.
-//
-// UNKNOWN IDS SURVIVE. Parsing answers "is this shaped like a panel?", never "is that collection
-// registered in this build?" — the pane-layout rule verbatim (tasks/layout.ts): the registry lookup
-// happens at RENDER time and an unresolved panel draws as inert rather than disappearing. A person's
-// composition is never collateral damage of switching a plugin off.
+// Panel-definition codec, shared with the node's measure sampler. Hand-written and tolerant like
+// every other slice, and unknown ids survive intact. See docs/dashboards.md § Persistence.
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -50,8 +35,8 @@ const parseQuery = (raw: unknown): PanelQuery | undefined => {
   if (!isRecord(raw)) return undefined
   const pluginId = str(raw.pluginId)
   const collectionId = str(raw.collectionId)
-  // The pair IS the address. A query missing either half names nothing, which is a different case
-  // from naming something this build cannot resolve — that one is kept.
+  // Both pluginId and collectionId are required, or the query is dropped. A collectionId this
+  // build cannot resolve is a different case, kept and resolved at render time.
   if (!pluginId || !collectionId) return undefined
   const params = stringRecord(raw.params)
   return { pluginId, collectionId, ...(params && Object.keys(params).length ? { params } : {}) }
@@ -83,9 +68,9 @@ const parseShaping = (raw: unknown): PanelShaping => {
   const sort = list(raw.sort, parseSort)
   const fields = Array.isArray(raw.fields) ? raw.fields.filter((entry): entry is string => typeof entry === 'string') : []
   const limit = typeof raw.limit === 'number' && Number.isFinite(raw.limit) && raw.limit >= 0 ? Math.floor(raw.limit) : undefined
-  // Kept whether or not this build has an enum field to hang it on, for the same reason an unknown
-  // view kind is: the grouping is what a board IS, and a pass through a client whose plugin set
-  // differs must not be what deletes it.
+  // groupBy is kept even with no matching enum field in this build: the grouping is part of the
+  // panel's composition, and a pass through a client with a different plugin set must not delete
+  // it (docs/dashboards.md § Persistence, "Unknown ids survive inert").
   const groupBy = str(raw.groupBy)
   return {
     ...(filters.length ? { filters } : {}),
@@ -96,11 +81,7 @@ const parseShaping = (raw: unknown): PanelShaping => {
   }
 }
 
-// ── The mapping codec ─────────────────────────────────────────────────────────────────────────
-//
-// The one place a key is carried across UNREAD on purpose. `writeValue` is the write-back seam
-// (model.ts § PanelMappingColumn): nothing in this read-only build sets it or looks at it, and it
-// still round-trips, because a reserved shape that the codec quietly deletes is not reserved.
+// Mapping codec. writeValue round-trips unread; see docs/dashboards.md § Persistence.
 
 const parseMappingColumn = (raw: unknown): PanelMappingColumn | undefined => {
   if (!isRecord(raw)) return undefined
@@ -121,8 +102,8 @@ const parseColumn = (raw: unknown): PanelMappingColumnDef | undefined => {
   if (!isRecord(raw)) return undefined
   const id = str(raw.id)
   const label = str(raw.label)
-  // The pair IS the column: an id with no label draws a blank heading and a label with no id is
-  // unreferenceable from `bySource`.
+  // id and label are both required: an id with no label draws a blank heading, and a label with
+  // no id can't be referenced from bySource.
   if (!id || !label) return undefined
   const tone = TONES.find((candidate) => candidate === raw.tone)
   return { id, label, ...(tone ? { tone } : {}) }
@@ -134,8 +115,8 @@ const parseFieldDef = (raw: unknown): PanelFieldDef | undefined => {
   if (!isRecord(raw)) return undefined
   const id = str(raw.id)
   const label = str(raw.label)
-  // The pair IS the field, same rule as a column — and the type has to be one this build renders,
-  // because every view dispatches on it.
+  // id, label and type are all required for a field def. type must be one this build can render,
+  // since every view dispatches on it.
   const type = FIELD_TYPES.find((candidate) => candidate === raw.type)
   if (!id || !label || !type) return undefined
   return { id, label, type }
@@ -153,8 +134,8 @@ const parseMapping = (raw: unknown): PanelMapping | undefined => {
       const kept: Record<string, PanelMappingColumn> = {}
       for (const [columnId, entry] of Object.entries(entries)) {
         const parsed = parseMappingColumn(entry)
-        // NOT filtered against `columns`: an entry naming a column this blob does not carry is the
-        // same class of thing as an unknown pane id, and the render-time half already ignores it.
+      // Not filtered against columns: an entry naming a column this blob doesn't carry is kept and
+      // ignored at render, same as any other unknown id (docs/dashboards.md § Persistence).
         if (parsed) kept[columnId] = parsed
       }
       if (Object.keys(kept).length) bySource[key] = kept
@@ -164,8 +145,8 @@ const parseMapping = (raw: unknown): PanelMapping | undefined => {
   const fields: Record<string, Record<string, string>> = {}
   if (isRecord(raw.fields)) {
     for (const [key, entries] of Object.entries(raw.fields)) {
-      // `''` survives: it is the user saying "this source has nothing for that panel field", which
-      // is a different answer from an absent key (model.ts § PanelMapping).
+      // An explicit '' means this source has nothing for this field, a different answer from an
+      // absent key. See docs/dashboards.md § The mapping layer.
       const mapped = stringRecord(entries)
       if (mapped && Object.keys(mapped).length) fields[key] = mapped
     }
@@ -183,23 +164,16 @@ const parseMapping = (raw: unknown): PanelMapping | undefined => {
 
 const parseView = (raw: unknown): PanelView => {
   if (!isRecord(raw)) return { kind: 'list' }
-  // Any non-empty kind is kept, INCLUDING one this build cannot draw. Coercing a `board` written by
-  // a newer client into a list would destroy the panel on the first round trip through an older
-  // one, and these definitions are shared by every client paired with the node.
+  // Any non-empty kind is kept, including one this build can't draw: coercing it would corrupt a
+  // definition written by a newer client. See docs/dashboards.md § Persistence.
   const kind = str(raw.kind) ?? 'list'
   const aggregate = str(raw.aggregate)
   const field = str(raw.field)
-  // The chart keys, tolerantly. Same additive posture as every other key in this slice: an old
-  // client that WRITES the blob drops them and the chart falls back to its inferred defaults — the
-  // panel itself survives, and an old client RENDERING a `chart` panel already shows "view
-  // unavailable" rather than coercing it to something it can draw.
+  // The chart keys, tolerantly parsed. See docs/dashboards.md § Persistence.
   const shape = raw.shape === 'bar' || raw.shape === 'line' ? raw.shape : undefined
   const x = str(raw.x)
   const series = str(raw.series)
-  // The trend keys (docs/dashboards.md § Trends), literal-checked exactly
-  // like `shape` above and dropped when malformed. `trend: 'history'` is also what the NODE's
-  // sampler selects on, so a client that drops these keys on a round trip does not corrupt the
-  // panel — the series simply stops accruing until a newer client writes them back.
+  // The trend keys, parsed the same way. See docs/dashboards.md § Persistence.
   const trend = raw.trend === 'history' || raw.trend === 'activity' ? raw.trend : undefined
   const compare = raw.compare === 'day' || raw.compare === 'week' ? raw.compare : undefined
   const good = raw.good === 'up' || raw.good === 'down' ? raw.good : undefined
@@ -234,13 +208,8 @@ export function parsePanelDefinition(raw: unknown): PanelDefinition | undefined 
   }
 }
 
-/** The definitions and the placements, and deliberately not the geometry. This is everything the
- *  SAMPLER needs out of the prefs blob — which panels exist, and whether any surface draws them —
- *  and the client's own parser (persist.ts) builds on it by adding the rect codec.
- *
- *  Not filtered against each other: a placement naming a panel with no definition is the same class
- *  of thing as an unknown pane id, and dropping it here would make a partially-written blob lose
- *  placements. */
+/** Definitions and placements only, not geometry: everything the sampler needs from the prefs
+ *  blob. See docs/dashboards.md § Persistence. */
 export function parsePanels(value: unknown): {
   panels: Record<string, PanelDefinition>
   placements: Record<string, string[]>
@@ -250,8 +219,8 @@ export function parsePanels(value: unknown): {
   if (isRecord(value.panels)) {
     for (const [id, entry] of Object.entries(value.panels)) {
       const panel = parsePanelDefinition(entry)
-      // The map key wins over whatever the row claims: a definition filed under a stranger's id
-      // would be unreachable by every placement that references it.
+      // The record key becomes the id, overriding whatever the row itself claims: a definition filed
+      // under the wrong key would be unreachable from placements that reference it by that key.
       if (panel) panels[id] = { ...panel, id }
     }
   }

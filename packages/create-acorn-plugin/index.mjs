@@ -1,36 +1,20 @@
 #!/usr/bin/env node
-// `npm create acorn-plugin` — the front door for an author with no checkout of this repository.
-//
-// It emits the no-bundler profile documented in docs/plugin-authoring.md: a hand-written manifest, a
-// multi-file relative-import ESM node half, and one file of plain JavaScript for the client with the
-// bridge handshake already inlined. That last part is the whole point. Everything else in the profile
-// is a few lines an author can read off the guide; the handshake is thirty lines of protocol they would
-// otherwise reverse-engineer from a 460-line TypeScript file they cannot import.
-//
-// Zero dependencies and no build step, on purpose. The generated package has none either — a plugin
-// directory is installed as a bare directory with no node_modules beside it, so anything this wrote
-// that needed resolving would fail on every machine but the one that scaffolded it.
-//
-// The emitted bridge is a COPY, not a library. `acorn-plugin-sdk` does not exist to depend on, and a
-// hand-written client could not resolve a bare specifier if it did. The copy is safe to freeze because
-// the protocol is versioned: the host announces `{ acornBridge: 1 }`, and a future protocol is a
-// different number that this code refuses out loud rather than mis-parses.
+// `npm create acorn-plugin`: the front door for an author with no checkout of this repository. See
+// docs/plugin-authoring.md § Start from the scaffold for the no-bundler profile, and for why the
+// emitted bridge is a copy rather than a dependency.
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 /**
- * The plugin API major this scaffold writes into `apiVersion`. A manifest must name the loading node's
- * `PLUGIN_API_MAJOR` by exact string match or the plugin is a `failed` roster row.
- *
- * Hardcoded because this package is published standalone and cannot import the constant. `index.test.ts`
- * in the acorn repository asserts the two are equal, so a bump that forgets this file fails there rather
- * than in a stranger's install.
+ * The plugin API major this scaffold writes into `apiVersion`. Hardcoded because this package is
+ * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
+ * scaffold for how index.test.ts keeps the copy honest.
  */
 export const API_VERSION = '2'
 
-/** Manifest ids are `/^[a-z][a-z0-9-]{1,31}$/` — the dot ban is what keeps `plugins/<id>/` and
- * `plugins/<id>.sqlite` from colliding. Returns null when nothing usable survives. */
+/** Manifest ids: `/^[a-z][a-z0-9-]{1,31}$/`. See docs/plugin-authoring.md § The manifest for the
+ * dot-ban rule. Returns null when nothing usable survives. */
 export function toPluginId(input) {
   const id = String(input ?? '')
     .toLowerCase()
@@ -69,9 +53,9 @@ function manifest(id, name) {
         apiVersion: API_VERSION,
         node: './node/index.js',
         client: './client.js',
-        // `api: []` is correct rather than an omission: a frame's own `/v2/p/<id>/` namespace needs no
-        // scope. Add one of the six grantable scopes only when you call a core route.
-        // `core: ['tasks']` is here because node/routes.js resolves a task.
+        // `api: []` is correct, not an omission: a frame's own `/v2/p/<id>/` namespace needs no scope.
+        // Add one of the six grantable scopes only when you call a core route. `core: ['tasks']` is
+        // here because node/routes.js resolves a task.
         permissions: {
           api: [],
           events: [],
@@ -90,7 +74,7 @@ function manifest(id, name) {
 function nodeIndex(id) {
   return `import { handle } from './routes.js'
 
-// Relative paths and \`node:\` builtins only — an installed plugin is a bare directory with no
+// Relative paths and \`node:\` builtins only. An installed plugin is a bare directory with no
 // node_modules beside it. A bare specifier that resolves in a dev checkout (Node walks ancestor
 // directories) fails on every machine that installs this, so "it worked in dev" proves nothing.
 export default {
@@ -118,8 +102,8 @@ function nodeRoutes() {
 
   if (request.method === 'GET' && pathname === '/greeting') {
     const taskId = searchParams.get('taskId')
-    // core.tasks answers with a TaskRef projection — id, title, projectId, branch, worktreePath,
-    // pullNumber — never the database row. A column rename in acorn cannot silently break you.
+    // core.tasks answers with a TaskRef projection: id, title, projectId, branch, worktreePath,
+    // pullNumber, never the database row. A column rename in acorn cannot silently break you.
     const task = taskId ? await core.tasks.load(taskId) : null
     return Response.json({
       text: task ? \`Hello from \${task.title}\` : 'Hello from the node',
@@ -135,7 +119,7 @@ function nodeRoutes() {
 function client(id, name) {
   return `// The client half: one file, plain JavaScript, no imports.
 //
-// A plugin origin serves exactly four paths — /, /index.html, /ui.css and /client.js — so a second
+// A plugin origin serves exactly four paths: /, /index.html, /ui.css and /client.js, so a second
 // module, a stylesheet, an image or a font cannot be fetched. Inline them; the CSP allows
 // \`img-src 'self' data:\` for exactly that. The frame also has no network at all (\`connect-src 'none'\`):
 // fetch, XHR, WebSocket and EventSource all fail. Its only I/O is the MessagePort below.
@@ -178,8 +162,8 @@ function onMessage(message, resolve) {
   }
   switch (message.kind) {
     case 'ready':
-      // You MUST post something back. The host arms a 10-second deadline when it transfers the port
-      // and swaps this frame for a labelled "UI failed to start" placeholder if nothing arrives — which
+      // You must post something back. The host arms a 10-second deadline when it transfers the port
+      // and swaps this frame for a labelled "UI failed to start" placeholder if nothing arrives, which
       // is what a bundle that throws at module scope looks like from outside.
       port.postMessage({ kind: 'connected' })
       resolve(message.context)
@@ -229,8 +213,8 @@ const ui = {
   copy: (text) => send({ kind: 'ui', op: 'copy', text }),
   openUrl: (url) => send({ kind: 'ui', op: 'openUrl', url }),
 }
-// Durable, host-keyed by (pluginId, key), 1 MiB per value. This — not localStorage, which is keyed by
-// bundle hash and rotates on every update — is the supported channel to your node half's prefs.
+// Durable, host-keyed by (pluginId, key), 1 MiB per value. This, not localStorage, which is keyed by
+// bundle hash and rotates on every update, is the supported channel to your node half's prefs.
 const state = {
   get: (key) => send({ kind: 'state.get', key }),
   set: (key, value) => send({ kind: 'state.set', key, value }),
@@ -238,7 +222,7 @@ const state = {
 
 // ── Your pane ─────────────────────────────────────────────────────────────────────────────────────
 // The document already exists and already links /ui.css: a module script runs after it parses. Vanilla
-// DOM is the natural fit — inside your own frame you may bundle any framework you like, but the bridge
+// DOM is the natural fit. Inside your own frame you may bundle any framework you like, but the bridge
 // is the whole surface a frame has anyway.
 
 const root = document.createElement('div')
@@ -254,7 +238,7 @@ connected
     heading.textContent = text
 
     const button = document.createElement('button')
-    button.className = 'ui-btn' // from the host's /ui.css — your frame looks native for free
+    button.className = 'ui-btn' // from the host's /ui.css, your frame looks native for free
     button.textContent = 'Say hello back'
     button.addEventListener('click', () => void ui.toast('${name}', 'Hello from the frame'))
 

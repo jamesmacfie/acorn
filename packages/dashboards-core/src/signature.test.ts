@@ -46,8 +46,8 @@ describe('what resets a series and what does not', () => {
   })
 
   it('gives two panels with the same meaning the same signature', () => {
-    // The series is keyed by panel id, so this is not a correctness requirement — it is the property
-    // that says the hash is over MEANING and carries nothing incidental.
+    // The series is keyed by panel id, so this is not a correctness requirement. It is the property
+    // that says the hash is over meaning and carries nothing incidental.
     expect(measureSignature(panel({ id: 'p1' }))).toBe(measureSignature(panel({ id: 'p2' })))
   })
 })

@@ -93,7 +93,7 @@ const frameFor = (yLabels: readonly string[]): ChartFrame => {
   return frameWithLeft(Math.min(CHART_BOX.width / 3, Math.max(MIN_LEFT, widest * GLYPH_W + TICK_GAP * 2)))
 }
 
-/** The frame a chart has before any label widens its gutter. Only a placeholder — every plot carries
+/** The frame a chart has before any label widens its gutter. Only a placeholder: every plot carries
  *  the frame it was actually laid out in. */
 export const CHART_FRAME: ChartFrame = frameWithLeft(MIN_LEFT)
 
@@ -539,7 +539,7 @@ function buildLine(
   // floor that never happened, so a gappy measure keeps the connect-the-dots reading.
   const aggregate = view.aggregate ?? 'count'
   const span = (last - first) / 86_400_000 + 1
-  // ponytail: past the fill limit the gaps stay gaps. A span that wide has more days than this box has
+  // Past the fill limit the gaps stay gaps. A span that wide has more days than this box has
   // pixels to put them in, so the fill would be invisible arithmetic. Upgrade path: bucket by week or
   // month once the span asks for it, which is a real feature rather than part of this fix.
   const FILL_DAY_LIMIT = 400
