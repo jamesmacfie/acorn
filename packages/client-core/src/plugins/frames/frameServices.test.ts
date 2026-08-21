@@ -118,6 +118,29 @@ describe('subscribe', () => {
     clientEvents.emit('runtime:task-archived', { taskId: 'task-1' })
     expect(seen).toHaveLength(1)
   })
+
+  it('attaches to the plugin\'s own live channel and hands over the frame minus its channel', async () => {
+    const { _resetPluginChannels, onPluginPush } = await import('../pluginChannel')
+    const { routeWsFrame } = await import('../../wsChannels')
+    // A push has to reach the bus for the frame to hear it, and `onPluginPush` is what claims the
+    // prefix on the chrome side. The frame's own subscribe claims it too; either is enough.
+    const stopPush = onPluginPush(() => {})
+    try {
+      const seen: unknown[] = []
+      const off = build().subscribe('plugin:board:sample', (payload) => seen.push(payload))
+      routeWsFrame({ channel: 'plugin:board:sample', cpu: 12 })
+      off()
+      routeWsFrame({ channel: 'plugin:board:sample', cpu: 13 })
+      expect(seen).toEqual([{ cpu: 12 }])
+    } finally {
+      stopPush()
+      _resetPluginChannels()
+    }
+  })
+
+  it('refuses another plugin\'s channel, the way it refuses another plugin\'s routes', () => {
+    expect(() => build().subscribe('plugin:other:sample', () => {})).toThrow(/belongs to 'other', not 'board'/)
+  })
 })
 
 describe('plugin state', () => {

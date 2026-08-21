@@ -379,6 +379,21 @@ with the same access as acorn itself." The second must not be softened or droppe
 full contrast rather than as fine print, and `e2e/twoNode.spec.ts` asserts it so its removal cannot
 pass as a copy tidy-up.
 
+### The broadcast namespace
+
+One thing in that block *is* enforced, and it is worth separating from everything around it. A loaded
+plugin's `ctx.events.send` used to accept any channel name, which meant it could put frames on `term:`
+or `workflow:` and impersonate core's own streams — a renderer cannot tell a forged `term:out` from a
+real one, because the WS envelope is deliberately open and core routes on the channel alone.
+
+It is now confined to `plugin:<its-id>:*`, and naming anything else throws. This is a real check rather
+than a disclosure, and it is cheap precisely because it does not pretend to be more: the same bundle can
+still `import('node:net')` and open its own socket. What the confinement buys is that a plugin cannot
+lie to the renderer *through core's own transport*, which is a different thing from being contained.
+
+A built-in is unaffected. It owns real channel prefixes through `ctx.events.channel`, is compiled into
+the binary, and is not the trust class this section is about.
+
 ### Threat model
 
 Adversaries, in decreasing order of likelihood based on how extension ecosystems actually get

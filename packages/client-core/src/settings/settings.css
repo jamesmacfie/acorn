@@ -158,15 +158,28 @@
   white-space: pre;
 }
 
-/* Settings → Plugins (settings/PluginsSettings.tsx). */
-.plugin-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.plugin-row { display: flex; align-items: center; gap: var(--space-3); }
+/* Settings → Plugins (settings/PluginsSettings.tsx). The list is a four-column table drawn as a grid —
+   checkbox+name, version, source/status, actions — with subgrid rows so every column keeps one edge
+   across rows whatever a name or source string measures. */
+.plugin-list {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  column-gap: var(--space-5);
+  row-gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plugin-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
 .plugin-row label { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .plugin-pending { font-size: var(--fs-xs); }
 /* Only present on a plugin loaded from the node's disk; a built-in's version is the app's. */
 .plugin-version { font-family: var(--font-mono); font-size: var(--fs-xs); }
-.plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); }
+/* Source and status share the one flexible column; the source ellipsises (full text in its title)
+   rather than wrapping an absolute path across the row. */
+.plugin-meta { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
 /* Development mode. Drawn as a warning rather than as muted meta text on purpose: it says this device
    accepts new code for this plugin without asking, which is the loudest thing a row on this page can say
@@ -176,9 +189,8 @@
    line with actions pinned right, and a thrown message can be a paragraph. The full text is the element's
    `title`, and the attention row in the bell renders it unclipped. */
 .plugin-failed-reason { font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Row actions sit hard right, so the checkbox column stays a straight edge however long the names and
-   sources are. */
-.plugin-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+/* Row actions are the last grid column, pinned right. */
+.plugin-actions { display: flex; align-items: center; gap: var(--space-2); justify-self: end; }
 .plugin-confirm { font-size: var(--fs-sm); }
 .plugin-install { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-install .ui-input[data-width='full'] { flex: 1; }
@@ -187,8 +199,19 @@
    (folder installs only) sits under the first and keeps normal spacing rather than inheriting a negative
    margin meant for a different neighbour. */
 .plugin-install + .plugin-install-hint { margin-top: calc(var(--space-2) * -1); }
-.plugin-authoring { display: flex; align-items: center; gap: var(--space-2); }
-.plugin-authoring .muted { font-size: var(--fs-xs); }
+/* "Create a plugin" is a panel of its own — explanation first, the button under it, pinned right —
+   because it is the one control on this page that reaches an agent rather than the install route. */
+.plugin-authoring {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  background: var(--bg-subtle);
+}
+.plugin-authoring .muted { align-self: stretch; margin: 0; font-size: var(--fs-xs); }
 
 /* Section headings inside a settings page. Settings → Security is the first page with two independent
    halves (backup, audit trail), and an unstyled <h3> inherits a browser default that fights every style

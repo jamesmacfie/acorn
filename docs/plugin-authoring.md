@@ -280,8 +280,20 @@ beside it). Much of core is listed in the table with no mapping at all and can n
 whatever a manifest declares — the plugin install route above all, because a frame that could reach it
 would install unsandboxed code and make every other line moot.
 
-`permissions.events` names shell channels the frame may subscribe to. Subscribing does not create a
-channel.
+`permissions.events` names channels the frame may subscribe to. Subscribing does not create a channel,
+and there are two kinds to name:
+
+- **Four of the shell's own**, listed in `client-core/plugins/frames/channels.ts`. They say that
+  something a frame may be showing has gone or moved: `runtime:task-archived`,
+  `runtime:workspace-removed`, `runtime:node-removed`, `runtime:node-switched`.
+- **Your own live channel**, `plugin:<your-id>:<verb>`, which your node half broadcasts on with
+  `ctx.events.send({ channel, ...payload })` and which core routes to whichever of your frames
+  subscribed. Both halves are lowercase, start with a letter, and hold no colon. Another plugin's is
+  always refused, exactly as its routes are.
+
+That second one is how a frame gets live data without polling, and it also nudges your own descriptors
+— badges, rail rows — so they update faster than the 30-second floor a declared `refresh` allows. See
+[plugins.md § The live channel](./plugins.md) for the cadence rules and what a push does *not* reach.
 
 ## The node half
 
@@ -419,7 +431,7 @@ messages by hand:
 | --- | --- |
 | `context` | The `ready` snapshot. |
 | `api` | `get`, `post`, `put`, `patch`, `del` — five, matching `PluginBridgeApiRequest.method` exactly. A method missing from the facade is a method no plugin can reach, however permissive the scope table underneath. |
-| `events.on` | Subscribe to a channel the manifest declared. |
+| `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
 | `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. |
 | `document.read` / `write` / `flush` | Only from a `document-over-frame` pane. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |

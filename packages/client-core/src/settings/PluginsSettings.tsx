@@ -16,6 +16,7 @@ import { canPickFolder, pickFolder } from '../platform'
 import { readPluginHostState, setPluginDevGrant } from '../plugins/host'
 import { syncPluginDistribution } from '../plugins/distribution'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../ui/primitives'
+import Icon from '../ui/Icon'
 import { activeTaskId } from '../tasks/tasks'
 import { nextDisabledList, pluginPending } from './pluginToggle'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
@@ -95,10 +96,9 @@ export default function PluginsSettings() {
   )
 
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
-  // A required plugin cannot be disabled, so it is not a checkbox. The route refuses one and the host
-  // ignores it; offering the control would be an affordance that silently does nothing.
+  // A required plugin cannot be disabled, so it is not a checkbox — the route refuses one and the host
+  // ignores it — and the page does not list them at all: there is nothing an owner could do to the row.
   const optional = createMemo(() => rows().filter((row) => !row.required))
-  const required = createMemo(() => rows().filter((row) => row.required))
   const restartRequired = () => state()?.restartRequired === true
 
   // The device's own answers, which the node knows nothing about: it served the bundle, and this
@@ -217,11 +217,6 @@ export default function PluginsSettings() {
         </label>
       </Show>
 
-      <p class="muted">
-        Which plugins <strong>{node()?.label ?? 'this node'}</strong> runs. A change takes effect when the
-        node restarts; its data is left in place either way.
-      </p>
-
       <Show when={restartRequired()}>
         <Alert
           tone="warn"
@@ -242,13 +237,13 @@ export default function PluginsSettings() {
           composer — the owner reads it, finishes the sentence and sends — because a settings button that
           silently starts an agent turn is a button nobody presses twice. */}
       <div class="plugin-authoring">
-        <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void createPlugin()}>
-          Create a plugin
-        </Button>
-        <span class="muted">
+        <p class="muted">
           Drafts a prompt in the current task's agent. It writes the package and asks you to install it;
           it cannot install anything itself.
-        </span>
+        </p>
+        <Button size="sm" disabled={busy()} onClick={() => void createPlugin()}>
+          Create a plugin
+        </Button>
       </div>
 
       {/* The install form. Deliberately plain: there is no browse-and-discover surface and there is not
@@ -300,6 +295,9 @@ export default function PluginsSettings() {
         <p class="muted">This node did not report a plugin list. It may be offline.</p>
       </Show>
 
+      {/* A grid, not a flex line per row: checkboxes, names, versions and the action buttons each keep
+          a straight column edge however long a name or source string runs. Every row renders all four
+          cells — an absent version is an empty cell, not a shifted column. */}
       <ul class="plugin-list">
         <For each={optional()}>
           {(row) => (
@@ -311,78 +309,78 @@ export default function PluginsSettings() {
                 onChange={(event) => void toggle(row.name, !event.currentTarget.checked)}
               />
               {/* Only a plugin that came off this node's disk has a version worth showing; a built-in's
-                  is the app's. Absence of the block is also how the owner tells the two apart. */}
-              <Show when={row.installed}>
-                {(installed) => (
-                  <>
-                    <span class="plugin-version muted">{installed().version}</span>
-                    <Show when={installed().source}>
-                      {(source) => <span class="plugin-source muted">{source()}</span>}
-                    </Show>
-                  </>
-                )}
-              </Show>
-              {/* Development mode, stated in full rather than as a decoration. The security story here
-                  rests entirely on the owner being able to SEE this and end it: the moment a dev-mode
-                  plugin looks like a normal install, the trust story has rotted (docs/security.md § The
-                  dev grant). */}
-              <Show when={devGrant(row)}>
-                {(grant) => (
-                  <>
-                    <span class="plugin-dev" role="status" title={grant().path}>
-                      in development — bundle changes are auto-trusted
-                    </span>
-                    <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void endDevMode(row)}>
-                      End dev mode
-                    </Button>
-                  </>
-                )}
-              </Show>
-              {/* This device has seen these exact bytes and said no. Per-device by design, hence the
-                  wording: the same plugin may be running happily on the owner's other laptop. */}
-              <Show when={blockedHere(row)}>
-                <span class="plugin-failed" role="status">blocked on this device</span>
-              </Show>
-              {/* The install directory and this process disagree — installed, updated or uninstalled
-                  since the node last started. Unlike a failed row, a restart is exactly the fix. */}
-              <Show when={row.state === 'pending-restart'}>
-                <span class="plugin-pending muted">waiting for a restart</span>
-              </Show>
-              {/* Only when the two answers differ — otherwise every row would carry a redundant label. */}
-              <Show when={row.state !== 'pending-restart' && pluginPending(row)}>
-                <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>
-              </Show>
-              {/* A plugin installed on this node that threw, or that never loaded at all. Restarting will
-                  not fix either, so this deliberately does not raise the restart banner — the owner has to
-                  turn it off or fix the plugin.
-
-                  `reason` is the node's verbatim account of what broke: a thrown message from a contained
-                  init, or the loader's own sentence for a manifest that does not parse or a bundle that
-                  will not import. It is a loaded plugin's text crossing into the owner's UI, so it is
-                  interpolated as TEXT and arrives already capped from the node. Absent from an older
-                  node, which is why the label stands alone. */}
-              <Show when={row.state === 'failed'}>
-                <span class="plugin-failed" role="status">
-                  failed to {row.stage === 'load' ? 'load' : 'start'}
-                </span>
-                <Show when={row.reason}>
-                  {(reason) => <span class="plugin-failed-reason muted" title={reason()}>{reason()}</span>}
+                  is the app's. An empty cell is also how the owner tells the two apart. */}
+              <span class="plugin-version muted">{row.installed?.version ?? ''}</span>
+              <span class="plugin-meta">
+                {/* An absolute path or repo spec can outrun the column; it ellipsises and the full text
+                    lives in the title. */}
+                <Show when={row.installed?.source}>
+                  {(source) => <span class="plugin-source muted" title={source()}>{source()}</span>}
                 </Show>
-              </Show>
+                {/* Development mode, stated in full rather than as a decoration. The security story here
+                    rests entirely on the owner being able to SEE this and end it: the moment a dev-mode
+                    plugin looks like a normal install, the trust story has rotted (docs/security.md § The
+                    dev grant). */}
+                <Show when={devGrant(row)}>
+                  {(grant) => (
+                    <>
+                      <span class="plugin-dev" role="status" title={grant().path}>
+                        in development — bundle changes are auto-trusted
+                      </span>
+                      <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void endDevMode(row)}>
+                        End dev mode
+                      </Button>
+                    </>
+                  )}
+                </Show>
+                {/* This device has seen these exact bytes and said no. Per-device by design, hence the
+                    wording: the same plugin may be running happily on the owner's other laptop. */}
+                <Show when={blockedHere(row)}>
+                  <span class="plugin-failed" role="status">blocked on this device</span>
+                </Show>
+                {/* The install directory and this process disagree — installed, updated or uninstalled
+                    since the node last started. Unlike a failed row, a restart is exactly the fix. */}
+                <Show when={row.state === 'pending-restart'}>
+                  <span class="plugin-pending muted">waiting for a restart</span>
+                </Show>
+                {/* Only when the two answers differ — otherwise every row would carry a redundant label. */}
+                <Show when={row.state !== 'pending-restart' && pluginPending(row)}>
+                  <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>
+                </Show>
+                {/* A plugin installed on this node that threw, or that never loaded at all. Restarting will
+                    not fix either, so this deliberately does not raise the restart banner — the owner has to
+                    turn it off or fix the plugin.
 
-              {/* Only a package that came off disk can be updated or removed; a built-in ships with the
-                  app and goes away when the app does. */}
-              <Show when={row.installed}>
-                <span class="plugin-actions">
+                    `reason` is the node's verbatim account of what broke: a thrown message from a contained
+                    init, or the loader's own sentence for a manifest that does not parse or a bundle that
+                    will not import. It is a loaded plugin's text crossing into the owner's UI, so it is
+                    interpolated as TEXT and arrives already capped from the node. Absent from an older
+                    node, which is why the label stands alone. */}
+                <Show when={row.state === 'failed'}>
+                  <span class="plugin-failed" role="status">
+                    failed to {row.stage === 'load' ? 'load' : 'start'}
+                  </span>
+                  <Show when={row.reason}>
+                    {(reason) => <span class="plugin-failed-reason muted" title={reason()}>{reason()}</span>}
+                  </Show>
+                </Show>
+              </span>
+
+              {/* Only a package the owner installed can be updated or removed. A bundled package ships
+                  with the app and has no lockfile, so the node cannot re-resolve a source for it — the
+                  update route would only answer "acorn does not know where this came from" — and it comes
+                  back at the app's version on the next build either way. */}
+              <span class="plugin-actions">
+                <Show when={row.installed && !row.installed.bundled}>
                   <Show
                     when={removing() === row.name}
                     fallback={
                       <>
-                        <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void update(row.name)}>
-                          Update
+                        <Button size="sm" variant="ghost" iconOnly aria-label={`Update ${row.name}`} title="Update" disabled={busy()} onClick={() => void update(row.name)}>
+                          <Icon name="refresh-cw" />
                         </Button>
-                        <Button size="sm" variant="ghost" tone="danger" disabled={busy()} onClick={() => setRemoving(row.name)}>
-                          Uninstall
+                        <Button size="sm" variant="ghost" tone="danger" iconOnly aria-label={`Uninstall ${row.name}`} title="Uninstall" disabled={busy()} onClick={() => setRemoving(row.name)}>
+                          <Icon name="trash-2" />
                         </Button>
                       </>
                     }
@@ -401,19 +399,12 @@ export default function PluginsSettings() {
                       Cancel
                     </Button>
                   </Show>
-                </span>
-              </Show>
+                </Show>
+              </span>
             </li>
           )}
         </For>
       </ul>
-
-      <Show when={required().length}>
-        <p class="muted">
-          Always on: {required().map((row) => row.name).join(', ')}. Core assumes their capabilities exist,
-          so a node without them would start and then fail at the first task.
-        </p>
-      </Show>
 
       <ReplacedSurfaces />
     </div>

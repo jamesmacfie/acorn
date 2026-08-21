@@ -45,6 +45,32 @@ describe('makeTestNodeContext', () => {
     }
   })
 
+  it('confines a loaded plugin\'s broadcast to its own channel namespace', () => {
+    // `send` used to be handed over raw, which let a loaded package post on `term:` or `workflow:` and
+    // impersonate core's own streams. The confinement is also the definition of the namespace its frames
+    // may subscribe to (client-core/plugins/pluginChannel.ts).
+    const ctx = makeTestNodeContext({ plugin, permissions: {} })
+    try {
+      expect(() => ctx.events.send({ channel: 'plugin:testkit-probe:sample', cpu: 1 })).not.toThrow()
+      expect(() => ctx.events.send({ channel: 'term:status' })).toThrow(/may only broadcast on plugin:testkit-probe:/)
+      expect(() => ctx.events.send({ channel: 'plugin:someone-else:sample' })).toThrow(/may only broadcast on/)
+      // A name that does not parse is refused too, rather than treated as this plugin's because it
+      // starts with the right word.
+      expect(() => ctx.events.send({ channel: 'plugin:testkit-probe' })).toThrow(/may only broadcast on/)
+    } finally {
+      ctx.cleanup()
+    }
+  })
+
+  it('leaves a built-in\'s broadcast alone, because it owns real prefixes', () => {
+    const ctx = makeTestNodeContext({ plugin })
+    try {
+      expect(() => ctx.events.send({ channel: 'term:status' })).not.toThrow()
+    } finally {
+      ctx.cleanup()
+    }
+  })
+
   it('says which knob is missing when there is no migration chain to find', () => {
     // 'testkit-probe' is not a plugin in this checkout, so the id-based default finds nothing. That
     // is also what a plugin developed outside this repo hits, and the message has to name the way out.

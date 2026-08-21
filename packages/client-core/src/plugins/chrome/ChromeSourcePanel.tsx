@@ -11,7 +11,7 @@ import { FRESHNESS_LABELS } from '../../node/freshness'
 import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import { runChromeAction } from './actions'
-import { chromeKey, chromeRevision, readRailItems, scopedSourceItemsPath } from './data'
+import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './data'
 import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
 import { workspaceForProject } from '../../workspaces/activeWorkspace'
 import { PromoteToTaskModal } from '../../integrations/PromoteToTaskModal'
@@ -69,7 +69,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   // The project rides in the dependency rather than being read from `params` inside the fetch, so it
   // reaches the cache key as well as the path. Both halves of the pair have to agree on scope now that
   // the fan-out serves its last answer on mount.
-  const scope = () => ({ revision: chromeRevision(), projectId: params.projectId })
+  const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: params.projectId })
   const [result, { refetch }] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(

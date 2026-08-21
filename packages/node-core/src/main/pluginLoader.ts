@@ -54,6 +54,8 @@ export type InstalledPlugin = {
   // to be able to re-resolve it.
   source?: string
   installedAt?: number
+  // Seeded by the app build rather than installed over the route. No lockfile, so it cannot be updated.
+  bundled?: true
 }
 
 // The `dir`-free projection the roster route takes. `dir` is an absolute path on the node's
@@ -79,6 +81,7 @@ export type InstalledPluginInfo = {
   hasNode: boolean
   source?: string
   installedAt?: number
+  bundled?: true
 }
 
 // Why one directory did not produce a plugin (docs/plugins.md § Loaded plugins, "Failures are
@@ -157,6 +160,7 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   hasNode: entry.manifest.node !== undefined,
   ...(entry.source === undefined ? {} : { source: entry.source }),
   ...(entry.installedAt === undefined ? {} : { installedAt: entry.installedAt }),
+  ...(entry.bundled === undefined ? {} : { bundled: entry.bundled }),
 })
 
 // The bytes behind GET /v2/core/plugins/:id/client.js. Re-confines the path rather than trusting the
@@ -251,7 +255,7 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
       ...(lock
         ? { source: describeSource(lock.source), installedAt: lock.installedAt }
         : bundled?.status === 'installed'
-          ? { source: 'bundled with acorn', installedAt: bundled.installedAt }
+          ? { source: 'bundled with acorn', installedAt: bundled.installedAt, bundled: true as const }
           : {}),
     })
   }
