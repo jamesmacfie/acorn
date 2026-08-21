@@ -11,12 +11,13 @@ import {
 import type { ProjectConfigPatch, ProjectConfigResponse } from '@acorn/protocol/api.ts'
 import { readJson, writeJson } from '../apiClient'
 
-// plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
-// here as literals because client-core is a shared library and may not import a plugin — the arch
-// suite enforces that, and it is the rule that keeps the shell from depending on features.
+// plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are
+// duplicated here as literals because client-core is a shared library and may not import a
+// plugin; the arch suite enforces that, and it is the rule that keeps the shell from depending on
+// features.
 //
-// This file is deliberately core: it is platform state (which agent sessions exist on this node),
-// not terminal-drawer internals, and its own header says so. Two duplicated strings is the cheaper
+// This file is core: it holds platform state (which agent sessions exist on this node), not
+// terminal-drawer internals, and its own header says so. Two duplicated strings is the cheaper
 // side of that trade against inventing a capability seam for a GET. Collected as debt against
 // finding 10 (de-GitHub the shell), which reworks how the shell reaches feature routes.
 const terminalSessionActionRoute = (sid: string, action: 'send') => `/v2/p/terminal/sessions/${encodeURIComponent(sid)}/${action}`
@@ -29,7 +30,7 @@ export type TaskBridge = {
   }
   // Run a repo's browser-preview script in the task's worktree; stdout (trimmed) is the URL.
   previewUrl(taskId: string, script: string): Promise<{ ok: boolean; url?: string; reason?: string }>
-  // Bracketed-paste delivery into an agent PTY (docs/panes.md): one block, three submit modes.
+  // Bracketed-paste delivery into an agent PTY: one block, three submit modes.
   sendToAgent(sessionId: string, text: string, submit: 'now' | 'after-ready' | 'draft'): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   task: {
     archive(id: string, opts?: ArchiveOpts): Promise<ArchiveResult>
@@ -46,11 +47,11 @@ const post = <T>(url: string, body?: unknown) =>
 const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-// Every route below is ordinary `/v2` against the node, so this is available wherever a node is —
-// there is nothing left to probe for. It used to return null unless Electron's preload exposed a native
-// FOLDER PICKER, which took the terminal drawer, agents, run targets and workflows down with it on any
-// other host (git history: docs/future/node-first/platform-seam.md). The picker now lives on the platform seam as
-// `pickFolder()`, where it belongs, and this is a plain accessor.
+// Every route below is ordinary `/v2` against the node, so this is available wherever a node is;
+// there is nothing left to probe for. It used to return null unless Electron's preload exposed a
+// native folder picker, which took the terminal drawer, agents, run targets and workflows down
+// with it on any other host (git history: docs/future/node-first/platform-seam.md). The picker now
+// lives on the platform seam as `pickFolder()`, where it belongs, and this is a plain accessor.
 export const taskBridge = (): TaskBridge => {
   return {
     project: {

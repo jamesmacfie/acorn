@@ -1,7 +1,6 @@
-// Rail selection state (docs/workspaces-and-tasks.md). The task *list* is a TanStack query (tasksOptions); this
-// module tracks what the rail has selected — a Source browse view or an active task — plus each
-// task's pane layout. Signals-only, like ../terminal/sessions.ts. The terminal drawer + topbar key
-// off activeTaskId.
+// Rail selection state. The task list is a TanStack query (tasksOptions); this module tracks what
+// the rail has selected, a Source browse view or an active task, plus each task's pane layout.
+// Signals-only, like ../terminal/sessions.ts. The terminal drawer and topbar key off activeTaskId.
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
 import { activeNodeId } from '../node/activeNode'
@@ -12,10 +11,10 @@ import { onScopeEvicted } from '../registries/scopeEviction'
 export type { PaneId, TaskLayout } from './layout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 
-// Which browse Source is selected, or null when a task is the active view (docs/workspaces-and-tasks.md).
-// Known core ids stay typed for contributions and UI construction. The live selection deliberately
-// accepts an unknown string so a temporarily missing plugin source remains inert and round-trips
-// through persistence until the user explicitly selects another source.
+// Which browse Source is selected, or null when a task is the active view. Known core ids stay
+// typed for contributions and UI construction. The live selection accepts an unknown string so a
+// temporarily missing plugin source remains inert and round-trips through persistence until the
+// user explicitly selects another source.
 export type SourceId = string
 export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && !!sourceRegistry.get(v)
 
@@ -31,15 +30,17 @@ export function setSelectedSource(source: string | null): void {
   setSelectedSourceState(source)
 }
 
-// Per-workspace memory of the last view — a rail source (browse) or a task — so switching workspaces
-// returns you to exactly what you were looking at rather than always jumping back to GitHub.
-// Session-only (not persisted); first-load restore is handled by the last_source/last_task prefs.
+// Per-workspace memory of the last view, a rail source (browse) or a task, so switching
+// workspaces returns you to exactly what you were looking at rather than always jumping back to
+// GitHub. Session-only (not persisted); first-load restore is handled by the last_source/last_task
+// prefs.
 //
-// Keyed by node AND cleared on a switch, which is belt and braces on purpose. The key stops two nodes'
-// workspace ids colliding (they are node-minted UUIDs, and two nodes may hold the same one —
-// docs/architecture-overview.md § Fleet semantics); the clear stops the persistence pass writing one node's scopes under
-// the other's storage key, because `storageKeyFor` reads the active node at WRITE time and these stores
-// survive the shell's remount. See `clearNodeScopedTaskState` at the foot of this file.
+// Keyed by node and cleared on a switch, which is belt and braces. The key stops two nodes'
+// workspace ids colliding (they are node-minted UUIDs, and two nodes may hold the same one,
+// docs/architecture-overview.md § Client state and fleet behavior); the clear stops the
+// persistence pass writing one node's scopes under the other's storage key, because
+// `storageKeyFor` reads the active node at write time and these stores survive the shell's
+// remount. See `clearNodeScopedTaskState` at the foot of this file.
 const viewByWorkspace = new Map<string, WorkspaceView>()
 const viewKey = (workspaceId: string): string => `${activeNodeId() ?? ''}/${workspaceId}`
 export const rememberWorkspaceView = (workspaceId: string, view: WorkspaceView): void => {
@@ -53,9 +54,10 @@ export const evictWorkspaceView = (workspaceId: string): void => {
 // The active task (its terminals scope to this; its view shows when no Source is selected).
 const [activeTaskId, setActiveTaskId] = createSignal<string | null>(null)
 
-// Per-task pane layout (docs/panes.md): a left→right row of open panes. ALL transitions go
-// through the pure reducer (applyLayoutAction) via dispatchLayout — the single-writer rule.
-// Persisted to the `task_layouts` preference (App.tsx); the value is migrated on hydrate and scoped per task.
+// Per-task pane layout (docs/panes.md): a left-to-right row of open panes. All transitions go
+// through the pure reducer (applyLayoutAction) via dispatchLayout, the single-writer rule.
+// Persisted to the `task_layouts` preference (App.tsx); the value is migrated on hydrate and
+// scoped per task.
 const [taskLayouts, setTaskLayouts] = createSignal<Record<string, TaskLayout>>({})
 
 export const layoutForTask = (taskId: string): TaskLayout | undefined => taskLayouts()[taskId]

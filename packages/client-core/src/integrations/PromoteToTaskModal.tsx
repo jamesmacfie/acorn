@@ -9,12 +9,11 @@ import { Tabs } from '../ui/Tabs'
 import { createDismissable } from '../ui/dismissable'
 import { Alert, Button, Select } from '../ui/primitives'
 
-// Shared "+TASK" flow for the integration browses (docs/workspaces-and-tasks.md). Promoting an
-// external item (a Rollbar error, a Linear ticket) either CREATES a new task or ATTACHES the item to
-// an existing one — a task references many external items (task_links is a bag, not a scalar). When
-// open tasks exist we tab between the two; the default is always a new task. The create/attach
-// mechanics come from the provider's registered `promotion` contract, so this component is
-// provider-agnostic.
+// Shared "+ Task" flow for the integration browses. Promoting an external item (a Rollbar error, a
+// Linear ticket) either creates a new task or attaches the item to an existing one: a task
+// references many external items (task_links is a bag, not a scalar). When open tasks exist we tab
+// between the two; the default is always a new task. The create/attach mechanics come from the
+// provider's registered `promotion` contract, so this component is provider-agnostic.
 export function PromoteToTaskModal(props: {
   providerId: string
   item: unknown
@@ -32,9 +31,9 @@ export function PromoteToTaskModal(props: {
   const github = () => project()?.github
   const promotion = () => {
     const source = sourceRegistry.get(props.providerId)
-    // A source with no promotion cannot be promoted through this modal, and nothing opens it for one — the
-    // rail's promote affordance is rendered by each browse surface. Throwing names the real mistake rather
-    // than failing later on `undefined.prepare`.
+    // A source with no promotion cannot be promoted through this modal, and nothing opens it for
+    // one: the rail's promote affordance is rendered by each browse surface. Throwing names the
+    // real mistake rather than failing later on `undefined.prepare`.
     if (!source?.promotion) throw new Error(`No promotable source registered for provider '${props.providerId}'`)
     return source.promotion
   }

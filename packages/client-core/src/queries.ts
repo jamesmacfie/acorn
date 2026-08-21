@@ -47,13 +47,13 @@ export const workspaceExternalProjectsOptions = (workspaceId: string | null, ena
     readJson<WorkspaceExternalProjectsResponse>(workspaceExternalProjectsRoute(workspaceId as string), { signal }),
 })
 
-// The projects ONE connection offers, for the workspace mapping picker
-// (settings/WorkspaceExternalProjects.tsx). Per connection, so a provider that is down shows its own
-// error row and its siblings still list.
+// The projects one connection offers, for the workspace mapping picker
+// (settings/WorkspaceExternalProjects.tsx). Per connection, so a provider that is down shows its
+// own error row and its siblings still list.
 //
-// No staleTime and no retry, both deliberate. A picker's list is a claim about the provider now — the
-// surface this replaced had to reach past a five-minute cache by hand to get that — and a connection
-// that failed should say so at once with a Retry button rather than after three silent attempts.
+// No staleTime and no retry. A picker's list is a claim about the provider now (the surface this
+// replaced had to reach past a five-minute cache by hand to get that), and a connection that
+// failed should say so at once with a Retry button rather than after three silent attempts.
 export const integrationProjectsKey = (connectionId: string) => ['integration-projects', connectionId] as const
 export const integrationProjectsOptions = (connectionId: string, enabled: boolean) => ({
   queryKey: integrationProjectsKey(connectionId),
@@ -67,8 +67,9 @@ export const integrationProjectsOptions = (connectionId: string, enabled: boolea
 export const prefsOptions = (enabled: boolean) => ({
   queryKey: prefsKey,
   enabled,
-  // The ACTIVE node's prefs. Everything left in this store describes that node's resources, and the
-  // per-node QueryClient partition (node/fleet.ts) already keeps one node's answer out of another's.
+  // The active node's prefs. Everything left in this store describes that node's resources, and
+  // the per-node QueryClient partition (node/fleet.ts) already keeps one node's answer out of
+  // another's.
   queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> => {
     const nodePrefs = await readJson<Record<string, string>>(prefsRoute, { signal })
     seedDevicePrefs(nodePrefs)

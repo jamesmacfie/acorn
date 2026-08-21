@@ -3,8 +3,8 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { setActiveNode } from './node/activeNode'
 import { registerWsChannel } from './wsChannels'
 
-// The renderer no longer owns a socket, so this fakes the BROKER rather than a WebSocket: the thing
-// under test is the subscription bookkeeping and the reconnect behaviour, not a transport.
+// The renderer no longer owns a socket, so this fakes the broker rather than a WebSocket: the
+// thing under test is the subscription bookkeeping and the reconnect behaviour, not a transport.
 
 type Bridge = {
   sent: { nodeId: string; frame: unknown }[]
@@ -16,9 +16,9 @@ function installBridge(): Bridge {
   const sent: { nodeId: string; frame: unknown }[] = []
   const frameHandlers: ((nodeId: string, frame: unknown) => void)[] = []
   const statusHandlers: ((status: NodeStatus) => void)[] = []
-  // `nodeFetch` is what makes the host's transport EXIST as far as platform/index.ts is concerned — it is
-  // the "there is a broker" discriminator — so a fake that pushes frames has to answer requests too, even
-  // if this suite never sends one.
+  // `nodeFetch` is what makes the host's transport exist as far as platform/index.ts is concerned:
+  // it is the "there is a broker" discriminator, so a fake that pushes frames has to answer
+  // requests too, even if this suite never sends one.
   const acorn = {
     desktop: true,
     nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
@@ -114,8 +114,8 @@ describe('wsClient', () => {
     expect(statuses).toEqual([])
   })
 
-  // The FIRST online transition is a connect, not a reconnect: re-attaching there would duplicate the
-  // attach the subscriber already sent, and refetching would fire on every cold start.
+  // The first online transition is a connect, not a reconnect: re-attaching there would duplicate
+  // the attach the subscriber already sent, and refetching would fire on every cold start.
   it('does not treat the first online transition as a reconnect', () => {
     const reconnects: number[] = []
     client.wsOnReconnect(() => reconnects.push(1))
@@ -150,9 +150,10 @@ describe('wsClient', () => {
   })
 
 
-  // Main holds a socket to EVERY paired node and pushes every frame here, while the subscription maps
-  // below are keyed on session / container / exec ids alone. docs/architecture-overview.md § Fleet semantics: two nodes
-  // may coincidentally hold the same UUID, and that must never collide in the client.
+  // Main holds a socket to every paired node and pushes every frame here, while the subscription
+  // maps below are keyed on session/container/exec ids alone. Two nodes may coincidentally hold
+  // the same UUID (docs/architecture-overview.md § Client state and fleet behavior), and that must
+  // never collide in the client.
   describe('frames from a node that is not the active one', () => {
     it('does not reach a terminal subscriber, even for the same session id', () => {
       const output: unknown[] = []

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { composeItems, fuzzyFilter, fuzzyScore, type PaletteItem } from './model'
 
-// Rows now arrive pre-built from `paletteRows` contributions, so these are the shapes plugins/terminal and
-// plugins/workflows produce. composeItems no longer knows what a run target or a workflow is; what it still
-// owns — and what these assert — is the ORDER of the assembled list.
+// Rows now arrive pre-built from `paletteRows` contributions, so these are the shapes
+// plugins/terminal and plugins/workflows produce. composeItems no longer knows what a run target
+// or a workflow is; what it still owns, and what these assert, is the order of the assembled list.
 const runRow = (id: string, running = false): PaletteItem =>
   ({ kind: 'run', id: `run:${id}`, label: `${running ? 'Stop' : 'Run'}: ${id}`, hint: 'pnpm dev', running })
 const layoutRow = (id: string): PaletteItem =>
@@ -36,8 +36,9 @@ describe('composeItems', () => {
   })
 
   it('keeps contributed row order, so a source cannot be reordered by kind', () => {
-    // The palette concatenates sources in `order`, and composeItems must not resort them: terminal's run and
-    // layout rows come before workflows' rows because that is the order the palette produced them in.
+    // The palette concatenates sources in `order`, and composeItems must not resort them:
+    // terminal's run and layout rows come before workflows' rows because that is the order the
+    // palette produced them in.
     const items = composeItems({ rows: [layoutRow('review'), runRow('dev')], errors: [], actions: [] })
     expect(items.map((i) => i.id)).toEqual(['layout:review', 'run:dev'])
   })

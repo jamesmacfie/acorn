@@ -66,9 +66,10 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     const late = sourceRegistry.register({ id: 'aardvark', order: 999, glyph: 'a', label: 'Aardvark' })
     const early = sourceRegistry.register({ id: 'zebra', order: 1, glyph: 'z', label: 'Zebra' })
     try {
-      // 'zebra' registered last with order 1 leads; 'aardvark' registered first with order 999 trails. Under
-      // registration order this would read aardvark, linear, rollbar, github, zebra — and alphabetically it
-      // would read aardvark first too, so neither fallback can produce this answer.
+      // 'zebra' registered last with order 1 leads; 'aardvark' registered first with order 999
+      // trails. Under registration order this would read aardvark, linear, rollbar, github,
+      // zebra, and alphabetically it would read aardvark first too, so neither fallback can
+      // produce this answer.
       expect(availableSources([integration('github'), integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['zebra', 'github', 'linear', 'rollbar', 'aardvark'])
     } finally {
       late.dispose()
@@ -76,9 +77,9 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     }
   })
 
-  // `when` is the second, independent gate. Fleet home is its one contributor: docs/ui-design.md says the view "stays
-  // out of the way" with a single node, and first-run must never mention nodes at all — so the rail button
-  // has to be absent, not present-and-empty.
+  // `when` is the second, independent gate. Fleet home is its one contributor: with a single node
+  // the rail button must be absent, not present-and-empty, since a first run never mentions nodes
+  // at all.
   it('honours `when` independently of providerId', () => {
     let visible = false
     const gated = sourceRegistry.register({ id: 'when-test', order: 0, glyph: 'w', label: 'When', when: () => visible })
@@ -92,8 +93,8 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
   })
 
   it('AND-s `when` with the provider gate rather than replacing it', () => {
-    // A source with both must satisfy both — otherwise adding `when` would have quietly opened a hole in
-    // the integration gate for any contribution that declared one.
+    // A source with both must satisfy both, otherwise adding `when` would have quietly opened a
+    // hole in the integration gate for any contribution that declared one.
     const both = sourceRegistry.register({
       id: 'both-test', order: 0, glyph: 'b', label: 'Both', providerId: 'linear', when: () => false,
     })

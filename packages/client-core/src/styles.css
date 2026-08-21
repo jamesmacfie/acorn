@@ -1,9 +1,9 @@
 /* Shell stylesheet manifest (docs/ui-design.md). Feature modules co-locate their own stylesheet
  * next to the component and import it directly; this covers the shell and the token axes.
  *
- * ORDER. Only "defaults before overrides" is load-bearing. The theme and style axes declare
+ * Order. Only "defaults before overrides" is load-bearing. The theme and style axes declare
  * disjoint token sets (styles/tokenAxes.test.ts enforces it), so their order relative to each
- * other is irrelevant — which is what removes the old source-order fragility where every
+ * other is irrelevant. That removes the old source-order fragility where every
  * :root[data-theme] block sat at the same (0,2,0) specificity as the prefers-color-scheme block.
  */
 @import './styles/fonts.css';

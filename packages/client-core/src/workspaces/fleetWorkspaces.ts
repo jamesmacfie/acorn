@@ -16,9 +16,9 @@ export type FleetWorkspace = {
 export type FleetWorkspaceList = {
   entries: FleetWorkspace[]
   unavailable: FleetUnavailable[]
-  // False when there is one node, which is every single-node install. Consumers use it to decide whether
-  // to render a node label at all — with one node it names the only machine there is, which docs/ui-design.md § New
-  // surfaces rules out ("first-run never mentions nodes").
+  // False when there is one node, which is every single-node install. Consumers use it to decide
+  // whether to render a node label at all: with one node it names the only machine there is, and
+  // a first run never mentions nodes at all.
   grouped: boolean
 }
 
@@ -41,12 +41,12 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
   })
 }
 
-// Selecting a workspace on another node: switch the node FIRST, then navigate.
+// Selecting a workspace on another node: switch the node first, then navigate.
 //
-// The order is the whole point. The source route has no node in it, and the shell derives the active
-// workspace from that repo against the ACTIVE node's query cache — so navigating first would resolve the
-// path against the wrong node, which either finds nothing or, worse, finds a different repo that happens
-// to share the owner/name. docs/ui-design.md § New surfaces requires node context to switch atomically.
+// The order is the whole point. The source route has no node in it, and the shell derives the
+// active workspace from that repo against the active node's query cache, so navigating first
+// would resolve the path against the wrong node, which either finds nothing or, worse, finds a
+// different repo that happens to share the owner/name.
 export function selectFleetWorkspace(entry: FleetWorkspace, navigate: (path: string) => void): void {
   const first = entry.workspace.projects[0]
   if (!first) return // an empty workspace has nowhere to go, same as the single-node picker

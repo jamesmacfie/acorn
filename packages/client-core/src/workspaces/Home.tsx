@@ -11,14 +11,11 @@ import { taskStatus } from '../tasks/taskStatus'
 import { workspaceForProject } from './activeWorkspace'
 import './home.css'
 
-// The core home is deliberately provider-neutral. It is the stable landing source when no optional
-// integration is connected; provider plugins contribute their own browse sources beside it.
+// The core home is provider-neutral. It is the stable landing source when no optional integration
+// is connected; provider plugins contribute their own browse sources beside it.
 //
-// It is also the default panel placement (docs/dashboards.md § On Home). ADDITIVE, and that
-// is a decision rather than a layout accident: the active-task list is what people open this screen
-// for, so panels go BELOW it and a person who never composes one sees the page they saw before plus
-// one ghost button. An empty grid on a surface nobody asked to turn into a dashboard would be a
-// regression dressed as a feature.
+// It is also the default panel placement, additive below the active-task list (docs/dashboards.md
+// § Placements).
 export default function Home() {
   const navigate = useNavigate()
   const tasks = createQuery(() => tasksOptions(true))
@@ -29,17 +26,14 @@ export default function Home() {
     return !project?.hidden
   })
 
-  // ── Dashboards (docs/dashboards.md § Persistence) ─────────────────────────────────────────────
+  // Dashboards (docs/dashboards.md § Placements): a tab is a placement scope, so all Home owns is
+  // which one the grid is pointed at.
   //
-  // A tab is a placement scope, so all Home owns is WHICH ONE the grid is pointed at. With one
-  // dashboard there is no bar, the scope is the bare `home` key and this page is what it always was.
-  //
-  // The bar is built ONCE, outside the memo, and only conditionally handed to the grid. Solid props
-  // are lazy getters, so it stays reactive — but rebuilding it whenever the tab list changed would
-  // discard the rename it is in the middle of, which is the write that changes the tab list.
+  // The bar is built once, outside the memo, and only conditionally handed to the grid. Solid
+  // props are lazy getters, so it stays reactive, but rebuilding it whenever the tab list changed
+  // would discard the rename it is in the middle of, which is the write that changes the tab list.
   const tabs = createMemo(() => homeTabs(dashboards()))
-  /** A remembered tab that has since been deleted falls back to the default rather than showing an
-   *  empty grid for a dashboard that does not exist. */
+  // See docs/dashboards.md § Placements for why a deleted tab falls back to the default.
   const activeTab = () => (tabs().some((tab) => tab.id === activeHomeTab()) ? activeHomeTab() : '')
   const bar = <DashboardTabs tabs={tabs()} active={activeTab()} onSelect={setActiveHomeTab} />
 

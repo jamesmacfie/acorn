@@ -1,4 +1,4 @@
-// Persist in-progress comment/reply drafts in localStorage so they survive navigation and reloads —
+// Persist in-progress comment/reply drafts in localStorage so they survive navigation and reloads,
 // you can leave a PR mid-comment and pick it up later. Per-device, synchronous seed, no server
 // round-trip: same rationale as rememberOpen in the github plugin's PullDetail. Drafts clear on
 // successful submit because composers set their text to '' afterward, which removes the stored key

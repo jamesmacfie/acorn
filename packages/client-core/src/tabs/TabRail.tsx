@@ -52,13 +52,14 @@ export default function TabRail() {
   const prefs = createQuery(() => prefsOptions(true))
   const [menuId, setMenuId] = createSignal<string | null>(null)
   const [dragId, setDragId] = createSignal<string | null>(null)
-  // The right-click door onto the same row actions. One menu for the whole list rather than one per
-  // row, and the row it belongs to travels in the signal — the same reason `menuId` is rail state.
+  // The right-click door onto the same row actions. One menu for the whole list rather than one
+  // per row, and the row it belongs to travels in the signal, the same reason `menuId` is rail
+  // state.
   const [rowMenu, setRowMenu] = createSignal<ContextMenuOpening | null>(null)
   let rowMenuReturnFocus: HTMLElement | undefined
 
-  // Rail order (docs/panes.md): pin-to-top + drag-reorder in a dedicated pref — never
-  // tasks.sort. The pure model lives in railOrder.ts.
+  // Rail order: pin-to-top plus drag-reorder in a dedicated pref, never tasks.sort. The pure model
+  // lives in railOrder.ts.
   const railOrder = () => parseRailOrder(prefs.data?.[PrefKeys.railOrder])
   const saveOrder = async (o: RailOrder) => {
     await saveJsonPref(queryClient, PrefKeys.railOrder, o)
@@ -74,18 +75,19 @@ export default function TabRail() {
   // Chosen icon for the task being created/renamed. null = let the origin derive it.
   const [iconDraft, setIconDraft] = createSignal<string | null>(null)
   const [newProject, setNewProject] = createSignal('')
-  // Project options are snapshotted when the modal opens, not bound to the reactive activeWorkspace().
-  // Otherwise a workspace switch mid-modal (App.tsx restore-nav / workspaces refetch) repopulates the
-  // <select> while newRepo() stays on the previously selected repo → the task is created in the wrong
-  // workspace.
+  // Project options are snapshotted when the modal opens, not bound to the reactive
+  // activeWorkspace(). Otherwise a workspace switch mid-modal (App.tsx restore-nav / workspaces
+  // refetch) repopulates the <select> while newRepo() stays on the previously selected repo, and
+  // the task is created in the wrong workspace.
   const [newProjectOptions, setNewProjectOptions] = createSignal<Project[]>([])
-  // Custom branch name (docs/terminal-and-agents.md): defaults to a de-duped slug of the title until the user
-  // edits the branch field directly, then their value wins.
+  // Custom branch name (docs/workspaces-and-tasks.md § Task creation and navigation): defaults to
+  // a de-duped slug of the title until the user edits the branch field directly, then their value
+  // wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
-  // The selected project's branch prefix. Desktop-only — project config is behind the
-  // main-process bridge; on web there's no checkout to prefix branches for. Read through taskBridge,
-  // not the terminal plugin's client: core must not import plugins (core/boundaries.test.ts).
+  // The selected project's branch prefix. Desktop-only: project config is behind the main-process
+  // bridge, and on web there's no checkout to prefix branches for. Read through taskBridge, not
+  // the terminal plugin's client, because core must not import plugins (core/boundaries.test.ts).
   const [prefixRow] = createResource(
     () => (draft()?.mode === 'new' ? newProject() : undefined),
     (id) => id ? taskBridge().project.get(id) : null,
@@ -128,9 +130,9 @@ export default function TabRail() {
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
-    // From a task view the URL is /t/:taskId, which carries no project — and every browse Source scopes
-    // itself to the routed project. Without this the rail swaps to a Source that then reports it has
-    // nothing to show. Selecting a Source keeps the project you were working in.
+    // From a task view the URL is /t/:taskId, which carries no project, and every browse Source
+    // scopes itself to the routed project. Without this the rail swaps to a Source that then
+    // reports it has nothing to show. Selecting a Source keeps the project you were working in.
     if (params.projectId) return
     const projectId = query.data?.find((task) => task.id === activeTaskId())?.projectId
     if (projectId) navigate(projectPath(projectId))
@@ -146,10 +148,9 @@ export default function TabRail() {
     navigate(pathForTask(w))
   }
 
-  // What a right-click on a task row is ABOUT, in the host's own vocabulary
-  // (registries/contextMenus.ts). Flat scalars, because a contributed `when` is a map of literals
-  // compared against these fields — `origin`, `projectId` and `pinned` are the three a contribution
-  // may match on, and `id`/`title` are the payload the action receives rather than a predicate.
+  // What a right-click on a task row is about, in the host's own vocabulary (docs/plugins.md §
+  // Context menus): `origin`, `projectId` and `pinned` are the only facts a contribution may match
+  // on, and `id`/`title` are the payload the action receives rather than a predicate.
   const rowTarget = (w: Task): TaskRowTarget => ({
     location: 'task.row',
     id: w.id,
@@ -162,11 +163,8 @@ export default function TabRail() {
   const taskById = (id: string) => (query.data ?? []).find((task) => task.id === id)
 
   onMount(() => {
-    // Core's own row actions, registered rather than written inline — this registry's first consumers.
-    // The point of moving them is the contract: a menu contribution is a label, an order, a predicate
-    // over the target and one action, and that is only true if core's items fit it too. Pin and Unpin
-    // are two contributions with opposite `when`s rather than one row with a computed label, which is
-    // the shape a manifest can express.
+    // Core's own row actions, registered rather than written inline (docs/plugins.md § Context
+    // menus): this registry's first consumers.
     const rowActions = registerContextMenuItems([
       {
         id: 'task.pin', location: 'task.row', label: 'Pin to top', icon: 'pin', order: 10,
@@ -276,10 +274,10 @@ export default function TabRail() {
     }
   }
 
-  // Archive confirm/error use the same modal shell as create/rename (Electron has no window.prompt/
-  // confirm-styling; the rail's dialogs stay consistent). When the bridge is present the archive
-  // ALWAYS runs through the guarded main-process teardown (main decides "no worktree → plain flip",
-  // refuses while sessions run or the worktree is dirty); the plain HTTP flip exists only for the
+  // Archive confirm/error use the same modal shell as create/rename (Electron has no
+  // window.prompt/confirm-styling; the rail's dialogs stay consistent). When the bridge is
+  // present, the archive always runs through the guarded teardown flow
+  // (docs/workspaces-and-tasks.md § Worktrees and setup); the plain HTTP flip exists only for the
   // bridge-absent browser dev build (capabilities()).
   const [archiveErr, setArchiveErr] = createSignal('')
   const [draftErr, setDraftErr] = createSignal('')
@@ -297,9 +295,9 @@ export default function TabRail() {
 
   async function archive(w: Task, applyChecks: string[] = []) {
     if (capabilities().terminal) {
-      // `force`, matching the task pane's own archive. This used to send no options at all, so a task
-      // with a dirty worktree came back "Worktree has uncommitted changes — confirm to discard" AFTER
-      // the owner had confirmed exactly that on the danger row. Confirming means confirming.
+      // `force`, matching the task pane's own archive. This used to send no options at all, so a
+      // task with a dirty worktree came back "uncommitted changes, confirm to discard" after the
+      // owner had already confirmed exactly that on the danger row. Confirming means confirming.
       const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
       if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
       if (res.cleanupFailed?.length) setArchiveErr(`Archived, but cleanup failed for: ${res.cleanupFailed.join(', ')}`)
@@ -348,7 +346,7 @@ export default function TabRail() {
             // repository source seam; the GitHub PR pane remains the authoritative check surface.
             const checks = () => []
             const st = () => taskStatus(w.id)
-            // Active rail markers — one source of truth for the overlay icons below and the hover
+            // Active rail markers: one source of truth for the overlay icons below and the hover
             // tooltip's legend, so the two never drift.
             const statusItems = () =>
               railStatusItems({
@@ -357,8 +355,8 @@ export default function TabRail() {
                 unread: !!unreadForTask(w.id),
                 status: st(),
               })
-            // Workspace identity derived onto the row (docs/workspaces-and-tasks.md): 3px accent in the
-            // workspace's colour, matching the active-row accent convention in docs/ui-design.md.
+            // Workspace identity derived onto the row: a 3px accent in the workspace's colour,
+            // matching the active-row accent convention.
             const ws = () => workspaceForProject(workspaces.data, w.projectId)
             const accent = () => {
               const g = ws()
@@ -373,8 +371,9 @@ export default function TabRail() {
               class="tabrail-item"
               draggable={true}
               // The second door onto the row's actions. `contextmenu` is also what the platform
-              // dispatches for Shift+F10 and the menu key, so this is the keyboard path too — and the
-              // button menu beside it still offers the identical list, from the identical registry.
+              // dispatches for Shift+F10 and the menu key, so this is the keyboard path too, and
+              // the button menu beside it still offers the identical list, from the identical
+              // registry.
               onContextMenu={(e) => {
                 e.preventDefault()
                 setMenuId(null)
@@ -395,7 +394,7 @@ export default function TabRail() {
                 <span class="tabrail-pin" title="Pinned to top"><Icon name="pin" /></span>
               </Show>
               {/* Gains Escape, outside-click and menu roles, none of which this had. The rail
-                  keeps owning WHICH menu is open — ⌘1-9 navigation closes it, and that decision
+                  keeps owning which menu is open: Cmd+1-9 navigation closes it, and that decision
                   cannot live inside one menu instance. */}
               <Menu
                 class="tabrail-menu"
@@ -433,18 +432,18 @@ export default function TabRail() {
                     <Menu.Label>{w.title}</Menu.Label>
                     <Menu.Label>{w.branch ?? 'Project folder'}</Menu.Label>
                     <Menu.Separator />
-                    {/* The rows come from the registry, core's own included, so this menu and the
-                        right-click one can never offer different things. */}
+                    {/* Both doors onto a task row draw the same list from the same registry
+                        (docs/plugins.md § Context menus), so they cannot offer different things. */}
                     <ContextMenuItems context={menu} location="task.row" target={rowTarget(w)} />
                   </>
                 )}
               </Menu>
-              {/* Live status markers (docs/workspaces-and-tasks.md): CI dot, agent-working spinner,
-                  needs-you notice, dirty/repair — from railStatus.ts, mirrored in the hover tooltip. */}
+              {/* Live status markers: CI dot, agent-working spinner, needs-you notice,
+                  dirty/repair, from railStatus.ts, mirrored in the hover tooltip. */}
               <For each={statusItems()}>
                 {(s) => (
                   <span class={s.overlayCls} title={s.label}>
-                    {/* The CI marker has no glyph — it is a StatusDot, whose colour used to come
+                    {/* The CI marker has no glyph, it is a StatusDot, whose colour used to come
                         from a class defined in the GitHub plugin's stylesheet. */}
                     <Show when={s.glyph} fallback={<Show when={s.dotTone}>{(tone) => <StatusDot tone={tone()} />}</Show>}>
                       {(g) => <Icon name={g()} />}
@@ -471,7 +470,7 @@ export default function TabRail() {
       <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
         +
       </button>
-      {/* `.tabrail-action-error` was never defined in any stylesheet — dropped with the migration. */}
+      {/* `.tabrail-action-error` was never defined in any stylesheet, dropped with the migration. */}
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (

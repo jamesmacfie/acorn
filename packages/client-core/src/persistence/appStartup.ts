@@ -23,7 +23,7 @@ const stringCodec = {
 const legacyScalar = (key: string) => (prefs: Readonly<Record<string, string>>) => ({ '': prefs[key] ?? '' })
 
 // Every read goes through `resolveTheme` (settings/themes.ts), which falls back to the built-in
-// default when the stored id names a theme that is not registered right now — a plugin theme whose
+// default when the stored id names a theme that is not registered right now: a plugin theme whose
 // package is disabled, gone, or on a node this window cannot reach. It reads the theme registry, so
 // this function is reactive: the effect below re-runs and the plugin's theme reappears the moment the
 // chrome pass registers it. The stored pref is never rewritten.
@@ -57,9 +57,10 @@ export type AppStartupOptions = {
   cacheRestoring: Accessor<boolean>
   projects: Accessor<Project[] | undefined>
   tasks: Accessor<Task[] | undefined>
-  // The current location's pathname. Read whole rather than rebuilt from route params: this slice used to
-  // assemble `/p/:projectId/pulls/:number` by hand, which meant core was writing one plugin's URL shape and
-  // could remember no other. Any project-scoped path a source contributes now round-trips unchanged.
+  // The current location's pathname. Read whole rather than rebuilt from route params: this slice
+  // used to assemble `/p/:projectId/pulls/:number` by hand, which meant core was writing one
+  // plugin's URL shape and could remember no other. Any project-scoped path a source contributes
+  // now round-trips unchanged.
   path: Accessor<string>
   navigate: Navigate
   collapsed: Accessor<boolean>
@@ -82,8 +83,8 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       id: 'core.last-path', key: PrefKeys.lastPath, scope: 'app', restore: 'workspace', version: 1,
       codec: stringCodec, empty: () => '', unknownIds: 'drop', maxBytes: 2 * 1024,
       binding: appStateBinding(
-        // Only project-scoped paths are worth remembering — a task path is restored by `core.last-task`
-        // and a settings path is not a place to come back to.
+        // Only project-scoped paths are worth remembering: a task path is restored by
+        // `core.last-task` and a settings path is not a place to come back to.
         () => (isProjectPath(options.path()) ? options.path() : ''),
         (saved) => {
           const projects = options.projects() ?? []

@@ -2,19 +2,19 @@ import { createSignal, onCleanup, type Accessor } from 'solid-js'
 import { integrationFlowRegistry, type DeviceFlowStart } from '../registries/integrationFlows'
 
 // Device authorization grant (RFC 8628) for a provider whose descriptor says `kind: 'device-flow'`.
-// The node performs the token exchange; this only paces the polling — which is the whole reason it is
-// a shared module rather than a branch inside one settings component. Both the Integrations page and
+// The node performs the token exchange; this only paces the polling, which is the whole reason it
+// is a shared module rather than a branch inside one settings component. Both the Integrations page and
 // first-run onboarding need identical pacing, and getting it wrong (polling faster than the
 // advertised interval, ignoring slow_down) is how a connection quietly stops working.
 //
-// Deliberately free of JSX so it can sit on the @acorn/plugin-api/client barrel: a plugin's
-// node-environment test suite must be able to import that barrel.
+// Free of JSX so it can sit on the @acorn/plugin-api/client barrel: a plugin's node-environment
+// test suite must be able to import that barrel.
 
 export type DeviceFlowController = {
   /** The started grant while it is in flight, else null. */
   device: Accessor<DeviceFlowStart | null>
   error: Accessor<string>
-  /** True while starting. Polling is not "busy" — the caller keeps its UI interactive. */
+  /** True while starting. Polling is not "busy": the caller keeps its UI interactive. */
   busy: Accessor<boolean>
   start: () => Promise<void>
   cancel: () => void
@@ -78,7 +78,7 @@ export function createDeviceFlow(
       if (!active) throw new Error('This provider does not expose a device connection flow.')
       const started = await active.start()
       setDevice(started)
-      // `interval` is the provider's, honoured exactly — polling faster earns a slow_down and,
+      // `interval` is the provider's, honoured exactly. Polling faster earns a slow_down and,
       // eventually, nothing.
       poll(started, started.interval * 1_000, Date.now() + started.expiresIn * 1_000)
     } catch (cause) {

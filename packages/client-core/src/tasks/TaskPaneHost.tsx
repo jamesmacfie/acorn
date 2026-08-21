@@ -33,10 +33,10 @@ export default function TaskPaneHost(props: {
       const pane = paneContribution(id)
       return pane && paneAvailable(pane, props.task) ? [pane] : []
     })
-    // A layout can name a pane this task cannot show — DEFAULT_PANE is the PR pane, and a task on a
-    // plain or GitHub-less project has no PR, which is now the ordinary case rather than the exception.
-    // Fall back to the first pane the task DOES offer; the empty state below is then what it says it
-    // is: an environment with no panes at all.
+    // A layout can name a pane this task cannot show: DEFAULT_PANE is the PR pane, and a task on a
+    // plain or GitHub-less project has no PR, which is now the ordinary case rather than the
+    // exception. Fall back to the first pane the task does offer; the empty state below is then
+    // what it says it is, an environment with no panes at all.
     return chosen.length ? chosen : switcherPanes().slice(0, 1)
   }
   const visiblePanes = () => {
@@ -49,9 +49,10 @@ export default function TaskPaneHost(props: {
   const onSwitch = (pane: PaneId, event: MouseEvent) =>
     dispatch(event.metaKey || event.ctrlKey ? { type: 'add', pane } : { type: 'show', pane })
 
-  // The badge is hidden while everything is fine, which is the common case and the reason this is not
-  // visual noise in every pane header. One value for the whole task view, because that is what it reports:
-  // the node's state, not a per-pane query (registries/panes.ts explains why there is no per-pane hook).
+  // The badge is hidden while everything is fine, which is the common case and the reason this is
+  // not visual noise in every pane header. One value for the whole task view, because that is what
+  // it reports: the node's state, not a per-pane query (registries/panes.ts explains why there is
+  // no per-pane hook).
   const nodeFreshness = (): Freshness => freshnessOf(nodeState(activeNodeId() ?? ''))
 
   const weightFor = (pane: PaneId) => layout().weights?.[pane] ?? 1
@@ -60,8 +61,9 @@ export default function TaskPaneHost(props: {
   const slotRefs = new Map<PaneId, HTMLDivElement>()
 
   // Pointer capture, rAF coalescing, selection suppression and the arrow/Home/End keys come from
-  // createSplitDrag; the weight model stays here. Widths are snapshotted at pointer-down because the
-  // reducer works from the sizes the drag STARTED at — re-measuring mid-drag compounds the delta.
+  // createSplitDrag; the weight model stays here. Widths are snapshotted at pointer-down because
+  // the reducer works from the sizes the drag started at; re-measuring mid-drag compounds the
+  // delta.
   const paneDrag = (pane: PaneContribution, adjacent: () => PaneContribution | undefined) => {
     let paneWidth = 0
     let adjacentWidth = 0

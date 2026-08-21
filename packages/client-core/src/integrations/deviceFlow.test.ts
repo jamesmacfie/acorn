@@ -12,7 +12,7 @@ const STARTED: DeviceFlowStart = {
 }
 
 // Pacing is the only thing worth testing here: polling faster than the advertised interval, or
-// ignoring slow_down, is how a device grant quietly stops working — and nothing in the type system
+// ignoring slow_down, is how a device grant quietly stops working, and nothing in the type system
 // catches it.
 describe('createDeviceFlow', () => {
   let polls: DeviceFlowPoll[] = []

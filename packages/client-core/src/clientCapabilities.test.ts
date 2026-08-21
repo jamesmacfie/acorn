@@ -29,7 +29,7 @@ describe('client capability registry', () => {
     first.dispose()
     first.dispose() // no-op, not a throw
     provideClientCapability(GREETER, { hello: () => 'second' })
-    // The stale handle must not delete the new impl — this is the re-activation case the plugin host
+    // The stale handle must not delete the new impl. This is the re-activation case the plugin host
     // hits when it disposes a plugin's contributions and immediately re-registers them.
     first.dispose()
     expect(clientCapability(GREETER)?.hello()).toBe('second')

@@ -1,8 +1,8 @@
-/* Workspace view (docs/workspaces-and-tasks.md): PR-review (Navigator + Diff) or an empty state, plus a thin
+/* Workspace view (docs/panes.md): PR-review (Navigator + Diff) or an empty state, plus a thin
    pane-switcher rail on the right. Mirrors the .panes grid but with the switcher as a 3rd column.
-   `.panes.panes-workspace` (specificity 0,2,0) so it reliably beats the base `.panes` 3-col rule —
+   `.panes.panes-workspace` (specificity 0,2,0) so it reliably beats the base `.panes` 3-col rule,
    otherwise the switcher falls into a 1fr track (huge right gap) and the Navigator widens. */
-/* Wrap so a status footer can sit below the terminal drawer (docs/workspaces-and-tasks.md). */
+/* Wrap so a status footer can sit below the terminal drawer. */
 /* Reserve room for the fixed status footer plus the terminal drawer when it's open
    (--term-drawer-h, set by TerminalPanel). The panes shrink above both docked surfaces, keeping
    their scrollbars visible. */
@@ -16,7 +16,7 @@
   grid-template-columns: clamp(360px, 23vw, 430px) minmax(0, 1fr) auto;
 }
 /* `.app.left-collapsed .panes` (0,3,0) otherwise beats the rule above (0,2,0) and forces the PR
-   view's `0 | mid | 1fr` grid onto the workspace's [Navigator | Diff | switcher] children —
+   view's `0 | mid | 1fr` grid onto the workspace's [Navigator | Diff | switcher] children,
    collapsing the Navigator and dropping the switcher into the 1fr track (huge right gap). The
    workspace has no left pane to collapse, so keep its own 3-track grid when the left is collapsed. */
 .app.left-collapsed .panes.panes-workspace {
@@ -122,10 +122,10 @@
   white-space: nowrap;
 }
 
-/* The pane-switcher mirrors the left TabRail exactly — same width and button size — for a symmetric
+/* The pane-switcher mirrors the left TabRail exactly, same width and button size, for a symmetric
    pair of icon rails. (Accent sits on the right edge since this rail is on the right.) */
 .pane-switcher {
-  /* Fixed so it runs the full height of the right edge — beside the panes AND the terminal drawer —
+  /* Fixed so it runs the full height of the right edge, beside the panes and the terminal drawer,
      instead of being squeezed above the drawer with the rest of .workspace-wrap's flow. The
      drawer's right: var(--tabrail-w) stops exactly at its left. */
   position: fixed;
@@ -164,11 +164,12 @@
 .close-confirm { color: var(--del-marker); border-color: var(--del-marker); }
 .task-run-error { position: absolute; left: 12px; bottom: 12px; z-index: var(--z-float); max-width: min(620px, 70vw); display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-5); background: var(--bg); border: var(--control-bw) solid var(--del-marker); }
 
-/* The Linear Source browse used to be here — the master/detail list, its triage filters, the priority-bar
-   glyph, the label chip and the workspace project picker. Linear is a loaded package now: the list is a
-   host-drawn descriptor rail (client-core/plugins/chrome/ChromeSourcePanel.tsx, styled by the shell's own
-   primitives) and the detail is the plugin's frame, so none of it had a caller left. The project picker
-   went with it and has nowhere to come back to, which is written up in docs/integrations.md § Linear. */
+/* The Linear Source browse used to be here: the master/detail list, its triage filters, the
+   priority-bar glyph, the label chip and the workspace project picker. Linear is a loaded package
+   now: the list is a host-drawn descriptor rail (client-core/plugins/chrome/ChromeSourcePanel.tsx,
+   styled by the shell's own primitives) and the detail is the plugin's frame, so none of it had a
+   caller left. The project picker went with it and has nowhere to come back to, which is written
+   up in docs/integrations.md § Linear. */
 
 /* Run-target buttons (docs/workflows.md §2): one ▶ per named target, id shown under the glyph. */
 .pane-switch-run { flex-direction: column; gap: 1px; }

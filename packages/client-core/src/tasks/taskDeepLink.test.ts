@@ -19,7 +19,7 @@ describe('parseTaskDeepLink', () => {
   })
 
   it('rejects a pane no plugin contributed', () => {
-    // Otherwise openPane would push an id nothing can render into the task's PERSISTED layout, where it
+    // Otherwise openPane would push an id nothing can render into the task's persisted layout, where it
     // would survive restarts.
     expect(parseTaskDeepLink({ pane: 'test.absent', item: 'ENG-404' })).toBeNull()
   })

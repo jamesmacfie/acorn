@@ -1,8 +1,8 @@
-// Notification centre (docs/terminal-and-agents.md): a bounded in-memory ring of agent-event notices, mirrored to
-// a prefs blob so the last ~50 survive a reload — ephemeral app state, not a table (the durable
-// truth is the session/task). Signals-only, like sessions.ts. Edge detection is pure (detectEdges),
-// fed by the sessions store on every refresh; OS toasts are focus-gated + cooldown/deduped here
-// (the main process no longer fires them).
+// Notification centre: a bounded in-memory ring of agent-event notices, mirrored to a prefs blob
+// so the last ~50 survive a reload. Ephemeral app state, not a table; the durable truth is the
+// session/task. Signals-only, like sessions.ts. Edge detection is pure (detectEdges), fed by the
+// sessions store on every refresh. OS toasts are focus-gated and cooldown/deduped here; the main
+// process no longer fires them.
 import { createSignal } from 'solid-js'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { wsOnNotice } from '../wsClient'
@@ -27,15 +27,15 @@ export type Notice = {
   read: boolean
   action?: 'review-config' | 'review-plugin-request'
   target?: NoticeTarget
-  // Which node the notice is about. Stamped by `pushNotice` from the active node rather than passed by
-  // each of the six call sites: every notice originates from a frame or a session list belonging to
-  // whichever node the client is currently talking to (wsClient.ts now drops frames from any other), so
-  // the caller has no extra information to add and six chances to forget.
+  // Which node the notice is about. Stamped by `pushNotice` from the active node rather than
+  // passed by each of the six call sites: every notice originates from a frame or a session list
+  // belonging to whichever node the client is currently talking to (wsClient.ts drops frames from
+  // any other), so the caller has no extra information to add and six chances to forget.
   //
-  // A nodeId rather than clearing the ring on a switch. Notices are persisted and rehydrated once at
-  // boot, so clearing would empty the bell permanently after the first node switch; filtering keeps both
-  // nodes' history and is what docs/ui-design.md § Prompts and notifications asks for ("grouped per node").
-  // `undefined` means the notice belongs to the home node.
+  // A nodeId rather than clearing the ring on a switch. Notices are persisted and rehydrated once
+  // at boot, so clearing would empty the bell permanently after the first node switch; filtering
+  // keeps both nodes' history, grouped separately. `undefined` means the notice belongs to the
+  // home node.
   nodeId?: string
 }
 
@@ -64,9 +64,10 @@ export function openNoticeTarget(notice: Notice): void {
   if (notice.target) openTarget(notice.taskId, notice.target)
 }
 
-// The same dispatch for an ATTENTION item, which carries the identical target shape but is not a Notice
-// (registries/attention.ts explains why they are separate types). Exported rather than duplicating the
-// handler-table lookup in the inbox: one table, one place that knows how to open a target.
+// The same dispatch for an attention item, which carries the identical target shape but is not a
+// Notice (registries/attention.ts explains why they are separate types). Exported rather than
+// duplicating the handler-table lookup in the inbox: one table, one place that knows how to open a
+// target.
 export function openTarget(taskId: string, target: NoticeTarget): void {
   targetHandlers.get(target.kind)?.(taskId, target)
 }
@@ -94,18 +95,20 @@ export const unreadForTask = (taskId: string): number =>
 export function markRead(id: string): void {
   setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
 }
-// "Mark all read" from the bell means the list the bell is SHOWING. Marking another node's notices read
-// from a popover that never displayed them would quietly destroy the only signal that they existed.
+// "Mark all read" from the bell means the list the bell is showing. Marking another node's
+// notices read from a popover that never displayed them would quietly destroy the only signal
+// that they existed.
 export function markAllRead(): void {
   const visible = new Set(noticesForActiveNode().map((n) => n.id))
   setNotices((prev) =>
     prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
   )
 }
-// Viewing a task acknowledges its notices — the ACTIVE node's, matching `unreadForTask` and `markAllRead`.
-// Without the filter this marked another node's notice about a task with the same id read, so the badge on
-// that node silently lost the only signal that it existed. Two nodes holding one task UUID is the case
-// docs/architecture-overview.md § Fleet semantics says must never collide.
+// Viewing a task acknowledges its notices: the active node's, matching `unreadForTask` and
+// `markAllRead`. Without the filter this marked another node's notice about a task with the same
+// id read, so the badge on that node silently lost the only signal that it existed. Two nodes
+// holding one task UUID is the case docs/architecture-overview.md § Client state and fleet
+// behavior says must never collide.
 export function markTaskRead(taskId: string): void {
   const visible = new Set(noticesForActiveNode().filter((n) => n.taskId === taskId).map((n) => n.id))
   setNotices((prev) =>
@@ -133,14 +136,14 @@ export function hydrateNoticeValues(restored: Notice[]): void {
 export const serializeNotices = (): string => JSON.stringify(notices())
 
 // Test seam: the ring is a module singleton, so cases in one file otherwise inherit each other's
-// notices — which matters now that visibility depends on a node stamp and an unstamped leftover reads as
-// "belongs to whatever node is active".
+// notices. That matters now that visibility depends on a node stamp, since an unstamped leftover
+// reads as "belongs to whatever node is active".
 export function _resetNotices(): void {
   setNotices([])
 }
 
-// --- Pure edge detection (docs/terminal-and-agents.md): compare consecutive session snapshots. Edges are
-// tracked unconditionally (suppression only affects the OS toast) so the NEXT transition is right.
+// Pure edge detection: compare consecutive session snapshots. Edges are tracked unconditionally
+// (suppression only affects the OS toast) so the next transition is right.
 type SessionEdgeState = Pick<TerminalSession, 'id' | 'taskId' | 'title' | 'kind' | 'status' | 'idle' | 'agentState' | 'exitCode'>
 
 export function detectEdges(prev: SessionEdgeState[], next: SessionEdgeState[], at: number): Omit<Notice, 'id' | 'read'>[] {
@@ -168,8 +171,8 @@ export function detectEdges(prev: SessionEdgeState[], next: SessionEdgeState[], 
   return out
 }
 
-// --- OS-toast gating (docs/terminal-and-agents.md): focused window → bell only; plus a per-(task,kind)
-// cooldown so a chatty agent can't spam. Pure — state is passed in.
+// OS-toast gating: focused window means bell only, plus a per-(task,kind) cooldown so a chatty
+// agent can't spam. Pure; state is passed in.
 export const TOAST_COOLDOWN_MS = 30_000
 
 export function shouldToast(
@@ -190,8 +193,8 @@ export function pushBackgroundError(taskId: string, title: string, detail?: stri
   return pushNotice({ taskId, kind: 'background-error', title, detail, at: Date.now() })
 }
 
-// Workflow notices (docs/workflows.md, docs/terminal-and-agents.md): main broadcasts gate/run-done events over the stream
-// WebSocket (the WebSocket transport); they land in the same bell + toast gate. Returns unsubscribe.
+// Workflow notices (docs/workflows.md § Routes and UI): main broadcasts gate/run-done events over
+// `/v2/events`; they land in the same bell and toast gate here. Returns unsubscribe.
 export function initWorkflowNotices(): () => void {
   return wsOnNotice((n) => {
     const at = Date.now()
@@ -210,8 +213,8 @@ export function initWorkflowNotices(): () => void {
 // --- Wiring: called by sessions.ts on every refresh with the previous + new snapshot.
 const lastToastAt = new Map<string, number>()
 
-// Managed-agent notices deliberately carry no prompt-derived title, response, filename, or path.
-// The durable notice target provides exact navigation without leaking sensitive content to the OS.
+// Managed-agent notices carry no prompt-derived title, response, filename, or path. The durable
+// notice target provides exact navigation without leaking sensitive content to the OS.
 export function pushManagedAgentNotice(input: {
   taskId: string
   sessionId: string

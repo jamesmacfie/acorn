@@ -1,8 +1,8 @@
 import { Menu } from './ui/Menu'
 
-// The topbar's overflow menu. It stopped being an *account* menu when the GitHub session went away —
-// there is no identity to show and nothing to log out of — but it is still where the two app-level
-// actions live, so the name and the CSS stay rather than churning both for a rename.
+// The topbar's overflow menu. It stopped being an *account* menu when the GitHub session went
+// away: there is no identity to show and nothing to log out of. It is still where the two
+// app-level actions live, so the name and the CSS stay rather than churning both for a rename.
 //
 // Dismissal, portalling, arrow-key roving and focus-return now come from Menu. This file used to
 // hand-roll its own document pointerdown and keydown listeners and had no arrow keys at all.
