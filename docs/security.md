@@ -28,7 +28,66 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - `/v2/node` and `/v2/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
   security, and backup are device-only.
 - `/v2/events` authenticates the upgrade and rechecks device activity for long-lived streams.
+- Revoking a device (`DELETE /v2/core/devices/:id`) closes that device's live sockets immediately and
+  fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing
+  itself.
 - There is no cookie or ambient browser credential, so CSRF middleware is not part of the protocol.
+
+`requireUser` is the single gate mounted over `/v2/*`. It accepts either credential kind, device or
+internal, because product routes such as the MCP server and agent sessions legitimately read and
+write task data as the owner. `requireDevice` is narrower and sits in front of surfaces an
+agent-spawned child must never reach: pairing, device management, plugin administration, audit,
+security, backup, and schedules. Before `requireDevice` existed, the internal token injected into
+every PTY and agent session environment was a complete privilege escalation: a prompt-injected agent
+could call `POST /v2/core/pair/start`, read the pairing code back out of the response body, pair
+itself a device, and walk away with a permanent owner-authority token. `requireDevice` answers 403
+rather than 401 for this case: the caller authenticated fine, it just is not the owner at a keyboard,
+and a 401 would invite a retry loop instead of stopping it.
+
+Both gates, and the task-scope and provider-access gates below them, are applied to a router's mount
+path in `server/index.ts` rather than inside each handler. A route added later under an already-gated
+prefix inherits the gate automatically instead of depending on someone remembering to add a check to
+it. An adversarial review found the per-route form of this check applied at exactly one call site out
+of six for task scope, leaving `/v2/core/tasks/<other>/preview-url` reachable by another task's
+credential for arbitrary shell execution in that task's worktree; mounting the gate is what keeps a
+newly added route safe by default instead of by memory.
+
+The task-scope gate matches a task id out of the URL, so it only reaches routes that carry one. Real
+plugins mount two shapes: `prefix: '/tasks'` with `/:id/...` underneath (changes, database, editor),
+or `prefix: ''` with `/tasks/:id/...` underneath (memory, workflows, docker). A route addressed by an
+opaque id instead, such as terminal's `/sessions/:sid`, agents' `/sessions/:sessionId`, or workflows'
+`/runs/:runId`, carries no `:id` for the gate to match, so its own router has to resolve the owning
+task and enforce the scope itself. That is a named exception to "mount the gate, don't check by hand,"
+not an oversight, so a route on this list has its own scope check to show for it.
+
+Terminal's routes (`plugins/terminal/src/server/routes/terminal.ts`) show what that self-check has to
+get right. The guard resolves the owning task for a session id before any handler runs, and answers an
+unknown session id with the same 404 as a foreign one, so a task-scoped caller cannot use the response
+to learn which session ids exist. Before the fix, a task-scoped credential could `POST
+/sessions/<any-id>/send` and type a shell command into another task's terminal. The session roster is
+filtered rather than gated, since a caller may legitimately list its own task's sessions; unfiltered,
+`list()` handed every caller every task's session titles and ids, the same shape of leak as an
+unguarded `/devices` route. One ordering rule matters too: a missing PTY engine (`dev:node` without
+one wired) must still answer with the bridge's 503, not the ownership guard's 404, because the
+client's degraded-mode handling keys on the 503 and the two failures are not interchangeable.
+
+The WebSocket hub (`main/wsHub.ts`) had the same class of gap. `authorize()` verified a task-scoped
+internal token and returned its claims, but the connection object built afterward discarded them, so
+the `term:` dispatch routed by session id alone and every other channel, plus the broadcast path, ran
+with no scope check at all. A task-scoped credential could open the socket itself and reach
+`docker:exec:open`/`docker:exec:in`, which spawn an interactive shell in any container on the machine:
+arbitrary command execution as the owner, from inside another task's context. The scope check now runs
+once, before a frame reaches any channel handler or the `term:` dispatch, and it fails closed on an
+unknown stream id rather than allowing it, since failing open would make the check bypassable by
+racing session creation.
+
+A task-confined connection also receives none of `wsBroadcast`'s frames. No broadcast channel is
+task-addressed: `workflow:step:event` carries another task's raw agent stream (assistant text and tool
+results), `workflow:notice` carries another task's title, `agent:session`/`agent:event` carry another
+task's session, and `term:status`/`docker:changed` are content-free cache-dirty pings whose only value
+is to a UI. With nothing to narrow the frame to, the filter withholds everything rather than guessing
+at what would be safe to keep. A task-confined socket is not otherwise deaf: its own session's output
+still reaches it, through the per-session sink rather than through broadcast.
 
 ## Credential handling
 
@@ -41,16 +100,60 @@ Child environments are built by the process broker. They do not inherit `SESSION
 credentials, arbitrary `ACORN_*` values, or the parent process environment. They receive a task-scoped
 internal token, the current data-root path, and the TLS trust material needed to call the Node.
 
+Internal tokens are stateless HMAC credentials. A signing key persists across restarts so a
+tmux-reattached agent session can keep authenticating after the Node restarts; rotating the key
+revokes every outstanding token. Tokens carry no expiry of their own, so scope and key rotation are
+the only lifetime controls. Two scopes exist: `service`, for the node's own loopback calls (a
+firing schedule, the measure sampler, notes seeding), minted in-process and never placed in a
+child's environment; and `task`, for everything handed to a child process, PTYs, agent sessions,
+workflow steps, the MCP server. A `task`-scoped token carries the task id it was minted for, and
+route handlers compare that id against the task named in the URL before acting.
+
+Minting a token is not exposed on `CoreServices`: any plugin could then request a token for any
+scope, which defeats the point of scoping them at all. Instead the composition root builds a scoped
+credential factory and hands it to the plugins that spawn children, terminal and agents, as a
+constructor dependency. The factory closes over the signing key and the listener's own address,
+neither of which exists until every plugin's `init` has run, so only the composition root can build
+it, and only after the fact. A plugin calls it once per child with the scope that child needs, for
+example `{ scope: 'task', taskId, sessionId }` for one managed-agent session.
+
 The node-owner identity is opaque, explicit, and persisted at first boot. It is independent of
 provider connections, and internal auth fails closed if it is unset. A task-scoped token cannot use
 another task's task-addressed routes, terminal streams, preview tunnel, or worktree operations.
 Provider-credential restrictions are route-specific; the current GitHub routes can be reached by an
 authenticated internal principal and therefore can spend the active owner's GitHub credential.
+Routes that administer or spend a provider connection use a middleware gate one step wider than
+`requireDevice`: device principals plus the node's own `service`-scope internal calls, which need
+provider reads to warm a mirror. A `task`-scoped token still cannot reach these routes.
+
+Core's own code reads a stored secret through `SecretService.use()`
+(`packages/node-core/src/main/core/security/secrets.ts`), not through a raw decrypt call. Before this
+existed, `decryptSecret(row.authRef, c.env.SESSION_ENC_KEY)` appeared at six sites across core and
+three plugins, and each site both held the plaintext and had `SESSION_ENC_KEY` itself in scope.
+`use()` passes the plaintext into a caller-supplied function and, if that function throws, scrubs the
+plaintext out of the thrown error before it leaves the call. That matters because some providers echo
+a credential back in a malformed-header error response, and that response gets logged, wrapped in an
+`ApiError`, and sometimes returned to a client; scrubbing at the one point that sees both the secret
+and the failure closes that leak. `use()` does not stop a caller from returning the plaintext out of
+its own scope, since TypeScript cannot express that restriction; the containment that matters, an agent
+reaching a credential at all, comes from internal-token scoping, not from this shape.
+
+`reveal()` is the named escape hatch for a call site that hands the credential to a long-lived
+consumer whose lifetime this scope cannot bracket, such as a database connection pool or a driver's
+child-process environment. Every call to `reveal()` sits outside the scrub-on-throw guarantee.
 
 ## Process, path, and configuration controls
 
 - Plugins use CoreServices for filesystem access and Git. The filesystem service applies one
-  symlink-aware data-root/worktree confinement policy.
+  symlink-aware data-root/worktree confinement policy
+  (`packages/node-core/src/main/core/filesystem/confinement.ts`). Four call sites used to each check
+  this on their own: `taskWorktree.ts`'s lexical-plus-symlink check, `pathGuards.ts`'s lexical-only
+  check, the agents plugin's own realpath-and-relative pass, and the editor plugin's `confine()`
+  wrapper. Lexical-only is not enough on its own: a worktree holds arbitrary checked-out content,
+  including a symlink an untrusted branch added that points at `~/.ssh`, and a lexical check lets that
+  through. `resolveInRoot` stayed the one implementation everywhere except the Docker plugin's
+  container-label matcher, which compares paths reported by the daemon inside a container namespace;
+  resolving those against this host's filesystem would be wrong, not merely redundant.
 - Short-lived task work goes through the process broker, which uses explicit working directories,
   environment allowlists, process-group termination, bounded output, and production timeouts.
 - Long-lived engines own their own children, under the same environment hygiene. The broker's model is
@@ -69,6 +172,19 @@ authenticated internal principal and therefore can spend the active owner's GitH
   the appropriate trust gate.
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to
   HTTP(S) URLs without userinfo.
+
+Before the broker (`packages/node-core/src/main/core/exec/proc.ts`) existed, about sixteen call sites
+spawned or exec'd children with their own ad hoc handling, and the inconsistency was not cosmetic.
+`plugins/terminal`'s preview capture ran a repo-configured script through `/bin/sh -c` with no `env`
+option, so it inherited the node's full environment, `SESSION_ENC_KEY` and `INTERNAL_TOKEN` included,
+and had no output cap. The agents plugin's Claude driver spread `process.env` into its child the same
+way. The Docker plugin denylisted six named secrets, and the "keep in sync" comment above the list
+pointed at a file that no longer existed; a denylist silently misses any binding nobody remembered to
+add. Only one site, `main/headless.ts`, killed the child's process group, so everywhere else a hung
+child's grandchildren survived and kept the stdio pipes open. The broker fixes this by building a
+caller's environment from an allowlist and never spreading `process.env`; a caller that needs more
+passes `passthrough: ['DOCKER_*']`, visible at the call site and additive rather than "everything
+except what we remembered."
 
 ## Third-party plugin bundles
 
@@ -566,6 +682,10 @@ before persistence or rendering. Raw payloads, request headers, cookies, bodies,
 provider objects are discarded. Normalization failure rejects the item rather than widening the
 surface automatically.
 
+The allowlist runs even when the source SDK already scrubbed common secret keys before sending the
+payload: that scrubbing is the sender's choice and acorn's storage and rendering path cannot rely on
+a filter it does not control.
+
 ## Filesystem and backup
 
 Data roots, credential files, TLS material, databases, WAL files, blobs, and worktrees are created
@@ -584,3 +704,12 @@ pairing-window changes, device pair/revoke, config-trust acknowledgement, secret
 plugin toggles, plugin install/update/uninstall/reload, the owner's answer to an agent-raised plugin
 request, and backup. The Settings → Security surface reads it. The trail is
 not tamper-evident against someone who already controls the database file.
+
+Secret *use* is not recorded, only creation, replacement and deletion. Every credential read goes
+through `SecretService.use` (`main/core/secrets.ts`), which holds only an encryption key and nothing
+else, no database, no request, no connection id, so a row written from there could only name the
+credential by a hash of its ciphertext. Recording every read would also turn the table into a request
+log, since a mirror refresh reads a provider token on a timer, and would bury the handful of decisions
+an owner actually reviews. Auditing only the single GitHub read site was considered and rejected too:
+partial coverage that reads as complete would let an owner conclude nothing else spends a credential,
+which is worse than recording nothing.

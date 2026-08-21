@@ -427,6 +427,45 @@ The arithmetic is pure in `dashboards-core/trend.ts` (points, path data, baselin
 reads the series from `GET /v2/core/dashboards/history`; there is no write route, because the sampler
 and the store share a process and one writer needs no convergence.
 
+### Sampling and retention
+
+`core:sample-measures` samples every placed panel that asked for a history trend, once an hour
+([schedules.md](./schedules.md)). It reads the prefs blob through the same parser the clients use and
+computes each panel's number with the same pipeline the stat renders with, so a stored sample means
+what the number on screen means. An unplaced panel is skipped: nothing renders it, so sampling it
+would be cost with no reader. Placing it again resumes sampling from the next pass, and the gap in
+between renders honestly as a gap.
+
+A panel over more than one collection is skipped whole when any of them fails to resolve, unlike
+rendering's partial union: a stat that recorded a dip because one provider was briefly unavailable
+would be a number that never happened. Skips are named in the run's own detail line, for example "12
+sampled, 2 skipped: github unavailable", so a chart with holes in it can be explained rather than
+mistaken for a quiet failure.
+
+The store keeps hourly samples for 14 days, then compacts them to one value per UTC day, the day's
+last value rather than an average, for up to 400 days total (just over a year, so a "vs last year"
+comparison has an answer for as long as anyone is likely to ask one). A hard cap of 1000 samples per
+panel exists only to bound a bug in compaction; the retention windows above land well under it. The
+daily `core:compact-history` pass also drops the history of any panel whose definition has been
+deleted, using the set of panel ids the prefs blob currently defines rather than what is placed, since
+unplacing a panel must not delete its history. When the prefs blob cannot be read, compaction skips
+this sweep entirely: treating "could not read" as "no panels exist" would delete every series over a
+transient error.
+
+Changing a panel's meaning, such as adding a filter, resets its series. The old samples would describe
+a different measure and sitting them beside the new ones would be a lie, so the store discards them
+and the trend visibly restarts.
+
+The reset is driven by a signature (`dashboards-core/signature.ts`) over the parts of the definition
+that change what the measure means: `queries` (ids and params), `mapping`, `shaping.filters`,
+`view.aggregate` and `view.field`. Everything else is left out on purpose: the view kind, sort, limit,
+the field projection, the title, the geometry, and the trend/compare/good display keys change how the
+number is presented, not what it is, so retitling a panel or dragging it to a new column does not
+invalidate a fortnight of history. `sort` and `limit` are a judgment call rather than an oversight: a
+limit does bound the row set an aggregate runs over, but a stat with a limit is rare enough that
+resetting everyone's history for it costs more than it buys. Move a field onto the "in" side the day a
+real panel needs it; the signature changing is exactly the honest reset.
+
 ### The mapping layer, and cross-source panels
 
 A panel over more than one collection, or over one with user-declared columns, goes through
@@ -541,6 +580,11 @@ measure sampler reads the same blob the clients write and has to parse it throug
 rather than a second one that agrees today. `persist.ts` keeps the store, the slice registration and
 the *geometry* codec — a rect is a rendering concern the node has no use for.
 
+The chart keys (`shape`, and the axis fields that go with it) are parsed the same tolerant way: any
+value outside the literal set is dropped rather than coerced. An old client that writes the blob loses
+them and the chart falls back to its inferred defaults, so the panel survives; an old client
+*rendering* a `chart` panel already shows "view unavailable" rather than drawing something it cannot.
+
 `PanelView` also carries three optional stat keys, parsed exactly like the chart keys and dropped when
 malformed: `trend` (`'history' | 'activity'`), `compare` (`'day' | 'week'`) and `good`
 (`'up' | 'down'`). `trend: 'history'` is what the node's sampler selects a panel on, and § Trends is
@@ -633,7 +677,13 @@ Dashboard picker always offers "New dashboard…" — the bar's `+` cannot be th
 is what one dashboard does not have. Picking it reveals a name field under the picker, for the same
 reason the bar's `+` drops into a rename: a dashboard called "New dashboard" forever is what happens
 when naming it is a second trip. Empty falls back to the unique default, so it stays an option rather
-than a step, and nothing is written until the last step commits either way. A panel moves between tabs
+than a step, and nothing is written until the last step commits either way.
+
+Creating that first extra dashboard is also what first writes the `tabs` key: the original tab has
+no entry of its own until then, so it is named `Home` at the same moment, and a bar whose first tab
+has no name is never seen. Every name from then on, typed or defaulted, is deduplicated against the
+existing ones as `New dashboard`, `New dashboard 2`, and so on up to the tab cap, so two tabs can
+never read the same. A panel moves between tabs
 through **"Move to…"** in its own overflow menu, keeping its definition and taking a fresh rect at the
 destination.
 

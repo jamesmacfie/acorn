@@ -73,6 +73,17 @@ deliberate exception is `PLUGIN_API_MAJOR`, which is the contract's version and 
 surface by definition. Anything that turns out to be missing is one line to add back, under the
 add-is-free rule below.
 
+Adding a name is mechanically free, but it is still a compatibility promise the moment a third-party
+plugin exists. The 2026-08 architecture review flagged the client barrel's 173 exports at the time as
+accumulated rather than chosen, so a new addition to `/client` or `/node` should face the same
+question a new dependency gets: does a third-party plugin need this, or is it convenient for a
+first-party one that could import deeper instead?
+
+A comment marked `// prune candidate:` in the facade source flags a name that a first-party plugin
+still reaches for but a third-party plugin should not. It names the `ctx` seam that plugin should
+move to instead, so the marked name can come off the surface once every first-party caller has
+moved onto that seam.
+
 Eight entrypoints:
 
 | Entrypoint | What it carries |
@@ -154,6 +165,11 @@ person wrote and a person reviewed. It is held to the implementation by mutual-a
 `packages/plugin-sdk/src/contract.test.ts`, which `tsc --noEmit` fails the moment an upstream shape moves
 underneath a stable name — the exact drift the name-level snapshot cannot see.
 
+`PLUGIN_BRIDGE_VERSION` (`packages/protocol/src/pluginBridge.ts`) is not part of that published
+surface. A frame never compares it itself: `connect()` does, and refuses a hello it does not
+recognize. Exporting the number would invite a plugin to branch on it and claim it supports two
+protocol versions, which is not a promise acorn makes.
+
 **Hono and drizzle are part of the tier-1 contract, and that is a decision, not an oversight.**
 `PluginRouteRegistry.register` takes a `Hono<AppEnv>` and `PluginDatabase` is
 `ReturnType<typeof drizzleOverSqlite> & …`, so a compiled-in plugin shares the host's HTTP framework and
@@ -216,6 +232,18 @@ still boot.
 
 Optional plugins can be disabled per Node through Settings → Plugins; their SQLite files remain on
 disk and can be re-enabled later.
+
+Settings → Plugins, install included, is scoped to one Node at a time, with a node picker at the top.
+Which plugins a Node runs decides which routes exist and which SQLite files it opens, so disabling a
+plugin is a statement about one machine: a fleet is a set of independently administered nodes, and
+there is no "install everywhere" or "disable everywhere" here.
+
+The page shows two facts per row, not one: `disabled` is what will happen (it takes effect at the
+Node's next start, since routes, tables, and jobs are wired at init) and `running` is what is happening
+now. Between saving a toggle and restarting the Node, the two can differ, and the page keeps both
+visible with a restart banner rather than collapsing them into one state that would either lie about
+the checkbox or hide the pending restart. Install and update carry the same banner, for the same
+reason: a package that installed onto the Node's disk has not necessarily started running yet.
 
 Node initialization happens before the listener accepts requests. A plugin can register:
 
@@ -816,7 +844,10 @@ kinds of contribution come out of one manifest:
   telling someone "nothing is assigned to you" because a request timed out is a claim the host has no
   business making on a plugin's behalf. It is deliberately no richer than a sentence and a button; the
   field exists because a rail that cannot say what empty *means* pushes sources into showing a wrong
-  list instead of an empty one, which is exactly what Linear did. A `contentLinks` entry uses a
+  list instead of an empty one, which is exactly what Linear did. `emptyState` belongs to this
+  descriptor twin only (`@acorn/protocol/api.ts` § `PluginSourceEmptyState`): a first-party
+  `SourceContribution` is a component and already renders whatever it wants when it has nothing, so
+  the same field there would be one every first-party source carries and none reads. A `contentLinks` entry uses a
   bounded `https://` host/path grammar and delivers one captured path segment to one of **three**
   destinations: an optional **task-scoped** `openPane` from the same manifest, which receives it as a
   `plugin:select` intent in the active task; the plugin's own **reference panel**, shown over
@@ -1283,6 +1314,12 @@ rail keeps drawing its own. The user picks a provider in **Settings → Plugins 
 and that choice is a device preference — which list a person looks at is a property of the screen they
 are looking at.
 
+The picker lives in Settings → Plugins, not Appearance, because of what the choice is about.
+Appearance's colour and shape axes exist whether or not anything is installed; this picker's options
+are named after installed plugins and exist only because something is installed. It is hidden
+entirely when nobody has offered a replacement, since a select with one option cannot do anything and
+a permanent "no plugin replaces your task list" row would be chrome earning nothing.
+
 **Core is the fallback in the strong sense**: not "when nothing is set" but whenever anything at all is
 off. Nobody chosen, the chosen plugin not installed on this node, installed but disabled or untrusted,
 or its surface threw while rendering — all four draw core's own implementation, and the settings row
@@ -1506,6 +1543,12 @@ agent contexts, agent-tool renderers, pollers, persisted-state slices, Node stat
 items. An activation pass handles subscriptions or local storage initialization after all descriptors
 exist.
 
+A contribution that names a provider must name its own plugin. `registries/plugin.ts`'s
+`declaredProvider` stamps `providerId` from the plugin that is activating, never from a value the
+contribution itself carries, the same way a Node route is confined to its own path. Without it a
+plugin could claim another plugin's integration rows, which is what `providerId` otherwise selects a
+rail source on.
+
 **`persistedState` has no manifest form, and will not get one.** A slice is not a value — it is a
 `{ codec, empty, unknownIds, maxBytes, legacy, binding: { values, hydrate } }` record the host drives
 through its own restore phases, reading and writing SHELL SIGNALS at boot before any frame exists, and
@@ -1614,6 +1657,22 @@ Plugins collaborate through four mechanisms:
    owning plugin's tables. Two plugins that need to talk use a capability (2).
 4. **Client registries and slots** — register UI contributions without importing another plugin's
    implementation. The host records disposables so disabling/reloading a plugin removes its entries.
+
+`packages/client-core/src/clientCapabilities.ts` mirrors capabilities (2) on the client: a typed
+`Map` keyed by `ClientCapabilityId<T>`, so one plugin's client half can call another's without an
+import edge between their packages. The motivating case was the agent task sidebar merging
+`plugins/workflows`' steps into its roster while `plugins/workflows`' node half already needed
+`plugins/agents` to execute a session, two legitimate couplings pointing opposite ways, which is a
+package cycle that turbo refuses to build. Routing one direction through a capability id breaks the
+cycle.
+
+Like the Node's registry, it is not a DI container: it resolves nothing on its own, constructs
+nothing, and orders nothing. Call sites must resolve at call time, never at module scope or in a
+component body that runs once, because a plugin's client registration order is not a contract, and
+reading a capability during another plugin's init could cache `undefined` just because that plugin
+happened to register second. Unlike the Node's registry, which is per-runtime because the service can
+boot twice in one process, this one is a module singleton: a renderer has exactly one client graph,
+and `_resetClientCapabilities` exists only for tests.
 
 The architecture test enforces zero non-contract plugin-to-plugin edges, no app imports from packages
 or plugins, no Electron imports outside the allowed desktop surface, protocol purity, declared
@@ -1738,6 +1797,20 @@ in `pluginDisable.test.ts` (`agents`, `memory`, `notes`, `terminal`), because wh
 off is policy and deriving it from `p.required` would assert nothing; the anti-vacuity floors, which are what
 stops an exact match against an empty snapshot passing; and the prose above each snapshot read, explaining
 what is ABSENT and why, which a generated file cannot say for itself.
+
+`pluginDisable.test.ts` compares route, tool, section, provider and database lists with multiset
+subtraction, not set subtraction: it removes each expected entry once and reports what is left over.
+A plain `filter` against the expected list would be wrong, because some plugins register several
+entries under the same key (github mounts eleven routers under `github/repos`; `changes` and `editor`
+each mount two under one prefix). Set-style subtraction would drop all of them for one expectation and
+would not notice most of them going missing. Counting catches a duplicate disappearing, which is the
+only way an exact match means anything for a key with repeats.
+
+Regeneration can only record what a boot lost, so it cannot record an entry a disable wrongly added;
+that case still has to fail the equality against the recorded file. Route removals are also attributed,
+not just counted: a route's key names its owning plugin (`/v2/p/<plugin>/...`, see § Activation), so an
+entry credited to the wrong plugin in the golden file fails that check even when the overall equality
+still passes. Regenerating the file cannot launder a wrong attribution, only a human correcting it can.
 
 Two neighbours have the same shape and different commands. `packages/plugin-api/src/surface.snapshot.txt`
 pins the facade's exports and regenerates with `UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`; a

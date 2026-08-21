@@ -70,8 +70,9 @@ source on its contribution, and one that declares none is absent rather than pre
 ([integrations.md](./integrations.md)). Selection is edited one project at a time against the current
 set, so a provider whose list fails to load — or one that is simply not on screen — keeps its rows.
 
-A rail scoped to nothing mapped is unscoped, not empty: with no rows for its connections an integration
-shows what it can reach on its own (Linear, the viewer's assigned issues; Rollbar, every connection).
+A rail scoped to nothing mapped is not always empty: Rollbar, which has no linked-project concept,
+reads every connection unscoped. Linear, which does have one, declares its own `emptyState` for "no
+linked projects" instead of falling back to any issues ([integrations.md § Linear](./integrations.md)).
 
 ## Task
 
@@ -103,6 +104,18 @@ refused with a `worktree-stale` 409, and a worktree that cannot be created is re
 `worktree-unavailable` rather than silently falling back to the main checkout. Both used to hand the
 task another branch's files, which is the tree its agent then read and edited.
 
+A new branch is created from a base ref chosen in order: the project's preferred ref, an
+identity-scoped preference read from prefs key `base_ref:<projectId>`, then `origin/main`, then
+`origin/master`, falling back to the checkout's current HEAD if none of those exist. Resolving the
+preferred ref needs the caller's identity; a missing identity fails closed to the origin/main
+fallback rather than risk reading another login's preference.
+
+A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: repo-relative files,
+usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
+without a setup script. Missing sources warn rather than fail worktree creation, existing targets
+are never overwritten, and a repo's list wins over a personal one outright rather than merging with
+it.
+
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
 failures instead of pretending removal succeeded. Its order is guard → repo teardown script → stop
 sessions → plugin cleanups → remove worktree → mark archived; the two teardown steps sit before
@@ -116,8 +129,19 @@ still archived, because it is.
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
-machine-local values. Executable committed configuration is hash-gated by `config_acks`; changing
+machine-local values.
+
+The `dev` run target layers in this order, each entry overriding the last: `workspaces.devScript`
+and `devRestartScript` as a base target, then `projects.run_targets` (the per-project Settings
+surface), then `~/.acorn/config.toml`, then the committed `./.acorn/config.toml`, which always
+wins. The base `dev` target carries no URL and gets no `default` flag, so it never shadows a repo's
+real default target. Executable committed configuration is hash-gated by `config_acks`; changing
 the snapshot requires a new review before a task or workflow executes it.
+
+A `[layout.<id>]` block in the same config seeds a task's pane layout: known panes open left to
+right, unknown or duplicate pane ids are dropped, and a recipe naming no valid pane does nothing.
+`terminal = "<run-target-id>"` auto-starts that target and opens the terminal drawer; `browser =
+"run:<id>"` points the browser pane at that target's resolved URL once it is up.
 
 ## Task creation and navigation
 

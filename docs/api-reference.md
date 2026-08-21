@@ -37,6 +37,31 @@ branch; otherwise the transport codes are `bad_request`, `unauthorized`, `forbid
 `revision_conflict`, `idempotency_conflict`, `provider_error`, `rate_limited`, `timeout`, and
 `internal`.
 
+## Pairing
+
+A pairing code is a one-time, 128-bit credential with a 10-minute window and a 5-attempt budget,
+issued and displayed by the node (QR plus text) and typed into the new client. It lives in memory
+only and is never persisted: a code that survived a node restart would be a credential sitting on
+disk for a window the owner believes has closed, so a restart loses an in-flight code and the owner
+just reopens the window. Issuing a new code replaces any code already open; there is at most one open
+window at a time.
+
+Every failure mode, no open window, an expired window, an exhausted attempt budget, a wrong code, or
+a malformed request body, answers with the same 401 status and message. The response gives a caller
+no way to tell which of those it hit, so there is no oracle for "right code, wrong something". The
+attempt counter increments before the code comparison runs, so exhausting the budget cannot be
+avoided by racing concurrent guesses.
+
+`POST /v2/pair` returns the device's bearer token exactly once, in that response; the node stores
+only its hash from then on. The node's unauthenticated probe response carries the TLS certificate
+fingerprint, for the new client to compare against what the node's own screen shows. Sending the
+fingerprint over the connection being authenticated proves nothing by itself; the comparison's value
+comes from the owner reading both screens.
+
+`DELETE /v2/core/devices/:id` closes that device's open WebSocket connections immediately, since a
+live socket holds no bearer to re-check against a revocation. A device may revoke itself; every
+paired device already has full owner authority, so there is no separate self-revocation guard.
+
 ## Versioning
 
 **One number, one meaning.** `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
@@ -88,6 +113,30 @@ only (`docs/plugins.md § The plugin API`).
 enqueue, and request resolution. A device-keyed replay stores the request hash and final response;
 reuse with a different body returns `idempotency_conflict`. Internal callers have no device replay
 namespace.
+
+The client mints the key, never the broker: only the call site knows that a retry is the same
+logical mutation, and a broker-minted key would defeat replay entirely.
+
+## Errors
+
+Every route that fails returns the same envelope, `{ error: { code, message, requestId, retryable,
+details? } }` (`@acorn/protocol/errors.ts`). `ERROR_CODES` is a small set of transport-level codes,
+the floor every consumer can rely on for a failure with no domain meaning: things like `not_found`,
+`internal`, and `rate_limited`. Error bodies never carry secrets, tokens, file contents, or a
+provider's raw response body; an unknown internal failure returns `internal` plus a `requestId` and
+logs the rest server-side.
+
+That floor is closed but not exclusive. A route may return its own documented code instead of a
+floor code, and about three dozen of those domain codes are already load-bearing on the client:
+`needs-trust` opens the config-trust modal, `provider_needs_auth` rewrites the error message, and so
+on. Collapsing every route onto the ten floor codes would delete that behavior. A closed set exists
+to buy interop discipline across an API boundary, and there is no such boundary here: the client and
+the Node ship from the same repository and release together (§ Versioning above). So the floor is a
+fallback for the case a route did not think to name, not a whitelist a route must stay inside.
+
+`retryable` is derived from the HTTP status, not set by hand, so callers never maintain a per-code
+table: `408`, `429`, `502`, `503`, and `504` are retryable, and no other 5xx is. A `500` usually means
+the request itself is broken, and marking it retryable would only invite a client to hammer it.
 
 ## Core routes
 
@@ -272,6 +321,21 @@ marks the Node stale and refetches. Durable agent and workflow history is read f
 
 PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview tunnels use the
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
+
+The preview tunnel (`/v2/tunnel`, `packages/node-core/src/main/tunnel.ts`) is a separate upgrade on
+the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device/internal-token
+authorization as `/v2/events`. It forwards raw bytes to `127.0.0.1` on the named port only, never to a
+resolved hostname: only declared ports are tunnellable, and there is no general SOCKS proxy to
+whatever else is listening on the node's loopback. A port counts as declared when the task's run
+bridge already names it as a run target's URL, or when the project's `previewMode` is `'port'`.
+`previewMode: 'script'` is not a source, because its value is a shell command whose output would have
+to run on every tunnel attempt to answer the question; a remote task configured that way gets no
+tunnel until the same port also appears as a run target's URL or a `'port'` value. `previewMode: 'url'`
+is also declared, the same way as `'port'`: without it, a remote task configured with
+`http://localhost:8025` would resolve the tunnel request, get refused, and fall back to loading the URL
+as given, which rendered whatever was on the owner's own port 8025 while claiming to show the remote
+preview. A URL naming a host other than loopback contributes nothing to the allowlist: it is already
+reachable from the client directly, so there is nothing to tunnel.
 
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
 both ends. Core owns three of them: `term:` (transport on both ends), `workflow:` (the notification

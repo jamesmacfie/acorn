@@ -35,6 +35,12 @@ Renderer calls require a device principal. MCP calls require an internal princip
 bound to the task. The Node applies the caller scope, task identity, and the owner's per-tool
 permission preference before executing.
 
+Permissions are enforced in two layers, persisted together as one prefs slice under
+`agentTools.perms`: a **tier** default (`read` / `write` / `execute`) and a **per-tool** override. A
+per-tool toggle wins over its tier, and both default to on. Turning a tier off removes every tool at
+that risk level from `tools/list` and rejects a direct harness call for one of them. This applies
+before any workflow or profile ceiling, which can only narrow the tools available further.
+
 ## Context sections
 
 Plugins register context sections through the Node context-section registry. Each contribution declares
@@ -43,12 +49,37 @@ IDs. Core applies byte/token budgets, records section status/freshness, and retu
 snapshot. GitHub, notes, memory, Linear, Rollbar, and task sections are optional contributions; one
 failing section does not discard its siblings.
 
+Core's own `issues` section registers at module scope in `contextSections.ts`, not through
+`wireAgentTools`. That matters because `wireAgentTools` is not called on every boot shape: the
+standalone Node (`pnpm dev:node`, and any Node a client pairs with over the LAN) never calls it. A
+module-scope registration means the section, and its "Linked issues" row in the context pane, exists
+on that boot too.
+
+Order used to be a hardcoded `['pr', 'issues', 'notes', 'memory']` list, with core sequencing four
+known plugin ids, so a fifth section could only ever land last. Now each section declares its own
+order and the registry sorts on that value, spaced widely enough (10, 20, 30, 40, ...) that a new
+section can slot between two existing ones without renumbering anything. The order is load-bearing:
+every existing prompt, the client's Manifest preview, and the byte-exactness rule below all assume
+`pr`, `issues`, `notes`, `memory` in that sequence, so changing a section's number changes what an
+agent reads.
+
+A section's `compact` rendering must not depend on which other sections are included alongside it.
+This lets the client assemble the exact context block a send will produce from a single `include=*`
+inventory, by filtering `ctx.sections` and calling `formatContextBlock`, with no second curated fetch.
+A section that reads sibling-inclusion state into its own `compact` breaks that byte-exactness
+silently.
+
 `sections` is the canonical context representation used by the renderer and MCP context formatter.
 The response also retains the top-level `pr`, `issues`, `notes`, and `memory` fields as a bounded
 compatibility projection for existing task-context clients and agent tools. This is an intentional
 wire-compatibility adapter, not a second assembly path: both views are produced from the same
 contribution and budgeted in one pass. A future protocol-version migration can remove the projection
 after those consumers move to `sections`.
+
+`issues` and `task_links` are core tables (docs/data-layer.md § External-item read model); GitHub and
+Rollbar write them through the `ExternalItemStore` seam rather than owning them. The core-owned
+`issues` section is also the only one that reads the database handle, which is why the shared
+`PluginContextSection` contract can withhold that handle from every other section at no cost.
 
 ## `plugin_authoring` — how to write one, from the node that will run it
 
@@ -68,11 +99,23 @@ this module rather than a silent omission from the guide. What is left hand-writ
 sequence of acts, which no schema states — and `pluginAuthoring.test.ts` re-derives every list and asserts
 it reached the rendered text.
 
-Two things it deliberately does not carry. The `@acorn/plugin-api` export list: a hand-written plugin
+Two things it does not carry. The `@acorn/plugin-api` export list: a hand-written plugin
 cannot import that package at all, and a packaged node has no copy of `surface.snapshot.txt` to read — the
 snapshot has its own drift gate and is the answer for a plugin that *is* built. And the grantable
 `permissions.api` scope names: that allowlist lives in the client and the node cannot import it, so a list
 here would be a copy, and a wrong scope name in a guide the agent believes is worse than none.
+
+It answers through a context section rather than an `agentContexts` descriptor because the shapes
+don't match: `agentContexts` is a manifest key, so a core-owned entry would mean core pretending to
+be a plugin, and its contract is an `options` GET plus a `capture` POST against a plugin's own
+namespace, a picker over rows. `contextSections` already has the one dial this needs,
+`defaultIncluded: false`.
+
+Neither door is a new route. The tool call and the context section both resolve inside the Node
+process rather than through a route a frame could call, so nothing had to be added to the frame
+allowlist (`client-core/plugins/frames/scopes.ts`). The one place this text is reachable from a frame
+is `GET /v2/core/tasks/:id/context` with an explicit `include=plugin-authoring`, a read of acorn's own
+published contract under a scope the task owner already granted.
 
 The same text is also a **context section** (`plugin-authoring`, `defaultIncluded: false`). That flag is
 the whole affordability argument: a task that is not writing a plugin never assembles it and pays nothing,

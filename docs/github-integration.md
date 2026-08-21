@@ -19,6 +19,15 @@ polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated o
 The optional GitHub plugin reads `GITHUB_CLIENT_ID`, uses no client secret, and needs no callback URL.
 `githubToken(c)` is the single credential read site for GitHub routes.
 
+Device flow wins over the redirect web flow for three reasons. The web flow needs a client secret to
+exchange the code, and a secret shipped inside a distributed binary is recoverable, a problem an
+earlier version hit and could not fix; device flow exchanges on `client_id` alone. The web flow also
+needs a redirect URI, and the renderer has no server-served origin to redirect back to, while a remote
+node would need its own registered callback URL; device flow has neither problem, so a local node and
+a remote node run the same code path. And the web flow needs an auth `BrowserWindow` in Electron main
+to intercept the redirect, which device flow avoids. The cost is one extra step for the person
+connecting: they read a code and type it at `github.com/login/device`.
+
 ## Mirror
 
 The GitHub plugin database contains repositories, pull requests, PR files, reviews, comments,
@@ -35,6 +44,33 @@ The GitHub source provides repository browse, PR lists/detail, diff files, check
 mentions, labels, reviewers, comments, review threads, and create-PR. Mutations call GitHub first and
 then update or invalidate the affected mirror so a subsequent read does not serve a known pre-write
 value.
+
+The "my pull requests" collection filters by involvement (review-requested, assigned, authored) as a
+live GitHub search rather than a mirror query. Assignees are never mirrored, and review requests only
+mirror through the PR-detail sync, which only runs for PRs already in the mirror because this account
+opened them, so a mirror-side filter would parse and render but answer nothing for exactly what the
+person is asking. Each involvement value runs as its own search and the results are unioned, since
+GitHub's search qualifiers only AND and "assigned to me or waiting on my review" is two questions
+however it is asked.
+
+The three-pane browse layout (PR list, PR detail, diff) is pinned by the desktop e2e suite. Changing
+its panes, headers, or affordances needs a matching e2e update.
+
+## Content links
+
+GitHub declares two content-link recognisers (`plugins/github/src/client/contentLinks.ts`; the shared
+recognition and destination ladder is in [plugins.md](./plugins.md) under Frame authoring and the UI
+kit). A `github.com/<owner>/<repo>/pull/<n>` URL declares `providerId: 'github'`, so a click can open
+the reference panel: a pull request is glance-sized enough to answer "what is this" without the reader
+losing their place. A bare `github.com/<owner>/<repo>` URL declares no `providerId`, because a
+repository is a list rather than a card, and its destination is the browse route.
+
+Both recognisers resolve `owner/repo` to a tracked project by comparing case-insensitively. GitHub
+treats an owner and a repo name as case-insensitive, but the two sides of that comparison come from
+different places: a URL, and the plugin's own PR mirror, carry GitHub's canonical spelling (for
+example `Runn-Fast`), while `projects.github_owner` is stored folded to lower case (`runn-fast`). An
+`===` comparison here matched neither a dashboard row nor a PR link inside a rendered body, and it
+failed silently, because an unresolved repo simply opens the real `github.com` URL instead of erroring.
 
 ## Importing projects
 
