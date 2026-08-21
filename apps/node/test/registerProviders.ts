@@ -1,16 +1,17 @@
-// Register the built-in integration providers directly into the core registries, for integration tests.
+// Register the built-in integration providers directly into the core registries, for integration
+// tests.
 //
-// TEST-ONLY, and it exists because production no longer has an equivalent: each provider plugin registers
-// its own descriptor from `init` through `ctx.providers` now, so apps/node/src/server/providers.ts is
-// gone. A suite that only wants a registered provider (to assert a route's behaviour, or a codec's
-// conformance) should not have to boot the whole plugin host, open four SQLite files and start a PTY
-// engine to get one.
+// Test only. It exists because production no longer has an equivalent: each provider plugin
+// registers its own descriptor from `init` through `ctx.providers` now, so
+// apps/node/src/server/providers.ts is gone. A suite that only wants a registered provider, to
+// assert a route's behaviour or a codec's conformance, should not have to boot the whole plugin
+// host, open four SQLite files and start a PTY engine to get one.
 //
-// Imported from each test rather than Vitest global setup so a suite's `vi.mock` declarations hoist before
-// provider modules are loaded.
+// Imported from each test rather than Vitest global setup, so a suite's `vi.mock` declarations hoist
+// before provider modules load.
 //
-// Suites that assert the assembled MOUNT TABLE must NOT use this — they run `initPlugins` over the real
-// plugin list, which is where the provider routers come from now.
+// A suite that asserts the assembled mount table must not use this: it runs `initPlugins` over the
+// real plugin list, which is where the provider routers come from now.
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { githubProvider } from '@acorn/plugin-github/server/provider.ts'
@@ -28,9 +29,9 @@ for (const provider of [githubProvider, linearProvider, rollbarProvider]) {
   connectionProviderRegistry.register(provider, provider.id)
   integrationProviderRegistry.register(provider, provider.id)
 }
-// Neither loaded plugin has a compiled router any more — their routes only run over the portable
-// fetch carrier, so the registry gets the same shape production registers and the mount table
-// adapts it.
+// Neither loaded plugin has a compiled router any more. Their routes run only over the portable
+// fetch carrier, so the registry gets the same shape production registers and the mount table adapts
+// it.
 for (const route of [
   { providerId: 'linear', prefix: '', fetch: createLinearFetch() },
   { providerId: 'rollbar', prefix: '', fetch: createRollbarFetch() },

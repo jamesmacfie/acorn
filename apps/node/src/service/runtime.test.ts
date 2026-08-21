@@ -9,12 +9,12 @@ import type { ServiceStartResult, ServiceState } from '@acorn/protocol/servicePr
 // A fully validated request against the node's reported pin. `ca` is the node's own self-signed
 // certificate; `rejectUnauthorized` stays true, so the IP:127.0.0.1 SAN has to match too.
 //
-// `expectedFingerprint` replaces hostname verification with the fingerprint comparison, which is what
-// the client's connection broker does (apps/desktop/src/app/main/nodeBroker.ts § pinning). The shape is
-// restated here rather than imported because a package or app may never import an app — so the pin is
-// proved in two halves: this one asserts the NODE really answers under the identity it reported, and
-// nodeBroker.test.ts asserts the BROKER accepts exactly that identity and no other. Neither half is
-// allowed to see the other, and weakening the boundary rule to join them would be the wrong trade.
+// `expectedFingerprint` replaces hostname verification with the fingerprint comparison, the same
+// check the client's connection broker does (docs/electron.md § Connection broker). The shape is
+// restated here rather than imported, because a package or app may never import an app, so the pin
+// is proved in two halves: this file asserts the node really answers under the identity it reported,
+// and nodeBroker.test.ts asserts the broker accepts exactly that identity and no other. Neither half
+// sees the other; joining them would weaken the boundary rule for no real gain.
 function get(started: ServiceStartResult, path: string, expectedFingerprint?: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const req = httpsRequest(
@@ -24,12 +24,11 @@ function get(started: ServiceStartResult, path: string, expectedFingerprint?: st
         path,
         ca: [started.certPem],
         // Never false. In that mode Node skips checkServerIdentity entirely, so the pin below would
-        // silently never be consulted — a failure that fails OPEN.
+        // never be consulted, and the failure would fail open.
         rejectUnauthorized: true,
-        // A fresh connection per call. https.globalAgent keeps sockets alive and keys them on the TLS
-        // options WITHOUT checkServerIdentity, so a pooled socket from an earlier call would serve this
-        // one and the pin would never be evaluated — which is exactly the false pass this test exists
-        // to catch.
+        // A fresh connection per call. https.globalAgent keeps sockets alive and keys them without
+        // checkServerIdentity, so a pooled socket from an earlier call could serve this one and skip
+        // the pin. That false pass is exactly what this test exists to catch.
         agent: false,
         ...(expectedFingerprint
           ? {
@@ -135,14 +134,15 @@ describe('Electron-free service runtime', () => {
       expect(runtime.started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
       expect(readFileSync(join(dataDir!, 'active-identity'), 'utf8').trim()).toMatch(/^owner-[0-9a-f-]{36}$/)
 
-      // The pre-auth route, over a connection validated against the reported certificate. There is no
-      // SPA shell to fetch any more — the node serves no web assets.
+      // The pre-auth route, over a connection validated against the reported certificate. The node
+      // serves no web assets (docs/architecture-overview.md § Runtime topology), so there is no SPA
+      // shell to fetch any more.
       expect(await get(runtime.started, '/v2/node')).toBe(200)
 
-      // The pin, end to end: a client that checks the fingerprint the service reported gets through…
+      // The pin, end to end: a client that checks the fingerprint the service reported gets through.
       expect(await get(runtime.started, '/v2/node', runtime.started.fingerprint)).toBe(200)
-      // …and one expecting any other identity is refused before a byte of the request is sent. A
-      // changed fingerprint is a hard security stop (docs/security.md), so it must fail CLOSED.
+      // A client expecting any other identity is refused before a byte of the request is sent. A
+      // changed fingerprint is a hard security stop (docs/security.md), so it must fail closed.
       const wrong = (runtime.started.fingerprint[0] === '0' ? '1' : '0') + runtime.started.fingerprint.slice(1)
       await expect(get(runtime.started, '/v2/node', wrong)).rejects.toThrow(/fingerprint mismatch/)
 
@@ -154,8 +154,8 @@ describe('Electron-free service runtime', () => {
     expect(states.at(-1)).toBe('stopped')
   }, 20_000)
 
-  // Two nodes on one machine is an ordinary case now (docs/architecture-overview.md § Topology), and the
-  // pinned port made it impossible.
+  // Two nodes on one machine is ordinary now (docs/architecture-overview.md § Runtime topology), and
+  // the old pinned port made it impossible.
   it('binds a different port, and a different identity, per data root', async () => {
     seedEnv()
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-service-a-'))

@@ -4,18 +4,17 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { PLUGIN_CONFIG_FILE, validatePluginConfig } from '@acorn/node-core/testkit/manifest.ts'
 
-// Every loadable plugin's declaration, checked against the real manifest schema — here, at `pnpm test`
-// time, rather than at the next boot.
+// Checked against the real manifest schema at `pnpm test` time, for every loadable plugin
+// (docs/plugins.md § The dev loop: "A malformed acorn-plugin.config.mjs no longer waits for a
+// rebuild or a boot to announce itself").
 //
-// Nothing did this. A malformed `acorn-plugin.config.mjs` was found by running the builder, or by a
-// boot-time console line in a packaged app that shows it to nobody. The rules it catches are the ones no
-// reviewer checks by eye: a route or rail-items path outside the plugin's own `/v2/p/<id>/` prefix, an
-// `openPane` naming a frame the manifest never declared, a duplicate contribution id, a brand mark that
-// is not a bare path `d`.
+// The rules it catches are the ones no reviewer checks by eye: a route or rail-items path outside
+// the plugin's own `/v2/p/<id>/` prefix, an `openPane` naming a frame the manifest never declared, a
+// duplicate contribution id, a brand mark that is not a bare path `d`.
 //
 // This lives in apps/node because apps/node owns the builder that reads these files. It walks the
-// filesystem rather than listing ids, so a plugin that becomes loadable tomorrow is covered the day its
-// config lands.
+// filesystem rather than listing ids, so a plugin that becomes loadable tomorrow is covered the day
+// its config lands.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const PLUGINS = join(ROOT, 'plugins')
 

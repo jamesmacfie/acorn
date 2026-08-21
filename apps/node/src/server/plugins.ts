@@ -1,6 +1,6 @@
-// The Node plugin activation list. A plugin that is not registered here does not exist in this Node.
-// The host supplies routes, capabilities, CoreServices, tools, providers, context sections, storage,
-// and lifecycle hooks through NodePluginContext.
+// The Node activation list (docs/plugins.md § Activation). The host supplies routes, capabilities,
+// CoreServices, tools, providers, context sections, storage, and lifecycle hooks through
+// NodePluginContext.
 import type { NodePlugin } from '@acorn/node-core/server/plugin/types.ts'
 import { agentsPlugin, type AgentsPluginDeps } from '@acorn/plugin-agents/node/index.ts'
 import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
@@ -28,11 +28,11 @@ export type NodePluginDeps = {
   workflows: WorkflowsPluginDeps
 }
 
-// `dataDir` is threaded in for the three plugins that write files of their OWN under the data root —
-// agents' attachments and artifacts, memory's index sources, notes' markdown. It is no longer threaded
-// in so a plugin can open its database: the host does that behind `ctx.storage`, from each plugin's
-// declared `migrationsModule`. Cross-plugin dependencies resolve through the capability/provider
-// registries at call time; array order is not a feature contract.
+// `dataDir` is threaded in for the three plugins that write files of their own under the data root:
+// agents' attachments and artifacts, memory's index sources, notes' markdown. It is no longer needed
+// so a plugin can open its database, since the host does that behind `ctx.storage`, from each
+// plugin's declared `migrationsModule`. Cross-plugin dependencies resolve through the
+// capability/provider registries at call time; array order is not a feature contract.
 export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[] => [
   agentsPlugin(dataDir, deps.agents),
   changesPlugin(),
