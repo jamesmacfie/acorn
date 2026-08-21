@@ -1,28 +1,13 @@
 import { createSignal, onCleanup, onMount } from 'solid-js'
 
-// Element-anchored floating surfaces: portal-aware dismissal plus position-to-rect.
-//
-// Extracted verbatim from Picker.tsx, whose comment said "extract it if a second element-anchored
-// popover appears". Five appeared, and each solved less of the problem: AccountMenu and
-// NotificationBell hand-rolled their own document listener, TabRail's task menu had neither
-// outside-click nor Escape, and terminal's profile menu had no portal at all — so any overflow
-// ancestor clipped it, which is precisely the failure Picker documents.
-//
-// The Portal is the load-bearing part. Panes set `overflow`, and an absolutely-positioned child
-// cannot escape an overflow-clipped ancestor; it gets cut at the pane edge instead of overlaying
-// the next column. Fixed-positioning to the trigger's rect works unchanged inside a sandboxed
-// plugin frame, where the "viewport" is simply the frame.
-//
-// This hook owns dismissal and geometry ONLY. List semantics come from focus.ts, markup from the
-// call site. No flip/collision middleware beyond a `placement` flag and a re-measure on reflow —
-// extend when a real collision case turns up, not before.
+// Element-anchored floating surfaces: portal-aware dismissal plus position-to-rect. See
+// docs/ui-design.md § Menus and right-click for why this exists, what it leaves to focus.ts and the
+// call site, and why the portal matters.
 
 export type Placement = 'bottom-start' | 'bottom-end' | 'top-start' | 'right-start'
 
-/** What a surface is positioned against: an element, or a POINT — which is what a right-click has.
- *  This is the whole of the "same hook anchored to a point rather than a rect" that Menu.tsx's header
- *  has promised since it was written; a point is a zero-size rect, and everything downstream of
- *  `reposition` already works in rects. */
+/** What a surface is positioned against: an element, or a point (what a right-click has). See
+ * docs/ui-design.md § Menus and right-click for why a point needs no special handling downstream. */
 export type AnchorTarget = HTMLElement | { readonly x: number; readonly y: number }
 
 type Rect = { top: number; bottom: number; left: number; right: number; width: number; height: number }
@@ -43,7 +28,7 @@ export type AnchoredPopover = {
   position: () => { top: number; left: number; width?: number }
   /** Ref for the floating element. Outside-click needs it: it lives outside the anchor's subtree. */
   setSurface: (element: HTMLElement | undefined) => void
-  /** Inline style for the floating element — `position: fixed` plus the measured offsets. */
+  /** Inline style for the floating element: position: fixed plus the measured offsets. */
   surfaceStyle: () => Record<string, string>
 }
 
@@ -52,15 +37,15 @@ export function createAnchoredPopover(opts: {
   placement?: () => Placement
   /** `'anchor'` matches the trigger's width; a number is a minimum (Picker's max(rect.width, 300)). */
   minWidth?: number | 'anchor'
-  /** Keep the surface inside the viewport. Off by default so the four element-anchored consumers keep
-   *  the geometry they were tuned against; on for a point anchor, where the click really can be one
-   *  pixel from the bottom edge and there is no trigger rect to fall back to. */
+  /** Keep the surface inside the viewport. Off by default so the four element-anchored consumers
+   *  keep the geometry they were tuned against. See docs/ui-design.md § Menus and right-click for
+   *  why a point anchor turns it on. */
   clamp?: boolean
   onDismiss?: () => void
   disabled?: () => boolean
-  /** Controlled visibility, for the case where the surrounding component already owns "which one is
-   *  open" as app state — the task rail closes its row menu on ⌘1-9 navigation, and that decision
-   *  cannot live inside one menu instance. Supply both or neither. */
+  /** Controlled visibility, for when the surrounding component already owns "which one is open" as
+   *  app state. The task rail closes its row menu on cmd+1-9 navigation, and that decision cannot
+   *  live inside one menu instance. Supply both or neither. */
   open?: () => boolean
   onOpenChange?: (open: boolean) => void
 }): AnchoredPopover {
@@ -123,7 +108,7 @@ export function createAnchoredPopover(opts: {
   const onDocPointer = (event: PointerEvent) => {
     if (!open()) return
     const target = event.target as Node
-    // A point anchor has no element, so nothing but the surface itself counts as "inside" — which is
+    // A point anchor has no element, so nothing but the surface itself counts as "inside". That is
     // the right answer for a context menu: the row it was opened over is not part of the menu.
     if (!elementOf(opts.anchor())?.contains(target) && !surface?.contains(target)) close()
   }

@@ -1,18 +1,10 @@
 import { createSignal, Show, type JSX } from 'solid-js'
 import { cx } from './cx'
 
-// A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written with
-// its own localStorage closure, and three separate mechanisms were in circulation across the app (native
-// <details>, a signal plus a twist glyph, and a Set of collapsed ids), two of them missing
-// `aria-expanded`.
-//
-// Native <details> and <summary>, so keyboard behaviour and semantics come free. The summary is composed
-// from SectionHeader's label, count and actions structure, so a closed fold looks like a section header,
-// which is what all of these were imitating.
-//
-// Accordion behaviour has no consumers, so it isn't here. Content folds inside a card, such as agents'
-// reasoning and tool-output blocks, should stay raw <details>: they aren't titled sections, and wrapping
-// them would add chrome they don't want.
+// A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written
+// with its own localStorage closure across three different mechanisms, two of them missing
+// `aria-expanded`. See docs/ui-design.md § How the primitives are built (CollapsibleSection) for
+// why it uses native `<details>` and has no accordion mode.
 
 // Reading and writing one localStorage key is the same carve-out ui/diff/DiffRows.tsx has for draft
 // state, and is why this is a component rather than a caller responsibility: the eight github sites each

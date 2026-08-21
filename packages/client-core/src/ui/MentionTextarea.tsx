@@ -35,7 +35,7 @@ export default function MentionTextarea(props: {
   const [sel, setSel] = createSignal(0)
 
   // Anchoring, outside-click and Escape come from ui/anchor.ts. This used to be a private
-  // pointerdown listener plus a one-shot measurement, so the popup did not follow a scrolling pane —
+  // pointerdown listener plus a one-shot measurement, so the popup did not follow a scrolling pane;
   // it stayed where the textarea had been. The hook re-measures on scroll and resize.
   //
   // The fragment drives the surface rather than a toggle: an @-mention popup opens because the text

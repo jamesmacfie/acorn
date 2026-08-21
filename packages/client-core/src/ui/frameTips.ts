@@ -1,16 +1,9 @@
-// The frame-side half of the tooltip protocol (tips.tsx documents the attributes).
-//
-// Its own module, and framework-free on purpose: tips.tsx imports Solid, Icon, the primitives and a
-// stylesheet for the shell's singleton, and this function is reached from
-// @acorn/plugin-api/ui/sdk — which is bundled INTO a plugin's frame and must not drag a slice of the
-// shell (or a second copy of Solid) across that boundary. Nothing here imports anything.
+// The frame-side half of the tooltip protocol (tips.tsx documents the attributes). See
+// docs/ui-design.md § Tooltips for why this is a separate, importless module.
 
-/** Frame-side tooltip listener.
- *
- * A sandboxed plugin frame has its own document, so the shell's singleton cannot see its elements and
- * every `data-tip` inside a frame was silently inert. This mounts the same delegated listener and the
- * same bubble markup into a frame's document, the way frames already mount their own copy of the
- * shared CSS. Pure DOM — no shell imports — so it belongs on the frame-safe barrel.
+/**
+ * Mounts the tooltip listener into a plugin frame's own document. See docs/ui-design.md
+ * § Tooltips for why a frame needs its own copy.
  *
  * Returns a teardown function.
  */
@@ -49,7 +42,7 @@ export function mountFrameTips(doc: Document = document): () => void {
       subRow.textContent = sub
       bubble.append(subRow)
     }
-    // Inside a frame the viewport IS the frame, so there is no rail to fly around: always right.
+    // Inside a frame the viewport is the frame, so there is no rail to fly around: always right.
     const rect = element.getBoundingClientRect()
     bubble.style.left = `${rect.right + 8}px`
     bubble.style.right = ''

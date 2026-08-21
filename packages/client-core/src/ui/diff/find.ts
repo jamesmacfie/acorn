@@ -1,15 +1,15 @@
 import { isCodeRow, type CodeRow, type Row } from './model'
 
 // In-diff find (Cmd+F). The diff list is virtualized, so off-screen lines aren't in the DOM and the
-// native find can't see them. Instead we search the row model, meaning every code row's raw text,
-// scroll the virtualizer to matches, and split tokens so the matched substring gets a highlight class
-// while keeping its syntax colour, like Monaco's in-file find.
+// native find can't see them. This searches the row model instead: every code row's raw text,
+// scrolls the virtualizer to matches, and splits tokens so the matched substring gets a highlight
+// class while keeping its syntax colour, like Monaco's in-file find.
 
 export type FindMatch = { row: CodeRow; rowIndex: number; start: number; end: number }
 export type FindHighlight = { ranges: [number, number][]; current: [number, number] | null }
 
-// Every occurrence of `query` across the code rows. Occurrences within a line never overlap, because we
-// advance past each hit, so a row's ranges stay sorted and markTokens relies on that.
+// Every occurrence of `query` across the code rows. Occurrences within a line never overlap, because
+// the scan advances past each hit, so a row's ranges stay sorted and markTokens relies on that.
 export function collectMatches(rows: Row[], query: string, caseSensitive: boolean): FindMatch[] {
   if (!query) return []
   const needle = caseSensitive ? query : query.toLowerCase()

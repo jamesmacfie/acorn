@@ -1,17 +1,7 @@
 import { onCleanup } from 'solid-js'
 
-// Drag-to-resize, plus the keyboard contract the three hand-rolled splitters didn't have.
-//
-// DELTA-based, not value-based. The three call sites model size differently — the pane row resizes
-// TWO adjacent panes against each other by a pixel delta, the terminal drawer owns one absolute
-// height, the document surface owns a fraction — and a delta is the one thing all three can turn
-// into their own units. A `value`/`onChange` hook would have fit exactly one of them.
-//
-// What it owns: pointer capture, rAF coalescing, text-selection suppression during the drag, and
-// `role="separator"` with arrow/Home/End keys. Persistence stays with the caller, because only the
-// caller knows what it is persisting — a pref, a layout weight, a fraction.
-//
-// Same idiom as dismissable.ts: behaviour as a hook, markup at the call site.
+// Drag-to-resize, plus the keyboard contract the three hand-rolled splitters didn't have. See
+// docs/ui-design.md § Drag-to-resize for why it reports a delta and what it owns versus the caller.
 
 export type SplitDrag = {
   /** Spread onto the handle element. */
@@ -27,10 +17,10 @@ export type SplitDrag = {
 }
 
 export function createSplitDrag(opts: {
-  /** The axis the handle MOVES along: 'x' for a vertical divider between columns. */
+  /** The axis the handle moves along: 'x' for a vertical divider between columns. */
   axis: 'x' | 'y'
   label: string
-  /** Called once at pointer-down, before any delta — the moment to snapshot current sizes. */
+  /** Called once at pointer-down, before any delta: the moment to snapshot current sizes. */
   onStart?: () => void
   /** Pixels moved since pointer-down, sign following the axis. The caller clamps. */
   onDelta: (deltaPx: number) => void
@@ -45,7 +35,8 @@ export function createSplitDrag(opts: {
 }): SplitDrag {
   const step = () => opts.step ?? 16
 
-  // A drag that outlives its component would keep moving panes that no longer exist.
+  // See docs/ui-design.md § Drag-to-resize: a drag that outlives its component would keep moving
+  // panes that no longer exist.
   let release: (() => void) | undefined
   onCleanup(() => release?.())
 
@@ -66,9 +57,8 @@ export function createSplitDrag(opts: {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => opts.onDelta(current - start))
     }
-    // Idempotent, because it is reachable from four places. Clears by REMOVING the property rather than
-    // restoring a snapshot: a snapshot taken while an earlier drag was still stuck would preserve `none`
-    // forever, whereas removal heals a document that already leaked one.
+    // Idempotent: reachable from four places. See docs/ui-design.md § Drag-to-resize for why this
+    // removes the property rather than restoring a snapshot.
     const up = () => {
       if (ended) return
       ended = true
@@ -84,10 +74,8 @@ export function createSplitDrag(opts: {
     release = up
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
-    // `pointerup` is not guaranteed: an interrupted gesture fires `pointercancel` instead, and losing
-    // capture (the handle re-rendering mid-drag) fires neither. Missing either path left
-    // `user-select: none` on the body, so nothing in the document could be selected for the rest of the
-    // session. PanelGrid's own drag already handles cancel for the same reason.
+    // See docs/ui-design.md § Drag-to-resize for why both `pointerup` and `pointercancel` are
+    // handled here. PanelGrid's own drag already handles cancel for the same reason.
     window.addEventListener('pointercancel', up)
     handle?.addEventListener('lostpointercapture', up)
   }
@@ -112,7 +100,7 @@ export function createSplitDrag(opts: {
   return {
     handleProps: {
       role: 'separator',
-      // A handle that moves along x separates columns, which is a VERTICAL divider.
+      // A handle that moves along x separates columns, which is a vertical divider.
       'aria-orientation': opts.axis === 'x' ? 'vertical' : 'horizontal',
       'aria-label': opts.label,
       tabindex: 0,

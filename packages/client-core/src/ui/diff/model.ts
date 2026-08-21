@@ -1,26 +1,17 @@
-// The shared diff viewer's row model. It moved out of the github plugin because both `changes` (a
-// worktree's uncommitted diff) and `github` (a PR's patches) render diffs, and the changes pane was
-// reaching across a plugin boundary to get here: sharing rendering code is good, sharing feature
-// internals is what's banned (docs/plugins.md § Cross-plugin collaboration).
-//
-// It used to type on github's `PullFile` and `Thread`, re-exported through client-core's queries.ts,
-// and a comment here claimed those types "are already client-core's; the plugin never owned them."
-// That was backwards — they are github's wire types, and core was holding them. The renderer declares
-// its own contract below instead: what a diff row needs to render, named for what it renders.
-//
-// github's PullFile/Thread and changes' local rows stay structurally assignable to these, so no call
-// site changed. That is the point: a renderer should describe its input, not name one caller's type.
+// The shared diff viewer's row model (see docs/diff-rendering.md for how GitHub and Changes each
+// reach it and for the row types' structural contract).
 import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from './synth'
 import type { getHighlighter } from '../../highlight/shiki'
 import { langFor } from '../../highlight/shiki'
-// Type-only, so the worker client's module graph (and its dynamic `?worker` import) stays out of this
-// module — several plugin tests load it in a node environment where that import cannot resolve.
+// Type-only, so the worker client's module graph, including its dynamic `?worker` import, stays out
+// of this module. Several plugin tests load it in a node environment where that import cannot
+// resolve.
 import type { TokenizeDocument } from '../../highlight/worker'
 
-// The renderer's own input contract. Deliberately structural, so any producer of a patch — a PR file
-// from github, an uncommitted hunk from changes, whatever comes next — satisfies it without either
+// The renderer's own input contract, structural rather than named after one producer. A PR file
+// from github, an uncommitted hunk from changes, or a future producer all satisfy it without either
 // side importing the other.
 export type DiffFile = {
   path: string
@@ -71,7 +62,7 @@ export type LoadDiffRow = { kind: 'load'; file: DiffFile; status: LoadDiffStatus
 export type ThreadRowT = { kind: 'thread'; thread: DiffThread }
 // A run of unchanged lines hidden between/above/below hunks. oldNo/newNo advance in lockstep
 // (unchanged context), so expansion just slices the head blob from newStart. count is null for the
-// bottom gap — its size needs the file's total line count, known only once the body is fetched.
+// bottom gap; its size needs the file's total line count, known only once the body is fetched.
 export type GapRow = {
   kind: 'gap'
   path: string
@@ -97,8 +88,8 @@ export type TokenizeLine = (path: string, content: string) => Tok[]
 export const isCodeRow = (r: Row): r is CodeRow => r.kind === 'normal' || r.kind === 'insert' || r.kind === 'delete'
 export const fileAnchor = (path: string) => `diff-file:${path}`
 
-// Virtualizer size estimates per row kind — the single source for these numbers (DiffView's
-// fallback estimate imports DIFF_LOAD_ROW_HEIGHT rather than redefining 36).
+// Virtualizer size estimates per row kind. This is the single source for these numbers; DiffView's
+// fallback estimate imports DIFF_LOAD_ROW_HEIGHT rather than redefining 36.
 export const DIFF_LINE_HEIGHT = 20
 export const DIFF_FILE_HEADER_HEIGHT = 36
 export const DIFF_THREAD_HEIGHT = 140
@@ -116,15 +107,12 @@ export const estimateRowSize = (row: Row | undefined) => {
   return DIFF_LINE_HEIGHT
 }
 
-// Widest code line, in columns. Code lines do not soft-wrap, so this is what the row canvas has to
-// be wide enough to hold — and it has to be computed from the DATA, not from layout: only the rows
-// inside the virtual window have boxes, so a `max-content` width would change every time you
-// scrolled and take the horizontal scroll position with it.
+// Widest code line, in columns of 1ch (see docs/diff-rendering.md § Row geometry for why the row
+// canvas has to be this wide rather than sized by layout).
 //
-// The font is monospace, so a column is exactly 1ch and no measurement is needed. A tab advances to
-// the next multiple of TAB_COLUMNS rather than counting as one, matching CSS `tab-size`'s default —
-// counting it as one character under-measures indented code, and under-measuring is the failure
-// that clips a line.
+// A tab advances to the next multiple of TAB_COLUMNS rather than counting as one, matching CSS
+// tab-size's default. Counting it as one character under-measures indented code, and
+// under-measuring is the failure that clips a line.
 const TAB_COLUMNS = 8
 export const maxLineCols = (rows: readonly Row[]) => {
   let widest = 0
@@ -232,22 +220,22 @@ function rawPatchRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
   return rows
 }
 
-// One tokenizable document: the lines of ONE SIDE of ONE HUNK, and the rows they belong to.
+// One tokenizable document: the lines of one side of one hunk, and the rows they belong to.
 //
-// A hunk interleaves two documents. A deleted line belongs to the pre-image, an inserted line to the
-// post-image, an unchanged line to both. Tokenizing them in display order would feed the grammar a
-// text that never existed — a deleted `*/` would close a comment for the inserted lines below it — so
-// the two sides are gathered separately and each is tokenized as its own document.
+// A hunk interleaves two documents. A deleted line belongs to the pre-image, an inserted line to
+// the post-image, an unchanged line to both. Tokenizing them in display order would feed the
+// grammar a text that never existed: a deleted `*/` would close a comment for the inserted lines
+// below it. So the two sides are gathered separately and each is tokenized as its own document.
 //
-// Context lines are in BOTH batches on purpose. They are what carries grammar state to the deletions
-// on one side and the insertions on the other, so leaving them out of either would put that side's
-// changed lines back on a cold start. Their row appears as a target twice and the second assignment
-// wins; that is deliberate and the sides agree on the text by definition.
+// Context lines are in both batches, because they carry grammar state to the deletions on one side
+// and the insertions on the other; leaving them out of either would put that side's changed lines
+// back on a cold start. Their row appears as a target twice, and the second assignment wins. The
+// two sides agree on the text by definition, so this is safe.
 type TokenBatch = { code: string; targets: CodeRow[] }
 
-// The structure of a patch, with the tokens still missing. Split out because the two fill strategies —
-// per line on the main thread, per hunk-side in the worker — differ only in how `batches` is consumed,
-// and the hunk walk below is not worth having twice.
+// The structure of a patch, with the tokens still missing. Split out because the two fill
+// strategies, per line on the main thread and per hunk-side in the worker, differ only in how
+// `batches` is consumed, and the hunk walk below is not worth having twice.
 function buildRowSkeleton(file: DiffFile): { rows: DiffRow[]; batches: TokenBatch[] } | null {
   let parsed: ReturnType<typeof gitdiffParser.parse>
   try {
@@ -316,17 +304,19 @@ export function buildDiffRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[]
 /**
  * The same rows, tokenized a document at a time instead of a line at a time.
  *
- * This is the path the app uses. It is what makes the worker worth having (one message per hunk-side
- * rather than per line — see highlight/worker.ts) and it is what makes multi-line constructs colour
- * correctly, because shiki carries grammar state across the lines of a single call.
+ * This is the path the app uses. It is what makes the worker worth having, one message per
+ * hunk-side rather than per line (see highlight/worker.ts), and it is what makes multi-line
+ * constructs colour correctly, because shiki carries grammar state across the lines of a single
+ * call.
  *
- * Never rejects: `tokenizeDocument` degrades to plain text rather than throwing, and a patch that will
- * not parse falls back to the untokenized raw rows exactly as the sync path does.
+ * Never rejects: tokenizeDocument degrades to plain text rather than throwing, and a patch that
+ * will not parse falls back to the untokenized raw rows exactly as the sync path does.
  */
 export async function buildDiffRowsAsync(file: DiffFile, tokenizeDoc: TokenizeDocument): Promise<DiffRow[]> {
   if (!file.patch) return []
   const built = buildRowSkeleton(file)
-  // A patch this parser cannot read is a display problem, not a highlighting one — show the raw lines.
+    // A patch this parser cannot read is a display problem, not a highlighting one. Show the raw
+    // lines.
   if (!built) return rawPatchRows(file, plainTokenize)
   for (const batch of built.batches) {
     const lines = await tokenizeDoc(file.path, batch.code)
@@ -352,11 +342,11 @@ export function expandGap(gap: GapRow, body: string, tokenize: TokenizeLine): Co
 /**
  * As above, tokenized as one document so the revealed run colours consistently.
  *
- * ponytail: the run still starts from a cold grammar state at its first line, because the lines above
- * it were never tokenized — this reveals a slice out of the middle of a file. Expanding into the top
- * of a block comment therefore still mis-colours until the expansion reaches line 1. Fixing it means
- * tokenizing the whole body and keeping the state, which is worth doing when someone complains about
- * an expanded gap specifically rather than on spec.
+ * The run still starts from a cold grammar state at its first line, because the lines above it were
+ * never tokenized: this reveals a slice out of the middle of a file. Expanding into the top of a
+ * block comment therefore still mis-colours until the expansion reaches line 1. Fixing it means
+ * tokenizing the whole body and keeping the state, worth doing when someone complains about an
+ * expanded gap specifically rather than on spec.
  */
 export async function expandGapAsync(gap: GapRow, body: string, tokenizeDoc: TokenizeDocument): Promise<CodeRow[]> {
   const rows = gapRows(gap, body)

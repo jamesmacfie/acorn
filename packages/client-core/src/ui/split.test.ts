@@ -2,9 +2,9 @@ import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createSplitDrag } from './split'
 
-// This package has no DOM env by design, but the hook renders nothing and touches only four APIs, so
-// faking them is cheap — and worth it: a drag that ends without `pointerup` used to leave
-// `user-select: none` on the body, which makes the whole app unselectable for the rest of the session.
+// This package has no DOM env by design, but the hook renders nothing and touches only four APIs,
+// so faking them is cheap. It is worth it: see docs/ui-design.md § Drag-to-resize for the bug this
+// guards against.
 
 type Listener = () => void
 

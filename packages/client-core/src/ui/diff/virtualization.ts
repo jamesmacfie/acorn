@@ -1,8 +1,8 @@
 import { createVirtualizer } from '@tanstack/solid-virtual'
 
-// Virtualizer plumbing shared by DiffView's unified/split lists: the two createVirtualizer setups
+// Virtualizer plumbing shared by DiffView's unified/split lists. The two createVirtualizer setups
 // are identical apart from their item/key/estimate sources, and both feed the same batched-rAF
-// measure scheduling. Mechanical extraction from DiffView — no behaviour change.
+// measure scheduling. Mechanical extraction from DiffView; no behaviour change.
 
 export function createDiffVirtualizer<T>(opts: {
   items: () => readonly T[]

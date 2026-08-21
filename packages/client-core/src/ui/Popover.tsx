@@ -5,11 +5,12 @@ import { cx } from './cx'
 
 // The common case over createAnchoredPopover: a trigger and a floating surface.
 //
-// The trigger is a render prop rather than a `label` string because every current call site puts
-// something different there — a Button, an avatar, a tab-rail row, a bell with a count badge. The
+// The trigger is a render prop rather than a `label` string, because every current call site puts
+// something different there: a Button, an avatar, a tab-rail row, a bell with a count badge. The
 // hook is right there for anything this shape does not fit.
+//
 // A `display: contents` wrapper has no box of its own, so getBoundingClientRect on it returns an
-// empty rect. Measure the trigger the wrapper contains instead — that is the element the surface is
+// empty rect. Measure the trigger the wrapper contains instead; that is the element the surface is
 // meant to be anchored to anyway.
 const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
   (wrapper?.firstElementChild as HTMLElement | null) ?? wrapper
@@ -24,7 +25,7 @@ export default function Popover(props: {
   ariaLabel?: string
   onDismiss?: () => void
   class?: string
-  /** A function when the content needs to dismiss itself — a menu item's click lands INSIDE the
+  /** A function when the content needs to dismiss itself: a menu item's click lands inside the
    *  surface, so outside-click will never fire for it. */
   children: JSX.Element | ((state: { close: () => void }) => JSX.Element)
 }) {

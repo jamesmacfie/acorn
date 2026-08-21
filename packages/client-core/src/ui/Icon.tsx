@@ -5,18 +5,15 @@ import { iconNodes as nodes } from './iconNodes'
 
 export const ICON_NAMES = Object.keys(nodes)
 
-// Two families behind one name. A bare name is a Lucide glyph: stroked, unfilled, 24 box. A
-// `brand:`-prefixed name is a brand mark from brandMarks.ts: one filled path, same box. The prefix
-// keeps brand marks out of ICON_NAMES, which IconPicker enumerates for user-chosen workspace and
-// task icons, and stays unambiguous if Lucide ever grows brand-shaped names back.
+// Two families behind one name. See docs/ui-design.md § Icons for the resolution order and the
+// `brand:` prefix.
 const BRAND = 'brand:'
 
 export default function Icon(props: { name: string; size?: number | string; class?: string; title?: string }) {
   const brand = () => (props.name.startsWith(BRAND) ? brandMarkRegistry.get(props.name.slice(BRAND.length)) : undefined)
   return (
     <Switch
-      // Still load-bearing rather than a nicety: an unmatched name renders as text, which the
-      // remaining inline literals (◆/◇ pin state, ⊘/◉ hidden) depend on.
+      // See docs/ui-design.md § Icons: this fallback is load-bearing, not a nicety.
       fallback={
         <span class={`glyph ${props.class ?? ''}`} aria-hidden={props.title ? undefined : true} title={props.title}>
           {props.name}

@@ -10,20 +10,20 @@ import { Button, Input, Toolbar } from './primitives'
 //   Shift+Enter  previous match
 //   Escape       close
 //
-// Matching and highlighting stay entirely at the call site — the bar is chrome. What it also
-// standardises is the highlight CLASS: `.ui-find-mark` (plus `[data-current]`) replaces three
+// Matching and highlighting stay entirely at the call site; the bar is chrome. What it also
+// standardises is the highlight class: `.ui-find-mark` (plus `[data-current]`) replaces three
 // separate vocabularies, and callers put it on their own <mark> elements.
 export function FindBar(props: {
   query: string
   onQuery: (query: string) => void
-  /** Renders "3/17". Omit while idle — a 0/0 reads as a failed search rather than an unused one. */
+  /** Renders "3/17". Omit while idle; a 0/0 reads as a failed search rather than an unused one. */
   count?: { current: number; total: number }
   onNext: () => void
   onPrev: () => void
   onClose?: () => void
   /** ToggleButtons or a SegmentedControl: case, whole-word, regex, follow. */
   toggles?: JSX.Element
-  /** A live note beside the count — docker's stream state, the editor's truncation warning. */
+  /** A live note beside the count: docker's stream state, the editor's truncation warning. */
   status?: JSX.Element
   placeholder?: string
   ref?: (element: HTMLInputElement) => void

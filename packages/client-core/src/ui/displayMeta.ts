@@ -69,9 +69,10 @@ export function checksState(checks: { status: string | null }[]): 'success' | 'f
   return 'success'
 }
 
-// The domain→semantic hop StatusDot asks its call sites to make, declared once. Both the rail
-// (tasks/railStatus.ts) and the GitHub plugin's PR rows draw this dot, and before this they shared a
-// class defined in the plugin's own stylesheet — so core's markup went unstyled when it was disabled.
+// The domain-to-semantic hop StatusDot asks its call sites to make, declared once. Both the rail
+// (tasks/railStatus.ts) and the GitHub plugin's PR rows draw this dot. Before this they shared a
+// class defined in the plugin's own stylesheet, so core's markup went unstyled when it was
+// disabled.
 export const CHECK_TONE: Record<ReturnType<typeof checksState>, 'ok' | 'warn' | 'bad' | 'mixed'> = {
   success: 'ok',
   failure: 'bad',
@@ -79,7 +80,7 @@ export const CHECK_TONE: Record<ReturnType<typeof checksState>, 'ok' | 'warn' | 
   mixed: 'mixed',
 }
 
-/** Tone for ONE raw check conclusion, for the per-check list under a PR's roll-up dot. */
+/** Tone for one raw check conclusion, for the per-check list under a PR's roll-up dot. */
 export const checkStatusTone = (status: string | null): 'ok' | 'warn' | 'bad' | 'muted' => {
   const s = (status ?? '').toLowerCase()
   if (FAILED_STATUSES.has(s)) return 'bad'

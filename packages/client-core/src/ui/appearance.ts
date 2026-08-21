@@ -1,12 +1,9 @@
-// Reading the appearance axes from JavaScript.
+// Reading the appearance axes from JavaScript. See docs/ui-design.md § Token axes for why these
+// tokens are read this way and why renaming one fails silently.
 //
-// Canvas surfaces — xterm, Monaco, the SQL grid — cannot use CSS, so they resolve tokens at call
-// time and re-resolve when the axes change. That is a CORE concern, not a terminal one: it lives
-// here so the editor, database and github plugins can use it without importing across plugin
-// boundaries (core/boundaries.test.ts treats plugin→plugin coupling as a shrinking baseline).
-//
-// The token names these read are declared in BRIDGE_TOKENS (./tokenAxes.ts) precisely because a
-// rename here fails silently — the lookup is by string.
+// This is a core concern, not a terminal one: it lives here so the editor, database, and github
+// plugins can use it without importing across plugin boundaries (core/boundaries.test.ts treats
+// plugin-to-plugin coupling as a shrinking baseline).
 
 /** Resolved value of a custom property on `<html>`, trimmed. */
 export const token = (name: string): string =>
@@ -15,7 +12,7 @@ export const token = (name: string): string =>
 /** Perceived-luminance dark check on a 6-digit hex colour. Pure; exported for tests. */
 export const isDarkColor = (hex: string): boolean => {
   const n = parseInt(hex.slice(1), 16)
-  // Rec. 601 luma — plenty for "is this background dark?".
+  // Rec. 601 luma, plenty for "is this background dark?".
   return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff) < 128
 }
 

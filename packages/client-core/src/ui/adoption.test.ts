@@ -3,14 +3,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Primitive adoption ledger.
-//
-// The failure mode this exists to prevent is a six-month half-migration: two ways to write a
-// button, no way to tell which files are done, and no signal when a new one regresses. Progress
-// here is monotone and visible in one list, and a regression is a test failure rather than a
-// reviewer noticing.
-//
-// Same shrinking-baseline idiom as core/boundaries.test.ts.
+// Primitive adoption ledger. See docs/ui-design.md § Primitive adoption ratchet for why this
+// exists and how the list grew.
 
 // Anchored on the workspace root rather than a fixed hop to a src/ dir: renderer code is spread
 // across packages/client-core and the plugin/app packages now, and a relative hop breaks on every
@@ -40,32 +34,25 @@ const rel = (p: string) => p.slice(SRC.length + 1)
 
 describe('primitive adoption', () => {
   it('no call site hand-writes a retired shared class', () => {
-    // `action-error` was the worst of these: 32 files reached for it and only the GitHub plugin's
-    // stylesheet defined it, so the shell's error messages were unstyled whenever that plugin was
-    // off. The Alert primitive owns it now and both github rules are gone.
+    // `action-error` was the worst of the retired classes; see docs/ui-design.md
+    // § How the primitives are built for why. The Alert primitive owns it now and both github
+    // rules are gone.
     const retired = /class="[^"]*\b(overlay-btn|integration-key-input|ui-form-field|query-gate-\w+|action-error)\b/
     const offenders = tsx().filter((f) => retired.test(readFileSync(f, 'utf8'))).map(rel)
     expect(offenders).toEqual([])
   })
 
-  // A primitive spreads its OWN data-attributes after `rest`, so a call site that writes the raw
-  // attribute instead of the prop is silently overridden — `<Button data-size="sm">` rendered at
-  // md, and nobody could see it in review or in tsc (ComponentProps<'button'> accepts any data-*).
-  // The +TASK button in every integration browse sat at full control height for exactly this.
+  // See docs/ui-design.md § Primitive adoption ratchet for why a primitive spreads its own
+  // data-attributes after `rest`, and the bug this test caught.
   it('no call site passes a primitive its own data-attribute instead of the prop', () => {
     const owned = /<(?:Button|Badge|Chip|Row|Input|Select|Textarea|Spinner|Toolbar|SegmentedControl|ToggleButton|Card|Alert)\b[^>]*\sdata-(?:size|tone|variant|shape|dashed|icon-only|width|kind|invalid)=/
     const offenders = tsx().filter((f) => owned.test(readFileSync(f, 'utf8'))).map(rel)
     expect(offenders).toEqual([])
   })
 
-  // A class handed to a primitive lands on the SAME element as the primitive's own class, so it
-  // competes with `.ui-x` at (0,1,0) — which it ties and wins on order — but LOSES outright to
-  // `.ui-x[data-variant='…']` at (0,2,0). cssHygiene.test.ts already bans the bare shape for Card;
-  // this is the general rule, and it is checked against what each call site actually renders.
-  //
-  // Three bugs in one week: docker's filter strip lost its padding to `.ui-toolbar[data-size='sm']`,
-  // Modern repainted every solid button because its pack rule outranked the variant, and eight more
-  // strips had silently lost their gap. None of it is visible in review or to tsc.
+  // See docs/ui-design.md § Primitive adoption ratchet for the specificity clash this guards
+  // against. cssHygiene.test.ts already bans the bare shape for Card; this is the general rule,
+  // checked against what each call site actually renders.
   const CSS_CLASH = (() => {
     // What each primitive emits unconditionally (the `?? 'default'` in primitives.tsx).
     const DEFAULTS: Record<string, Record<string, string>> = {
@@ -151,7 +138,7 @@ describe('primitive adoption', () => {
   })
 
   // Files fully converted to the primitive components. Add a file here when you migrate it; the
-  // list may only grow. It is deliberately not "all files" — migration is incremental by design.
+  // list may only grow. It is not "all files": migration is incremental.
   const CONVERTED = [
     'packages/client-core/src/settings/AppearanceSettings.tsx',
     'plugins/changes/src/client/agentToolRenderer.tsx',
@@ -170,12 +157,7 @@ describe('primitive adoption', () => {
     'plugins/agents/src/client/QueuedAgentTurns.tsx',
     'plugins/agents/src/client/sourceContribution.tsx',
     'plugins/agents/src/client/toolRendererRegistry.tsx',
-    // Tier-1 of the 2026-08 design-system migration: Alert, EmptyState, StatusDot, Checkbox,
-    // ConfirmButton/createArmedConfirm, Popover/createAnchoredPopover. These files cleared the bar as
-    // a side effect of losing their bespoke error banners, empty states, status dots and checkboxes.
-    //
-    // Files that gained a primitive but still hand-write a <button> elsewhere are NOT here: the
-    // ledger means "fully converted", and listing a partly-converted file would spend the signal.
+    // Tier 1 (see docs/ui-design.md § Migration tiers and their two invariant tests).
     'packages/client-core/src/editor/DocumentSurface.tsx',
     'packages/client-core/src/node/NodeChip.tsx',
     'packages/client-core/src/settings/AgentToolsSettings.tsx',
@@ -195,8 +177,7 @@ describe('primitive adoption', () => {
     'plugins/linear/src/frame/app.tsx',
     'plugins/rollbar/src/frame/RollbarItemView.tsx',
     'plugins/rollbar/src/frame/app.tsx',
-    // Tier-2 migration: Menu, Toolbar, Chip, Tooltip (the promoted attribute protocol), Toast,
-    // DescriptionList, CollapsibleSection, SegmentedControl/ToggleButton, Input kind, Kbd.
+    // Tier 2 (see docs/ui-design.md § Migration tiers and their two invariant tests).
     'packages/client-core/src/plugins/frames/PluginFrame.tsx',
     'packages/client-core/src/ui/CollapsibleSection.tsx',
     'packages/client-core/src/ui/Popover.tsx',
@@ -206,8 +187,7 @@ describe('primitive adoption', () => {
     'plugins/linear/src/frame/index.tsx',
     'plugins/rollbar/src/frame/index.tsx',
     'plugins/terminal/src/client/slotContribution.tsx',
-    // Tier-3 migration: Card, DocumentTabs, TreeRow, FindBar, Drawer, SplitHandle/createSplitDrag,
-    // CodeBlock, Meter, KeyValueEditor, Table, Composer, PaletteSurface.
+    // Tier 3 (see docs/ui-design.md § Migration tiers and their two invariant tests).
     'apps/desktop/src/app/client/CommandPalette.tsx',
     'packages/client-core/src/palette/WorkspacePalette.tsx',
     'packages/client-core/src/plugins/frames/DocumentOverFrame.tsx',
@@ -221,9 +201,7 @@ describe('primitive adoption', () => {
     'plugins/github/src/client/DiffToolbar.tsx',
     'plugins/onboarding/src/client/OnboardingWizard.tsx',
     'plugins/http/src/frame/RequestTabs.tsx',
-    // Tier-4: the Button/Select sweep. Every raw <select> in the app became the Select primitive,
-    // and every ACTION button became Button — the row/tab/menu-item buttons Button's own note
-    // excludes stayed as they were, which is why some heavily-converted files are still absent.
+    // Tier 4 (see docs/ui-design.md § Migration tiers and their two invariant tests).
     'apps/desktop/src/app/client/App.tsx',
     'apps/desktop/src/app/client/TaskView.tsx',
     'packages/client-core/src/configTrust/ConfigTrustDialog.tsx',
@@ -263,15 +241,14 @@ describe('primitive adoption', () => {
     expect(text, 'raw class="ui-input"').not.toMatch(/class="ui-input"/)
   })
 
-  // Every primitive must keep appending the caller's class — that passthrough is what makes
-  // migration incremental (a converted call site can carry its old bespoke class and look
-  // identical).
+  // See docs/ui-design.md § Migration tiers and their two invariant tests for why every primitive
+  // must keep appending the caller's class rather than replacing it.
   //
-  // Matched as `.*Class` rather than the literal `.class` because a primitive that renders more than
-  // one element needs more than one class prop: ListDetail draws a container and two columns, so its
-  // passthroughs are `class`, `listClass` and `detailClass`. The receiver varies too — a primitive
-  // that splitProps() reads `own.class`. The invariant is that every cx() takes a caller-supplied
-  // class, not that they are all spelled the same.
+  // Matched as `.*Class` rather than the literal `.class` because a primitive that renders more
+  // than one element needs more than one class prop: ListDetail draws a container and two columns,
+  // so its passthroughs are `class`, `listClass`, and `detailClass`. The receiver varies too; a
+  // primitive that splitProps() reads `own.class`. The invariant is that every cx() takes a
+  // caller-supplied class, not that they are all spelled the same.
   it('primitives append the caller class rather than replacing it', () => {
     const text = readFileSync(join(SRC, 'packages/client-core/src/ui/primitives.tsx'), 'utf8')
     const classAttrs = [...text.matchAll(/class=\{cx\(([^)]*)\)\}/g)].map((m) => m[1])
