@@ -13,30 +13,24 @@ import {
 } from '../../contract/collections'
 import { pullRequests, repos } from '../../node/schema'
 
-// The collection half of the PR mirror (@acorn/protocol/collections.ts). One route, one question: the
-// open pull requests this user has mirrored, across every repository, newest first.
+// The collection half of the PR mirror (@acorn/protocol/collections.ts). One route, one question:
+// the open pull requests this user has mirrored, across every repository, newest first.
 //
-// It READS the mirror and never drives it, which is the one decision in this file worth arguing. The
-// repo-scoped list route owns freshness — `serveThenRevalidate` at `PULLS_STALE_AFTER_MS`
-// (server/routes/pulls.ts) — because it is looking at ONE repository the person is looking at too. A
-// panel is the opposite shape: it polls on a timer, unattended, across every repo at once, and a
-// revalidate here would multiply one dashboard by the user's repository count against a rate limit the
-// whole plugin shares. So the mirror's freshness stays owned by the read that a person is waiting on,
-// and this one serves whatever that read last wrote.
+// Reads the mirror and never drives it; freshness here stays owned by the repo-scoped list route a
+// person is actually waiting on (docs/dashboards.md § Freshness). No refresh of its own, so a panel
+// shows rows as old as the last time that repo's PR list was opened. The upgrade, when a dashboard is
+// somebody's home page rather than a second view of an open list, is a single cross-repo refresh
+// through the engine (`resource: 'pulls:mine'`, one GitHub search query, one TTL) rather than one
+// revalidate per repository.
 //
-// No refresh of its own. The ceiling is a panel showing rows as old as the last time the PR
-// list was opened for that repo. The upgrade, when a dashboard is somebody's home page rather than a
-// second view of a list they already have open, is a single cross-repo refresh through the engine —
-// `resource: 'pulls:mine'`, one GitHub search query, one TTL — not one revalidate per repository.
-// The GitHub side of the `involves` param. One search, whatever the repository count — which is why it
-// is allowed to spend a request where the mirror read above is not: the objection to refreshing here
-// was N repos × one poll, and this is 1. It is the single cross-repo query the comment above names as
-// the upgrade path, arriving early because a mirror-side answer to "asked me to review" would be wrong
-// rather than merely stale.
+// The GitHub side of the `involves` param spends a request the mirror read above does not, because
+// it is one search whatever the repository count rather than N repos times one poll, and a
+// mirror-side answer to "asked me to review" would be wrong rather than merely stale
+// (docs/github-integration.md § Reads and writes).
 //
-// The selection set is deliberately the mirror's list columns and no more — PR_FRAGMENT exists for a
-// PR someone has open in front of them, and pulling its reviews, threads and commits for fifty rows
-// nobody has clicked would cost a rate limit to render columns this collection does not declare.
+// The selection set is the mirror's list columns and no more. PR_FRAGMENT exists for a PR someone has
+// open in front of them, and pulling its reviews, threads and commits for fifty rows nobody has
+// clicked would cost a rate limit to render columns this collection does not declare.
 const SEARCH_QUERY = `
 query PullsInvolvingMe($q: String!, $first: Int!) {
   search(query: $q, type: ISSUE, first: $first) {
@@ -67,9 +61,9 @@ type GqlSearchPull = {
   repository?: { name: string; owner: { login: string } } | null
 }
 
-/** Search nodes → the same source shape the mirror select produces. `type: ISSUE` can return issues as
- *  well as pull requests, and an inline fragment that does not match answers `{}` — so a node with no
- *  number is dropped rather than rendered as PR #NaN. */
+/** Search nodes to the same source shape the mirror select produces. `type: ISSUE` can return issues
+ *  as well as pull requests, and an inline fragment that does not match answers `{}`, so a node with
+ *  no number is dropped rather than rendered as PR #NaN. */
 const toSource = (nodes: readonly GqlSearchPull[]): PullCollectionSource[] =>
   nodes.flatMap((node) =>
     node.number && node.repository
@@ -101,7 +95,7 @@ export const collections = (db: PluginDatabase) => new Hono<AppEnv>().get(`/${PU
   // stale saved panel is a thing that can arrive here, and the widest honest answer beats a broken tile.
   if (involvements.length) {
     const token = await githubToken(c)
-    // One search each, in parallel, unioned — GitHub's qualifiers only AND, so "assigned to me or
+    // One search each, in parallel, unioned: GitHub's qualifiers only AND, so "assigned to me or
     // waiting on my review" is two questions however it is asked. At most three, and a search is one
     // call whatever the repository count, so the ceiling is three calls per poll.
     const results = await Promise.all(involvements.map((involvement) =>
@@ -116,9 +110,9 @@ export const collections = (db: PluginDatabase) => new Hono<AppEnv>().get(`/${PU
         ? respondError(c, failed.failure.status, failed.failure.error)
         : respondError(c, 502, 'github_unavailable', failed.messages)
     }
-    // A PR you were assigned AND asked to review is one row. Deduped here rather than by the host: the
-    // host dedupes a mixed board by row id and would have got this right too, but a collection answering
-    // the same record twice is a wrong answer regardless of who is looking at it.
+    // A PR you were assigned and asked to review is one row. Deduped here rather than by the host: the
+    // host dedupes a mixed board by row id and would have got this right too, but a collection
+    // answering the same record twice is a wrong answer regardless of who is looking at it.
     const found = new Map<string, PullCollectionSource>()
     for (const result of results) {
       if (!result.ok) continue

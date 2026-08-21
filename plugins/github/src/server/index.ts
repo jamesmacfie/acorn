@@ -24,7 +24,7 @@ export const gh = (token: string, path: string, init?: RequestInit) =>
       })
     : Promise.resolve(notConnected())
 
-// GraphQL — POST to /graphql. No ETag support (docs/caching.md); callers self-cache by TTL.
+// GraphQL, POST to /graphql. No ETag support (docs/caching.md); callers self-cache by TTL.
 export const ghGraphQL = (token: string, query: string, variables: Record<string, unknown>) =>
   token
     ? fetch('https://api.github.com/graphql', {

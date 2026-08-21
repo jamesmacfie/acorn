@@ -7,11 +7,8 @@ import { comments, pullRequests, repos, reviewThreads, reviews } from '../../nod
 // best-effort: an unmirrored repo yields an empty list, so the client just gets no suggestions, which is
 // why this keeps its own lookup rather than resolveRepoForUser's live-fetch-on-miss.
 //
-// A factory over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database, and a second startServiceRuntime in one process builds fresh routers over its
-// own handle instead of inheriting a closed one.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const mentions = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/mentions', async (c) => {
   const uid = ownerId(c)
   const owner = c.req.param('owner')!

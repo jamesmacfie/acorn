@@ -86,13 +86,10 @@ const handleFilesRead = async (db: PluginDatabase, c: Context<AppEnv>, options: 
 }
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
-// path/status/+/−/sha/patch in one call — richer than the GraphQL composite, which dropped files).
-// Mirror logic is shared with the batch route — see prMirror.ts.
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
-// handle instead of inheriting a closed one.
+// path/status/+/−/sha/patch in one call, richer than the GraphQL composite, which dropped files).
+// Mirror logic is shared with the batch route, see prMirror.ts.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const pullFiles = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
   const path = c.req.query('path')
   const summaryOnly = c.req.query('summary') === '1' && !path

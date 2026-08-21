@@ -2,18 +2,8 @@ import { Hono } from 'hono'
 import { type AppEnv, connectProvider, ownerId, providerError, respondError } from '@acorn/plugin-api/node'
 import { GITHUB_PROVIDER } from '../githubToken'
 
-// GitHub OAuth via the device authorization grant (RFC 8628).
-//
-// Chosen over the redirect web flow for three reasons, in order of weight:
-//   1. No client secret. The web flow needs one to exchange the code, and a secret shipped inside a
-//      distributed binary is recoverable — a caveat V1 documented and could not fix. The device flow
-//      exchanges on `client_id` alone.
-//   2. No redirect URI. The renderer no longer has a server-served origin to redirect back to, and a
-//      remote node would need its own registered callback URL. Device flow has neither problem, so
-//      local and remote nodes run the identical code path.
-//   3. No auth BrowserWindow. The whole intercept-navigation dance in Electron main goes away.
-//
-// The cost is one extra user action: they read a code and type it at github.com/login/device.
+// GitHub OAuth via the device authorization grant, RFC 8628 (docs/github-integration.md §
+// Connecting, for why device flow wins over the redirect web flow).
 
 const DEVICE_CODE_URL = 'https://github.com/login/device/code'
 const TOKEN_URL = 'https://github.com/login/oauth/access_token'
@@ -42,7 +32,7 @@ const form = (body: Record<string, string>): RequestInit => ({
 export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
   // Open a device-flow window. Returns what the UI must display: the code, where to type it, and how
   // often to poll. The device_code is a bearer for the pending grant, so it is returned to the
-  // client rather than held server-side — it authorizes nothing on this node and keeping per-owner
+  // client rather than held server-side, since it authorizes nothing on this node and keeping
   // pending state would only add a lifecycle to get wrong.
   .post('/auth/device/start', async (c) => {
     ownerId(c) // owner-gated: only the owner may begin connecting an account
@@ -91,21 +81,21 @@ export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
 
     // Hand the token to the same path every other provider's connect uses: it validates against
     // GET /user, records the granted scopes, encrypts at rest and enforces maxConnections. A token
-    // GitHub then rejects must surface as 401, not as an uncaught 500 — hence the same mapping the
-    // core connection routes use.
+    // GitHub then rejects surfaces as 401, not as an uncaught 500, through the same mapping the core
+    // connection routes use.
     try {
       const integration = await connectProvider(
-        // CORE's handle, deliberately: this writes core's `integrations` row through core's own
-        // connectProvider, and touches none of this plugin's tables. `c.env.DB` rather than getDb() only
-        // because importing from server/db is what the schema ratchet measures, and there is nothing about
-        // github's schema in this call.
+        // Core's handle: this writes core's `integrations` row through core's own connectProvider and
+        // touches none of this plugin's tables. `c.env.DB` rather than getDb() only because importing
+        // from server/db is what the schema ratchet measures, and there is nothing about github's
+        // schema in this call.
         c.env.DB,
         userId,
         { providerId: GITHUB_PROVIDER, credentials: { accessToken: body.access_token } },
         c.env.SECRETS,
       )
-      // The token itself is never echoed back — the client only needs to know it worked. The machine
-      // identity is NOT touched here: it is minted at boot (core's ensureBoundIdentity), and the GitHub
+      // The token itself is never echoed back; the client only needs to know it worked. The machine
+      // identity is not touched here, only minted at boot (core's ensureBoundIdentity); the GitHub
       // login is just this integration's account metadata.
       return c.json({ status: 'connected', integration } as const)
     } catch (error) {

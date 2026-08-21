@@ -9,11 +9,11 @@ import { checks as checksTable, comments as commentsTable, prCommits as prCommit
 // Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
 // on-disk patch blobs), plus their read-backs. Both the single-PR routes (pullDetail / pullFiles)
 // and the batch route (pullsBatch) read+write the same mirror tables, so the logic lives here
-// once to avoid drift. PR data is "fast-changing" (docs/caching.md) — freshness is a TTL gate in
-// sync_state (PULLS_STALE_AFTER_MS, server/sync/policy.ts).
+// once to avoid drift. PR data is "fast-changing" (docs/caching.md); freshness is a TTL gate in
+// sync_state (PULLS_STALE_AFTER_MS, server/syncPolicy.ts).
 
-// Every exported helper here already took the handle as a parameter, which is why this module needed no
-// reshaping when the tables moved — only the type of the thing being passed in changed.
+// Every exported helper here already took the handle as a parameter, which is why this module needed
+// no reshaping when the tables moved. Only the type of the thing being passed in changed.
 type Db = PluginDatabase
 export type PrKey = { userId: string; repoId: number; number: number }
 
@@ -297,8 +297,8 @@ export const fetchFiles = async (token: string, owner: string, repo: string, num
   return { ok: true, value: (await res.json()) as GitHubFile[] }
 }
 
-// Re-mirror one PR's files: patch bodies → on-disk BLOBS by immutable sha (deduped, cached
-// forever — see server/blobs.ts); only the metadata rows go to the DB. Bodies resolve back from
+// Re-mirror one PR's files: patch bodies go to on-disk BLOBS by immutable sha (deduped, cached
+// forever, see server/blobs.ts); only the metadata rows go to the DB. Bodies resolve back from
 // BLOBS on read.
 //
 // Stated structurally rather than as `Pick<Env['BLOBS'], …>`: naming core's runtime bindings put

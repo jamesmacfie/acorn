@@ -10,24 +10,21 @@ import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { syncState } from '../../node/schema'
 
-// Batch prefetch — warm the mirror for several open PRs at once so client navigation is instant.
+// Batch prefetch: warm the mirror for several open PRs at once so client navigation is instant.
 // Detail is one multi-alias GraphQL call for all stale PRs (one GitHub round-trip); files stay N
 // parallel REST calls (REST can't be aliased). Per-PR TTL skip means already-fresh PRs cost no
 // GitHub calls. Reuses the same mirror tables/logic as the single-PR routes (prMirror.ts).
 //
-// Deliberately NOT on the serve-then-revalidate engine (docs/caching.md): this is a multi-item
-// prefetch that always blocks and never serves-then-revalidates (there is no single response
-// resource to hand back stale). It shares the engine's TTL (PULLS_STALE_AFTER_MS) but owns its own
-// per-item freshness gate below.
+// Not on the serve-then-revalidate engine (docs/caching.md): this is a multi-item prefetch that
+// always blocks and never serves-then-revalidates, since there is no single response resource to
+// hand back stale. It shares the engine's TTL (PULLS_STALE_AFTER_MS) but owns its own per-item
+// freshness gate below.
 const MAX_BATCH = 10 // bounds the GraphQL query size; the client sends ~5
 const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
   value === 'full' || value === 'summary' || value === 'none'
 
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
-// handle instead of inheriting a closed one.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const pullsBatch = (db: PluginDatabase) => new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
@@ -63,7 +60,7 @@ export const pullsBatch = (db: PluginDatabase) => new Hono<AppEnv>().post('/:own
   const staleFiles = filesMode === 'none' ? [] : numbers.filter((n) => !isFresh(filesResource(repoId, n)))
 
   // Detail: one multi-alias GraphQL query for all stale PRs. A whole-response error (auth/rate
-  // limit) fails the batch — the client treats prefetch as best-effort and falls back to on-demand.
+  // limit) fails the batch. The client treats prefetch as best-effort and falls back to on-demand.
   if (staleDetail.length) {
     const varDecls = staleDetail.map((_, i) => `$n${i}: Int!`).join(', ')
     const aliases = staleDetail.map((n, i) => `pr_${n}: pullRequest(number: $n${i}) { ...PrFields }`).join('\n    ')

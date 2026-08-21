@@ -64,10 +64,10 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
   return db as unknown as PluginDatabase
 }
 
-// CORE's real migrated database, holding the stored GitHub credential. It is seeded through
-// seedGithubIntegration rather than stubbed because githubToken() DECRYPTS the row — a placeholder would
-// make the route see no credential and call gh() with an empty token, which is precisely the failure the
-// `gh` expectations below are for.
+// Core's real migrated database, holding the stored GitHub credential. It is seeded through
+// seedGithubIntegration rather than stubbed because githubToken() decrypts the row. A placeholder
+// would make the route see no credential and call gh() with an empty token, which is precisely the
+// failure the `gh` expectations below are for.
 const ENC_KEY = '0'.repeat(64)
 let core: TestDb
 

@@ -8,11 +8,8 @@ import { readCachedRepos, refreshRepos, toPublicRepo } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { repos as reposTable, syncState } from '../../node/schema'
 
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
-// handle instead of inheriting a closed one.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const repos = (db: PluginDatabase) => new Hono<AppEnv>()
   .get('/', async (c) => {
     const uid = ownerId(c)
@@ -22,7 +19,7 @@ export const repos = (db: PluginDatabase) => new Hono<AppEnv>()
     const resource = reposResource()
 
     // Freshness comes from sync_state (bumped on every 200/304). A pre-ETag mirror has repo rows but
-    // no sync row yet — fall back to the newest row's fetchedAt so it serves as stale (not cold) and
+    // no sync row yet, fall back to the newest row's fetchedAt so it serves as stale (not cold) and
     // self-heals on the first refresh. Cold only when nothing was ever fetched.
     const read = async (): Promise<Cached<Repo[]> | null> => {
       const [[sync], rows] = await Promise.all([

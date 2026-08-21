@@ -29,11 +29,8 @@ type GitHubPull = {
   updated_at: string | null
 }
 
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
-// handle instead of inheriting a closed one.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>) => new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
@@ -41,14 +38,14 @@ export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>) => 
   const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
-  // open | closed (closed covers merged — GitHub's list reports merged PRs as "closed").
+  // open | closed (closed covers merged, since GitHub's list reports merged PRs as "closed").
   const state = c.req.query('state') === 'closed' ? 'closed' : 'open'
 
   const resolved = await resolveRepoForUser(db, token, userId, owner, repo)
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const repoId = resolved.value.repoId
 
-  // Closed PRs are historical/effectively-immutable and unbounded — no point mirroring them
+  // Closed PRs are historical, effectively immutable, and unbounded. No point mirroring them
   // locally with a short TTL. Proxy GitHub one page at a time; the client load-mores via
   // createInfiniteQuery.
   if (state === 'closed') {
@@ -116,7 +113,7 @@ const ghToPublic = (p: GitHubPull) =>
     autoMergeEnabled: false,
   }) satisfies Pull
 
-// Public projection — the fields the SPA PR list needs; no staleness bookkeeping. Reads the full
+// Public projection: the fields the SPA PR list needs; no staleness bookkeeping. Reads the full
 // mirror row so merge state (owned by the detail route) rides along.
 const toPublic = (r: typeof pullRequests.$inferSelect) =>
   ({

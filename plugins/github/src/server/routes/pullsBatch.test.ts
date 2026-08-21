@@ -38,10 +38,10 @@ const jsonRequest = (body: unknown) =>
     body: JSON.stringify(body),
   })
 
-// The plugin handle the router is a factory over. It answers exactly one query — the per-PR `sync_state`
-// freshness read — because every mirror read/write around it is mocked above; both resources come back
-// fresh so nothing reaches GitHub. It is handed to the factory directly now instead of through a getDb
-// mock, which is why that mock is gone.
+// The plugin handle the router is a factory over. It answers exactly one query, the per-PR
+// `sync_state` freshness read, because every mirror read/write around it is mocked above; both
+// resources come back fresh so nothing reaches GitHub. It is handed to the factory directly now
+// instead of through a getDb mock, which is why that mock is gone.
 const makeDb = () =>
   ({
     select: vi.fn(() => ({
@@ -54,9 +54,9 @@ const makeDb = () =>
     })),
   }) as unknown as PluginDatabase
 
-// CORE's handle, on `env.DB`: the stored GitHub credential lives in core's `integrations` table and is
-// read through the core seam. No rows is the not-connected path, and the token is never spent here
-// because the batch is fully fresh.
+// Core's handle, on `env.DB`: the stored GitHub credential lives in core's `integrations` table and
+// is read through the core seam. No rows is the not-connected path, and the token is never spent
+// here because the batch is fully fresh.
 const noIntegrations = { select: () => ({ from: () => ({ where: async () => [] }) }) } as unknown as Env['DB']
 
 // `BLOBS` is here because the route hands `readFiles` a blob store rather than the whole binding set:

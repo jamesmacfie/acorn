@@ -5,7 +5,7 @@ import type { RunJobs } from '../../contract/api'
 import { githubToken } from '../githubToken'
 
 // Read-only Actions endpoints for the checks side panel. Writes (rerun) live in prActions.ts.
-// Deliberately uncached on the server — no mirror table, no BLOBS entry: the client query cache
+// Uncached on the server: no mirror table, no BLOBS entry. The client query cache
 // (IndexedDB-persisted) already covers reuse on this machine, and job/log payloads go stale fast.
 
 type GhJob = {
@@ -40,7 +40,8 @@ export const actions = new Hono<AppEnv>()
     return c.json(body)
   })
   // Full plaintext log for one job. GitHub 302-redirects to signed blob storage; follow it
-  // manually and re-fetch WITHOUT the auth header (the target rejects/leaks the token otherwise).
+  // manually and re-fetch without the auth header, since the target rejects or leaks the token
+  // otherwise.
   .get('/:owner/:repo/actions/jobs/:jobId/logs', async (c) => {
     ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)

@@ -10,16 +10,13 @@ import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { syncState } from '../../node/schema'
 
-// PR detail — the composite GraphQL read (docs/github-integration.md), the primary read for the
+// PR detail: the composite GraphQL read (docs/github-integration.md), the primary read for the
 // PR screen: PR + reviews + comments + checks in one round-trip. GraphQL has no ETag, so
 // freshness is a TTL gate in sync_state (`pr:<repoId>:<number>`); the mirror tables are the
-// cache. The mirror logic is shared with the batch route — see prMirror.ts. Files live in
+// cache. The mirror logic is shared with the batch route, see prMirror.ts. Files live in
 // pr_files, owned by /files.
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
-// handle instead of inheriting a closed one.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const pullDetail = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
@@ -36,7 +33,7 @@ export const pullDetail = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owne
   const key = { userId, repoId, number }
   const resource = prResource(repoId, number)
 
-  // Cold when never fetched (no sync row) OR the composite has no pull yet — both mean "nothing
+  // Cold when never fetched (no sync row) or the composite has no pull yet, both meaning "nothing
   // usable to serve, block on a refresh". `pull` is written atomically with the sync row by
   // mirrorPr, so a fresh sync row always carries a pull; the null-pull case is the stale-empty one.
   const read = async (): Promise<Cached<PullDetail> | null> => {

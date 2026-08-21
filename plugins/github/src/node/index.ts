@@ -26,42 +26,39 @@ export const githubPlugin = (): NodePlugin => {
   return {
     name: 'github',
     required: false,
-    // This module's own URL: the chain sits at plugins/github/migrations beside it, and the host owns
-    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    // This module's own URL, so the host can walk from here for the migration chain (docs/plugins.md
+    // § Data ownership).
     migrationsModule: import.meta.url,
     init: async (ctx) => {
-      // Opened and migrated by the host before init returns. Every router below is a FACTORY closing over
-      // this handle rather than a module-scope router reading `getDb(c.env)`, for the reason
-      // plugins/changes/src/server/routes/reviewNotes.ts states first: the tables are in
-      // <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-      // (docs/data-layer.md § Plugin DBs). So there is no request that can reach an unmigrated database.
+      // Opens and migrates before init returns; every router below closes over this handle rather
+      // than reading one off the request environment (docs/data-layer.md § Plugin databases).
       const store = ctx.storage.open()
 
-      // Bounded startup repair of parent-only mirror evictions (server/mirrorRetention.ts). Pre-listener,
-      // as it was when the composition root owned it — see the ordering note in this file's header.
+      // Bounded startup repair of parent-only mirror evictions (server/mirrorRetention.ts). Runs
+      // before any route registers, matching where the composition root used to call it.
       const { removedPulls } = await pruneOrphanedGithubMirror(store)
       if (removedPulls) ctx.log.log(`[github] pruned ${removedPulls} orphaned mirrored pull request(s)`)
 
-      // The provider itself, into the connection AND integration registries. NOT optional and not
-      // cosmetic: `connectProvider` looks github up in the connection registry, so without this the
-      // device-flow poll fails `provider_bad_config` and GitHub can NEVER be connected — while an
-      // already-authenticated machine keeps working, because githubToken() reads the stored row and
-      // never consults the registry. That asymmetry is exactly why it went unnoticed when
-      // apps/node/src/server/providers.ts was deleted: only a FRESH data root reveals it.
+      // Registers the provider in both the connection and integration registries. This is required,
+      // not cosmetic: connectProvider looks github up in the connection registry, so without it the
+      // device-flow poll fails provider_bad_config and github can never connect, while an
+      // already-authenticated machine keeps working because githubToken() reads the stored row
+      // directly and never consults the registry. That asymmetry is why deleting
+      // apps/node/src/server/providers.ts went unnoticed: only a fresh data root reveals it.
       //
-      // The router is registered separately below rather than passed here, because github's device-flow
-      // routes live under its own namespace alongside twelve mirror routers whose order is load-bearing.
+      // The device-flow router registers separately below because github's routes share a namespace
+      // with twelve mirror routers whose registration order is load-bearing.
       ctx.providers.integration(githubProvider)
 
-      // /v2/p/github/repos/* — the mirror. The `/repos` prefix and the router order are carried over
-      // verbatim from apps/node/src/server/routes.ts: several of these declare overlapping paths under
-      // the same prefix (`/:owner/:repo/pulls/:number/...`), so the order they are registered in is the
-      // order Hono matches them, and reshuffling it would change which handler wins.
+      // /v2/p/github/repos/* is the mirror. The /repos prefix and the router order carry over from
+      // apps/node/src/server/routes.ts: several of these routers declare overlapping paths under the
+      // same prefix (/:owner/:repo/pulls/:number/...), so the registration order is the order Hono
+      // matches them, and reshuffling it changes which handler wins.
       ctx.routes.register(repos(store), { prefix: '/repos' })
       ctx.routes.register(repoLabels(store), { prefix: '/repos', note: '/:owner/:repo/labels' })
-      // `core` as well as the handle: refreshing the open-PR list also ADOPTS a PR into any local-first
-      // task on that branch (Flow B), and `tasks` is core's table in core's file — so that write leaves the
-      // mirror's transaction and goes through CoreServices.tasks.adoptPullNumbers instead.
+      // Takes `core` as well as the handle: refreshing the open-PR list also adopts a PR into any
+      // local-first task on that branch (Flow B), and `tasks` is core's table in core's file, so that
+      // write goes through CoreServices.tasks.adoptPullNumbers instead of the mirror's transaction.
       ctx.routes.register(pulls(store, ctx.core), { prefix: '/repos' })
       ctx.routes.register(pullDetail(store), { prefix: '/repos' })
       // The one github router with no plugin database handle: it shells out to git in the mapped project
@@ -72,56 +69,53 @@ export const githubPlugin = (): NodePlugin => {
       ctx.routes.register(pullsBatch(store), { prefix: '/repos' })
       ctx.routes.register(prActions(store), { prefix: '/repos' })
       // Workflow-run/job reads and re-runs. It resolves everything from the GitHub API and the URL, so it
-      // holds no mirror state and takes no handle — the one github router that genuinely needed nothing.
+      // holds no mirror state and takes no handle, the one github router that genuinely needed nothing.
       ctx.routes.register(actions, { prefix: '/repos' })
       ctx.routes.register(prCreate(store), { prefix: '/repos' })
       ctx.routes.register(mentions(store), { prefix: '/repos' })
-      // Moved out of core with `pinned_repos`: /v2/core/pins → /v2/p/github/pins. A wire-surface change,
-      // and the client's `pinsRoute` moved with it in the same commit — the repo selector is the only
-      // caller.
+      // Moved out of core with `pinned_repos`: /v2/core/pins became /v2/p/github/pins. A wire-surface
+      // change, and the client's `pinsRoute` moved with it in the same commit; the repo selector is
+      // the only caller.
       ctx.routes.register(pins(store), { prefix: '/pins' })
-      // /v2/p/github/collections/* — the mirror projected as typed records a user can compose a panel
-      // over (server/routes/collections.ts). Its own prefix rather than `/repos`, because a collection
-      // spans every mirrored repository and is not addressed by one.
+      // /v2/p/github/collections/* projects the mirror as typed records a user can compose a panel
+      // over (server/routes/collections.ts). It gets its own prefix rather than /repos because a
+      // collection spans every mirrored repository and is not addressed by one.
       ctx.routes.register(collections(store), { prefix: '/collections' })
-      // The COMPILED feeder for node-side collection reads (docs/future/cron/targets.md § seam 1).
-      // The client half of this registration ships a `fetch` that reads the same route over HTTP; this
-      // is the pointer that lets the measure sampler read it in-process with no client attached. Both
-      // name the one route constant the contract module exports, so they cannot drift apart.
+      // The compiled feeder for node-side collection reads (docs/schedules.md § Reading a collection
+      // from the node). The client half of this registration ships a `fetch` that reads the same
+      // route over HTTP; this is the pointer that lets the measure sampler read it in-process with no
+      // client attached.
       ctx.collections.register({
         collectionId: PULLS_COLLECTION_ID,
         items: pullsCollectionRoute,
         params: [{ id: 'repo', name: 'Repository', type: 'text' }],
       })
-      // The device-flow connect writes CORE's `integrations` row through core's own connectProvider.
-      // It does not bind the machine identity: core mints that owner at boot. It touches none of this
-      // plugin's tables, so it takes no handle.
+      // The device-flow connect writes core's own `integrations` row through connectProvider
+      // (docs/github-integration.md § Connecting). It touches none of this plugin's tables, so it
+      // takes no handle.
       ctx.routes.register(githubDeviceAuth(githubClientId), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
       ctx.routes.register(githubImport(store, ctx.core), { prefix: '', note: 'POST /import — import mirrored repositories into core projects' })
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
         pullRequest: (userId, repoOwner, repoName, pullNumber) => mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
-        // Resolving the task itself is CORE's job — `tasks` is core's table and this plugin has no handle
-        // to it — so the taskId round-trips through CoreServices before the mirror is consulted.
+        // Resolving the task itself is core's job (`tasks` is core's table and this plugin has no
+        // handle to it), so the taskId round-trips through CoreServices before the mirror is consulted.
         failingChecks: (userId, taskId) => failingChecksFor(store, ctx.core, userId, taskId),
         footprint: () => mirrorFootprint(store),
       })
 
-      // The `pr` context section. Its rows are this plugin's — `repos ⋈ pull_requests ⋈ pr_files` lives in
-      // github.sqlite — so github registers it, and core keeps the section's budget/legacy/format contract
-      // (server/agentTools/contextSections.ts). Straight to the query, not through GITHUB_MIRROR: resolving
+      // The `pr` context section. Its rows are this plugin's (`repos ⋈ pull_requests ⋈ pr_files` in
+      // github.sqlite), so github registers it directly rather than through GITHUB_MIRROR: resolving
       // its own capability out of the registry would be a plugin asking the graph about itself.
-      //
-      // The previous shape was a THUNK the composition root injected, precisely so an absent capability could
-      // render an empty section instead of throwing. That safety is now structural: if github's init never
-      // runs, the section is never registered, and `parseInclude` simply has no `pr` id to include.
+      // Optional contribution semantics, including what an absent section renders as, are core's
+      // (docs/agent-tools.md § Context sections).
       ctx.contextSections.register(pullRequestSection((userId, repoOwner, repoName, pullNumber) =>
         mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
       ))
 
     },
-    // No dispose. The only resource this plugin held was its SQLite handle, and the host drains that —
-    // still before the data root's lock is dropped. Every router above closes over the handle and is
+    // No dispose. The only resource this plugin held was its SQLite handle, and the host drains that
+    // before the data root's lock is dropped. Every router above closes over the handle and is
     // discarded with the plugin's route contributions by the host.
   }
 }
