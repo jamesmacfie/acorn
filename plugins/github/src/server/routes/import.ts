@@ -63,10 +63,8 @@ export const githubImport = (db: PluginDatabase, core: ImportCore) => new Hono<A
           path = join(item.parentDir, repo.name)
         }
 
-        // A path-less project for this repository is a placeholder left by an older import, not a
-        // second checkout — fill it in rather than adding a rival row. A project that already HAS a
-        // path is a real checkout, and two clones of one repository are legal (schema.ts: the
-        // projects_github_idx is deliberately non-unique), so that case still creates a new project.
+        // Fills a path-less placeholder left by an older import rather than adding a rival row
+        // (docs/github-integration.md § Importing projects).
         const placeholder = await core.projects.byGithub(repo.owner, repo.name)
         const existingId = placeholder && placeholder.path === null ? placeholder.id : null
         const projectId = existingId ?? (await core.projects.create({ name: repo.name, path })).id

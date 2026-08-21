@@ -90,7 +90,7 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
   const getOpen = () => app.fetch(new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls'), { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env)
 
   it('cold: blocks on GitHub, mirrors the list, and adopts a matching local task (Flow B)', async () => {
-    // A local-first task on the same branch with no PR yet — the refresh should adopt PR #42.
+    // A local-first task on the same branch with no PR yet; the refresh should adopt PR #42.
     await core.db.insert(schema.tasks).values({
       id: 'task-1', title: 'wip', origin: 'local', projectId: 'project-runn', branch: 'feature-x', status: 'active', createdAt: 0, updatedAt: 0,
     })

@@ -36,9 +36,10 @@ const publicRepo: Repo = { id: 19847, owner: 'Runn-Fast', name: 'runn', private:
 const responseJson = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } })
 
-// TWO handles, and no getDb mock any more: `repos`/`sync_state` are this plugin's tables in
-// <data-root>/plugins/github.sqlite and the router is a factory over that handle, while the stored GitHub
-// credential still lives in CORE's `integrations` table and is read through the core seam off `env.DB`.
+// Two handles, and no getDb mock any more: `repos`/`sync_state` are this plugin's tables in
+// <data-root>/plugins/github.sqlite and the router is a factory over that handle, while the stored
+// GitHub credential still lives in core's `integrations` table and is read through the core seam off
+// `env.DB`.
 describe('repos list (serve-then-revalidate via the sync engine)', () => {
   let core: TestDb
   let plugin: TestPluginDb

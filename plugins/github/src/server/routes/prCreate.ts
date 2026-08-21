@@ -7,7 +7,7 @@ import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/
 import { githubToken } from '../githubToken'
 import { repos, syncState } from '../../node/schema'
 
-// Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror —
+// Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror,
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
 // the open-pulls sync_state so the list refetches the new PR; the PR detail mirror fills on
 // navigation via the existing pullDetail route.
@@ -26,11 +26,8 @@ type GitHubCompare = {
   commits?: { sha: string; commit: { message: string } }[]
 }
 
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
-// handle instead of inheriting a closed one.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
   .get('/:owner/:repo/branches', async (c) => {
     ownerId(c) // gate on auth; the credential itself comes from the stored integration
@@ -99,7 +96,7 @@ export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
       commits: (data.commits ?? []).map((c) => ({ sha: c.sha, message: c.commit.message })),
     } satisfies Compare)
   })
-  // Create the PR. 422 (PR exists / no commits / bad branch) carries GitHub's message — surface it
+  // Create the PR. 422 (PR exists / no commits / bad branch) carries GitHub's message, so surface it
   // verbatim instead of letting ghError flatten it to github_unavailable.
   .post('/:owner/:repo/pulls', async (c) => {
     const uid = ownerId(c)

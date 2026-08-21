@@ -12,8 +12,8 @@ export type MirroredPullRequest = {
 export type GithubMirrorCapability = {
   /**
    * The mirrored PR for a task's (owner, repo, pullNumber), or null when there is no PR, no mirrored
-   * repo, or nothing cached yet. Deliberately does NOT fetch: this backs the `pr` context section, which
-   * is assembled synchronously while a prompt is being built, and a cold mirror must render as an absent
+   * repo, or nothing cached yet. Never fetches: this backs the `pr` context section, which is
+   * assembled synchronously while a prompt is being built, and a cold mirror must render as an absent
    * section rather than block on GitHub.
    */
   pullRequest(userId: string, repoOwner: string, repoName: string, pullNumber: number): Promise<MirroredPullRequest | null>
@@ -21,13 +21,13 @@ export type GithubMirrorCapability = {
   /**
    * Re-derived CI state for a task's PR, as the workflow runner's `checks-green` policy needs it. The
    * three-valued answer is load-bearing and is why this is not a boolean:
-   *   ''    — every mirrored check passed (the ci-loop step is done, the policy passes)
-   *   text  — a rendered list of the failing ones, which becomes the fix prompt
-   *   null  — nothing to check at all: no PR, no active identity, or the repo is not mirrored yet. The
-   *           ci-loop step treats this as a hard failure rather than as success.
+   *   ''    is every mirrored check passed (the ci-loop step is done, the policy passes)
+   *   text  is a rendered list of the failing ones, which becomes the fix prompt
+   *   null  is nothing to check at all: no PR, no active identity, or the repo is not mirrored yet.
+   *         The ci-loop step treats this as a hard failure rather than as success.
    *
-   * The workflow plugin resolves this capability through the runtime registry rather than importing the
-   * GitHub implementation directly.
+   * The workflow plugin resolves this capability through the runtime registry rather than importing
+   * the GitHub implementation directly.
    */
   failingChecks(userId: string | null, taskId: string): Promise<string | null>
 

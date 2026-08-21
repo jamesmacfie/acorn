@@ -34,9 +34,9 @@ describe('github pull requests as a collection', () => {
   })
 
   it('folds three mirror columns into the one status the vocabulary allows', () => {
-    // GitHub says "what state is this PR in" three times — `state`, `draft` and `mergeStateStatus` —
-    // and the wire allows one enum per field. Deciding what a status IS is the plugin's job, and it
-    // reads better than the mirror does.
+    // GitHub says "what state is this PR in" three times, through `state`, `draft` and
+    // `mergeStateStatus`, and the wire allows one enum per field. Deciding what the status is is the
+    // plugin's job, and it reads better than the mirror does.
     expect(pullStatus(pull({ draft: true, mergeStateStatus: 'CLEAN' }))).toBe('draft')
     expect(pullStatus(pull({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }))).toBe('conflicts')
     expect(pullStatus(pull({ mergeStateStatus: 'BLOCKED' }))).toBe('blocked')
@@ -71,7 +71,7 @@ describe('github pull requests as a collection', () => {
 
   it('reads several involvements from one param, and drops what it does not know', () => {
     // The param is a comma-joined set because "assigned to me OR waiting on my review" is one question
-    // and GitHub's qualifiers only AND — so the route runs one search per entry and unions them.
+    // and GitHub's qualifiers only AND, so the route runs one search per entry and unions them.
     expect(parsePullInvolvement('assigned,review-requested')).toEqual(['review-requested', 'assigned'])
     // Declaration order out, whatever order they were ticked in: one set of choices is one query string,
     // so two panels with the same answer share a cache key.

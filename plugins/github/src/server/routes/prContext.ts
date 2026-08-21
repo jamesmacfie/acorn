@@ -24,11 +24,11 @@ type PrContext = {
   headSha: string | null
 }
 
-// Write-path PR resolution — MIRROR-ONLY, deliberately stricter than the read path's
-// resolveRepoForUser (repoMirror.ts), which falls through to a live GitHub fetch on a miss.
-// Every PR write targets a PR the user is looking at, so its repo (and usually the PR row) is
-// already mirrored; a miss here means the client skipped the read path, and 404 is the honest
-// answer rather than lazily mirroring on a write.
+// Write-path PR resolution, mirror-only and stricter than the read path's resolveRepoForUser
+// (repoMirror.ts), which falls through to a live GitHub fetch on a miss. Every PR write targets a PR
+// the user is looking at, so its repo (and usually the PR row) is already mirrored; a miss here means
+// the client skipped the read path, and 404 is the honest answer rather than lazily mirroring on a
+// write.
 export async function resolvePr(db: PluginDatabase, c: Context<AppEnv>): Promise<PrFailure | PrContext> {
   const userId = ownerId(c) // auth is enforced by requireUser upstream
   const owner = c.req.param('owner')!

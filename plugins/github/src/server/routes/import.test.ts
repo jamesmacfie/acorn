@@ -69,7 +69,7 @@ describe('GitHub project importer', () => {
   })
 
   // The duplicate this closes: an older import left a path-less placeholder for the repository, and
-  // mapping a folder afterwards produced a SECOND project for the same repo.
+  // mapping a folder afterwards produced a second project for the same repo.
   it('fills in a path-less project for the same repository instead of creating a rival', async () => {
     byGithub.mockResolvedValue(ref('placeholder-id', null))
     const response = await post({ repositories: [{ repoId: 103, action: 'map', path: '/checkouts/placeholder-me' }] })

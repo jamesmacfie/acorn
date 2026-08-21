@@ -1,15 +1,14 @@
 // GitHub's wire contract: the mirrored PR/repo/check types, the /v2/p/github route builders, and the
 // TanStack query keys that address them.
 //
-// In contract/ rather than shared/ because other plugins read it — plugins/changes types its local
-// diff rows against `PullFile` — and contract/ is the one sanctioned cross-plugin surface
+// In contract/ rather than shared/ because other plugins read it (plugins/changes types its local
+// diff rows against `PullFile`), and contract/ is the one sanctioned cross-plugin surface
 // (docs/plugins.md § Package shape).
 //
-// The whole block moved verbatim out of @acorn/protocol/api.ts, which is the point of finding 1:
-// core held a dozen plugins' wire types, so no plugin could define its own surface without editing
-// core. Routes and keys are byte-identical — a retyped route template compiles fine and 404s at
-// runtime, and a changed query key silently orphans a user's persisted IndexedDB cache, which has no
-// buster.
+// Moved verbatim out of @acorn/protocol/api.ts, which used to hold every plugin's route builders
+// (docs/architecture-overview.md § Package boundaries). Routes and keys are byte-identical: a
+// retyped route template compiles fine and 404s at runtime, and a changed query key silently orphans
+// a user's persisted IndexedDB cache, which has no buster.
 
 export type Repo = {
   id: number
@@ -19,9 +18,7 @@ export type Repo = {
   defaultBranch: string | null
   pushedAt: number | null
 }
-// There is no 'defer': not importing a repository is what deferring meant, and the placeholder
-// project it used to create was a duplicate waiting to happen — map the same repo later and the
-// account ended up with two rows for one repository.
+// No 'defer' action (docs/github-integration.md § Importing projects).
 export type GithubImportAction = 'map' | 'clone'
 export type GithubImportItem =
   | { repoId: number; action: 'map'; path: string }
@@ -65,7 +62,7 @@ export type PullFile = {
 }
 export type PullFilesPatchRequest = { paths: string[] }
 // Conflicting files for a PR. `available` is false when the repo isn't mapped to a local checkout
-// (or the trial merge couldn't run) — the UI then can't enumerate files, only say conflicts exist.
+// (or the trial merge couldn't run), the UI then can't enumerate files, only say conflicts exist.
 export type PullConflicts = { available: boolean; files: string[] }
 export type Review = { id: string; author: string | null; state: string | null; body: string | null; submittedAt: number | null }
 export type Comment = { id: string; author: string | null; body: string | null; createdAt: number | null }
@@ -133,8 +130,7 @@ export const fileBlobRoute = (owner: string, repo: string, sha: string) => repoR
 export const resolveThreadRoute = (owner: string, repo: string, number: string | number, threadId: string) =>
   pullRoute(owner, repo, number, `threads/${encodeURIComponent(threadId)}/resolve`)
 export const autoMergeRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'auto-merge')
-// Files that conflict on a trial merge of base←head, computed locally (GitHub's API exposes no
-// per-file conflict data — only the `mergeable` enum). `base` is the PR's base ref.
+// Trial-merge conflicts (server/routes/pullConflicts.ts). `base` is the PR's base ref.
 export const conflictsRoute = (owner: string, repo: string, number: string | number, base: string) =>
   `${pullRoute(owner, repo, number, 'conflicts')}?base=${encodeURIComponent(base)}`
 export const rerunFailedRoute = (owner: string, repo: string, runId: number) => repoRoute(owner, repo, `actions/${runId}/rerun`)

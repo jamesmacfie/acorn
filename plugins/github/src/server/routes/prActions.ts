@@ -10,11 +10,8 @@ import { comments, prLabels, pullRequests, reviewRequests, viewedFiles } from '.
 // a read within the TTL window reflects the change, and returns the canonical bit. The client
 // layers optimistic updates / invalidation on top.
 
-// A FACTORY over this plugin's own database, not a module-scope router reading getDb(c.env). The tables
-// live in <data-root>/plugins/github.sqlite now, and `c.env` deliberately carries no per-plugin handles
-// (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so no request can reach an
-// unmigrated database — and a second startServiceRuntime in one process builds fresh routers over its own
-// handle instead of inheriting a closed one.
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// databases).
 export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
   // Merge: PUT /pulls/{n}/merge. 405 = not mergeable, 409 = head moved.
   .post('/:owner/:repo/pulls/:number/merge', async (c) => {
@@ -245,7 +242,7 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
   .post('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'add'))
   .delete('/:owner/:repo/pulls/:number/requested-reviewers', (c) => mutateReviewers(db, c, 'remove'))
   // Rerun a workflow run's failed jobs: POST /actions/runs/{runId}/rerun-failed-jobs (GitHub → 201).
-  // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update —
+  // Repo-scoped (no PR number): a check's runId is the Actions run, not the PR. No mirror to update;
   // the new run states surface on the next composite refetch.
   .post('/:owner/:repo/actions/:runId/rerun', async (c) => {
     ownerId(c) // gate on auth; the credential itself comes from the stored integration

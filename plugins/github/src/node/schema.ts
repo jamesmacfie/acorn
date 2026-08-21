@@ -6,7 +6,7 @@ export const repos = sqliteTable(
   'repos',
   {
     // Private repos are user-scoped (docs/data-layer.md): two users may mirror the same
-    // private repo, so (userId, id) is the key — id alone (the GitHub repo id) isn't unique.
+    // private repo, so (userId, id) is the key. Id alone (the GitHub repo id) isn't unique.
     userId: text('user_id').notNull(),
     id: integer('id').notNull(), // GitHub repo id
     owner: text('owner').notNull(),
@@ -50,7 +50,7 @@ export const pullRequests = sqliteTable(
 )
 
 // --- PR-detail children: mirrored together from the GraphQL composite, replaced wholesale on
-// each sync. No per-row staleness — freshness is governed by sync_state(`pr:<repoId>:<number>`).
+// each sync. No per-row staleness; freshness is governed by sync_state(`pr:<repoId>:<number>`).
 // All user-scoped and keyed off the PR (userId, repoId, number) + a per-row discriminator.
 
 export const prFiles = sqliteTable(

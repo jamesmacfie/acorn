@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
-// CORE's schema, on purpose: the device flow writes core's `integrations` row through core's own
-// connectProvider and touches none of this plugin's tables — so this test needs core's handle only.
+// Core's schema: the device flow writes core's `integrations` row through core's own
+// connectProvider and touches none of this plugin's tables, so this test needs core's handle only.
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { decryptSecret } from '@acorn/node-core/server/secretBox.ts'
 import { testGate } from '@acorn/node-core/testkit/auth.ts'

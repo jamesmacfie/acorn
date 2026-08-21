@@ -5,7 +5,7 @@ import { checks, comments, prFiles, pullRequests, repos, reviews } from '../node
 
 const USER = 'octocat'
 
-// This plugin's OWN migrated SQLite file, not core's: retention only ever touches github's mirror
+// This plugin's own migrated SQLite file, not core's: retention only ever touches github's mirror
 // tables, which live in <data-root>/plugins/github.sqlite now. Core's handle would not even have the
 // tables to seed.
 describe('GitHub mirror retention repair', () => {

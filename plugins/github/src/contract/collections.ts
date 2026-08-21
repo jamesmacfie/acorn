@@ -5,27 +5,22 @@ import type {
 } from '@acorn/protocol/collections.ts'
 import { formatPullRef } from './pullRef'
 
-// GitHub's open pull requests, expressed as a COLLECTION (@acorn/protocol/collections.ts): a typed set
-// of records the host draws with its own components, so the same rows can sit on a board beside another
-// plugin's without either plugin knowing the other exists.
+// GitHub's open pull requests, expressed as a collection (docs/dashboards.md § Collections).
 //
-// In contract/ rather than server/ because both halves need it: the node route builds its response
-// against this schema, and the client's `ctx.collections.register` declares the same object as the
-// STATIC schema, so a panel editor can offer views before the first fetch. One declaration, two
-// readers — a second copy is a column that renders under a different name than it sorts by.
+// Declared in contract/, not server/, because the node route and the client's
+// `ctx.collections.register` both need this schema. One declaration, two readers, so a column
+// can't render under a different name than it sorts by.
 export const PULLS_COLLECTION_ID = 'pulls-mine'
 export const pullsCollectionRoute = `/v2/p/github/collections/${PULLS_COLLECTION_ID}`
 
-/** The one status value a row carries, projected from THREE mirror columns. See `pullStatus`. */
+/** The one status value a row carries, projected from three mirror columns. See `pullStatus`. */
 export type PullCollectionStatus = 'draft' | 'open' | 'unstable' | 'behind' | 'blocked' | 'conflicts' | 'ready'
 
-// GitHub says "what state is this PR in" three times — `state`, `draft`, and `mergeStateStatus` — and no
-// two of them are independent. That is the interesting half of expressing this as a collection: the wire
-// vocabulary has ONE enum per field, so the plugin has to decide what its status actually is instead of
-// handing the host three columns and a rendering problem. It reads better than the mirror does.
+// GitHub reports a PR's state through `state`, `draft`, and `mergeStateStatus`, and no two of them
+// are independent, so this collection derives one status value rather than exposing three columns.
 //
-// Declaration order is group order: a board grouped by this column reads left to right the way a pull
-// request moves. Tones are the host's own StatusDot vocabulary, so an appearance pack owns the colour.
+// Declaration order is group order: a board grouped by this column reads left to right the way a
+// pull request moves. Tones are the host's StatusDot vocabulary (docs/ui-design.md).
 const STATUS_VALUES = [
   { id: 'draft', label: 'Draft', tone: 'muted' },
   { id: 'open', label: 'Open', tone: 'accent' },
@@ -62,26 +57,19 @@ export const pullStatus = (row: {
   if (row.mergeStateStatus === 'BEHIND') return 'behind'
   if (row.mergeStateStatus === 'UNSTABLE') return 'unstable'
   if (row.mergeStateStatus === 'CLEAN' || row.mergeStateStatus === 'HAS_HOOKS') return 'ready'
-  // UNKNOWN, or a repo whose detail has never been fetched. "Open" is the honest answer: the mirror
+  // Unknown, or a repo whose detail has never been fetched. "Open" is the honest answer: the mirror
   // holds no merge state for a PR nobody has opened, and inventing `ready` from silence would tell
   // someone a branch is mergeable when nothing has checked.
   return 'open'
 }
 
-// ── "…involving me", and why it does not read the mirror ───────────────────────────────────────────
+// The three questions a person actually asks a PR dashboard, as one enum param rather than three
+// booleans: the param vocabulary has no boolean, and a single answer reads better in a dropdown than
+// three checkboxes that can contradict each other. Unset keeps the collection's original behaviour,
+// every open PR in every mirrored repo.
 //
-// The three questions a person actually asks a PR dashboard. Declared as ONE enum param rather than
-// three booleans because the param vocabulary has no boolean, and because they are how you're involved
-// — a single answer reads better in a dropdown than three checkboxes that can contradict each other.
-//
-// Unset is the collection's original behaviour: every open PR in every mirrored repo.
-//
-// Two of the three CANNOT be answered from the mirror, which is the whole reason this exists as a
-// search rather than another `where` clause. Assignees are not mirrored at all — no column, no table.
-// Review requests are mirrored, but only by the PR-DETAIL sync (server/routes/prMirror.ts), so the
-// mirror knows you were asked to review exactly the pull requests you already opened — the precise
-// complement of what someone asking "what's waiting on me" wants to see. A mirror-side filter would
-// have parsed, rendered, and quietly answered "nothing".
+// None of the three can be answered from the mirror, which is why this runs as a GitHub search
+// instead of a `where` clause (docs/github-integration.md § Reads and writes).
 export const PULL_INVOLVEMENT = ['review-requested', 'assigned', 'authored'] as const
 export type PullInvolvement = (typeof PULL_INVOLVEMENT)[number]
 
@@ -104,10 +92,10 @@ export const pullsSearchQuery = (involvement: PullInvolvement, repo = ''): strin
     .filter(Boolean)
     .join(' ')
 
-/** The param's value is a comma-joined set, because "assigned to me OR waiting on my review" is one
- *  question a person asks and GitHub's qualifiers only AND. So the route runs one search per involvement
- *  and unions the results — which is why this parses to a LIST rather than a value, and why an
- *  unrecognised entry is dropped instead of failing: a saved panel outlives the vocabulary. */
+/** The param's value is a comma-joined set, because "assigned to me or waiting on my review" is one
+ *  question a person asks and GitHub's qualifiers only AND. So the route runs one search per
+ *  involvement and unions the results, which is why this parses to a set rather than a value, and why
+ *  an unrecognised entry is dropped instead of failing: a saved panel outlives the vocabulary. */
 export const parsePullInvolvement = (value: string): PullInvolvement[] =>
   PULL_INVOLVEMENT.filter((entry) => value.split(',').includes(entry))
 
@@ -128,14 +116,14 @@ export type PullCollectionSource = {
 }
 
 export const pullsCollectionPage = (rows: readonly PullCollectionSource[]): PluginCollectionResponse => ({
-  // The response repeats the same object the client declares as its static schema. GitHub is compiled
-  // and has no manifest at all, so there is no third place for the two to disagree.
+  // The response repeats the object the client declares as its static schema; contract/ is where
+  // both sides read it from, so there is no third place for the two to disagree.
   schema: pullsCollectionSchema,
   rows: rows.map((row): PluginCollectionRowBody => {
     const url = `https://github.com/${row.owner}/${row.repo}/pull/${row.number}`
     return {
       // Stable across refreshes and unique across repositories, which a bare PR number is not. Spelled
-      // by ./pullRef.ts, which is the one owner of this identity — a recognised URL and the reference
+      // by ./pullRef.ts, which is the one owner of this identity. A recognised URL and the reference
       // panel resolve to the same string through the same helper.
       id: formatPullRef(row.owner, row.repo, row.number),
       values: {
@@ -148,16 +136,9 @@ export const pullsCollectionPage = (rows: readonly PullCollectionSource[]): Plug
         autoMerge: row.autoMergeEnabled,
         url,
       },
-      // `openUrl` and not `openPane`: a row on a dashboard has no task, and the PR pane belongs to one.
-      // The verb set is the manifest's context-free union, so a click can do exactly what a command can
-      // do and nothing more.
-      //
-      // It does NOT follow that the click leaves acorn. The URL is this PR's durable identity, and the
-      // host resolves it late against the content-link recognisers — github's own `github.pull-request`
-      // declares the route (client/contentLinks.ts § path), so a tracked repo lands on `/p/:projectId/
-      // pulls/:number` and only an untracked one reaches github.com. Which is why this stays a URL
-      // rather than becoming a routed verb: the row cannot know the project, and by the time someone
-      // clicks, the client can look it up.
+      // `openUrl`, not `openPane`: a row on a dashboard has no task, and the PR pane belongs to one.
+      // The click still stays inside acorn for a tracked repo, because the host resolves the URL
+      // against github's own content-link recogniser (docs/github-integration.md § Content links).
       action: { verb: 'openUrl', url },
     }
   }),
