@@ -7,11 +7,8 @@ import './notes.css'
 import { Alert, Button, createArmedConfirm, EmptyState, Input, ListDetail, Row, Toolbar } from '@acorn/plugin-api/ui'
 import { toast } from '@acorn/plugin-api/client'
 
-// The Notes pane (docs/agent-tools.md): where you write context. Lands in this task's
-// scratchpad (a *virtual* note until the first keystroke creates the file); a library column
-// grouped Task / Workspace / Global with agent/seeded notes badged in place, a filter, per-group
-// create, an include dot per row, rename, and "view in Context". Autosave discipline unchanged:
-// debounce(save, 1500), flush on blur/switch/cleanup, cancel on delete. renderMarkdown preview kept.
+// The Notes pane (docs/notes-and-memory.md § Notes). Autosave: debounce(save, 1500), flush on
+// blur/switch/cleanup, cancel on delete.
 type Selected = { scope: NoteScope; slug: string; virtual?: boolean }
 
 const scopeGlyph = (scope: NoteScope): string => (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : '🌐')
@@ -66,10 +63,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     const f = filter().trim().toLowerCase()
     return !f || n.title.toLowerCase().includes(f) || n.slug.toLowerCase().includes(f)
   }
-  // External snapshots (PR description / comments / ticket) are seeded as workflow-authored scratch
-  // notes. They belong to context (the PR/issues sections + assembled block), not this editing pane,
-  // so keep them out of the library. Workflow handoffs are workflow-authored too but kind 'finding',
-  // so they stay. (docs/agent-tools.md)
+  // docs/notes-and-memory.md § Notes explains why this checks kind, not just author.
   const notSeed = (n: NoteSummary) => !(n.author === 'workflow' && n.kind === 'scratch')
   const taskNotes = () => taskList() ?? []
   const scratchpad = () => taskNotes().find((n) => n.slug === SCRATCHPAD_SLUG)

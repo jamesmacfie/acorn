@@ -1,14 +1,8 @@
-// The four `notes_*` agent tools (docs/agent-tools.md), owned by the plugin that owns the notes.
-//
-// They lived in apps/node/src/wiring/agentToolsWiring.ts for two recorded blockers, and both are gone:
-// the NotesStore instance was constructed by plugins/memory (it is this plugin's own now, published as
-// `notes.store`), and the 'workspace' scope needed `workspaceIdFor` over core workspace membership, for
-// which CoreServices had no seam (`CoreServices.tasks.workspaceId` is that seam, added with these
-// callers rather than ahead of them).
-//
-// Provenance is not optional here: every write stamps `author: 'agent'` plus the calling session id
-// (`ctx.sessionId`, from the x-acorn-session-id header), which is what lets the pane and the context
-// assembler show who wrote a note and lets a human tell an agent's scratch from their own.
+// The four notes_* agent tools (docs/notes-and-memory.md § Notes covers what they do and the
+// provenance they stamp). They moved here from apps/node/src/wiring/agentToolsWiring.ts once two
+// blockers cleared: the NotesStore instance is this plugin's own now (published as `notes.store`,
+// where plugins/memory built it before), and CoreServices gained the `tasks.workspaceId` seam the
+// workspace scope needs to resolve a task's membership.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import type { NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
@@ -20,9 +14,9 @@ export type NotesToolCoreServices = Pick<CoreServices, 'tasks'>
 
 const scopeArg = z.enum(['task', 'workspace', 'global']).optional()
 
-// A note scope becomes a directory, so the workspace case has to resolve the task's membership first.
-// It throws when the task has no workspace — surfaced as a tool error rather than a 500, because "this
-// task is not in a workspace" is an answer the agent can act on.
+// A note scope becomes a directory, so the workspace case has to resolve the task's membership
+// first. It throws when the task has no workspace, surfaced as a tool error rather than a 500,
+// because "this task is not in a workspace" is an answer the agent can act on.
 async function noteLocationFor(core: NotesToolCoreServices, taskId: string, scope: NoteScope = 'task'): Promise<NoteLocation> {
   if (scope === 'task') return { scope, taskId }
   if (scope === 'global') return { scope }

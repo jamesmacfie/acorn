@@ -1,20 +1,18 @@
-// Workspace notes store (docs/notes-and-memory.md): plain .md files with YAML-ish frontmatter at
-// <dataDir>/notes/<workspaceId>/<slug>.md — ONE store (main process) read by the UI and, later,
-// the MCP notes_* tools. Files are gitignored working state (Conductor's .context-in-git bug is
-// the warning); durable knowledge is promoted into committed memory (12). Kinds are
-// scratch|plan|finding|handoff ONLY — anchored annotations are review_notes rows (README
-// decision 16), never note kinds. Writes are atomic (temp+rename); slugs are validated at this
-// boundary. Human-editable by hand — the frontmatter is plain key: value lines.
+// Workspace notes store (docs/notes-and-memory.md § Notes). Files are gitignored working state,
+// the kind of thing Conductor's .context-in-git bug warns against; durable knowledge gets promoted
+// into committed memory instead. Kinds are limited to scratch, plan, finding and handoff. An
+// anchored annotation is a review_notes row in the changes plugin, never a note kind. Writes are
+// atomic (temp then rename) and slugs are validated at this boundary.
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@acorn/protocol/notes.ts'
 
-// Canonical wire shapes live in shared/notes.ts (imported by the client too); re-exported here so
-// main-side callers keep one import point.
+// Canonical wire shapes live in @acorn/protocol/notes.ts, imported by the client too. Re-exported
+// here so main-side callers keep one import point.
 export type { Note, NoteAuthor, NoteKind, NoteSummary } from '@acorn/protocol/notes.ts'
 
-// The frontmatter block of a note file — Note minus slug/body.
+// The frontmatter block of a note file: Note minus slug/body.
 export type NoteMeta = Omit<Note, 'slug' | 'body'>
 
 // Safe filename component: no traversal, no separators, no dotfiles.
@@ -41,7 +39,7 @@ export function serializeNote(meta: NoteMeta, body: string): string {
     `kind: ${meta.kind}`,
     ...(meta.originSessionId ? [`originSessionId: ${meta.originSessionId}`] : []),
     ...(meta.originTaskId ? [`originTaskId: ${meta.originTaskId}`] : []),
-    // Default (included) is omitted so hand-edited/legacy notes stay clean — only the opt-out is written.
+    // Default (included) is omitted so hand-edited/legacy notes stay clean; only the opt-out is written.
     ...(meta.included ? [] : ['included: false']),
     `createdAt: ${meta.createdAt}`,
     '---',

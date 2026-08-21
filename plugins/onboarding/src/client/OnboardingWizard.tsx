@@ -29,10 +29,10 @@ const DOT_OF: Record<Step, number> = { welcome: 0, add: 1, github: 1, organize: 
 /** Sentinel option: "put this project in a workspace that does not exist yet". */
 const NEW_WORKSPACE = '__new__'
 
-// Hardcoded rather than read from the keybinding registry. `onboarded` is a node preference, so this
-// screen only ever renders for someone who has not rebound anything — and reaching the registry
-// would pull registries/keybindings.ts onto the @acorn/plugin-api/client barrel, which a plugin's
-// node-environment test suite has to be able to import.
+// Hardcoded rather than read from the keybinding registry. `onboarded` is a node preference, so
+// this screen only ever renders for someone who has not rebound anything, and reaching the
+// registry would pull registries/keybindings.ts onto the @acorn/plugin-api/client barrel, which a
+// plugin's node-environment test suite has to be able to import.
 const SHORTCUTS: [string, string][] = [
   ['⌘⇧N', 'new task'],
   ['⌘K', 'command palette'],
@@ -47,12 +47,12 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
 
   const [step, setStep] = createSignal<Step>('welcome')
   const [trail, setTrail] = createSignal<Step[]>([])
-  // The ids of every project this run added, in the order they were added — reported by whatever did
+  // The ids of every project this run added, in the order they were added, reported by whatever did
   // the adding, never inferred. Importing is not a one-shot choice: an account has many repositories
-  // and the natural move is to take three, so the wizard stays on the list until you say you are done
-  // and then names the whole batch. An earlier version diffed the project list against a snapshot
-  // taken on entry, which dropped any import that REPAIRED an existing project instead of creating
-  // one — the batch then showed the last repository only.
+  // and the natural move is to take three, so the wizard stays on the list until you say you are
+  // done and then names the whole batch. An earlier version diffed the project list against a
+  // snapshot taken on entry, which dropped any import that repaired an existing project instead of
+  // creating one: the batch then showed the last repository only.
   const [addedIds, setAddedIds] = createSignal<string[]>([])
   const [names, setNames] = createSignal<Record<string, string>>({})
   // Chosen workspace per project, empty until the owner picks one.
@@ -83,8 +83,8 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     queryClient.invalidateQueries({ queryKey: workspacesKey }),
   ])
 
-  // Both Finish and Skip land here. Skipping is not punished — it writes the same preference, so the
-  // wizard does not ambush the user again on the next launch; everything it offered is in Settings.
+  // Both Finish and Skip land here. Skipping writes the same preference as finishing, so the wizard
+  // does not ambush the user again on the next launch. Everything it offered is in Settings.
   const finish = async () => {
     setBusy(true)
     try {
@@ -115,7 +115,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     }
   }
 
-  // Called after EVERY successful import, and deliberately does not navigate: the owner decides when
+  // Runs after every successful import and does not navigate on its own: the owner decides when
   // the batch is finished.
   async function afterImport(ids: readonly string[] = []) {
     remember(ids)
@@ -123,7 +123,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   }
 
   // A row can ask for a workspace that does not exist yet. Create it, point that project at it, and
-  // let the refreshed list offer it to every other row — which is how a batch ends up spread across
+  // let the refreshed list offer it to every other row. That is how a batch ends up spread across
   // several new workspaces.
   async function createHome(project: Project, name: string) {
     setBusy(true)

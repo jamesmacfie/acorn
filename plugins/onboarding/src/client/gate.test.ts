@@ -15,7 +15,7 @@ describe('shouldShowOnboarding', () => {
   })
 
   it('stays shut once a project exists', () => {
-    // The bug this replaces: the old gate asked whether a WORKSPACE existed, so a set-up user
+    // The bug this replaces: the old gate asked whether a workspace existed, so a set-up user
     // with projects still met it and saw the modal on every launch.
     expect(shouldShowOnboarding({ ...firstRun, projectCount: 3 })).toBe(false)
   })

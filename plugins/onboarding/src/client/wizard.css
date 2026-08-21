@@ -70,8 +70,8 @@
   letter-spacing: var(--label-tracking);
 }
 
-/* A hosted importer is a full-width block, not a flex item sized to its widest row — without this the
-   repo list stretches the column and every label wraps mid-word. */
+/* A hosted importer is a full-width block, not a flex item sized to its widest row. Without this
+   the repo list stretches the column and every label wraps mid-word. */
 .wizard-importer {
   width: 100%;
   min-width: 0;
@@ -150,7 +150,7 @@
 
 /* Done: chord → what it does. */
 /* DescriptionList owns the grid, Kbd owns the cap. Each row is its own Item, so the columns are
-   per-row rather than aligned across rows — which is fine here: the caps are all one or two glyphs. */
+   per-row rather than aligned across rows, which is fine here: the caps are all one or two glyphs. */
 .wizard-keys { gap: var(--space-3); }
 .wizard-keys .ui-dl-item { grid-template-columns: max-content 1fr; gap: var(--space-6); align-items: center; }
 .wizard-keys .ui-dl-value { color: var(--text-muted); }

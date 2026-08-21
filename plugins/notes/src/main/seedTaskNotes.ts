@@ -1,9 +1,6 @@
-// Seed task notes from a task's PR + linked tickets at creation (docs/notes-and-memory.md).
-// When a task is promoted from a GitHub PR we snapshot its context into discrete, user-curatable
-// notes — one for the PR description, one for the comment/review thread, one per linked Linear
-// ticket — each tagged with the task id so the context assembler scopes them to this task alone.
-// Best-effort and idempotent per task: a failure never blocks task/worktree setup, and a re-fire
-// no-ops once any note carries this task's id.
+// Seeds a freshly created task's PR and linked-ticket notes (docs/notes-and-memory.md § Notes).
+// Best effort and idempotent per task: a failure here never blocks task or worktree setup, and a
+// re-fire no-ops once any note already carries this task's id.
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { NotesStoreCapability, SeedTask } from '../contract/store'
 
@@ -64,15 +61,11 @@ export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesSto
   const base = internalApiEnv.ACORN_API_URL
   const token = internalApiEnv.ACORN_API_TOKEN ?? ''
   if (!base) return
-  // Idempotency: if any note already belongs to this task, we've seeded it before — bail.
   const location = { scope: 'task' as const, taskId: task.id }
   const existing = await notesStore.list(location)
   if (existing.some((n) => n.originTaskId === task.id)) return
 
-  // author 'workflow' marks these as external snapshots (PR/comment/ticket), not hand-authored notes
-  // — they carry the `seed` badge, stay in assembled context, and are hidden from the Notes editing
-  // pane (docs/agent-tools.md). Handoffs are also author 'workflow' but kind 'finding', so they
-  // stay visible; only the workflow+scratch combo is a seed.
+  // See docs/notes-and-memory.md § Notes for why these are stamped author 'workflow' kind 'scratch'.
   const seed = (title: string, body: string) => notesStore.create(location, title, { author: 'workflow', kind: 'scratch', originTaskId: task.id, included: true, body })
 
   const project = await core.projects.byId(task.projectId)

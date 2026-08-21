@@ -31,8 +31,8 @@ export function PreviewTaskPane(props: { task: Task }) {
       return result.ok ? (result.url ?? null) : null
     },
   )
-  // The URL as the NODE resolves it. Every branch produces a value that means something on the node's own
-  // machine — `previewMode: 'port'` literally builds a localhost URL here.
+  // The URL as the node resolves it. Every branch produces a value that means something on the
+  // node's own machine: previewMode: 'port' builds a localhost URL here.
   const nodeUrl = () => {
     const recipe = recipeBrowserUrl(props.task.id)
     if (recipe) return recipe
@@ -47,16 +47,17 @@ export function PreviewTaskPane(props: { task: Task }) {
     return current?.previewMode === 'script' ? (scriptUrl() ?? null) : null
   }
 
-  // …and the URL this machine can actually load. For the bundled local node the two are identical; for a
-  // remote one a loopback URL is rewritten to a tunnel port that main opens over the authenticated
-  // connection (client-core's node/tunnelUrl.ts). A resource, because opening the tunnel is a round trip.
+  // The URL this machine can actually load. For the bundled local node the two are identical. For a
+  // remote one, a loopback URL is rewritten to a tunnel port that main opens over the authenticated
+  // connection (client-core's node/tunnelUrl.ts). This is a resource because opening the tunnel is a
+  // round trip.
   const [loadable] = createResource(
     () => ({ taskId: props.task.id, url: nodeUrl() }),
     ({ taskId, url }) => tunnelUrl(taskId, url),
   )
 
-  // The listener is per (node, task, port) and outlives a pane re-render on purpose — the pane reconciles
-  // its URL often. It goes when the task does.
+  // The listener is per (node, task, port) and outlives a pane re-render, since the pane reconciles
+  // its URL often. It closes when the task does.
   onCleanup(() => closeTunnelsForTask(props.task.id))
 
   return <PreviewPane taskId={props.task.id} url={loadable() ?? null} />

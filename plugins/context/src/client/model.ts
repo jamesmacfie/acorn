@@ -15,7 +15,7 @@ export function traySummary(ctx: TaskContext | undefined): string {
 
 
 // Worst-case byte allowance for a section's budget bar. Null when maxBytesPerItem is absent
-// (memory's index-only budget) — those sections show size text but no bar.
+// (memory's index-only budget); those sections show size text but no bar.
 export function sectionCap(budget: ContextBudget): number | null {
   if (budget.maxBytesPerItem == null) return null
   return (budget.maxItems ?? 1) * budget.maxBytesPerItem

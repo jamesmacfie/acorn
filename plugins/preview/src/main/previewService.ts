@@ -42,13 +42,9 @@ export type PreviewViewService = {
   evictMatching(predicate: (key: string) => boolean): void
 }
 
-// `electron` is resolved when registerPreviewIpc is CALLED, not when this module is imported — the
-// same treatment plugins/terminal/src/main/folderPickerIpc.ts gets, for the same reason. A barrel
-// evaluates every module on it, so a static `import { BrowserWindow, ipcMain } from 'electron'` here
-// makes main/index.ts unloadable outside Electron: Node's ESM linker fails on the named exports of
-// electron's CommonJS shim before a line of it runs. The types stay static (they are erased), and only
-// calling this needs a desktop. apps/node/test/integration/mainBarrelLoad.test.ts loads the barrel in
-// plain Node and fails if a static value import comes back.
+// electron is required lazily so this module stays importable outside Electron
+// (docs/architecture-overview.md § Package boundaries, "The node stays bootable"). This is the same
+// treatment plugins/terminal/src/main/folderPickerIpc.ts uses, for the same reason.
 const electron = () => createRequire(import.meta.url)('electron') as typeof import('electron')
 
 const previewKey = (taskId: string): string => `preview:${taskId}`
