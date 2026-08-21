@@ -11,12 +11,12 @@ export type ExternalResourceRow = { identifier: string; data: string; fetchedAt:
 export type ExternalItemStore = {
   /** One item within one connection. */
   read(connectionId: string, identifier: string): Promise<ExternalItemRow | null>
-  /** Every item this connection has cached — the membership read behind a provider's list resource. */
+  /** Every item this connection has cached, the membership read behind a provider's list resource. */
   listForConnection(connectionId: string): Promise<ExternalItemRow[]>
   /**
-   * The same identifiers across EVERY connection of the provider. Linear's batch enrichment needs
-   * this: a bare `ENG-42` is resolved by trying each connected workspace in turn, so the read cannot
-   * be scoped to a single connection before the resolution has happened.
+  /**
+   * The same identifiers across every connection of the provider; see docs/integrations.md § Linear
+   * for why a bare id is resolved by trying each connected workspace in turn.
    */
   listByIdentifier(identifiers: string[]): Promise<ExternalItemRow[]>
   write(row: { connectionId: string; identifier: string; data: string; fetchedAt: number }): Promise<void>
@@ -30,26 +30,23 @@ export type ExternalItemStore = {
     fetchedAt: number
   }): Promise<void>
   /**
-   * Collection-level freshness for a provider resource, in core's `sync_state`. A list endpoint's
-   * fetch time has no per-row home, and a provider's list membership is defined as "the rows stamped
-   * with THIS marker's time" (docs/caching.md), so the marker has to be readable beside the items.
+  /**
+   * Collection-level freshness for a provider resource, in core's `sync_state`. The key is
+   * `provider:<providerId>:<connectionId>:...`, which `db/cascade.ts` matches on to evict a
+   * disconnected integration's markers and which the store below enforces on writes.
    *
-   * The key space is `provider:<providerId>:<connectionId>:…` — which is what `db/cascade.ts` matches
-   * on to evict a disconnected integration's markers, and what the store now ENFORCES (see below).
-   * github's `sync_state` is a different table in a different file (plugins/github/src/node/schema.ts);
-   * the key spaces are kept separate by ownership rather than convention.
+   * GitHub keeps a separate `sync_state` table in its own schema (plugins/github/src/node/schema.ts);
+   * the two key spaces stay apart by ownership, not by convention.
    */
   readMarker(resource: string): Promise<number | null>
   writeMarker(resource: string, fetchedAt: number): Promise<void>
 }
 
 /**
- * Scoped to ONE provider at construction, not per call. The ownership check at the ask
- * (`assertOwnedProvider` in plugin/requestContext.ts) gates who can build a store; baking the
- * provider in here is what makes that check the truth about every row the store can touch —
- * otherwise a store built for `linear` could pass `github` to a method and read or write another
- * provider's cache. Every query below carries the provider, and a marker key outside the provider's
- * own `provider:<id>:` namespace is refused rather than written.
+/**
+ * Scoped to one provider at construction, not per call; see docs/integrations.md § Connection
+ * lifecycle for why that is what makes the ownership check at the ask (`assertOwnedProvider` in
+ * plugin/requestContext.ts) the truth about every row the store can touch.
  */
 export function createExternalItemStore(db: AppDatabase, userId: string, provider: string): ExternalItemStore {
   const item = (row: typeof schema.issues.$inferSelect): ExternalItemRow => ({

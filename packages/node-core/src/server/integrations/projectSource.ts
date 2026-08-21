@@ -1,16 +1,6 @@
-// Running a provider's declared project source (integrations/types.ts § ProviderProjectSource), for
-// core's own workspace↔external-project picker.
-//
-// The credential handling here is deliberately the same shape as resourceRuntime.ts's: the provider
-// call happens INSIDE `secrets.use`, so a provider that echoes its token back in an error body gets it
-// scrubbed at the one boundary that sees both, and inside the request scheduler, so a picker opening
-// over four connections cannot outrun the provider's declared concurrency.
-//
-// What it does NOT reuse is the mirror. A project list is not an external item and has no business in
-// core's `issues` table, so there is no cache here: the picker asks the provider, every time. That is
-// what the deleted Linear picker did by hand (`projects.refetch()` past a disabled query) for the
-// reason that matters — a picker's empty state is a claim about the provider NOW, and serving it from
-// a five-minute cache tells the user "you have no projects" when they have just created one.
+// Runs a provider's declared project source for core's own workspace-project picker; see
+// docs/integrations.md § Project sources and § Provider boundaries for the credential handling and
+// caching rules this follows.
 import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
@@ -27,19 +17,19 @@ const failure = (error: ProviderErrorCode, status: RouteFailure['status']): Rout
   failure: { error, status },
 })
 
-// The host binds every namespace, and a provider's project list is plugin-supplied data on its way
-// into core state — one of these ids becomes a `workspace_external_projects` row the moment the owner
-// ticks it. So the same bounding the PUT body gets from Zod is applied to the list as well, before it
-// is even offered for selection. Generous enough that no honest provider notices.
+// Bounds a provider's claimed project list before any of it becomes a `workspace_external_projects`
+// row; see docs/integrations.md § Project sources for the limits and why they match the
+// workspace-mapping write's own Zod bounds.
 export const PROVIDER_PROJECT_LIMITS = { maxProjects: 500, maxIdBytes: 200, maxLabelBytes: 200 } as const
 
 /**
- * A provider's claimed project list, reduced to what core is willing to store and show.
+/**
+ * A provider's claimed project list, bounded to what core will store and show; see
+ * docs/integrations.md § Project sources for why an over-long or empty id is dropped rather than
+ * truncated.
  *
- * An over-long or empty `id` DROPS the entry rather than being truncated: a truncated id is a
- * different project, and silently mapping a workspace to one the owner did not pick is worse than
- * omitting a row. A label is display-only, so it is truncated, and falls back to the id when the
- * provider gives nothing usable — a checkbox with no text beside it is not a choice.
+ * A label is display-only, so it is truncated rather than dropped, and falls back to the id when the
+ * provider gives nothing usable.
  */
 export function boundProviderProjects(raw: unknown): ProviderProject[] {
   if (!Array.isArray(raw)) return []
@@ -62,10 +52,9 @@ export function boundProviderProjects(raw: unknown): ProviderProject[] {
 }
 
 /**
- * The projects one connection offers, or a typed failure for THAT connection. Per connection rather
- * than per provider on purpose: the picker shows a row per connection and one connection failing must
- * not erase a sibling's list, which is far easier to honour when the failure never leaves the
- * connection it belongs to.
+/**
+ * The projects one connection offers, or a typed failure for that connection; see
+ * docs/integrations.md § Project sources for why this runs per connection rather than per provider.
  */
 export async function listConnectionProjects(args: {
   db: AppDatabase
@@ -79,8 +68,8 @@ export async function listConnectionProjects(args: {
   const provider = connectionProviderRegistry.get(connection.provider)
   const source = provider?.projects
   // Reaching here without a source means the client asked about a connection whose provider never
-  // offered projects — the descriptor it filtered on said otherwise, so the roster moved under it (a
-  // plugin disabled mid-session). A misconfiguration, not something the owner did.
+  // offered projects. The descriptor it filtered on said otherwise, so the roster moved under it (a
+  // plugin disabled mid-session), a misconfiguration rather than something the owner did.
   if (!provider || !source) return failure('provider_bad_config', 502)
 
   // Same rule as the mirrored-resource path: a connection awaiting re-auth or turned off must not

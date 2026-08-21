@@ -37,9 +37,8 @@ export async function runProviderResource<TInput, TOutput>(args: {
   const connection = await getConnection(args.db, args.userId, args.connectionId)
   if (!connection || connection.provider !== args.providerId) return failure('provider_not_connected', 403)
 
-  // Built once per call and scoped to this owner AND this provider. The provider sees only the
-  // store's operations against its own rows in core's external-item tables
-  // (integrations/itemStore.ts), never core's database handle.
+  // Built once per call, scoped to this owner and provider; see docs/integrations.md § Connection
+  // and integration contributions for why this replaced a raw database handle here.
   const items = createExternalItemStore(args.db, args.userId, args.providerId)
   const context = (): ProviderResourceContext => ({
     items,
@@ -72,9 +71,9 @@ export async function runProviderResource<TInput, TOutput>(args: {
     read,
     refresh: async () => {
       try {
-        // The provider call runs INSIDE the secret scope, which is the point: a provider that echoes
-        // the credential back in an error body gets it scrubbed here, before this failure is logged
-        // or surfaced (main/core/secrets.ts).
+        // The provider call runs inside the secret scope (docs/integrations.md § Provider
+        // boundaries), so a credential echoed back in an error body is scrubbed before this failure
+        // is logged or surfaced.
         return await args.secrets.use(connection.authRef, `${connection.provider}: read ${resource.id}`, (secret) =>
           providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
             resource.refresh({ ...context(), secret }, args.input),
@@ -93,11 +92,10 @@ export async function runProviderResource<TInput, TOutput>(args: {
   return !result.ok && fallback ? { ok: true, value: fallback.data } : result
 }
 
-// The request-context form, for a provider plugin's routes. Same function; core keeps the database
-// handle, the owner id and the secret service instead of making eight call sites in linear and rollbar
-// assemble them by hand from `getDb(c.env)` / `ownerId(c)` / `c.env.SECRETS`. That assembly is what put
-// both plugins on the schema ratchet, and getting the owner id wrong at any one of those sites would
-// have read another owner's cached items.
+// The request-context form, for a provider plugin's routes: the same function, with core supplying
+// the database handle, the owner id and the secret service instead of eight call sites in linear and
+// rollbar assembling them by hand. That assembly is what put both plugins on the schema ratchet
+// described in docs/integrations.md § Connection and integration contributions.
 export const providerResource = <TInput, TOutput>(
   c: Context<AppEnv>,
   args: { providerId: string; connectionId: string; resourceId: string; input: TInput; force?: boolean },

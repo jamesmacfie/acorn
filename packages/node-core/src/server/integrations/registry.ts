@@ -1,11 +1,12 @@
 import type { IntegrationProviderContribution, ProviderRouteContribution } from './types'
 
-// A MODULE SINGLETON, like routeRegistry and unlike the capability registry, because a provider
-// contribution is a static descriptor rather than a per-boot object bound to a database handle. But it is
-// now written by plugin INIT rather than by a one-time side-effect import, and that changes one thing:
+// A module singleton, like routeRegistry and unlike the capability registry, because a provider
+// contribution is a static descriptor rather than a per-boot object bound to a database handle. It
+// is written by plugin init rather than by a one-time side-effect import, and that matters because
 // `startServiceRuntime` can run several times in one process (its own test does it four times), so a
-// second boot would hit the duplicate-id guards below and fail the whole boot. Hence `removePluginProviders`
-// — the exact counterpart of `removePluginRoutes`, called by the plugin host before each init.
+// second boot would hit the duplicate-id guards below and fail the whole boot. Hence
+// `removePluginProviders`, the exact counterpart of `removePluginRoutes`, called by the plugin host
+// before each init.
 //
 // Owner is tracked rather than inferred from the id: a plugin may contribute several providers
 // (model-providers registers two), and the ids are not derived from the plugin name.
@@ -39,9 +40,9 @@ class IntegrationProviderRegistry {
     if (owner) this.#owners.set(provider.id, owner)
   }
 
-  // Drop everything `plugin` contributed on a previous boot, providers and their routers alike. Routes go
-  // first: a route contribution is validated against a REGISTERED provider, so removing the provider first
-  // would leave a router referring to nothing.
+  // Drop everything `plugin` contributed on a previous boot, providers and their routers alike.
+  // Routes go first: a route contribution is validated against a registered provider, so removing
+  // the provider first would leave a router referring to nothing.
   removeForPlugin(plugin: string): void {
     const ids = [...this.#owners.entries()].filter(([, owner]) => owner === plugin).map(([id]) => id)
     if (!ids.length) return
@@ -82,7 +83,7 @@ class IntegrationProviderRegistry {
   registerRoute(route: ProviderRouteContribution): void {
     this.validateContribution(route.providerId, 'Provider route')
     // Keyed by (providerId, prefix): the prefix is namespace-relative now, so two providers may both
-    // contribute the empty prefix — only the same provider doing it twice is a collision.
+    // contribute the empty prefix. Only the same provider doing it twice is a collision.
     if (this.#routes.some((candidate) => candidate.providerId === route.providerId && candidate.prefix === route.prefix)) {
       throw new Error(`Duplicate provider route prefix '${route.prefix}' for provider '${route.providerId}'.`)
     }
