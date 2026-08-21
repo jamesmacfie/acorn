@@ -1,5 +1,5 @@
-// The Docker task pane: containers linked to this task (matched main-side by worktree/slug),
-// a chip per container switching the shared ContainerDetail — the RollbarPane shape.
+// The Docker task pane: containers linked to this task (matched main-side by worktree/slug), a
+// chip per container switching the shared ContainerDetail, the same shape as RollbarPane.
 import { createEffect, createResource, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { DockerContainerSummary } from '../shared/model'

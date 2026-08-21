@@ -1,24 +1,23 @@
-// The memory plugin's agent tools, as the `tools` contribution point (docs/plugins.md § Agent
-// tools and MCP).
+// The memory plugin's agent tools, the `tools` contribution point (docs/plugins.md § Agent tools
+// and MCP).
 //
 // These four were defined in apps/node/src/wiring/agentToolsWiring.ts, which held this plugin's
-// MemoryIndex and MemoryProposalStore in an app-level dep bag to do it. They now close over the same
-// objects the plugin's own routes do, so there is one index and one proposal queue per node however the
-// caller arrived.
+// MemoryIndex and MemoryProposalStore in an app-level dep bag to do it. They now close over the
+// same objects the plugin's own routes do, so there is one index and one proposal queue per node
+// no matter how the caller arrived.
 //
-// The provenance invariant is unchanged and is the reason memory_write is a WRITE tool that writes
-// nothing: memory_write PROPOSES, and the human gate is the sole writer of accepted memory
-// (docs/notes-and-memory.md §1). `ctx.sessionId` is transport metadata from the x-acorn-session-id
-// header, stamped on the proposal so a reviewer can see which agent session asked for it.
+// memory_write proposes and never writes directly (docs/notes-and-memory.md § Memory).
+// `ctx.sessionId` is transport metadata from the x-acorn-session-id header, stamped on the
+// proposal so a reviewer can see which agent session asked for it.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import type { MemoryIndex } from './knowledgeIpc'
 import { MEMORY_TYPES, type MemoryType } from './memory'
 import type { MemoryProposalStore } from './memoryProposals'
 
-// The one core read these tools need: `tasks` is a CORE table and this plugin owns its own SQLite file,
-// so the project a memory is scoped to is resolved through core rather than queried here
-// (docs/data-layer.md § Plugin DBs).
+// The one core read these tools need: `tasks` is a core table and this plugin owns its own SQLite
+// file, so the project a memory is scoped to comes through core rather than a local query
+// (docs/data-layer.md § Plugin databases).
 type ToolCore = Pick<CoreServices, 'tasks'>
 
 const asMemoryType = (type: string | undefined): MemoryType | undefined =>
@@ -42,7 +41,7 @@ export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalSt
       scope: 'task',
       risk: 'read',
       handler: async (a, ctx) => {
-        // Every read reconciles from the markdown files first — they are the truth, the index is derived.
+        // Every read reconciles from the markdown files first (docs/notes-and-memory.md § Memory).
         await index.reconciled()
         const { query, type } = a as { query: string; type?: string }
         return index.search(query, { projectId: await projectIdFor(core, ctx.taskId), type: asMemoryType(type) })

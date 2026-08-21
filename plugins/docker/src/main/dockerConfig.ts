@@ -1,7 +1,7 @@
 // Per-repo matcher overrides: the `[docker]` table of `.acorn/config.toml`, layered
-// worktree-over-home like runConfig.ts. Non-executable configuration only (label keys, project
-// names) — so unlike [scripts.*] it needs no repo-config trust gate. Commands like "runn up"
-// deliberately stay in [scripts.run.*] run targets, which are gated and already have a UI.
+// worktree-over-home like runConfig.ts. Non-executable configuration only, label keys and project
+// names, so unlike `[scripts.*]` it needs no repo-config trust gate (docs/security.md § Process,
+// path, and configuration controls).
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'

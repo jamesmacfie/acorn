@@ -27,9 +27,9 @@ const run = async <T>(fn: () => Promise<T>): Promise<T> => fn().catch(toBridgeEr
 
 const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' || c.state === 'paused' || c.state === 'restarting'
 
-// `tasks` is a CORE table and this plugin owns no tables of its own, so its two task reads — one id,
-// and the whole active set for the rail badge — come through the core service rather than a db handle
-// it should not hold (docs/data-layer.md § Plugin DBs).
+// `tasks` is a core table and this plugin owns no tables of its own, so its two task reads, one id
+// and the whole active set for the rail badge, come through the core service rather than a db
+// handle it should not hold (docs/data-layer.md § Plugin databases).
 export type DockerCoreServices = Pick<CoreServices, 'tasks'>
 
 export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsServerFrame) => void): DockerBridge {
@@ -42,8 +42,8 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
     return (await service.containers()).filter((c) => containerMatchesTask(c, task, overrides))
   }
 
-  // Decorate summaries with the stale signal: the compose working_dir no longer exists on disk.
-  // One existsSync per distinct dir per call — a handful of stats, not worth caching.
+  // Decorate summaries with the stale signal: the compose working_dir no longer exists on disk. One
+  // existsSync per distinct dir per call, a handful of stats, not worth caching.
   function withStale(cs: DockerContainerSummary[]): DockerContainerSummary[] {
     const missing = new Map<string, boolean>()
     return cs.map((c) => {
@@ -123,9 +123,10 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
     }),
     taskContainers: (taskId) => run(() => linkedContainers(taskId)),
     taskTeardown: (taskId) => run(async () => {
-      // Compose projects get `compose -p <project> down` (compose reconstructs the project from
-      // labels — no compose file needed, works even after the worktree is gone). Loose linked
-      // containers are just stopped. Volumes are kept (no -v): stop reclaiming RAM, not data.
+      // Compose projects get `compose -p <project> down`: compose reconstructs the project from
+      // labels, so no compose file is needed and it works even after the worktree is gone. Loose
+      // linked containers are just stopped. Volumes are kept (no -v) to stop reclaiming RAM, not
+      // data.
       const matched = await linkedContainers(taskId)
       const projects = [...new Set(matched.flatMap((c) => (c.composeProject ? [c.composeProject] : [])))]
       const loose = matched.filter((c) => !c.composeProject && isActive(c))

@@ -27,8 +27,8 @@ export type DockerContainerSummary = {
   composeService: string | null
   composeWorkingDir: string | null
   labels: Record<string, string>
-  // The compose working_dir no longer exists on disk — the worktree behind this stack is gone
-  // (the stale-cleanup signal). Computed main-side; absent when there is no working_dir label.
+  // The compose working_dir no longer exists on disk, meaning the worktree behind this stack is
+  // gone (the stale-cleanup signal). Computed main-side; absent when there is no working_dir label.
   workingDirMissing?: boolean
 }
 
@@ -75,19 +75,20 @@ export type DockerContainerDetail = DockerContainerSummary & {
 export type DockerContainerAction = 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause'
 export const dockerContainerActions: readonly DockerContainerAction[] = ['start', 'stop', 'restart', 'kill', 'pause', 'unpause']
 
-// Compose bulk ops act on the recorded project (labels), so they work without compose files —
-// which rules out `up`; `start` restarts the project's existing containers.
+// Compose bulk ops act on the recorded project (labels), so they work without compose files. That
+// rules out `up`; `start` restarts the project's existing containers.
 export type DockerComposeAction = 'start' | 'stop' | 'restart' | 'down'
 export const dockerComposeActions: readonly DockerComposeAction[] = ['start', 'stop', 'restart', 'down']
 
 export type DockerPruneKind = 'containers' | 'images' | 'volumes' | 'networks' | 'builder'
 export const dockerPruneKinds: readonly DockerPruneKind[] = ['containers', 'images', 'volumes', 'networks', 'builder']
 
-// Cache scopes — also the payload of the `docker:changed` WS frame.
+// Cache scopes, also the payload of the `docker:changed` WS frame.
 export type DockerScope = 'containers' | 'images' | 'volumes' | 'networks'
 
-// Container/image/network refs and compose project names reach argv in the main process — validate
-// shape and forbid a leading dash so a ref can never be read as a flag (privileged-boundary contract).
+// Container/image/network refs and compose project names reach argv in the main process, so this
+// validates shape and forbids a leading dash to keep a ref from being read as a flag
+// (privileged-boundary contract).
 const REF_RE = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,255}$/
 export const isDockerRef = (ref: string): boolean => REF_RE.test(ref)
 

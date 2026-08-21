@@ -1,7 +1,7 @@
 // The Docker rail Source (docs/plugins.md): OrbStack-style master/detail. Left column groups
 // containers by compose project (running groups first, a Stopped section below) with a segmented
 // sub-nav for Images / Volumes / Networks; the right pane is the shared ContainerDetail. Refresh
-// is event-driven — the store re-fetches on `docker:changed`.
+// is event-driven: the store re-fetches on `docker:changed`.
 import { createQuery } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { prefsOptions } from '@acorn/plugin-api/client'

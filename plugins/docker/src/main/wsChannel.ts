@@ -1,6 +1,7 @@
 // Adapts the wsHub channel-handler registry to the docker streams: log/stats children plus
-// interactive `docker exec` PTYs (node-pty — `-it` needs a real tty). Everything is keyed by
-// connection and torn down on detach/kill/disconnect. Refs are shape-validated here — they reach argv.
+// interactive `docker exec` PTYs (node-pty; `-it` needs a real tty). Everything is keyed by
+// connection and torn down on detach/kill/disconnect. Refs are shape-validated here since they
+// reach argv.
 import { spawn as ptySpawn, type IPty } from 'node-pty'
 import type { PluginBroadcast } from '@acorn/plugin-api/node'
 import { isDockerRef } from '../shared/model'
@@ -12,7 +13,7 @@ import { getDockerService } from './dockerService'
 type StreamKey = string // `${kind}:${ref}`
 const MAX_EXECS_PER_CONN = 8
 
-// Try bash, fall back to sh — works across alpine/debian-ish images.
+// Try bash, fall back to sh. Works across alpine/debian-ish images.
 const EXEC_SHELL = 'command -v bash >/dev/null && exec bash || exec sh'
 
 // `events` rather than a direct main/wsHub import: the hub is reached through the plugin context now
@@ -32,9 +33,9 @@ export function registerDockerWsChannel(events: PluginBroadcast): void {
 
   events.channel('docker', {
     onFrame(rawFrame, send, conn) {
-      // The ONE cast, at the front door. Core hands over an open envelope and this plugin owns what is
-      // inside it (../shared/wsFrames.ts); every field read below is still guarded, because the sender
-      // is a peer over JSON and a type has never proved anything about that.
+      // The one cast, at the front door. Core hands over an open envelope and this plugin owns what
+      // is inside it (../shared/wsFrames.ts); every field read below is still guarded, because the
+      // sender is a peer over JSON and a type has never proved anything about that.
       const frame = rawFrame as DockerClientFrame
       switch (frame.channel) {
         case 'docker:logs:attach':

@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 
-// Moved here from @acorn/client-core/wsClient.test.ts with the channel it covers. Core's test keeps
-// the transport, the reconnect edge and the fleet filter; this one keeps what is docker's — that a
-// stream is routed by kind and id, and that a live subscription re-attaches after a drop.
+// Moved here from @acorn/client-core/wsClient.test.ts with the channel it covers. Core's test
+// keeps the transport, the reconnect edge and the fleet filter. This one keeps what is docker's:
+// that a stream is routed by kind and id, and that a live subscription re-attaches after a drop.
 //
-// The bridge is faked, not a WebSocket: the renderer does not own a socket, Electron main's broker
-// does, so the thing under test is subscription bookkeeping.
+// The bridge is faked, not a WebSocket: the renderer does not own a socket, Electron main's
+// broker does, so the thing under test is subscription bookkeeping.
 
 type Bridge = {
   sent: { nodeId: string; frame: unknown }[]
@@ -22,8 +22,8 @@ function installBridge(): Bridge {
   const acorn = {
     desktop: true,
     // `nodeFetch` is the "there is a broker" discriminator in client-core's platform seam
-    // (packages/client-core/src/platform/index.ts), so a fake that pushes frames has to answer requests
-    // too — even though this suite never sends one.
+    // (packages/client-core/src/platform/index.ts), so a fake that pushes frames has to answer
+    // requests too, even though this suite never sends one.
     nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
     nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {

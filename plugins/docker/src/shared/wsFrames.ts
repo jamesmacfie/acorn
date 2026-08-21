@@ -7,7 +7,7 @@
 export type DockerStatsSample = {
   cpuPercent: number
   memPercent: number
-  memUsage: string // "24.5MiB / 7.75GiB" — display text; parsing bytes adds nothing
+  memUsage: string // "24.5MiB / 7.75GiB": display text, parsing bytes adds nothing
   netIO: string
   blockIO: string
   pids: number

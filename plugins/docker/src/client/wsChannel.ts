@@ -1,19 +1,19 @@
 // Docker's half of the WebSocket, moved out of @acorn/client-core/wsClient.ts.
 //
 // It was thirteen lines of a flat if/else in core plus four module-level subscriber maps plus a
-// reconnect loop that knew how to spell `docker:${kind}:attach`. Core now owns the envelope and routes
-// on the `docker` prefix (@acorn/client-core/wsChannels.ts); everything below — the maps, the payload
-// narrowing, and the reattach set — belongs to this plugin.
+// reconnect loop that knew how to spell `docker:${kind}:attach`. Core now owns the envelope and
+// routes on the `docker` prefix (@acorn/client-core/wsChannels.ts). Everything below, the maps,
+// the payload narrowing, and the reattach set, belongs to this plugin.
 import { registerWsChannel, wsConnect, wsSend } from '@acorn/plugin-api/client'
 import type { DockerServerFrame, DockerStatsSample } from '../shared/wsFrames'
 
 const dockerChangedSubs = new Set<(scopes: string[]) => void>()
-// Log/stats stream subscribers, keyed `${kind}:${id}` — the first-attach / last-detach contract, and
-// the set the reconnect reattach below is computed from.
+// Log/stats stream subscribers, keyed `${kind}:${id}`: the first-attach / last-detach contract,
+// and the set the reconnect reattach below is computed from.
 export type DockerStreamEvent = { kind: 'log'; data: string } | { kind: 'stats'; sample: DockerStatsSample } | { kind: 'end' }
 const dockerStreamSubs = new Map<string, Set<(event: DockerStreamEvent) => void>>()
-// Interactive docker-exec PTYs: one listener per execId, and NO reconnect reattach — the PTY dies with
-// the connection, the pane shows the exit, and the user reopens.
+// Interactive docker-exec PTYs: one listener per execId, and no reconnect reattach. The PTY dies
+// with the connection, the pane shows the exit, and the user reopens.
 export type DockerExecEvent = { kind: 'out'; data: string } | { kind: 'exit' }
 const dockerExecSubs = new Map<string, (event: DockerExecEvent) => void>()
 
@@ -50,7 +50,7 @@ export function wsDockerExecResize(execId: string, cols: number, rows: number): 
 }
 
 // Subscribe to a docker log/stats stream; returns an unsubscribe. First local subscriber per
-// (kind, container) attaches, the last detaches — the wsAttach contract.
+// (kind, container) attaches, the last detaches: the wsAttach contract.
 export function wsDockerAttach(kind: 'logs' | 'stats', id: string, cb: (event: DockerStreamEvent) => void): () => void {
   const key = `${kind}:${id}`
   let set = dockerStreamSubs.get(key)
@@ -76,7 +76,7 @@ export function wsDockerAttach(kind: 'logs' | 'stats', id: string, cb: (event: D
 registerWsChannel(
   'docker',
   (rawFrame) => {
-    // The ONE cast, at the front door, against this plugin's own union (../shared/wsFrames.ts).
+    // The one cast, at the front door, against this plugin's own union (../shared/wsFrames.ts).
     const frame = rawFrame as DockerServerFrame
     switch (frame.channel) {
       case 'docker:changed':

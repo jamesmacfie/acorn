@@ -3,8 +3,8 @@
 import type { DockerStatsSample } from '../shared/wsFrames'
 import type { DockerContainerDetail, DockerContainerSummary, DockerImage, DockerNetwork, DockerPort, DockerScope, DockerVolume } from '../shared/model'
 
-// Every list command emits one JSON object per line. Malformed lines are skipped, not fatal —
-// a torn read mid-stream must never take the whole list down.
+// Every list command emits one JSON object per line. Malformed lines are skipped, not fatal: a
+// torn read mid-stream must never take the whole list down.
 export function parseJsonLines<T>(text: string): T[] {
   const out: T[] = []
   for (const line of text.split('\n')) {
