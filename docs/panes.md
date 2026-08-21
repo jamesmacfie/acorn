@@ -22,8 +22,10 @@ string owned by the contribution; core does not maintain a closed union of featu
 
 Compiled provider panes appear when their linked provider is connected and the task has relevant data.
 The four loaded ones — `database`, `http`, `linear` and `rollbar` — are frame surfaces declared in a
-manifest, which has no form for either condition: they are offered whenever the plugin is running on the
-node the window is talking to, and a task with nothing linked gets the frame's own empty state.
+manifest and offered whenever the plugin is running on the node the window is talking to. A task pane
+whose manifest also names a `providerId` (`linear` and `rollbar` do) is a linked-items view, and the
+host additionally hides it on tasks with no link from that provider; `database` and `http` are useful
+with nothing linked and stay unconditional.
 
 `database` is the one COMPOSED pane: its manifest declares a `document-over-frame` layout, so the host
 draws the SQL editor and the drag handle and the plugin's frame draws everything below them. To the

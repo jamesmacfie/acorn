@@ -65,7 +65,9 @@ export default {
     // Keeping BOTH is why nothing regresses. Had the task pane simply become project-scoped, the
     // keybinding, the command and every content link in a note would have quietly stopped resolving.
     frames: [
-      { target: 'pane', id: 'linear', label: 'Linear', glyph: 'brand:linear', order: 90 },
+      // `providerId` marks the task pane as a linked-items view: the host hides it on tasks with no
+      // linear link (client-core plugins/frames/register.ts).
+      { target: 'pane', id: 'linear', label: 'Linear', glyph: 'brand:linear', order: 90, providerId: 'linear' },
       { target: 'pane', id: 'linear-issue', label: 'Linear issue', glyph: 'brand:linear', scope: 'project' },
       { target: 'refPanel', id: 'linear-ref', label: 'Linear issue', providerId: 'linear' },
     ],

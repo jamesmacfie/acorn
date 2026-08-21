@@ -256,6 +256,13 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             region: panelRegion(pluginId, asidePoint.panels),
           }
           : null
+        // A pane that names a provider is a linked-items view: on a task with nothing linked it could
+        // only draw its own empty state, so the switcher hides it until the task links an item of that
+        // provider. Same self-naming rule as the refPanel below. The gate also covers `openPane`, so a
+        // rail-row click lands on a task that will not mount the pane unless the item is linked first.
+        if (surface.providerId && surface.providerId !== pluginId) {
+          throw new Error(`declared provider '${surface.providerId}' is not '${pluginId}'`)
+        }
         return paneRegistry.register({
           id: surface.id,
           label: surface.label,
@@ -263,7 +270,8 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           order: surface.order,
           // The per-node gate. A plugin installed on node A contributes nothing to a task on node B, so
           // the switcher never offers a pane whose routes aren't there (distribution.ts).
-          when: () => pluginEnabledOnNode(frameNode(), pluginId),
+          when: (task) => pluginEnabledOnNode(frameNode(), pluginId)
+            && (!surface.providerId || task.links.some((link) => link.providerId === surface.providerId)),
           component: (props) => {
             const frame = createComponent(PluginFrame, {
               binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),

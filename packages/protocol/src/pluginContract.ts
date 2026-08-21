@@ -125,8 +125,9 @@ const frameSurface = z.object({
   order: z.number().int().min(0).max(100_000).default(500),
   // Lets a mobile shell skip a desktop-shaped pane instead of rendering it unusably.
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
-  // `refPanel` only. The client adapter checks it against the plugin id: a panel may only name its
-  // own provider.
+  // `refPanel` and task-scoped `pane`. The client adapter checks it against the plugin id: a surface
+  // may only name its own provider. On a task pane it additionally marks the pane as a linked-items
+  // view, hidden on tasks with no link from that provider.
   providerId: z.string().min(1).max(64).optional(),
   // `settings` only.
   group: z.enum(['general', 'workspace']).optional(),
