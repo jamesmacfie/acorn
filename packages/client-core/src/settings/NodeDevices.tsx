@@ -4,16 +4,13 @@ import { nodeDevices, revokeNodeDevice } from '../node/fleetActions'
 import { formatLastSeen } from '../node/freshness'
 import { Button } from '../ui/primitives'
 
-// Every client paired with one node, with a revoke per row (docs/ui-design.md § New surfaces: "revoke this or other
-// devices").
+// Every client paired with one node, with a revoke per row (docs/security.md § Trust boundaries):
+// every paired device has full owner authority, which is exactly why the list has to be visible.
+// `removeNode(nodeId, revoke)` deletes only this client's device row, so this is what lets a lost or
+// reinstalled machine be cut off without re-pairing everything.
 //
-// Only the first half of that existed. `removeNode(nodeId, revoke)` deletes THIS client's device row, so a
-// laptop that was lost or a machine that was reinstalled could not be cut off short of re-pairing everything
-// — and every paired device has full owner authority (security.md § Threat model), which is exactly why the
-// list has to be visible.
-//
-// Collapsed by default. On a single-node install with one device this is a row that says "you are here", and
-// unfolding it is the deliberate act of someone auditing access.
+// Collapsed by default. On a single-node install with one device this is a row that says "you are
+// here", and unfolding it is the act of auditing access.
 export default function NodeDevices(props: { nodeId: string; onError: (message: string) => void }) {
   const [open, setOpen] = createSignal(false)
   const [busy, setBusy] = createSignal('')
@@ -28,7 +25,8 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
     try {
       await revokeNodeDevice(props.nodeId, device.id)
       // Optimistic, then refetch: revoking closes that device's sockets immediately
-      // (docs/api-reference.md § Pairing), so the row should go at once rather than after a round trip.
+      // (docs/security.md § Transport and auth), so the row should go at once rather than after a
+      // round trip.
       mutate((current) => (current ?? []).filter((candidate) => candidate.id !== device.id))
       await refetch()
     } catch (failure) {
@@ -61,8 +59,8 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
                 <span class="muted">last seen {formatLastSeen(device.lastSeenAt ?? undefined)}</span>
                 <Button class="node-danger"
                   disabled={busy() === device.id}
-                  /* No "is this me?" guard. The client cannot know which row is its own — the device id it
-                     was issued lives in main, not here — and revoking yourself is a legitimate action that
+                  /* No "is this me?" guard. The client cannot know which row is its own, since the device id
+                     it was issued lives in main, not here, and revoking yourself is a legitimate action that
                      `removeNode(nodeId, true)` already performs from the row below. */
                   onClick={() => void revoke(device)}
                 >

@@ -10,12 +10,13 @@ import { ProjectConfig } from './WorkspaceProjectSettings'
 import WorkspaceExternalProjects from './WorkspaceExternalProjects'
 import { Button } from '../ui/primitives'
 
-// Settings → per-workspace page: workspace IDENTITY (name / icon / colour) + membership + delete.
-// Build/run/db/preview config is REPO-level (repo-level-settings): a workspace groups repos, but
-// setup/dev/db/preview describe one project, so those editors live in ProjectConfig, one per project.
+// Settings → per-workspace page: workspace identity (name / icon / colour) + membership + delete.
+// Build/run/db/preview config is repo-level (docs/workspaces-and-tasks.md § Worktrees and setup): a
+// workspace groups repos, but setup/dev/db/preview describe one project, so those editors live in
+// ProjectConfig, one per project.
 //
-// It also owns the workspace's LINKED PROVIDER PROJECTS (WorkspaceExternalProjects), which is core's
-// surface for every integration rather than any one plugin's — see the header there.
+// It also owns the workspace's linked provider projects (WorkspaceExternalProjects), which is core's
+// surface for every integration rather than any one plugin's; see the header there.
 export default function WorkspaceSettings(props: { workspace: Workspace; onDeleted: () => void }) {
   const qc = useQueryClient()
   const projects = createQuery(() => projectsOptions(true))
@@ -26,8 +27,9 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const [hex, setHex] = createSignal(props.workspace.color && !(props.workspace.color in WORKSPACE_COLORS) ? props.workspace.color : '')
   const refresh = () => qc.invalidateQueries({ queryKey: workspacesKey })
 
-  // Identity (docs/workspaces-and-tasks.md): emoji icon (blank clears back to the derived initial) + a colour
-  // swatch row (preset tokens) with a free hex input. Saves immediately — these are single scalars.
+  // Identity (docs/workspaces-and-tasks.md § Workspace and project): emoji icon (blank clears back to
+  // the derived initial) plus a colour swatch row (preset tokens) with a free hex input. Saves
+  // immediately, since these are single scalars.
   const saveIcon = async (value: string) => {
     setBusy(true)
     try {

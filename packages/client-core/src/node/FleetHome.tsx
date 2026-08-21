@@ -12,32 +12,32 @@ import NodeChip from './NodeChip'
 import './nodes.css'
 import { Alert, Button } from '../ui/primitives'
 
-// Fleet home (docs/ui-design.md § New surfaces): the landing view once more than one node is paired — a
-// card per node with connection state, counts, last-refresh and the two actions that matter from here.
+// Fleet home: the landing view once more than one node is paired, a card per node with connection
+// state, counts, last-refresh, and the two actions that matter from here.
 //
-// It is a rail SOURCE rather than a route, registered by core with `order: 0` and
+// It is a rail source rather than a route, registered by core with `order: 0` and
 // `when: () => nodes().length > 1`. Two consequences worth stating:
 //
 //   - With only the bundled local node the rail button does not exist at all, so "first-run never
 //     mentions nodes" is structural rather than a paragraph in a component nobody reaches.
-//   - Every number on a card comes through `createFleetQuery`, so a node that is down contributes a
-//     "node unavailable" line and its neighbours still render. That is the whole reason the fan-out
-//     exists as a primitive.
+//   - Every number on a card comes through `createFleetQuery`, so a node that is down contributes an
+//     "unavailable" line and its neighbours still render (docs/architecture-overview.md § Client
+//     state and fleet behavior).
 //
-// The card holds no per-node settings. Rename, unpair, revoke and the identity-change hard stop live in
-// Settings → Nodes, which already does all four properly; duplicating them here would mean two places to
-// keep in step on a screen whose job is an overview.
+// The card holds no per-node settings. Rename, unpair, revoke and the identity-change hard stop live
+// in Settings → Nodes, which already does all four properly; duplicating them here would mean two
+// places to keep in step on a screen whose job is an overview.
 export default function FleetHome() {
-  // The TASK LIST under `tasksKey`, counted in the component — not a count fetched under that key.
-  //
-  // `fetchQuery` writes through the node's own cache, so this fetch returns the task list itself and the
-  // component derives the count. A fan-out shares a key only when it shares the value's shape.
+  // The task list under `tasksKey`, counted in the component, not a count fetched under that key.
+  // `fetchQuery` writes through the node's own cache, so this fetch returns the task list itself and
+  // the component derives the count (docs/caching.md § Fan-out cache safety).
   const [tasksPerNode] = createFleetQuery(
     () => tasksKey,
     (nodeId, _dep, signal) => readJson<Task[]>(tasksRoute, { nodeId, signal }),
   )
-  // One fan-out per contributed stat rather than one combined call: each plugin's fetch is independent,
-  // and a plugin disabled on one node should leave that number off THAT card without affecting the rest.
+  // One fan-out per contributed stat rather than one combined call: each plugin's fetch is
+  // independent, and a plugin disabled on one node should leave that number off that card without
+  // affecting the rest.
   const stats = nodeStatContributions().map((stat) => {
     const [values] = createFleetQuery(
       () => ['node-stat', stat.id] as const,
@@ -46,8 +46,8 @@ export default function FleetHome() {
     return { stat, values }
   })
 
-  // docs/ui-design.md's "attention count" on the card. Same source of truth as the bell's "Needs you" section, so the
-  // two cannot disagree about how many things are waiting on a node.
+  // The bell's "Needs you" count, on the card. Same source of truth as the bell, so the two cannot
+  // disagree about how many things are waiting on a node.
   const inbox = createAttentionInbox()
   const attentionFor = (nodeId: string) => inbox().rows.filter((row) => row.nodeId === nodeId).length
 

@@ -1,7 +1,7 @@
 /* Node freshness chip (NodeChip.tsx) and Settings → Nodes (settings/NodesSettings.tsx).
    Co-located with the components, per the manifest note in styles.css. */
 
-/* The six-value vocabulary from docs/ui-design.md § States — mapped here, so the
+/* The six-value vocabulary from docs/ui-design.md § States, mapped here, so the
    component derives the state and the stylesheet owns how it reads. */
 .node-chip {
   display: inline-flex;
@@ -23,7 +23,7 @@
   color: var(--text);
 }
 
-/* Dev-only node switcher (plan.md § 69: "a minimal node switcher in the dev UI"). */
+/* Dev-only node switcher, for switching between paired nodes while developing. */
 .node-switcher {
   max-width: 180px;
 }
@@ -245,8 +245,8 @@
   overflow-wrap: anywhere;
 }
 
-/* Paired-client list per node (settings/NodeDevices.tsx). Collapsed by default — on a one-device install it
-   says "you are here", and unfolding it is the deliberate act of auditing access. */
+/* Paired-client list per node (settings/NodeDevices.tsx). Collapsed by default: on a one-device
+   install it says "you are here", and unfolding it is the act of auditing access. */
 .node-devices {
   display: flex;
   flex-direction: column;

@@ -8,10 +8,11 @@ import type { ProjectConfigPatch } from '@acorn/protocol/api.ts'
 import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
 import { Alert, Button, Checkbox, Select } from '../ui/primitives'
 
-// All project-level config for one folder project, collapsed behind a native <details> so a workspace
-// with several projects isn't an overwhelming wall of fields. Reads/writes the project row through
-// the project bridge; local signals override the fetched row while typing (null = use row).
-// Gated on a mapped checkout, like run targets: the scripts run on the NODE, so the hosting client is
+// All project-level config for one folder project (docs/workspaces-and-tasks.md § Worktrees and
+// setup), collapsed behind a native <details> so a workspace with several projects isn't an
+// overwhelming wall of fields. Reads/writes the project row through the project bridge; local
+// signals override the fetched row while typing (null means use the row).
+// Gated on a mapped checkout, like run targets: the scripts run on the node, so the hosting client is
 // irrelevant. (Was labelled desktop-only, from when every route here was a preload bridge.)
 export function ProjectConfig(props: { projectId: string; name: string }) {
   const api = taskBridge()
@@ -30,8 +31,8 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   const [branchPrefix, setBranchPrefix] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
 
-  // Gate the AI-SQL schema-source editor on a configured model provider connection (the feature is
-  // useless without one), matching where SQL generation itself is available.
+  // Gate the AI-SQL schema-source editor on a configured model provider connection, since the
+  // feature is useless without one, matching where SQL generation itself is available.
   const integrations = createQuery(() => integrationsOptions(true))
   const hasModelConnection = () => {
     const data = integrations.data
@@ -56,8 +57,9 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   const debDbSchema = debounce(() => void save({ dbSchemaValue: dbSchemaValue() ?? '' }), 1500)
   const debDbNotes = debounce(() => void save({ dbSchemaNotes: dbSchemaNotes() ?? '' }), 1500)
   const debPreview = debounce(() => void save({ previewValue: previewValue() ?? '' }), 1500)
-  // The prefix is normalised server-side ('feature' → 'feature/'), so drop the local override once
-  // saved — the refetched row is the canonical value and the input should show it, not the raw typing.
+  // The prefix is normalised server-side ('feature' becomes 'feature/'), so drop the local override
+  // once saved: the refetched row is the canonical value and the input should show it, not the raw
+  // typing.
   const debBranchPrefix = debounce(() => void save({ branchPrefix: branchPrefix() ?? '' }).then(() => setBranchPrefix(null)), 1500)
   onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debDbNotes.flush(); debPreview.flush(); debBranchPrefix.flush() })
 
@@ -296,9 +298,9 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   )
 }
 
-// Preview-browser page rules (docs/panes.md): row-per-rule editor over a repo's browserRules array.
-// Whole-array save; rows missing a pattern or selector are kept locally but not saved, so half-typed
-// rules never 400 against the strict route validation.
+// Preview-browser page rules: row-per-rule editor over a repo's browserRules array. Whole-array save;
+// rows missing a pattern or selector are kept locally but not saved, so half-typed rules never 400
+// against the strict route validation.
 function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: BrowserRule[]) => Promise<unknown> }) {
   const [rules, setRules] = createSignal<BrowserRule[]>(props.rules)
 
@@ -372,8 +374,8 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
   )
 }
 
-// Per-repo run-target JSON editor (docs/workflows.md §2) — the DB fallback surface. Desktop-only
-// because it uses the main-process runtime.
+// Per-repo run-target JSON editor (docs/workflows.md § Routes and UI), the DB fallback surface.
+// Desktop-only because it uses the main-process runtime.
 function RepoRunTargets(props: { projectId: string }) {
   const api = taskBridge()
   const [row, { refetch }] = createResource(

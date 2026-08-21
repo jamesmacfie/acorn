@@ -7,12 +7,12 @@ import { STYLES } from './uiStyles'
 import { Checkbox, Field, Select } from '../ui/primitives'
 import { PrefKeys } from '../persistence/prefKeys'
 
-// Settings → Appearance. Two orthogonal axes (docs/ui-design.md): STYLE owns shape, typography,
-// spacing and density; THEME owns colour. They compose freely — every style works with every
-// theme — because the two token sets are disjoint, which styles/tokenAxes.test.ts enforces.
+// Settings → Appearance. Two orthogonal axes (docs/ui-design.md § Token axes): style owns shape,
+// typography, spacing and density; theme owns colour. They compose freely, because the two token sets
+// are disjoint, which styles/tokenAxes.test.ts enforces.
 //
-// Theme additionally has a follow-the-OS mode with one pick per mode; style has no OS signal, so
-// it is a single value.
+// Theme additionally has a follow-the-OS mode with one pick per mode; style has no OS signal, so it
+// is a single value.
 //
 // Also the first call site converted to the <Field>/<Select> primitives, which is why it reads
 // noticeably shorter than the settings pages that still hand-roll label + select markup.
@@ -22,10 +22,8 @@ export default function AppearanceSettings() {
   const style = () => prefs.data?.[PrefKeys.style] ?? 'terminal'
   // Default to following the OS until the user has explicitly picked a theme.
   const followSystem = () => (prefs.data?.[PrefKeys.themeFollowSystem] ?? (prefs.data?.[PrefKeys.theme] ? 'false' : 'true')) === 'true'
-  // Through `resolveTheme`, so the picker shows the theme that is ON SCREEN. A plugin theme whose
-  // package is disabled or unreachable is not in the option list, and a Select whose value matches no
-  // option renders its first one — which would show "Light" for a stored id the shell is already
-  // falling back on anyway. Reading the fallback is honest; the stored pref is untouched either way.
+  // Through `resolveTheme` (see its own doc comment), so the picker shows the theme that is on screen
+  // rather than a stored id the shell has already fallen back on.
   const theme = () => resolveTheme(prefs.data?.[PrefKeys.theme], 'light')
   const lightTheme = () => resolveTheme(prefs.data?.[PrefKeys.themeLight], 'light')
   const darkTheme = () => resolveTheme(prefs.data?.[PrefKeys.themeDark], 'dark')

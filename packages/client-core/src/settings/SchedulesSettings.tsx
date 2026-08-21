@@ -26,29 +26,15 @@ import { nodes } from '../node/fleet'
 import { Alert, Badge, Button, Checkbox, ConfirmButton, Input, Row, Select, StatusDot } from '../ui/primitives'
 import './settings.css'
 
-// Settings → Schedules (docs/schedules.md): every piece of periodic work this node owns, in one list,
-// whoever declared it.
-//
-// Per NODE, with the same picker as Settings → Plugins and Security, and for the same reason: a
-// schedule is a promise one machine makes. Rolling two nodes' schedules into one list would imply a
-// fleet-wide scheduler, which is exactly the thing the design refuses.
-//
-// The creation form is deliberately four fields and no wizard: pick a thing this node can run, name it,
-// say when. The list of things is what RESOLVES on the node right now (`/schedules/targets`), so there
-// is no invalid choice to validate after the fact — the same "unrepresentable rather than validated"
-// posture the panel editor takes.
-//
-// ARMING. A target carries a declared risk tier, and creating a schedule against it shows that tier and
-// makes the person accept it explicitly. That confirmation is host-drawn from the node's answer and
-// cannot be talked out of asking — and it is taken HERE, once, because 3am cannot answer a confirmation
-// strip. The accepted tier is stamped onto the row and rendered on it forever, which is what makes
-// one-time consent honest. If the tier later rises, runs fail closed and this surface offers the re-arm.
+// Settings → Schedules, per node (docs/schedules.md § Settings): every piece of periodic work this
+// node owns, in one list, whoever declared it. The arming confirmation for a schedule's risk tier is
+// taken once at creation, drawn by the host, and cannot be talked out of asking.
 
 const OWNER_TONE = { core: 'neutral', plugin: 'accent', user: 'add' } as const
 
 /** What the arming strip says about each tier, in the register a person would use. The vocabulary is
- *  `ToolRisk` — the same three the agent-tool permission surface already projects — so a person meets
- *  one scale for "how dangerous is this", not two. */
+ *  `ToolRisk` (docs/schedules.md § Settings), the same three the agent-tool permission surface
+ *  already projects, so a person meets one scale for "how dangerous is this". */
 const RISK_COPY: Record<ToolRisk, string> = {
   read: 'only reads. It will run unattended from now on.',
   write: 'changes data on this machine. It will run unattended, with nobody to confirm it.',
@@ -99,7 +85,7 @@ export default function SchedulesSettings() {
   }))
 
   // What this node can run, for the picker. Separate from the list because it answers a different
-  // question — "what COULD be scheduled" rather than "what IS" — and because it changes only when a
+  // question, "what could be scheduled" rather than "what is", and because it changes only when a
   // plugin comes or goes, so it has no business on the list's 30-second clock.
   const targets = createQuery(() => ({
     queryKey: ['schedule-targets', nodeId()],
@@ -116,7 +102,7 @@ export default function SchedulesSettings() {
   const paused = () => schedules.data?.paused ?? false
   const invalidate = () => qc.invalidateQueries({ queryKey: ['schedules', nodeId()] })
 
-  // Every verb is the same three steps — name what is busy, do it, refresh — so they share one wrapper
+  // Every verb is the same three steps: name what is busy, do it, refresh. So they share one wrapper
   // rather than each growing its own try/catch and its own spinner flag.
   const act = async (label: string, work: () => Promise<unknown>): Promise<void> => {
     setError('')

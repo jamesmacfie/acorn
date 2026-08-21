@@ -1,4 +1,4 @@
-/* Settings page (SettingsModal.tsx): a wide two-column modal — left tab rail, right scrolling pane.
+/* Settings page (SettingsModal.tsx): a wide two-column modal, left tab rail, right scrolling pane.
    Reuses .overlay-backdrop / .overlay from overlays.css; this widens it and lays out the columns. */
 .overlay.settings {
   flex-direction: row;
@@ -156,7 +156,7 @@
 .plugin-row label { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .plugin-pending { font-size: var(--fs-xs); }
-/* Only present on a plugin loaded from the node's disk — a built-in's version is the app's. */
+/* Only present on a plugin loaded from the node's disk; a built-in's version is the app's. */
 .plugin-version { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); }
 .plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
@@ -175,7 +175,7 @@
 .plugin-install { display: flex; align-items: center; gap: var(--space-2); }
 .plugin-install .ui-input[data-width='full'] { flex: 1; }
 .plugin-install-hint { font-size: var(--fs-xs); }
-/* The pull-up hugs the FORM, so it is scoped to the hint that actually follows one. The second hint
+/* The pull-up hugs the form, so it is scoped to the hint that actually follows one. The second hint
    (folder installs only) sits under the first and keeps normal spacing rather than inheriting a negative
    margin meant for a different neighbour. */
 .plugin-install + .plugin-install-hint { margin-top: calc(var(--space-2) * -1); }

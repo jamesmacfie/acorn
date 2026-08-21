@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { readStyleSheets, stripComments } from '../styles/readStyleSheets'
 import { STYLES } from './uiStyles'
 
-// Drift guard, mirroring themes.test.ts: the Appearance STYLES picker is hand-synced with the
-// `:root[data-style="…"]` blocks in styles/style-*.css. Offering a style with no pack behind it
-// would silently render as Terminal.
+// Drift guard, mirroring themes.test.ts (docs/ui-design.md § Style packs): the Appearance styles
+// picker is hand-synced with the `:root[data-style="…"]` blocks in styles/style-*.css. Offering a
+// style with no pack behind it would silently render as Terminal.
 describe('STYLES ↔ stylesheets', () => {
   it('lists exactly the styles the stylesheets define', () => {
     const css = stripComments(readStyleSheets().map((f) => f.text).join('\n'))

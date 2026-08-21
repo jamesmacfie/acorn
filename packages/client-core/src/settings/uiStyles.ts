@@ -2,7 +2,7 @@ import { styleContributions, styleRegistry, type StyleContribution } from '../re
 
 // Settings → Appearance style picker. 'terminal' is the plain-:root default in
 // styles/tokens-style.css and has no [data-style] block, exactly as 'light' has no [data-theme]
-// block — which is also why the correct default paints before any JS runs.
+// block, which is also why the correct default paints before any JS runs.
 const builtInStyles: StyleContribution[] = [
   { id: 'terminal', label: 'Terminal', description: 'Flat, square, monospaced, dense.' },
   { id: 'modern', label: 'Modern', description: 'Sans type, rounded cards, soft elevation.' },

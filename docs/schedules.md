@@ -276,6 +276,10 @@ validate after the fact — and when nothing offers a schedulable action the for
 sentence saying so rather than a create button that always fails. A row whose tier has risen shows the
 re-arm inline.
 
+The tier copy shown in the arming strip uses `ToolRisk`, the same three-value scale the agent-tool
+permission surface already projects. A person learns one vocabulary for "how dangerous is this" instead
+of two.
+
 ## What deliberately is not a schedule
 
 The sweep was re-run across the tree and these stay on their own timers, because their lifetime is an
