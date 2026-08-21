@@ -48,6 +48,14 @@ keeps manual SQL available and hides Generate. The frame learns which connection
 this plugin's node half over `CoreServices.models.available` — ids and labels only. A frame has no way
 to read core's connection roster, and it should not get one.
 
+## SQL safety
+
+Every value that reaches Postgres is parameterized. Identifiers (schema, table and column names)
+cannot be parameterized, so every identifier a route builds SQL from is checked against the live
+introspected schema (`assertTable`, `assertColumns` in `main/database.ts`) and double-quoted before
+use. Arbitrary SQL typed into the editor runs verbatim: it is the reader's own database, and writes
+are the point of the pane.
+
 ## Boundaries
 
 Task IDs and worktree paths are revalidated by the Node. The database plugin does not expose

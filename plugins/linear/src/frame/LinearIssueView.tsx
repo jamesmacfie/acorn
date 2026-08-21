@@ -5,15 +5,15 @@ import { priorityMeta } from '../shared/triage'
 import { formatDate, relativeTime } from './model'
 
 // One Linear ticket, rendered inside the frame's own document. The same three tabs the compiled panel
-// had — Overview / Activity / Comments, all fed by the one detail request — drawn with the shell's own
+// had, Overview, Activity, and Comments, all fed by the one detail request, drawn with the shell's own
 // primitives so a loaded Linear looks like a first-party one under every appearance pack.
 //
-// Three things the compiled panel owned are gone from here, and all three moved OUT rather than being
-// lost. The right-anchored drawer chrome belongs to whoever opened the panel, because a frame cannot
-// Portal past its iframe (client-core/plugins/frames/register.ts). The ticket switcher for a task
-// linking several tickets is the app shell's business, so it sits in app.tsx beside the task read. And
-// where a link in rendered content goes is a policy question with two answers — re-point this view, or
-// hand the URL to the host — so it arrives as `onContentClick` from app.tsx, which holds both.
+// Three things the compiled panel owned moved elsewhere rather than being lost. The right-anchored
+// drawer chrome belongs to whoever opened the panel, because a frame cannot Portal past its iframe
+// (client-core/plugins/frames/register.ts). The ticket switcher for a task linking several tickets is
+// the app shell's business, so it sits in app.tsx beside the task read. Where a link in rendered content
+// goes is a policy question with two answers, re-point this view or hand the URL to the host, so it
+// arrives as `onContentClick` from app.tsx, which holds both.
 
 // Glyph per activity kind (Linear-style compact feed). State changes are tinted by the new state.
 const ACTIVITY_GLYPH: Record<string, string> = { created: '✦', state: '◐', assignee: '○', label: '▣', title: '✎' }
@@ -35,8 +35,8 @@ export type LinearIssueViewProps = {
   onComment(body: string, parentId?: string): void
   onCopy(text: string): void
   /**
-   * A click anywhere in rendered markdown. Where a link goes is not this view's decision — a Linear
-   * ticket re-points the view, anything else is handed to the host — and both halves need things this
+   * A click anywhere in rendered markdown. Where a link goes is not this view's decision: a Linear
+   * ticket re-points the view, anything else is handed to the host, and both halves need things this
    * file does not have (the current target, the bridge). It arrives as one handler for the same reason
    * the ref-panel contract passes `onContentClick` down instead of resolving it in the panel.
    */

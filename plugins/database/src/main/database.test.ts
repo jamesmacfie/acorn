@@ -1,13 +1,14 @@
 // The one thing this file guards: a committed `.acorn/config.toml [database].url_script` is a shell
 // script from the checkout, so resolving the Database pane's connection must not run it until the repo
-// config has been reviewed (core/main/repoConfigTrust.ts). Cloning a repo — or checking out a PR that
-// adds the file — must not be sufficient to execute its commands.
+// config has been reviewed (core/main/repoConfigTrust.ts; docs/data-layer.md § Database plugin: the
+// Postgres pane). Cloning a repo, or checking out a PR that adds the file, must not be enough to
+// execute its commands.
 //
-// Only the refusal direction is tested here, deliberately: letting the script actually run means
-// spawning `bash -lc`, a login shell that sources the user's profile and costs ~15s under the full
-// parallel suite. The "does not over-block" direction is already covered without that cost —
-// runConfig.test.ts pins dbUrlFromRepo to false for user/DB-authored scripts (so the gate is never
-// reached), and repoConfigTrust.test.ts pins assertRepoConfigTrusted to resolve once acknowledged.
+// Only the refusal direction is tested here. Letting the script actually run means spawning `bash -lc`,
+// a login shell that sources the user's profile and costs about 15 seconds under the full parallel
+// suite. The "does not over-block" direction is covered without that cost: runConfig.test.ts pins
+// dbUrlFromRepo to false for user/DB-authored scripts, so the gate is never reached, and
+// repoConfigTrust.test.ts pins assertRepoConfigTrusted to resolve once acknowledged.
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -30,7 +31,7 @@ describe('resolveDbUrl: repo-authored url_script trust gate', () => {
   let core: DatabaseCoreServices
 
   // The script's only job is to prove it ran. `existsSync(marker)` is therefore an exact "did the
-  // untrusted script execute?" oracle — stronger than asserting on an error string.
+  // untrusted script execute?" oracle, stronger than asserting on an error string.
   const writeCommittedUrlScript = () =>
     writeFileSync(join(repo, '.acorn', 'config.toml'), `[database]\nurl_script = "touch ${marker}; echo postgres://from-script/db"\n`)
 
@@ -67,9 +68,9 @@ describe('resolveDbUrl: repo-authored url_script trust gate', () => {
   })
 
   it('fails closed rather than falling through to the .env fallback', async () => {
-    // The gate sits OUTSIDE the try/catch that treats a failing script as "auto-detect instead". If it
-    // ever moves inside, an untrusted repo silently downgrades to this .env URL and the refusal
-    // becomes invisible — so assert the throw wins over a perfectly usable fallback.
+    // The gate sits outside the try/catch that treats a failing script as "auto-detect instead". If it
+    // ever moves inside, an untrusted repo silently downgrades to the .env URL and the refusal becomes
+    // invisible, so this asserts the throw wins over a perfectly usable fallback.
     writeCommittedUrlScript()
     writeFileSync(join(repo, '.env'), 'DATABASE_URL=postgres://from-dotenv/db\n')
     await expect(resolveDbUrl(core, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
