@@ -1,7 +1,7 @@
-// Layout recipes (docs/workflows.md §3): a [layout.<id>] config block seeds a TaskLayout, auto-starts
-// its named run target in the drawer, and points the browser pane at a target's resolved URL
-// (`browser = "run:<id>"`). A pure executor over injected services, unit tested with stubs; the palette
-// wires the real runtime, layout and browser glue.
+// Layout recipes (docs/workspaces-and-tasks.md § Task): a [layout.<id>] config block seeds a
+// TaskLayout, auto-starts its named run target in the drawer, and points the browser pane at a
+// target's resolved URL (`browser = "run:<id>"`). A pure executor over injected services, unit
+// tested with stubs; the palette wires the real runtime, layout and browser glue.
 import { isPaneId, paneContribution, type TaskLayout } from '@acorn/plugin-api/client'
 
 export type RecipeSpec = {

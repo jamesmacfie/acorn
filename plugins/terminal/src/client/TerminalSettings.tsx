@@ -3,7 +3,7 @@ import { PrefKeys, prefsOptions, savePref, termFontSize } from '@acorn/plugin-ap
 import { resolveTerminalFontSize, TERMINAL_FONT_SIZE_OPTIONS } from './preferences'
 import { Checkbox, Select } from '@acorn/plugin-api/ui'
 
-// Settings → Terminal: the rail-default profile — what the terminal button auto-launches when the
+// Settings → Terminal: the rail-default profile, what the terminal button auto-launches when the
 // drawer opens empty (TerminalPanel reads `term_rail_default`).
 export default function TerminalSettings() {
   const qc = useQueryClient()

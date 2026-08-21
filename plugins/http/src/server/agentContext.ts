@@ -1,16 +1,14 @@
 // "Saved HTTP requests" in the agent composer, as the two routes the manifest's `agentContexts`
-// descriptor names (docs/third-party/README.md § "http has moved").
+// descriptor names (docs/http-client.md § Client).
 //
-// This used to be a client contribution: two async functions over rows the renderer already held.
-// Moving it to the node is the one genuinely risky part of that move, because the rows here come
-// straight out of this plugin's SQLite with the ciphertext already opened — real bearer tokens, real
-// bodies, real variable values. So the redaction lives in its own module with its own test rather
-// than inline in a handler, and the shape below is an allowlist: every field named is one a reader
-// decided an agent may see. Adding a field is an explicit act.
+// The rows here come straight out of this plugin's SQLite with the ciphertext already opened: real
+// bearer tokens, real bodies, real variable values. The redaction lives in its own module with its
+// own test rather than inline in a handler. The shape below is an allowlist: every field named is
+// one a reader decided an agent may see. Adding a field is an explicit act.
 //
-// What the host does NOT let this file decide: `source` (bound from the plugin id), the capture time,
-// and the byte measurement the 512 KiB composer ceiling is checked against. So the only thing that can
-// go wrong in here is disclosure, which is why disclosure is all it is about.
+// What the host does not let this file decide: `source` (bound from the plugin id), the capture
+// time, and the byte measurement the 512 KiB composer ceiling is checked against. The only thing
+// that can go wrong here is disclosure.
 import { MAX_PLUGIN_AGENT_CONTEXT_OPTIONS } from '@acorn/protocol/agentContext.ts'
 import type { AgentContextOption, PluginAgentContextSnapshotBody } from '@acorn/protocol/agentContext.ts'
 import type { HttpRequest } from '../shared/model'
@@ -30,18 +28,18 @@ export const requestOption = (request: HttpRequest): AgentContextOption => ({
 const TEMPLATE_ONLY = /^\{\{[A-Za-z0-9_.-]+\}\}$/
 
 /**
- * The URL with its query VALUES redacted and its keys kept.
+/**
+ * The URL with its query values redacted and its keys kept.
  *
- * The path is shape and stays; a query value is data and does not, because `?token=sk-live-…` is a
- * perfectly ordinary way for someone to have saved a request and there is no way to recognise which
+ * The path is shape and stays; a query value is data and does not, because `?token=sk-live-...` is a
+ * perfectly ordinary way for someone to have saved a request, and there is no way to recognise which
  * literal is a secret. Keys survive, so an agent still learns the endpoint takes `token`.
  *
- * This is stricter than the renderer contribution it replaces, which sent the whole URL. That was a real
- * leak — found by the test that came with this move, which is the reason the doc asked for the redaction to
- * be tested on the node rather than assumed to have travelled.
+ * Stricter than the renderer contribution it replaced, which sent the whole URL and leaked exactly
+ * this way (docs/third-party/README.md § "http has moved").
  *
- * String surgery rather than `new URL()`: the stored URL is frequently a template (`{{BASE_URL}}/users`)
- * and would not parse.
+ * String surgery rather than `new URL()`: the stored URL is frequently a template
+ * (`{{BASE_URL}}/users`) and would not parse.
  */
 export function redactUrl(url: string): string {
   const cut = url.indexOf('?')
@@ -64,13 +62,10 @@ export function redactUrl(url: string): string {
 }
 
 /**
- * One saved request as markdown an agent can learn the API's SHAPE from: method, URL, folder, the auth
- * MODE, the body MODE, and header NAMES.
- *
- * Everything credential-bearing is absent rather than masked — header values, the auth payload, the body
- * and every variable — and the URL goes through `redactUrl`, so a literal in the query string does not
- * ride along either. A `{{TOKEN}}` reference survives, because a reference is shape: its resolved value
- * never existed here at all, since resolution happens at send time in send.ts.
+/**
+ * One saved request as markdown an agent can learn the API's shape from (docs/http-client.md §
+ * Client). Method, URL, folder, auth mode, body mode, and header names survive; everything
+ * credential-bearing does not.
  */
 export const requestSnapshot = (request: HttpRequest): PluginAgentContextSnapshotBody => {
   const headerNames = request.headers.filter((header) => header.enabled).map((header) => header.name).join(', ')

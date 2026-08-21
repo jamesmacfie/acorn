@@ -12,7 +12,7 @@ import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVa
 import { protectHttpValue } from './storage'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 
-// buildRequest is where interpolation, auth compilation and the scheme check land — the parts that
+// buildRequest is where interpolation, auth compilation and the scheme check land: the parts that
 // would silently send the wrong thing. The fetch call itself and the DB read around it are thin.
 
 const input = (patch: Partial<HttpSendInput> = {}): HttpSendInput => ({
@@ -30,7 +30,7 @@ const USER = 'octocat'
 const ENC_KEY = '0'.repeat(64)
 const SECRETS = new SecretService(ENC_KEY)
 
-// TWO databases, which is the whole shape of the split: `http_variables` lives in this plugin's own
+// Two databases, which is the shape of the split: `http_variables` lives in this plugin's own
 // file, and the task/checkout fixtures the command-variable tests need live in core's. The plugin reads
 // the second only through CoreServices, so the test builds the real thing over a real core DB rather
 // than stubbing the seam it is meant to exercise.
@@ -205,7 +205,7 @@ describe('resolveVars — command execution context', () => {
     root = null
   })
 
-  // Spawns a real subprocess via a bash LOGIN shell in a temp git worktree, so it is sensitive to
+  // Spawns a real subprocess via a bash login shell in a temp git worktree, so it is sensitive to
   // machine load: on a saturated box the profile-sourcing shell can exceed send.ts's own 15s
   // production command timeout. Retry rather than loosening a production timeout to suit CI.
   it('runs a command in the explicit task worktree and uses its last non-empty output line', { timeout: 30_000, retry: 2 }, async () => {

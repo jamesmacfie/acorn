@@ -47,13 +47,12 @@ type Session = {
   display: TerminalDisplay
   lastActivityAt: number
   sawIdle: boolean // has this session ever gone idle? the first idle uses a shorter window (FIRST_IDLE_MS)
-  // PTY output coalescing (docs/electron.md §12): buffer bytes and flush one 'output' frame per ~16ms
-  // tick instead of one per PTY chunk, so a busy TUI doesn't send a frame per keystroke echo.
+  // PTY output coalescing (docs/terminal-and-agents.md § Sessions).
   pendingOut: string
   flushTimer: ReturnType<typeof setTimeout> | null
 }
 
-// About one frame at 60fps, the busy-TUI coalescing target (docs/electron.md §12).
+// About one frame at 60 fps, the coalescing target (docs/terminal-and-agents.md § Sessions).
 const OUTPUT_COALESCE_MS = 16
 
 const sessions = new Map<string, Session>()
@@ -83,8 +82,8 @@ function services(): TerminalCoreServices {
   return core
 }
 
-// sendToAgent (docs/panes.md): bracketed-paste delivery into agent PTYs, with 'after-ready' queued on
-// the idle edge below. One instance over the live session map.
+// sendToAgent (docs/terminal-and-agents.md § Sending text to an agent), with 'after-ready' queued
+// on the idle edge below. One instance over the live session map.
 const agentSender = new AgentSender((id) => {
   const s = sessions.get(id)
   if (!s) return null
@@ -96,15 +95,16 @@ export function sendToAgent(sessionId: string, text: string, submit: SendSubmit)
 }
 
 // Spawn and enumerate, published by this plugin's init as the `terminal.sessions` capability
-// (contract/sessions.ts). A two-method object rather than a reach into the TerminalBridge, because the
-// bridge is the route layer's dependency: it exists to be nulled on dispose, and a capability consumer
-// resolving it would be reading this plugin's HTTP wiring.
+// (contract/sessions.ts). A two-method object rather than a reach into the TerminalBridge, because
+// the bridge is the route layer's dependency: it exists to be nulled on dispose, and a capability
+// consumer resolving it would be reading this plugin's HTTP wiring.
 //
-// Its one consumer is plugins/agents' terminal handoff, the only cross-plugin caller that needs to start
-// a PTY. Same list and create implementations the bridge exposes, and deliberately not the other six.
+// Its one consumer is plugins/agents' terminal handoff, the only cross-plugin caller that needs to
+// start a PTY. It shares the bridge's list and create implementations; the other six methods stay
+// on the bridge alone.
 //
-// Named `sessionControl`, not `terminalSessions`, because that name is already the Drizzle table this
-// module imports and shadowing it would silently rebind every query below.
+// Named `sessionControl`, not `terminalSessions`, because that name is already the Drizzle table
+// this module imports, and shadowing it would silently rebind every query below.
 export const sessionControl = {
   create: (opts: CreateOpts): Promise<TerminalSession> => create(opts),
   list: async (): Promise<TerminalSession[]> => [...sessions.values()].map((s) => s.meta),
@@ -440,11 +440,9 @@ const isDefaultApp = (): boolean => (process as { defaultApp?: boolean }).defaul
 const mcpName = () => configuredMcp?.name ?? serverName(!isDefaultApp() && !process.env.ELECTRON_IS_DEV)
 const mcpLauncher = () => configuredMcp?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
 
-// Boot-time MCP re-registration (docs/mcp.md). The registered launcher command is process.execPath, a
-// volatile pnpm-store Electron path in dev that ENOENTs after any electron reinstall, leaving `/mcp`
-// showing acorn disconnected. Session spawn already re-registers, but restored and tmux-reattached
-// sessions never do, so refresh every agent CLI's entry to the current binary once at boot. Idempotent
-// (remove then add), failures swallowed.
+// Boot-time MCP re-registration (docs/mcp.md § Configuration). Session spawn already re-registers;
+// this covers restored and tmux-reattached sessions, which never respawn. Idempotent (remove then
+// add), failures swallowed.
 export async function refreshAcornMcpRegistrations(): Promise<void> {
   const name = mcpName()
   const launcher = mcpLauncher()
@@ -536,14 +534,14 @@ export type TerminalIpcDeps = {
   streams?: (handlers: Parameters<PluginBroadcast['streams']>[0]) => void
 }
 
-// Release everything registerTerminalIpc installed. Called from the plugin's dispose (node/index.ts),
-// which runs before the data root's lock is dropped. Idempotent, so it's safe after a partial boot that
-// never started the idle watch.
+// Release everything registerTerminalIpc installed. Called from the plugin's dispose
+// (node/index.ts), which runs before the data root's lock is dropped. Idempotent, so it's safe after
+// a partial boot that never started the idle watch.
 //
-// The session map is cleared. Without that, a second startServiceRuntime in one process inherits the
-// previous boot's sessions: `list()` would report PTYs owned by a torn-down engine, and the WS hub's
-// task-scope guard would resolve stream ids against them. The PTYs themselves are deliberately not
-// killed, because a tmux session outliving the app is the point of the tmux backend.
+// The session map is cleared. Without that, a second startServiceRuntime in one process inherits
+// the previous boot's sessions: `list()` would report PTYs owned by a torn-down engine, and the WS
+// hub's task-scope guard would resolve stream ids against them. The PTYs themselves are not killed:
+// a tmux session outliving the app is what the tmux backend is for.
 export function disposeTerminal(): void {
   if (idleWatch) {
     clearInterval(idleWatch)
@@ -596,7 +594,7 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
     list: async () => [...sessions.values()].map((s) => s.meta),
     profiles: async () => listProfiles(),
     create: (opts) => create(opts ?? ({} as CreateOpts)),
-    // sendToAgent (docs/panes.md): bracketed paste into an agent session's PTY, with a submit mode.
+    // sendToAgent (docs/terminal-and-agents.md § Sending text to an agent).
     sendToAgent: async (sessionId, text, submit) => {
       if (!sessionId || !text) return { ok: false, reason: 'Invalid payload.' }
       return agentSender.send(sessionId, text, submit)

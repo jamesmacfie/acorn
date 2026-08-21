@@ -1,12 +1,13 @@
 // The terminal plugin's agent tools: the five run_* tools, as the `tools` contribution point
-// (docs/plugins.md § Agent tools and MCP).
+// (docs/plugins.md § Tool projection).
 //
-// They were defined in apps/node/src/wiring/agentToolsWiring.ts, which resolved the RuntimeService out
-// of the capability registry purely so it could declare them. The service is built by this plugin's init
-// (it closes over the live session map and this plugin's database), so the tools belong beside it.
+// They were defined in apps/node/src/wiring/agentToolsWiring.ts, which resolved the RuntimeService
+// out of the capability registry purely so it could declare them. The service is built by this
+// plugin's init (it closes over the live session map and this plugin's database), so the tools
+// belong beside it.
 //
-// A run target IS a terminal session in the task worktree — start/stop/restart go through the same PTY
-// engine the run pane drives, so an agent and a human cannot end up with two copies of `pnpm dev`.
+// A run target is a terminal session in the task worktree: start/stop/restart go through the same
+// PTY engine the run pane drives, so an agent and a human cannot end up with two copies of `pnpm dev`.
 import { z } from 'zod'
 import { type AgentToolContribution, isRepoConfigTrustError, type ToolContext, ToolError } from '@acorn/plugin-api/node'
 import type { TerminalRunTargets } from '../contract/runTargets'
@@ -14,9 +15,10 @@ import type { TerminalRunTargets } from '../contract/runTargets'
 export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNotice: (taskId: string) => void = () => {}): AgentToolContribution[] {
   const empty = z.object({})
 
-  // Starting a run target EXECUTES the repo's committed `.acorn/config.toml`, so it is behind the
-  // hash-gated trust acknowledgement. The notice is broadcast so the human sees the review prompt in the
-  // UI, and the agent gets a distinct 'needs-trust' kind rather than an opaque failure it might retry.
+  // Starting a run target executes the repo's committed `.acorn/config.toml`, so it sits behind the
+  // hash-gated trust acknowledgement (docs/workflows.md § Configuration trust). The notice
+  // broadcasts so the human sees the review prompt, and the agent gets a distinct 'needs-trust' kind
+  // rather than an opaque failure it might retry.
   const executeRun = async <T>(taskId: string, execute: () => Promise<T>): Promise<T> => {
     try {
       return await execute()
@@ -27,8 +29,9 @@ export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNot
     }
   }
 
-  // Only available when the task actually HAS run targets. The predicate re-evaluates per manifest fetch,
-  // so run_* appear mid-session once a repo declares them (the MCP proxy sends tools/list_changed).
+  // Only available when the task actually has run targets. The predicate re-evaluates per manifest
+  // fetch, so run_* tools appear mid-session once a repo declares them (the MCP proxy sends
+  // tools/list_changed).
   const hasRunTargets = async (ctx: ToolContext): Promise<boolean> => {
     const t = await runTargets.targets(ctx.taskId)
     return 'targets' in t && t.targets.length > 0

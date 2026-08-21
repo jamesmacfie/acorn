@@ -37,7 +37,7 @@ export type HttpRequest = {
 export type VariableKind = 'value' | 'secret' | 'command'
 export const variableKinds = ['value', 'secret', 'command'] as const
 
-// `value` is masked to '' by the server for secret rows — plaintext never reaches the renderer.
+// `value` is masked to '' by the server for secret rows: plaintext never reaches the renderer.
 export type HttpVariable = {
   id: string
   name: string
@@ -49,9 +49,9 @@ export type HttpVariable = {
 
 export type TimelineEntry = { label: string; detail: string }
 
-// Sending has its own task context. `HttpRequest.taskId` says where an ad-hoc request is stored;
-// `executionTaskId` says which task worktree supplies builtins and runs command variables. Keeping
-// those meanings separate lets a repo-saved request run correctly when it is opened in a task pane.
+// Sending has its own task context (docs/http-client.md § Data model): `taskId` says where an
+// ad-hoc request is stored, `executionTaskId` says which task worktree supplies builtins and runs
+// command variables.
 export type HttpSendInput = Pick<HttpRequest, 'method' | 'url' | 'headers' | 'bodyMode' | 'body' | 'auth' | 'vars'> & {
   executionTaskId: string | null
 }
@@ -100,7 +100,7 @@ export const missingVars = (input: string, vars: Record<string, string>): string
 export type AuthApplied = { headers: KeyValue[]; queryParams: KeyValue[] }
 
 // btoa is Latin-1 only and throws on any character above U+00FF, so UTF-8 encode first. Buffer
-// isn't an option here — this module also runs in the renderer.
+// isn't an option here: this module also runs in the renderer.
 const base64Utf8 = (s: string): string => {
   const bytes = new TextEncoder().encode(s)
   let binary = ''

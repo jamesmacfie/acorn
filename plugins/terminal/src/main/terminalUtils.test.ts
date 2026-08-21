@@ -65,8 +65,8 @@ describe('launchCommandLine (docs/notes-and-memory.md)', () => {
   it('quotes launchArgs for the shell-line spawn paths, and is a no-op without them', () => {
     expect(launchCommandLine('claude')).toBe('claude')
     expect(launchCommandLine('claude', [])).toBe('claude')
-    // The prompt text has spaces and apostrophes — unquoted, tmux would run `claude --append-…` with
-    // "This" as the prompt and the rest as stray argv.
+    // The prompt text has spaces and apostrophes; unquoted, tmux would run `claude --append-...`
+    // with "This" as the prompt and the rest as stray argv.
     expect(launchCommandLine('claude', ['--append-system-prompt', "call task_context; don't ask"])).toBe(
       `claude '--append-system-prompt' 'call task_context; don'\\''t ask'`,
     )

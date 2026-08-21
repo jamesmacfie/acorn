@@ -1,15 +1,15 @@
-// The http plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
+// The http plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
 // <data-root>/plugins/http.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: saved requests and project variables are the API panel's
-// data, and core has no reason to know their shape. `task_id` is a plain ID into core's `tasks` —
+// data, and core has no reason to know their shape. `task_id` is a plain ID into core's `tasks`,
 // dereferenced through CoreServices.tasks, never joined.
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-// Saved HTTP requests for the API panel (docs/panes.md). Project-scoped like the database plugin's saved
-// queries — a request written against a project's API outlives any one task worktree. Credentials make
-// this identity-scoped even on a single-user machine. Sensitive fields are JWE ciphertext whenever
-// `encrypted` is true.
+// Saved HTTP requests for the API panel (docs/http-client.md § Data model). Project-scoped like the
+// database plugin's saved queries: a request written against a project's API outlives any one task
+// worktree, and credentials make this identity-scoped even on a single-user machine. Sensitive
+// fields are JWE ciphertext whenever `encrypted` is true.
 // The `http_` prefix, not `api_`: `api_tokens`/`api_idempotency` belonged to V1's public automation
 // API, and so does the settings page id `api`.
 export const httpRequests = sqliteTable(
@@ -43,9 +43,8 @@ export const httpRequests = sqliteTable(
   ],
 )
 
-// Project-level variables for the API panel. `command` values are persisted shell commands whose
-// output is resolved at send time and never persisted. Every value kind is JWE ciphertext under
-// SESSION_ENC_KEY; secret plaintext is additionally never sent to the renderer.
+// Project-level variables for the API panel (docs/http-client.md § Data model). `command` values
+// are persisted shell commands whose output is resolved at send time and never persisted.
 export const httpVariables = sqliteTable(
   'http_variables',
   {

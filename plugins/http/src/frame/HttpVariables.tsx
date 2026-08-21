@@ -2,10 +2,10 @@
 // and as the "API requests" settings page. One component, two entry points.
 //
 // Three kinds:
-//   value   — stored and shown as typed
-//   secret  — encrypted at rest with the Node's secret key; the
+//   value   - stored and shown as typed
+//   secret  - encrypted at rest with the Node's secret key; the
 //             plaintext never comes back to the renderer, so the field shows a placeholder
-//   command — a stored shell command run in the task worktree (or the project checkout) when a
+//   command - a stored shell command run in the task worktree (or the project checkout) when a
 //             request references it. Its output is never stored. The same mechanism the Database
 //             pane uses for its connection URL.
 import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
@@ -35,7 +35,7 @@ export default function HttpVariables(props: { projectId: string; projectName: s
   const [busy, setBusy] = createSignal<string | null>(null)
   const [stored] = createResource(() => props.projectId, listVariables)
 
-  // One local list, seeded from the server load and thereafter edited in place — each save patches
+  // One local list, seeded from the server load and thereafter edited in place: each save patches
   // its row from the response, so nothing refetches under a cursor. The earlier stored-plus-drafts
   // merge rebuilt every row object on each keystroke and moved an edited row to the end of the list,
   // which tore the input out from under the caret; rows are addressed by position now.
@@ -69,7 +69,7 @@ export default function HttpVariables(props: { projectId: string; projectName: s
   async function remove(index: number) {
     const row = rows()[index]
     if (!row.id) return dropRow(index)
-    // Two clicks rather than a dialog: a plugin frame has no `window.confirm` (confirmDelete.ts).
+    // Two clicks rather than a dialog (docs/http-client.md § Client).
     if (!armedDelete.request(row.id)) return
     try {
       await deleteVariable(props.projectId, row.id)

@@ -1,6 +1,6 @@
 // The request half of the API panel: Params / Body / Headers / Auth / Vars.
 // The mode selectors for Body and Auth sit in the tab strip's right slot rather than inside their
-// panels — Bruno's arrangement, and it keeps the current mode visible from any tab.
+// panels, Bruno's arrangement, and it keeps the current mode visible from any tab.
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { Input, KeyValueEditor, Select, type TabDef, Tabs, Textarea } from '@acorn/plugin-api/ui'
 import { authModes, bodyModes, joinUrl, parseFormBody, splitUrl, type AuthConfig, type BodyMode, type KeyValue } from '../shared/model'
@@ -9,9 +9,10 @@ import type { Draft } from './draft'
 type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'vars'
 
 /**
+/**
  * The shared editor, adapted to this plugin's `KeyValue` shape (`name` where KVRow says `key`).
  *
- * The grid itself moved to client-core's KeyValueEditor, which was lifted from THIS implementation —
+ * The grid itself moved to client-core's KeyValueEditor, which was lifted from this implementation,
  * including the trailing blank row and the `<Index>`-not-`<For>` rule that keeps an input from losing
  * focus on every keystroke.
  */
@@ -28,7 +29,7 @@ function KeyValueTable(props: { rows: KeyValue[]; onChange: (rows: KeyValue[]) =
   )
 }
 
-// Per-request variable overrides are a plain Record, not KeyValue[] — they have no enabled flag and
+// Per-request variable overrides are a plain Record, not KeyValue[]: they have no enabled flag and
 // no kind. Secrets and commands are repo-level, where the server can decrypt and run them.
 function VarsTable(props: { vars: Record<string, string>; onChange: (vars: Record<string, string>) => void }) {
   const rows = createMemo<KeyValue[]>(() => Object.entries(props.vars).map(([name, value]) => ({ name, value, enabled: true })))
@@ -118,7 +119,7 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
 }
 
 // Switching auth mode has to build a whole new config object, since each mode carries different
-// fields. Defaults are empty rather than carried over — a token is not a password.
+// fields. Defaults are empty rather than carried over: a token is not a password.
 const emptyAuth = (mode: AuthConfig['mode']): AuthConfig => {
   switch (mode) {
     case 'basic':

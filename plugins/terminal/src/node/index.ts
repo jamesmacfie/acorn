@@ -9,9 +9,9 @@ import { disposeTerminal, registerTerminalIpc, sendToAgent, sessionControl, term
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
 
 // The four hooks this plugin still cannot resolve for itself. Each one's blocker is stated on
-// TerminalIpcDeps in main/terminal.ts; in short, one closes over the listener origin and the internal
-// signing key (neither exists at init), and three belong to plugins/memory whose capability id is
-// deliberately not in a contract/.
+// TerminalIpcDeps in main/terminal.ts; in short, one closes over the listener origin and the
+// internal signing key (neither exists at init), and three belong to plugins/memory, whose
+// capability id is not in a contract/.
 export type TerminalPluginDeps = Omit<TerminalIpcDeps, 'seedTaskNotes'>
 
 export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
@@ -87,13 +87,14 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // resolve a capability of its own.
       ctx.capabilities.provide(TERMINAL_SESSIONS, sessionControl)
     },
-    // Everything init reached out and touched, in reverse: the engine's idle-watch timer, its session
-    // displays and session map, and the four slots it filled. The SQLite handle is not in the list any
-    // more — the host closes it right after this returns, which is the same point in the drain.
+    // Everything init reached out and touched, in reverse: the engine's idle-watch timer, its
+    // session displays and session map, and the four slots it filled. The SQLite handle is not in
+    // the list any more, since the host closes it right after this returns, at the same point in
+    // the drain.
     //
-    // The slots are cleared explicitly rather than trusting teardown order. disposeWsHub also clears the
-    // hub, and the process is usually about to exit, but "release what init opened" has to hold on its
-    // own or a second boot in one process serves through the first boot's closures.
+    // The slots are cleared explicitly rather than trusting teardown order. disposeWsHub also clears
+    // the hub, and the process is usually about to exit, but "release what init opened" has to hold
+    // on its own or a second boot in one process serves through the first boot's closures.
     dispose: () => {
       disposeTerminal()
       for (const disposable of routeDisposables) disposable.dispose()

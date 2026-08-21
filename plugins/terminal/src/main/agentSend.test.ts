@@ -26,7 +26,7 @@ const fakeSession = (idle: boolean) => {
   return s
 }
 
-// schedule that fires immediately — the settle delay is not what these tests assert.
+// schedule that fires immediately: the settle delay is not what these tests assert.
 const immediate = (fn: () => void) => fn()
 
 describe('AgentSender submit modes', () => {
@@ -76,7 +76,7 @@ describe('AgentSender submit modes', () => {
 describe('live PTY delivery (cat)', () => {
   it('a multi-line send lands as ONE wrapped block in the ring', async () => {
     const { spawn } = await import('node-pty')
-    // raw -echo: cat's stdout is then exactly the bytes we wrote, once — no tty-echo interleaving.
+    // raw -echo: cat's stdout is then exactly the bytes we wrote, once, no tty-echo interleaving.
     const pty = spawn('/bin/sh', ['-c', 'stty raw -echo; cat'], { name: 'xterm-256color', cols: 80, rows: 24, cwd: process.cwd(), env: { PATH: process.env.PATH ?? '', TERM: 'xterm-256color' } })
     let ring = ''
     pty.onData((d) => {

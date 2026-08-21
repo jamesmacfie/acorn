@@ -1,8 +1,8 @@
-// The terminal plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
+// The terminal plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
 // <data-root>/plugins/terminal.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: a pseudo-terminal session is this plugin's data and
-// nothing in core reads it. `task_id` is a plain ID into core's `tasks` — dereferenced through
+// nothing in core reads it. `task_id` is a plain ID into core's `tasks`, dereferenced through
 // CoreServices.tasks, never joined, because a transaction never spans database files.
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
