@@ -127,11 +127,19 @@
    `.shortcut-conflict` above, which recolours the key INPUT. */
 .shortcut-conflict-note.ui-alert { display: inline; margin-top: 0; }
 .shortcut-group { display: contents; }
+/* `.help-list` is the help overlay's own scroll container, where it is the only child and owns the
+   height. Here it is one of many blocks inside the scrolling settings body, and an overflow:auto flex
+   child shrinks to nothing rather than to its content, which clipped every row in half. */
+.shortcut-group .help-list { flex: none; overflow: visible; padding: 0 0 0 var(--space-5); }
 .shortcut-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
 .shortcut-group-disabled .help-list { opacity: 0.62; }
 .shortcut-plugin-state { margin: 0; font-size: var(--fs-xs); }
 .shortcut-claims { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-xs); }
 .shortcut-cleanup { margin-top: var(--space-8); }
+/* The runs toggle sits mid-sentence in a schedule's meta line, so it reads as the faint link the
+   sentence already is — no leading margin, which is what `.shortcut-reset` was giving it. */
+.schedule-runs.ui-btn[data-variant='bare'] { color: var(--text-faint); font-size: inherit; }
+.schedule-runs:hover { text-decoration: underline; }
 
 /* Dev-only style gallery (StyleGallery.tsx): every primitive × variant in one place so a style
    pack can be authored against the whole vocabulary at once. */

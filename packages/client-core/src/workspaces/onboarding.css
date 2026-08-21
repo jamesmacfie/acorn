@@ -29,10 +29,8 @@
    still its own element, which keeps per-row borders, hover and hidden-state styling.
 
    Fixed tracks for the two controls, flexible ones for the text. `auto` tracks size to max-content and
-   are served before any fr, so leaving the select and the action buttons on `auto` is what keeps the
-   text columns elastic. */
-   and are served BEFORE any fr, so leaving the select and the action buttons on `auto` let them eat
-   the row and squeezed the path down to an ellipsis. */
+   are served before any fr, so leaving the select and the action buttons on `auto` let them eat the row
+   and squeezed the path down to an ellipsis. The select gets a fixed width instead. */
 .ws-group {
   display: grid;
   grid-template-columns: auto minmax(140px, 1fr) minmax(80px, 2fr) auto 160px auto;

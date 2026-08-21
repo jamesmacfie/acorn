@@ -207,11 +207,11 @@ export default function SchedulesSettings() {
 
       {/* Only rendered when there is something to offer. An empty picker is a create button that
           always fails, and saying "nothing here can be scheduled" is the more useful sentence. */}
+      <h3 class="settings-heading">New schedule</h3>
       <Show
         when={targets.isSuccess && options().length > 0}
         fallback={<Show when={targets.isSuccess}><p class="muted">Nothing installed on this node offers an action you can put on a schedule.</p></Show>}
       >
-        <h3 class="settings-heading">New schedule</h3>
         <label class="settings-field">
           <span>Action</span>
           <Select value={chosen()} onChange={(event) => setChosen(event.currentTarget.value)}>
@@ -292,7 +292,7 @@ export default function SchedulesSettings() {
                   {row.name}{' '}
                   <Badge size="xs" tone={OWNER_TONE[row.owner]}>{row.owner === 'plugin' ? row.pluginId : row.owner}</Badge>
                   {/* The consent taken at creation stays visible for the schedule's whole life. */}
-                  <Show when={row.risk}>{(risk) => <Badge size="xs" tone="warn">{risk()}</Badge>}</Show>
+                  <Show when={row.risk}>{(risk) => <> <Badge size="xs" tone="warn">{risk()}</Badge></>}</Show>
                 </span>
                 <span class="muted">
                   {describeCadence(row.cadence)}
@@ -301,7 +301,7 @@ export default function SchedulesSettings() {
                   {row.enabled ? `next ${formatWhen(row.nextRunAt, now)}` : 'paused'}
                   <Show when={row.lastRunAt}>{(last) => <> · last run {formatRelativeTime(last(), now)}</>}</Show>
                   {' · '}
-                  <Button variant="bare" class="shortcut-reset" onClick={() => setExpanded(expanded() === row.key ? null : row.key)}>
+                  <Button variant="bare" class="schedule-runs" onClick={() => setExpanded(expanded() === row.key ? null : row.key)}>
                     {expanded() === row.key ? 'hide runs' : 'runs'}
                   </Button>
                 </span>
