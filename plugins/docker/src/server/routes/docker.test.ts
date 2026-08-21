@@ -27,7 +27,7 @@ const as = (principal: unknown) => {
   return app.route('/api/docker', docker)
 }
 const authed = () => as({ kind: 'device', userId: 'james' })
-// A child an agent spawned inside t1 — an agent session's own ACORN_API_TOKEN.
+// A child an agent spawned inside t1: an agent session's own ACORN_API_TOKEN.
 const asTask1 = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
 
 const summary = {
@@ -133,9 +133,10 @@ describe('docker routes', () => {
 describe('the docker daemon surface is device-only', () => {
   afterEach(() => setDockerBridge(null))
 
-  // Walks the router's OWN route table rather than a hand-written list of paths, so a daemon-wide route added
-  // later without a `use(..., requireDevice)` line fails here instead of shipping ungated. This is the
-  // counterweight to gating per subtree: the enumeration is checked, not trusted.
+  // Walks the router's own route table rather than a hand-written list of paths, so a daemon-wide
+  // route added later without a `use(..., requireDevice)` line fails here instead of shipping
+  // ungated. This is the counterweight to gating per subtree: the enumeration is checked, not
+  // trusted.
   const daemonRoutes = docker.routes
     .filter((r) => r.method !== 'ALL' && !r.path.startsWith('/tasks/'))
     .map((r) => ({ method: r.method, path: r.path }))
@@ -159,9 +160,9 @@ describe('the docker daemon surface is device-only', () => {
     setDockerBridge(spy)
     const app = asTask1()
     for (const { method, path } of daemonRoutes) {
-      // A concrete ref, and a body that would VALIDATE — so a 400 cannot be mistaken for the gate. The gate
-      // runs before body parsing, which is the ordering that matters: it must not have to read the request to
-      // refuse it.
+      // A concrete ref, and a body that would validate, so a 400 cannot be mistaken for the gate.
+      // The gate runs before body parsing, which is the ordering that matters: it must not have to
+      // read the request to refuse it.
       const url = `/api/docker${path.replace(':ref', 'web-1')}`
       const body = method === 'POST' ? { action: 'stop', kind: 'images', force: true, project: 'runn_x' } : undefined
       expect((await app.fetch(req(url, method, body), {} as Env)).status, `${method} ${path}`).toBe(403)

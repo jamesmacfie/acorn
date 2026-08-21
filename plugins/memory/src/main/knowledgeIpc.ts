@@ -20,12 +20,11 @@ export type KnowledgeDeps = {
 
 export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity'>
 
-// Reads over the derived index, BOUND to this plugin's own database. This is what lets the app-layer
-// agent-tool and context-section wiring keep working: it can no longer hold a handle to the file these
-// rows live in (docs/data-layer.md § Plugin DBs). Every read reconciles from the markdown files first —
-// they are the truth.
+// Reads over the derived index, bound to this plugin's own database (docs/data-layer.md §
+// Plugin databases). Keeps the app-layer agent-tool and context-section wiring working without a
+// handle to the underlying files (docs/notes-and-memory.md § Memory).
 export type MemoryIndex = {
-  // Exposed as well as used internally, because a caller that then reads through some OTHER path (core's
+  // Exposed as well as used internally: a caller that then reads through a different path (core's
   // context assembler) still needs the index fresh.
   reconciled(): Promise<void>
   list(opts: { projectId?: string | null; type?: MemoryType }): Promise<MemoryRow[]>
@@ -37,21 +36,20 @@ export type MemoryIndex = {
 
 export type MemoryKnowledge = MemoryIndex & {
   proposals: MemoryProposalStore
-  // Push the combined launch block (task context + project memory) into a fresh agent session
-  // (docs/notes-and-memory.md). Best-effort — a session must never fail to launch over it.
+  // Pushes the combined launch block (task context + project memory) into a fresh agent session
+  // (docs/notes-and-memory.md § Context integration). Best-effort: never fails a launch.
   launchInjector(taskId: string, sessionId: string): Promise<void>
   // Memory auto-generation trigger: fired when an agent session for a task exits, with that session's
   // ring tail as the transcript input.
   memoryReviewTrigger(taskId: string, transcriptTail: string): Promise<void>
 }
 
-// The capability id moved to ../contract/knowledge.ts, narrowed to the two methods that are actually
-// driven from outside this plugin. This type stays here because it is the full runtime — including the
-// proposal-store handle, which a contract/ file may not name.
+// The capability id moved to ../contract/knowledge.ts, narrowed to the two methods that are
+// actually driven from outside this plugin. This type stays here because it is the full runtime,
+// including the proposal-store handle, which a contract file may not name.
 
-// The headless profile the memory-review pass runs on: the FIRST installed agent profile with a
-// headless mode (claude-code, then codex) — hardcoding claude-code silently disabled
-// auto-generation for Codex-only users (docs/notes-and-memory.md).
+// The headless profile the memory-review pass runs on (docs/notes-and-memory.md § Lifecycle
+// hooks).
 export function memoryReviewProfile(): ProfileDef | null {
   return (
     listProfileDefs().find((p) => p.kind === 'agent' && profileAvailable(p) && buildHeadlessArgv(p.id, resolveCommand(p), { prompt: '' }) !== null) ?? null
@@ -69,8 +67,9 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
     }
   }
 
-  // Memory (docs/notes-and-memory.md): files are truth; the SQLite index reconciles from every active
-  // worktree + primary checkout + the private home dir before each read (cheap at this scale).
+  // Memory (docs/notes-and-memory.md § Memory): files are truth, and the SQLite index reconciles
+  // from every active worktree, primary checkout, and the private home dir before each read
+  // (cheap at this scale).
   const buildMemorySources = async () => {
     const active = (await core.tasks.active())
       .filter((t) => t.worktreePath && isDir(t.worktreePath))
@@ -82,10 +81,9 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
   const reconciled = async () => reconcileMemories(db, await buildMemorySources())
 
   const launchInjector = async (taskId: string, sessionId: string) => {
-    // Launch injection (docs/notes-and-memory.md): one first-prompt block combining task context
-    // (PR + linked issues + notes, gated by the startup_context_injection pref) and the project-memory
-    // block (MEMORY.md index slice + feedback/convention bodies). Queued 'after-ready' so it lands
-    // as the agent's first prompt once the CLI settles. Best-effort — never blocks a launch.
+    // Launch injection (docs/notes-and-memory.md § Context integration): task context is gated by
+    // the startup_context_injection pref; the memory block is the MEMORY.md index slice plus
+    // feedback/convention bodies. Queued 'after-ready'. Best-effort: never blocks a launch.
     try {
       const t = await core.tasks.load(taskId)
       if (!t) return
@@ -108,14 +106,14 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
 
       if (blocks.length) deps.sendToAgent(sessionId, blocks.join('\n\n'), 'after-ready')
     } catch {
-      // launch injection is best-effort — never blocks a session launch
+      // launch injection is best-effort: it never blocks a session launch
     }
   }
 
-  // Memory auto-generation (docs/notes-and-memory.md): the task-completion trigger. Fired on agent session
-  // end (and best-effort at archive) while the worktree is still alive; proposals flow through the
-  // human gate — nothing lands without an accept. Verification flags ride the proposal's `flags`
-  // field (structural), never folded into the description.
+  // Memory auto-generation (docs/notes-and-memory.md § Lifecycle hooks): the task-completion
+  // trigger, fired on agent session end (and best-effort at archive) while the worktree is still
+  // alive. Verification flags ride the proposal's `flags` field, never folded into the
+  // description.
   const memoryReviewTrigger = async (taskId: string, transcriptTail: string) => {
     try {
       const t = await core.tasks.load(taskId)
@@ -159,7 +157,7 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
       })
       if (out.proposed > 0) deps.notice(taskId, 'gate', `${out.proposed} memory proposal${out.proposed === 1 ? '' : 's'} await review`)
     } catch {
-      // auto-generation is best-effort — never disturbs the task lifecycle
+      // auto-generation is best-effort: it never disturbs the task lifecycle
     }
   }
 
@@ -178,8 +176,8 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
         await reconciled()
         return searchMemories(db, query, { projectId: projectId ?? null, type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
       }),
-    // Manual add (12 P1): project scope writes into the TASK'S WORKTREE (reviewed via its PR — never
-    // the user's primary checkout); private scope into ~/.acorn/memory.
+    // Manual add: project scope writes into the task's worktree, reviewed through its PR and never
+    // the user's primary checkout. Private scope writes into ~/.acorn/memory.
     memoryAdd: (taskId, p) =>
       guard(async () => {
         const type: MemoryType = MEMORY_TYPES.includes(p.type as MemoryType) ? (p.type as MemoryType) : 'reference'
@@ -198,7 +196,7 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
             const { stdout } = await gitOrThrow(['rev-parse', 'HEAD'], { cwd: t.worktreePath, timeoutMs: 5_000 })
             commitSha = stdout.trim()
           } catch {
-            // no commit yet — fine
+            // no commit yet; continue without one
           }
         }
         const res = await writeMemoryFile(dir, {
@@ -229,11 +227,10 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
     },
     // --- notes ---
     //
-    // Delegated to plugins/notes' `notes.store` capability, resolved per call. These routes stay in THIS
-    // plugin's namespace (/v2/p/memory/tasks/:id/notes) even though the data is notes'. Moving them to
-    // /v2/p/notes/* would be the tidier mount, but it is a change to the wire surface — api.ts's route
-    // builders, the notes client, the mount table — and this batch's job was the storage ownership, not
-    // the URL. Recorded as an outstanding item rather than half-done.
+    // Delegated to plugins/notes' `notes.store` capability, resolved per call (docs/notes-and-memory.md
+    // § Notes: this is the one-release compatibility alias for older clients). Moving the mount to
+    // /v2/p/notes/* remains outstanding: it needs route builder, client, and mount-table changes
+    // this batch didn't make.
     notesList: (location) => guard(() => deps.notes().list(location)),
     notesRead: (location, slug) => guard(() => deps.notes().read(location, slug)),
     notesCreate: (location, title, kind) => guard(() => deps.notes().create(location, title, { kind: kind as NoteKind | undefined })),
@@ -259,8 +256,8 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
       }),
   }
 
-  // Published as `memory.knowledge`. The four index reads are bound to THIS plugin's database, which
-  // is what lets the agent-tool and context-section wiring keep working without a handle to it.
+  // Published as `memory.knowledge`. See the MemoryIndex comment above for why these reads bind
+  // to this plugin's own database.
   return {
     route,
     proposals,

@@ -1,5 +1,6 @@
 // Shared container detail panel (docs/ui-design.md): Info + live Logs + live Stats tabs, used by
-// the browse right pane and the task pane — one component, two hosts (the RollbarItemPanel split).
+// the browse right pane and the task pane. One component, two hosts, the same split as
+// RollbarItemPanel.
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import { requestTerminalFocusIntent, toast, writeJson } from '@acorn/plugin-api/client'
 import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/routes.ts'
@@ -13,7 +14,7 @@ import { containerTone, dockerDetailState, rememberDockerDetailState, type Docke
 import DockerExecTerminal from './DockerExecTerminal'
 import { Alert, Button, Checkbox, Chip, DescriptionList, EmptyState, FindBar, Meter, StatusDot, Tabs, createArmedConfirm } from '@acorn/plugin-api/ui'
 
-// Try bash, fall back to sh — works across alpine/debian-ish images.
+  // Try bash, fall back to sh. Works across alpine/debian-ish images.
 const execCommand = (ref: string): string => `docker exec -it ${ref} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`
 
 const portLabel = (p: DockerPort): string =>
@@ -50,7 +51,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
     rememberView()
   }
 
-  // Chip switches change props.target without remounting — restore the new container's view state.
+  // Chip switches change props.target without remounting. Restore the new container's view state.
   createEffect(on(() => props.target, (target) => {
     const saved = dockerDetailState(props.taskId, target)
     setTab(saved?.tab ?? 'info')
@@ -163,8 +164,8 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   }
 
   // Exec into the container. With a task in scope, open it as a session in the task's terminal
-  // drawer (plain HTTP + the core focus intent — no terminal-plugin import). Without one, copy the
-  // command for any terminal.
+  // drawer (plain HTTP plus the core focus intent, no terminal-plugin import). Without one, copy
+  // the command for any terminal.
   async function openExec(name: string) {
     if (!props.taskId) {
       void navigator.clipboard.writeText(execCommand(name))

@@ -1,11 +1,11 @@
 // What docker has to say when the owner archives a task, and the cleanup it offers to do.
 //
-// NODE-SIDE. This was a client-side `registerWillHandler` closure reading the polled summary store,
-// which had three problems the move fixes: a loaded plugin could never register one, the registration
-// went around `ctx` so the host held no disposable for it and it accumulated a copy on every
-// re-activation (the dialog drew the row twice), and the teardown fired from the client alongside the
-// archive request rather than as a step inside it. Here the answer comes from the daemon at the moment
-// it is asked, and `compose down` runs at a known point in the archive.
+// Runs node-side. This was a client-side `registerWillHandler` closure reading the polled summary
+// store, which had three problems the move fixes: a loaded plugin could never register one, the
+// registration went around `ctx` so the host held no disposable for it and it accumulated a copy
+// on every re-activation (the dialog drew the row twice), and the teardown fired from the client
+// alongside the archive request rather than as a step inside it. Here the answer comes from the
+// daemon at the moment it is asked, and `compose down` runs at a known point in the archive.
 import type { TaskConcern, TaskRef } from '@acorn/plugin-api/node'
 import type { DockerBridge } from '../server/routes/docker'
 

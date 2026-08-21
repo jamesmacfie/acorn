@@ -95,7 +95,7 @@ export async function scanMemoryDir(source: MemorySource): Promise<ScannedMemory
   return out
 }
 
-// MEMORY.md: one line per memory — the index injected at agent launch (12 P2).
+// MEMORY.md: one line per memory, the index injected at agent launch.
 export const renderMemoryIndex = (entries: Pick<MemoryFile, 'name' | 'description'>[]): string =>
   entries.length
     ? entries
@@ -121,9 +121,9 @@ export async function regenerateIndexFile(dir: string): Promise<void> {
   await atomicWrite(join(dir, 'MEMORY.md'), renderMemoryIndex(all))
 }
 
-// Write a memory file into a dir (the task worktree for project scope, or the project folder for a
-// branchless/plain-folder task — never a different project's primary checkout;
-// checkout — or ~/.acorn/memory for private) and regenerate that dir's MEMORY.md.
+// Writes a memory file into a dir: the task worktree for project scope, the project folder for a
+// branchless/plain-folder task, or ~/.acorn/memory for private. Never a different project's
+// primary checkout. Regenerates that dir's MEMORY.md afterward.
 export async function writeMemoryFile(dir: string, mem: MemoryFile): Promise<{ path: string }> {
   if (!isValidMemoryName(mem.name)) throw new Error('Invalid memory name.')
   mkdirSync(dir, { recursive: true })
@@ -176,9 +176,7 @@ export type MemoryRow = typeof memories.$inferSelect
 
 export type MemoryHit = MemoryRow & { rank: number }
 
-// Recall bookkeeping (docs/notes-and-memory.md): a memory that was actually READ (search hit /
-// memory_get) bumps lastAccessedAt + accessCount — the inputs for future decay/ranking. Listing
-// the index does NOT count as a read. Stats survive reconciles by content-hash id.
+// Recall bookkeeping (docs/notes-and-memory.md § Memory).
 async function touchMemories(db: PluginDatabase, ids: string[]): Promise<void> {
   if (!ids.length) return
   await db
@@ -228,16 +226,16 @@ export async function listMemories(db: PluginDatabase, opts: { projectId?: strin
   return rows.filter((r) => (opts.projectId ? r.projectId === opts.projectId || r.scope === 'private' : true)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
-// The always-safe injection slice (12 P2): the index lines + project-scoped feedback/convention names.
+// The always-safe injection slice: the index lines plus project-scoped feedback/convention names.
 export async function memoryIndexSlice(db: PluginDatabase, projectId: string, cap = 30): Promise<{ name: string; description: string }[]> {
   const rows = await listMemories(db, { projectId })
   return rows.slice(0, cap).map((r) => ({ name: r.name, description: r.description }))
 }
 
-// Launch injection block (docs/notes-and-memory.md, the push half): the MEMORY.md index slice (cheap,
-// always-safe) plus the project-scoped feedback/convention BODIES (the rules an agent must never
-// miss). Caps keep it compact — injection is recall for the high-value slice; MCP search is
-// recall for the long tail.
+// Launch injection block, the push half (docs/notes-and-memory.md § Context integration): the
+// MEMORY.md index slice plus the project-scoped feedback/convention bodies, the rules an agent
+// must never miss. Caps keep it compact: injection covers the high-value slice, MCP search covers
+// the long tail.
 export function formatMemoryInjection(
   slice: { name: string; description: string }[],
   keyMemories: { name: string; type: string; body: string }[],

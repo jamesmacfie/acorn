@@ -4,10 +4,7 @@ import type { Context } from 'hono'
 import type { NoteLocation } from '@acorn/protocol/notes.ts'
 import { type AppEnv, isTaskConfined, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
-// Memory's route surface plus a one-release compatibility alias for the notes routes. The notes
-// plugin owns the current `/v2/p/notes/*` namespace; these `/v2/p/memory/*/notes` paths remain only
-// for clients and agent prompts that may have retained the old URL. Both surfaces use the same
-// NotesStore capability, so the alias cannot create a second source of truth.
+// Memory's route surface plus the notes compatibility alias (docs/notes-and-memory.md § Notes).
 
 export type KnowledgeBridge = {
   memoryList(projectId?: string): Promise<unknown>
@@ -39,14 +36,14 @@ const titleBody = z.object({ title: z.string().trim().min(1) })
 const workspaceLocation = (id: string): NoteLocation => (id === 'global' ? { scope: 'global' } : { scope: 'workspace', workspaceId: id })
 const taskLocation = (id: string): NoteLocation => ({ scope: 'task', taskId: id })
 
-// Pin the proposal list to a confined caller's own task, the way plugins/agents' `confineFilter` pins
-// its session roster. `GET /memory/proposals` with no `?task=` returns EVERY pending proposal on the
-// node with bodies included, and with a `?task=` it honoured whatever was asked for — so an agent could
-// read the pending memory writes of every other task by asking nicely.
+// Pin the proposal list to a confined caller's own task, the way plugins/agents' `confineFilter`
+// pins its session roster. `GET /memory/proposals` with no `?task=` used to return every pending
+// proposal on the node with bodies included, and with a `?task=` it honoured whatever was asked
+// for, so an agent could read the pending memory writes of every other task by asking nicely.
 //
-// null means refuse: the caller named a task that is not its own, or is confined and carries no task at
-// all. Silently rewriting the filter would answer a question nobody asked, which is the same reasoning
-// managed.ts records.
+// null means refuse: the caller named a task that is not its own, or is confined and carries no
+// task at all. Silently rewriting the filter would answer a question nobody asked, which is the
+// same reasoning managed.ts records.
 const confineTaskQuery = (c: Context<AppEnv>): { taskId?: string } | null => {
   const asked = c.req.query('task') ?? undefined
   if (!isTaskConfined(c)) return { taskId: asked }

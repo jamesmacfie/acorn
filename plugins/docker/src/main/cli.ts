@@ -1,26 +1,25 @@
 // The one seam to the docker CLI: execFile with arg arrays (no shell), timeouts, and a typed
-// failure taxonomy. Talking to the CLI (not the socket) keeps this working identically across
-// Docker Desktop / OrbStack / colima — whatever `docker context` points at.
+// failure taxonomy. Talking to the CLI, not the socket, keeps this working identically across
+// Docker Desktop, OrbStack, and colima, whatever `docker context` points at.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { brokerEnv } from '@acorn/plugin-api/node'
 
 const exec = promisify(execFile)
 
-// The env the docker CLI sees. This was a DENYLIST of six known secret names, whose "keep in sync"
-// comment pointed at plugins/terminal/main/executionService.ts — a file that no longer exists. A
-// denylist leaks every binding nobody remembered to add to it, so it is now the broker's allowlist
-// (CoreServices.proc) plus the DOCKER_*/COMPOSE_* configuration the CLI genuinely needs to find the
-// daemon: DOCKER_HOST and DOCKER_CONTEXT are how OrbStack/colima/Desktop differ.
+// The env the docker CLI sees (docs/security.md § Process, path, and configuration controls, the
+// denylist-to-allowlist history). DOCKER_HOST and DOCKER_CONTEXT are how OrbStack, colima and
+// Docker Desktop differ, so they ride the DOCKER_*/COMPOSE_* passthrough below.
 export function dockerEnv(): NodeJS.ProcessEnv {
   return brokerEnv({
     passthrough: [
       'DOCKER_*',
       'COMPOSE_*',
       'XDG_CONFIG_HOME',
-      // A denylist kept these by accident; an allowlist has to name them. Without the proxy vars
-      // `docker pull` fails behind a corporate proxy, and without the cloud ones the ECR/GCR credential
-      // helpers cannot authenticate — both are configuration the CLI needs, not acorn's secrets.
+      // A denylist kept these by accident; an allowlist has to name them. Without the proxy vars,
+      // `docker pull` fails behind a corporate proxy, and without the cloud ones, the ECR/GCR
+      // credential helpers cannot authenticate. Both are configuration the CLI needs, not acorn's
+      // secrets.
       'HTTP_PROXY',
       'HTTPS_PROXY',
       'NO_PROXY',

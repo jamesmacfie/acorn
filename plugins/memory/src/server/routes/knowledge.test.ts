@@ -25,7 +25,7 @@ const as = (principal: unknown) => {
   return app.route('/api', knowledge)
 }
 const authed = () => as({ kind: 'device', userId: 'james' })
-// A child an agent spawned inside task1 — an agent session's own ACORN_API_TOKEN.
+// A child an agent spawned inside task1: an agent session's own ACORN_API_TOKEN.
 const asTask1 = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
 // The node calling its own HTTP surface over loopback.
 const asService = () => as({ kind: 'internal', userId: 'james', scope: 'service' })
@@ -124,8 +124,9 @@ describe('memory proposals are device-gated and task-confined', () => {
       notesRemove: async (l) => (calls.push(`rm:${l.scope}`), { ok: true }),
     }))
     const app = asTask1()
-    // Both mount shapes: the bare collection path and the deeper ones. Hono's trailing `/*` matches zero
-    // segments, so one `.use` covers both — pinned here so an upgrade cannot unmount half the gate.
+    // Both mount shapes: the bare collection path and the deeper ones. Hono's trailing `/*`
+    // matches zero segments, so one `.use` covers both, pinned here so an upgrade cannot unmount
+    // half the gate.
     const probes: Array<[string, string, unknown?]> = [
       ['/api/workspaces/global/notes', 'GET'],
       ['/api/workspaces/ws1/notes', 'GET'],
@@ -141,8 +142,8 @@ describe('memory proposals are device-gated and task-confined', () => {
     }
     expect(calls).toEqual([])
 
-    // The agent's own task notes are untouched — this is a confinement, not a shutdown — and the human
-    // pane still reaches the workspace subtree.
+    // The agent's own task notes are untouched, a confinement rather than a shutdown, and the
+    // human pane still reaches the workspace subtree.
     expect((await app.fetch(req('/api/tasks/task1/notes'), {} as Env)).status).toBe(200)
     expect((await authed().fetch(req('/api/workspaces/global/notes/hi/included', 'POST', { included: true }), {} as Env)).status).toBe(200)
     expect(calls).toEqual(['list:task', 'included:global:true'])

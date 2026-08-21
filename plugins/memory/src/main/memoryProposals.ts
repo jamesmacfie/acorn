@@ -1,7 +1,6 @@
-// Memory proposals (docs/notes-and-memory.md, docs/mcp.md): agent memory_write NEVER lands silently — it files a
-// proposal here, and the human gate (accept/edit/reject, 6.6) is the only path that writes a
-// memory .md. Proposals are JSON files under <dataDir>/memory-proposals/ — visible, greppable,
-// crash-safe, no schema.
+// Memory proposals (docs/notes-and-memory.md § Memory): agent memory_write never lands silently.
+// The human gate is the only path that writes a memory .md. Proposals are JSON files under
+// <dataDir>/memory-proposals/, visible, greppable, crash-safe, no schema.
 import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
@@ -17,9 +16,10 @@ export type MemoryProposal = {
   type: MemoryType
   description: string
   body: string
-  // Verification FLAGS from the auto-generation pass (memoryGen verifyCandidates) — e.g. a
-  // contradiction with an existing memory. Carried structurally (never folded into description,
-  // which would leak into the memory file on accept) so the gate UI can render them separately.
+  // Verification flags from the auto-generation pass (memoryGen verifyCandidates), for example a
+  // contradiction with an existing memory. Carried structurally, never folded into the
+  // description (which would leak into the memory file on accept), so the gate UI can render them
+  // separately.
   flags: string[]
   originSessionId: string | null
   status: 'pending' | 'accepted' | 'rejected'
@@ -31,8 +31,8 @@ const memoryProposalSchema = z
     id: z.string().min(1),
     taskId: z.string().min(1),
     projectId: z.string().nullable().optional(),
-    // Pre-Phase-4 proposals used a repo pair string. It remains readable but is deliberately
-    // discarded instead of being guessed into a project id.
+    // Older proposals used a repo pair string. It remains readable but is discarded instead of
+    // being guessed into a project id.
     repo: z.string().nullable().optional(),
     name: z.string(),
     type: z.enum(MEMORY_TYPES),
@@ -101,7 +101,7 @@ export class MemoryProposalStore {
     }
   }
 
-  // The gate's verdict (6.6 calls this after accept-writes-the-file or on reject).
+  // The gate's verdict: called after accept writes the file, or on reject.
   async resolve(id: string, status: 'accepted' | 'rejected', edited?: Pick<MemoryProposal, 'name' | 'description' | 'body' | 'type'>): Promise<MemoryProposal | null> {
     const p = await this.get(id)
     if (!p) return null

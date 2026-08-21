@@ -1,6 +1,6 @@
 // The stateful docker runtime: an in-memory list cache invalidated by a long-lived `docker events`
 // watcher, which also pushes a debounced `docker:changed` frame over the WS hub so every window
-// refreshes without polling the daemon. Pure Node (child processes only) — constructed lazily on
+// refreshes without polling the daemon. Pure Node, child processes only, constructed lazily on
 // first use, so it works under both the Electron root and dev:node; bootstrap disposes it on quit.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
@@ -64,7 +64,7 @@ class DockerService {
     return this.cachedList('networks', async () => parseNetworksOutput(await docker(['network', 'ls', '--format', '{{json .}}'])))
   }
 
-  // Mutations bypass the cache and dirty it immediately — the events watcher confirms shortly after,
+  // Mutations bypass the cache and dirty it immediately. The events watcher confirms shortly after,
   // but an eager invalidate keeps the UI honest if events lag.
   invalidate(scope: DockerScope): void {
     this.lists.delete(scope)
@@ -97,7 +97,7 @@ class DockerService {
     this.events = child
     let buffer = ''
     child.stdout.on('data', (chunk: Buffer) => {
-      // A steady stream of events means the watcher is healthy — reset the restart backoff.
+      // A steady stream of events means the watcher is healthy, so reset the restart backoff.
       this.eventsBackoffMs = 1_000
       buffer += chunk.toString('utf8')
       const lines = buffer.split('\n')
@@ -152,7 +152,7 @@ class DockerService {
     const child = spawn('docker', args, { env: dockerEnv() })
     this.streams.add(child)
     let stopped = false
-    // Logs keep raw chunk text (no line framing needed downstream); stats are parsed per line, so
+    // Logs keep raw chunk text, no line framing needed downstream. Stats are parsed per line, so
     // buffer to line boundaries there. Both stdio streams are log content for `docker logs`.
     let buffer = ''
     const emit = (chunk: Buffer) => {
