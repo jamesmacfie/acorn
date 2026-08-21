@@ -7,11 +7,13 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 
 // The exit criteria for docs/plugins.md, as assertions.
 //
-// The plugin here has NO CLIENT BUNDLE AT ALL — that is the whole point of the phase. Every pixel is
+// The exit criteria for docs/plugins.md, as assertions.
+//
+// The plugin here has no client bundle at all, which is the whole point of the phase. Every pixel is
 // drawn by the host from the manifest's descriptors, and every number in it comes from the plugin's
-// node half over its own routes. Which also means there is no trust prompt to click past: descriptors
-// execute nothing, so there are no bytes for this device to acknowledge, and the rail icon has to be
-// there without one.
+// node half over its own routes. There is no trust prompt to click past either: descriptors execute
+// nothing, so there are no bytes for this device to acknowledge, and the rail icon has to be there
+// without one.
 //
 // Local node rather than a paired one, for the same reason pluginFrame.spec.ts gives: distribution is
 // phase 2's test, and pairing would add ninety seconds to every assertion here.
@@ -195,10 +197,11 @@ async function launch(): Promise<Running> {
 }
 
 const dismissOnboarding = async (page: Page): Promise<void> => {
-  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
-  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
-  // its own button can no longer land. So record the preference on the node, which survives the
-  // reloads these specs do, and close the wizard directly if it has already painted.
+  // These fixtures are first-run nodes with zero projects, so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it, a click on
+  // its own button can no longer land. Recording the preference on the node settles it, since it
+  // survives the reloads these specs do; closing the wizard directly here only helps when it has
+  // already painted.
   await page.evaluate(async () => {
     const bridge = (window as BridgeWindow).acorn
     if (!bridge) return
@@ -214,8 +217,8 @@ const dismissOnboarding = async (page: Page): Promise<void> => {
     })
   })
   // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
-  // it this click cannot land. The preference above is what actually settles it — this is only here to
-  // close a wizard that is already reachable.
+  // it, this click cannot land. The preference above is what actually settles it; this click only
+  // closes a wizard that is already reachable.
   const skip = page.getByRole('button', { name: 'skip for now' })
   if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
@@ -254,7 +257,7 @@ test('a plugin with no client bundle contributes native chrome', async () => {
   await settleOverlays(page)
 
   // No trust dialog: there are no bytes to acknowledge, so the chrome is simply there. Asserting its
-  // ABSENCE is the phase-4 half of "trust binds to bytes" — chrome is data, and data is not code.
+  // absence is the phase-4 half of "trust binds to bytes": chrome is data, and data is not code.
   await expect(page.locator('.plugin-trust-dialog')).toHaveCount(0)
 
   // The host-adapted binding is an ordinary Settings row, grouped under the plugin and scoped to
@@ -282,8 +285,8 @@ test('a plugin with no client bundle contributes native chrome', async () => {
   // ── Freshness: the node mutates and pings, the client re-reads ─────────────────────────────────
   //
   // Asserted on the rail badge rather than on the task-footer one, which is otherwise the phase doc's
-  // example. The footer only renders its slots for a task that HAS a worktree, and a worktree is
-  // created lazily by whatever first needs a cwd — so the badge would be testing the shell's worktree
+  // example. The footer only renders its slots for a task that has a worktree, and a worktree is
+  // created lazily by whatever first needs a cwd, so the badge would be testing the shell's worktree
   // lifecycle, not this. Both surfaces read through the same query and the same revision signal
   // (client-core/plugins/chrome/data.ts), and the slot registration itself is unit-covered.
   const badge = rows.first().locator('.ui-badge')
@@ -303,7 +306,7 @@ test('a plugin with no client bundle contributes native chrome', async () => {
   const row = page.locator('.palette-row', { hasText: 'Board: bump the count' })
   await expect(row).toHaveCount(1, { timeout: 15_000 })
   await row.click()
-  // `runNodeAction` POSTed to the plugin's own route, which mutated and pinged — so the rail moves
+  // `runNodeAction` POSTed to the plugin's own route, which mutated and pinged, so the rail moves
   // again, this time driven end to end by chrome the manifest declared.
   await expect(badge).toHaveText('3 stuck', { timeout: 30_000 })
 

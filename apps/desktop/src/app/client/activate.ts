@@ -27,43 +27,42 @@ for (const contribution of shellSlotContributions) uiSlotRegistry.register(contr
 // Core's home is the stable default; Fleet is hidden by its own `when` until a second node is paired.
 for (const source of coreSourceContributions) sourceRegistry.register(source)
 // Core's own persisted state: the shell slices (selection, layouts, drawer height, notices) plus the
-// direct preference slices. Which FEATURES persist state is each plugin's own declaration now, through
-// ctx.persistedState — the app no longer holds a list of four plugin slices it does not own.
+// direct preference slices. Which features persist state is each plugin's own declaration now,
+// through ctx.persistedState. The app no longer holds a list of four plugin slices it does not own.
 for (const slice of [...coreStateSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
 pollerRegistry.register(taskStatusPollerContribution)
 // Core's own pane: a dashboard placement beside a task. Registered here rather than by a plugin
-// because the composition layer is host-owned — a plugin that shipped it would own a surface whose
-// contents belong to the user (docs/future/dashboards/refused.md § No per-plugin "dashboard"
-// contribution kind).
+// because the composition layer is host-owned (docs/dashboards.md § What is deliberately not here).
 paneRegistry.register(dashboardPaneContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)
 activateScopedStateEviction()
-// Bytes an older release left in localStorage, some of them credential-bearing. Before anything renders,
-// and in the SHELL rather than in the plugin that wrote them — a loaded plugin's frame has its own
-// storage area and could not reach these (persistence/legacyStorage.ts).
+// Bytes an older release left in localStorage, some of them credential-bearing. This runs before
+// anything renders, and in the shell rather than in the plugin that wrote them: a loaded plugin's
+// frame has its own storage area and could not reach these (persistence/legacyStorage.ts).
 const swept = purgeRetiredLocalStorage()
 if (swept.length) console.log(`[client:boot] removed ${swept.length} retired local key(s)`)
 
-// The first activation runs with nothing disabled, and that is not a placeholder any more: the list
-// belongs to a NODE, and at module-evaluation time no node has answered yet. `applyNodePlugins` below is
-// called once before the first render and again on every node switch.
+// The first activation runs with nothing disabled, and that is not a placeholder: the list belongs to
+// a node, and at module-evaluation time no node has answered yet. `applyNodePlugins` below is called
+// once before the first render and again on every node switch.
 //
-// Empty-first rather than blocking here is deliberate. A plugin that never registers cannot be brought
-// back by anything short of a second activation, so the worst case of registering everything first is a
-// contribution that disappears a moment later; the worst case of waiting is a shell that will not paint
-// because a node is slow to answer.
+// Registering everything first, rather than blocking here, trades a different failure for a better
+// one. A plugin that never registers cannot be brought back by anything short of a second activation,
+// so the worst case of registering everything first is a contribution that disappears a moment later;
+// the worst case of waiting is a shell that will not paint because a node is slow to answer.
 const activated = initClientPlugins(clientPlugins)
 if (activated.skipped.length) console.log(`[client:boot] plugins disabled: ${activated.skipped.join(', ')}`)
 
-// Re-run the host with whatever the active node reports. This IS the client-side disable: the host takes
-// each plugin's previous contributions back before re-registering, so one call replaces a predicate
-// threaded through nine registry accessors (node/nodePlugins.ts explains the trade at length).
+// Re-run the host with whatever the active node reports. This is the client-side disable: the host
+// takes each plugin's previous contributions back before re-registering, so one call replaces a
+// predicate threaded through nine registry accessors (node/nodePlugins.ts explains the trade at
+// length).
 //
-// `applied` makes it idempotent per node, so App.tsx can call it from a plain mount effect (which fires for
-// the first node too, right after index.tsx already did) without disposing and re-registering every
-// contribution a second time mid-paint.
+// `applied` makes it idempotent per node, so App.tsx can call it from a plain mount effect (which
+// fires for the first node too, right after index.tsx already did) without disposing and
+// re-registering every contribution a second time mid-paint.
 let applied: string | null = null
 
 export async function applyNodePlugins(nodeId?: string): Promise<void> {

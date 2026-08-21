@@ -14,7 +14,7 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 // subframe, and "the request never reaches nodeFetch" is a claim about a code path unit tests can stub
 // away. So this suite drives a real plugin, in a real frame, on a real origin.
 //
-// The plugin is installed on the LOCAL node rather than a paired one. The two-node distribution path is
+// The plugin is installed on the local node rather than a paired one. The two-node distribution path is
 // already the phase-2 test's job (twoNode.spec.ts); what is under test here is what happens once bytes
 // are trusted, and pairing would add ninety seconds and a second process to every assertion.
 
@@ -114,9 +114,9 @@ function installPlugin(dataDir: string, webviewUrl?: string): void {
     version: '1.4.0',
     apiVersion: PLUGIN_API_MAJOR,
     client: './dist/client.js',
-    // `core.projects:write` is declared ON PURPOSE and is the point of two assertions below: a frame that
-    // legitimately holds it must still be refused the project-config writes, because those are shell
-    // commands the node executes.
+    // `core.projects:write` is declared here for two assertions below: a frame that legitimately holds
+    // it must still be refused the project-config writes, because those are shell commands the node
+    // executes.
     permissions: {
       api: ['core.tasks:read', 'core.projects:read', 'core.projects:write'],
       events: ['runtime:task-archived'],
@@ -200,10 +200,11 @@ async function launch(webviewUrl?: string): Promise<Running> {
 }
 
 const dismissOnboarding = async (page: Page): Promise<void> => {
-  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
-  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
-  // its own button can no longer land. So record the preference on the node, which survives the
-  // reloads these specs do, and close the wizard directly if it has already painted.
+  // These fixtures are first-run nodes with zero projects, so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it, a click on
+  // its own button can no longer land. Recording the preference on the node settles it, since it
+  // survives the reloads these specs do; closing the wizard directly here only helps when it has
+  // already painted.
   await page.evaluate(async () => {
     const bridge = (window as BridgeWindow).acorn
     if (!bridge) return
@@ -219,16 +220,16 @@ const dismissOnboarding = async (page: Page): Promise<void> => {
     })
   })
   // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
-  // it this click cannot land. The preference above is what actually settles it — this is only here to
-  // close a wizard that is already reachable.
+  // it, this click cannot land. The preference above is what actually settles it; this click only
+  // closes a wizard that is already reachable.
   const skip = page.getByRole('button', { name: 'skip for now' })
   if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
 
 // Nothing in this suite may click a rail row while a modal backdrop is still up, and after a reload the
-// onboarding wizard can mount a beat later than `.shell` does — so dismissing once races it. Poll instead,
-// and let the count assertion name whichever overlay refused to go. The wizard is a full-screen takeover
-// with its own backdrop class, so both are counted.
+// onboarding wizard can mount a beat later than `.shell` does, so dismissing once races it. Poll
+// instead, and let the count assertion name whichever overlay refused to go. The wizard is a
+// full-screen takeover with its own backdrop class, so both are counted.
 const settleOverlays = async (page: Page): Promise<void> => {
   await expect
     .poll(async () => {
@@ -279,7 +280,7 @@ async function openPluginPane(webviewUrl?: string): Promise<Running & { frame: F
   const iframe = slot.locator('iframe')
   await expect(iframe).toHaveAttribute('src', /^app-plugin:\/\/[0-9a-f]{64}\/index\.html$/)
   // Defence in depth on top of the separate origin: no popups, no top-level navigation, no forms, no
-  // downloads. `allow-same-origin` keeps the hash origin, which is what the served CSP's `'self'` means —
+  // downloads. `allow-same-origin` keeps the hash origin, which is what the served CSP's `'self'` means.
   // PluginFrame.tsx has the full argument for why the pair is safe here.
   await expect(iframe).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
 
@@ -397,12 +398,13 @@ test('a plugin frame can reach nothing on this machine but its own bridge', asyn
   ).toMatch(/^threw:/)
 
   // ── No network at all ──────────────────────────────────────────────────────────────────────────
-  // Not a restricted network — none. `connect-src 'none'` means a malicious bundle cannot exfiltrate
+  // Not a restricted network, none. `connect-src 'none'` means a malicious bundle cannot exfiltrate
   // what it sees even to its own server.
   //
-  // Asserted on the CSP violation reports rather than on whether each call "failed". A hostname that does
-  // not resolve fails for every API here whatever the policy says, so a passing catch-block would prove
-  // only that DNS works — the violation event is the one signal that names the policy as the reason.
+  // Asserted on the CSP violation reports rather than on whether each call "failed". A hostname that
+  // does not resolve fails for every API here whatever the policy says, so a passing catch-block would
+  // prove only that DNS works. The violation event is the one signal that names the policy as the
+  // reason.
   const network = await frame.evaluate(async () => {
     const violations: string[] = []
     document.addEventListener('securitypolicyviolation', (event) => {
@@ -413,7 +415,7 @@ test('a plugin frame can reach nothing on this machine but its own bridge', asyn
       try {
         await attempt()
       } catch {
-        // The refusal shape differs per API — thrown here, an error event there. The violation list is
+        // The refusal shape differs per API: thrown here, an error event there. The violation list is
         // what this measures.
       }
     }
@@ -425,13 +427,13 @@ test('a plugin frame can reach nothing on this machine but its own bridge', asyn
     })
     await swallow(() => new WebSocket('wss://acorn-e2e-blocked.invalid/x'))
     await swallow(() => new EventSource(target))
-    // Its return value is deliberately not asserted on: Chromium answers `true` (queued) and enforces the
-    // policy afterwards, so the violation below is the only honest evidence either way.
+    // Its return value is not asserted on: Chromium answers `true` (queued) and enforces the policy
+    // afterwards, so the violation below is the only honest evidence either way.
     navigator.sendBeacon(target)
     await new Promise((resolve) => setTimeout(resolve, 500))
     return violations
   })
-  // One per attempt — fetch, XHR, WebSocket, EventSource, sendBeacon — and every one names connect-src.
+  // One per attempt: fetch, XHR, WebSocket, EventSource, sendBeacon. Every one names connect-src.
   expect(network.length).toBeGreaterThanOrEqual(5)
   expect([...new Set(network)]).toEqual(['connect-src'])
 
@@ -518,8 +520,10 @@ test('a plugin frame can reach nothing on this machine but its own bridge', asyn
 
   // ── Top-level navigation, last ─────────────────────────────────────────────────────────────────
   // The shell's window may only ever sit on app://acorn, so a plugin bundle can never become the whole
-  // window. Left until the end deliberately: main PREVENTS the navigation rather than completing it, which
-  // leaves this page with a navigation Playwright waits forever to finish, so nothing may follow it.
+  // The shell's window may only ever sit on app://acorn, so a plugin bundle can never become the whole
+  // window. This is left until the end because main prevents the navigation rather than completing it,
+  // which leaves this page with a navigation Playwright waits forever to finish, so nothing may follow
+  // it.
   const before = page.url()
   await page.evaluate(() => {
     window.location.href = 'app-plugin://' + 'a'.repeat(64) + '/index.html'

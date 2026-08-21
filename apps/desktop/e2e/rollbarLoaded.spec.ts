@@ -90,11 +90,10 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page; root: s
   const dist = join(dataDir, 'plugins', 'rollbar', 'dist')
   renameSync(join(dist, 'node.js'), join(dist, 'real-node.js'))
   writeFileSync(join(dist, 'node.js'), NODE_BUNDLE)
-  // Drop the dev-build marker `build:plugin` just wrote. It tells boot reconciliation "this package is a
-  // temporary override, replace it with the bundled copy" (node-core/main/bundledPlugins.ts), which is
-  // right for a developer and fatal here: the replacement would take the stubbed node bundle above with
-  // it and this spec would drive the real api.rollbar.com. Without the marker the package reads as
-  // owner-installed and is preserved, which is exactly what a fixture wants.
+  // Drop the dev-build marker `build:plugin` just wrote (docs/plugins.md § Loaded plugins): without it,
+  // boot reconciliation would treat the package as a stale developer override and replace it with the
+  // bundled copy, taking the stubbed node bundle above with it and sending this spec against the real
+  // api.rollbar.com.
   rmSync(join(dataDir, 'plugins', 'rollbar', '.acorn-dev-build'), { force: true })
 
   const app = await electron.launch({
@@ -116,10 +115,11 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page; root: s
 }
 
 const dismissOnboarding = async (page: Page): Promise<void> => {
-  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
-  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
-  // its own button can no longer land. So record the preference on the node, which survives the
-  // reloads these specs do, and close the wizard directly if it has already painted.
+  // These fixtures are first-run nodes with zero projects, so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it, a click on
+  // its own button can no longer land. Recording the preference on the node settles it, since it
+  // survives the reloads these specs do; closing the wizard directly here only helps when it has
+  // already painted.
   await page.evaluate(async () => {
     const bridge = (window as BridgeWindow).acorn
     if (!bridge) return
@@ -135,8 +135,8 @@ const dismissOnboarding = async (page: Page): Promise<void> => {
     })
   })
   // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
-  // it this click cannot land. The preference above is what actually settles it — this is only here to
-  // close a wizard that is already reachable.
+  // it, this click cannot land. The preference above is what actually settles it; this click only
+  // closes a wizard that is already reachable.
   const skip = page.getByRole('button', { name: 'skip for now' })
   if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
@@ -170,18 +170,19 @@ test('the loaded Rollbar package renders native rows and its real sandbox frame'
   await dismissOnboarding(page)
 
   // No trust prompt at all: rollbar is on the bundled first-party roster, and a development build
-  // acknowledges that roster exactly as a packaged build does (main/bundledPluginTrust.ts). This used to
-  // be a sixty-second loop that answered one dialog per bundled client bundle to reach rollbar's, because
-  // the first prompt queued was not necessarily this spec's. What the dialog SAYS is asserted where it is
-  // still raised — twoNode.spec.ts for a package a node serves, pluginInstall.spec.ts for an install.
+  // acknowledges that roster the same way a packaged build does
+  // (docs/plugins.md § Reloading one plugin without a restart, "Boot trust prompts are gone from
+  // development"). This used to be a sixty-second loop answering one dialog per bundled client bundle
+  // to reach rollbar's, because the first prompt queued was not necessarily this spec's. What the
+  // dialog says is asserted where it is still raised: twoNode.spec.ts for a package a node serves,
+  // pluginInstall.spec.ts for an install.
   //
-  // One unstated dependency, worth knowing before blaming a diff: the auto-grant is keyed by
-  // (pluginId, hash) over the bytes read from `out/bundled-plugins`, and the fixture above installs its
-  // own build into the DATA ROOT. Zero dialogs therefore also requires the two builds of rollbar's client
-  // bundle to be byte-identical. They are, because the builder is deterministic over identical sources —
-  // but anything that puts a timestamp, a build id or an absolute path into that bundle turns this
-  // assertion into a surprise prompt, and the fix would be to build with `--package-root` into the
-  // staging directory instead.
+  // One thing worth knowing before blaming a diff: the auto-grant is keyed by (pluginId, hash) over the
+  // bytes in `out/bundled-plugins`, and the fixture above installs its own build into the data root.
+  // Zero dialogs therefore also requires the two builds of rollbar's client bundle to be byte-identical,
+  // which holds because the builder is deterministic over identical sources. Anything that puts a
+  // timestamp, a build id or an absolute path into that bundle turns this assertion into a surprise
+  // prompt; the fix is to build with `--package-root` into the staging directory instead.
   await expect(page.locator('.plugin-trust-dialog')).toHaveCount(0)
 
   const workspace = await nodeJson<{ id: string }>(page, '/v2/core/workspaces', { method: 'POST', body: { name: 'Rollbar' } })

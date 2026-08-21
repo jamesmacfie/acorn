@@ -284,10 +284,28 @@ Every Node-backed query is rendered with `live`, `refreshing`, `stale`, `offline
 `error` status. Cached reads remain visible when a Node is offline; mutations fail fast and retain
 the user's text as a draft. There is no automatic mutation queue.
 
+A paired Node's own connection has a separate, smaller vocabulary: `NodeConnectionState`
+(`packages/protocol/src/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
+and nothing else. A certificate fingerprint mismatch is not a sixth state: it surfaces as `offline`
+with an `identity_mismatch` error, because it is a reason the Node is unreachable rather than a
+distinct steady state that the UI would need its own row for. `incompatible` is decided from the
+protocol major the probe reports, before pairing completes (docs/api-reference.md § Versioning), so
+a client refuses to pair with an incompatible Node rather than pairing and then discovering it cannot
+talk to it.
+
 Aggregate surfaces fan out requests per Node with bounded timeouts, merge successful results, and
 show partial availability with a Node label. A mutation always targets the Node that owns its
 resource. Node IDs are part of cache and persisted-state scope, so identical IDs on different Nodes
 cannot collide.
+
+The Fleet source and the node switcher exist only once more than one Node is paired
+(`SourceContribution.when`). With a single, bundled local Node the rail never mentions Nodes at all,
+so first-run stays a one-Node product. When a Node stops answering, its card in the Fleet view keeps
+rendering from that Node's own query cache rather than blanking: `createFleetQuery` falls back to
+whatever that Node's `QueryClient` last held, so a Node that answered once and then went quiet reads
+as a stale row, not a failure. The banner that says a Node has never answered is reserved for a Node
+whose cache is empty; conflating the two would let a merely offline Node look unreachable and a
+never-reachable Node look merely stale.
 
 ## Agent execution
 

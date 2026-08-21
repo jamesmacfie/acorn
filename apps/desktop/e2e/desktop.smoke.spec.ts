@@ -93,9 +93,9 @@ function seedQueuedAgent(dataDir: string, taskId: string): QueuedAgentSeed {
 }
 
 // The window holds no credential of its own: every request goes through Electron main's connection
-// broker, which owns the endpoint and the device bearer (docs/architecture-overview.md § How the client
-// talks to nodes). So the suite seeds through the same bridge the renderer's apiClient uses. Raw
-// The page uses the same broker bridge as the renderer, so the test never gives the page a token.
+// broker, which owns the endpoint and the device bearer
+// (docs/architecture-overview.md § Node API and client flow). The suite seeds through that same
+// bridge, the one the renderer's apiClient uses, so the test never gives the page a token of its own.
 type NodeFetchResult = { status: number; body: Uint8Array }
 type PageBridge = {
   nodeFetch(nodeId: string, request: Record<string, unknown>): Promise<NodeFetchResult>
@@ -139,9 +139,9 @@ async function launch(previous?: Pick<RunningApp, 'dataDir' | 'repoDir'>): Promi
   }
   const app = await electron.launch({
     // Per-run Chromium profile. The renderer's origin is now the constant app://acorn, so its
-    // IndexedDB bucket — which holds the persisted TanStack cache — is shared by every launch that
-    // shares a userData dir. Keying the profile to dataDir keeps a relaunch of the same app's cache and
-    // device token isolated from other tests.
+    // IndexedDB bucket, which holds the persisted TanStack cache, is shared by every launch that shares
+    // a userData dir. Keying the profile to dataDir keeps a relaunch of the same app's cache and device
+    // token isolated from other tests.
     args: ['out/main/index.js', `--user-data-dir=${join(dataDir, 'chromium')}`],
     env: {
       ...process.env,
@@ -173,10 +173,11 @@ async function seedTask(page: Page, repoDir: string): Promise<{ id: string }> {
 }
 
 async function dismissOnboarding(page: Page): Promise<void> {
-  // These fixtures are first-run nodes — zero projects — so the wizard legitimately opens over them.
-  // It is not what any of this suite tests, and once a security prompt stacks on top of it a click on
-  // its own button can no longer land. So record the preference on the node, which survives the
-  // reloads these specs do, and close the wizard directly if it has already painted.
+  // These fixtures are first-run nodes with zero projects, so the wizard legitimately opens over them.
+  // It is not what any of this suite tests, and once a security prompt stacks on top of it, a click on
+  // its own button can no longer land. Recording the preference on the node settles it, since it
+  // survives the reloads these specs do; closing the wizard directly here only helps when it has
+  // already painted.
   await page.evaluate(async () => {
     const bridge = (window as BridgeWindow).acorn
     if (!bridge) return
@@ -192,8 +193,8 @@ async function dismissOnboarding(page: Page): Promise<void> {
     })
   })
   // Best-effort: a plugin-trust prompt is modal and paints above the wizard, so until the spec answers
-  // it this click cannot land. The preference above is what actually settles it — this is only here to
-  // close a wizard that is already reachable.
+  // it, this click cannot land. The preference above is what actually settles it; this click only
+  // closes a wizard that is already reachable.
   const skip = page.getByRole('button', { name: 'skip for now' })
   if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 5_000 }).catch(() => {})
 }
@@ -215,9 +216,9 @@ async function createTerminalAndCapture(page: Page, taskId: string, command: str
   const session = await nodeJson<{ id: string }>(page, '/v2/p/terminal/sessions', {
     method: 'POST', body: { taskId, profileId: 'shell', command, title: 'Smoke terminal' },
   })
-  // The socket belongs to main too — the bearer rides the upgrade headers, which a page cannot set —
-  // so attaching is `nodeSend` + `onNodeFrame`, exactly what client-core/wsClient.ts does. That is
-  // also why WS_PATH is no longer needed here: the page never sees the URL.
+  // The socket belongs to main too: the bearer rides the upgrade headers, which a page cannot set, so
+  // attaching is `nodeSend` + `onNodeFrame`, exactly what client-core/wsClient.ts does. That is also
+  // why WS_PATH is no longer needed here, since the page never sees the URL.
   return page.evaluate(async ({ sessionId }) => {
     const bridge = (window as BridgeWindow).acorn
     if (!bridge) throw new Error('The node broker bridge is missing.')
@@ -246,8 +247,8 @@ test.afterEach(async () => {
 
 test('S1 boots the authenticated desktop shell with no console errors', async () => {
   const running = await launch()
-  // A CSP violation is reported as a console error and nothing else — the blocked resource just does
-  // not load. So this is the guard on main/appScheme.ts's policy: any directive tightened past what the
+  // A CSP violation is reported as a console error and nothing else; the blocked resource just does
+  // not load. This is the guard on main/appScheme.ts's policy: any directive tightened past what the
   // shell actually needs shows up here rather than as a subtly missing font, style or worker.
   const errors: string[] = []
   running.page.on('console', (message) => {
@@ -259,9 +260,9 @@ test('S1 boots the authenticated desktop shell with no console errors', async ()
   await expect(running.page.locator('.tabrail-source').first()).toBeVisible()
   const railSources = await running.page.locator('.tabrail-source')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
-  // Home is CORE's source and the default one. GitHub's PR source is gated on a github integration row
-  // (providerId), and this fixture never connects one — so on a GitHub-less install it is simply absent,
-  // which is the whole point of the projects migration.
+  // Home is core's source and the default one. GitHub's PR source is gated on a github integration row
+  // (providerId), and this fixture never connects one, so on a GitHub-less install it is simply absent.
+  // That absence is the whole point of the projects migration.
   expect(railSources).toEqual(['Home', 'Docker', 'API', 'Agents'])
   await running.app.close()
 })
@@ -284,13 +285,13 @@ test('S3 opens a task from the rail', async () => {
   await openSmokeWorkspace(running.page, running.repoDir)
   await running.page.getByRole('button', { name: 'Smoke task', exact: true }).click()
   await expect(running.page.locator('.task-layout')).toBeVisible()
-  // Every pane a LOCAL task can show, in docs/ui-design.md's order (agents 15, changes 20, notes 30, context 40,
-  // editor 50, search 60, database 70, http 76, preview 80), contributed by nine separate plugins'
-  // init. Absent by their own `when` predicate rather than by failing to register: pr (needs a PR
-  // number), docker (needs a linked container), linear and rollbar (need a task link).
+  // Every pane a local task can show, in docs/ui-design.md's order (agents 15, changes 20, notes 30,
+  // context 40, editor 50, search 60, database 70, http 76, preview 80), contributed by nine separate
+  // plugins' init. Absent by their own `when` predicate rather than by failing to register: pr (needs a
+  // PR number), docker (needs a linked container), linear and rollbar (need a task link).
   //
   // The tail of this row is `extraButtons` (run targets, the terminal toggle) followed by the close
-  // button, hence the slice — the assertion is about the switcher, not the whole toolbar.
+  // button, hence the slice. The assertion is about the switcher, not the whole toolbar.
   const paneLabels = await running.page.locator('.pane-switch-btn')
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
   expect(paneLabels.slice(0, 9)).toEqual([
@@ -392,10 +393,10 @@ test('S8 survives a hard reload of a deep route under the app scheme', async () 
   expect(running.page.url()).toBe(`app://acorn/p/${projectId}/pulls/1`)
   // What renders here is core's home surface, not the PR viewer: the GitHub rail source is gated on a
   // github integration row and this fixture never connects one. The deep path still has to survive the
-  // reload as a client route — that is what this test guards, and the URL above is the assertion for it.
+  // reload as a client route: that is what this test guards, and the URL above is the assertion for it.
   await expect(running.page.locator('.tabrail-source').first()).toBeVisible()
   // Read the policy back off the response. S1's console-error assertion catches a policy that is too
-  // tight; only this catches one that is not there at all — the failure mode where every directive
+  // tight; only this catches one that is not there at all, the failure mode where every directive
   // silently permits everything.
   const csp = await running.page.evaluate(async () =>
     (await fetch(location.href)).headers.get('content-security-policy'))
