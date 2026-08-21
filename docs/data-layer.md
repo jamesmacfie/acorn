@@ -30,8 +30,14 @@ exclusive `node.lock`.
   binary serving the root moved on (`docs/api-reference.md § Versioning`). Its schema ignores unknown
   keys precisely so a field can be retired without stranding roots that still have it. A root is
   opened by `openDataRoot`, which creates the identity, takes the lock, and refuses an incompatible
-  root. Database upgrades are applied by the owning migration chain; backups are explicit archives and
-  never mutate their source data.
+  root. Refusing rather than falling back to a fresh identity matters because a root that already has
+  paired devices must not have those pairings silently orphaned by a new random ID. Database upgrades
+  are applied by the owning migration chain; backups are explicit archives and never mutate their
+  source data.
+
+Files written once into the root, the node identity, the session key, and the active-identity file,
+use an atomic write: a temp file, an fsync, then a rename, so a crash mid-write cannot leave a
+truncated file behind.
 
 ## Core database
 
@@ -88,9 +94,54 @@ A plugin declares that it owns tables in one line — `migrationsModule: import.
 `ctx.storage.open()`. It never names the file, the data root, or the chain's directory, and it does not
 close the handle. See § Migrations below.
 
+Every route a table-owning plugin registers is a factory function that closes over the handle
+`ctx.storage.open()` returned, never a module-scope router that reads a handle off the request
+environment. The environment carries no per-plugin database handles, so a request can never reach one
+before that plugin's migrations have run: the handle exists only after `ctx.storage.open()` returns,
+and every router is built from it after that point. It also means two `startServiceRuntime` instances
+in the same process, as in a test, each build their own routers over their own handle instead of one
+inheriting a handle the other has already closed.
+
 Plugin databases have independent migration chains. There are no cross-database foreign keys,
 `ATTACH` queries, or transactions spanning files. A cross-plugin workflow uses IDs, capabilities,
 events, and durable operation state rather than joining tables.
+
+## Database plugin: the Postgres pane
+
+The database plugin's pane connects to a Postgres database per task, for browsing and editing the
+task's dev database. That connection is not part of acorn's own data root: it is the user's own
+database, reached over `pg`, and everything the pane shows is re-derived from it per call rather
+than cached in `plugins/database.sqlite`.
+
+`resolveDbUrl` (`plugins/database/src/main/database.ts`) resolves the connection URL for a task
+without persisting it, trying in order: a committed `.acorn/config.toml [database].url_script`
+(run inside the worktree), then `<worktree>/.env`'s `DATABASE_URL`, then `process.env.DATABASE_URL`.
+A committed `url_script` is executable content from the checkout, so resolving it goes through the
+same repo-config trust gate as other repo-authored run targets (`core/main/repoConfigTrust.ts`):
+cloning a repo, or checking out a PR that adds the script, must not be enough to run it. A
+user-or-database-authored script (`dbUrlFromRepo` false) is the user's own input and is not gated.
+
+Every identifier the pane sends to Postgres (schema, table, and column names) is validated against
+the live introspected schema before it is quoted, because identifiers can't be parameterized the
+way values can. Values are always parameterized. Arbitrary SQL typed into the editor runs verbatim,
+because it is the user's own database and writes are the point.
+
+The introspected catalog behind table and column completions is cached per task and invalidated on
+connect, on disconnect, and after any statement that is not a plain read or write, as a cheap
+approximation for "DDL ran through this pane." A stale completion popup is a small bug, but a
+visible one, and someone running a migration in the editor above the results grid is exactly who
+would hit it.
+
+AI query generation sends the introspected schema, the repo's free-form schema notes
+(`projects.db_schema_notes`), and any saved queries picked as examples to a connected model
+provider. The schema text is capped at 80,000 characters (`SCHEMA_CHAR_CAP`) and the notes/examples
+block at 16,000 (`GENERATE_MAX_CONTEXT_CHARS`), so the two together stay under the model runtime's
+100,000-character system prompt limit.
+
+`plugins/database.sqlite` (see Plugin databases above) holds the project-scoped saved queries and
+the task-scoped scratch document behind the pane's editor. Saved queries outlive any one task
+worktree because they are written against a project's schema rather than a task's checkout; the
+scratch document is task-scoped because it holds whatever the reader is doing right now.
 
 ## External-item read model
 
@@ -176,7 +227,19 @@ Native SQLite access is centralized, and both plugin tiers reach it the same way
 returns a migrated handle whose filename the host bound to the plugin id. Only the source of the chain
 differs — a loaded plugin's manifest names a directory confined to its package, a built-in declares
 `migrationsModule: import.meta.url` on its `NodePlugin` and the host walks from there
-(`packages/node-core/src/main/pluginMigrations.ts` covers all three runtime layouts). The host opens each
+(`packages/node-core/src/main/pluginMigrations.ts` covers all three runtime layouts).
+
+A built-in's chain lives in one of three places depending on how the node was run: a source checkout
+(`plugins/<name>/migrations/`), a built desktop app before packaging
+(`apps/desktop/out/migrations/<name>/`, beside core's own chain at `out/migrations/`), or a packaged app
+(`<resources>/migrations/<name>/`). `pluginMigrationsFolder` resolves this by walking up from the
+plugin's own module URL, never from node-core's, so a plugin can never find node-core's chain by
+proximity and adopt the wrong schema. At each level it checks the plugin-scoped candidate
+(`migrations/<plugin>/`) before the bare `migrations/` directory, because the built and packaged
+layouts place core's chain and a plugin's chain side by side. The walk never crosses the plugin's own
+package root, so a missing chain fails rather than silently adopting an ancestor's DDL. A loaded
+plugin skips the walk entirely: its manifest names the directory, already confined to its package, and
+`pluginMigrationsChain` only validates that a Drizzle chain actually exists there. The host opens each
 file lazily on first use, hands out one handle per boot, and closes it immediately after that plugin's
 `dispose()` — so a plugin's dispose is about the resources the plugin itself owns, and a plugin whose only
 resource was the database needs no dispose at all. Both tiers use `CoreServices` for core-owned
@@ -185,12 +248,31 @@ versions — the update applies at the next boot, against a database that alread
 `apps/node/test/integration/httpLoaded.test.ts`, along with a broken chain failing contained and
 uninstall-without-purge keeping the file.
 
+Drizzle-kit cannot model a virtual table, so a plugin that wants FTS5 search
+(`plugins/agents.sqlite`'s `agent_events_fts`, `plugins/memory.sqlite`'s `memories_fts`) writes the
+`CREATE VIRTUAL TABLE` and its triggers by hand into its migration SQL instead of declaring them in
+the Drizzle schema. The schema file still declares the backing columns the triggers read, so renaming
+one there is a signal to update the migration, but the thing that actually catches a missed rename is
+a schema-drift test that opens the migrated database and checks the virtual table's shape against the
+schema, because the trigger body is plain SQL text with no type checker over it
+(`plugins/agents/src/node/ftsSchema.test.ts` is the pattern to copy).
+
 ## Backup and import
 
 `POST /v2/core/backup` snapshots core and plugin SQLite databases with SQLite's online-backup API;
 `GET` on the same route returns the suggested destination path.
 The archive excludes blobs and worktrees and scrubs credentials, device rows, and other token
 material. Restore is a manual operation into a fresh data root.
+
+The archive holds `core.sqlite` and every `plugins/*.sqlite`: the workspace and task model, repo
+configuration, agent transcripts, notes, memories, and the HTTP client's saved requests. Secrets are
+blanked rather than removed, so an `integrations` row survives with an empty `access_token`: a
+restored node still shows that a connection existed and needs re-entering, and a deleted row would
+have silently lost the workspace links that point at it. Device rows are deleted outright, since a
+device row is itself a credential's public half and a restored node must re-pair rather than show a
+list of machines that no longer have access. Blobs and worktrees are excluded for size, not risk: the
+blob cache is routinely the largest thing in a data root and is refetchable from the provider, and a
+worktree is a git checkout whose restore is `git clone`.
 
 There is no runtime configuration importer, and no upgrade path from a pre-baseline database; a
 backup remains the supported way to preserve a source before an upgrade.

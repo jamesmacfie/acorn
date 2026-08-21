@@ -22,8 +22,24 @@ GitHub list and PR detail policies are defined in `plugins/github/src/server/` a
 to each resource. Repositories and open PR lists use ETags where the provider supplies them. A `304`
 only advances the local freshness timestamp. Explicit `force` requests block for a fresh response.
 
+The sync engine itself (`server/sync/policy.ts`, `engine.ts`) used to hold the staleness TTL for every
+provider resource: GitHub's pulls and repos, Rollbar's items, Linear's issues. Each now sits with the
+plugin whose API it describes, since how fast a provider's data moves is a fact about that provider,
+not about core. What stays in the engine's own policy is the rate-limit backoff: how long a
+rate-limited key waits before another background refresh runs. That one is the engine's, not a
+provider's, because a provider that could set its own backoff could make the node keep hammering an
+API that already said no. `read()` still takes a per-call `backoffMs` override for a provider that
+publishes a `Retry-After`.
+
 Provider item resources have independent freshness markers. A Rollbar item list, item detail, and
 occurrence history can therefore be stale independently.
+
+Linear's rail, its `issues-mine` collection, and its batch reference-resolution route are the
+exception to serve-then-revalidate: they read across every connected workspace with partial results,
+and a bare identifier has not yet been attributed to a connection, so there is no single freshness
+marker to revalidate against. These routes resolve directly against each connection and write what
+they find into the external-item store themselves. Linear's single-resource issue detail route still
+goes through the mirrored resource and gets serve-then-revalidate as normal.
 
 ## Immutable blob cache
 
@@ -46,6 +62,10 @@ The persisted cache is disposable and has a bounded lifetime. It provides fast l
 not mutation confirmation. When a Node is reconnecting or offline, cached responses remain visible
 with freshness badges. A WebSocket reconnect or sequence gap marks affected data stale and triggers
 normal refetching; there is no history cursor or offline mutation queue.
+
+The persisted cache has no version buster. A stale entry from before a response type gained a
+required field survives a relaunch as-is, so a query key must change whenever the shape it caches
+gains a required field; there is no other point at which an old entry gets invalidated.
 
 ## Fan-out cache safety
 
