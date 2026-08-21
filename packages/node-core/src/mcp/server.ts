@@ -1,16 +1,12 @@
-// The acorn MCP server (docs/mcp.md, docs/agent-tools.md): a stdio server that PROJECTS the app's
-// agent-tool registry. It holds no tool definitions of its own — it fetches the manifest
-// (GET /v2/core/tasks/:id/tools) and proxies every call (POST /v2/core/tasks/:id/tools/:name) over the
-// loopback API with the per-run internal bearer (see ./api.ts). One generic proxy replaces the 25
-// hand-written tool bodies; the registry (server/agentTools) is the single source of truth for
-// names, schemas, risk and availability.
+// The acorn MCP server (docs/mcp.md, docs/agent-tools.md § Projections): a stdio server that
+// projects the app's agent-tool registry rather than holding its own tool definitions. One generic
+// proxy replaces 25 hand-written tool bodies; the registry (server/agentTools) stays the single
+// source of truth for names, schemas, risk and availability.
 //
-// Launched by the AGENT (registered user-wide via `claude mcp add …` with the Electron-as-node
-// launcher over ./main.ts), so it scopes itself from inherited env: ACORN_TASK_ID (which task) plus
-// the loopback client's ACORN_DATA_DIR/ACORN_API_TOKEN (the endpoint is resolved from the data root
-// rather than a baked URL — see ./api.ts). Outside a task session, or with acorn not
-// running, tools/list is empty and a call returns a structured 'no-active-task' / 'acorn-not-running'
-// result — never a protocol error (a plain terminal loads this server too).
+// Launched by the agent (registered user-wide via `claude mcp add …` with the Electron-as-node
+// launcher over ./main.ts). Outside a task session, or with acorn not running, tools/list is empty
+// and a call returns a structured 'no-active-task' or 'acorn-not-running' result, never a protocol
+// error, because a plain terminal loads this server too.
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'

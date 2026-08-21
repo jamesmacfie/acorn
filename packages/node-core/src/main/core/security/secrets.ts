@@ -1,21 +1,6 @@
-// Use-scoped secret access (docs/security.md § Secrets: "Plugins get use-scoped access… No
-// getSecret() free-for-all, and credentials never appear in logs, events, error bodies, or client
-// payloads").
-//
-// Before this, `decryptSecret(row.authRef, c.env.SESSION_ENC_KEY)` appeared at six sites across core
-// and three plugins, each handing the plaintext to a caller that then owned it — and each site was a
-// place SESSION_ENC_KEY itself was in scope.
-//
-// The guarantee this actually enforces, and the one worth having: a secret used inside `use()` cannot
-// leak through the FAILURE path. Providers echo credentials back in error bodies (GitHub includes the
-// token in some malformed-header responses), and those bodies get logged, wrapped in an ApiError, and
-// sometimes returned to the client. `use()` scrubs the plaintext out of anything thrown from its own
-// scope, so a provider that echoes gets redacted at the one boundary that sees both.
-//
-// What it deliberately does NOT do: prevent a caller from returning the plaintext out of `use()`.
-// TypeScript cannot express that, and pretending otherwise with a branded wrapper would add ceremony
-// without the property. The containment that matters — an AGENT reaching a credential at all — is
-// closed by internal-token scoping (W7), not by this shape.
+// Use-scoped secret access (docs/security.md § Credential handling). `use()` scrubs the plaintext
+// out of anything thrown from its own scope; it does not stop a caller from returning the plaintext
+// out of `use()`, which internal-token scoping closes instead.
 import { decryptSecret, encryptSecret } from '../../../server/secretBox'
 
 export class SecretUnavailableError extends Error {
@@ -41,14 +26,15 @@ export function redact(text: string, secrets: readonly string[]): string {
   return out
 }
 
-// Mutate rather than re-wrap: callers branch on error CLASS (DockerCliError, BridgeError, ApiError), and
-// replacing the instance with a generic Error would change control flow to fix a string.
+// Mutate rather than re-wrap: callers branch on the error's class (DockerCliError, BridgeError,
+// ApiError), and replacing the instance with a generic Error would change control flow to fix a
+// string.
 //
-// Every write is guarded, because the one function whose job is non-disclosure must not become a leak
-// amplifier. A frozen or sealed Error, or one whose `message` is a getter-only accessor, makes the
-// assignment throw a TypeError — and that TypeError's own message embeds the original error's
-// stringification, i.e. THE SECRET, and it is thrown from inside this catch where no caller can recover
-// it. Confirmed against `Object.freeze(new Error(...))`. When a field cannot be rewritten, the error is
+// Every write is guarded, because the one function whose job is non-disclosure must not become a
+// leak amplifier. A frozen or sealed Error, or one whose `message` is a getter-only accessor, makes
+// the assignment throw a TypeError, and that TypeError's own message embeds the original error's
+// stringification, secret included, thrown from inside this catch where no caller can recover it.
+// Confirmed against `Object.freeze(new Error(...))`. When a field cannot be rewritten, the error is
 // replaced by a redacted plain Error: losing the class is bad, and leaking the credential is worse.
 //
 // `seen` breaks a circular cause chain, which otherwise recursed until RangeError (also confirmed).
@@ -85,8 +71,8 @@ function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = 
 export class SecretService {
   constructor(private readonly hexKey: string) {}
 
-  // `purpose` is what the owner would see in an audit row and what an error names. It is required so
-  // that a read has a stated reason at the call site — the difference between `getSecret(ref)` and
+  // `purpose` is what the owner would see in an audit row and what an error names. It is required
+  // so a read has a stated reason at the call site: the difference between `getSecret(ref)` and
   // "read the github credential to list pull requests".
   async use<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T> {
     const plaintext = ref ? await decryptSecret(ref, this.hexKey) : null
@@ -116,7 +102,7 @@ export class SecretService {
 
   // Escape hatch for the call sites that hand a credential to a long-lived consumer whose lifetime
   // this scope cannot bracket (a pg pool, a driver's child-process env). Named to be greppable, and
-  // every use of it is a place the scrub-on-throw guarantee does NOT apply.
+  // every use of it is a place the scrub-on-throw guarantee does not apply.
   reveal(ref: string, purpose: string): Promise<string> {
     return this.use(ref, purpose, (plaintext) => plaintext)
   }

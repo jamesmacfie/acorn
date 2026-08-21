@@ -15,7 +15,7 @@ import type { CapabilityRegistry } from '../../server/plugin/capabilities'
 export type CoreServices = {
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: typeof fs
-  // The one git seam — GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
+  // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
   git: typeof git
   // Every child process: env allowlist, process-group kill, bounded capture.
   proc: typeof proc
@@ -31,10 +31,10 @@ export type CoreServices = {
   // credential resolution and the provider adapters.
   models: ModelService
   // One (userId, key) row of core's `prefs` table. The server-side half of a preference whose value
-  // the node itself has to read — today only plugins/agents' model-pricing overrides, which the usage
+  // the node itself has to read: today only plugins/agents' model-pricing overrides, which the usage
   // service needs before it can price a token count.
   prefs: PrefService
-  // The machine identity: which owner this node is bound to. Read-only for consumers — the binding
+  // The machine identity: which owner this node is bound to. Read-only for consumers, the binding
   // is minted at boot (ensureBoundIdentity in main/bindings.ts), never by a plugin.
   identity: IdentityService
   // Narrow project identity for plugins: scope resolution, importer writes, and all mapped project

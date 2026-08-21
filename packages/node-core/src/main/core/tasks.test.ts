@@ -4,11 +4,8 @@ import { schema, type AppDatabase } from '../../server/db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { createTaskService } from './tasks'
 
-// `workspaceId` vs `workspaceIdOrNull` — two answers to the same question, and the difference is what a caller
-// does with "no workspace".
-//
-// The nullable form lets context assembly skip the workspace scope when a task's repository has no
-// workspace, while still propagating genuine database failures.
+// `workspaceId` vs `workspaceIdOrNull`: two answers to the same question, and the difference is
+// what a caller does with "no workspace".
 
 const now = Date.now()
 

@@ -47,6 +47,31 @@ desktop integration tree. Route protection must be tested through the real `crea
 not by mounting middleware only in the test. Standalone parity tests ensure `dev:node` wires the same
 pure-Node feature capabilities as the supervised Node.
 
+## Testkit
+
+`@acorn/node-core`'s testkit (`packages/node-core/src/testkit/`) used to be three files sitting under
+`server/routes/`, because that is where a test-only SQLite factory was first needed. None of the three
+were routes, and eleven packages ended up importing test scaffolding through a path that reads like
+production surface. The directory move made the import path say what it is: every
+`@acorn/node-core/testkit/...` import is test scaffolding by construction, and the arch suite fails a
+production file that reaches one (docs/architecture-overview.md § Package boundaries). See
+[plugins.md § What is published, and what acorn promises about it](./plugins.md) for why
+`makeTestNodeContext` and `makeTestRequestContext` build a real host context rather than a mock.
+
+`testEnv()` builds the `c.env` bindings a route test needs. `testSecretEnv()` and
+`TEST_ENCRYPTION_KEY` mint the raw session key and the `SecretService` binding it seals together, as a
+pair, because a test that sets only one of them compiles and then fails at the first credential read;
+every test in the repo uses the same 64-hex key so a test can seal a credential with the same key the
+`Env` it built is using.
+
+`workspacePluginMigrations()` and `makeTestPluginDb()` resolve a workspace plugin's Drizzle migration
+chain from its id, as `<checkout>/plugins/<id>/migrations`. They replaced about twenty call sites that
+spelled out a path the id already implies, and the eight per-plugin `migrations.ts` modules that used
+to do the same job. This only works from a source checkout, so a plugin developed outside this
+checkout passes its migrations folder explicitly. The `plugins/<id>/` segment is spelled out rather
+than found by walking up from the caller, so it can never resolve to core's own migration chain at
+`packages/node-core/migrations`, which a bare ancestor walk would find first.
+
 ## Reliability
 
 The suite launches Git, PTYs, Docker probes, provider fakes, and Node children. A full run is

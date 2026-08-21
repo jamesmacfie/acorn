@@ -15,7 +15,7 @@ const sh = (script: string, overrides: Partial<Parameters<typeof runProcess>[0]>
   runProcess({ file: '/bin/sh', args: ['-c', script], cwd: dir, ...overrides })
 
 // `kill -0` probes without signalling. EPERM means the process exists but is not ours, so only
-// ESRCH ("no such process") counts as dead — treating every failure as dead is how a liveness probe
+// ESRCH ("no such process") counts as dead. Treating every failure as dead is how a liveness probe
 // silently passes.
 const alive = async (pid: string): Promise<boolean> => {
   try {
@@ -27,14 +27,14 @@ const alive = async (pid: string): Promise<boolean> => {
 }
 
 describe('env allowlist', () => {
-  // The four bindings the node holds that a child must never see. Keep the boundary explicit
-  // enumerated exactly these and missed anything added later.
+  // The bindings the node actually holds that a child must never see, listed explicitly rather than
+  // derived, so adding a real one here is a decision.
   const SECRETS = {
     SESSION_ENC_KEY: 'a'.repeat(64),
     INTERNAL_TOKEN: 'internal-secret',
     ACORN_API_TOKEN: 'api-secret',
     GITHUB_CLIENT_SECRET: 'gh-secret',
-    // The point of an allowlist: a binding nobody thought about is absent by DEFAULT.
+    // Proves the allowlist model: a binding nobody thought about is absent by default.
     SOME_FUTURE_CREDENTIAL: 'not-yet-invented',
   }
 
@@ -49,7 +49,7 @@ describe('env allowlist', () => {
   it('never lets a real child observe the node secrets', async () => {
     const result = await sh('env', { env: { PROBE: 'visible' } })
     expect(result.code).toBe(0)
-    // Against the ACTUAL process env, not a fixture — this is the assertion that would have caught
+    // Against the real process env, not a fixture: this is the assertion that would have caught
     // previewUrl passing no env at all.
     const seen = new Set(result.stdout.split('\n').map((line) => line.split('=')[0]))
     for (const key of ['SESSION_ENC_KEY', 'INTERNAL_TOKEN', 'ACORN_API_TOKEN', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']) {
@@ -77,9 +77,9 @@ describe('process-group kill', () => {
   it('reaps a grandchild the direct child left behind', async () => {
     const pidFile = join(dir, 'grandchild.pid')
     // The child backgrounds a long sleeper and waits, so killing only the direct pid would leave the
-    // sleeper running — exactly what held stdio pipes open before.
+    // sleeper running, exactly what held stdio pipes open before.
     //
-    // Aborted once the grandchild has registered itself, NOT after a fixed timeout: a 300ms deadline
+    // Aborted once the grandchild has registered itself, not after a fixed timeout: a 300ms deadline
     // raced the fork under full-suite load and the pid file did not exist yet, which failed this test
     // intermittently for a reason that had nothing to do with process groups.
     const controller = new AbortController()
@@ -153,7 +153,7 @@ describe('bounded capture', () => {
   // distinguish it.
   it('does not corrupt a multi-byte character split across pipe chunk boundaries', async () => {
     // 40 000 box-drawing characters = 120 000 bytes, comfortably more than one 64 KiB pipe read, so a
-    // 3-byte character WILL straddle a boundary. Decoding per chunk produced three U+FFFD here.
+    // 3-byte character will straddle a boundary. Decoding per chunk produced three U+FFFD here.
     const count = 40_000
     const result = await sh(`node -e "process.stdout.write('\u2500'.repeat(${count}))"`, { maxOutputBytes: 1 << 20 })
     expect(result.code).toBe(0)
@@ -163,8 +163,8 @@ describe('bounded capture', () => {
   })
 
   it('never exceeds the byte cap, even mid-character', async () => {
-    // Slicing a decoded STRING to a byte length overshot and left a replacement character at the end;
-    // slicing the byte stream cannot.
+    // Slicing a decoded string to a byte length overshot and left a replacement character at the
+    // end; slicing the byte stream cannot.
     const result = await sh(`node -e "process.stdout.write('\u2500'.repeat(1000))"`, { maxOutputBytes: 20 })
     expect(result.truncated).toBe(true)
     expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(20)

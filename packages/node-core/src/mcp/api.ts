@@ -7,7 +7,7 @@ const DATA_DIR = process.env.ACORN_DATA_DIR ?? ''
 const STATIC_URL = process.env.ACORN_API_URL ?? ''
 const API_TOKEN = process.env.ACORN_API_TOKEN ?? ''
 // The agent session id (provenance): stamped on notes/memory writes server-side. Transport
-// metadata, never a tool arg — sent on every call so the harness can attribute writes.
+// metadata, never a tool arg. Sent on every call so the harness can attribute writes.
 const SESSION_ID = process.env.ACORN_SESSION_ID ?? ''
 const TOOL_CEILING = process.env.ACORN_TOOL_CEILING ?? ''
 
@@ -15,8 +15,9 @@ export type ApiResult = { ok: true; data: unknown } | { ok: false; kind: 'acorn-
 
 let cachedUrl: string | null = null
 
-// Read the port the node most recently bound. Returns '' when the root holds no port yet (a node that
-// has never listened) or is unreadable — which surfaces as 'acorn-not-running', the honest answer.
+// Read the port the node most recently bound. Returns '' when the root holds no port yet (a node
+// that has never listened) or is unreadable, which surfaces as 'acorn-not-running', the honest
+// answer.
 function readEndpoint(): string {
   if (!DATA_DIR) return STATIC_URL
   try {

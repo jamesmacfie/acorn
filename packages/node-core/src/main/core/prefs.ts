@@ -1,2 +1,2 @@
-// Compatibility facade. The implementation lives in the domain-owned module documented in WP-10.
+// Compatibility facade: the implementation lives in the domain-owned module this re-exports.
 export * from './identity/preferences.ts'
