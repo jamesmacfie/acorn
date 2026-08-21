@@ -8,11 +8,11 @@ import { PaletteSurface } from '@acorn/plugin-api/ui/host'
 import { createQuery } from '@tanstack/solid-query'
 import { githubCreateRoute } from './routes'
 
-// Global keyboard shortcuts + the file finder. Mounted once in App. PullList owns j/k (next/prev
-// PR) — those keys are deliberately untouched here. Global shortcut dispatch lives in the command
-// registry; the open finder handles its own dialog-scoped navigation.
-// The finder is local; the shortcut *reference* now lives in Settings → Shortcuts, so `?` opens
-// that tab (via onOpenShortcuts) rather than a local help overlay.
+// Global keyboard shortcuts and the file finder. Mounted once in App. PullList owns j/k (next/prev
+// PR); those keys are untouched here. Global shortcut dispatch lives in the command registry; the
+// open finder handles its own dialog-scoped navigation.
+// The finder is local; the shortcut reference lives in Settings → Shortcuts, so `?` opens that tab
+// (via onOpenShortcuts) rather than a local help overlay.
 
 export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
   const params = useParams()
@@ -60,10 +60,10 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // Finder results ranked with the palette's fuzzy scorer: every query char must appear in order
-  // in the path, and contiguous runs / word-start hits score higher — so substring-ish matches
-  // sort above looser subsequence ones. Ties keep the PR's file order (stable sort); an empty
-  // query lists all files in PR order.
+  // Finder results ranked with the palette's fuzzy scorer: every query char must appear in order in
+  // the path, and contiguous runs or word-start hits score higher, so substring-ish matches sort
+  // above looser subsequence ones. Ties keep the PR's file order (stable sort); an empty query lists
+  // all files in PR order.
   const results = createMemo(() => {
     const q = finder.query().trim()
     const list = allFiles()

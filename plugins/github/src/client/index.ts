@@ -35,14 +35,13 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.sources.register({
       id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
       routes: githubRouteContributions,
-      // A PR-backed task lives at its PR URL. Core used to encode this itself by asking the route registry
-      // for whatever owned `kind: 'detail'` — which was only ever this plugin, by luck of being the only
-      // one with routes. The claim belongs here, where the shape of a PR URL is already known.
+      // A PR-backed task lives at its PR URL. The claim belongs here, where the shape of a PR URL is
+      // already known, rather than in core's route registry.
       taskPath: (task) => (task.pullNumber != null && task.github ? `${githubBrowsePath(task.projectId)}/${task.pullNumber}` : undefined),
-      // The same knowledge read backwards, for "is there already a task for this PR" (registries/sources.ts
-      // § tracksRef). A github-pr task records its pull request as `pullNumber` on the task ROW — its
-      // `links` hold the Linear tickets found in the PR body — so the host's link matching cannot see it
-      // and would have offered to create a duplicate.
+      // The same knowledge read backwards, for "is there already a task for this PR"
+      // (docs/plugins.md § Frame authoring and the UI kit, `tracksRef`). A github-pr task records its
+      // pull request as `pullNumber` on the task row; `links` holds the Linear tickets found in the
+      // PR body.
       tracksRef: (task, ref) => ref.providerId === 'github' && task.pullNumber != null && !!task.github
         && pullRefMatchesTask(ref.displayId, task.github, task.pullNumber),
     })
@@ -62,32 +61,32 @@ export const githubClientPlugin: ClientPlugin = {
       defaultChord: 'meta+0',
       when: 'global',
     })
-    // The COMPILED feeder for collections (client-core/registries/collections.ts). A loaded plugin
-    // declares this in its manifest and the host synthesises the same contribution over its own reader;
-    // github ships no manifest, so it supplies the fetch itself.
+    // The compiled feeder for collections (client-core/registries/collections.ts). A loaded plugin
+    // declares this in its manifest and the host synthesises the same contribution over its own
+    // reader; github ships no manifest, so it supplies the fetch itself.
     //
-    // No schema parse on the way in, and that is the boundary rather than an omission: this response is
-    // this repo's own TypeScript answering this repo's own route, which is the house rule for a read
-    // (docs/architecture-overview.md § wire validation). The parse exists for a LOADED plugin's answer,
-    // which is untrusted wire. Provenance is still stamped rather than read, for the same reason it is
-    // on that path — a row never names its own source, even when the source is us.
+    // No schema parse on the way in: this response is this repo's own TypeScript answering this
+    // repo's own route (docs/architecture-overview.md § wire validation). The parse exists for a
+    // loaded plugin's answer, which is untrusted wire. Provenance is still stamped rather than read,
+    // for the same reason as on that path: a row never names its own source, even when the source is
+    // us.
     ctx.collections.register({
       collectionId: PULLS_COLLECTION_ID,
       name: 'My pull requests',
       schema: pullsCollectionSchema,
       params: [
-        // `enum` with no declared values, because the values are this user's repositories and no static
-        // declaration can name them — `paramOptions` below fills them on the device.
+        // `enum` with no declared values: the values are this user's repositories, and no static
+        // declaration can name them. `paramOptions` below fills them on the device.
         { id: 'repo', name: 'Repository', type: 'enum' },
-        // Unset is "every open PR in every mirrored repo" — the collection's original answer, and still
-        // the default. Setting it hands the same columns from a GitHub search instead, which is the only
-        // place two of the three answers exist (contract/collections.ts § involvement). `multiple`,
-        // because "assigned to me or waiting on my review" is one question a person asks.
+        // Unset is "every open PR in every mirrored repo", the collection's original answer and
+        // still the default. Setting it hands the same columns from a GitHub search instead, which
+        // is the only place two of the three answers exist (contract/collections.ts § involvement).
+        // `multiple`, because "assigned to me or waiting on my review" is one question a person asks.
         { id: 'involves', name: 'Involving me', type: 'enum', multiple: true, values: [...PULL_INVOLVEMENT] },
       ],
-      // The repositories this user has mirrored, which is also exactly the set the mirror path can match.
-      // The repo picker's own route and cache; no new endpoint, and no refresh of its own — a panel editor
-      // open long enough for the list to go stale is not a case worth a poll.
+      // The repositories this user has mirrored, which is also exactly the set the mirror path can
+      // match. The repo picker's own route and cache; no new endpoint, and no refresh of its own. A
+      // panel editor open long enough for the list to go stale is not a case worth a poll.
       paramOptions: async (paramId, nodeId) => {
         if (paramId !== 'repo') return []
         const repos = await readJson<{ owner: string; name: string }[]>(reposRoute, { nodeId })

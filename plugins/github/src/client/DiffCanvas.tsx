@@ -21,7 +21,7 @@ export function DiffCanvas(props: {
   // The scroller must be handed back: the virtualizer only produces rows once it has this element.
   publishScrollEl: (element: HTMLDivElement, mode: ViewMode) => void
   onScroll: (element: HTMLDivElement) => void
-  /** Widest code line in columns — the row canvas's width, since code lines don't wrap. */
+  /** Widest code line in columns: the row canvas's width, since code lines don't wrap. */
   maxCols: Accessor<number>
   scheduleElementMeasure: (target: 'unified' | 'split', element: HTMLElement) => void
   shouldMeasureRow: (row: Row) => boolean

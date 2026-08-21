@@ -16,19 +16,14 @@ import { DiffToolbar } from './DiffToolbar'
 import { DiffCanvas } from './DiffCanvas'
 import { createDiffStickyFile } from './DiffStickyFile'
 
-// Right (Diff) pane: render EVERY changed file's diff stacked one after another in a single
-// virtualized list (docs/diff-rendering.md, docs/ui-design.md). Each file opens with a header row;
-// `?file=` no longer picks which file is shown — it's the scroll target (the file list, finder,
-// and [ / ] all set it), so selecting a file scrolls the combined diff to it.
+// Right (Diff) pane: renders every changed file's diff stacked in one virtualized list
+// (docs/diff-rendering.md). Each file opens with a header row; `?file=` is the scroll target rather
+// than a file picker (the file list, finder, and [ / ] all set it).
 //
-// The files query returns the full changed-file payload, so patch bodies are normally all present
-// up front; the hydrator's fetchPatches fallback re-fetches any body that is still missing (a
-// leftover of the earlier summaries-first design that now only covers partial/restored caches —
-// binary and too-large files legitimately have no patch and render a "No diff" row instead).
-// Parsing and Shiki highlighting hydrate in priority order so large PRs do not turn one network
-// gap into one giant main-thread block. Review threads are interleaved at render time (matched by
-// path) so thread mutations rerender without re-tokenizing patches.
-//
+// The files query returns the full changed-file payload up front. `fetchPatches` below only covers
+// a body still missing from a partial or restored cache; binary and too-large files have no patch
+// and render a "No diff" row instead. Review threads interleave at render time (matched by path), so
+// a thread mutation rerenders without re-tokenizing patches.
 export type PullRoute = {
   owner: string
   repo: string
@@ -93,15 +88,15 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
       diff: shouldUsePlainTokenizer(file) ? buildDiffRows(file, plainTokenize) : await buildDiffRowsAsync(file, tokenizeDocument),
     }),
     onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
-    // Patch-body source: the query cache first (per-path patch entries, then the warmed files
-    // query — which also resolves binary/too-large files to their legitimate null patch)…
+    // Patch-body source, checked in order: the per-path patch cache entry, then the warmed files
+    // query (which also resolves binary/too-large files to their legitimate null patch).
     cachedFile: (path) => {
       const direct = queryClient.getQueryData<PullFile>(filePatchKey(owner, repo, number, path))
       if (direct) return direct
       const warmed = queryClient.getQueryData<PullFile[]>(filesKey(owner, repo, number))
       return warmed?.find((file) => file.path === path) ?? null
     },
-    // …then the batch patch endpoint for anything still missing, seeding per-path cache entries.
+    // Anything still missing comes from the batch patch endpoint, seeding per-path cache entries.
     fetchPatches: async (paths, signal) => {
       const fetched = await fetchFilePatches(owner, repo, number, paths, signal)
       for (const file of fetched) {
@@ -163,12 +158,12 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const bands = createMemo<SplitBand[]>(() => (viewMode() === 'split' ? toBands(rows()) : []))
   const bandKeys = createMemo(() => splitBandIdentityKeys(bands()))
 
-  // Scroll element as a signal so the virtualizer re-attaches when it (re)mounts (it lives behind a
-  // `<Show>` — no PR / split mode — so it's absent at this component's onMount). The virtualizer
-  // reads the element's size only when getScrollElement first returns it; publishing the ref inside
-  // requestAnimationFrame guarantees that read happens AFTER layout (offsetHeight is real), not in
-  // the same tick a cached query fills rows() — otherwise it freezes a 0-height viewport and the
-  // range stays empty. measure() then drives that post-layout re-read.
+  // Scroll element as a signal so the virtualizer re-attaches when it (re)mounts; it lives behind a
+  // `<Show>` (no PR, or split mode) so it is absent at this component's onMount. The virtualizer
+  // reads the element's size only when getScrollElement first returns it. Publishing the ref inside
+  // requestAnimationFrame guarantees that read happens after layout, when offsetHeight is real,
+  // rather than in the same tick a cached query fills rows(); otherwise it freezes a 0-height
+  // viewport and the range stays empty. measure() then drives the post-layout re-read.
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
   const virt = createDiffVirtualizer({
     items: rows,
@@ -202,11 +197,8 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // Threads only. Code rows used to be measured too, because they soft-wrapped and their real height
-  // was a layout question — which is what made scrolling flash and jitter: every row painted at its
-  // 20px estimate, got corrected a frame later, and a first-time correction above the scroll offset
-  // makes the virtualizer write scrollTop to compensate. Lines don't wrap now, so every code row is
-  // exactly DIFF_LINE_HEIGHT, the estimate is always right, and there is nothing to correct.
+  // Only threads are measured (docs/diff-rendering.md § Row geometry): every code row is exactly
+  // DIFF_LINE_HEIGHT, so there is nothing left to correct after the estimate.
   const shouldMeasureRow = (row: Row) => row.kind === 'thread'
   const shouldMeasureBand = (band: SplitBand) => band.kind === 'full' && band.row.kind === 'thread'
 
@@ -312,9 +304,9 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     bands().length
     if (scrollEl()) scheduleVirtualMeasure('split')
   })
-  // Depend on the composer *key* via a memo (equality-checked), not the composer object — the
-  // object is replaced on every keystroke, and re-measuring per keystroke remounts the virtual
-  // rows, which destroys the focused textarea (flicker + lost selection). Only opening/closing/
+  // Depend on the composer's *key* through a memo (equality-checked), not the composer object: the
+  // object is replaced on every keystroke, and re-measuring per keystroke remounts the virtual rows,
+  // which destroys the focused textarea (flicker and lost selection). Only opening, closing, or
   // moving the composer changes row heights.
   const lineComposerKey = createMemo(() => lineComposer()?.key ?? null)
   createEffect(() => {
@@ -377,8 +369,9 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     onCleanup(off)
   })
 
-  // Scroll to the file named in `?file=` once summaries have created the file headers. Loading that
-  // file's patch is prioritized separately so navigation doesn't wait for tokenization.
+  // Scroll to the file named in `?file=` once summaries have created the file headers
+  // (docs/diff-rendering.md § Review threads and state). Loading that file's patch is prioritized
+  // separately so navigation doesn't wait for tokenization.
   createEffect(() => {
     const path = typeof searchParams.file === 'string' ? searchParams.file : ''
     if (!path) {

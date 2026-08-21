@@ -39,7 +39,7 @@ export function PullSummary(props: {
   conflictsLoading: Accessor<boolean>
   selectFile: (path: string) => void
 }) {
-  // Reopen exists, so closing is reversible — arm-to-confirm rather than a dialog.
+  // Reopen exists, so closing is reversible: arm-to-confirm rather than a dialog.
   const closeArmed = createArmedConfirm()
   return (
     <>

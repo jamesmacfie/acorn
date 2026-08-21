@@ -13,10 +13,9 @@ const connectedGithub = (integrations: IntegrationsResponse) =>
 const githubAccount = (integrations: IntegrationsResponse | undefined) =>
   integrations?.integrations.find((integration) => integration.providerId === 'github')?.account?.label ?? null
 
-// One repository, one decision, taken immediately. The previous shape — tick a set of checkboxes,
-// choose an action per row, then press Import and answer a folder dialog per ticked row — asked the
-// owner to hold a plan in their head and only told them where the folders went at the end. Here the
-// button IS the action: Map and Clone open the picker on the spot, Defer needs no folder at all.
+// One repository, one decision, taken immediately: the button is the action. Map and Clone both
+// open the folder picker on the spot; there is no third "defer" action
+// (docs/github-integration.md § Importing projects).
 export default function GithubImporter(props: ProjectImporterProps) {
   const queryClient = useQueryClient()
   const integrations = createQuery(() => integrationsOptions(true))

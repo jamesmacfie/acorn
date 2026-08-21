@@ -18,10 +18,11 @@ export function prefillFromCompare(commits: CompareCommit[], headRef: string): {
   return { title: humanizeBranch(headRef), body: '' }
 }
 
-// An in-progress new-PR form, kept in localStorage per repo so navigating away doesn't lose it —
-// same rationale (and per-device scope) as the comment drafts in @acorn/client-core/lib/draftState.ts. base/head
-// are stored too: they live in the URL while the form is mounted, but a fresh visit to /:owner/:repo/new
-// carries no query params, so the URL alone can't restore them.
+// An in-progress new-PR form, kept in localStorage per repo so navigating away doesn't lose it, the
+// same rationale (and per-device scope) as the comment drafts in
+// @acorn/client-core/lib/draftState.ts. base/head are stored too: they live in the URL while the
+// form is mounted, but a fresh visit to /:owner/:repo/new carries no query params, so the URL alone
+// cannot restore them.
 export type PullDraft = { base: string; head: string; title: string; body: string; draft: boolean; touched: boolean }
 
 const draftKey = (owner: string, repo: string) => `new-pr:${owner}/${repo}`
@@ -47,7 +48,8 @@ export function parsePullDraft(raw: string | null): PullDraft | null {
 export const readPullDraft = (owner: string, repo: string): PullDraft | null =>
   parsePullDraft(localStorage.getItem(draftKey(owner, repo)))
 
-// An untouched form with no head chosen is indistinguishable from a fresh one — don't leave a key behind.
+// An untouched form with no head chosen is indistinguishable from a fresh one, so do not leave a key
+// behind.
 export function writePullDraft(owner: string, repo: string, d: PullDraft): void {
   if (d.head || d.touched || d.draft) localStorage.setItem(draftKey(owner, repo), JSON.stringify(d))
   else clearPullDraft(owner, repo)

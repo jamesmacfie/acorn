@@ -2,9 +2,7 @@
 // detail + file summaries and seed their caches so likely navigation has an instant first paint.
 // The previous unbounded warm-up scaled network, SQLite reads, JSON parsing, memory and IndexedDB
 // writes with every open PR in a repo. Remaining rows are warmed on hover/focus instead.
-// Patch bodies stay intent-driven in DiffView. Open only — closed PRs stay on-demand.
-// Best-effort: any failure just leaves that PR to load on first visit. Abortable, so a repo switch
-// cancels the in-flight warm-up (the caller aborts on cleanup).
+// Patch bodies stay intent-driven in DiffView. Open only; closed PRs stay on-demand.
 import type { QueryClient } from '@tanstack/solid-query'
 import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '../contract/api'
 import { pullsOptions } from './queries'
@@ -111,8 +109,8 @@ async function fetchPullSummaries(
     signal,
   }).catch(() => null)
   if (!items) return
-  // Seed summary-level caches. PullDetail's own queries (staleTime 0) still revalidate on
-  // visit, so this only makes first paint instant — it doesn't suppress on-visit refresh.
+  // Seed summary-level caches. PullDetail's own queries (staleTime 0) still revalidate on visit, so
+  // this only makes first paint instant; it does not suppress on-visit refresh.
   for (const { number, detail, files } of items) {
     seedIfNotNewer(qc, pullKey(owner, repo, String(number)), detail, requestStartedAt)
     seedIfNotNewer(qc, fileSummariesKey(owner, repo, String(number)), files, requestStartedAt)
