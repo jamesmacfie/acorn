@@ -11,7 +11,7 @@ const { runChromeAction } = await import('./actions')
 const { paneRegistry } = await import('../../registries/panes')
 const { projectSurfaceRegistry } = await import('../../registries/projectSurfaces')
 const { clientEvents, consumePaneIntent, evictPendingIntents } = await import('../../registries/clientEvents')
-const { setActiveTaskId } = await import('../../tasks/tasks')
+const { setActiveTaskId, setSelectedSource } = await import('../../tasks/tasks')
 const { setTaskLookup } = await import('../../tasks/taskLookup')
 type Task = import('../../queries').Task
 const { closePluginOverlay, pluginOverlayOpen } = await import('../frames/overlays')
@@ -27,6 +27,7 @@ afterEach(() => {
   for (const entry of disposables.splice(0).reverse()) entry.dispose()
   evictPendingIntents('task-1')
   setActiveTaskId(null)
+  setSelectedSource(null)
   setTaskLookup(() => undefined)
 })
 
@@ -49,6 +50,19 @@ describe('openPane', () => {
     expect(navigate).toHaveBeenCalledWith('/t/task-2')
     expect(consumePaneIntent('task-2', 'board')).toEqual({ kind: 'plugin:select', item: 'conn-1:ENG-42' })
     evictPendingIntents('task-2')
+  })
+
+  it('still navigates when the named task is the active one but a Source browse is on screen', () => {
+    // activeTaskId is sticky: it names whichever task you last had open, not whichever screen you're
+    // looking at. A dashboard row for that same task must still take the reader back to it.
+    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    setTaskLookup((taskId) => (taskId === 'task-1' ? ({ id: 'task-1', links: [] } as unknown as Task) : undefined))
+    setActiveTaskId('task-1')
+    setSelectedSource('pulls')
+    const navigate = vi.fn()
+    runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-1', navigate })
+    expect(navigate).toHaveBeenCalledWith('/t/task-1')
+    expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'conn-1:ENG-42' })
   })
 
   it('refuses a task this node does not have, rather than opening the pane somewhere else', () => {

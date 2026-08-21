@@ -8,7 +8,7 @@ import { openInAppUrl } from '../../registries/contentLinks'
 import { projectSurfacePath } from '../../registries/projectSurfaces'
 import { activateTaskSignals, pathForTask } from '../../tasks/activate'
 import { taskById } from '../../tasks/taskLookup'
-import { activeTaskId } from '../../tasks/tasks'
+import { activeTaskId, selectedSource } from '../../tasks/tasks'
 import { openPluginOverlay } from '../frames/overlays'
 import { ownsRoute } from './data'
 
@@ -76,7 +76,12 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       if (context.taskId && !named) {
         return toast(context.pluginId, 'that task is not on this node', 'It may have been archived, or the list has not loaded yet.')
       }
-      if (named && named.id !== activeTaskId()) {
+      // `activeTaskId()` is sticky: it's whichever task you last had open, not whichever screen you're
+      // looking at now, so it stays put after you leave to a Source browse or the dashboard
+      // (tasks/tasks.ts, `selectedSource`). Skipping the navigate just because it happens to still name
+      // this task was the bug: a dashboard row for the task you left behind looked like a dead click,
+      // because the pane opened in a task the reader wasn't looking at.
+      if (named && (named.id !== activeTaskId() || selectedSource())) {
         activateTaskSignals(named)
         context.navigate?.(pathForTask(named))
       }
