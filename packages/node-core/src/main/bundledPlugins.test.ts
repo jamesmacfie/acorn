@@ -113,7 +113,7 @@ describe('bundled plugin reconciliation', () => {
   })
 
   it('replaces a developer’s own build:plugin output, and keeps doing so after the first time', () => {
-    // Byte-for-byte the case above — an unrecorded directory in the data root — except for the marker
+    // Byte-for-byte the case above, an unrecorded directory in the data root, except for the marker
     // `build:plugin` leaves when it writes there. Without it the two are indistinguishable, so a dev
     // build was marked `user` and then survived every app rebuild: a feature that reads as missing.
     const devBuild = () => {
@@ -126,10 +126,10 @@ describe('bundled plugin reconciliation', () => {
     expect(reconcileBundledPlugins(root, resources)).toMatchObject({ updated: ['rollbar'], preserved: [] })
     expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('app version')
     expect(readBundledPluginState(root, 'rollbar')).toMatchObject({ status: 'installed', version: '2.0.0' })
-    // `place` replaced the directory, so the marker went with it — an ordinary bundled package again.
+    // `place` replaced the directory, so the marker went with it: an ordinary bundled package again.
     expect(existsSync(join(pluginDir(root, 'rollbar'), DEV_BUILD_MARKER))).toBe(false)
 
-    // The second dev build is the one a state-row-only fix would miss: there IS a row now, saying
+    // The second dev build is the one a state-row-only fix would miss: there is a row now, saying
     // 'installed' with a fingerprint the rebuild invalidated, which is the same trap one step later.
     devBuild()
     packageAt(resources, '3.0.0', 'newer app version')

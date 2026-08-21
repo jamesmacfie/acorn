@@ -8,9 +8,9 @@ export type DisabledPluginsStore = {
 
 const FILE_NAME = 'disabled-plugins.json'
 
-// Anything unparseable reads as "nothing disabled". The opposite default (fail the boot) would turn a
-// corrupted 40-byte file into an app that cannot start, and the recovery — delete the file — is the same
-// state this produces.
+// Anything unparseable reads as "nothing disabled". The opposite default (fail the boot) would turn
+// a corrupted 40-byte file into an app that cannot start, and the recovery, delete the file, is the
+// same state this produces.
 const parse = (raw: string): string[] => {
   try {
     const value: unknown = JSON.parse(raw)

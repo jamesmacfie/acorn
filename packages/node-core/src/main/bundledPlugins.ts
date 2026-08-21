@@ -76,15 +76,11 @@ const place = (dataRoot: string, id: string, source: string): void => {
   if (displaced) rmSync(displaced, { recursive: true, force: true })
 }
 
-/** Written by `apps/node/scripts/build-plugin.mjs` into a package it builds STRAIGHT INTO the data root
- * — never into `--package-root` staging, which is the distribution path. Re-spelled there rather than
- * imported, for the reason the route prefixes are: the script is plain ESM run by node with no build
- * step, and one filename in two places beats a build dependency between a script and this package.
- *
- * A dev build looks exactly like an owner-installed package to reconciliation — a directory with bytes
- * that are nobody's on record — so it was marked `user` and then never updated again. Correct for a real
- * user, a trap for a developer: the plugin they last built quietly outlives every rebuild of the app,
- * and the symptom is a feature that appears not to exist. This is the one bit that tells the two apart. */
+/** Written by `apps/node/scripts/build-plugin.mjs` into a package it builds straight into the data
+ * root, never into `--package-root` staging (docs/plugins.md § Loaded plugins, on why reconciliation
+ * needs this marker to tell a developer's own build from an owner-installed package). Re-spelled here
+ * rather than imported: the script is plain ESM run by node with no build step, and one filename in
+ * two places beats a build dependency between a script and this package. */
 export const DEV_BUILD_MARKER = '.acorn-dev-build'
 
 const bundledDirectories = (root: string): string[] => {
@@ -141,12 +137,12 @@ export function reconcileBundledPlugins(dataRoot: string, bundledRoot: string): 
           continue
         }
 
-        // A developer's own `build:plugin` output. Treated as app-owned, so a newer bundled version wins
-        // — the whole point being that a dev build is a temporary override, not an installation. Checked
-        // BEFORE the state test rather than only in the no-row case, because the second dev build over an
-        // already-reconciled package leaves an 'installed' row whose fingerprint has drifted, which is
-        // the same trap one step later. `place` replaces the directory, so the marker goes with it and
-        // the package is an ordinary bundled one again until the next build.
+        // A developer's own `build:plugin` output, treated as app-owned so a newer bundled version
+        // wins (docs/plugins.md § Loaded plugins). Checked before the state test rather than only in
+        // the no-row case, because the second dev build over an already-reconciled package leaves an
+        // 'installed' row whose fingerprint has drifted, which is the same trap one step later.
+        // `place` replaces the directory, so the marker goes with it and the package is an ordinary
+        // bundled one again until the next build.
         if (existsSync(join(target, DEV_BUILD_MARKER))) {
           place(dataRoot, id, source)
           markBundledPluginInstalled(dataRoot, id, manifest.version, fingerprint, state?.installedAt)

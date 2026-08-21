@@ -21,7 +21,7 @@ describe('disabledPluginsStore', () => {
     // Sorted and de-duplicated on write, so the file is stable across saves that reorder checkboxes.
     expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual(['docker', 'rollbar'])
     expect(statSync(file()).mode & 0o777).toBe(0o600)
-    // A SECOND store — the next boot, which is the only reader that matters.
+    // A second store: the next boot, which is the only reader that matters.
     expect(disabledPluginsStore(dir).get()).toEqual(['docker', 'rollbar'])
   })
 
@@ -32,8 +32,8 @@ describe('disabledPluginsStore', () => {
   })
 
   it('reads a corrupt or wrongly-shaped file as nothing disabled', () => {
-    // Fail OPEN, not closed. The opposite default turns a truncated 40-byte file into a node that will
-    // not boot, and the recovery — delete the file — lands on exactly this state anyway.
+    // Fail open, not closed. The opposite default turns a truncated 40-byte file into a node that
+    // will not boot, and the recovery, delete the file, lands on exactly this state anyway.
     for (const raw of ['{ not json', '{"disabled":["docker"]}', 'null', '[1, 2, 3]', '']) {
       writeFileSync(file(), raw)
       expect(disabledPluginsStore(dir).get(), raw).toEqual([])

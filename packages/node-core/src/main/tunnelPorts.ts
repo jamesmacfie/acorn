@@ -6,30 +6,14 @@ import { loadTask } from './taskWorktree'
 import { getProjectConfig } from './projectConfig'
 
 // Which loopback ports a task legitimately serves on, for the preview tunnel's allowlist
-// (main/tunnel.ts). docs/api-reference.md § Streams: "Only declared ports; no general SOCKS."
-//
-// **Derived, never configured.** There is no new setting here on purpose: a port is tunnellable exactly
-// when the owner has already told the node something serves on it. Two sources, both of which the preview
-// pane itself reads:
-//
-//   1. the default run target's URL, which the run bridge resolves (a fixed `url`, or one discovered from a
-//      running instance's `url_command` output);
-//   2. the repo's `previewMode: 'port'` value.
-//
-// `previewMode: 'script'` is deliberately NOT a source, and it is the ONE case that is not covered. Its
-// value is a shell command whose stdout is the URL, and running it to answer an upgrade would mean
-// executing repo config on every tunnel attempt — the config-trust gate exists precisely to stop that
-// being incidental. So a remote task using a URL script gets no tunnel unless the same port also appears
-// as a run target's url or as `previewMode: 'port'`. The client fails CLOSED there (node/tunnelUrl.ts
-// returns null rather than the untunnelled URL), so the pane says nothing rather than showing the owner's
-// own localhost.
-//
-// A URL naming a host other than loopback contributes nothing: it is already reachable from the client, so
-// there is nothing to tunnel, and treating it as a port to open would be the SOCKS hole.
+// (main/tunnel.ts, docs/api-reference.md § WebSocket). Derived, never configured: there is no new
+// setting here, because a port is tunnellable exactly when the owner has already told the node
+// something serves on it.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0'])
 
-// The port a URL implies, when the URL is loopback. Explicit ports only plus the two scheme defaults —
-// a dev server on 80 or 443 is unusual but legal, and refusing it would be an arbitrary hole.
+// The port a URL implies, when the URL is loopback. Explicit ports only, plus the two scheme
+// defaults: a dev server on 80 or 443 is unusual but legal, and refusing it would be an arbitrary
+// hole.
 export function loopbackPortOf(url: string | undefined | null): number | null {
   if (!url) return null
   let parsed: URL
@@ -54,10 +38,8 @@ export function declaredTunnelPorts(db: AppDatabase, capabilities?: Pick<Capabil
       if (port) ports.add(port)
     }
 
-    // Source 1: EVERY run target's fixed `url`, not just the default one's.
-    //
-    // Include every fixed run-target URL because a layout recipe's browser URL may point to a non-default
-    // target.
+    // Source 1: every run target's fixed `url`, not just the default one's, because a layout recipe's
+    // browser URL may point to a non-default target.
     //
     // `get`, not `require`: a node whose terminal plugin is disabled has no run bridge, and the honest
     // answer there is "no run-target port", not a thrown upgrade.
@@ -71,8 +53,8 @@ export function declaredTunnelPorts(db: AppDatabase, capabilities?: Pick<Capabil
       if (Array.isArray(list)) for (const target of list) if (typeof target?.url === 'string') add(target.url)
     }
 
-    // Source 2. Resolved through the task's project, so a caller cannot name a project it has no task in — the
-    // taskId is already scope-checked by the upgrade handler.
+    // Source 2. Resolved through the task's project, so a caller cannot name a project it has no task
+    // in: the taskId is already scope-checked by the upgrade handler.
     const task = await loadTask(db, taskId).catch(() => null)
     if (task?.projectId) {
       const config = (await getProjectConfig(db, task.projectId))?.config
@@ -81,10 +63,7 @@ export function declaredTunnelPorts(db: AppDatabase, capabilities?: Pick<Capabil
         const port = Number(value)
         if (Number.isInteger(port) && port >= 1 && port <= 65535) ports.add(port)
       }
-      // `'url'` was missing, and its absence was the worse half of the bug: the client resolves the URL,
-      // asks for a tunnel, gets a 403, and falls back to loading the URL as given — so a remote task
-      // configured with `http://localhost:8025` rendered whatever was on the OWNER'S 8025 while claiming to
-      // show the remote preview. It is declarative config, exactly like `'port'`.
+      // `previewMode: 'url'` is also a source (docs/api-reference.md § WebSocket).
       if (config?.previewMode === 'url') add(value)
     }
 

@@ -8,16 +8,17 @@ import { openDataRoot, type DataRoot } from './dataRoot'
 import { makeRuntime, startListener, type Listener } from './server'
 import { disposeWsHub } from './wsHub'
 
-// The listener's transport contract, asserted against a REAL socket: it speaks TLS with the certificate
-// it reports, that certificate VALIDATES for 127.0.0.1 (no `rejectUnauthorized: false` anywhere — in
-// that mode Node skips checkServerIdentity entirely, so a pin would silently never be checked), and the
-// loopback Host guard still uses the port it actually bound now that the port is ephemeral.
+// The listener's transport contract, asserted against a real socket: it speaks TLS with the
+// certificate it reports, that certificate validates for 127.0.0.1 (no `rejectUnauthorized: false`
+// anywhere: in that mode Node skips checkServerIdentity entirely, so a pin would silently never be
+// checked), and the loopback Host guard still uses the port it actually bound now that the port is
+// ephemeral.
 
 type Probe = { status: number; body: string }
 
-// Deliberately full verification: `ca` is the node's own self-signed certificate, which is what makes
-// the chain valid, and the hostname check then has to pass on the IP:127.0.0.1 SAN. If either is wrong
-// this rejects — which is the whole point, because the MCP child (docs/mcp.md) trusts the same file the
+// Full verification: `ca` is the node's own self-signed certificate, which is what makes the chain
+// valid, and the hostname check then has to pass on the IP:127.0.0.1 SAN. If either is wrong this
+// rejects, which is the whole point, because the MCP child (docs/mcp.md) trusts the same file the
 // same way.
 function probe(listener: Listener, path: string, host?: string): Promise<Probe> {
   return new Promise((resolve, reject) => {
@@ -90,7 +91,7 @@ describe('the loopback TLS listener', () => {
     expect(started.endpoint.port).toBeGreaterThan(0)
     expect(started.fingerprint).toMatch(/^[0-9a-f]{64}$/)
     // GET /v2/node is the pre-auth route a client that has never paired uses (docs/api-reference.md
-    // § Pairing), so it is reachable without a bearer — which makes it the right shape probe here. It
+    // § Pairing), so it is reachable without a bearer, which makes it the right shape probe here. It
     // advertises the same fingerprint the handshake above just presented.
     const response = await probe(started, '/v2/node')
     expect(response.status).toBe(200)
@@ -124,8 +125,8 @@ describe('the loopback TLS listener', () => {
     expect(second.endpoint.port).toBe(port)
   }, 30_000)
 
-  // …but never at the cost of not starting. The remembered port belongs to whoever holds it now, and an
-  // ephemeral port is a perfectly good endpoint because the client is told where we bound.
+  // ...but never at the cost of not starting. The remembered port belongs to whoever holds it now, and
+  // an ephemeral port is a perfectly good endpoint because the client is told where we bound.
   it('falls back to an ephemeral port when the remembered one is taken', async () => {
     const first = await start()
     const port = first.endpoint.port

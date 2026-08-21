@@ -1,15 +1,13 @@
-// Loading a plugin's node half from disk (docs/plugins.md).
+// Loading a plugin's node half from disk (docs/plugins.md § Loaded plugins).
 //
-// Everything here is best-effort by design: a bad manifest, an unimportable bundle or an id that
-// collides with a built-in is a SKIP plus a report, never a throw. A node that cannot run one
-// installed plugin must still boot — that is the whole difference between loaded plugins and
-// built-ins, and the reason the plugin host grows a `contained` path in the same phase.
+// Everything here is best-effort: a bad manifest, an unimportable bundle or an id that collides with
+// a built-in is a skip plus a report, never a throw (docs/plugins.md § Loaded plugins, "Failures are
+// contained").
 //
 // The loader used to be inert unless ACORN_UNSAFE_PLUGINS=1, because there was no consent surface and
 // a default-on loader would have run third-party code nobody agreed to. Phase 5 removed the flag: the
-// only way a package reaches `<dataRoot>/plugins` now is through the installer, which is an
-// owner-authenticated route, and the device asks again before it runs the client half
-// (docs/plugins.md).
+// only way a package reaches `<dataRoot>/plugins` now is through the installer, an
+// owner-authenticated route, and the device asks again before it runs the client half.
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -47,20 +45,20 @@ export type InstalledPlugin = {
   // sha256 (lowercase hex) and byte length of the client entrypoint, read at boot. null when the
   // manifest declares none, or the file is missing or escapes the plugin directory.
   //
-  // It can go stale — nothing stops the file being edited under a running node — and that is the
-  // wanted behaviour rather than a gap: the device hashes the bytes it actually received, finds they
-  // do not match this claim, and refuses them. Fail closed.
+  // It can go stale, since nothing stops the file being edited under a running node, and that is
+  // wanted: the device hashes the bytes it actually received, finds they do not match this claim, and
+  // refuses them. Fail closed.
   client: { hash: string; bytes: number } | null
   // From the package's lockfile, absent when it has none (installed before phase 5, or copied in by
-  // hand). Display only — the structured source stays in the lockfile, which is the one thing that has
+  // hand). Display only: the structured source stays in the lockfile, which is the one thing that has
   // to be able to re-resolve it.
   source?: string
   installedAt?: number
 }
 
-// The `dir` -free projection the roster route takes. `dir` is an absolute path on the node's
-// filesystem and must not be reachable from a route, so the narrowing happens here rather than
-// being a discipline each composition root has to remember.
+// The `dir`-free projection the roster route takes. `dir` is an absolute path on the node's
+// filesystem and must not be reachable from a route, so the narrowing happens here rather than being
+// a discipline each composition root has to remember.
 export type InstalledPluginInfo = {
   id: string
   version: string
@@ -83,16 +81,16 @@ export type InstalledPluginInfo = {
   installedAt?: number
 }
 
-// Why one directory did not produce a plugin. `id` is the directory name when the manifest could not
-// be read at all — it is the only handle we have on the thing that failed.
-// `at` is when this pass discovered the failure, and it exists so the bell can say "20 minutes ago".
-// Without it the roster row had no timestamp, the attention item fell back to 0, and every load failure
-// rendered as a 56-year-old event that also sorted last within its severity band.
+// Why one directory did not produce a plugin (docs/plugins.md § Loaded plugins, "Failures are
+// contained"). `id` is the directory name when the manifest could not be read at all, since it is the
+// only handle we have on the thing that failed. `at` used to be missing, and every load failure
+// rendered as a 56-year-old event that sorted last within its severity band; the roster needs it so
+// the bell can say "20 minutes ago".
 export type PluginLoadFailure = { id: string; dir: string; reason: string; at: number }
 
-// The same record before it is stamped. One timestamp per pass, applied at the return: these walks are
-// synchronous, so a clock at each of the nine record sites would differ by microseconds and claim a
-// precision the roster does not have.
+// The same record before it is stamped. One timestamp per pass, applied at the return: these walks
+// are synchronous, so a clock read at each of the nine record sites would differ by microseconds and
+// claim a precision the roster does not have.
 type UnstampedFailure = Omit<PluginLoadFailure, 'at'>
 
 const stamped = (failures: readonly UnstampedFailure[]): PluginLoadFailure[] => {
@@ -108,8 +106,8 @@ export type PluginLoadResult = { loaded: LoadedPlugin[]; installed: InstalledPlu
 // loader has always used.
 export { pluginInstallRoot as pluginInstallDir } from './pluginInstaller'
 
-// Structural, not `instanceof`. The bundle was compiled separately, so its classes are its own even
-// though it shares this realm; identity checks would reject a perfectly good plugin.
+// Structural, not `instanceof`: the bundle was compiled separately, so its classes are its own even
+// though it shares this realm, and an identity check would reject a perfectly good plugin.
 function asNodePlugin(mod: unknown): NodePlugin | null {
   const candidate = (mod as { default?: unknown } | null)?.default
   if (!candidate || typeof candidate !== 'object') return null
@@ -120,9 +118,9 @@ function asNodePlugin(mod: unknown): NodePlugin | null {
   return candidate as NodePlugin
 }
 
-// Identity plus content, so a file that was replaced between two scans is re-read and one that was not
-// is not. Phase 5 made `scanInstalled` a per-request call from the roster route, and sha256 over an
-// 8 MiB bundle on every GET is a cost with no answer attached to it.
+// Identity plus content, so a file that was replaced between two scans is re-read and one that was
+// not is not. Phase 5 made `scanInstalled` a per-request call from the roster route, and sha256 over
+// an 8 MiB bundle on every GET is a cost with no answer attached to it.
 const digestCache = new Map<string, { key: string; value: { hash: string; bytes: number } }>()
 
 // The client entrypoint's hash and size, or null. Every failure is null rather than a throw: a
@@ -183,9 +181,9 @@ export async function readClientBundle(
   }
 }
 
-// Directories, plus symlinks to directories — a `{ path }` dev install is a symlink, and Dirent's
-// isDirectory() is lstat-shaped so it answers false for one. Dot-prefixed names are skipped: the
-// installer stages under `.staging-*` in this same directory, and a plugin id can never start with a
+// Directories, plus symlinks to directories: a `{ path }` dev install is a symlink, and Dirent's
+// isDirectory() is lstat-shaped so it answers false for one. Dot-prefixed names are skipped, since the
+// installer stages under `.staging-*` in this same directory and a plugin id can never start with a
 // dot anyway.
 function subdirectories(dir: string): string[] {
   try {
@@ -206,13 +204,13 @@ const isDirectory = (path: string): boolean => {
   }
 }
 
-/** Every package on disk whose manifest parses and whose apiVersion this node speaks — with nothing
+/** Every package on disk whose manifest parses and whose apiVersion this node speaks, with nothing
  * imported and nothing executed.
  *
- * Split out of `loadExternalPlugins` because phase 5 gave the roster route a second question to answer:
- * the load result describes what this PROCESS assembled at boot, and after an install or an uninstall
- * that is no longer what is on disk. This is the "right now" answer, and comparing the two is how the
- * roster knows a restart is pending (server/routes/plugins.ts). */
+ * Split out of `loadExternalPlugins` because phase 5 gave the roster route a second question to
+ * answer: the load result describes what this process assembled at boot, and after an install or an
+ * uninstall that is no longer what is on disk. This is the "right now" answer, and comparing the two
+ * is how the roster knows a restart is pending (server/routes/plugins.ts). */
 export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[]; failures: PluginLoadFailure[] } {
   const root = pluginInstallRoot(dataRoot)
   const installed: InstalledPlugin[] = []
@@ -221,8 +219,8 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
 
   for (const name of subdirectories(root).sort()) {
     const dir = join(root, name)
-    // The reason carries the Zod issue paths, so "which of ~30 rules did I break" is answered on the
-    // roster row rather than by reading the schema (docs/plugins.md § Failures are contained).
+    // The reason carries the Zod issue paths (docs/plugins.md § Loaded plugins, "Failures are
+    // contained").
     const read = readPluginManifestResult(dir)
     if (!read.ok) {
       failures.push({ id: name, dir, reason: read.reason })
@@ -267,16 +265,9 @@ export async function loadExternalPlugins(
   dataRoot: string,
   options: {
     builtins: readonly string[]
-    /** Plugin ids whose entry module must be EVALUATED AGAIN rather than served from Node's module
-     * cache (main/pluginReload.ts). Empty at boot, one id on a reload.
-     *
-     * The technique is a generation stamp on the file URL, and its ceiling is exactly one module deep:
-     * `import('…/index.js?load=7')` is a new key, but a relative specifier inside that module resolves
-     * against the URL's PATH — the query is not inherited — so `./chunk.js` comes back from the cache
-     * with the code it had at boot. A plugin whose edit lands in a non-entry file therefore needs a
-     * restart. Single-file node halves (the authoring profile) are unaffected, and the honest fix for
-     * the rest is a `module.register` resolve hook stamping the whole subgraph, which is a loader hook
-     * this repo does not have and does not need yet. Stated in docs/plugins.md § The dev loop. */
+    /** Plugin ids whose entry module must be evaluated again rather than served from Node's module
+     * cache (main/pluginReload.ts). Empty at boot, one id on a reload
+     * (docs/plugins.md § The dev loop, "Only the entry module is re-evaluated"). */
     reimport?: readonly string[]
   },
 ): Promise<PluginLoadResult> {
@@ -293,7 +284,7 @@ export async function loadExternalPlugins(
   for (const entry of scan.installed) {
     const { manifest, dir } = entry
     // Client-only package. Nothing to load in the Node, but its bundle still has to reach every
-    // paired device — which is the whole reason `installed` exists alongside `loaded`.
+    // paired device, which is the whole reason `installed` exists alongside `loaded`.
     if (!manifest.node) {
       installed.push(entry)
       continue
@@ -326,9 +317,9 @@ export async function loadExternalPlugins(
     try {
       // pathToFileURL, never the bare path: `import('C:\\...')` is not a valid specifier on Windows.
       const url = pathToFileURL(entrypoint)
-      // Node caches an ES module permanently by resolved URL, so a second import of the same path hands
-      // back the FIRST load's module object. See the `reimport` option above for what this does and does
-      // not invalidate.
+      // Node caches an ES module permanently by resolved URL (docs/plugins.md § The dev loop, "Only
+      // the entry module is re-evaluated"). See the `reimport` option above for what this does and
+      // does not invalidate.
       if (reimport.has(manifest.id)) url.searchParams.set('load', `${Date.now()}-${(importGeneration += 1)}`)
       mod = await import(url.href)
     } catch (error) {
@@ -341,17 +332,16 @@ export async function loadExternalPlugins(
       failures.push({ id: manifest.id, dir, reason: 'node entrypoint must default-export { name, init, ready?, dispose? } from an ESM bundle' })
       continue
     }
-    // The host binds every namespace from the MANIFEST id. A mismatch means the package is
+    // The host binds every namespace from the manifest id. A mismatch means the package is
     // internally inconsistent, and picking a winner silently is how squatting starts.
     if (plugin.name !== manifest.id) {
       failures.push({ id: manifest.id, dir, reason: `bundle declares name '${plugin.name}' but the manifest id is '${manifest.id}'` })
       continue
     }
 
-    // Shadowing a built-in is how the loader is dogfooded: `scripts/build-plugin.mjs rollbar` installs
-    // the disk copy and the compiled-in one steps aside. Loud rather than silent, because "the version
-    // running is not the one in this binary" is the single most confusing thing a support thread can
-    // fail to mention.
+    // Shadowing a built-in during a staged migration (docs/plugins.md § The dev loop). Loud rather
+    // than silent, because "the version running is not the one in this binary" is the single most
+    // confusing thing a support thread can fail to mention.
     const shadowsBuiltin = builtins.has(manifest.id)
     if (shadowsBuiltin) {
       console.warn(`[plugins] ${manifest.id}: loading from ${dir} INSTEAD of the built-in`)

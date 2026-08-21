@@ -1,8 +1,7 @@
-// The single authenticated WebSocket hub (docs/electron.md §12): one socket on the loopback
-// origin carries every live stream (shared/ws.ts). It lives in the utility service beside the
-// PTY engine; terminal.ts registers the stream handlers, notify.ts broadcasts the
-// pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it shares
-// the loopback listener and its Host guard.
+// The single authenticated WebSocket hub (docs/api-reference.md § WebSocket). It lives in the
+// utility service beside the PTY engine: terminal.ts registers the stream handlers and notify.ts
+// broadcasts pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it
+// shares the loopback listener and its Host guard.
 import { verifyInternalToken, type InternalClaims } from '../server/auth/internalTokens'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
@@ -12,7 +11,7 @@ import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import { WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
 import { claimUpgrade } from './upgradeClaim'
 
-// A sink is one connection's outlet for a session's ServerMsg frames — terminal.ts adds/removes it
+// A sink is one connection's outlet for a session's ServerMsg frames. terminal.ts adds and removes it
 // from a session's subscriber set on attach/detach and calls it to push output.
 export type StreamSink = (msg: ServerMsg) => void
 
@@ -23,7 +22,7 @@ export type StreamHandlers = {
   attach(id: string, sink: StreamSink): void
   detach(id: string, sink: StreamSink): void
   // Which task a stream belongs to, or null/undefined when the id is unknown. Required for the
-  // task-scope check in onConnect: a task-scoped internal credential may only drive its OWN task's
+  // task-scope check in onConnect: a task-scoped internal credential may only drive its own task's
   // streams, and only the engine that owns the sessions can answer that question.
   streamTaskId(id: string): string | null | undefined
 }
@@ -32,8 +31,8 @@ let handlers: StreamHandlers | null = null
 export const setStreamHandlers = (h: StreamHandlers | null): void => void (handlers = h)
 
 // Generic channel handlers: a plugin claims a channel prefix (the token before the first ':', e.g.
-// 'docker') and receives every client frame on it plus a disconnect signal per connection. `conn`
-// is an opaque per-connection identity token — key subscription maps by it, never look inside.
+// 'docker') and receives every client frame on it plus a disconnect signal per connection. `conn` is
+// an opaque per-connection identity token. Key subscription maps by it, never look inside.
 export type WsChannelHandler = {
   onFrame(frame: WsClientFrame, send: (frame: WsServerFrame) => void, conn: object): void
   onDisconnect(conn: object): void
@@ -46,7 +45,7 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
   else channelHandlers.delete(prefix)
 }
 
-// `deviceId` is null for an internal-token socket — the one credential kind with no device row to
+// `deviceId` is null for an internal-token socket, the one credential kind with no device row to
 // revoke. `seq` is this connection's own counter (docs/api-reference.md § Events), so a
 // reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
 type Conn = {
@@ -54,10 +53,9 @@ type Conn = {
   sinks: Map<string, StreamSink>
   deviceId: string | null
   seq: number
-  // The claims of an internal credential, when this socket authenticated with one. Retained rather than
-  // discarded at the door: without it a 'task'-scoped token could attach to, and type into, ANY task's
-  // pseudo-terminal — arbitrary command execution as the owner in another task's shell, which is
-  // exactly what scoping the token was supposed to prevent.
+  // The claims of an internal credential, when this socket authenticated with one. Retained rather
+  // than discarded at the door: this is what onConnect and mayDriveStream need to enforce task scope
+  // (docs/security.md § Transport and auth).
   internal?: InternalClaims
   missedPongs: number
 }
@@ -66,8 +64,8 @@ const hubDisposers = new WeakMap<Server, () => void>()
 
 // Two unanswered pings, not one: a single miss on a congested link is not evidence, and the cost of
 // being wrong is tearing down a working socket and every stream attached to it. The ping rides the
-// existing revocation sweep rather than a second timer — same cadence, one thing to unref, and the sweep
-// is already the "walk every connection" loop.
+// existing revocation sweep rather than a second timer, so there is one cadence and one thing to
+// unref.
 const MISSED_PONGS_BEFORE_DEAD = 2
 
 const MAX_BUFFERED_BYTES = 4 * 1024 * 1024
@@ -82,25 +80,12 @@ function sendFrame(conn: Conn, frame: WsServerFrame): void {
 
 // Is this connection confined to a single task? The socket-level twin of requireUser.ts's
 // `isTaskConfined`, kept here rather than imported because that one reads a Hono context and this one
-// reads a Conn — same rule, two different carriers of the same claims.
-//
-// A device is the owner and a 'service'-scoped token is the node calling itself; both are unconfined.
+// reads a Conn: same rule, two different carriers of the same claims.
 const isConfined = (conn: Conn): boolean => !!conn.internal && conn.internal.scope !== 'service'
 
-// Session-status pings + workflow notices go to every open socket (notify.ts). Sessions' own output
-// goes only to attached sockets, via their per-session sink.
-//
-// A task-confined socket receives NOTHING from here, and the reason is that not one broadcast frame is
-// task-addressed, so there is nothing to narrow: `workflow:step:event` carries a whole agent turn's raw
-// stream (assistant text and tool results) keyed only by runId, `workflow:notice` carries another task's
-// title, `agent:session`/`agent:event` carry another task's session, and `term:status`/`docker:changed`
-// are content-free cache-dirty pings whose only value is to a UI. So the filter is the frame-shaped
-// equivalent of the HTTP side, which now 404s a foreign run — without it the socket handed back exactly
-// what those route guards had just taken away.
-//
-// Rejected: filtering per channel on a taskId in the payload. Only `workflow:notice` has one; runId and
-// sessionId would each need a lookup through a plugin the hub must not know about, and the default for a
-// channel added later would silently be "leak it".
+// Session-status pings and workflow notices go to every open socket (notify.ts); a session's own
+// output goes only to attached sockets, through their per-session sink. A task-confined socket
+// receives none of this (docs/security.md § Transport and auth).
 export function wsBroadcast(frame: WsServerFrame): void {
   for (const c of conns) {
     if (isConfined(c)) continue
@@ -108,7 +93,7 @@ export function wsBroadcast(frame: WsServerFrame): void {
   }
 }
 
-// True when any socket is connected — notify.ts uses the same "no window layer → no-op" idea for WS.
+// True when any socket is connected. notify.ts uses the same "no window layer means no-op" idea for WS.
 export const wsHasClients = (): boolean => conns.size > 0
 
 export type WsAuthDeps = {
@@ -137,18 +122,17 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
   if (!deps.allowedHosts.has(req.headers.host ?? '')) return null
   const bearer = req.headers.authorization
   if (bearer?.startsWith('Bearer ')) {
-    // A bearer that fails does NOT fall through to the internal token: presenting a credential and
+    // A bearer that fails does not fall through to the internal token: presenting a credential and
     // having it rejected is a rejection, not an invitation to try the next mechanism.
     const authenticated = await deps.devices.authenticate(bearer.slice('Bearer '.length).trim())
     return authenticated ? { deviceId: authenticated.deviceId } : null
   }
   const token = req.headers['x-acorn-internal']
-  // HMAC-verified, not compared with `===`. Two changes in one: the plain equality leaked the token's
-  // length and a prefix-match position through timing (the HTTP path already used a constant-time
-  // compare, this one did not), and INTERNAL_TOKEN is now a signing key rather than the credential
-  // (server/auth/internalTokens.ts). An internal socket still gets `deviceId: null` — it has no device
-  // row to revoke — but the claims are carried so a future sweep can close a task's sockets when the
-  // task ends.
+  // HMAC-verified, not compared with `===`, which used to leak the token's length and a prefix-match
+  // position through timing. INTERNAL_TOKEN is now a signing key rather than the credential
+  // (server/auth/internalTokens.ts). An internal socket still gets `deviceId: null`, since it has no
+  // device row to revoke, but the claims are carried so a future sweep can close a task's sockets when
+  // the task ends.
   if (typeof token !== 'string' || !token) return null
   const claims = verifyInternalToken(deps.internalToken, token)
   return claims ? { deviceId: null, internal: claims } : null
@@ -177,19 +161,14 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
       if (!parsed.success) return
       frame = parsed.data
     } catch {
-      return // non-JSON noise — ignore defensively
+      return // non-JSON noise, ignore defensively
     }
     if (frame.channel.startsWith('term:')) {
       if (!handlers) return
-      // Scope check BEFORE any handler runs. A device socket is the owner and may drive anything; an
-      // internal socket may drive only the streams of the task its credential names. An unknown stream
-      // id is refused for a task-scoped caller rather than allowed — failing open here would make the
-      // check trivially bypassable by racing session creation.
-      //
-      // Narrowed once, here, because the frame envelope is open now (@acorn/protocol/ws.ts): the union
-      // used to do this discrimination for us. The runtime guards below are unchanged and every one of
-      // them is load-bearing — the union only ever proved the shapes to the compiler, never to a peer
-      // sending JSON.
+      // Scope check before any handler runs (docs/security.md § Transport and auth). Narrowed once,
+      // here, because the frame envelope is open now (@acorn/protocol/ws.ts): the runtime guards below
+      // are load-bearing on their own, since the union only ever proved the shapes to the compiler,
+      // never to a peer sending JSON.
       const { id, data } = frame as { id?: unknown; data?: unknown }
       const streamId = typeof id === 'string' ? id : null
       if (!mayDriveStream(conn, streamId)) return
@@ -210,24 +189,19 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
       }
       return
     }
-    // Every non-`term:` channel is refused outright for a task-confined socket, mirroring the posture
-    // workflows' node-wide trigger-poll route takes (isTaskConfined → 403): there is no task to narrow
-    // the frame to, so the only honest answer is no.
+    // Every non-`term:` channel is refused outright for a task-confined socket, the same posture
+    // workflows' node-wide trigger-poll route takes: there is no task to narrow the frame to, so the
+    // only honest answer is no (docs/security.md § Transport and auth, on the docker-exec finding this
+    // check closes).
     //
-    // This is not hypothetical tidying. The scope check above lived INSIDE the `term:` branch, and
-    // `docker:exec:open` spawns `docker exec -it <ref> sh -c …` with `docker:exec:in` writing arbitrary
-    // bytes to it — so a task-scoped credential (which an agent holds in its own environment, along with
-    // the data root that names the port) got an interactive root shell in any container on the machine,
-    // one directory away from the guard that exists to stop exactly that.
-    //
-    // A per-channel opt-in on WsChannelHandler was considered and rejected: docker browse and exec are a
-    // renderer surface with no agent consumer, so the opt-in would have no takers, and the safe default
-    // has to be the one a channel added later inherits.
+    // A per-channel opt-in on WsChannelHandler was considered and rejected: docker browse and exec are
+    // a renderer surface with no agent consumer, so the opt-in would have no takers, and the safe
+    // default has to be the one a channel added later inherits.
     if (isConfined(conn)) return
     channelHandlers.get(frame.channel.split(':')[0])?.onFrame(frame, (f) => sendFrame(conn, f), conn)
   })
   const cleanup = () => {
-    if (!conns.delete(conn)) return // 'error' + 'close' can both fire — run once
+    if (!conns.delete(conn)) return // 'error' and 'close' can both fire, run once
     for (const [id, sink] of conn.sinks) handlers?.detach(id, sink)
     conn.sinks.clear()
     for (const handler of channelHandlers.values()) handler.onDisconnect(conn)
@@ -249,15 +223,15 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   const wss = new WebSocketServer({ noServer: true })
   // Immediate path: the revoke that happened in this process tells us directly.
   const offRevoked = deps.devices.onRevoked(dropDevice)
-  // Backstop for long-lived streams (docs/api-reference.md § Pairing, security.md § Transport: "re-check
-  // revocation every 60s"). It covers a revoke this hub never heard about — another process, or a
-  // listener registered after the revoke — which is exactly the case a live socket cannot detect,
-  // since it holds no bearer to re-present.
+  // Backstop for long-lived streams (docs/api-reference.md § Pairing, docs/security.md § Transport and
+  // auth). It covers a revoke this hub never heard about, another process, or a listener registered
+  // after the revoke, which is exactly the case a live socket cannot detect since it holds no bearer
+  // to re-present.
   const sweep = setInterval(() => {
     for (const conn of [...conns]) {
       // Liveness first, and synchronously: a socket whose peer has vanished is one this hub should stop
       // holding stream subscriptions open for, and asking the database whether its device is still active
-      // tells us nothing about that. Checked BEFORE the ping is sent, so the count read here is of pings
+      // tells us nothing about that. Checked before the ping is sent, so the count read here is of pings
       // that have already had a full interval to be answered.
       if (conn.missedPongs >= MISSED_PONGS_BEFORE_DEAD) {
         conn.ws.terminate()
@@ -280,10 +254,10 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   // A background sweep must never be the reason the process stays alive.
   sweep.unref?.()
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
-    // Only claim our path — other upgrades (if any) are left for their own handlers.
+    // Only claim our path. Other upgrades, if any, are left for their own handlers.
     let path: string
     try {
-      // Only a syntactic base for parsing the path out — a request with no Host is refused by
+      // Only a syntactic base for parsing the path out. A request with no Host is refused by
       // authorize() below regardless, so the placeholder never decides anything.
       path = new URL(req.url ?? '', `http://${req.headers.host ?? 'placeholder.invalid'}`).pathname
     } catch {

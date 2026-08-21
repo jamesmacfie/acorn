@@ -7,14 +7,14 @@ import type { DeviceService } from '../server/auth/deviceTokens'
 import { attachTunnel, disposeTunnel, TUNNEL_PATH } from './tunnel'
 import { isUpgradeClaimed } from './upgradeClaim'
 
-// The tunnel is the single most sensitive upgrade this server offers — a raw TCP pipe to a port on the
-// node's host — so these are its four refusals plus the one thing it is for.
+// The tunnel is the single most sensitive upgrade this server offers, a raw TCP pipe to a port on the
+// node's host, so these are its four refusals plus the one thing it is for.
 
 const INTERNAL_KEY = 'k'.repeat(64)
 const DEVICE_TOKEN = 'acorn_dt_test'
 
-// A revocable stub. The tunnel has to honour both halves of docs/api-reference.md § Pairing — the immediate
-// `onRevoked` callback AND the periodic `isActive` sweep — so both are drivable here.
+// A revocable stub. The tunnel has to honour both halves of docs/api-reference.md § Pairing: the
+// immediate `onRevoked` callback and the periodic `isActive` sweep, so both are drivable here.
 let active = new Set(['d1'])
 let fireRevoked: ((deviceId: string) => void) | null = null
 const devices = {
@@ -76,16 +76,16 @@ beforeEach(async () => {
 
 afterEach(async () => {
   disposeTunnel(http)
-  // Reap every socket before close(). A refused upgrade leaves a half-closed connection, and an upgrade no
-  // handler answered leaves an open one — `close()` waits for both forever otherwise, which shows up as a
-  // ten-second hook timeout rather than as the test that caused it.
+  // Reap every socket before close(). A refused upgrade leaves a half-closed connection, and an
+  // upgrade no handler answered leaves an open one. Otherwise close() waits for both forever, which
+  // shows up as a ten-second hook timeout rather than as the test that caused it.
   http.closeAllConnections?.()
   await new Promise<void>((resolve) => http.close(() => resolve()))
   await new Promise<void>((resolve) => echo.close(() => resolve()))
 })
 
-// A port nothing is listening on, obtained by binding and releasing one — guessing an offset can collide
-// with something real on the machine running the suite.
+// A port nothing is listening on, obtained by binding and releasing one. Guessing an offset can
+// collide with something real on the machine running the suite.
 const freePort = async (): Promise<number> => {
   const probe = createTcpServer()
   await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', () => resolve()))
@@ -122,7 +122,7 @@ function open(target: string, headers: Record<string, string>, payload = 'ping',
   })
 }
 
-// Opens a tunnel and KEEPS it open, resolving once the echo has come back so the pipe is known live.
+// Opens a tunnel and keeps it open, resolving once the echo has come back so the pipe is known live.
 // Returns a promise that settles when the socket closes, which is what revocation has to cause.
 function hold(target: string, headers: Record<string, string>): Promise<{ closed: Promise<void>; ws: WebSocket }> {
   return new Promise((resolve, reject) => {
@@ -145,8 +145,9 @@ describe('attachTunnel', () => {
   })
 
   it('refuses an undeclared port', async () => {
-    // docs/api-reference.md § Streams: "Only declared ports; no general SOCKS." Without this the pipe is a proxy to
-    // anything listening on the node's loopback — every database, every other app's dev server.
+    // Only a declared port is tunnellable (docs/api-reference.md § WebSocket). Without this the pipe
+    // is a proxy to anything listening on the node's loopback, every database, every other app's dev
+    // server.
     declared = [echoPort + 1]
     await expect(open(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })).rejects.toThrow(/status 403/)
   })
@@ -158,17 +159,17 @@ describe('attachTunnel', () => {
 
   it('refuses a task-scoped credential aimed at another task', async () => {
     // The hole this closes: an agent holds ACORN_API_TOKEN and can reach the node's own listener, so
-    // without the check it could open a pipe to any port ANY other task declares.
+    // without the check it could open a pipe to any port any other task declares.
     const foreign = mintInternalToken(INTERNAL_KEY, { scope: 'task', taskId: 'task-2' })
     await expect(open(url('task-1', echoPort), { 'x-acorn-internal': foreign })).rejects.toThrow(/status 403/)
-    // …and its own task still works, so the refusal is the scope check and not the credential kind.
+    // ...and its own task still works, so the refusal is the scope check and not the credential kind.
     const own = mintInternalToken(INTERNAL_KEY, { scope: 'task', taskId: 'task-1' })
     await expect(open(url('task-1', echoPort), { 'x-acorn-internal': own })).resolves.toBe('PING')
   })
 
   it('refuses a foreign Host header', async () => {
-    // The DNS-rebinding guard the HTTP surface has. Reached through authorizeWsUpgrade, which is why the
-    // tunnel reuses it rather than writing its own door.
+    // The DNS-rebinding guard the HTTP surface has, reached through authorizeWsUpgrade, which is why
+    // the tunnel reuses it rather than writing its own door.
     await expect(
       open(`ws://127.0.0.1:${httpPort}${TUNNEL_PATH}?task=task-1&port=${echoPort}`, {
         authorization: `Bearer ${DEVICE_TOKEN}`,
@@ -178,8 +179,8 @@ describe('attachTunnel', () => {
   })
 
   it('answers 502 when nothing is listening on a declared port', async () => {
-    // Distinguishable from 403 on purpose: "you may not ask for that" and "your dev server is not running"
-    // are different problems, and the preview pane says different things about them.
+    // Distinguishable from 403 on purpose: "you may not ask for that" and "your dev server is not
+    // running" are different problems, and the preview pane says different things about them.
     const dead = await freePort()
     declared = [dead]
     await expect(open(url('task-1', dead), { authorization: `Bearer ${DEVICE_TOKEN}` })).rejects.toThrow(/status 502/)
@@ -193,7 +194,7 @@ describe('attachTunnel', () => {
 
   it('closes a live pipe on the periodic sweep, for a revoke it never heard about', async () => {
     // The backstop wsHub also has: another process revoked, or this listener was registered after the
-    // revoke. Driven by flipping `isActive` WITHOUT firing onRevoked, so the callback cannot be the
+    // revoke. Driven by flipping `isActive` without firing onRevoked, so the callback cannot be the
     // explanation.
     const held = await hold(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })
     active.delete('d1')
@@ -224,19 +225,19 @@ describe('attachTunnel', () => {
       process.off('uncaughtException', onUncaught)
       slowPorts = 0
     }
-    // …and the tunnel still works afterwards, so the process did not merely survive by going deaf.
+    // ...and the tunnel still works afterwards, so the process did not merely survive by going deaf.
     await expect(open(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })).resolves.toBe('PING')
   })
 
   it('claims only its own upgrade path', async () => {
-    // The events hub attaches to the same listener, so a tunnel that answered EVERY upgrade would have
+    // The events hub attaches to the same listener, so a tunnel that answered every upgrade would have
     // broken `/v2/events` the moment it was attached.
     //
-    // Asserted by watching this request go unanswered, with NO second handler registered — the earlier
-    // shape (register a rival handler and check it wins) could not distinguish anything: Node calls both
-    // listeners, ours completes asynchronously after an await, so the synchronous rival always won the race
-    // whether or not the path was checked. The query deliberately carries a valid task and port, so
-    // `parseTarget` would accept it if the path comparison were the only thing stopping it.
+    // Asserted by watching this request go unanswered, with no second handler registered: the earlier
+    // shape of registering a rival handler and checking it wins could not distinguish anything, since
+    // Node calls both listeners and the synchronous rival always won the race whether or not the path
+    // was checked. The query carries a valid task and port, so `parseTarget` would accept it if the
+    // path comparison were the only thing stopping it.
     await expect(
       open(`ws://${allowedHost}/v2/events?task=task-1&port=${echoPort}`, { authorization: `Bearer ${DEVICE_TOKEN}` }, 'ping', 700),
     ).rejects.toThrow()

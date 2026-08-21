@@ -45,10 +45,10 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
 
   const { keyPem, certPem, fingerprint } = ensureCert(root.dir)
 
-  // Host guard (docs/electron.md §4g): binding an interface is not the same as answering to any name on
-  // it, so a Host we did not expect is refused. That is what stops a DNS-rebinding page from reaching this
-  // API as some other origin. Loopback is always allowed; anything else is here because the operator
-  // advertised it (main/advertise.ts).
+  // Host guard (docs/node-distribution.md § Reaching a node from another machine): binding an
+  // interface is not the same as answering to any name on it, so a Host we did not expect is refused.
+  // Loopback is always allowed; anything else is here because the operator advertised it
+  // (main/advertise.ts).
   //
   // One Set, shared by reference with the two upgrade handlers below and filled in place once the kernel
   // has picked a port. It starts empty and therefore rejects everything, which is the safe direction for
@@ -83,7 +83,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
   const server = createAdaptorServer({
     fetch,
     createServer: createHttpsServer,
-    // TLS 1.3 only (docs/security.md § Transport and authentication). Every client is one we ship, the
+    // TLS 1.3 only (docs/security.md § Transport and auth). Every client is one we ship, the
     // broker's https.Agent, `ws`, and Node children, so there is no legacy peer to accommodate, and
     // pinning the floor here means the transport cannot be downgraded.
     serverOptions: { key: keyPem, cert: certPem, minVersion: 'TLSv1.3' },
@@ -147,7 +147,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
       root.recordPort(address.port)
       console.log(`acorn server on https://127.0.0.1:${address.port}`)
       for (const host of advertised) console.log(`acorn server also answering to https://${host}:${address.port}`)
-      server.off('error', onError) // listening — later runtime errors are not listen failures
+      server.off('error', onError) // listening, later runtime errors are not listen failures
       // Loopback, even when advertising: this origin is handed to child processes, which validate the
       // certificate fully against its IP:127.0.0.1 SAN. The address a remote client uses is the one the
       // operator was shown, not this.
