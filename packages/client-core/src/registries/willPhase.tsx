@@ -13,7 +13,7 @@ type Prompt = {
 }
 
 /** What the caller learns. `checked` is the id of every concern whose checkbox was still ticked when
- *  the owner confirmed — for `task:archive` those are the qualified ids the node matches against its
+ *  the owner confirmed. For `task:archive` those are the qualified ids the node matches against its
  *  task-check registry, and the caller passes them straight through to the archive request. */
 export type WillDecision = { confirmed: boolean; checked: string[] }
 

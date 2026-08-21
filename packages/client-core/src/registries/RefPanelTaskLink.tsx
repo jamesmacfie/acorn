@@ -9,18 +9,8 @@ import { createTask } from '../tasks/mutations'
 import { Button, Select, Toolbar } from '../ui/primitives'
 import type { RefPanelTarget } from './refPanels'
 
-// "Is there a task for this thing, and if not, start one" — for ANY provider's reference panel.
-//
-// THE HOST DRAWS IT, and that is the load-bearing decision rather than a placement preference. A panel is
-// frequently a sandboxed third-party rectangle, and creating a task is a core write that makes a worktree
-// on the owner's disk. A plugin drawing this button itself would have to hold `core.tasks:write`
-// permanently — for everything it ever does, not just for this click — to earn one affordance. Here the
-// plugin holds nothing and the host does the write.
-//
-// It is a component a panel RENDERS rather than chrome wrapped around every panel, because the two kinds
-// of panel disagree about who owns the box: a frame panel is wrapped by the host (plugins/frames/
-// PluginRefPanel.tsx), a first-party one draws its own. One component both can place keeps the logic in
-// one place without the host having to win that argument.
+// "Is there a task for this thing, and if not, start one" for any provider's reference panel
+// (docs/panes.md § Not a pane: the reference panel).
 
 export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
   const navigate = useNavigate()
@@ -31,9 +21,9 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
   const [chosen, setChosen] = createSignal('')
   const [busy, setBusy] = createSignal(false)
 
-  // Narrowed to the workspace the reader is in WHEN there is one to read. A panel opened over a project
-  // page has a routed project and therefore a workspace; one opened over a dashboard has neither, and the
-  // honest answer there is every repo rather than a guessed subset.
+  // Narrowed to the workspace the reader is in when there is one to read. A panel opened over a
+  // project page has a routed project and therefore a workspace; one opened over a dashboard has
+  // neither, and the honest answer there is every repo rather than a guessed subset.
   const choices = createMemo(() => {
     const all = (projects.data ?? []).filter((project) => !project.hidden && project.path)
     const workspace = all.find((project) => project.id === params.projectId)?.workspaceId
@@ -41,14 +31,14 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
   })
   const projectId = (): string => chosen() || (choices().length === 1 ? choices()[0]!.id : '')
 
-  // `taskTracksRef` and not a link check written here, which is what this first did and why it was wrong
-  // for the provider it was written alongside. A github-pr task records its pull request as `pullNumber`
-  // on the task row rather than as a link, so matching only `task.links` found nothing for a PR and
-  // offered to create a task that already existed. The host asks links first and then every source
-  // (registries/sources.ts § tracksRef).
+  // `taskTracksRef`, not a link check written here (docs/plugins.md § "Loaded plugins: the client
+  // half"): a github-pr task records its pull request as `pullNumber` on the task row rather than as
+  // a link, so matching only `task.links` found nothing for a PR and offered to create a task that
+  // already existed.
   //
-  // FIRST match, and the honest ceiling: one reference can accumulate several tasks over time and this
-  // shows the oldest. A chooser is the upgrade, and it needs a design rather than a `find` → `filter`.
+  // First match, and the honest ceiling: one reference can accumulate several tasks over time and
+  // this shows the oldest. A chooser is the upgrade, and it needs a design rather than a `find` →
+  // `filter`.
   const existing = createMemo(() => (tasks.data ?? []).find((task) => taskTracksRef(task, props.target)))
 
   const open = (task: Task): void => {
@@ -58,8 +48,9 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
 
   const create = async (): Promise<void> => {
     const project = projectId()
-    // A ticket names no repo, so SOMETHING has to answer that, and the honest answer is the owner. Which
-    // is why this is a picker whenever the choice is real, and not a button that quietly picks for them.
+    // A ticket names no repo, so something has to answer that, and the honest answer is the owner.
+    // Which is why this is a picker whenever the choice is real, and not a button that quietly picks
+    // for them.
     if (!project || busy()) return
     setBusy(true)
     try {
@@ -67,9 +58,9 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
         origin: 'manual',
         projectId: project,
         title: props.target.displayId,
-        // The link is the whole point: it is what makes the NEXT visit to this panel offer to open the
-        // task rather than to make a second one. A target with no connection cannot seed one — the seed
-        // requires it — so that case creates a plain task, and the link can be added from the task side.
+        // The link is the whole point: it is what makes the next visit to this panel offer to open
+        // the task rather than make a second one. A target with no connection cannot seed one, so
+        // that case creates a plain task, and the link can be added from the task side.
         ...(props.target.connectionId
           ? { links: [{ connectionId: props.target.connectionId, identifier: props.target.displayId, providerId: props.target.providerId }] }
           : {}),

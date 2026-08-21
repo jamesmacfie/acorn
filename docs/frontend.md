@@ -30,6 +30,29 @@ explicit default lazily after plugin registration, with declared rail order as a
 The shell consumes that accessor for initial selection, persistence, workspace restoration, and task
 fallbacks; provider-specific navigation commands belong to the owning plugin.
 
+Every registry's `order` is a required field, not inferred from where its plugin activates. Plugin
+activation order is otherwise invisible in the code and only lightly covered by end-to-end tests, so
+leaving order optional and falling back to activation order let a reorder land with nothing to catch
+it. Panes, rail sources, settings pages, shell slots, and palette rows all sort on this same explicit
+field for that reason.
+
+A rail source may also gate itself with a `when` predicate, for relevance that is not an integration
+question. Core's own Fleet home is the one user of it: the predicate is true only once more than one
+Node is registered, so a single-Node install never sees a rail entry for a concept it has not met.
+
+A Fleet home node card can also carry a plugin's own number alongside core's task count
+(`registries/nodeStats.ts`). The card lives in client-core, which cannot import the agents or workflows
+plugins to ask them directly, so a plugin registers its own labelled count instead. A stat is fetched
+per Node the same way the attention inbox is, but is not merged with it: an attention item is a
+navigable row with a severity and a target, and a stat is one integer with a label.
+
+Several client registries (`slots.ts`, `contextMenus.ts`, `extensionPoints.ts`, and
+`exclusiveSlots.ts`) hold no JSX import. The vitest suite for this package runs in a bare Node
+environment with no Solid transform, so a module that imports a `.tsx` file cannot be loaded by a test
+at all. Each of these registries keeps its rules (ordering, gates, resolution) in a plain module for
+that reason, and pairs it with a small `.tsx` host that only draws what the registry already decided,
+kept as thin as the job allows because that half can only be checked by looking at the running app.
+
 The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `CommandPalette.tsx` consume
 registry entries and client-core contracts. A feature that needs native behavior goes through the
 platform seam (`client-core/src/platform/`), which `@acorn/plugin-api/client` re-exports the plugin-safe
@@ -88,6 +111,14 @@ The terminal drawer is a task surface and is available when the desktop terminal
 Overlays are shell-owned: command palette, settings, onboarding, notices, confirmations, and secret
 entry are not rendered by arbitrary pane content. Native preview views are positioned by the main
 process over a renderer pane host and hidden while overlays cover them.
+
+The top bar's bell renders two different kinds of item, and the difference matters to whatever
+produces one. A notice is an event that already happened, such as a run finishing or a build
+failing: it is client-local, dismissible, and gone once the ring rolls over it. An attention item
+(`registries/attention.ts`) is a state that persists until something changes on the Node: a pending
+approval is still pending after a person dismisses it, so it returns on the next fetch. That is why
+attention items are fetched per Node rather than pushed, and why they carry no `read` flag; a notice
+is fired once and forgotten.
 
 ## Restore and persistence
 
