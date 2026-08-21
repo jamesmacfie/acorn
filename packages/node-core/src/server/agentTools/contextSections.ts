@@ -12,25 +12,15 @@ type TaskRow = typeof schema.tasks.$inferSelect
 type AssembleArgs = { db: AppDatabase; userLogin: string; task: TaskRow; repo: string; github: { owner: string; name: string } | null; workflowRunId?: string }
 type ContextDraft = {
   items: ContextItem[]
-  // The response adapter is intentionally separate from canonical `items`: existing task-context
-  // clients still consume the top-level fields in TaskContext, while new consumers use sections.
+  // Kept separate from canonical `items` (docs/agent-tools.md § Context sections).
   compatibility?: Partial<Pick<TaskContext, 'pr' | 'issues' | 'notes' | 'memory'>>
   absent?: ContextSectionResult['absent']
 }
 
 export type ContextSectionContribution = {
   id: string
-  // Where this section sits in the assembled block. DECLARED by the section, not ranked by core.
-  //
-  // The order used to be a hardcoded `['pr','issues','notes','memory']` list in this file — core
-  // sequencing four plugin-owned ids, which meant a fifth section could only ever land at the end and
-  // a plugin could not say where it belonged. This is the same "sort on a declared field, never on
-  // when you registered" rule the client-side pane and slot registries already follow, and the numbers
-  // are spaced so a new section can slot between two without renumbering.
-  //
-  // The ORDER IS LOAD-BEARING, not cosmetic: every existing prompt, the client's Manifest preview and
-  // the byte-exactness invariant all assume pr, issues, notes, memory. Changing a number changes what
-  // an agent reads.
+  // Where this section sits in the assembled block, declared by the section rather than ranked by
+  // core, and load-bearing for existing prompts (docs/agent-tools.md § Context sections).
   order: number
   label: string
   defaultIncluded: boolean
@@ -101,17 +91,12 @@ function budgetCompatibilityProjection(
 
 const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more omitted` : '')
 
-// INVARIANT (relied on by the client-side Manifest preview + local send assembly, docs/ui-design.md):
-// a section's `compact` MUST be computed independently of which *other* sections are included. This lets
-// the client assemble the exact send block from a single `include=*` inventory by filtering ctx.sections
-// and calling formatContextBlock — no second curated fetch. A new section that reads sibling inclusion
-// state into its compact breaks that byte-exactness silently. Don't.
+// Invariant: a section's `compact` must be computed independently of which other sections are
+// included (docs/agent-tools.md § Context sections).
 
 // ─── The sections ───────────────────────────────────────────────────────────────────────────────
 //
-// Sections are registered by the plugin or core service that owns their rows. The shared contract keeps
-// budgets, compatibility projections, and wire formatting consistent for the route, manifest preview, and send
-// assembly.
+// Registered by whoever owns the rows (docs/agent-tools.md § Context sections).
 
 export function pullRequestSection(source: ContextPullRequestSource): PluginContextSection {
   return {
@@ -148,10 +133,9 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
   }
 }
 
-// CORE's own: `task_links` and `issues` are core tables and stay core's — plugins/linear and plugins/rollbar
-// write them through the ExternalItemStore seam rather than owning them (server/integrations/itemStore.ts
-// states the full argument). This is also the only section that reads `db`, which is why PluginContextSection
-// can withhold the handle without costing anything.
+// `task_links` and `issues` are core tables (docs/data-layer.md § External-item read model);
+// GitHub and Rollbar write them through the ExternalItemStore seam. This is also the only section
+// that reads `db`, which is why PluginContextSection can withhold the handle at no cost.
 export const linkedIssuesSection: ContextSectionContribution = {
   id: 'issues',
   order: 20,
@@ -275,10 +259,10 @@ class ContextSectionRegistry {
     }
   }
 
-  // ORDER IS THE WIRE ORDER of the assembled block, so it cannot be registration order.
-  // Sorted on each section's DECLARED order. Ties keep registration order, because Array.sort is stable
-  // — two sections claiming the same slot is a contribution the author should fix, not something for
-  // this list to arbitrate.
+  // The wire order of the assembled block (docs/agent-tools.md § Context sections), so list() sorts
+  // on each section's declared order rather than registration order. Ties keep registration order
+  // because Array.sort is stable; two sections claiming the same slot is a contribution the author
+  // should fix, not something for this list to arbitrate.
   list(): readonly ContextSectionContribution[] {
     return this.#registrations.map((r) => r.section).sort((a, b) => a.order - b.order)
   }
@@ -287,9 +271,9 @@ class ContextSectionRegistry {
 
 const registry = new ContextSectionRegistry()
 
-// Widen a plugin's `db`-less section to the registry's shape by DROPPING the handle. One helper rather
+// Widen a plugin's `db`-less section to the registry's shape by dropping the handle. One helper rather
 // than an inline lambda at the plugin host, so the place the handle is withheld is a named thing a reader
-// can find — and so a test registering a plugin-shaped section goes through the same path production does.
+// can find, and so a test registering a plugin-shaped section goes through the same path production does.
 export const asContextSection = (section: PluginContextSection): ContextSectionContribution => ({
   ...section,
   assemble: ({ db: _db, ...rest }) => section.assemble(rest),

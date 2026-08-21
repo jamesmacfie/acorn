@@ -9,10 +9,9 @@ import {
   raisePluginRequest,
 } from './pluginRequests'
 
-// The one agent tool that can put third-party code on a node, and the thing worth asserting about it is
-// what it CANNOT do. Every test below is a variation on the same sentence: the tool raises a question, and
-// only a device answering that question makes anything happen (docs/security.md § Third-party plugin
-// bundles).
+// The one agent tool that can put third-party code on a node, and the thing worth asserting is what
+// it cannot do: every test below is a variation on "the tool raises a question, and only a device
+// answering it makes anything happen" (docs/agent-tools.md § plugin_request).
 
 const ctx = { taskId: 'task-1', userLogin: 'owner' }
 
@@ -23,10 +22,10 @@ beforeEach(() => _resetPluginRequests())
 
 describe('the tool cannot install', () => {
   it('imports nothing that could install, download or write to disk', () => {
-    // Structural, not behavioural, and deliberately so: the request/decision split is only a defence for
-    // as long as this module has no installer in reach. A future import of pluginInstaller here would
-    // give a prompt-injected agent a code path to arbitrary code execution on the node, and no unit test
-    // written against the handler's OUTPUT would notice.
+    // Structural, not behavioural: the request/decision split is only a defence for as long as this
+    // module has no installer in reach. A future import of pluginInstaller here would give a
+    // prompt-injected agent a code path to arbitrary code execution, and no test written against the
+    // handler's output would notice.
     const source = readFileSync(new URL('./pluginRequests.ts', import.meta.url), 'utf8')
     const imports = [...source.matchAll(/^import[^\n]*from '([^']+)'/gm)].map((match) => match[1])
     expect(imports).toEqual(['node:crypto', 'zod', './registry.ts', '@acorn/protocol/api.ts'])
@@ -85,8 +84,8 @@ describe('the owner’s answer', () => {
     decidePluginRequest(pending.requestId, { decision: 'approved', message: 'board 1.0.0 is installed.' })
 
     expect(await call(tool, args)).toEqual({ state: 'approved', message: 'board 1.0.0 is installed.' })
-    // Spent. A second identical call is a NEW question the owner has to answer, not a second use of the
-    // yes they already gave — which is what stops one approval from authorising two installs.
+    // Spent (docs/plugins.md § Approval-mediated install): a second identical call is a new question,
+    // not a second use of the yes already given.
     await expect(call(tool, args)).rejects.toMatchObject({ kind: 'needs-trust' })
     expect(pendingPluginRequests()).toHaveLength(1)
   })

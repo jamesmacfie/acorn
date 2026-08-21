@@ -20,10 +20,8 @@ import {
 } from './pluginAuthoring.ts'
 import type { CoreServices } from '../../main/core/index.ts'
 
-// The point of this file is DRIFT. The guide is text an agent believes, so the only failure mode worth
-// testing for is the vocabulary in it quietly falling behind the schemas that enforce it. Every test
-// below re-derives an answer from the source of truth and compares; none of them pins a hand-written
-// list, because a hand-written list here would be the very thing being guarded against.
+// The point of this file is drift: every test below re-derives an answer from the source of truth
+// and compares, rather than pinning a hand-written list (docs/agent-tools.md § plugin_authoring).
 
 describe('the derived vocabulary tracks the manifest schema', () => {
   it('derives something at all', () => {
@@ -38,11 +36,10 @@ describe('the derived vocabulary tracks the manifest schema', () => {
   })
 
   it('reads the two closed placement vocabularies off the things that enforce them', () => {
-    // Both are short enums that grow only when a host surface appears to draw them, and both are
-    // things an agent gets wrong from memory — a slot or a location this node does not have is a
-    // manifest that fails to parse. The locations have an independent declaration to compare against
-    // (@acorn/protocol/contextMenus.ts, which the client reads too); the slot enum does not, so it is
-    // checked the only way that proves anything: every listed name parses, and a plausible one does not.
+    // Both are short enums, and one has an independent declaration to compare against
+    // (`@acorn/protocol/contextMenus.ts`, which the client also reads); the slot enum does not, so
+    // it is checked the only way that proves anything: every listed name parses, and a plausible
+    // one does not.
     const v = pluginAuthoringVocabulary()
     expect(v.manifest.contextMenuLocations).toEqual([...CONTEXT_MENU_LOCATIONS])
     const withSlot = (slot: string) => pluginManifestShape.safeParse({
@@ -52,9 +49,6 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(v.manifest.slots.length).toBeGreaterThan(1)
     for (const slot of v.manifest.slots) expect(withSlot(slot), slot).toBe(true)
     expect(withSlot('overlay')).toBe(false)
-    // The two cross-plugin vocabularies, held to the same rule and against their own declarations: a
-    // location or a designated core surface an agent invents is a manifest that does not parse, and a
-    // list this projection silently read back as [] would be worse than no list at all.
     expect(v.manifest.extensionPointLocations).toEqual([...EXTENSION_POINT_LOCATIONS])
     expect(v.manifest.coreSlots).toEqual([...CORE_EXCLUSIVE_SLOTS])
     for (const value of [
@@ -85,8 +79,8 @@ describe('the derived vocabulary tracks the manifest schema', () => {
       const parsed = pluginManifestShape.safeParse({
         id: 'p', name: 'P', version: '1', apiVersion: PLUGIN_API_MAJOR, contributions: { [key]: overflowing },
       })
-      // Specifically the CAP, not the entries' shape — the placeholder above is not a valid descriptor
-      // for most of these keys, so "it failed" on its own would prove nothing about the number.
+      // Specifically the cap, not the entries' shape: the placeholder above is not a valid
+      // descriptor for most of these keys, so "it failed" alone would prove nothing about the number.
       const tooBig = parsed.success
         ? []
         : parsed.error.issues.filter((issue) => issue.code === 'too_big' && issue.path.join('.') === `contributions.${key}`)
@@ -95,9 +89,8 @@ describe('the derived vocabulary tracks the manifest schema', () => {
   })
 
   it('lists the theme palette a manifest must state in full', () => {
-    // A theme is refused unless its map holds EXACTLY these names, so an agent writing one from memory
-    // writes a manifest that will not parse. Derived from the strict object the schema builds over the
-    // palette, so a token added to the appearance contract reaches the guide with no edit here.
+    // A manifest's theme map must hold exactly these names. Deriving it from the schema's strict
+    // object means a token added to the palette reaches the guide with no edit here.
     const v = pluginAuthoringVocabulary()
     expect(v.manifest.themeTokens).toEqual([...THEME_PALETTE_TOKENS])
     // And the three the host writes from `dark` are not in it: they are not colours, and a manifest
@@ -131,9 +124,9 @@ describe('the derived vocabulary tracks the manifest schema', () => {
 })
 
 describe('the permission facets are the ones scopeCore honours', () => {
-  // A facet in the guide that grants nothing is a lie the agent writes into a manifest and then debugs.
-  // `scopeCore` gates by OMISSION, so "this token grants something" is exactly "the returned object is
-  // not empty" — which is also why an unknown token has to come back empty.
+  // A facet in the guide that grants nothing is a lie the agent writes into a manifest and then
+  // debugs. `scopeCore` gates by omission, so "this token grants something" is exactly "the
+  // returned object is not empty", which is also why an unknown token has to come back empty.
   const core = {
     fs: {}, git: {}, tasks: {}, context: {}, models: {}, identity: {}, prefs: { read: () => {}, write: () => {} },
     projects: { byId: 1, byGithub: 1, checkouts: 1, externalProjects: 1, config: 1, assertConfigTrusted: 1, setup: 1, create: 1, update: 1 },
@@ -161,10 +154,10 @@ describe('the two doors', () => {
   it('registers an opt-in context section that costs a normal task nothing', () => {
     const section = getContextSections().find((candidate) => candidate.id === PLUGIN_AUTHORING_SECTION)
     expect(section).toBeDefined()
-    // The whole affordability argument. If this ever flips, every task in the product starts paying for
-    // an authoring guide it is not using.
+    // The whole affordability argument (docs/agent-tools.md § plugin_authoring): if this ever
+    // flips, every task starts paying for a guide it is not using.
     expect(section?.defaultIncluded).toBe(false)
-    // After memory (40), so the four sections every existing prompt assumes keep their wire order.
+    // Keeps wire order after memory (docs/agent-tools.md § Context sections).
     expect(section?.order).toBeGreaterThan(40)
   })
 

@@ -24,12 +24,10 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
   const { db } = deps
   const empty = z.object({})
 
-  // The context-read tools compose from the shared section registry (contextSections.ts). Each section is
-  // registered by whoever owns its rows — core's `issues` below, and `pr`/`notes`/`memory` by their plugins
-  // — and the /context route reads the same assembler, so nothing to wire here.
+  // The context-read tools compose from the shared section registry (docs/agent-tools.md § Context
+  // sections); the /context route reads the same assembler.
 
   return [
-    // ── Context-read (read tier): compose from the shared section registry, no self-fetch ──────────
     {
       name: 'task_current',
       description: "The current acorn task: repo, branch, worktree path, PR number and linked issues.",
@@ -92,14 +90,11 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       },
     },
 
-    // ── Extending acorn itself ─────────────────────────────────────────────────────────────────────
-    //
-    // How to write one (read tier). Importing the module also registers the matching `plugin-authoring`
-    // context section, which is opt-in — a task not writing a plugin assembles it never.
+    // Extending acorn itself: writing one (read tier). Importing the module also registers the
+    // matching context section (docs/agent-tools.md § plugin_authoring).
     pluginAuthoringTool(),
-    // The only tool that can put third-party code on this node, and it does so by ASKING: it raises a
-    // request and rings the owner's bell. The install is performed by a device over the device-gated
-    // install route (agentTools/pluginRequests.ts says why that split is the whole design).
+    // The only tool that can put third-party code on this node, by asking rather than installing
+    // (docs/agent-tools.md § plugin_request).
     pluginRequestTool(broadcastPluginApprovalNotice),
   ]
 }
