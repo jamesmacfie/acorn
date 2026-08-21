@@ -19,24 +19,24 @@ const relTime = (at: number): string => {
   return `${Math.round(s / 86400)}d`
 }
 
-// The top-bar bell (docs/terminal-and-agents.md): unread pill + popover, now holding TWO sections.
+// The top-bar bell: unread pill plus popover, holding two sections.
 //
-// "Needs you" is the attention inbox (docs/ui-design.md § Prompts and notifications), fleet-wide and fetched from every
-// node. It shares the popover with notices rather than getting its own surface because the two answer
-// adjacent questions — "what needs me" and "what happened" — and the popover already has the row chrome,
-// the target-handler table and the task navigation both need. A separate rail source would have duplicated
-// all three and split the unread pill's meaning.
+// "Needs you" is the attention inbox, fleet-wide and fetched from every node. It shares the
+// popover with notices rather than getting its own surface because the two answer adjacent
+// questions, "what needs me" and "what happened", and the popover already has the row chrome, the
+// target-handler table and the task navigation both need. A separate rail source would have
+// duplicated all three and split the unread pill's meaning.
 //
-// The sections differ in kind and the copy says so: an attention item is a STATE on the node and cannot be
-// dismissed from here (dismiss it and the next fetch brings it back, correctly); a notice is an event that
-// already happened and is client-local.
+// The sections differ in kind and the copy says so: an attention item is a state on the node and
+// cannot be dismissed from here (dismiss it and the next fetch brings it back, correctly); a
+// notice is an event that already happened and is client-local.
 export default function NotificationBell(props: { onSelectTask: (taskId: string) => void }) {
   const inbox = createAttentionInbox()
   const multiNode = () => nodes().length > 1
 
-  // Popover for the chrome only — the portal, the anchoring, outside-click and the Escape this never
-  // had. The CONTENT stays as it is: an inbox with two sections and dismissable rows is not a list of
-  // menu items, so it is deliberately not a Menu.
+  // Popover for the chrome only: the portal, the anchoring, outside-click and the Escape this
+  // never had. The content stays as it is: an inbox with two sections and dismissable rows is not
+  // a list of menu items, so it is not a Menu.
   return (
     <Popover
       class="notify-popover"
@@ -75,9 +75,9 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       class="notify-row unread"
                       onClick={() => {
                         close()
-                        // The node FIRST, then the task: navigation resolves against the active node, so
-                        // selecting a task on another node before switching would look up an id that is
-                        // not there (and might collide with a local one).
+                        // The node first, then the task: navigation resolves against the active
+                        // node, so selecting a task on another node before switching would look up
+                        // an id that is not there (and might collide with a local one).
                         if (row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
                         if (row.item.taskId) props.onSelectTask(row.item.taskId)
                         if (row.item.target && row.item.taskId) openTarget(row.item.taskId, row.item.target)

@@ -30,7 +30,7 @@ export function PaletteSurface<T>(props: {
   onPick: (item: T, index: number) => void
   /** A hints line under the list ("↑↓ navigate · ↵ open"). */
   footer?: JSX.Element
-  /** Extra content between the input and the list — an error banner. */
+  /** Extra content between the input and the list, an error banner. */
   status?: JSX.Element
   class?: string
   ariaLabel?: string

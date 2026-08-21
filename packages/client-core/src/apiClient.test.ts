@@ -44,7 +44,7 @@ afterEach(() => {
 describe('mutations against an unreachable node', () => {
   it.each(['offline', 'revoked'] as const)('fails fast without attempting the request (%s)', async (state) => {
     await ready(state)
-    // Fail HERE rather than waiting for the broker's 30s request timeout. Main already holds the socket, so
+    // Fail here rather than waiting for the broker's 30s request timeout. Main already holds the socket, so
     // it already knows; without this the user watched a spinner and then read "connect ECONNREFUSED".
     const error = await writeJson('/v2/core/workspaces', { method: 'POST', body: '{}' }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)

@@ -1,8 +1,8 @@
-// Rail status markers — one source of truth for the small icons overlaid on a task row AND the
-// legend in its hover tooltip (docs/workspaces-and-tasks.md). Each entry is a marker shown only
-// while its condition holds: the rail overlay renders it positioned (`overlayCls`), the tooltip
-// re-renders the same glyph next to what it means, so hovering both reports the task's live state
-// and teaches the icon. Pure/view-only — callers resolve the reactive inputs and pass them in.
+// Rail status markers: one source of truth for the small icons overlaid on a task row and the
+// legend in its hover tooltip. Each entry is a marker shown only while its condition holds: the
+// rail overlay renders it positioned (`overlayCls`), the tooltip re-renders the same glyph next to
+// what it means, so hovering both reports the task's live state and teaches the icon. Pure/view-
+// only; callers resolve the reactive inputs and pass them in.
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 import { CHECK_TONE } from '../ui/displayMeta'
 

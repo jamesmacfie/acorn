@@ -5,8 +5,8 @@ import { activeNodeId } from './node/activeNode'
 import { nodeState } from './node/fleet'
 
 // The renderer's only HTTP surface. Every request goes through Electron main's connection broker
-// (docs/architecture-overview.md § How the client talks to nodes), which owns the endpoint, the pinned
-// certificate and the device token — so nothing here knows an origin and nothing here holds a
+// (docs/architecture-overview.md § Node API and client flow), which owns the endpoint, the pinned
+// certificate, and the device token, so nothing here knows an origin and nothing here holds a
 // credential.
 //
 // readJson / writeJson / postJson keep the exact signatures their 213 call sites already use; only
@@ -60,8 +60,8 @@ const isMutation = (method: string | undefined): boolean => {
   return verb !== 'GET' && verb !== 'HEAD'
 }
 
-// A node whose connection state means a write cannot land. Read from the broker's projection rather than
-// attempted and timed out — main already knows.
+// A node whose connection state means a write cannot land. Read from the broker's projection
+// rather than attempted and timed out: main already knows.
 const isWritable = (nodeId: string): boolean => {
   const state = nodeState(nodeId)
   return state !== 'offline' && state !== 'revoked'
@@ -75,7 +75,7 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   if (!transport || !nodeId) {
     // No broker: the renderer is running in a plain browser served directly by a node (`dev:node`),
     // or in a unit test that stubs global fetch. Same-origin, so whatever auth that origin accepts
-    // applies — there is no device token on this path by definition.
+    // applies. There is no device token on this path by definition.
     const res = await fetch(path, {
       method: options.method ?? 'GET',
       headers: options.headers,
@@ -85,16 +85,16 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
     return { ok: res.ok, status: res.status, headers: headersToObject(res.headers), body: new Uint8Array(await res.arrayBuffer()) }
   }
 
-  // docs/ui-design.md § Connection and staleness vocabulary: "mutations fail fast with a clear 'node offline' error
-  // and keep the user's input as a draft. Nothing is queued for later automatic replay."
+  // docs/architecture-overview.md § Client state and fleet behavior: mutations fail fast and keep
+  // the user's input as a draft, with no automatic replay queue.
   //
-  // Fail fast HERE, not by waiting for a TCP timeout. Main holds the socket, so it already knows the node
-  // is unreachable, and without this check a submit sat spinning for the broker's 30s request timeout
-  // before producing a message about connect ECONNREFUSED. A mutation is what matters — a READ against an
-  // offline node is still worth attempting, because the broker may reconnect between the status update
-  // and the request, and a read that fails costs nothing but a stale badge.
+  // Fail fast here rather than wait for a TCP timeout: main already knows the node is unreachable,
+  // and without this check a submit sat spinning for the broker's 30s request timeout before
+  // producing a message about connect ECONNREFUSED. A read against an offline node is still worth
+  // attempting, since the broker may reconnect between the status update and the request, and a
+  // failed read costs nothing but a stale badge.
   //
-  // `offline` and `revoked` only. `degraded` is WS-down/HTTP-up, where writes still work, and
+  // `offline` and `revoked` only: `degraded` is WS-down/HTTP-up, where writes still work, and
   // `incompatible` gets its own message from the route it fails on.
   if (isMutation(options.method) && !isWritable(nodeId)) {
     throw new ApiError('This node is offline, so nothing was sent. Try again once it is back.', 0, 'node_offline', {
@@ -151,7 +151,7 @@ const JSON_HEADERS = { 'content-type': 'application/json' }
 
 const parseJson = <T>(res: ApiResponse): T => (res.body.byteLength === 0 ? (undefined as T) : (JSON.parse(decoder.decode(res.body)) as T))
 
-// One place that reads the wire envelope (docs/api-reference.md § Errors). A non-JSON or
+// One place that reads the wire envelope (docs/api-reference.md § Transport). A non-JSON or
 // pre-envelope body degrades to `undefined` rather than throwing over the original failure.
 function errorBody(res: ApiResponse): ApiErrorBody['error'] | undefined {
   try {
@@ -164,7 +164,7 @@ function errorBody(res: ApiResponse): ApiErrorBody['error'] | undefined {
 }
 
 // Prefer the human/upstream prose in `message` (e.g. GitHub's verbatim 422 reason) over the machine
-// code — the code is for branching, the message is for people.
+// code. The code is for branching, the message is for people.
 const errorText = (error: ApiErrorBody['error'] | undefined, fallback: string): string => error?.message || error?.code || fallback
 
 const raise = (res: ApiResponse, fallback: string): never => {
@@ -177,22 +177,17 @@ const raise = (res: ApiResponse, fallback: string): never => {
 
 type ReadOptions = { signal?: AbortSignal; nodeId?: string }
 
-// A cast, not a parse, and that is now a stated rule rather than an accident
-// (docs/api-reference.md § Versioning): within a protocol major every change is additive, so a read
-// tolerates fields it does not know about. What it buys is that a NEWER node can serve an older client.
-//
-// The direction that is not covered: a field this client requires and the node no longer sends arrives
-// as `undefined` and fails somewhere deep in a component, not here. That is precisely why removing or
-// renaming a field is a major bump rather than something the boundary can absorb.
+// A cast, not a parse: within a protocol major every change is additive, so a read tolerates
+// fields it does not know about (docs/api-reference.md § Versioning).
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await send(url, { signal: options.signal, nodeId: options.nodeId })
   if (!res.ok) raise(res, `${url} ${res.status}`)
   return parseJson<T>(res)
 }
 
-// The one non-JSON read: a download. A route builder's URL can no longer be handed to the browser as
-// an `href` or `src` — under app:// it resolves against the protocol handler, not a node — so a
-// download has to come back as bytes and become a blob URL on this side.
+// The one non-JSON read: a download. A route builder's URL can no longer be handed to the browser
+// as an `href` or `src`, since under app:// it resolves against the protocol handler, not a node,
+// so a download has to come back as bytes and become a blob URL on this side.
 export async function readBytes(url: string, fallback = 'download failed'): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
   const res = await send(url)
   if (!res.ok) raise(res, fallback)
@@ -203,9 +198,9 @@ export async function readBytes(url: string, fallback = 'download failed'): Prom
   }
 }
 
-// Only the quoted `filename="…"` form, which is the only form our own routes emit. Anything else is a
-// null and the caller names the file itself — guessing at RFC 5987 for a header we control would be
-// speculative.
+// Only the quoted `filename="…"` form, which is the only form our own routes emit. Anything else
+// is a null and the caller names the file itself: guessing at RFC 5987 for a header we control
+// would be speculative.
 const filenameFromDisposition = (header: string | undefined): string | null =>
   /filename="([^"]+)"/.exec(header ?? '')?.[1] ?? null
 
@@ -215,11 +210,7 @@ export async function apiError(res: ApiResponse, fallback: string): Promise<stri
   return errorText(errorBody(res), fallback)
 }
 
-// Status, parsed body, and the node's own error envelope — without the throw. Every other export here
-// converts a failure into an exception, and the plugin UI bridge needs the opposite: it forwards the
-// node's envelope verbatim down a MessagePort to a sandboxed frame, so a plugin author handles one
-// error shape whether the call was denied at the bridge or refused by the node
-// (docs/plugins.md).
+// Status, parsed body, and the node's own error envelope, without the throw. Every other export here
 export type RawApiResult = { ok: boolean; status: number; body: unknown; error?: ApiErrorBody['error'] }
 
 export async function sendRaw(url: string, init: WriteInit = {}): Promise<RawApiResult> {
@@ -259,9 +250,7 @@ export const postJson = async <T>(url: string, body?: unknown, options?: { idemp
     method: 'POST',
     headers: {
       ...(body === undefined ? {} : JSON_HEADERS),
-      // Minted by the CALLER, never by the broker: only the call site knows that a retry is the same
-      // logical mutation, and a broker-minted key would defeat replay entirely
-      // (docs/api-reference.md § HTTP conventions).
+      // The client mints the key, never the broker (docs/api-reference.md § Request processing).
       ...(options?.idempotencyKey ? { 'idempotency-key': options.idempotencyKey } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

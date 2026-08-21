@@ -5,9 +5,10 @@ import { attentionSources, compareAttention, type AttentionItem } from '../regis
 
 // The fleet-wide attention list, merged across every source and every node.
 //
-// One fan-out per SOURCE rather than one combined call per node: each plugin's fetch is independent, so a
-// plugin disabled on one node leaves its rows off that node only, and a slow source cannot hold up a fast
-// one. The cost is N resources instead of one, which for two or three sources is nothing.
+// One fan-out per source rather than one combined call per node: each plugin's fetch is
+// independent, so a plugin disabled on one node leaves its rows off that node only, and a slow
+// source cannot hold up a fast one. The cost is N resources instead of one, which for two or three
+// sources is nothing.
 export type AttentionRow = {
   item: AttentionItem
   nodeId: string
@@ -43,8 +44,8 @@ export function createAttentionInbox(): () => AttentionInbox {
       }
       for (const entry of current.unavailable) if (!unavailable.has(entry.nodeId)) unavailable.set(entry.nodeId, entry)
     }
-    // Severity first, then newest — the ranking lives with the type so the fleet-home count and this list
-    // cannot disagree about what is urgent.
+    // Severity first, then newest. The ranking lives with the type so the fleet-home count and
+    // this list cannot disagree about what is urgent.
     rows.sort((a, b) => compareAttention(a.item, b.item))
     return { rows, unavailable: [...unavailable.values()] }
   })

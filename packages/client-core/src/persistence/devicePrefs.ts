@@ -27,10 +27,11 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
 
 const PREFIX = 'acorn-pref:'
 
-// Exact match, and only exact match. Every key above is an `app`-scope slice, so none of them is ever
-// suffixed — a scoped slice writes `<declaredKey>:<encodedScopeId>` (persistence/persistedState.ts), and
-// the scoped slices are exactly the four composition kinds that now belong to the node they describe
-// (docs/state.md § Scope rules). Unknown means node, which is what a per-task layout key needs.
+// Exact match, and only exact match. Every key above is an `app`-scope slice, so none of them is
+// ever suffixed: a scoped slice writes `<declaredKey>:<encodedScopeId>`
+// (persistence/persistedState.ts), and the scoped slices are exactly the four composition kinds
+// that now belong to the node they describe (docs/state.md § Scope rules). Unknown means node,
+// which is what a per-task layout key needs.
 export const isDevicePref = (key: string): boolean => DEVICE_KEYS.has(key)
 
 // `null` rather than a throw when there is no storage: this runs in a bare-Node vitest too, and a pref that
@@ -59,9 +60,9 @@ function storedPrefs(): Record<string, string> {
   return out
 }
 
-// Filtered, and that filter is load-bearing rather than tidiness. `mergePrefs` lets the device win, so
-// a leftover under a key that has since become node-owned would shadow the node's copy forever — the
-// user's layouts would look fine and no write from any other client would ever appear.
+// Filtered, and that filter is load-bearing rather than tidiness. `mergePrefs` lets the device win,
+// so a leftover under a key that has since become node-owned would shadow the node's copy forever:
+// the user's layouts would look fine and no write from any other client would ever appear.
 export function readDevicePrefs(): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [key, value] of Object.entries(storedPrefs())) if (isDevicePref(key)) out[key] = value
@@ -72,9 +73,9 @@ export function writeDevicePref(key: string, value: string): void {
   storage()?.setItem(`${PREFIX}${key}`, value)
 }
 
-// One-time seed from whatever the node already had, so an existing install keeps its theme, keybindings and
-// layouts instead of resetting to defaults on the upgrade. Only fills keys the device does not have yet —
-// a value written here since the upgrade always wins.
+// One-time seed from whatever the node already had, so an existing install keeps its theme,
+// keybindings and layouts instead of resetting to defaults on the upgrade. Only fills keys the
+// device does not have yet: a value written here since the upgrade always wins.
 export function seedDevicePrefs(nodePrefs: Readonly<Record<string, string>>): void {
   const store = storage()
   if (!store) return
@@ -86,7 +87,7 @@ export function seedDevicePrefs(nodePrefs: Readonly<Record<string, string>>): vo
 }
 
 // The inverse of `seedDevicePrefs`, for the keys travelling the other way: pane layouts, open-file sets,
-// PR filters and context selections describe a NODE's resources, so they belong in that node's per-user
+// PR filters and context selections describe a node's resources, so they belong in that node's per-user
 // prefs where every client that pairs with it can see them (docs/state.md § Scope rules). This device is
 // still holding the copy the last release seeded, and `readDevicePrefs` now ignores it, so hand each one
 // to the node before dropping it or an upgrade loses the layouts the user built.
@@ -94,13 +95,11 @@ export function seedDevicePrefs(nodePrefs: Readonly<Record<string, string>>): vo
 // The device's value wins over the node's: the node's copy is whatever was there before the previous
 // migration seeded the device, and every edit since has landed here.
 //
-// Only the ACTIVE node's keys. One device's storage holds every node it has ever looked at, and these
-// keys carry the node they describe (`nodeIdFromStorageKey`), so draining the lot here would hand a
-// remote node's layouts to whichever node happened to be selected at boot and delete them from the only
-// place they existed. The rest wait, untouched, for the fetch that runs while their own node is active.
-//
-// Removed only after the write resolves. A PUT that fails leaves the value in place to try again on the
-// next prefs fetch, which is the difference between a drain and a wipe.
+// Only the active node's keys. One device's storage holds every node it has ever looked at, and
+// these keys carry the node they describe (`nodeIdFromStorageKey`), so draining the lot here
+// would hand a remote node's layouts to whichever node happened to be selected at boot and delete
+// them from the only place they existed. The rest wait, untouched, for the fetch that runs while
+// their own node is active.
 export async function drainMigratedPrefs(
   nodeId: string | null,
   nodePrefs: Readonly<Record<string, string>>,

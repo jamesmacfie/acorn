@@ -1,7 +1,7 @@
 import { createSignal, For, onCleanup } from 'solid-js'
 import { activeToasts, dismissToast, type Toast } from './toast'
 
-// The stack. State lives in toast.ts — see the note there on why they are separate files.
+// The stack. State lives in toast.ts; see the note there on why they are separate files.
 export function ToastHost() {
   return (
     <div class="ui-toast-host">

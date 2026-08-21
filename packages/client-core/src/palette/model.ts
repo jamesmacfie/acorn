@@ -15,9 +15,10 @@ export type PaletteItem =
   | { kind: 'error'; id: string; label: string } // config parse errors (13 §B) — visible, not invocable
 
 export type PaletteSources = {
-  // Rows built by `paletteRows` contributions (registries/paletteRows.ts), already in source order. This used
-  // to be three typed fields — `targets`, `layouts`, `workflows` — which meant core knew what a run target and
-  // a workflow were, and adding a fourth kind of contributed row meant editing this file.
+  // Rows built by `paletteRows` contributions (registries/paletteRows.ts), already in source
+  // order. This used to be three typed fields, `targets`, `layouts`, `workflows`, which meant core
+  // knew what a run target and a workflow were, and adding a fourth kind of contributed row meant
+  // editing this file.
   rows?: PaletteItem[]
   tasks?: { id: string; label: string; hint?: string }[]
   workspaces?: { id: string; label: string; hint?: string }[]
@@ -25,9 +26,10 @@ export type PaletteSources = {
   actions: { id: string; label: string; hint?: string }[]
 }
 
-// Errors first — they explain why a row someone expected is missing, and that is a property of the WHOLE list,
-// so no single contributing source can produce it. Then contributed rows, then actions
-// (panes/terminal/archive), then switch-workspace and Go-to-task last: those are navigation, not commands.
+// Errors first: they explain why a row someone expected is missing, and that is a property of the
+// whole list, so no single contributing source can produce it. Then contributed rows, then
+// actions (panes/terminal/archive), then switch-workspace and Go-to-task last, since those are
+// navigation, not commands.
 export function composeItems(src: PaletteSources): PaletteItem[] {
   return [
     ...src.errors.map((e, i): PaletteItem => ({ kind: 'error', id: `error:${i}`, label: `config error (${e.source}): ${e.message}` })),

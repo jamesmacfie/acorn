@@ -2,18 +2,18 @@ import { createEffect, createSignal, onCleanup, onMount, type Accessor } from 's
 import { commandRegistry } from '../registries/commands'
 import { keybindingRegistry } from '../registries/keybindings'
 
-// Shared interaction plumbing for the overlay palettes (⌘K command palette, ⌘P file palette,
-// `/` changed-file finder): open/query/selection signals, local ↑/↓ (clamped) / Enter / Esc
-// handling, and input focus ownership. The overlay markup stays in each component — this is a
-// hook returning the shared signals/handlers, not a framework.
+// Shared interaction plumbing for the overlay palettes (Cmd+K command palette, Cmd+P file palette,
+// `/` changed-file finder): open/query/selection signals, local up/down (clamped) / Enter / Esc
+// handling, and input focus ownership. The overlay markup stays in each component. This is a hook
+// returning the shared signals/handlers, not a framework.
 
 export type OverlayPalette = {
   open: Accessor<boolean>
   query: Accessor<string>
   sel: Accessor<number>
-  /** Row hover handler — moves the selection without touching the query. */
+  /** Row hover handler. Moves the selection without touching the query. */
   setSel: (index: number) => void
-  /** Input handler — updates the query and resets the selection to the top. */
+  /** Input handler. Updates the query and resets the selection to the top. */
   setQuery: (query: string) => void
   /** Open the overlay and focus its input (registered via setInputRef). */
   show: () => void
@@ -55,14 +55,14 @@ export function createOverlayPalette(opts: {
     setQuerySignal('')
     setSel(0)
     // Return focus to wherever it was before we grabbed it, so Esc / backdrop / re-toggle dismissal
-    // doesn't strand keyboard focus on <body>. Skip if that element is gone — a pick that navigated
+    // doesn't strand keyboard focus on <body>. Skip if that element is gone: a pick that navigated
     // or opened a file unmounted it, and that action's own focus target wins.
     const prev = prevFocus
     prevFocus = null
     if (prev?.isConnected && prev !== document.activeElement) prev.focus()
   }
   const show = () => {
-    // Close any other open overlay first (it restores its own prevFocus), then capture ours — so the
+    // Close any other open overlay first (it restores its own prevFocus), then capture ours, so the
     // element we return to on dismissal is the real pre-overlay one, not the other palette's input.
     if (activeClose && activeClose !== close) activeClose()
     activeClose = close

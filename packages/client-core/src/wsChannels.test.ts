@@ -8,9 +8,9 @@ describe('ws channel registry', () => {
     const seen: string[] = []
     registerWsChannel('docker', (frame) => seen.push(frame.channel))
     routeWsFrame({ channel: 'docker:exec:out', execId: 'e1', data: 'x' })
-    // Nobody claimed 'ghost'. A drop is the honest outcome — it is also what happens when the owning
-    // plugin is disabled on this node — but it is now SILENT, where the old if/else had a dead branch.
-    // That is why bootClientPlugins pins its prefix set (apps/desktop).
+    // Nobody claimed 'ghost'. A drop is the honest outcome; it is also what happens when the
+    // owning plugin is disabled on this node, but it is now silent, where the old if/else had a
+    // dead branch. That is why bootClientPlugins pins its prefix set (apps/desktop).
     routeWsFrame({ channel: 'ghost:thing' })
     expect(seen).toEqual(['docker:exec:out'])
   })

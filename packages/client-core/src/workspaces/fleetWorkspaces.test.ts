@@ -40,7 +40,7 @@ afterEach(() => {
 describe('selectFleetWorkspace', () => {
   it('switches the node BEFORE navigating', () => {
     // The order is the whole contract. Routes carry no node in them, and the shell derives the active
-    // workspace from the project against the ACTIVE node's cache — navigating first would resolve the
+    // workspace from the project against the active node's cache; navigating first would resolve the
     // path against the wrong node.
     const observed: { path: string; node: string | null }[] = []
     selectFleetWorkspace(

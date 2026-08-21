@@ -33,8 +33,8 @@ export type PersistedStateSlice<T> = {
 export const persistedStateRegistry = new Registry<PersistedStateSlice<unknown>>('persisted-state')
 
 // Every slice codec parses the same way: a persisted value arrives as a JSON string, but a legacy or
-// already-decoded value can arrive as the object itself. Undefined on malformed input — codecs are
-// required to tolerate it (persistedState.conformance.test.ts).
+// already-decoded value can arrive as the object itself. Malformed input returns undefined; codecs
+// are required to tolerate it (persistedState.conformance.test.ts).
 export const parseJson = (raw: unknown): unknown => {
   if (typeof raw !== 'string') return raw
   try {
@@ -49,41 +49,32 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
   hydrate: (_scopeId, value) => hydrate(value),
 })
 
-// A scope id qualified by the node that owns the resource it names.
+// A scope id qualified by the node that owns the resource it names (docs/state.md § Scope rules).
+// The `app` scope is the exception: it describes this window, not a node's data, so qualifying it
+// would reset things like the left rail's collapse state on every node switch.
 //
-// docs/ui-design.md § State ownership: "All keys that touch node resources include the nodeId." Every non-app scope here
-// is a node resource — a workspace, a task, a pane within a task — and the ids are UUIDs a node mints, so
-// docs/architecture-overview.md § Fleet semantics applies directly: "Two nodes may coincidentally hold the same UUID; that
-// must never collide in the client." Before this, a remote task's pane layout and open editor files were
-// stored under a bare task id, which is exactly that collision.
+// This pair of functions is the only place a node id enters or leaves a storage key, which keeps
+// each slice's own binding speaking in bare resource ids.
 //
-// The `app` scope is deliberately NOT qualified. `core.last-path`, `core.left-collapsed` and the rest describe
-// the window, not a node's data, and node-qualifying them would mean the left rail's collapse state resetting
-// on every node switch.
-// The two functions are a matched pair and this is the ONLY place a nodeId enters or leaves a storage key.
-// Qualifying here rather than in each slice's binding is what keeps this to one edit: every binding still
-// speaks in bare resource ids, which is what its store is keyed by.
-// The node id is written RAW and the scope id ENCODED, so the `/` between them is the only unescaped slash
-// in the key. Encoding the pair as one string instead would be ambiguous: a scope id may legitimately contain
-// a slash (a pane scope is a composite), and after a single `encodeURIComponent` there is no way to tell
-// `<node>/<scope>` from a scope id that simply had a slash in it. This spelling makes "contains a raw slash"
-// mean exactly "carries a node qualifier".
+// Both the node id and the scope id are percent-encoded, so the `/` between them is the only
+// unescaped slash in the key. A node id arrives from `GET /v2/node` unchecked, so writing it raw
+// would let a node reporting `a/b` produce a key this parser could never split correctly, and an
+// empty node id would produce an unqualified key that let one node read another node's layouts.
+// Encoding the scope id too keeps the split unambiguous, since a pane scope id can itself contain
+// a slash.
 export const storageKeyFor = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, scopeId: string): string => {
   if (slice.scope === 'app') return slice.key
   const nodeId = activeNodeId()
-  // BOTH halves encoded. A nodeId arrives from `GET /v2/node` over the wire and nothing validates it as a
-  // UUID, so writing it raw let a node reporting `a/b` produce keys this parser could never recover (the
-  // qualifier would read as `a`), and an empty node ID would produce an unqualified key. That could make
-  // one node read another node's layouts. `encodeURIComponent` cannot emit a `/`, so the separator stays
-  // the only unescaped slash in the key either way.
+  // Both halves encoded (see the note above). `encodeURIComponent` cannot emit a `/`, so the
+  // separator stays the only unescaped slash in the key either way.
   return `${slice.key}:${nodeId ? `${encodeURIComponent(nodeId)}/` : ''}${encodeURIComponent(scopeId)}`
 }
 
-// Which node a storage key is qualified for, without knowing which slice wrote it — `null` for an
-// unqualified key (an `app` slice, or a pre-qualification leftover). The raw `/` is the qualifier's tell,
-// per the note above; slice keys never contain one, so the id is the segment between the last `:` before
-// that slash and the slash itself. Used by the device-storage drain, which has a bag of keys and no
-// slice to match them against, and must not hand one node's layouts to another.
+// Which node a storage key is qualified for, without knowing which slice wrote it: `null` for an
+// unqualified key (an `app` slice, or a pre-qualification leftover). The raw `/` is the qualifier's
+// tell, per the note above; slice keys never contain one, so the id is the segment between the
+// last `:` before that slash and the slash itself. Used by the device-storage drain, which has a
+// bag of keys and no slice to match them against, and must not hand one node's layouts to another.
 export const nodeIdFromStorageKey = (key: string): string | null => {
   const slash = key.indexOf('/')
   if (slash === -1) return null

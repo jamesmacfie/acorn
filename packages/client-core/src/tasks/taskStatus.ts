@@ -42,7 +42,7 @@ export const taskStatusPollerContribution: PollerContribution = {
   intervalMs: 10_000,
   requires: 'desktop',
   run: refreshTaskStatuses,
-  // PTY status edges arrive on the shared WebSocket, which is core's own transport — no need to go
+  // PTY status edges arrive on the shared WebSocket, which is core's own transport, no need to go
   // through a feature accessor for it.
   subscribe: (refresh) => wsOnStatus(refresh),
 }

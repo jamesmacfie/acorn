@@ -7,8 +7,9 @@ export const PrefKeys = {
   theme: 'theme',
   themeLight: 'theme_light',
   themeDark: 'theme_dark',
-  // Visual style — the appearance axis orthogonal to theme. One key, not four: unlike light/dark
-  // there is no OS signal to follow, and nobody wants square panes by day and rounded by night.
+  // Visual style: the appearance axis orthogonal to theme. One key, not four, because unlike
+  // light/dark there is no OS signal to follow, and nobody wants square panes by day and rounded
+  // by night.
   style: 'style',
   lastTask: 'last_task',
   lastPath: 'last_path',
@@ -34,31 +35,32 @@ export const PrefKeys = {
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',
   contextSelectionScoped: 'context:section-selection',
-  // Which nodes' disk-encryption warnings this DEVICE has already been shown (docs/data-layer.md
-  // § Backup: "the app surfaces a one-time warning if the disk isn't encrypted"). A JSON array of
-  // nodeIds in ONE key rather than a key per node: the fleet is small, and a key-per-node scheme would
-  // need a scoped slice and an eviction rule for a value that is three booleans.
+  // Which nodes' disk-encryption warnings this device has already been shown once
+  // (docs/security.md § Filesystem and backup). A JSON array of nodeIds in one key rather than a
+  // key per node: the fleet is small, and a key-per-node scheme would need a scoped slice and an
+  // eviction rule for a value that is three booleans.
   //
-  // The DEVICE's, not the node's, and that is the substantive choice. "Have I shown you this?" is a
-  // fact about this installation of the app — a second machine paired with the same node has never seen
-  // the warning and should get it.
+  // The device's, not the node's: "have I shown you this?" is a fact about this installation of
+  // the app, and a second machine paired with the same node has never seen the warning and should
+  // get it.
   diskWarningAcked: 'disk_warning_acked',
   // Which plugin, if any, the owner picked to draw each designated core surface
-  // (registries/exclusiveSlots.ts). A JSON `{ slot: pluginId }` map in ONE key rather than a key per
-  // slot, the same shape `disk_warning_acked` takes: the designated list is short, and a key per member
-  // would need a registration and an eviction rule for a value that is one string.
+  // (registries/exclusiveSlots.ts). A JSON `{ slot: pluginId }` map in one key rather than a key
+  // per slot, the same shape `disk_warning_acked` takes: the designated list is short, and a key
+  // per member would need a registration and an eviction rule for a value that is one string.
   //
-  // The DEVICE's, like `theme` and `style` beside it. Which list a person looks at is a property of the
-  // screen they are looking at, and the plugin behind the choice may not even be installed on the other
-  // machine paired with the same node.
+  // The device's, like `theme` and `style` beside it. Which list a person looks at is a property
+  // of the screen they are looking at, and the plugin behind the choice may not even be installed
+  // on the other machine paired with the same node.
   exclusiveSlots: 'exclusive_slots',
-  // User-composed panel definitions and where they are placed (dashboards/persist.ts). The NODE's,
-  // not the device's: a panel describes that node's resources, so it follows the resource and every
-  // client paired with the node renders the board its owner built.
+  // User-composed panel definitions and where they are placed (docs/state.md § Scope rules;
+  // dashboards/persist.ts). The node's, not the device's: a panel describes that node's resources,
+  // so it follows the resource and every client paired with the node renders the board its owner
+  // built.
   dashboards: 'dashboards',
-  // Which Home dashboard this screen is reading (dashboards/homeTab.ts). The DEVICE's, unlike the
-  // composition above: the board belongs to the node, but which of its tabs you happen to be looking
-  // at is view state, and syncing it would move another machine's screen under its owner.
+  // Which Home dashboard this screen is reading (dashboards/homeTab.ts). The device's, unlike the
+  // composition above: the board belongs to the node, but which of its tabs you happen to be
+  // looking at is view state, and syncing it would move another machine's screen under its owner.
   homeTab: 'home_tab',
 } as const
 

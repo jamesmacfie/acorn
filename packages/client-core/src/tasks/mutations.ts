@@ -1,6 +1,6 @@
-// Task writes (docs/workspaces-and-tasks.md). Core owns tasks — they are the workspace's unit of work,
-// not a GitHub concept — and every route helper below lives in protocol. Callers invalidate tasksKey
-// after.
+// Task writes (docs/workspaces-and-tasks.md). Core owns tasks: they are the workspace's unit of
+// work, not a GitHub concept, and every route helper below lives in protocol. Callers invalidate
+// tasksKey after.
 //
 // The review-note writes that used to sit alongside these moved to
 // plugins/changes/src/client/reviewNoteMutations.ts: they are the changes pane's, and keeping them

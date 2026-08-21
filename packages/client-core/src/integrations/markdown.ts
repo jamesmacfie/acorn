@@ -16,7 +16,7 @@ const safeImageSrc = (u: string): boolean => /^(https?:\/\/|data:image\/)/i.test
 // never contains, so tokens survive escaping and subsequent Markdown transforms can't mutate them.
 const S = '\uE000'
 
-// Inline pass on RAW text: protect code spans and images, escape, then apply links / bold / italic.
+// Inline pass on raw text: protect code spans and images, escape, then apply links / bold / italic.
 function inline(raw: string): string {
   const codes: string[] = []
   const images: { alt: string; url: string }[] = []
