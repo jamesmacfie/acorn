@@ -24,9 +24,9 @@ describe('Rollbar loaded routes', () => {
       externalProjects: async () => [{ connectionId: 'rollbar-b', externalId: 'project-b' }],
     })
     // The host's request context, with canned answers only for the two provider calls that would
-    // otherwise reach Rollbar's API. `withConnections` and `items` are deliberately NOT stubbed: they
-    // stay the real runtime, so if this route ever starts reading the item store directly the host's own
-    // ownership check fails the test — the previous version of this file stubbed them with a `throw`,
+    // otherwise reach Rollbar's API. `withConnections` and `items` are not stubbed: they stay the
+    // real runtime, so if this route starts reading the item store directly, the host's own
+    // ownership check fails the test. An earlier version of this file stubbed them with a `throw`,
     // which only asserted what the file itself had written.
     const context = await makeTestRequestContext({
       plugin: 'rollbar',

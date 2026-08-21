@@ -5,9 +5,7 @@ import { rollbarProvider } from './provider'
 
 const ref: ExternalRef = { providerId: 'rollbar', connectionId: 'conn-1', displayId: '142' }
 
-// A Rollbar token is scoped to one project, so the source answers from the connection row `normalize`
-// already wrote and never calls out. Declared anyway so the workspace mapping is writable at all — the
-// rail scopes on the mapping's connection ids, and with no writer it showed every connected Rollbar.
+// See docs/integrations.md § Rollbar: why the project source is declared rather than omitted.
 describe('rollbar project source', () => {
   const connection = (config: string) => ({ id: 'conn-1', label: 'Rollbar · acme', config } as StoredConnection)
 

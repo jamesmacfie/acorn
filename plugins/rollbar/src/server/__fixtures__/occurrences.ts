@@ -1,5 +1,5 @@
-// Synthetic Rollbar fixtures — NO real token, occurrence value, IP, person, or request body. Field
-// names and type/shape variants only, enough to exercise the normalizer (server/normalize.ts).
+// Synthetic Rollbar fixtures. No real token, occurrence value, IP, person, or request body: field
+// names and shape variants only, enough to exercise the normalizer in server/normalize.ts.
 import type { RollbarApiInstance, RollbarApiItem } from '../'
 
 export const ITEM: RollbarApiItem = {

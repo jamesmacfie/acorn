@@ -10,7 +10,7 @@ import { renderWorkflowPrompt } from './workflowValidation'
 export const MAX_STEP_TURNS = 8
 export const MAX_FAN_OUT_TASKS = 12
 
-// The single source of truth for what ships built in — registration below is keyed off these, and
+// The single source of truth for what ships built in. Registration below is keyed off these, and
 // workflowFiles' default validation catalog reuses them.
 export const BUILTIN_STEP_KINDS = ['agent', 'gate-human', 'gate-policy', 'ci-loop', 'fan-out', 'join', 'decide'] as const
 export const BUILTIN_POLICIES = ['checks-green'] as const
@@ -250,7 +250,7 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
             // Queued children stay 'pending' until they hold a concurrency slot.
             onStart: () => services.setStep(rowId, { status: 'running' }),
           },
-          // Rebind the step id AND the emit sink so child stream events land on the child row.
+          // Rebind the step id and the emit sink so child stream events land on the child row.
           { ...ctx, step: { ...ctx.step, id: rowId }, emit: ({ event }) => services.deps.emitStepEvent?.(ctx.run.id, rowId, event) },
         )
         const outcome = headlessOutcome(result)

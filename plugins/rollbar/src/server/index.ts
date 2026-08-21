@@ -1,6 +1,7 @@
-// Rollbar REST client (docs/integrations.md) — the thin sibling of server/linear/. A connection is a
-// project-read access token; items are Rollbar's deduped errors, identified in acorn by their
-// visible `counter` (#142). Exported fetch is mocked in route tests; never called live there.
+// Rollbar REST client, structured like server/linear/ (docs/integrations.md § Rollbar covers the
+// connection model). Items are Rollbar's deduped errors, identified in acorn by their visible
+// `counter` (#142) rather than their internal id. Exported fetch is mocked in route tests, never
+// called live there.
 
 const BASE = 'https://api.rollbar.com/api/1'
 
@@ -8,7 +9,8 @@ export function rollbarFetch(token: string, path: string): Promise<Response> {
   return fetch(`${BASE}${path}`, { headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' } })
 }
 
-// Rollbar wraps everything as { err: 0, result } — err != 0 or HTTP failure is an API error.
+// Rollbar wraps every response as { err: 0, result }. A nonzero err or an HTTP failure counts as an
+// API error.
 export async function rollbarData<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`rollbar ${res.status}`)
   const body = (await res.json()) as { err?: number; message?: string; result?: T }
@@ -19,10 +21,11 @@ export async function rollbarData<T>(res: Response): Promise<T> {
 
 export type RollbarProject = { id: number; name: string }
 
-// Upstream shapes are deliberately loose: Rollbar's reference documents endpoints more reliably than
-// response schemas, and fields are plan-dependent. Everything beyond the identifiers is optional and
-// guarded during normalization (server/normalize.ts). NOTE: authored from Rollbar's public API docs,
-// not a live contract spike — the normalizer treats every field as possibly absent or mistyped.
+// Upstream shapes stay loose: Rollbar's reference documents endpoints more reliably than response
+// schemas, and fields vary by plan. Everything beyond the identifiers is optional and is checked
+// during normalization in server/normalize.ts. This type is written from Rollbar's public API docs,
+// not from a live contract spike, so the normalizer treats every field as possibly absent or
+// mistyped.
 export type RollbarApiItem = {
   id: number
   counter: number

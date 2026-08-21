@@ -1,12 +1,11 @@
-// Rollbar's wire contract (docs/integrations.md): deduped error items mirrored into `issues`.
+// Rollbar's wire contract (docs/integrations.md): deduped error items mirrored into `issues`. Types,
+// route builders, and query keys live here, not in `@acorn/protocol` (docs/architecture-overview.md:
+// a plugin owns the shape of its own wire surface). Route strings and query keys are unchanged from
+// the old @acorn/protocol/api.ts version, since a changed key orphans a user's persisted cache
+// (docs/caching.md).
 //
-// Types, route builders and query keys together, following the docker/http convention — the plugin
-// that owns the namespace owns the shape of what crosses it. This block lived in
-// @acorn/protocol/api.ts, which meant a plugin could not define its own wire surface without editing
-// core. Moved verbatim: the route strings and the query keys are byte-identical, because the
-// persisted query cache has no buster and a changed key value would orphan a user's IndexedDB.
 // The list row (summary) and the detail differ: detail adds a normalized, privacy-safe view of the
-// latest occurrence. Raw upstream occurrence JSON never crosses this boundary (see docs/security.md).
+// latest occurrence. Raw upstream occurrence JSON never crosses this boundary (docs/security.md).
 export type RollbarItemSummary = {
   integrationId: string
   integrationLabel: string

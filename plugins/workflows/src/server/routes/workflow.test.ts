@@ -5,8 +5,9 @@ import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Workflow start/gate execute an agent step, so the route test proves body validation + auth +
-// the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in main/workflowRunner.test.ts.
+// Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
+// the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in
+// main/workflowRunner.test.ts.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -24,7 +25,7 @@ const as = (principal: unknown) => {
   return app.route('/api', workflow)
 }
 const authed = () => as({ kind: 'device', userId: 'james' })
-// A child an agent spawned inside task1 — a workflow step's own environment.
+// A child an agent spawned inside task1: a workflow step's own environment.
 const asTask1 = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
 
 const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
@@ -95,9 +96,10 @@ describe('workflow routes', () => {
   })
 })
 
-// A workflow step executes an agent CLI in a worktree, so approving another task's gate or killing its
-// step acts on that task. The run-scoped paths carry no taskId, so core's mounted requireTaskScope cannot
-// see them — the /tasks/:id half of this router is covered there and is deliberately not retested here.
+// A workflow step executes an agent CLI in a worktree, so approving another task's gate or killing
+// its step acts on that task. The run-scoped paths carry no taskId, so core's mounted
+// requireTaskScope cannot see them. The /tasks/:id half of this router is covered there; this file
+// does not retest it.
 describe('a task-scoped credential is confined to its own runs', () => {
   afterEach(() => setWorkflowBridge(null))
 
@@ -125,7 +127,8 @@ describe('a task-scoped credential is confined to its own runs', () => {
   it('cannot fire the node-wide trigger poll', async () => {
     let polled = 0
     setWorkflowBridge(fake({ pollTriggers: async () => (polled++, { started: 0, errors: [] }) }))
-    // No taskId to confine a sweep to, and it STARTS runs across every task — so refused, not narrowed.
+    // No taskId to confine a sweep to, and it starts runs across every task, so it is refused
+    // rather than narrowed.
     expect((await asTask1().fetch(req('/api/workflows/triggers/poll', 'POST'), {} as Env)).status).toBe(403)
     expect(polled).toBe(0)
     expect((await authed().fetch(req('/api/workflows/triggers/poll', 'POST'), {} as Env)).status).toBe(200)

@@ -1,8 +1,5 @@
-// Workflow files (docs/workflows.md / 13): declarative, committed `.acorn/workflows/*.toml`,
-// layered repo → user like config.toml (repo wins by id). A step may reference another workflow
-// (`workflow = "<id>"`) — expanded inline, ONE level of nesting to start, cycles rejected with a
-// surfaced error (never a hang). Malformed files become error rows (the 13 §B DX rule), never
-// silent skips.
+// Workflow files: declarative, committed `.acorn/workflows/*.toml`. Layering and sub-workflow
+// expansion are covered in docs/workflows.md § Execution model.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
@@ -154,8 +151,7 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
   }
 }
 
-// Inline sub-workflow expansion with cycle rejection (a self/loop reference is an error row, not a
-// hang). Nested references expand recursively but a chain revisiting an id is refused.
+// Inline sub-workflow expansion with cycle rejection: see docs/workflows.md § Execution model.
 export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[], catalog: WorkflowValidationCatalog = defaultCatalog()): LoadedWorkflow[] {
   const byId = new Map(raw.map((w) => [w.id, w]))
   const out: LoadedWorkflow[] = []
@@ -217,7 +213,8 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
   return out
 }
 
-// Scan `.acorn/workflows/*.toml` in the repo checkout/worktree + `~/.acorn/workflows` (repo wins).
+// Scans `.acorn/workflows/*.toml` in the repo checkout/worktree plus `~/.acorn/workflows`; see
+// docs/workflows.md § Execution model for the layering rule.
 export function loadWorkflowFiles(
   repoDir: string | null,
   userDir: string | null,

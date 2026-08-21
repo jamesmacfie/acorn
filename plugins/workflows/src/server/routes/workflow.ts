@@ -8,10 +8,10 @@ import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapabilit
 // The routes need the main-process WorkflowRunner, so they return 503 under dev:node.
 
 export type WorkflowBridge = {
-  // Which task a run belongs to, for the ownership guard below. `/workflows/runs/:runId/*` names no task,
-  // so the mount over /v2/p/:plugin/tasks/:id never sees it — and a workflow step executes an agent CLI in
-  // a worktree, so approving another task's gate or killing its step is acting on that task.
-  // `null` = no such run, which the guard treats as "not yours" so run ids cannot be enumerated.
+  // Which task a run belongs to, for the ownership guard below. `/workflows/runs/:runId/*` names
+  // no task, so the mount over /v2/p/:plugin/tasks/:id never sees it. A workflow step executes an
+  // agent CLI in a worktree, so approving another task's gate or killing its step acts on that task.
+  // `null` means no such run, which the guard treats as "not yours" so run ids cannot be enumerated.
   taskIdForRun(runId: string): Promise<string | null>
   defs(taskId: string): Promise<unknown> // { workflows, errors }
   start(taskId: string, def: unknown): Promise<{ runId?: string; error?: string }>
@@ -27,8 +27,9 @@ export const WORKFLOW_ROUTE = routeCapability<WorkflowBridge>('workflows.route')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
 export const setWorkflowBridge = (bridge: WorkflowBridge | null): void => setRouteTestCapability(WORKFLOW_ROUTE, bridge)
 
-// start executes an agent CLI, gate resumes one — both get validated bodies (the privileged-boundary contract). The def
-// shape is validated structurally (name + steps[]); the runner re-checks the rest.
+// start executes an agent CLI, gate resumes one; both get validated bodies (the privileged-boundary
+// contract). The def shape is validated structurally (name + steps[]); the runner re-checks the
+// rest.
 const startBody = z.object({ def: z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough() })
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
 const killBody = z.object({ stepId: z.string().min(1) })
@@ -40,7 +41,7 @@ const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
   const runId = c.req.param('runId')
   if (!runId || !isTaskConfined(c)) return next()
   const bridge = routeCapabilityFor(c, WORKFLOW_ROUTE)
-  if (!bridge) return next() // let viaBridge answer 503 — dev:node has no runner
+  if (!bridge) return next() // let viaBridge answer 503, dev:node has no runner
   const taskId = await bridge.taskIdForRun(runId)
   if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
   await next()
@@ -69,8 +70,8 @@ export const workflow = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, WORKFLOW_ROUTE, (b) => b.kill(c.req.param('runId'), parsed.data.stepId))
   })
-  // Node-wide, not task-scoped: a poll evaluates every task's triggers and STARTS runs. There is no
-  // taskId to confine it to, so a confined caller is refused outright rather than given a partial sweep —
-  // an agent has no business firing other tasks' workflows. The renderer's poller is a device.
+// Node-wide, not task-scoped: a poll evaluates every task's triggers and starts runs. There is no
+// taskId to confine it to, so a confined caller is refused outright rather than given a partial
+// sweep. An agent has no business firing other tasks' workflows. The renderer's poller is a device.
   .post('/workflows/triggers/poll', (c) =>
     isTaskConfined(c) ? respondError(c, 403, 'interactive_user_required') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.pollTriggers()))

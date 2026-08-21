@@ -28,8 +28,8 @@ export type RunStepOptions = HeadlessOpts & {
   mode?: 'headless' | 'ai'
   signal?: AbortSignal
   onEvent?: (event: StreamEvent) => void
-  // Fires once a concurrency slot is acquired, just before the process spawns — the seam fan-out
-  // children use to flip 'pending' → 'running' only when they actually start.
+  // Fires once a concurrency slot is acquired, just before the process spawns. This is the seam
+  // fan-out children use to flip 'pending' to 'running' only when they actually start.
   onStart?: () => void | Promise<void>
   tools?: ToolCeiling
   workflowRunId?: string
@@ -119,13 +119,13 @@ export class WorkflowRunner {
   readonly #activeRuns = new Set<string>()
   readonly #activeHandlers = new Map<string, Map<string, AbortController>>()
 
-  // Abort every in-flight step, for teardown. Not a cancel: cancelling a RUN is a user action that
-  // writes 'cancelled' and is meant to be visible next launch, whereas this is the process going away
-  // mid-run — the rows stay 'running' and reconcile() sweeps them back to 'pending' on the next boot,
-  // which is exactly what that sweep is for.
+  // Abort every in-flight step, for teardown. This is not cancel: cancelling a run is a user action
+  // that writes 'cancelled' and should stay visible on next launch, while this is the process going
+  // away mid-run. The rows stay 'running' and reconcile() sweeps them back to 'pending' on the next
+  // boot, which is exactly what that sweep is for.
   //
-  // Without it, dispose() closed the plugin's SQLite handle while headless children kept running, and
-  // their persistOutcome/setStep writes landed on a closed database as unhandled rejections.
+  // Without it, dispose() closed the plugin's SQLite handle while headless children kept running,
+  // and their persistOutcome/setStep writes landed on a closed database as unhandled rejections.
   stop(): void {
     for (const handlers of this.#activeHandlers.values()) {
       for (const controller of handlers.values()) controller.abort()
@@ -300,7 +300,7 @@ export class WorkflowRunner {
         def ??= normalizePersistedWorkflow(JSON.parse(run.defJson) as WorkflowDef) // defJson is frozen at start
         const steps = (await this.steps(runId)).filter((step) => step.parentStepId == null)
         // A persisted failed/safety-rail step with the run still 'running' means the app died
-        // between the step write and finishRun — complete the halt instead of advancing past it.
+        // between the step write and finishRun. Complete the halt instead of advancing past it.
         const halted = steps.find((step) => step.status === 'failed' || step.status === 'safety-rail')
         if (halted) {
           await this.finishRun(run, halted.status === 'safety-rail' ? 'safety-rail' : 'failed', halted.error ?? `Step '${halted.name}' failed.`)
