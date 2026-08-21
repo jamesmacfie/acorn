@@ -1,6 +1,5 @@
 import { parseRailItemId, railItemId, type PluginRailItem } from '@acorn/protocol/api.ts'
 import type { LinearProjectIssue } from './api'
-import { priorityMeta } from './triage'
 
 // The encoding is the host's (protocol/api.ts § railItemId); these two name its halves for Linear. The
 // connection has to travel with the identifier because Linear issue keys are not globally unique
@@ -26,19 +25,15 @@ export function parseLinearRailItemId(value: string): LinearRailTarget | null {
 // Byte-for-byte the seed `client/promotion.ts` produced, down to the branch fallback, so a task
 // promoted from the loaded rail is indistinguishable from one promoted before the move.
 export function linearRailItem(issue: LinearProjectIssue): PluginRailItem {
-  // Positional, and never filtered: `fields` is laid out as columns, so an issue with no assignee
-  // has to keep the empty cell or its priority slides under the next row's assignee.
-  const facts = [
-    issue.identifier,
-    issue.state?.name ?? '',
-    issue.assignee ?? '',
-    priorityMeta(issue.priority, issue.priorityLabel).label,
-  ]
+  // Title, key, status, +TASK, the shape github's PR list has. Two columns, so the reserved tracks
+  // leave the title room to be read; assignee, priority and labels are a click away in the detail pane.
+  //
+  // Positional, and never filtered: an issue with no state has to keep the empty cell or its key
+  // slides under the next row's state.
   return {
     id: linearRailItemId({ connectionId: issue.integrationId, identifier: issue.identifier }),
     title: issue.title,
-    fields: facts,
-    ...(issue.labels.length ? { badge: issue.labels.map((label) => label.name).join(', ') } : {}),
+    fields: [issue.identifier, issue.state?.name ?? ''],
     task: {
       origin: 'linear',
       title: `${issue.identifier} ${issue.title}`,

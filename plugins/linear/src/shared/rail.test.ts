@@ -31,8 +31,7 @@ describe('Linear descriptor rows', () => {
     expect(linearRailItem(ISSUE)).toEqual({
       id: 'linear%3Aacme:ENG-42',
       title: 'Ship it',
-      fields: ['ENG-42', 'In Progress', 'Ada', 'Urgent'],
-      badge: 'bug',
+      fields: ['ENG-42', 'In Progress'],
       task: {
         origin: 'linear',
         title: 'ENG-42 Ship it',
@@ -49,7 +48,5 @@ describe('Linear descriptor rows', () => {
   it('falls back to the lower-cased identifier when Linear suggests no branch', () => {
     const row = linearRailItem({ ...ISSUE, branchName: null, labels: [] })
     expect(row.task?.branch).toBe('eng-42')
-    // Omitted rather than empty: the host renders a badge whenever the key is present.
-    expect('badge' in row).toBe(false)
   })
 })
