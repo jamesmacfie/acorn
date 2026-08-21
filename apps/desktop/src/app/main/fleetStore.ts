@@ -4,18 +4,8 @@ import { z } from 'zod'
 import { nodeRecordSchema, type NodeRecord } from '@acorn/protocol/broker.ts'
 import { forgetDeviceToken, LOCAL_TOKEN_SCOPE, readDeviceToken, writeDeviceToken } from './deviceTokenStore'
 
-// Fleet membership: which nodes this client knows, where they are, and what certificate to pin.
-//
-// It lives in main because main holds the two things membership is inseparable from — the device
-// tokens and the pinned certificates (docs/architecture-overview.md § What runs where). The renderer gets
-// a token-free projection and asks main to mutate; nothing here is ever handed across contextBridge
-// except via `NodeRecord`.
-//
-// Split across two files on purpose: `fleet.json` holds the non-secret record (0600 anyway, because
-// an endpoint list is still information about the owner's machines) and each token is a separate
-// safeStorage blob. Putting tokens in the JSON would mean the whole file has to be decryptable to read
-// a label, and would lose deviceTokenStore's "no keychain ⇒ simply do not remember" behaviour: a
-// keychain-less machine keeps its fleet and re-pairs, rather than losing both.
+// Fleet membership, its storage split, and the local-node singleton invariant: docs/electron.md
+// § Fleet membership.
 //
 // Follows sessionKeyStore.ts's file discipline: 0700 dir, 0600 files, chmod after write so a looser
 // umask on an existing file cannot survive.
@@ -25,7 +15,7 @@ const FLEET_FILE = 'fleet.json'
 // The stored record: a NodeRecord plus the two fields the renderer must never need.
 export const fleetNodeSchema = nodeRecordSchema.extend({
   // The node's self-signed certificate, used as the CA for the pinned agent. Public material, but the
-  // renderer has no use for it — main is what performs the TLS.
+  // renderer has no use for it: main is what performs the TLS.
   certPem: z.string().optional(),
   // Our own row in the node's `devices` table, so "Revoke" can name it. Absent for the local node,
   // which is adopted from the service start handoff rather than paired and cannot be revoked anyway.
@@ -35,8 +25,7 @@ export type FleetNode = z.infer<typeof fleetNodeSchema>
 
 const fleetFileSchema = z.strictObject({ version: z.literal(1), nodes: z.array(fleetNodeSchema) })
 
-// The renderer's projection. Explicit rather than a spread-and-delete so a field added to FleetNode
-// cannot leak by default.
+// The renderer's projection: docs/electron.md § Fleet membership.
 export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   nodeId: node.nodeId,
   label: node.label,
@@ -45,7 +34,7 @@ export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
 })
 
-// The bundled local node's token predates its nodeId (deviceTokenStore.ts), so it has its own scope.
+// The bundled local node's token predates its nodeId: docs/electron.md § Fleet membership.
 const scopeOf = (node: Pick<FleetNode, 'nodeId' | 'local'>): string => (node.local ? LOCAL_TOKEN_SCOPE : node.nodeId)
 
 export class FleetStore {
@@ -67,24 +56,11 @@ export class FleetStore {
     return node ? readDeviceToken(this.userDataDir, scopeOf(node)) : undefined
   }
 
-  // Add or replace a node and its token. Called on every local-node start (the endpoint changes across
-  // restarts now that the port is ephemeral) and once per successful pairing.
+  // Add or replace a node and its token. Called on every local-node start (the endpoint changes
+  // across restarts now that the port is ephemeral) and once per successful pairing.
   //
-  // A LOCAL node replaces any OTHER local row as well as its own, because the local node is a singleton
-  // (docs/architecture-overview.md § Fleet semantics: "Exactly one, and it cannot be unpaired") while its
-  // IDENTITY is not stable — replace the data root and the same machine comes back up under a new nodeId.
-  // Matching on nodeId alone appended a second `local: true` row instead, and nothing ever cleared it:
-  // `adoptLocalNode` upserts only the id it just started, nodeBrokerIpc's boot loop skips local rows on
-  // purpose (the local endpoint is unknown until the service binds a port), and NODE_FORGET refuses to
-  // remove a local node at all, so the owner could not even clear it by hand.
-  //
-  // The consequence was not cosmetic. The leftover row stayed LISTED with no broker connection behind it,
-  // and `homeNode()` takes the first local row — so the window homed onto a node whose every request
-  // answers `Unknown node <id>` from the broker, while the persisted per-node query cache kept the shell
-  // looking populated and `pluginEnabledOnNode` quietly went false for every plugin.
-  //
-  // The dropped row's credential is deliberately NOT forgotten: every local row shares LOCAL_TOKEN_SCOPE
-  // (see `scopeOf`), so it is the live node's token and the write below is what refreshes it.
+  // Why a local node replaces any other local row as well as its own, and the bug this fixed:
+  // docs/electron.md § Fleet membership.
   remember(node: FleetNode, token: string): FleetNode {
     const nodes = this.list().filter((existing) => existing.nodeId !== node.nodeId && !(node.local && existing.local))
     nodes.push(node)
@@ -119,7 +95,7 @@ export class FleetStore {
       // owner a re-pair; half-reading it could point a pinned connection at the wrong fingerprint.
       console.warn('[fleet] fleet.json is unreadable; starting from an empty fleet')
     } catch {
-      // No file yet — first launch.
+      // No file yet: first launch.
     }
     return []
   }

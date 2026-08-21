@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { MAX_BUNDLE_BYTES, PluginCache } from './pluginCache'
 
-// No electron mock: the cache is deliberately Electron-free (it takes userDataDir as a parameter, the
-// way fleetStore does), which is what makes the hashing rules — the part that carries the security
-// property — testable without a window.
+// No electron mock: the cache is Electron-free (it takes userDataDir as a parameter, the way
+// fleetStore does), which is what makes the hashing rules, the part that carries the security
+// property, testable without a window.
 
 const BUNDLE = 'export default { name: "sparkline" }'
 const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text)).digest('hex')

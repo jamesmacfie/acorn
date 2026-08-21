@@ -18,8 +18,8 @@ describe('crash budget', () => {
     const times: number[] = []
     for (let i = 0; i < MAX_CRASHES_PER_WINDOW; i++) recordCrash(times, i * 1_000)
     // Well past the window, so every earlier crash is forgotten and this reads as the first one again.
-    // The boundary is inclusive — a crash exactly `CRASH_WINDOW_MS` old still counts — which is why
-    // this is not `CRASH_WINDOW_MS + 1`.
+    // The boundary is inclusive: a crash exactly `CRASH_WINDOW_MS` old still counts, which is why this
+    // is not `CRASH_WINDOW_MS + 1`.
     const muchLater = CRASH_WINDOW_MS * 2
     expect(recordCrash(times, muchLater)).toEqual({ retry: true, delayMs: 1_000 })
     expect(times).toEqual([muchLater])

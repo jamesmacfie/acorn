@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-// Narrow capability surface (docs/electron.md §4g): a desktop marker, the node-broker primitives, and
-// the validated terminal channels (docs/terminal-and-agents.md) — never raw ipcRenderer.
+// Narrow capability surface: docs/electron.md § Renderer origin and protocol handler. A desktop
+// marker, the node-broker primitives, and the validated terminal channels
+// (docs/terminal-and-agents.md); never raw ipcRenderer.
 contextBridge.exposeInMainWorld('acorn', {
   desktop: true,
   platform: process.platform,
@@ -41,19 +42,18 @@ contextBridge.exposeInMainWorld('acorn', {
   nodeRename: (nodeId: string, label: string) => ipcRenderer.invoke('acorn:node-rename', { nodeId, label }),
   nodeForget: (nodeId: string, revoke: boolean) => ipcRenderer.invoke('acorn:node-forget', { nodeId, revoke }),
   nodeReconnect: (nodeId: string) => ipcRenderer.send('acorn:node-reconnect', nodeId),
-  // Settings → Plugins' Restart button. Takes no nodeId: only the LOCAL node is supervised by this app,
-  // and a remote node is restarted by whatever started it (nodeBrokerIpc.ts).
+  // Settings → Plugins' Restart button. Takes no nodeId: only the local node is supervised by this
+  // app, and a remote node is restarted by whatever started it (nodeBrokerIpc.ts).
   nodeRestartLocal: (): Promise<void> => ipcRenderer.invoke('acorn:node-restart-local'),
-  // The preview tunnel. In: a task and a port ON THE NODE. Out: a port on THIS machine. The renderer never
-  // sees the node's endpoint or its device token — main owns the pipe (main/previewTunnel.ts).
+  // The preview tunnel. In: a task and a port on the node. Out: a port on this machine. The renderer
+  // never sees the node's endpoint or its device token; main owns the pipe (main/previewTunnel.ts).
   nodeTunnelOpen: (request: { nodeId: string; taskId: string; port: number }): Promise<{ port: number }> =>
     ipcRenderer.invoke('acorn:node-tunnel-open', request),
   nodeTunnelClose: (match: { nodeId?: string; taskId?: string }): void =>
     ipcRenderer.send('acorn:node-tunnel-close', match),
-  // Third-party plugin bundles (docs/plugins.md). `cachePut` names a
-  // node and a plugin and gets back the hash main computed from the bytes it fetched — the bundle
-  // itself never crosses this bridge, so the renderer is no more able to touch third-party code than
-  // it is to touch a device token.
+  // Third-party plugin bundles (docs/plugins.md). `cachePut` names a node and a plugin and gets back
+  // the hash main computed from the bytes it fetched. The bundle itself never crosses this bridge, so
+  // the renderer is no more able to touch third-party code than it is to touch a device token.
   plugins: {
     state: () => ipcRenderer.invoke('acorn:plugins-state'),
     cachePut: (request: unknown) => ipcRenderer.invoke('acorn:plugins-cache-put', request),
@@ -69,12 +69,13 @@ contextBridge.exposeInMainWorld('acorn', {
     openDataFolder: () => ipcRenderer.send('acorn:open-data-folder'),
     quit: () => ipcRenderer.send('acorn:force-quit'),
   },
-  // The native folder picker (dialog.showOpenDialog — a true Electron capability), for onboarding and
+  // The native folder picker (`dialog.showOpenDialog`, a true Electron capability), for onboarding and
   // project mapping. Returns the chosen absolute path or null.
   //
-  // It used to live under a `terminal` key, and the renderer read that key's PRESENCE as "this node runs
-  // terminals" — which hid the whole terminal/agents/workflows block from every non-Electron client for
-  // no reason (git history: docs/future/node-first/platform-seam.md). It is a folder dialog. It is named after one.
+  // It used to live under a `terminal` key, and the renderer read that key's presence as "this node
+  // runs terminals", which hid the whole terminal/agents/workflows block from every non-Electron
+  // client for no reason (git history: docs/future/node-first/platform-seam.md). It is a folder
+  // dialog. It is named after one.
   folderPath: {
     pick: () => ipcRenderer.invoke('term:folderPath:pick'),
   },

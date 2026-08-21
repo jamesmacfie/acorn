@@ -5,19 +5,9 @@ import { z } from 'zod'
 import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 
-// The content-addressed store of plugin client bundles a node handed us
-// (docs/plugins.md).
-//
-// Two properties carry the whole design, and both come from the file name being the hash of the
-// contents:
-//
-//   1. TRUST BINDS TO BYTES. The hash a node advertises in its plugin listing is untrusted input — a
-//      compromised node can put anything there. So this module hashes what it actually received,
-//      stores under THAT, and treats the advertised hash as a claim to be cross-checked. The device's
-//      trust acknowledgement (pluginTrustStore.ts) is then bound to a hash nobody but this process
-//      computed.
-//   2. A poisoned entry cannot masquerade as an accepted one. Overwriting `<hash>.js` with different
-//      bytes is not possible without breaking the name.
+// The content-addressed store of plugin client bundles a node handed us. Why the hash is trusted and
+// not the claim, and what that closes: docs/security.md § Third-party plugin bundles ("Trust binds to
+// bytes, not to claims").
 //
 // Only main writes here, and only main knows the paths: nothing on this class hands a filesystem path
 // across contextBridge. The renderer names bundles by hash and nothing else.
@@ -104,11 +94,8 @@ export class PluginCache {
   }
 
   // Pull a plugin's client bundle from a node and store it under the hash of the bytes that arrived.
-  //
-  // `claim` is what the node's listing said. It is used as a fast "do we already have this?" check and
-  // then as an integrity assertion — never as the storage key. A mismatch is reported rather than
-  // stored: bytes that do not match what the node itself advertised are either a corrupted transfer or
-  // a node lying to one device about what it is serving to another.
+  // `claim` is what the node's listing said; it is a fast "do we already have this?" check and an
+  // integrity assertion, never the storage key: docs/security.md § Third-party plugin bundles.
   async putFromNode(nodeId: string, pluginId: string, claim: { hash: string; version: string }): Promise<PutResult> {
     if (!HASH_RE.test(claim.hash)) return { error: 'hash-mismatch' }
     if (this.has(claim.hash)) {

@@ -12,13 +12,11 @@ import {
   type NodeStatus,
 } from '@acorn/protocol/broker.ts'
 
-// The connection broker (docs/architecture-overview.md § How the client talks to nodes). Owns, per node:
-// the endpoint, the pinned certificate, the device token, one WebSocket, and the connection state.
+// The connection broker: docs/electron.md § Connection broker for what it owns per node. Electron-free
+// so it can be unit-tested against a real TLS server; the IPC wiring that exposes it lives in
+// nodeBrokerIpc.ts.
 //
-// Electron-free on purpose — it imports node:https and `ws`, nothing from electron — so it can be
-// unit-tested against a real TLS server. The IPC wiring that exposes it lives in nodeBrokerIpc.ts.
-//
-// It must NOT live in @acorn/client-core: the boundary test classifies that package as client-side,
+// It must not live in @acorn/client-core: the boundary test classifies that package as client-side,
 // so a node:https import there would both fail the client/node split rule and drag Node builtins into
 // the renderer bundle.
 
@@ -76,8 +74,8 @@ export class NodeBroker {
   private readonly pingIntervalMs: number
 
   // The heartbeat cadence is injectable for the same reason node-core's `revocationCheckMs` is: the
-  // interval runs for REAL in tests, so the assertion is that the socket actually died rather than that
-  // a timer was scheduled. Faking the clock would test the schedule and not the behaviour.
+  // interval runs for real in tests, so the assertion is that the socket actually died rather than
+  // that a timer was scheduled. Faking the clock would test the schedule, not the behavior.
   constructor(
     private readonly events: BrokerEvents,
     options: { pingIntervalMs?: number } = {},
@@ -113,25 +111,25 @@ export class NodeBroker {
     void this.openConnection(connection)
   }
 
-  // The version gate, and the reason it is here rather than at pairing: pairing checks once, and a node
-  // upgrades. `incompatible` and `protocol_mismatch` have been in the protocol since it was written with
-  // nothing anywhere producing either, so a node that drifted past this client kept connecting and failed
-  // later as an `undefined` deep inside a component.
+  // The version gate runs here rather than at pairing, because pairing checks once and a node
+  // upgrades afterward. `incompatible` and `protocol_mismatch` have been in the protocol since it was
+  // written with nothing producing either, so a node that drifted past this client kept connecting and
+  // failed later as an `undefined` deep inside a component.
   //
-  // Before the socket, not alongside it: a client that cannot speak the protocol should not open a
-  // WebSocket and start interpreting frames on it.
+  // It runs before the socket opens, not alongside it: a client that cannot speak the protocol should
+  // not open a WebSocket and start interpreting frames on it.
   //
-  // A failure to REACH the node is not a version failure — it is the ordinary offline path, and treating
-  // an unreachable node as incompatible would be a sticky, alarming state for a laptop that is merely
-  // asleep. So only a definite, parseable, different major stops us; anything else opens the socket and
-  // lets the existing reconnect machinery say what it always said.
+  // A failure to reach the node is not a version failure. It is the ordinary offline path, and
+  // treating an unreachable node as incompatible would be a sticky, alarming state for a laptop that
+  // is merely asleep. Only a definite, parseable, different major stops the connection; anything else
+  // opens the socket and lets the existing reconnect machinery say what it always said.
   private async openConnection(connection: Connection): Promise<void> {
     if (connection.closed) return
     const major = await this.probeProtocol(connection)
     if (connection.closed) return
     if (major !== null && major !== NODE_PROTOCOL_VERSION) {
       // Sticky, like `revoked`: retrying cannot fix a version, and `downState` already refuses to
-      // downgrade either state. Only an upsert — a re-pair, or the app relaunching after an upgrade —
+      // downgrade either state. Only an upsert (a re-pair, or the app relaunching after an upgrade)
       // clears it, which is exactly when the answer could have changed.
       this.setState(connection, 'incompatible', { code: 'protocol_mismatch' })
       connection.closed = true
@@ -140,13 +138,14 @@ export class NodeBroker {
     this.openSocket(connection)
   }
 
-  // The node's own claim, over the pinned agent. Unauthenticated `GET /v2/node` — it needs no token, and
-  // asking for one here would confuse "your device was revoked" with "we disagree about the protocol".
+  // The node's own claim, over the pinned agent. Unauthenticated `GET /v2/node`, since it needs no
+  // token, and asking for one here would confuse "your device was revoked" with "we disagree about
+  // the protocol".
   //
   // `null` for anything that is not a clear answer: unreachable, non-JSON, or a body without a numeric
   // protocol. The schema is additive-forever so a newer node still parses; if it somehow does not, the
-  // raw field is still read, because refusing to learn a version from a response we could not fully
-  // parse is how a client ends up unable to explain itself.
+  // raw field is still read, because refusing to learn a version from a response that could not be
+  // fully parsed is how a client ends up unable to explain itself.
   private async probeProtocol(connection: Connection): Promise<number | null> {
     try {
       const response = await nodeRequest({
@@ -218,7 +217,7 @@ export class NodeBroker {
         method: request.method ?? 'GET',
         headers: {
           ...request.headers,
-          // Attached HERE, never by the renderer. That is the point of the broker.
+          // Attached here, never by the renderer. That is the point of the broker.
           authorization: `Bearer ${connection.node.token}`,
         },
         body: request.body,
@@ -228,10 +227,10 @@ export class NodeBroker {
       this.noteHttpResult(connection, response)
       return response
     } catch (error) {
-      // A cancellation the RENDERER asked for says nothing about the node's health. Marking it `offline`
-      // here was a live bug: a query aborted on unmount (or superseded by a refetch) flipped a perfectly
-      // healthy node to `offline`, and apiClient then fail-fasts every mutation with "This node is
-      // offline" until the next successful read happens to clear it.
+      // A cancellation the renderer asked for says nothing about the node's health. Marking it
+      // `offline` here was a live bug: a query aborted on unmount (or superseded by a refetch) flipped
+      // a perfectly healthy node to `offline`, and apiClient then fail-fasts every mutation with "This
+      // node is offline" until the next successful read happens to clear it.
       if (isAbort(error) && !timedOut) throw error
       this.noteHttpFailure(connection, error)
       // Renamed so the two aborts stay distinguishable one layer up (nodeBrokerIpc.ts swallows the
@@ -265,7 +264,7 @@ export class NodeBroker {
     if (connection.closed) return
     const url = new URL(WS_PATH, connection.node.endpoint)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    // The bearer rides the upgrade request's headers, which a browser cannot set — one of the reasons
+    // The bearer rides the upgrade request's headers, which a browser cannot set. That is one reason
     // the socket belongs to main rather than the renderer.
     const ws = new WebSocket(url, {
       headers: { authorization: `Bearer ${connection.node.token}` },
@@ -306,18 +305,18 @@ export class NodeBroker {
 
   // Ping on an interval; a peer that misses two in a row is treated as gone.
   //
-  // `terminate()` rather than `close()`, and that is the whole point: `close()` starts a closing
-  // HANDSHAKE, which waits for a reply from the peer we have just concluded is not replying. The socket
-  // would sit in CLOSING and the node would still read `online` — the exact bug this exists to fix, one
-  // state further along. `terminate()` destroys it, which fires `'close'`, which reaches the reconnect
-  // and state machinery already there.
+  // `terminate()` rather than `close()`: `close()` starts a closing handshake, which waits for a reply
+  // from a peer already concluded to be not replying. The socket would sit in a closing state and the
+  // node would still read `online`, the exact bug this exists to fix, one state further along.
+  // `terminate()` destroys it, which fires `'close'`, which reaches the reconnect and state machinery
+  // already there.
   private startHeartbeat(connection: Connection, ws: WebSocket): void {
     this.stopHeartbeat(connection)
     connection.missedPongs = 0
     const timer = setInterval(() => {
       if (ws.readyState !== WebSocket.OPEN) return
-      // Checked BEFORE sending, so the count read here is of pings that have already had a full interval
-      // to be answered. Incrementing first and checking after would condemn the socket on a ping that had
+      // Checked before sending, so the count read here is of pings that already had a full interval to
+      // be answered. Incrementing first and checking after would condemn the socket on a ping that had
       // not been given its chance yet.
       if (connection.missedPongs >= MISSED_PONGS_BEFORE_DEAD) {
         console.warn(`[broker] ${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`)
@@ -352,7 +351,7 @@ export class NodeBroker {
     const seq = (frame as { seq?: unknown }).seq
     if (typeof seq === 'number') {
       // A gap means loss. The protocol's remedy is to treat it as a reconnect, because there is no
-      // cursor into history to replay from — the client refetches instead.
+      // cursor into history to replay from; the client refetches instead.
       if (connection.seq !== 0 && seq !== connection.seq + 1) {
         console.warn(`[broker] frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`)
         connection.ws?.close()
@@ -390,16 +389,16 @@ export class NodeBroker {
     return httpRecent && downFor >= DEGRADED_AFTER_MS ? 'degraded' : 'offline'
   }
 
-  // Only the AUTH GATE's own answer is evidence that this device was revoked, and the gate says exactly
-  // one thing: 401 with `unauthenticated` (server/middleware/requireUser.ts — a revoked token resolves to
-  // no principal, indistinguishably from an unknown one).
+  // Only the auth gate's own answer is evidence that this device was revoked, and the gate says
+  // exactly one thing: 401 with `unauthenticated` (server/middleware/requireUser.ts; a revoked token
+  // resolves to no principal, indistinguishably from an unknown one).
   //
-  // Reading the status alone was wrong, and wrong in the direction that matters. Route-level failures
-  // reuse both codes for a DIFFERENT credential: `provider_not_connected` is a 403 and is what a fresh
-  // node answers for a GitHub integration nobody has connected yet, and `linear_reauth` /
-  // `provider_needs_auth` are 401s about a third-party token. The loopback Host guard also 403s. Any one
-  // of them marked a perfectly healthy node `revoked` — which the fleet UI renders as a security event
-  // and which stops the WebSocket being retried.
+  // Reading the status alone was wrong, in the direction that matters. Route-level failures reuse both
+  // codes for a different credential: `provider_not_connected` is a 403 and is what a fresh node
+  // answers for a GitHub integration nobody has connected yet, and `linear_reauth` /
+  // `provider_needs_auth` are 401s about a third-party token. The loopback Host guard also 403s. Any
+  // one of them marked a perfectly healthy node `revoked`, which the fleet UI renders as a security
+  // event and which stops the WebSocket being retried.
   private noteHttpResult(connection: Connection, response: NodeFetchResponse): void {
     if (response.status === 401 && errorCodeOf(response) === 'unauthenticated') {
       this.setState(connection, 'revoked', { code: 'unauthorized' })
@@ -452,11 +451,11 @@ export class NodeBroker {
 type HttpsAgentIdentityCheck = (host: string, cert: { fingerprint256: string }) => Error | undefined
 export type PinnedTlsOptions = { ca?: string[]; rejectUnauthorized: boolean; checkServerIdentity?: HttpsAgentIdentityCheck }
 
-// Certificate pinning (docs/api-reference.md § Transport and identity: "No CA, no hostname
-// validation — the pin is the identity").
+// Certificate pinning: docs/security.md § Transport and auth ("A changed fingerprint is a hard
+// stop").
 //
-// `rejectUnauthorized` MUST stay true. In false mode Node does not call checkServerIdentity at all,
-// so the pin would silently never be checked — a failure that fails OPEN. Supplying the node's own
+// `rejectUnauthorized` must stay true. In false mode, Node does not call checkServerIdentity at all,
+// so the pin would silently never be checked, a failure that fails open. Supplying the node's own
 // self-signed certificate as the CA is what makes the chain valid; the override then replaces
 // hostname verification with the fingerprint comparison.
 //
@@ -479,8 +478,9 @@ export const PIN_MISMATCH_CODE = 'ACORN_PIN_MISMATCH'
 
 export const normalizeFingerprint = (value: string): string => value.replace(/:/g, '').toLowerCase()
 
-// The `error.code` out of the node's error envelope (docs/api-reference.md § Errors), or null if this
-// response is not one. Only consulted for a 401, so parsing a body here costs nothing on the happy path.
+// The `error.code` out of the node's error envelope (docs/api-reference.md § Transport), or null if
+// this response is not one. Only consulted for a 401, so parsing a body here costs nothing on the
+// happy path.
 const errorCodeOf = (response: NodeFetchResponse): string | null => {
   try {
     const parsed = JSON.parse(new TextDecoder().decode(response.body)) as { error?: { code?: unknown } }

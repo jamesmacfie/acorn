@@ -54,8 +54,8 @@ afterEach(() => {
 
 const TARGET = { nodeId: 'n1', taskId: 'task-1', port: 3000 }
 
-// Connect to the local listener and send `head`. Resolves with whether the socket was still open a beat
-// later — a refused connection is destroyed, an authorised one is piped.
+// Connect to the local listener and send `head`. Resolves with whether the socket was still open a
+// beat later: a refused connection is destroyed, an authorized one is piped.
 async function speak(port: number, head: string): Promise<{ alive: boolean }> {
   const socket = createConnection({ port, host: '127.0.0.1' })
   clients.push(socket)
@@ -117,8 +117,8 @@ describe('the tunnel listener demands its secret', () => {
     const second = await tunnels.open({ ...TARGET, taskId: 'task-2' })
     expect(second).not.toBe(first)
 
-    // Per LISTENER, so a pane that legitimately holds one task's secret cannot reach another task's dev
-    // server through the tunnel opened for it.
+    // Per listener, so a pane that legitimately holds one task's secret cannot reach another task's
+    // dev server through the tunnel opened for it.
     const { alive } = await speak(second, request(secretHeader(first)))
     expect(alive).toBe(false)
     expect(upgrades).toEqual([])
@@ -144,7 +144,7 @@ describe('headersFor', () => {
     const port = await tunnels.open(TARGET)
 
     expect(tunnels.headersFor(`http://127.0.0.1:${port}/anything`)).toMatchObject({ 'x-acorn-tunnel': expect.any(String) })
-    // A different port on loopback is somebody else's server — very often the OWNER's own dev server,
+    // A different port on loopback is somebody else's server, very often the owner's own dev server,
     // which is the case that would leak the secret to a process we know nothing about.
     expect(tunnels.headersFor(`http://127.0.0.1:${port + 1}/`)).toBeNull()
     // `localhost` is deliberately not accepted: it can resolve to ::1 or, with a hosts entry, anywhere.

@@ -25,11 +25,7 @@ export type BootstrapOptions = {
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-// docs/architecture-overview.md § Failure behavior, literally: "Electron restarts it with backoff
-// (1/2/4/8/16s, max 5 in 10 min), then shows a recovery screen". The previous policy was
-// 250·2^(n-1) ms with a >3-in-60s ceiling — much tighter, and tight enough that a service crashing on
-// something durable (a corrupt database, a port it can never bind) burned its budget in under two
-// seconds and quit before a human could read anything.
+// Crash budget and restart backoff: docs/electron.md § Node child.
 
 export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
   let disposed = false
@@ -43,7 +39,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
     : join(import.meta.dirname, '../bundled-plugins')
 
   // Start the service and persist whatever token it ended up using. Reused on every start, including
-  // crash recovery — a restart must not mint a new device row, and the endpoint can change across
+  // crash recovery: a restart must not mint a new device row, and the endpoint can change across
   // restarts, so the caller always takes the fresh result rather than caching the first one.
   const startService = async (): Promise<ServiceStartResult> => {
     const started = await service.start(readDeviceToken(userDataDir, LOCAL_TOKEN_SCOPE))
@@ -77,9 +73,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   // data; neither previewService nor the picker adapter can reach SQLite.
   const disposePicker = registerFolderPickerIpc()
 
-  // The connection broker, likewise installed before the renderer: its first act on load is to ask
-  // for the fleet, so the handler must already exist. Registering the IPC also reconnects every node
-  // remembered from a previous launch — membership survives restarts, the local node included.
+  // The connection broker, installed before the renderer: docs/electron.md § Node child.
   const push = brokerPushTargets(() => window)
   const broker = new NodeBroker({ frame: push.frame, status: push.status })
   const fleet = new FleetStore(userDataDir)
@@ -100,9 +94,9 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode(), tunnels })
 
   // Third-party plugin bundles a node has served us, and this device's decisions about running them
-  // (docs/plugins.md). Both stores are main's: the bytes never pass
-  // through the renderer, and the acknowledgements sit beside the device tokens because they are the
-  // same kind of custody — something this machine agreed to, not something a node can assert.
+  // (docs/plugins.md). Both stores are main's: the bytes never pass through the renderer, and the
+  // acknowledgements sit beside the device tokens because they are the same kind of custody, something
+  // this machine agreed to, not something a node can assert.
   //
   // The sweep runs before the renderer can ask for state, so a bundle no node has offered in a month
   // is gone rather than briefly listed and then dropped.
@@ -118,14 +112,14 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   const disposePluginIpc = registerPluginIpc(pluginCache, pluginTrust)
   // The origin plugin UI renders on (docs/plugins.md). Registered here rather
   // than beside registerAppScheme in electron.ts because it serves out of the cache above and nothing
-  // else — the handler has no path parameter to be pointed at, by design.
+  // else: the handler has no path parameter to be pointed at, by design.
   registerPluginScheme(pluginCache)
 
   // Registered here rather than beside the picker above, because it needs `tunnels`: a preview pane
-  // pointed at a remote task loads a loopback URL, and the tunnel's listener refuses any connection that
-  // does not present that listener's secret (main/previewTunnel.ts). This is the injection that carries
-  // it — plugins/preview may not import an app, so the header record arrives as a function. Still well
-  // before the window exists, which is the ordering the picker comment above is about.
+  // pointed at a remote task loads a loopback URL, and the tunnel's listener refuses any connection
+  // that does not present that listener's secret (main/previewTunnel.ts). This is the injection that
+  // carries it, since plugins/preview may not import an app, so the header record arrives as a
+  // function. Still well before the window exists, the ordering the picker comment above is about.
   const webviews = new WebviewService()
   const disposePluginWebviews = registerPluginWebviewIpc(webviews)
   const disposePreview = registerPreviewIpc({
@@ -136,11 +130,12 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
 
   // Record (or re-record, after a crash restart) the local node and bring its connection up. The
   // endpoint, the certificate and even the token can change between starts now that the port is
-  // ephemeral, so this is driven by each start result rather than cached — but the LABEL is the
-  // owner's, so a rename survives.
+  // ephemeral, so this is driven by each start result rather than cached. The label stays the owner's
+  // though, so a rename survives.
   const adoptLocalNode = (started: ServiceStartResult): void => {
-    // Every start — first boot, crash recovery, a deliberate restart — can change the endpoint, the
-    // certificate and the token, so any surviving pipe to this node is pointed at a process that is gone.
+    // Every start (first boot, crash recovery, a deliberate restart) can change the endpoint, the
+    // certificate and the token, so any surviving pipe to this node is pointed at a process that is
+    // gone.
     tunnels.closeFor({ nodeId: started.nodeId })
     const node = fleet.remember(
       {
@@ -162,23 +157,23 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
 
   // Settings → Plugins' Restart button (nodeBrokerIpc.ts explains why only the local node has one).
   //
-  // It goes through the same `startService` as boot and crash recovery, so the node re-reads its
-  // disabled-plugins file on the way up and `adoptLocalNode` re-records the endpoint, certificate and
-  // token — all three can change across a restart now that the port is ephemeral. Not routed through
-  // `recover()`, deliberately: this is a deliberate restart, and spending one of the five crashes in the
-  // ten-minute budget on it would mean a few plugin toggles could trip the recovery screen.
+  // Goes through the same `startService` as boot and crash recovery, so the node re-reads its
+  // disabled-plugins file on the way up, and `adoptLocalNode` re-records the endpoint, certificate,
+  // and token, since all three can change across a restart now that the port is ephemeral. Not routed
+  // through `recover()`: this is a restart the owner asked for, and spending one of the five crashes
+  // in the ten-minute budget on it would mean a few plugin toggles could trip the recovery screen.
   // Guarded against `recover()`, which is the case that made this dangerous rather than merely racy.
   //
-  // `ServiceHost.start` throws "already started" while a child exists. So without the guard: the service
-  // crashes, `recover()` is inside its backoff `wait`, the owner clicks Restart, Restart succeeds — and
-  // then `recover()`'s own `startService()` throws, its catch calls `service.stop()` and KILLS the working
-  // node, then re-enters `recover()` and spends another crash from the budget. Two clicks during recovery
-  // tripped the recovery dialog on a healthy node.
+  // `ServiceHost.start` throws "already started" while a child exists. Without the guard: the service
+  // crashes, `recover()` is inside its backoff wait, the owner clicks Restart, Restart succeeds, and
+  // then `recover()`'s own `startService()` throws. Its catch calls `service.stop()` and kills the
+  // working node, then re-enters `recover()` and spends another crash from the budget. Two clicks
+  // during recovery tripped the recovery dialog on a healthy node.
   //
-  // A failure here also has to reach `recover()`, not just the renderer: if `startService()` rejects (a
-  // taken port, a corrupt plugin DB) no child was ever spawned, so `unexpectedExit` never fires and the app
-  // would sit with a dead node until relaunch. It still reports to the caller, so Settings → Plugins shows
-  // the reason.
+  // A failure here also has to reach `recover()`, not just the renderer: if `startService()` rejects
+  // (a taken port, a corrupt plugin DB) no child was ever spawned, so `unexpectedExit` never fires and
+  // the app would sit with a dead node until relaunch. It still reports to the caller, so Settings →
+  // Plugins shows the reason.
   const restartLocalNode = async (): Promise<void> => {
     if (disposed) return
     if (recovering) throw new Error('acorn is already restarting the background service.')
@@ -227,8 +222,8 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
       return showRecoveryScreen()
     }
     if (response === 3) return void app.exit(1)
-    // Retry: clear the budget so the next failure gets the full backoff again. The owner asking for a
-    // retry is new information — they may have just freed the port or fixed permissions.
+    // Retry: clear the budget so the next failure gets the full backoff again. The owner asking for
+    // a retry is new information: they may have just freed the port or fixed permissions.
     crashTimes.length = 0
     recovering = false
     await recover()

@@ -53,7 +53,7 @@ describe('acknowledging a bundle', () => {
   })
 
   it('asks again when the same plugin arrives with different bytes', () => {
-    // The update case. Consent was given to a hash, not to a name — which is the whole point of
+    // The update case. Consent was given to a hash, not to a name, which is the whole point of
     // binding the acknowledgement to content.
     store().record(ack())
     expect(store().decisionFor('sparkline', HASH_B)).toBeUndefined()
@@ -85,7 +85,7 @@ describe('acknowledging a bundle', () => {
 describe('custody', () => {
   it('is per device: a fresh store knows nothing and prompts again', () => {
     store().record(ack())
-    // A second machine, or a re-imaged one. Pairing a new laptop re-prompts by design — the decision
+    // A second machine, or a re-imaged one. Pairing a new laptop re-prompts by design: the decision
     // was this device's to make, exactly like its device token.
     const other = new PluginTrustStore(mkdtempSync(join(tmpdir(), 'acorn-plugin-trust-other-')))
     expect(other.decisionFor('sparkline', HASH_A)).toBeUndefined()
@@ -116,7 +116,7 @@ describe('custody', () => {
 
   it('keeps the readable acknowledgements when one row cannot be parsed', () => {
     // The whole file used to be parsed as a unit, so one row written by a newer build condemned every
-    // row beside it — and the empty result became the cache, so the next write ERASED them.
+    // row beside it, and the empty result became the cache, so the next write erased them.
     const good = ack({ hash: HASH_A })
     const alsoGood = ack({ pluginId: 'board', hash: HASH_B, decision: 'rejected' })
     writeFileSync(
@@ -155,9 +155,9 @@ describe('custody', () => {
   })
 
   it('never diffs an update against a partial snapshot', () => {
-    // A decision recorded when the disclosure could not be parsed (main/pluginIpc.ts). Its snapshot is
-    // known-incomplete, so using it as the "what changed" baseline would mark grants as newly
-    // requested that the owner had already seen — the alarming direction.
+    // A decision recorded when the disclosure could not be parsed (main/pluginIpc.ts). Its snapshot
+    // is known-incomplete, so using it as the "what changed" baseline would mark grants as newly
+    // requested that the owner had already seen, the alarming direction.
     const trust = store()
     trust.record(ack({ hash: HASH_A, partial: true }))
     expect(trust.previousFor('sparkline', HASH_B)).toBeUndefined()
