@@ -36,7 +36,7 @@ export const isPluginShortcutChord = (chord: string): boolean =>
 
 // Clipboard, undo and select-all are implemented by the browser (on macOS, by the Edit menu's roles)
 // against whatever is selected or focused. They carry a command modifier, so anything that cancels
-// "modified chords" on principle cancels these too — which is why copying out of a sandboxed frame
+// "modified chords" on principle cancels these too. That is why copying out of a sandboxed frame
 // silently did nothing. Shift is ignored so redo (meta+shift+z) is covered with undo.
 const EDITING_CHORD_KEYS = new Set(['a', 'c', 'v', 'x', 'z', 'y'])
 export const isBrowserEditingChord = (chord: string): boolean => {

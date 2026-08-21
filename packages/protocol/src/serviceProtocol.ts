@@ -33,9 +33,9 @@ export const serviceStartConfigSchema = z.strictObject({
   // into its writable data root before discovery; package ownership policy lives with that copy.
   bundledPluginsDir: z.string().min(1).optional(),
   // The device token this client remembered from a previous boot, if any. The service reuses it when
-  // it still authenticates, so the local bundle keeps ONE device row instead of accruing one per
+  // it still authenticates, so the local bundle keeps one device row instead of accruing one per
   // launch; otherwise (first run, a reset data root, or a revoked device) the service issues a new one
-  // and returns the effective token in the start result. Custody stays with the client — the service
+  // and returns the effective token in the start result. Custody stays with the client. The service
   // never persists it.
   deviceToken: z.string().min(1).optional(),
   disabledPlugins: z.array(z.string().min(1)).optional(),
@@ -57,7 +57,7 @@ export const serviceStartResultSchema = z.strictObject({
   // The bearer the client authenticates with. Never logged.
   deviceToken: z.string().min(1),
   // The node's transport identity: the self-signed certificate to pin and its sha256 fingerprint
-  // (docs/api-reference.md § Transport and identity). Required, not optional — the listener is TLS
+  // (docs/security.md § Transport and auth). Required, not optional: the listener is TLS
   // unconditionally, and an optional pin is a pin that silently is not one.
   fingerprint: z.string().min(1),
   certPem: z.string().min(1),

@@ -23,16 +23,13 @@ export const pluginWebviewGrants = (contributions: PluginContributions): PluginW
     .sort((a, b) => a.surface.localeCompare(b.surface))
 
 /**
- * Everything this manifest says about surfaces that are not its own, in BOTH directions.
- *
- * Both directions is the requirement, not a nicety. "This plugin extends that plugin" is a fact the
- * owner of the extending package must see before its rows appear somewhere unexpected — and the owner of
- * the extended package must see, because opening a point is opening a door. Neither is inferable from
- * the other side's manifest at trust time: they are two installs, possibly weeks apart.
+ * Everything this manifest says about surfaces that are not its own, in both directions. See
+ * docs/plugins.md § Cooperative extension points for why both directions matter and appear in the
+ * trust prompt.
  *
  * `pluginId` is passed in rather than read from the contributions, because a point's public name is
- * minted from the plugin the manifest was read from. A manifest that could state it could open a point
- * in another package's name.
+ * minted from the plugin the manifest was read from. A manifest that could state it could open a
+ * point in another package's name.
  */
 export const pluginExtensionGrants = (pluginId: string, contributions: PluginContributions): PluginExtensionGrant[] => [
   ...(contributions.extensionPoints ?? []).map((point): PluginExtensionGrant => ({
@@ -42,7 +39,7 @@ export const pluginExtensionGrants = (pluginId: string, contributions: PluginCon
   })),
   ...(contributions.extensions ?? []).flatMap((entry): PluginExtensionGrant[] => {
     // An unparseable reference is dropped rather than disclosed. The node refused it at parse and the
-    // client refuses it again, so it will never deliver anything — and a consent line about a grant that
+    // client refuses it again, so it will never deliver anything. A consent line about a grant that
     // cannot exist is noise in the one list that must not have any.
     const ref = parseExtensionPointRef(entry.point)
     return ref ? [{ kind: 'extends', target: entry.point, label: entry.label }] : []
@@ -53,18 +50,15 @@ export const pluginExtensionGrants = (pluginId: string, contributions: PluginCon
       : []),
 ].sort((a, b) => a.kind.localeCompare(b.kind) || a.target.localeCompare(b.target))
 
-/** What this package will run on its own, and how often. The `run` route is deliberately not part of
- * the grant: it is the plugin's own route, which it could already reach from any of its surfaces, and
- * what the owner is being told is WHEN — unattended, with no client open. */
+/** What this package will run on its own, and how often. See docs/plugins.md § Loaded plugins: the
+ *  client half (the `schedules` entry) for why the `run` route itself is not part of the grant. */
 export const pluginScheduleGrants = (contributions: PluginContributions): PluginScheduleGrant[] =>
   (contributions.schedules ?? [])
     .map((schedule) => ({ id: schedule.id, label: schedule.name, cadence: schedule.cadence }))
     .sort((a, b) => a.id.localeCompare(b.id))
 
-/** What this package will say — and possibly do — when a task is archived. Neither route is part of
- * the grant, for the reason the schedule grant states: both are the plugin's own, reachable from any
- * of its surfaces already. What the owner is being told is that archiving a task now runs this
- * package's code, and whether it will offer to change something. */
+/** What this package will say, and possibly do, when a task is archived. See docs/plugins.md §
+ *  Loaded plugins: the client half (task checks) for why neither route is part of the grant. */
 export const pluginTaskCheckGrants = (contributions: PluginContributions): PluginTaskCheckGrant[] =>
   (contributions.taskChecks ?? [])
     .map((check) => ({ id: check.id, cleansUp: check.apply !== undefined }))

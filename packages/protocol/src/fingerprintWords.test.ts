@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { FINGERPRINT_WORD_COUNT, fingerprintPhrase, fingerprintWords } from './fingerprintWords'
 
-// docs/api-reference.md § Transport and identity asks for a fingerprint "rendered as 6 words / grouped base32" because
-// the comparison IS the security of pairing: two 64-character hex strings differing in the middle look
-// identical to a person, which is exactly the substitution an attacker wants.
+// The comparison is the security of pairing (docs/api-reference.md § Pairing): two 64-character hex
+// strings differing in the middle look identical to a person, which is exactly the substitution an
+// attacker wants. Six words make that comparison practical.
 
 const A = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90'
 const B = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f91'
 
 describe('the word list', () => {
   it('is exactly 256 entries, so a word is one byte', () => {
-    // The arithmetic behind "six words": 256 entries is 8 bits each, so six carry 48 — the same strength as
-    // comparing twelve hex characters. A different size silently changes every fingerprint's phrase, so this
-    // is pinned rather than left to the array literal.
+    // The arithmetic behind "six words": 256 entries is 8 bits each, so six carry 48. That is the same
+    // strength as comparing twelve hex characters. A different size silently changes every
+    // fingerprint's phrase, so this is pinned rather than left to the array literal.
     expect(FINGERPRINT_WORD_COUNT).toBe(256)
   })
 })

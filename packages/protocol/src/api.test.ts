@@ -4,7 +4,7 @@ import { parseRailItemId, prefsKey, railItemId } from './api'
 
 describe('shared API contract helpers', () => {
   // A net under the ~90 route literals above, which were namespaced by hand: every one must land in a
-  // current /v2 namespace (docs/api-reference.md § HTTP conventions), because a path outside /v2/*
+  // current /v2 namespace (docs/api-reference.md § Transport), because a path outside /v2/*
   // escapes the server's single auth and requireUser glob and would 404 into the SPA shell. Enumerated
   // from the module rather than listed, so a new builder is covered the day it lands.
   it('namespaces every exported route builder under /v2/core or /v2/p', () => {

@@ -22,7 +22,7 @@ export type DesktopCapabilities = {
   browser: BrowserDesktopCapability
 }
 
-// Service-side projection of the deliberately small native surface. The utility service never
+// Service-side projection of the small native surface it exposes. The utility service never
 // receives a BrowserWindow/WebContents handle; it can only issue task-addressed commands.
 export function desktopCapabilitiesOverRpc(peer: ServiceRpcPeer): DesktopCapabilities {
   return {

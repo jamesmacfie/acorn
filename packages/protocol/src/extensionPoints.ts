@@ -1,22 +1,3 @@
-// Where one plugin may open itself to another, and where a plugin may stand in for a core surface — a
-// contract both sides read, for the same reason `contextMenus.ts` is one: the node has to reject a bad
-// `extensionPoints` / `extensions` / `coreSlot` entry at parse time, the client has to re-check the same
-// entry when it arrives inside a roster row, and the node cannot import the client.
-//
-// TWO SHAPES, ONE FILE, because they are the two halves of one decision: what it means for a plugin's
-// surface to be filled by somebody else's declaration.
-//
-//   COOPERATIVE  plugin A declares a point it HOSTS; plugin B declares items for it BY ID. Both sides are
-//                in a manifest, both are visible at install time, and the host is the only thing that
-//                carries a descriptor from one to the other.
-//   EXCLUSIVE    a plugin declares a replacement for a designated CORE surface. Registering seizes
-//                nothing — the user picks the provider in settings and core is the fallback.
-//
-// WHAT IS REFUSED, and it belongs on the record next to what is offered: there is no uncooperative
-// extension. Nothing here lets B alter A's UI or behaviour without A's declared consent — no DOM access
-// into another realm, no patching another plugin's registrations, no reading another plugin's routes. A
-// point that A did not declare simply has nothing delivered into it. If a real need surfaces that these
-// descriptors cannot express, the answer is to widen the descriptor vocabulary, not to open the realm.
 
 // Where one plugin may open itself to another, and where a plugin may stand in for a core surface. A
 // contract both sides read, for the same reason `contextMenus.ts` is one: the node has to reject a bad
@@ -38,7 +19,6 @@
 // did not declare simply has nothing delivered into it. See docs/plugins.md § Cooperative extension
 // points and § There is no uncooperative extension.
 
-/**
 /**
  * Every place the host will draw a point's contributed items. See docs/plugins.md § Cooperative
  * extension points for the full argument; `pane.footer` and `pane.aside`, what each contributor may put
@@ -74,11 +54,10 @@ export function parseExtensionPointRef(value: string): { owner: string; point: s
 }
 
 /**
-/**
  * One row a contribution's route answers with. Host-defined, like every other descriptor body: the host
  * is the one rendering these, so the shape is its contract and not the plugin's.
  *
- * Display strings only. There is no `action` here on purpose: the verb is declared once on the
+ * Display strings only. There is no `action` here: the verb is declared once on the
  * contribution in the manifest, where the node can check it against that plugin's own surfaces, exactly
  * as a rail source's `onSelect` is. A per-item verb would be an unchecked action arriving over a route.
  */
@@ -95,7 +74,6 @@ export type PluginExtensionItems = { items: PluginExtensionItem[] }
 
 // ── The exclusive half ────────────────────────────────────────────────────────────────────────────
 
-/**
 /**
  * The core surfaces a plugin may offer to replace. See docs/plugins.md § Replacing a core surface.
  *

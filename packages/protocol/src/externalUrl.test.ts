@@ -9,8 +9,8 @@ describe('isPluginOpenableUrl', () => {
   it('accepts https, whatever the host', () => {
     expect(isPluginOpenableUrl('https://linear.app/acme/issue/ENG-42')).toBe(true)
     expect(isPluginOpenableUrl('https://github.com/runn/acorn/pull/1?files=1#diff')).toBe(true)
-    // No host allowlist here on purpose: which sites a plugin may name is a product decision its
-    // manifest and its own content make, and this is only about the scheme.
+    // No host allowlist here: which sites a plugin may name is a product decision its manifest and
+    // its own content make; this file is only about the scheme.
     expect(isPluginOpenableUrl('https://localhost:3000/')).toBe(true)
   })
 
@@ -31,7 +31,7 @@ describe('isPluginOpenableUrl', () => {
 
   it('refuses the app’s own privileged origins', () => {
     // A frame asking the host to open another plugin's bundle, or the shell itself, is caught by the
-    // same single clause — which is the argument for an allowlist of one scheme over a denylist.
+    // same single clause. That is the case for an allowlist of one scheme over a denylist.
     expect(isPluginOpenableUrl('app-plugin://abc123/index.html')).toBe(false)
     expect(isPluginOpenableUrl('app://acorn/')).toBe(false)
   })

@@ -20,8 +20,8 @@ const decoded = (value: string, label: string): string => {
   }
 }
 
-// Compile a deliberately non-regex URL grammar. Matching is linear over host/path segments, so no
-// manifest string can introduce catastrophic backtracking into synchronous content rendering.
+// Compile a non-regex URL grammar. Matching is linear over host/path segments, so no manifest string
+// can introduce catastrophic backtracking into synchronous content rendering.
 export function compileContentLinkPattern(pattern: string): CompiledContentLinkPattern {
   if (!pattern.length || pattern.length > CONTENT_LINK_PATTERN_MAX_LENGTH) {
     throw new Error(`content-link pattern must be 1-${CONTENT_LINK_PATTERN_MAX_LENGTH} characters`)

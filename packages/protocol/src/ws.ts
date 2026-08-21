@@ -1,27 +1,16 @@
-// The one authenticated WebSocket that carries every live stream (docs/electron.md § capability map):
-// terminal PTY output/input + attach/detach, session-status pings, workflow notices and step events,
-// agent events, and docker log/stat/exec streams. One socket on the loopback origin at WS_PATH.
+// The one authenticated WebSocket that carries every live stream: PTY, docker, workflow and agent
+// events, plus preview tunnels (docs/api-reference.md § WebSocket). One socket per node per client, on
+// the loopback origin at WS_PATH, token-authenticated at upgrade.
 //
-// Framing is kind-tagged channels (docs/security.md § seams): every frame is a plain serializable
-// object with a stable string `channel` — never a live object.
+// The envelope is kind-tagged and open: every frame is a plain serializable object with a stable
+// string `channel`, never a live object. `channel` is `<owner>:<verb>`, the prefix before the first
+// `:` is what each side registers, and everything else on the frame is the owner's shape, defined in
+// its own `shared/`. Core reads only `channel` and never a payload, so a plugin adds a stream without
+// touching this file.
 //
-// THE ENVELOPE IS OPEN, and that is the point. This file used to be a discriminated union enumerating
-// every channel, including eleven docker-specific ones, and it imported a docker type and a terminal
-// type from inside protocol to do it. A plugin with a new stream could not exist without editing two
-// core packages. Now core owns the envelope and nothing else: `channel` is `<owner>:<verb>`, the token
-// before the first ':' is the registered prefix on both ends, and everything else on the frame belongs
-// to the channel's owner, whose own union lives in its `shared/`.
-//
-// This generalizes what agents already did deliberately — it carried `event: unknown` with a comment
-// saying product plugins keep their detailed contracts in their own shared folders, so that adding a
-// plugin does not invert the core→plugin dependency. That was right for one plugin and is right for
-// all of them.
-//
-// Registration: `ctx.events.channel(prefix, handler)` on the node (server/plugin/types.ts),
-// `registerWsChannel(prefix, ...)` on the client (@acorn/client-core/wsChannels.ts). Core never reads
-// a payload, so adding a stream is now a plugin-local change.
+// Register a channel with `ctx.events.channel(prefix, handler)` on the node (server/plugin/types.ts)
+// and `registerWsChannel(prefix, ...)` on the client (@acorn/client-core/wsChannels.ts).
 
-// docs/api-reference.md § Events: one WS per node per client, token-authenticated at upgrade.
 import { z } from 'zod'
 
 export const WS_PATH = '/v2/events'
@@ -31,18 +20,18 @@ export const WS_PATH = '/v2/events'
 // typecheck unchanged.
 export type WsFrame = { channel: string } & Record<string, unknown>
 
-// The envelope is deliberately open for plugin-owned payloads, but the channel tag is still a
-// mutation boundary for term input/attach/detach. Validate the one field core dispatches before any
-// plugin or terminal handler sees a peer-supplied frame.
+// The envelope stays open for plugin-owned payloads, but the channel tag is still a mutation boundary
+// for term input/attach/detach (docs/security.md § Transport and auth). This validates the one field
+// core dispatches on before any plugin or terminal handler sees a peer-supplied frame.
 export const wsFrameSchema = z.object({ channel: z.string().min(1) }).passthrough()
 
-// Kept as distinct names because the DIRECTION is still meaningful to a reader even though the shapes
-// are now identical, and because it means node-core, client-core and the desktop broker compile
-// against this file with no diff at all.
+// Kept as distinct names because the direction is still meaningful to a reader even though the shapes
+// are now identical, and because node-core, client-core and the desktop broker each compile against
+// this file unchanged.
 export type WsClientFrame = WsFrame
 export type WsServerFrame = WsFrame
 
-// `seq` is per connection and stamped by the hub. It increments even for a dropped frame, so a gap in
-// the sequence tells a client it missed something rather than that nothing happened — which is the
-// whole contract of an invalidation channel offering no replay.
+// `seq` is per connection and stamped by the hub. It increments even for a dropped frame, so a gap
+// tells a client it missed something rather than that nothing happened. That is the entire contract
+// of an invalidation channel with no replay.
 export type WsServerWireFrame = WsServerFrame & { seq: number }

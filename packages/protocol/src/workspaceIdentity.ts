@@ -1,9 +1,9 @@
 // Workspace identity helpers (docs/workspaces-and-tasks.md): icon JSON parse/serialize and the deterministic
-// name-hash default colour. Pure — shared by the Hono routes (parse on read) and the renderer
+// name-hash default colour. Pure, shared by the Hono routes (parse on read) and the renderer
 // (render + settings picker), unit-tested beside this file.
 import type { WorkspaceIcon } from './api'
 
-// Preset swatches (flat mid-tone hues that read on both light and dark backgrounds — the app
+// Preset swatches (flat mid-tone hues that read on both light and dark backgrounds; the app
 // palette itself is greyscale, so these are the only chromatic tokens).
 export const WORKSPACE_COLORS: Record<string, string> = {
   green: '#1a7f37',
@@ -42,7 +42,7 @@ export function resolveWorkspaceColor(color: string | null | undefined, name: st
 export const isValidWorkspaceColor = (color: string): boolean =>
   color in WORKSPACE_COLORS || /^#?[0-9a-fA-F]{6}$/.test(color)
 
-// Icon JSON round-trip. Parse is defensive — a malformed DB value degrades to null (derived
+// Icon JSON round-trip. Parse is defensive: a malformed DB value degrades to null (derived
 // default) rather than throwing into a route.
 export function parseWorkspaceIcon(text: string | null | undefined): WorkspaceIcon | null {
   if (!text) return null

@@ -10,7 +10,7 @@ import {
 import type { PluginCommandAction } from './pluginContract.ts'
 
 // What a loaded plugin's collection route may answer. The vocabularies are the design
-// (docs/dashboards.md § The two vocabularies), so what is worth pinning is their SIZE and the two rules
+// (docs/dashboards.md § The two vocabularies), so what is worth pinning is their size and the two rules
 // that make a row safe to render beside a stranger's: identity is required, and provenance is absent.
 
 const page = (over: Record<string, unknown> = {}) => pluginCollectionResponseSchema.safeParse({
@@ -70,9 +70,9 @@ describe('rows', () => {
   })
 
   it('strips a row claiming its own provenance rather than passing it through', () => {
-    // Plain `z.object`, so surplus is stripped — which means the host's stamp cannot be pre-empted by a
-    // body, not merely overwritten by it. A row that could name its own plugin could put its items
-    // behind a stranger's badge on a mixed board.
+    // Plain `z.object`, so surplus is stripped: the host's stamp cannot be pre-empted by a body, only
+    // overwritten by it. A row that could name its own plugin could put its items behind a stranger's
+    // badge on a mixed board.
     const result = page({ rows: [{ id: 'x', values: { title: 't' }, pluginId: 'linear', collectionId: 'issues-mine' }] })
     expect(result.success).toBe(true)
     expect(result.success && result.data.rows[0]).toEqual({ id: 'x', values: { title: 't' } })
@@ -96,7 +96,7 @@ describe('rows', () => {
   })
 
   it('takes a declared risk tier, and refuses one outside the closed set', () => {
-    // The tier is what the HOST renders its confirmation from. A plugin says how dangerous the thing
+    // The tier is what the host renders its confirmation from. A plugin says how dangerous the thing
     // is; it has no way to say what is asked, or to say nothing is.
     const risky = (risk: unknown) =>
       page({ rows: [{ id: 'x', values: {}, action: { verb: 'runNodeAction', path: '/plugin/b/delete', risk } }] })
@@ -115,12 +115,12 @@ describe('rows', () => {
     // collections.ts re-spells `contextFreeAction` rather than importing it, because pluginContract.ts
     // imports this module for its descriptor and a value import back would be a module cycle. These two
     // assignments are the pin: either side gaining or losing a verb stops one of them compiling.
-    // The path is nothing but a bounded string at this tier — confinement to the plugin's own
-    // namespace is the node's parse-time job, and this package may not spell that prefix at all.
+    // The path is nothing but a bounded string at this tier. Confinement to the plugin's own namespace
+    // is the node's parse-time job, and this package may not spell that prefix at all.
     //
-    // `risk` is deliberately NOT on the manifest side and does not break the pin, because it is
-    // optional: a row's action is DATA a response chose per row, and how dangerous one row's action
-    // is cannot be a static declaration about the command.
+    // `risk` is not on the manifest side, and its absence does not break the pin: it is optional, and a
+    // row's action carries data a response chose per row. How dangerous one row's action is cannot be a
+    // static declaration about the command.
     const fromManifest: PluginCommandAction = { verb: 'runNodeAction', path: '/plugin/board/act' }
     const fromRow: PluginCollectionRowAction = fromManifest
     const backAgain: PluginCommandAction = fromRow

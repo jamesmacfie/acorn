@@ -1,6 +1,6 @@
 // A certificate fingerprint rendered as words, so a human can actually compare two of them.
 //
-// In `protocol` rather than in the client because BOTH ends have to say the same thing: the node
+// In `protocol` rather than in the client because both ends have to say the same thing: the node
 // prints this phrase on its own terminal at boot and the desktop shows it on the pairing confirm
 // step, and comparing those two is the entire security of pairing (docs/api-reference.md § Pairing).
 // Two copies of the word list would be two things that can drift into a comparison that always
@@ -52,6 +52,6 @@ export function fingerprintWords(fingerprint: string | undefined | null, count =
 export const fingerprintPhrase = (fingerprint: string | undefined | null): string | null =>
   fingerprintWords(fingerprint)?.join(' ') ?? null
 
-// Exported for the test that pins the list's size and shape — the two properties every fingerprint's words
-// depend on.
+// Exported for the test that pins the list's size and shape: the two properties every fingerprint's
+// words depend on.
 export const FINGERPRINT_WORD_COUNT = WORDS.length

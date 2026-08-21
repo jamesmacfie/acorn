@@ -1,10 +1,10 @@
 // Canonical note shapes (docs/notes-and-memory.md), shared across the process boundary:
 // main/notes.ts (the store) and client/features/notes/notesClient.ts both import from here, so the
-// two sides can't drift. Kinds are scratch|plan|finding|handoff ONLY — anchored annotations are
-// review_notes rows (README decision 16), never note kinds.
+// two sides can't drift. Kinds are scratch|plan|finding|handoff only; anchored annotations are
+// review_notes rows (docs/notes-and-memory.md), never note kinds.
 
 // The per-task scratchpad's reserved slug. A cross-surface contract (Notes pane lands here; the
-// pane creates the file lazily on first keystroke), so it lives in shared. No store changes — the
+// pane creates the file lazily on first keystroke), so it lives in shared. No store changes: the
 // empty-body context filter keeps an untouched scratchpad out of assembled context.
 export const SCRATCHPAD_SLUG = 'scratchpad'
 
