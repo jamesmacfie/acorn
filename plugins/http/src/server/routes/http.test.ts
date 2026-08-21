@@ -29,10 +29,10 @@ describe('HTTP credential isolation', () => {
   // The router is a factory over this plugin's own database, so the test hands it one instead of putting
   // core's handle on `c.env`. Nothing about `c.env` is used any more except the one symbol the carrier
   // puts there, which is what `call` below supplies.
-  // The host's own context for this plugin, on the loaded tier — which is the only tier http has. The
-  // permissions come from the plugin's own acorn-plugin.config.mjs, so `ctx.core` here holds exactly the
-  // facets the owner is told about: under-declare `tasks`, `projects:read` or `secrets` in the config and
-  // these routes stop working in this suite, which is the point.
+  // The host's own context for this plugin, on the loaded tier (the only tier http has). The
+  // permissions come from the plugin's own acorn-plugin.config.mjs, so `ctx.core` here holds exactly
+  // the facets the owner is told about: under-declare `tasks`, `projects:read` or `secrets` in the
+  // config and these routes stop working in this suite too.
   let ctx: TestNodeContext
   let pluginDb: PluginDatabase
 
@@ -81,8 +81,8 @@ describe('HTTP credential isolation', () => {
   // stack, no middleware-set principal, and the identity arriving as the request context the host binds.
   const call = async (caller: Principal, path: string, init?: RequestInit) => {
     // The real request context, over the real bindings. It used to be a literal with four throwing
-    // provider stubs; http registers no provider, so the host's own ownership check is what refuses them
-    // now — and nothing here has to remember to keep the shape up to date.
+    // provider stubs; http registers no provider, so the host's own ownership check is what refuses
+    // them now, and nothing here has to remember to keep the shape up to date.
     const context = await makeTestRequestContext({ plugin: 'http', principal: caller, env: ctx.env })
     return createHttpFetch(pluginDb, ctx.core)(new Request(`http://acorn.test${path}`, init), context)
   }
@@ -170,7 +170,7 @@ describe('HTTP credential isolation', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
   })
 
-  // ── The descriptor routes the move added: what the HOST reads, not what the frame reads ───────────
+  // ── The descriptor routes the move added: what the host reads, not what the frame reads ───────────
 
   const save = (login: string, body: Record<string, unknown>) =>
     call(principal(login), '/projects/project-web/requests', {
@@ -202,7 +202,7 @@ describe('HTTP credential isolation', () => {
     await save('alice', { name: 'Filed in the project' })
 
     const options = (await (await call(principal('alice'), '/context-options?taskId=task-web')).json()) as AgentContextOption[]
-    // The option's URL is redacted too — the fixture's `?token=query-secret` is exactly the case for it.
+    // The option's URL is redacted too: the fixture's `?token=query-secret` is exactly the case for it.
     expect(options).toEqual([{ id: adhoc.id, label: 'Login', description: 'POST https://api.example.test/items?token=•••' }])
 
     const captured = await call(principal('alice'), '/context-capture', {

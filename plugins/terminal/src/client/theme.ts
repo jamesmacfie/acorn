@@ -26,7 +26,7 @@ export function ansiPalette(colors: Record<string, string>): Partial<ITheme> {
   return palette
 }
 
-// Chrome-only theme, synchronous — used at Terminal construction so there's no flash of xterm's
+// Chrome-only theme, synchronous. Used at Terminal construction so there's no flash of xterm's
 // default black-on-black while the (async) Shiki theme loads.
 export function baseTheme(dark: boolean): ITheme {
   const bg = token('--bg-subtle')

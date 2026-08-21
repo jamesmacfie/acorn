@@ -1,6 +1,7 @@
-// The API panel. Mounted twice: as the project-scoped surface beside the rail list (project tree, no task)
-// and as a task pane (that task's ad-hoc requests on top of the project tree). Everything below is shared
-// between them — the only difference is `taskId`.
+// The API panel (docs/http-client.md § Client: the `http` and `http-project` surfaces). Mounted
+// twice: as the project-scoped surface beside the rail list (project tree, no task) and as a task
+// pane (that task's ad-hoc requests on top of the project tree). Everything below is shared between
+// them; the only difference is taskId.
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Button, createArmedConfirm, EmptyState, Icon, Input, ListDetail, SectionHeader, Select, StatusDot, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
@@ -14,7 +15,7 @@ import SaveRequestModal, { type SaveTarget } from './SaveRequestModal'
 
 type Selection = { kind: 'saved'; id: string } | { kind: 'new' } | { kind: 'variables' }
 
-// Requests carry a slash path ('auth/login'), not a folder id — grouping is a client-side split.
+// Requests carry a slash path ('auth/login'), not a folder id: grouping is a client-side split.
 // A folder therefore exists exactly as long as something is filed in it.
 type Group = { folder: string; requests: HttpRequest[] }
 
@@ -37,8 +38,8 @@ export default function HttpPanel(props: {
   projectId: string
   projectName: string
   taskId?: string
-  // The rail row this surface was opened on, when it was opened by one. A LATER row click into the same
-  // mounted frame arrives as `bridge.onSelect` instead — `context` is a snapshot by contract, and
+  // The rail row this surface was opened on, when it was opened by one. A later row click into the
+  // same mounted frame arrives as `bridge.onSelect` instead: `context` is a snapshot by contract, and
   // remounting per click would discard whatever draft is being edited.
   initialRequestId?: string
 }) {
@@ -85,8 +86,9 @@ export default function HttpPanel(props: {
     setError(null)
   }
 
-  // A rail selection names a request id; the row itself arrives with the list. Applied as an effect rather
-  // than at mount because the two races are real — the id can be there before the list, or arrive after it.
+  // A rail selection names a request id; the row itself arrives with the list. Applied as an effect
+  // rather than at mount because the two races are real: the id can be there before the list, or
+  // arrive after it.
   const [requested, setRequested] = createSignal<string | undefined>(props.initialRequestId)
   onCleanup(props.bridge.onSelect((item) => setRequested(item)))
   createEffect(() => {
@@ -100,7 +102,7 @@ export default function HttpPanel(props: {
 
   function startNew(from?: HttpRequest) {
     setSelection({ kind: 'new' })
-    // "Copy an existing request" — the same flow as starting from scratch, just pre-filled. An
+    // "Copy an existing request": the same flow as starting from scratch, just pre-filled. An
     // ad-hoc copy belongs to the task, so it drops the folder it came from.
     setDraft(from ? { ...toDraft(from), name: `${from.name} copy`, taskId: props.taskId ?? null, folder: props.taskId ? '' : from.folder } : blank())
     setResult(null)
@@ -115,13 +117,13 @@ export default function HttpPanel(props: {
     scope: draft().taskId ? 'task' : 'project',
   }))
 
-  // `error` is shared with the send path, and the dialog shows it — don't open onto a stale one.
+  // `error` is shared with the send path, and the dialog shows it. Don't open onto a stale one.
   const openSave = () => {
     setError(null)
     setSaveOpen(true)
   }
 
-  // Saving an existing request writes straight through — its name and home are already settled.
+  // Saving an existing request writes straight through: its name and home are already settled.
   // Anything else (a new request, or a rename/move via the name button) asks first.
   const onSaveClick = () => (current() ? void persist(draft()) : openSave())
 
@@ -160,8 +162,7 @@ export default function HttpPanel(props: {
     setError(null)
     setResult(null)
     try {
-      // The panel decides where commands run. A repo-saved request still executes in the current
-      // task when opened here; its persisted taskId remains only its filing/ownership scope.
+      // The panel decides where commands run (docs/http-client.md § Data model).
       setResult(await sendRequest(props.projectId, toSendInput(draft(), props.taskId ?? null)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed')
@@ -170,8 +171,8 @@ export default function HttpPanel(props: {
     }
   }
 
-  // Pasting a curl command into the URL bar fills in the whole request — Bruno does the same, and
-  // it is by far the fastest way to get something from a terminal or a browser's devtools into here.
+  // Pasting a curl command into the URL bar fills in the whole request. Bruno does the same, and it
+  // is by far the fastest way to get something from a terminal or a browser's devtools into here.
   function onUrlPaste(event: ClipboardEvent) {
     const text = event.clipboardData?.getData('text') ?? ''
     if (!/^\s*curl\s/i.test(text)) return
@@ -181,9 +182,7 @@ export default function HttpPanel(props: {
     patch({ method: parsed.method, url: parsed.url, headers: parsed.headers, bodyMode: parsed.bodyMode, body: parsed.body, auth: parsed.auth })
   }
 
-  // Through the bridge, not `navigator.clipboard`: a frame's document is not focused from the shell's point
-  // of view when the click lands, and the Clipboard API refuses to write from an unfocused document. The
-  // host has the focus and the permission, so copying is one of the verbs it does on a frame's behalf.
+  // Through the bridge, not `navigator.clipboard` (docs/http-client.md § Client).
   async function copyAsCurl() {
     await props.bridge.ui.copy(toCurl(draft()))
   }
@@ -302,7 +301,7 @@ export default function HttpPanel(props: {
             const next: Draft = {
               ...draft(),
               name: target.name,
-              // A task-scoped request has no folder — the task is its home.
+              // A task-scoped request has no folder: the task is its home.
               folder: target.scope === 'project' ? target.folder : '',
               taskId: target.scope === 'task' ? (props.taskId ?? null) : null,
             }

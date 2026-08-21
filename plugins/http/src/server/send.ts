@@ -1,6 +1,7 @@
 // The API panel's request executor. Runs in the Hono server, which is a plain Node process (under
-// Electron via apps/desktop's main/bootstrap.ts, otherwise via apps/node's server/standalone.ts) — so this needs no
-// bridge. A bridge exists to hold a stateful Node handle (a pg.Pool, a PTY); fetch is stateless.
+// Electron via apps/desktop's main/bootstrap.ts, otherwise via apps/node's server/standalone.ts), so
+// this needs no bridge. A bridge exists to hold a stateful Node handle (a pg.Pool, a PTY); fetch is
+// stateless.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { eq, and } from 'drizzle-orm'
@@ -36,7 +37,7 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024
 const REQUEST_TIMEOUT_MS = 30_000
 const COMMAND_TIMEOUT_MS = 15_000
 const COMMAND_MAX_BUFFER = 1 << 20
-// All command variables together get one budget — N vars × 15s serial would hang a send.
+// All command variables together get one budget: N vars x 15s serial would hang a send.
 const ALL_COMMANDS_TIMEOUT_MS = 30_000
 
 export class SendError extends Error {}
@@ -45,9 +46,9 @@ export class SendError extends Error {}
 const ANSI = /\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g
 const lastLine = (stdout: string): string | null => stdout.replace(ANSI, '').split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? null
 
-// Command variables are executable, so resolve only names the request actually references. A
-// per-request override also shadows the project variable before execution; precedence must not mean
-// "run a lower layer for its side effects, then discard it".
+// Only resolves the names a request actually references (docs/http-client.md § Sending): a command
+// variable's value comes from running its shell command, and precedence must not mean running a
+// lower layer for its side effects, then discarding it.
 export function referencedVariableNames(input: HttpSendInput): Set<string> {
   const fields = [input.url]
   for (const header of input.headers) {
@@ -73,14 +74,8 @@ export function referencedVariableNames(input: HttpSendInput): Set<string> {
 // --- variable resolution ------------------------------------------------------------------
 
 /**
- * Flattens every variable layer into one lookup for interpolation.
- * Precedence, lowest first: task builtins < project variables < per-request overrides.
- *
- * `command` variables persist the user's shell command, then run it at send time without persisting
- * its output — the same mechanism the Database pane uses for `dbUrlScript`
- * (plugins/database/main/database.ts). Unlike that one there is no repo-config trust gate here:
- * these commands are typed by the user into the app's own DB, not read from a committed
- * .acorn/config.toml, so there is no repo-authored code to authorize.
+/**
+ * Flattens every variable layer into one lookup for interpolation (docs/http-client.md § Sending).
  */
 type ResolvedVariables = { values: Record<string, string>; sensitiveValues: string[] }
 
@@ -103,7 +98,7 @@ async function resolveVarsWithSensitivity(
     if (task.projectId !== projectId) {
       throw new SendError(`The selected task belongs to ${project?.name ?? task.projectId ?? 'another project'}, not this project`)
     }
-    // taskRoot is null until a worktree exists (and always under dev:node) — fall back to the
+    // taskRoot is null until a worktree exists (and always under dev:node); fall back to the
     // project checkout, exactly as resolveDbUrl and the preview resolver do.
     cwd = (await core.tasks.root(input.executionTaskId, userId)) ?? null
     if (project) {
@@ -166,7 +161,7 @@ async function resolveVarsWithSensitivity(
     if (row.kind === 'secret') vars[row.name] = opened.get(row.id)!
   }
 
-  // Per-request overrides win over project variables, by design.
+  // Per-request overrides win over project variables.
   for (const [name, value] of Object.entries(input.vars)) vars[name] = value
   return {
     values: vars,
@@ -190,13 +185,13 @@ export async function resolveVars(
 // --- execution ----------------------------------------------------------------------------
 
 /**
+/**
  * Turns a draft plus resolved variables into the exact request to put on the wire.
- * Split out from send() so it is testable without a database or a network — this is where the
+ * Split out from send() so it is testable without a database or a network. This is where the
  * interpolation, the auth compilation and the scheme check all land.
  */
 export function buildRequest(input: HttpSendInput, vars: Record<string, string>): { target: URL; headers: Headers; body: string | undefined } {
-  // Interpolate per field, never over a serialized request — a value containing a delimiter would
-  // otherwise reshape the request rather than fill a slot.
+  // Interpolate per field, never over a serialized request (docs/http-client.md § Sending).
   const applied = applyAuth(interpolateAuth(input.auth, vars))
 
   const { base, params } = splitUrl(interpolate(input.url, vars))
@@ -219,7 +214,7 @@ export function buildRequest(input: HttpSendInput, vars: Record<string, string>)
 
   const body = serializeBody(input.bodyMode, interpolate(input.body, vars))
   const contentType = defaultContentType(input.bodyMode)
-  // Only default it — an explicit Content-Type header always wins.
+  // Only default it: an explicit Content-Type header always wins.
   if (body !== undefined && contentType && !headers.has('content-type')) headers.set('content-type', contentType)
 
   return { target, headers, body }
@@ -269,9 +264,7 @@ export async function send(
       method: input.method,
       headers,
       body,
-      // redirect: 'follow' (the default) rather than a hand-rolled hop loop: undici already strips
-      // Authorization on a cross-origin redirect, and reimplementing that wrongly leaks the token.
-      // The cost is per-hop timeline rows; `redirected` + the final url cover the common question.
+      // redirect: 'follow' (docs/http-client.md § Sending).
       redirect: 'follow',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
@@ -339,8 +332,8 @@ function errorNodes(value: unknown): unknown[] {
   return out
 }
 
-// Read the body a chunk at a time so a huge or endless response can't exhaust memory — the cap has
-// to be enforced while streaming, not after arrayBuffer() has already buffered it all.
+// Reads the body a chunk at a time so a huge or endless response cannot exhaust memory
+// (docs/http-client.md § Sending).
 export async function readCapped(res: Response): Promise<{ bytes: Uint8Array; truncated: boolean }> {
   if (!res.body) return { bytes: new Uint8Array(0), truncated: false }
   const chunks: Uint8Array[] = []

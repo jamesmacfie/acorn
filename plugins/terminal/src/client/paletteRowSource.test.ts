@@ -94,7 +94,8 @@ describe('terminal palette rows', () => {
     expect(mocks.start).not.toHaveBeenCalled()
     expect(mocks.invokeLayoutRecipe).not.toHaveBeenCalled()
 
-    // And once task-B's own rows are fetched, its target works — so this is a guard, not a general refusal.
+    // And once task-B's own rows are fetched, its target works, so this is a guard, not a general
+    // refusal.
     mocks.targets.mockResolvedValue({ targets: [target('dev', true)], layouts: [], errors: [] })
     await source.rows('task-B')
     await source.invoke(runRow('dev', true), 'task-B')

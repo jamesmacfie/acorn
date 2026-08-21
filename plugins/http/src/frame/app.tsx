@@ -5,19 +5,19 @@ import { projectRoute, projectsRoute, type Project, type ProjectsResponse } from
 import HttpPanel from './HttpPanel'
 import HttpVariables from './HttpVariables'
 
-// One bundle, three manifest surfaces. What it renders is decided by `bridge.context`, which is the whole
-// point of the frame contract: the HOST says what this rectangle was opened to look at.
+// One bundle, three manifest surfaces (docs/http-client.md § Client). What it renders is decided by
+// `bridge.context`, which is the whole point of the frame contract: the host says what this
+// rectangle was opened to look at.
 //
-//   pane (task)     `context.taskId` + `context.projectId`. The API panel for a task: that task's ad-hoc
-//                   requests above the project tree, and `{{worktree}}`/`{{branch}}` resolving against it.
-//   pane (project)  `context.projectId` and no task, mounted beside the rail list at /p/:projectId. This is
-//                   the surface the compiled rail Source used to be, and it is the reason a rail row click
-//                   still opens something outside a task instead of being refused.
-//   settings        neither. Variables are project-scoped but the settings modal only knows a workspace, so
-//                   this surface picks a project first — same as the compiled settings page did.
+//   pane (task)     `context.taskId` + `context.projectId`.
+//   pane (project)  `context.projectId` and no task, mounted beside the rail list at /p/:projectId.
+//                   This is the surface the compiled rail Source used to be, and it is the reason a
+//                   rail row click still opens something outside a task instead of being refused.
+//   settings        neither. The settings modal only knows a workspace, so this surface picks a
+//                   project first, same as the compiled settings page did.
 //
-// A selection into an ALREADY-mounted project pane arrives as `onSelect`, because `context` is a snapshot
-// by contract and remounting per click would throw away the draft the panel is holding.
+// A selection into an already-mounted project pane arrives as `onSelect`, because `context` is a
+// snapshot by contract and remounting per click would throw away the draft the panel is holding.
 type Frame = 'task' | 'project' | 'settings' | 'unroutable'
 
 const nameOf = (project: Project | undefined): string => project?.name ?? ''
@@ -75,8 +75,8 @@ export function HttpFrameApp(props: { bridge: AcornBridge }) {
   )
 }
 
-// The variables settings surface. Deliberately still a picker rather than an inferred project: variables
-// belong to a project, the settings modal is workspace-shaped, and guessing which project someone meant
+// The variables settings surface. Still a picker rather than an inferred project: variables belong
+// to a project, the settings modal is workspace-shaped, and guessing which project someone meant
 // would be worse than asking.
 function SettingsSurface(props: { bridge: AcornBridge }) {
   const [projects] = createResource(() => props.bridge.api.get<ProjectsResponse>(projectsRoute))

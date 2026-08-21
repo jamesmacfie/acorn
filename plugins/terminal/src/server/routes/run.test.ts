@@ -5,8 +5,8 @@ import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { harness, setRunBridge, type RunBridge } from '@acorn/node-core/server/routes/harness.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// The renderer's run surface reuses the harness RunBridge routes. This proves the
-// renderer-facing verbs — targets/start/stop/status + the new default-url — and auth/503.
+// The renderer's run surface reuses the harness RunBridge routes. This proves the renderer-facing
+// verbs (targets/start/stop/status plus the new default-url) and auth/503.
 
 const req = (url: string, method = 'GET') => new Request(`http://acorn.test${url}`, { method })
 

@@ -18,9 +18,9 @@ const statusTone = (status: number): 'accent' | 'warn' | 'del' | 'neutral' => {
   return 'del'
 }
 
-// Pretty-print JSON when it is JSON; otherwise show it as it came. No syntax highlighting —
-// Monaco is off-limits here (its only cross-plugin import is baselined and the baseline is
-// shrink-only), and a highlighter for the sake of colour isn't worth a new dependency.
+// Pretty-print JSON when it is JSON; otherwise show it as it came. No syntax highlighting: Monaco is
+// off-limits here (its only cross-plugin import is baselined and the baseline is shrink-only), and a
+// highlighter for the sake of colour isn't worth a new dependency.
 function formatBody(text: string, contentType: string): string {
   if (!contentType.includes('json')) return text
   try {
@@ -154,8 +154,8 @@ export default function ResponseView(props: {
   result: SendResult | null
   error: string | null
   sending: boolean
-  /** The bridge's copy. A frame's document is not focused from the shell's point of view when the
-   *  click lands, so the Clipboard API refuses — the host copies on the frame's behalf. */
+  /** The bridge's copy: a frame's document is not focused from the shell's point of view, so the
+   *  Clipboard API refuses (docs/http-client.md § Client). The host copies on the frame's behalf. */
   onCopy: (text: string) => void
 }) {
   const success = createMemo((): SendSuccess | null => {

@@ -1,4 +1,4 @@
-// The redaction test, here rather than beside the route on purpose: this is the assertion that a
+// The redaction test lives here rather than beside the route: this is the assertion that a
 // captured snapshot can't carry a credential, and it has to hold over rows whose ciphertext has
 // already been opened, which is the state the capture route reads them in.
 import { describe, expect, it } from 'vitest'

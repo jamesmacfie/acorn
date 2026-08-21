@@ -11,9 +11,8 @@ import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 
 // Bottom drawer of persistent local sessions. The "+" opens a profile menu; the node resolves the
-// active project folder/worktree from the task id on a durable tmux backend.
-// Sessions are scoped to the active task, not the URL — switching tasks swaps the
-// visible terminals.
+// active project folder/worktree from the task id on a durable tmux backend. Sessions are scoped to
+// the active task, not the URL; switching tasks swaps the visible terminals.
 export default function TerminalPanel(props: { onClose: () => void; task: Task | null }) {
   const api = terminalApi()
   const queryClient = useQueryClient()
@@ -79,7 +78,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   // Cmd/Ctrl+W closes the active terminal tab when focus is inside the drawer.
   let drawerRef: HTMLElement | undefined
-  // Snapshotted at pointer-down. Null between drags, so a keyboard nudge measures from the CURRENT
+  // Snapshotted at pointer-down. Null between drags, so a keyboard nudge measures from the current
   // height instead of the last drag's starting point.
   let dragStartHeight: number | null = null
   onClosePaneWithin(() => drawerRef, () => {
@@ -151,7 +150,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // Maximized (⌘⇧⏎) fills the pane region via CSS (top: --topbar-h); the partial drag-height is ignored.
   const maximized = () => isTerminalMax(ws()?.id)
 
-  // Drawer height, seeded once from the `term_height` pref then dragged + persisted (§10).
+  // Drawer height, seeded once from the `term_height` pref, then dragged and persisted.
   const [height, setHeight] = createSignal(360)
   let seeded = false
   createEffect(() => {
@@ -162,14 +161,14 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     }
   })
   // Publish the live drawer height so the task view (`.workspace-wrap`) can reserve that much space
-  // at the bottom — the panes shrink to sit above the drawer (keeping their scrollbars) instead of
+  // at the bottom. The panes shrink to sit above the drawer (keeping their scrollbars) instead of
   // being covered by this fixed overlay. Cleared when the drawer unmounts (terminal closed).
   createEffect(() => document.documentElement.style.setProperty('--term-drawer-h', `${height()}px`))
   onCleanup(() => document.documentElement.style.removeProperty('--term-drawer-h'))
 
-  // The drawer grows UPWARD, so a downward drag shrinks it — hence the inverted delta and
-  // `invert` for the keyboard. Height and its pref stay here; the hook owns the drag and the keys
-  // this handle never had.
+  // The drawer grows upward, so a downward drag shrinks it: hence the inverted delta and `invert`
+  // for the keyboard. Height and its pref stay here; the hook owns the drag and the keys this
+  // handle never had.
   const drawerDrag = createSplitDrag({
     axis: 'y',
     label: 'Resize terminal drawer',
@@ -209,8 +208,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     }
   }
 
-  // Launch a profile; the node resolves project path/worktree from taskId. docs/workspaces-and-tasks.md:
-  // context comes from the task, not the URL; the worktree is created lazily in main (Flow C).
+  // Launch a profile; the node resolves project path/worktree from taskId
+  // (docs/workspaces-and-tasks.md § Task). Context comes from the task, not the URL; the worktree is
+  // created lazily in main.
   async function startProfile(profileId: string) {
     setError(null)
     const w = ws()
@@ -252,7 +252,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                 status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
                 title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
               })),
-              // The launching session has no id yet, so it cannot be activated or closed — it is a
+              // The launching session has no id yet, so it cannot be activated or closed. It is a
               // placeholder tab that the real session replaces.
               ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
             ]}

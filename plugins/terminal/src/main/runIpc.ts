@@ -1,11 +1,12 @@
 // Builds the RuntimeService over the session engine's glue. Run targets are exposed as the harness
-// RunBridge over HTTP (server/routes/harness.ts) — HTTP routes replaced the run:* IPC channels — and
-// as the `terminal.runTargets` capability for the agent-tool and workflow projections
-// (contract/runTargets.ts). The service stays dependency-injected so it's unit-testable under plain Node.
+// RunBridge over HTTP (server/routes/harness.ts), replacing the old run:* IPC channels, and as the
+// `terminal.runTargets` capability for the agent-tool and workflow projections
+// (contract/runTargets.ts). The service stays dependency-injected so it's unit-testable under plain
+// Node.
 //
 // Its two DB-shaped needs are now CoreServices calls, because this plugin has no handle to core's
-// database: `taskRunConfig` (project config merged with the project's committed config, in the lazily created
-// worktree) and the executable-config trust gate.
+// database: `taskRunConfig` (the layered run-target config, docs/workspaces-and-tasks.md § Task) and
+// the executable-config trust gate (docs/workflows.md § Configuration trust).
 import { buildSessionEnv, type CoreServices, type RunTarget } from '@acorn/plugin-api/node'
 import { RuntimeService } from './runtime'
 
@@ -18,8 +19,9 @@ export type RunSessionGlue = {
   killSession(sessionId: string): void
 }
 
-// Runtime service (docs/workflows.md §2): run targets as terminal sessions in the task worktree.
-// Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_* env.
+// Runtime service: run targets as terminal sessions in the task worktree (docs/terminal-and-agents.md
+// § Process broker). Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_*
+// env.
 export function createRuntimeService(core: Pick<CoreServices, 'tasks' | 'projects' | 'proc'>, glue: RunSessionGlue): RuntimeService {
   const runScript = async (taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }> => {
     const t = await core.tasks.load(taskId)

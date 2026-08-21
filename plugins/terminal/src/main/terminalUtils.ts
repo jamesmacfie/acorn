@@ -1,6 +1,6 @@
-// Pure terminal helpers — no electron / node-pty imports, so they're unit-testable under plain Node
-// (terminalUtils.test.ts). The PTY/IPC wiring that does need those lives in terminal.ts. Helpers that
-// aren't terminal-specific live in core: path/checkout guards in core/main/pathGuards.ts, the
+// Pure terminal helpers: no electron or node-pty imports, so they are unit-testable under plain Node
+// (terminalUtils.test.ts). The PTY and IPC wiring that needs those lives in terminal.ts. Helpers that
+// are not terminal-specific live in core: path and checkout guards in core/main/pathGuards.ts, the
 // task-scoped child environment in core/main/taskEnv.ts.
 
 export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt detection / transcript-tail analysis
@@ -12,21 +12,21 @@ export const trimRing = (ring: string): string => (ring.length > RING_CAP ? ring
 export const clampDim = (n: unknown, fallback: number): number =>
   Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 2000 ? (n as number) : fallback
 
-// tmux session names for our sessions. `acorn-<uuid>` — the prefix lets reconciliation pick out
-// our sessions from any the user runs, and is the handle for `tmux attach -t` from a real terminal.
+// tmux session names for our sessions: `acorn-<uuid>`. The prefix lets reconciliation pick out our
+// sessions from any the user runs, and is the handle for `tmux attach -t` from a real terminal.
 export const TMUX_PREFIX = 'acorn-'
 export const tmuxName = (id: string) => `${TMUX_PREFIX}${id}`
 
-// argv for the two tmux calls. new-session -A -d is create-or-noop, detached (we drive it through a
-// separate attach PTY). -c sets cwd; the trailing command runs only when the session is created.
+// argv for the two tmux calls. new-session -A -d is create-or-noop, detached (a separate attach PTY
+// drives it). -c sets cwd; the trailing command runs only when the session is created.
 //
-// `-e KEY=VAL` sets the SESSION environment explicitly (tmux ≥3.2). This is load-bearing: the tmux
-// server is a singleton, and a session created against an ALREADY-RUNNING server does NOT inherit
-// the env we hand execFileSync — it takes the server's stale global env plus only the
-// `update-environment` whitelist, silently dropping ACORN_TASK_ID / ACORN_API_TOKEN. That made
-// agent panes (tmux backend) show "connected · no tools" while shell panes (node-pty, full env)
-// worked. Passing every var via -e replicates node-pty's behaviour regardless of server state.
-// (Session names are unique per pane, so -A never attaches to an existing one where -e wouldn't apply.)
+// `-e KEY=VAL` sets the session environment explicitly (tmux >=3.2). This is load-bearing: the tmux
+// server is a singleton, and a session created against an already-running server does not inherit the
+// env handed to execFileSync. It takes the server's stale global env plus only the
+// `update-environment` allowlist, silently dropping ACORN_TASK_ID and ACORN_API_TOKEN. That made agent
+// panes (tmux backend) show "connected, no tools" while shell panes (node-pty, full env) worked.
+// Passing every var via -e replicates node-pty's behaviour regardless of server state. Session names
+// are unique per pane, so -A never attaches to an existing one where -e would not apply.
 export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, env: Record<string, string> = {}) => [
   'new-session',
   '-A',
@@ -45,10 +45,10 @@ export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, e
 // quantizes every 24-bit colour an agent TUI emits down to the 256 palette.
 export const tmuxAttachArgs = (name: string) => ['-u', '-T', 'RGB', 'attach', '-t', name]
 
-// A profile's launchArgs (docs/notes-and-memory.md) reach node-pty as a real argv, but tmux and the
-// `-lc` fallback take one shell LINE — so single-quote each arg there. The args are const strings
-// from a profile definition, never user input; quoting is correctness (spaces, apostrophes in the
-// prompt text), not a trust boundary.
+// launchArgs reach node-pty as a real argv, but tmux and the -lc fallback take one shell line, so
+// quote each arg here (docs/notes-and-memory.md § Context integration). The args are const strings
+// from a profile definition, never user input; quoting handles spaces and apostrophes in the prompt
+// text, not a trust boundary.
 const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 export const launchCommandLine = (command: string, launchArgs: string[] = []): string =>
   launchArgs.length ? [command, ...launchArgs.map(shellQuote)].join(' ') : command
@@ -57,14 +57,9 @@ export const launchCommandLine = (command: string, launchArgs: string[] = []): s
 export const parseTmuxSessions = (stdout: string): Set<string> =>
   new Set(stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith(TMUX_PREFIX)))
 
-// Idle = a running agent whose PTY has produced no output for `idleMs` (docs/terminal-and-agents.md activity
-// indicators). Backend-agnostic: silence, not transcript-scraping. Shells never count as idle —
-// "waiting for input" is only meaningful for an agent.
+// Idle threshold (docs/terminal-and-agents.md § Activity and status).
 export const IDLE_MS = 10_000
-// A fresh agent's FIRST idle uses a shorter window: launch-context injection (notes/PR/memory) is
-// queued 'after-ready' and only fires on that first idle edge, so the 10s "done working" heuristic
-// just delays the first prompt. A booting CLI reaches its input prompt in ~1-2s; 3s of silence is a
-// safe "boot settled" signal without waiting the full mid-session window (docs/notes-and-memory.md).
+// First-idle threshold, shorter than IDLE_MS (docs/terminal-and-agents.md § Activity and status).
 export const FIRST_IDLE_MS = 3_000
 export const computeIdle = (
   kind: 'shell' | 'agent',
@@ -74,8 +69,8 @@ export const computeIdle = (
   idleMs = IDLE_MS,
 ): boolean => kind === 'agent' && status === 'running' && now - lastActivityAt >= idleMs
 
-// Resolve a profile's backend preference against whether tmux is actually installed (docs/terminal-and-agents.md):
-// 'tmux' degrades to 'node-pty' when tmux is missing, so durable mode is simply unavailable.
+// Degrades a profile's tmux preference to node-pty when tmux is not installed
+// (docs/terminal-and-agents.md § Activity and status).
 export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: boolean): 'node-pty' | 'tmux' =>
   preference === 'tmux' && tmuxAvailable ? 'tmux' : 'node-pty'
 
@@ -101,14 +96,13 @@ export function matchBlockedPrompt(ringTail: string): boolean {
   if (!lines.length) return false
   const tail = lines.join('\n')
   if (BLOCKED_PATTERNS.some((re) => re.test(tail))) return true
-  // A trailing `?` counts only on the LAST line (a mid-stream question in scrollback doesn't).
+  // Trailing '?' rule (docs/terminal-and-agents.md § Activity and status).
   return /\?\s*$/.test(lines[lines.length - 1])
 }
 
-// Bracketed paste (docs/panes.md): agent TUIs treat the wrapped payload as ONE pasted block, so
-// multi-line prompts don't submit per-line. Sanitize: strip any stray paste markers from the
-// payload (a payload containing ESC[201~ would end the paste early — the injection risk) and trim
-// trailing whitespace so a submit '\r' is the only terminator.
+// Wraps text as one bracketed-paste block (docs/terminal-and-agents.md § Sending text to an agent).
+// Strips stray paste markers first: a payload containing ESC[201~ would end the paste early, so it
+// has to go. Trailing whitespace is trimmed too, so the caller's '\r' is the only terminator.
 export const PASTE_BEGIN = '\x1b[200~'
 export const PASTE_END = '\x1b[201~'
 // eslint-disable-next-line no-control-regex

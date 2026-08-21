@@ -1,4 +1,4 @@
-/* API panel — the rail Source and the task pane share every rule here (docs/ui-design.md).
+/* API panel: the rail Source and the task pane share every rule here (docs/ui-design.md).
    Feature-owned; shared tokens only. Borders are picked by role: --chrome-divider between regions,
    --divider between rows, --control-border on inputs. */
 
@@ -69,7 +69,7 @@
 
 .http-metabar.ui-toolbar { padding: var(--space-2) var(--pane-pad); }
 
-/* The request's name is a button that opens the save dialog — the only place it can be edited. */
+/* The request's name is a button that opens the save dialog, the only place it can be edited. */
 .http-name-btn {
   display: flex;
   align-items: center;
@@ -176,7 +176,7 @@
   padding-bottom: var(--space-1);
 }
 
-/* The trailing blank row is a typing affordance, not data — mute it until it has content. */
+/* The trailing blank row is a typing affordance, not data. Mute it until it has content. */
 .http-grid-row.is-blank { opacity: 0.6; }
 .http-grid-row.is-blank:focus-within { opacity: 1; }
 
@@ -276,7 +276,7 @@
 
 /* ── variables view ──────────────────────────────────────────────────────────────────────── */
 
-/* Fills the main column rather than sizing to its rows — `.http-main` is a flex column, so without
+/* Fills the main column rather than sizing to its rows: `.http-main` is a flex column, so without
    `flex: 1` the grid ends where its content does and the scroller never engages. */
 .http-variables {
   flex: 1;
@@ -293,8 +293,8 @@
 /* Settings hosts the same variables component with no pane chrome around it. */
 .settings-page .http-variables { padding: 0; flex: none; }
 
-/* `.settings-hint` is a shell class and the shell's settings.css is NOT one of the modules a frame's
-   host stylesheet carries (apps/desktop/src/app/main/pluginFrameStyles.ts is presentation primitives
-   only). One declaration here beats widening that list for one line of text — and a frame that reaches
-   for a host class it cannot see renders unstyled rather than failing, which is the quiet kind. */
+/* `.settings-hint` is a shell class, and the shell's settings.css is not one of the modules a
+   frame's host stylesheet carries (apps/desktop/src/app/main/pluginFrameStyles.ts is presentation
+   primitives only). One declaration here beats widening that list for one line of text. A frame
+   that reaches for a host class it cannot see renders unstyled rather than failing. */
 .settings-page .settings-hint { font-size: var(--fs-sm); color: var(--text-muted); }

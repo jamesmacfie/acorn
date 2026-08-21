@@ -1,11 +1,8 @@
-// sendToAgent (docs/panes.md): THE shared delivery primitive — review notes, "add file/line to
-// agent", and the context assembler all push text into an agent PTY through this. One bracketed
-// paste block per send; three submit modes:
-//   'now'         → paste, then '\r' after a short settle delay
-//   'after-ready' → paste+submit immediately if the session is idle, else queue on the existing
-//                   idle-detector edge (terminal.ts calls onIdle when a session flips idle)
-//   'draft'       → paste only; the user reviews and hits enter
-// Deps-injected (a session is just write/running/idle) so the logic tests under plain Node.
+// sendToAgent, the shared delivery primitive (docs/terminal-and-agents.md § Sending text to an
+// agent). terminal.ts calls onIdle when a session flips idle, which flushes anything queued for
+// 'after-ready'.
+//
+// Deps-injected (a session is just write/running/idle) so this logic tests under plain Node.
 import { wrapBracketedPaste } from './terminalUtils'
 import type { SendSubmit } from '../shared/send'
 
@@ -61,7 +58,7 @@ export class AgentSender {
     for (const block of queue) this.deliver(s, block, true)
   }
 
-  // Session exited — its queue can never fire.
+  // Session exited. Its queue can never fire.
   clear(sessionId: string): void {
     this.pending.delete(sessionId)
   }

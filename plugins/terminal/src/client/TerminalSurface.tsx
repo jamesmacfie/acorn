@@ -12,7 +12,7 @@ import { TERMINAL_LINE_HEIGHT } from './preferences'
 // workspace and stealing focus) can leave a Viewport.syncScrollArea queued for the next frame. By
 // the time it fires the render service's renderer is gone, so its `dimensions` getter reads
 // `_renderer.value.dimensions` on undefined and throws. The terminal is dead and the scroll sync is
-// a no-op — swallow exactly that stack (method names survive minification) and nothing else.
+// a no-op, so swallow exactly that stack (method names survive minification) and nothing else.
 let scrollGuardInstalled = false
 function installScrollAreaGuard() {
   if (scrollGuardInstalled || typeof window === 'undefined') return
@@ -38,7 +38,7 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
   onMount(() => {
     installScrollAreaGuard()
     // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
-    // TUI (Claude/Codex) drives the cursor itself — rewriting bare \n to \r\n injects stray carriage
+    // TUI (Claude/Codex) drives the cursor itself. Rewriting bare \n to \r\n injects stray carriage
     // returns that shift redraws to column 0, interleaving frames into garbage.
     const term = new Terminal({
       fontFamily: monoFont(),
@@ -49,10 +49,11 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)
-    // WebGL renderer: the DOM renderer draws box-drawing/block-element glyphs (U+2500–U+259F) from
-    // the font, whose metrics leave gaps — TUI logos/borders (Claude's banner) shatter into stray
-    // bars and boxes. WebGL rasterizes those ranges as exact shapes. Must load after open(). On GPU
-    // context loss (sleep/reset) dispose it and fall back to DOM rather than freeze on a dead canvas.
+    // WebGL renderer: the DOM renderer draws box-drawing/block-element glyphs (U+2500-U+259F) from
+    // the font, whose metrics leave gaps, and TUI logos and borders (Claude's banner) shatter into
+    // stray bars and boxes. WebGL rasterizes those ranges as exact shapes. Must load after open().
+    // On GPU context loss (sleep/reset) dispose it and fall back to DOM rather than freeze on a
+    // dead canvas.
     try {
       const webgl = new WebglAddon()
       webgl.onContextLoss(() => webgl.dispose())
@@ -70,12 +71,13 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     }
     safeFit()
 
-    // Follow the app theme live (manual toggle or OS preference change). The full theme resolves
-    // async (ANSI palette comes from the Shiki theme); guard against applying to a disposed term.
-    // Colours AND type: a style pack can move --font-mono's stack and --term-fs, which changes the
-    // cell metrics, so re-fit after applying or the PTY keeps the old cols/rows and the TUI wraps
-    // wrong. The theme resolves async (the ANSI palette comes from Shiki); guard against a disposed
-    // terminal.
+    // Follows the app theme live (manual toggle or OS preference change). The resolved theme arrives
+    // async, since its ANSI palette comes from Shiki, so this guards against applying to a term that
+    // has since been disposed.
+    //
+    // Colours and type both matter: a style pack can move --font-mono's stack and --term-fs, which
+    // changes the cell metrics, so this re-fits after applying, or the PTY keeps the old cols/rows
+    // and the TUI wraps wrong.
     const applyAppearance = () => {
       if (disposed) return
       term.options.fontFamily = monoFont()
@@ -87,7 +89,7 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     const unwatchAppearance = watchAppearance(applyAppearance)
 
     let detach: (() => void) | undefined
-    // Size the PTY and main-owned framebuffer to the fitted dims BEFORE attaching, so the serialized
+    // Size the PTY and main-owned framebuffer to the fitted dims before attaching, so the serialized
     // screen and subsequent TUI redraws share the renderer's width.
     void api.resize(props.sessionId, term.cols, term.rows).then(() => {
       if (disposed) return
@@ -108,8 +110,9 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
         api.write(props.sessionId, '\n')
         return false
       }
-      // ⌘ chords belong to the app (pane shortcuts, ⌘K, ⌘,, ⌘⇧N …), never the PTY — skip xterm's
-      // handling so they bubble to the window listeners. Ctrl/Alt chords stay terminal input.
+      // Cmd chords belong to the app (pane shortcuts, Cmd+K, Cmd+comma, Cmd+Shift+N...), never the
+      // PTY. Skip xterm's handling so they bubble to the window listeners. Ctrl/Alt chords stay
+      // terminal input.
       if (e.type === 'keydown' && e.metaKey) return false
       return true
     })
@@ -117,8 +120,8 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     term.onResize(({ cols, rows }) => void api.resize(props.sessionId, cols, rows))
     term.focus()
 
-    // Refit on any size change of the surface — drawer drag-resize, window resize, layout shifts.
-    // A ResizeObserver catches the drawer-height change that window 'resize' would miss.
+    // Refit on any size change of the surface: drawer drag-resize, window resize, layout shifts. A
+    // ResizeObserver catches the drawer-height change that window 'resize' would miss.
     const ro = new ResizeObserver(() => safeFit())
     ro.observe(host)
     onCleanup(() => {
