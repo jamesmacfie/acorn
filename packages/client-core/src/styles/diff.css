@@ -1,5 +1,5 @@
 /* Diff pane content. The .pane-right container itself (flex column, no trailing border) is owned
-   by tokens-layout.css with the rest of the pane layout. */
+   by shell.css with the rest of the pane layout. */
 .diff {
   flex: 1;
   min-height: 0;
@@ -15,18 +15,15 @@
   --diff-btn-w: calc(16px + var(--space-2));
   --diff-chrome-w: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w) + var(--diff-btn-w) + var(--pane-pad));
 }
-/* Code lines do not wrap, so the canvas is as wide as the widest line and `.diff` scrolls sideways
-   to reach it. `--diff-cols` is the column count from maxLineCols(), written inline by DiffCanvas:
-   the virtualizer's rows are absolutely positioned, so only the mounted ones would contribute to a
-   `max-content` width and the scroll width would jump around as you scrolled vertically.
-
-   1ch is exact for the mono font and wrong for anything it falls back on (CJK, emoji), which measure
-   wider. Such a line overflows its row instead, which Chromium still scrolls to — the width goes
-   back to being slightly jumpy for that one line rather than the text becoming unreachable. */
+/* docs/diff-rendering.md § Row geometry covers why the canvas width comes from --diff-cols rather
+   than max-content. 1ch is exact for the mono font and wrong for anything it falls back on (CJK,
+   emoji), which measure wider; such a line overflows its row instead, which Chromium still
+   scrolls to, so the width goes back to being slightly jumpy for that one line rather than the
+   text becoming unreachable. */
 .diff-rows { position: relative; width: 100%; min-width: calc(var(--diff-chrome-w) + var(--diff-cols, 0) * 1ch); }
 /* Read-only compare preview (create mode) and the changes pane: same rows in normal document flow
    instead of the virtualizer's absolute positioning. In flow the rows really do size the canvas, so
-   ask them rather than the column count — there is no virtual window here to make that unstable. */
+   ask them rather than the column count, since there is no virtual window here to make that unstable. */
 .compare-diff .diff-rows { position: static; min-width: max-content; }
 .compare-diff .diff-row { position: static; transform: none; }
 .diff-row {
@@ -43,7 +40,7 @@
 }
 .diff-gutter { flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: var(--diff-marker-w); text-align: center; color: var(--text-faint); user-select: none; }
-/* `flex: 1 1 0` with `min-width: 0` deliberately, even though the text no longer wraps: the row is
+/* `flex: 1 1 0` with `min-width: 0`, even though the text no longer wraps: the row is
    `flex-wrap: wrap` so an open composer can drop onto its own line, and a flex line breaks on an
    item's hypothetical size. Sizing this to its content would push the code itself onto line two. It
    gets the row's leftover width instead, and the row is as wide as the widest line. */
@@ -53,11 +50,10 @@
   padding-right: var(--pane-pad);
   white-space: pre;
 }
-/* Line numbers and the +/- marker stay pinned to the left edge while a long line scrolls under
-   them — losing them is the one real cost of not wrapping, and sticky is the whole fix. No z-index
-   needed: a sticky box paints in the positioned layer, above the unpositioned code span. They need
-   an opaque background of their own (a normal code row's is transparent) or the code shows through;
-   the add/del tints below re-state theirs for the same reason. */
+/* docs/diff-rendering.md § Row geometry covers why these stay pinned to the left edge. No z-index
+   needed here: a sticky box paints in the positioned layer, above the unpositioned code span. They
+   need an opaque background of their own (a normal code row's is transparent) or the code shows
+   through; the add/del tints below re-state theirs for the same reason. */
 .diff-gutter, .diff-marker { position: sticky; background: var(--bg); }
 .diff-row > .diff-gutter:first-child { left: 0; }
 .diff-row > .diff-gutter:nth-child(2) { left: var(--diff-gutter-w); }
@@ -229,9 +225,8 @@
 .diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
 
 /* Shiki dual-theme: each token carries both colours as --l/--r, and the active theme declares
-   which side to read via --syntax-fg (tokens-theme.css). This used to be a hardcoded list of dark
-   theme *names*, duplicated here and in checks-panel.css, that had to be extended in both files
-   every time a dark theme was added. */
+   which side to read via --syntax-fg. See docs/ui-design.md § Token axes for why that replaced a
+   hardcoded list of dark theme names. */
 .diff-code span { color: var(--syntax-fg); }
 
 /* Diff view-mode toggle (Unified | Split), persisted via the `diff_view` pref. Sits above the
@@ -245,17 +240,15 @@
   border-bottom: var(--chrome-divider);
   background: var(--bg);
 }
-/* In-diff find (⌘F). Lives in the toolbar, pushed to the far left so the view-mode toggle keeps
-   its flex-end spot. */
-/* FindBar owns the strip, the input, the count and the prev/next/close buttons (ui/FindBar.tsx).
-   What is left is the diff toolbar's own placement: the bar sits hard left so the view-mode segments
-   keep their flex-end spot. */
+/* In-diff find (⌘F). FindBar owns the strip, the input, the count and the prev/next/close buttons
+   (ui/FindBar.tsx); what is left is the diff toolbar's own placement, sitting hard left so the
+   view-mode segments keep their flex-end spot. */
 .diff-find { flex: 1; margin-right: auto; border-bottom: 0; background: none; }
 .diff-find .ui-findbar-input { width: 200px; flex: none; }
 /* The Aa toggle keeps its compact padding. */
 .diff-find-btn { padding: var(--space-1) var(--space-3); }
 
-/* Match highlights are `.ui-find-mark` now — one vocabulary across the diff, the log viewer and the
+/* Match highlights are `.ui-find-mark` now, one vocabulary across the diff, the log viewer and the
    file search, defined beside FindBar in primitives.css. They still layer over the line/word
    backgrounds, and the tokens are theme-independent so the syntax colour underneath stays legible. */
 
@@ -264,15 +257,14 @@
 .diff-viewmode .ui-segment { padding: var(--space-2) var(--space-6); font-size: var(--fs-sm); }
 
 /* Word-level intra-line diff: changed spans within a paired delete/insert line get a stronger
-   background + (inherited) marker glyph on the line — never colour alone. Layers over the line bg. */
+   background plus an inherited marker glyph on the line, never colour alone. Layers over the line bg. */
 .diff-word-del { background: var(--del-word-bg); border-radius: var(--radius-marker); }
 .diff-word-add { background: var(--add-word-bg); border-radius: var(--radius-marker); }
 
 /* Split (side-by-side) mode. Bands are virtualized; each mounted pair band is a two-column grid,
    while hunk headers + threads span both columns full-width. */
 .diff-split { padding-top: 0; }
-/* No canvas widening here, unlike unified: the pair always fits the pane and each column scrolls
-   horizontally inside itself, so half the pane stays half the pane however long a line gets. */
+/* docs/diff-rendering.md § Row geometry covers why split mode needs no canvas widening. */
 .diff-split-rows { position: relative; width: 100%; }
 .diff-split-band {
   position: absolute;
@@ -291,9 +283,7 @@
   border-left: var(--chrome-divider);
 }
 .diff-split-cell:first-child { border-left: 0; }
-/* The per-column scroller (splitScrollSync.ts keeps a column's rows in step). Its scrollbar is hidden
-   because there is one of these per ROW — forty of them stacked would be noise, not navigation. The
-   column scrolls by trackpad and by shift+wheel. */
+/* docs/diff-rendering.md § Row geometry covers the per-column scroller and why its scrollbar is hidden. */
 .diff-split-cell > .diff-code { overflow-x: auto; scrollbar-width: none; }
 .diff-split-cell > .diff-code::-webkit-scrollbar { display: none; }
 .diff-split-cell .diff-code { min-width: 0; }
@@ -301,7 +291,7 @@
 .diff-split-full { width: 100%; white-space: normal; }
 .diff-split-full.diff-hunk { display: block; white-space: pre; }
 .diff-split-full.diff-file-row { padding: 0; }
-/* :focus-within as well as :hover — the unified row already had the keyboard half (line ~152). */
+/* :focus-within as well as :hover: the unified row already had the keyboard half (line ~152). */
 .diff-split-pair:hover .diff-add-btn,
 .diff-split-pair:focus-within .diff-add-btn { visibility: visible; }
 
@@ -309,10 +299,7 @@
 .diff-reply-input::placeholder { color: var(--text-muted); }
 
 /* ── File status ────────────────────────────────────────────────────────────────────────────
-   The rendering half of `fileStatusMeta` (ui/displayMeta.ts), which is exported on the public
-   plugin API. It lived in the GITHUB plugin's stylesheet, so the diff rows below — core's own —
-   and the changes plugin only rendered their status letters and +/- counts while that plugin was
-   installed. A helper on the API contract cannot have its CSS behind a plugin. */
+   See docs/ui-design.md § How the primitives are built for why this owns .file-status now. */
 .file-status {
   flex: none;
   width: 16px;

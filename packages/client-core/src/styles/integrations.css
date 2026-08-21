@@ -25,9 +25,8 @@
   padding: var(--pane-pad);
   border-bottom: var(--chrome-divider);
 }
-/* A ref panel whose body is a plugin FRAME. PluginFrame's iframe asks for height:100%, which in this
-   fixed-height flex column would mean 100% of the drawer and an overflow the header's height; taking
-   the remaining space instead is what the enclosing column already implies. */
+/* See docs/ui-design.md § Chrome and overlays for why a ref panel's iframe takes flex: 1 rather
+   than height: 100%. */
 .plugin-ref-panel > iframe {
   flex: 1;
   min-height: 0;
@@ -79,10 +78,11 @@
   overflow-y: auto;
   padding: var(--pane-pad);
 }
-/* Linear's own panel CSS used to live here — a plugin's feature stylesheet in the shell's, because the
-   panel was a compiled component. Linear is a loaded package now and its frame carries its own layout
-   (plugins/linear/src/frame/linear-frame.css), so all of it went. What stayed is what the SHELL and other
-   plugins still draw: the overlay above, the inline id link below, and the provider logo tint. */
+/* Linear's own panel CSS used to live here, a plugin's feature stylesheet in the shell's, because
+   the panel was a compiled component. Linear is a loaded package now and its frame carries its own
+   layout (plugins/linear/src/frame/linear-frame.css), so all of it went. What stayed is what the
+   shell and other plugins still draw: the overlay above, the inline id link below, and the
+   provider logo tint. */
 
 /* Integrations settings (account menu → Integrations overlay). */
 .integration-setting {
@@ -120,7 +120,7 @@
   border-radius: var(--radius);
 }
 
-/* Logo slot — branded square; carries a real mark (SVG) or a monogram fallback. Adding a provider
+/* Logo slot, a branded square; carries a real mark (SVG) or a monogram fallback. Adding a provider
    later = drop in its mark + a data-provider colour rule. */
 .integration-logo {
   flex: none;
@@ -150,7 +150,7 @@
   padding: var(--space-1) 9px;
 }
 
-/* "Add integration" — the trigger. */
+/* "Add integration": the trigger. */
 .integration-add-btn {
   align-self: flex-start;
   gap: 7px;

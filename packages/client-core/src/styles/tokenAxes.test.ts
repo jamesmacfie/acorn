@@ -13,13 +13,9 @@ import {
 } from '../ui/tokenAxes'
 import { declaredByBlock, readAxisSheets, readStylePacks, readStyleSheets } from './readStyleSheets'
 
-// The appearance contract, as executable assertions.
-//
-// Appearance is two axes on <html>: data-theme owns colour, data-style owns everything else. The
-// whole design rests on the two token sets being DISJOINT — that is what makes their relative
-// source order irrelevant, which in turn is what makes a 4-styles × 12-themes matrix a non-issue
-// instead of a 48-cell screenshot grid. If disjointness is only a convention it will rot on the
-// first busy afternoon, so it is a test.
+// The appearance contract, as executable assertions. See docs/ui-design.md § Token axes for what
+// the two axes are and why they stay disjoint. If disjointness were only a convention it would
+// rot on the first busy afternoon, so it is a test instead.
 
 const theme = new Set<string>(THEME_TOKENS)
 const style = new Set<string>(STYLE_TOKENS)
@@ -69,13 +65,9 @@ describe('token axes are complete', () => {
   })
 
   it('declares every primitive palette token in every named theme block', () => {
-    // Derived tokens (--danger, --surface-sunken, …) are declared once on :root as var()
-    // references, so they follow each theme automatically and must NOT be restated per block.
-    // The split is DATA now rather than a list written out here (ui/tokenAxes.ts), because a
+    // docs/ui-design.md § Token axes covers why derived and series tokens are excluded here. The
+    // split is data now rather than a list written out in this file (ui/tokenAxes.ts), because a
     // plugin-contributed theme is validated against the same primitives.
-    // SERIES_TOKENS join them in being excluded, for a third reason: they are theme-axis colour with
-    // :root defaults that a theme block MAY restate and none has to, precisely so a plugin theme
-    // validated against the palette contract is not rejected for omitting them (ui/tokenAxes.ts).
     const derived = new Set<string>([...DERIVED_THEME_TOKENS, ...SELF_DESCRIPTION_TOKENS, ...SERIES_TOKENS])
     const primitives = [...theme].filter((t) => !derived.has(t))
     expect(primitives).toEqual([...THEME_PALETTE_TOKENS])
@@ -90,9 +82,8 @@ describe('token axes are complete', () => {
   })
 
   it('keeps the derived tokens derived — declared on bare :root, never inside a theme block', () => {
-    // The other half of the split above, and the one a plugin theme depends on: the host refuses a
-    // manifest that names a derived token, and that refusal is only correct while these are genuinely
-    // one-place var() references. Restating `--danger` in a theme block would make the refusal a lie.
+    // docs/ui-design.md § Token axes covers why a manifest naming a derived token is refused, and
+    // why restating `--danger` in a theme block would make that refusal a lie.
     const blocks = declaredByBlock(sheet('tokens-theme.css'))
     const root = blocks.get(':root') ?? new Set()
     expect([...DERIVED_THEME_TOKENS].filter((t) => !root.has(t))).toEqual([])
@@ -129,10 +120,8 @@ describe('style packs stay in their lane', () => {
     }
   })
 
-  // The architecture's own falsification test. A pack should be a token block; every structural
-  // override is a bug report against the vocabulary. Exceeding the budget means the fix is a new
-  // token, never a 26th override — otherwise the same overrides get written once per pack and the
-  // token layer quietly stops being the seam.
+  // docs/ui-design.md § Style packs covers why the budget exists and why the fix for exceeding it
+  // is always a new token, never a 26th override.
   it('keeps each pack within its escape-hatch budget of 25 override selectors', () => {
     for (const pack of packs) {
       const stripped = pack.text.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -167,8 +156,8 @@ describe('cross-axis selectors are banned', () => {
 })
 
 describe('canvas bridge tokens', () => {
-  // xterm and Monaco render to a canvas, so they read these by string via getComputedStyle.
-  // Renaming one breaks the terminal and the editor with no type error anywhere.
+  // docs/ui-design.md § Token axes covers why xterm and Monaco read these by string via
+  // getComputedStyle, and why renaming one breaks them with no type error anywhere.
   it('declares every bridge token somewhere in the axis sheets', () => {
     const declared = new Set(readAxisSheets().flatMap((f) => [...declaredIn(f.text)]))
     expect([...BRIDGE_TOKENS].filter((t) => !declared.has(t))).toEqual([])

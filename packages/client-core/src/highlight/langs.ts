@@ -60,7 +60,6 @@ export const langFor = (path: string): GrammarName | 'text' => SHIKI[languageIdF
 export const isGrammar = (lang: string): lang is GrammarName => lang in LANGS
 
 /**
-/**
  * Load one grammar into a highlighter, at most once per name. Callers pass their own `loaded` set so the
  * worker and main-thread highlighters keep separate ledgers: they're separate instances, and a grammar
  * loaded into one isn't loaded into the other.

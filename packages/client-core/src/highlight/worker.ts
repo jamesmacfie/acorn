@@ -1,11 +1,7 @@
 // The main-thread half of the highlight worker: one worker, lazily spawned, requests matched to
-// replies by id.
-//
-// WHY DOCUMENTS AND NOT LINES. The obvious port of the old per-line tokenizer is a postMessage per
-// line, and it is a trap: one 45-file diff is ~2,600 lines, so that is 2,600 round trips and it is far
-// slower than the main-thread code it replaces. Every caller here sends a WHOLE DOCUMENT — for a diff,
-// one side of one hunk (ui/diff/model.ts § buildDiffRowsAsync). Batching is not an optimisation on top
-// of the worker, it is the thing that makes a worker worth having.
+// replies by id. See docs/diff-rendering.md § Syntax highlighting for why every caller sends a
+// whole document (for a diff, one side of one hunk: ui/diff/model.ts § buildDiffRowsAsync) rather
+// than a line.
 import { getHighlighter } from './shiki'
 import { langFor } from './langs'
 import type { HighlightLines, HighlightRequest, HighlightResponse } from './protocol'
@@ -15,17 +11,13 @@ export type TokenizeDocument = (path: string, code: string) => Promise<Highlight
 
 const plain = (code: string): HighlightLines => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
 
-// Generous, because it is a backstop and not a budget: the slowest real document measured was ~110ms,
-// and the first request of a session also pays for spawning the worker and instantiating the WASM
-// engine (~340ms end to end). Anything past this is stuck, not slow.
+// docs/diff-rendering.md § Syntax highlighting covers why this is generous: a backstop, not a
+// budget.
 const TOKENIZE_TIMEOUT_MS = 10_000
 
 type Pending = { resolve: (lines: HighlightLines) => void }
 
-// 'cold' → nothing tried yet. 'live' → spawned and answering. 'dead' → unavailable or it failed its
-// first request; every later call goes straight to the fallback without re-trying, because the two
-// ways this fails (no Worker in the environment, CSP not applied to the worker script) are both
-// permanent for the life of the window.
+// See docs/diff-rendering.md § Syntax highlighting for the cold/live/dead state machine.
 let state: 'cold' | 'live' | 'dead' = 'cold'
 let worker: Worker | null = null
 let nextId = 1
@@ -38,9 +30,8 @@ const failAll = () => {
 
 const kill = (why: string) => {
   if (state !== 'dead') {
-    // LOUD, and deliberately so. The failure this replaces was silent for months: the WASM engine's
-    // rejection landed inside the highlighter's own promise and every surface simply rendered grey.
-    // If the worker is not carrying the load, that is a build or CSP regression someone must see.
+    // Logs loudly: see docs/diff-rendering.md § Syntax highlighting for the silent failure this
+    // replaces.
     console.error(`[highlight] worker unavailable, falling back to the main thread: ${why}`)
   }
   state = 'dead'
@@ -72,8 +63,8 @@ async function spawn(): Promise<Worker | null> {
         entry.resolve(message.lines)
         return
       }
-      // A per-document failure (bad grammar, rejected pattern) is not a dead worker — resolve this one
-      // empty and let the caller fall back for that document only.
+      // A per-document failure (bad grammar, rejected pattern) is not a dead worker: resolve this
+      // one empty and let the caller fall back for that document only.
       entry.resolve([])
     }
     spawned.onerror = () => kill('worker script failed to load or run')
@@ -121,7 +112,7 @@ export const tokenizeDocument: TokenizeDocument = async (path, code) => {
   const lines = await new Promise<HighlightLines>((resolve) => {
     // A TextMate grammar is a regex program, and a regex program can backtrack catastrophically. The
     // worker cannot block the UI, but a request that never comes back would leave a diff file showing
-    // its loading row forever — so give up on it and let the caller render plain text instead.
+    // its loading row forever, so give up on it and let the caller render plain text instead.
     const timer = setTimeout(() => {
       pending.delete(id)
       resolve([])
