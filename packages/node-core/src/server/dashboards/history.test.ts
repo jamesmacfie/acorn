@@ -10,9 +10,9 @@ import {
   readSeries,
 } from './history'
 
-// The store's own arithmetic, against a fake clock. Nothing here samples anything — the pass that
-// produces values is sampler.test.ts — so these are the retention and invalidation rules on their own,
-// which is where getting it wrong silently loses a fortnight of someone's history.
+// The store's own arithmetic, against a fake clock. Nothing here samples anything: the pass that
+// produces values is sampler.test.ts. These are the retention and invalidation rules on their own,
+// which is where getting them wrong silently loses a fortnight of someone's history.
 
 let test: TestDb
 beforeEach(async () => (test = await makeTestDb()))
@@ -58,8 +58,8 @@ describe('appending', () => {
       panelId: 'p1', signature: 'after', bucket: base + HOUR_MS, value: 9, recordedAt: base + HOUR_MS,
     })
     expect(reset).toBe(true)
-    // The old series is GONE rather than left beside the new one: a filter added yesterday makes last
-    // week's samples a lie, and a visibly restarting trend is the honest rendering of that.
+    // The old series is gone rather than left beside the new one: a filter added yesterday makes
+    // last week's samples a lie, and a visibly restarting trend is the honest rendering of that.
     expect(await readSeries(test.db, 'p1')).toEqual({ signature: 'after', samples: [{ bucket: base + HOUR_MS, value: 9 }] })
   })
 
@@ -86,8 +86,7 @@ describe('compaction', () => {
     const result = await compactHistory(test.db, NOW, null)
     expect(result.collapsed).toBe(2)
     const samples = (await readSeries(test.db, 'p1')).samples
-    // The day's LAST value, not an average: a stat shows point-in-time state, and averaging would
-    // invent a number the panel never displayed.
+    // The day's last value, not an average (docs/dashboards.md § Sampling and retention).
     expect(samples).toEqual([{ bucket: day + 23 * HOUR_MS, value: 30 }, { bucket: recent, value: 99 }])
   })
 
@@ -102,8 +101,8 @@ describe('compaction', () => {
   it('removes a series whose panel is gone, and keeps one that is merely unplaced', async () => {
     await write('deleted-panel', hourBucket(NOW), 1)
     await write('unplaced-but-defined', hourBucket(NOW), 2)
-    // The live set is what the prefs blob DEFINES, not what is placed: unplacing a panel keeps its
-    // definition, and its history goes with the definition.
+    // The live set is what the prefs blob defines, not what is placed (docs/dashboards.md § Sampling
+    // and retention).
     const result = await compactHistory(test.db, NOW, new Set(['unplaced-but-defined']))
     expect(result.orphaned).toBe(1)
     expect((await readSeries(test.db, 'deleted-panel')).samples).toEqual([])
@@ -112,8 +111,7 @@ describe('compaction', () => {
 
   it('skips the orphan sweep entirely when the blob could not be read', async () => {
     await write('p1', hourBucket(NOW), 1)
-    // `null` is "I do not know what panels exist", which is a different fact from "none do". Deleting
-    // every series because a preference read failed would be the worst available response.
+    // `null` means "unknown", not "none" (docs/dashboards.md § Sampling and retention).
     const result = await compactHistory(test.db, NOW, null)
     expect(result.orphaned).toBe(0)
     expect((await readSeries(test.db, 'p1')).samples).toHaveLength(1)

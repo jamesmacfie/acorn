@@ -178,8 +178,9 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
   const provider = connectionProviderRegistry.require(row.provider)
-  // The provider's own "test connection" call runs inside the secret scope, so a provider that echoes
-  // the credential in its failure response has it scrubbed before this becomes lastError or a log line.
+  // The provider's own "test connection" call runs inside the secret scope (docs/integrations.md §
+  // Provider boundaries), so an echoed credential is scrubbed before it becomes `lastError` or a log
+  // line.
   const health = await secrets
     .use(row.authRef, `${row.provider}: test connection`, (secret) =>
       providerRequestScheduler.run(provider.id, row.id, provider.budgets, () => provider.connection.test(secret, json(row.config, {}))),
@@ -278,12 +279,11 @@ export const withOwnedConnections = <T>(
 ): Promise<T[]> => forEachConnection(getDb(c.env), ownerId(c), providerId, c.env.SECRETS, visit)
 
 /**
-/**
  * The external-item read model for the calling principal, scoped to one provider
- * (integrations/itemStore.ts). This is how a compiled provider's route reaches core's `issues` table; a
- * provider's mirrored resource gets the same store on `ProviderResourceContext.items`. The compiled tier
- * is trusted, so `providerId` is taken at its word; the loaded tier's twin (`providers.items` on the
- * request context) asserts ownership first.
+ * (integrations/itemStore.ts). This is how a compiled provider's route reaches core's `issues` table;
+ * a provider's mirrored resource gets the same store on `ProviderResourceContext.items`. The compiled
+ * tier is trusted, so `providerId` is taken at its word; the loaded tier's twin (`providers.items` on
+ * the request context) asserts ownership first.
  */
 export const ownedExternalItems = (c: Context<AppEnv>, providerId: string): ExternalItemStore =>
   createExternalItemStore(getDb(c.env), ownerId(c), providerId)

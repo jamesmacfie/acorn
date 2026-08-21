@@ -72,10 +72,11 @@ describe('which panels a pass looks at', () => {
     const plain = panel({ id: 'plain', view: { kind: 'stat' } })
     const unplaced = panel({ id: 'unplaced' })
     const prefs = blob([wanted, activity, plain, unplaced], ['wanted', 'activity', 'plain'])
-    // `activity` needs no store at all and `plain` asked for no trend. `unplaced` is defined but
-    // nothing renders it, and a trend nobody can see is cost without a reader.
+    // `activity` needs no store and `plain` asked for no trend; `unplaced` is defined but nothing
+    // renders it (docs/dashboards.md § Sampling and retention).
     expect(panelsToSample(prefs).map((p) => p.id)).toEqual(['wanted'])
-    // Compaction's live set is different on purpose: UNPLACING must not delete history.
+    // Compaction's live set differs from the placed set: unplacing must not delete history
+    // (docs/dashboards.md § Sampling and retention).
     expect([...definedPanelIds(prefs)].sort()).toEqual(['activity', 'plain', 'unplaced', 'wanted'])
   })
 
@@ -92,7 +93,7 @@ describe('a sampling pass', () => {
       const result = await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
       expect(result).toMatchObject({ sampled: 1, skipped: [] })
       // Default aggregate is `count`, which is why a stat over a collection with no number field
-      // still draws — and still samples.
+      // still draws, and still samples.
       expect((await readSeries(core.db, 'p1')).samples.map((s) => s.value)).toEqual([3])
     } finally {
       core.cleanup()
@@ -118,8 +119,8 @@ describe('a sampling pass', () => {
     const { core, env } = await world(blob([panel()]), () => new Response('rate limited', { status: 429 }))
     try {
       const result = await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
-      // A partial union measures availability, not data: a mixed board missing one provider would
-      // record a dip that never happened.
+      // A partial union measures availability, not data (docs/dashboards.md § Sampling and
+      // retention).
       expect(result.sampled).toBe(0)
       expect(result.skipped).toEqual([{ panelId: 'p1', reason: 'acme unavailable' }])
       expect((await readSeries(core.db, 'p1')).samples).toEqual([])
@@ -146,7 +147,8 @@ describe('a sampling pass', () => {
     try {
       await runSamplePass(core.db, env, AbortSignal.timeout(5_000), 1_800_000_000_000)
 
-      // Same panel id, a filter added: last week's samples are now a lie.
+      // Same panel id, a filter added (docs/dashboards.md § Sampling and retention: a filter change
+      // resets the series).
       const after = panel({ shaping: { filters: [{ field: 'state', op: 'eq', value: 'open' }] } })
       await core.db
         .update(schema.prefs)

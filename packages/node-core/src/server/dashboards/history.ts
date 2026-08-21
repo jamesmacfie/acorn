@@ -2,39 +2,32 @@ import { and, asc, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
 import type { DashboardHistoryResponse, DashboardMeasureSample } from '@acorn/protocol/api.ts'
 import { type AppDatabase, schema } from '../db'
 
-// The measure-history store (docs/dashboards.md § Trends).
-//
-// Node-side, its own table, and NO WRITE ROUTE: the sampler and the store share a process, so the
-// only writer is the schedule. That is the whole reason this feature stopped being a client concern —
-// an earlier design had clients PUT samples while panels rendered, with last-write-wins buckets to
-// make several clients converge, and every part of that was compensating for the wrong writer.
-// One writer needs no convergence.
+// The measure-history store, node-side with its own table and no write route; see docs/dashboards.md
+// § Sampling and retention for why the sampler is the only writer.
 
-/** UTC hour start for an instant. One sample per bucket per panel; the primary key makes finer
- *  granularity unrepresentable, so nothing downstream has to defend against it. */
+/** UTC hour start for an instant. One sample per bucket per panel, so the primary key makes finer
+ *  granularity unrepresentable. */
 export const HOUR_MS = 60 * 60 * 1000
 export const DAY_MS = 24 * HOUR_MS
 export const hourBucket = (at: number): number => Math.floor(at / HOUR_MS) * HOUR_MS
 export const dayBucket = (at: number): number => Math.floor(at / DAY_MS) * DAY_MS
 
-/** Hourly samples are kept this long; older buckets collapse to one per UTC day. */
+/** Hourly retention window; see docs/dashboards.md § Sampling and retention for the full policy. */
 export const HOURLY_RETENTION_MS = 14 * DAY_MS
-/** Daily samples past this are dropped. Just over a year, so a "vs last year" question has an answer
- *  for as long as anyone is likely to ask one. */
+/** Daily retention window; see docs/dashboards.md § Sampling and retention for the full policy. */
 export const DAILY_RETENTION_MS = 400 * DAY_MS
-/** Hard cap per panel AFTER compaction; a series at the cap drops oldest first. It exists so nothing
- *  downstream has to trust the arithmetic above — 14 hourly days plus 400 daily days is ~736 rows, so
- *  a series that reaches this has found a bug in compaction and is bounded anyway. */
+/** Hard cap per panel after compaction; see docs/dashboards.md § Sampling and retention for why it
+ *  exists and how far under it the retention windows land. */
 export const MAX_SAMPLES_PER_PANEL = 1000
 
-// The wire shapes, from the protocol rather than spelled again here: the client draws the sparkline
-// from exactly what this stores, and two declarations of one row is how the two come to disagree.
+// Imported from the protocol rather than redeclared, so the client's sparkline and this store
+// describe one row instead of two that could drift apart.
 export type MeasureSample = DashboardMeasureSample
 export type MeasureSeries = DashboardHistoryResponse
 
 /** Record one sample, resetting the series first if the panel's meaning changed.
  *
- *  The signature check is here rather than in the sampler because it is a property of the STORE's
+ *  The signature check lives here rather than in the sampler because it is a property of the store's
  *  contract: a row whose signature disagrees with the one being written describes a different
  *  measure, and keeping the two side by side would make every read ambiguous. */
 export async function appendSample(
@@ -51,8 +44,9 @@ export async function appendSample(
   await db
     .insert(schema.dashboardMeasureSamples)
     .values(input)
-    // A bucket already written is OVERWRITTEN rather than kept: within one hour the later look is the
-    // better answer, and `run now` from the settings page must not be a no-op for the rest of the hour.
+    // A bucket already written is overwritten rather than kept: within one hour the later look is
+    // the better answer, and "run now" from the settings page must not be a no-op for the rest of
+    // the hour.
     .onConflictDoUpdate({
       target: [schema.dashboardMeasureSamples.panelId, schema.dashboardMeasureSamples.bucket],
       set: { value: input.value, signature: input.signature, recordedAt: input.recordedAt },
@@ -60,9 +54,8 @@ export async function appendSample(
   return { reset }
 }
 
-/** The series for one panel, ascending. An empty series is `{ signature: '', samples: [] }` and never
- *  an error: absence is data, and a panel that has just been given a trend has to render its cold
- *  state rather than a failure. */
+/** The series for one panel, ascending. An empty series is `{ signature: '', samples: [] }`; see
+ *  docs/dashboards.md § Trends for why that renders as a cold state rather than an error. */
 export async function readSeries(db: AppDatabase, panelId: string, since?: number): Promise<MeasureSeries> {
   const rows = await db
     .select({
@@ -91,8 +84,8 @@ export async function deleteSeries(db: AppDatabase, panelIds: readonly string[])
   return Number(result.changes ?? 0)
 }
 
-/** Every panel this store holds samples for. The compaction pass uses it to find series whose panel
- *  has been deleted, which is how a removed definition's history goes without needing a route. */
+/** Every panel this store holds samples for; see docs/dashboards.md § Sampling and retention for the
+ *  orphan sweep this feeds. */
 export async function sampledPanelIds(db: AppDatabase): Promise<string[]> {
   const rows = await db
     .selectDistinct({ panelId: schema.dashboardMeasureSamples.panelId })
@@ -102,16 +95,8 @@ export async function sampledPanelIds(db: AppDatabase): Promise<string[]> {
 
 export type CompactionResult = { collapsed: number; dropped: number; orphaned: number }
 
-/** Retention, as one pass (`core:compact-history`, daily).
- *
- *  Hourly samples older than 14 days collapse to ONE PER UTC DAY, keeping THE DAY'S LAST VALUE — a
- *  stat shows point-in-time state, so last-known beats averaging, which would invent a number the
- *  panel never displayed. Daily samples past 400 days go. A series over the hard cap drops oldest
- *  first, and a series whose panel no longer exists goes whole.
- *
- *  `livePanelIds` is what the prefs blob currently defines. Passing `null` skips the orphan sweep,
- *  which is what a caller that could not read the blob must do: deleting every series because a
- *  preference read failed would be the worst possible response to a transient error. */
+/** Retention, as one daily pass (`core:compact-history`); see docs/dashboards.md § Sampling and
+ *  retention for the policy and the orphan sweep. */
 export async function compactHistory(
   db: AppDatabase,
   now: number,
@@ -126,10 +111,9 @@ export async function compactHistory(
     orphaned = await deleteSeries(db, stale)
   }
 
-  // Older than the hourly window: keep the LAST bucket of each UTC day, delete the rest. Done in one
-  // read and one delete per panel rather than a clever SQL window, because a series is at most a few
-  // hundred rows and this job runs once a day — the arithmetic being obvious is worth more here than
-  // it being in the query planner.
+  // Older than the hourly window: keep the last bucket of each UTC day, delete the rest. One read
+  // and one delete per panel rather than a SQL window function, because a series is at most a few
+  // hundred rows and this job runs once a day.
   const hourlyFloor = hourBucket(now) - HOURLY_RETENTION_MS
   const oldRows = await db
     .select({ panelId: schema.dashboardMeasureSamples.panelId, bucket: schema.dashboardMeasureSamples.bucket })
