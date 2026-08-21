@@ -48,9 +48,10 @@ export function activeIdentityStore(dataDir: string): ActiveIdentityStore {
   }
 }
 
-// The same contract with no file behind it, for callers that build CoreServices without a data root —
-// today only tests. It is a separate export rather than a `dataDir?` default so a composition root
-// cannot get a process-local identity by forgetting an argument: omitting it there is a type error.
+// The same contract with no file behind it, for callers that build CoreServices without a data
+// root, today only tests. It is a separate export rather than a `dataDir?` default so a
+// composition root cannot get a process-local identity by forgetting an argument: omitting it
+// there is a type error.
 export function memoryIdentityStore(initial: string | null = null): ActiveIdentityStore {
   let current = initial
   return {

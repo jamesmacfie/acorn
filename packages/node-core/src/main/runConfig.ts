@@ -16,9 +16,9 @@ export type RunTarget = {
 
 export type LayoutRecipe = {
   id: string
-  panes: string[] // panes split equally — there is deliberately no ratio field
+  panes: string[] // panes split equally, there is no ratio field
   terminal?: string // run.<id> to auto-start in the drawer
-  browser?: string // 'run:<id>' — point the browser at that target's resolved URL
+  browser?: string // 'run:<id>', points the browser at that target's resolved URL
 }
 
 export type ConfigError = { source: string; message: string }
@@ -31,9 +31,9 @@ export type RepoConfig = {
   // Database-pane connection resolver + browser-preview URL config. db/preview may come from committed
   // repo config; browserRules stays DB-only because autofill selectors are machine/personal.
   dbUrlScript: string | null
-  // True when dbUrlScript's winning layer is the committed repo config — the same provenance signal
-  // repoTargetIds carries, for the same reason: dbUrlScript is executed as a shell script, so the
-  // trust gate must apply when the checkout authored it and must NOT when the user did.
+  // True when dbUrlScript's winning layer is the committed repo config, the same provenance signal
+  // repoTargetIds carries for the same reason: dbUrlScript runs as a shell script, so the trust
+  // gate must apply when the checkout authored it and must not apply when the user did.
   dbUrlFromRepo: boolean
   preview: { mode: PreviewMode | null; value: string | null }
   browserRules: BrowserRule[]
@@ -43,9 +43,9 @@ export type RepoConfig = {
   repoTargetIds: string[]
 }
 
-// The DB columns the file layers override — the project config row (project-level settings; formerly
-// per-workspace columns). The `dev` run button comes from the dev script (or explicit
-// config) — see the layering comment in loadRepoConfig below.
+// The DB columns the file layers override: the project config row (project-level settings,
+// formerly per-workspace columns). The `dev` run button comes from the dev script or explicit
+// config; see the layering comment in loadRepoConfig below.
 export type DbConfigFallback = {
   setupScript?: string | null
   teardownScript?: string | null
@@ -125,10 +125,10 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
       }
     }
   }
-  // [database] url_script — the Database pane's connection resolver (docs/pg.md).
+  // [database] url_script: the Database pane's connection resolver (docs/pg.md).
   const database = doc.database
   if (database && typeof database === 'object') layer.dbUrlScript = str((database as Record<string, unknown>).url_script)
-  // [preview] mode + value — how the browser-preview pane resolves its URL (docs/panes.md).
+  // [preview] mode and value: how the browser-preview pane resolves its URL (docs/panes.md).
   const preview = doc.preview
   if (preview && typeof preview === 'object') {
     const pv = preview as Record<string, unknown>
@@ -170,9 +170,9 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
   return layer
 }
 
-// The projects.run_targets JSON column → RunTarget[] (the per-project DB fallback surface).
-// Malformed JSON → no targets. (The pre-0017 scalar runCommand/devPort columns are gone — data
-// migration 0017 folded them into this JSON column, and 0018 dropped them.)
+// The projects.run_targets JSON column, converted to RunTarget[] (the per-project DB fallback
+// surface). Malformed JSON yields no targets. The pre-0017 scalar runCommand/devPort columns are
+// gone: migration 0017 folded them into this JSON column, and 0018 dropped them.
 export function projectRunTargets(db: DbConfigFallback): RunTarget[] {
   if (!db.runTargetsJson) return []
   try {
@@ -220,15 +220,12 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
   const user = readLayer(userConfigDir, 'user')
 
   const run = new Map<string, RunTarget>()
-  // THE `dev` target's layering, in one place (docs/workflows.md): `.acorn/config.toml` is the
-  // CANONICAL home for run targets — commit `[scripts.run.dev]` there. The DB surfaces are
-  // fallback layers only, and the merge order below makes toml win by inserting later:
+  // The `dev` target's layering: docs/workspaces-and-tasks.md § Worktrees and setup covers why.
+  // The merge order below makes toml win by inserting later:
   //   1. workspaces.devScript/devRestartScript → a base `dev` target (lowest precedence)
   //   2. projects.run_targets JSON (per-project Settings surface)
   //   3. ~/.acorn/config.toml (personal defaults)
-  //   4. ./.acorn/config.toml (committed — always wins)
-  // The base `dev` target gets no `default` flag — it carries no URL, so flagging it would shadow
-  // a repo's real default target in RuntimeService.defaultUrl.
+  //   4. ./.acorn/config.toml (committed, always wins)
   if (db.devScript?.trim()) run.set('dev', { id: 'dev', command: db.devScript.trim(), restart: db.devRestartScript?.trim() || undefined })
   for (const t of projectRunTargets(db)) run.set(t.id, t)
   for (const t of user?.run.values() ?? []) run.set(t.id, t)

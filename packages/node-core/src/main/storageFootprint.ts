@@ -29,9 +29,9 @@ async function directoryBytes(path: string, keep: (name: string) => boolean = ()
 }
 
 // `<dataRoot>/plugins` holds two unrelated things: one SQLite file per plugin (plus its -wal/-shm
-// siblings), and — since the loader landed — the unpacked package of every INSTALLED plugin, in a
-// subdirectory named for its id. Only the first is "plugin databases"; counting the second would
-// silently report bundle bytes as stored rows.
+// siblings), and, since the loader landed, the unpacked package of every installed plugin in a
+// subdirectory named for its id. Only the first counts as "plugin databases"; counting the second
+// would silently report bundle bytes as stored rows.
 const isPluginDatabase = (name: string): boolean => name.includes('.sqlite')
 
 /**

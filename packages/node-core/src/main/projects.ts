@@ -6,17 +6,17 @@ import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { git } from './core/git'
 
-// A project is a folder on this machine (server/db/schema.ts `projects`). Adding one requires nothing
-// beyond an absolute existing directory: the VCS and
-// GitHub facets are DETECTED, never demanded. `.git` present → vcs 'git'; an origin remote that
-// parses as github.com/<owner>/<name> → the GitHub facet. Both are cached disk truth, refreshed by
-// detectProject whenever the folder changes underneath us (git init, remote add, …).
+// A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
+// § Workspace and project covers facets generally). Adding one needs only an absolute existing
+// directory: a `.git` entry sets the git facet, and an origin remote that parses as
+// `github.com/<owner>/<name>` sets the GitHub facet. `detectProject` refreshes both whenever the
+// folder changes underneath us.
 
 export type ProjectRow = typeof schema.projects.$inferSelect
 
-// Cross-plugin project identity. This is intentionally a projection rather than ProjectRow: plugin
-// code may resolve scope and filesystem ownership, but it must not receive core's executable config,
-// hidden/sort state, or a database handle (docs/data-layer.md § plugin databases).
+// Cross-plugin project identity, a projection rather than ProjectRow (docs/plugins.md §
+// Activation): a plugin may resolve scope and filesystem ownership, but never receives core's
+// executable config, hidden/sort state, or a database handle.
 export type ProjectRef = {
   id: string
   name: string
@@ -71,7 +71,8 @@ export function parseGithubRemote(url: string): { owner: string; name: string } 
 
 export async function detectFacets(path: string): Promise<ProjectFacets> {
   const none: ProjectFacets = { vcs: null, remoteUrl: null, githubOwner: null, githubName: null, defaultBranch: null }
-  // A .git ENTRY, not directory: a linked worktree holds a .git file and is still a git checkout.
+  // A `.git` entry, not a directory: a linked worktree holds a `.git` file and is still a git
+  // checkout.
   if (!existsSync(join(path, '.git'))) return none
 
   // Exit code as data (core/vcs/git.ts): a repo with no origin remote is a git project, not an error.
@@ -174,8 +175,9 @@ export async function projectByGithub(db: AppDatabase, owner: string, name: stri
 }
 
 // Re-probe the folder and refresh the cached facets. Never clears the GitHub facet on a vanished
-// remote if a task/pull history hangs off it — a remote can be temporarily re-pointed; losing the
-// facet would orphan the github surfaces for no gain. It DOES clear when the whole .git goes away.
+// remote if a task or pull history hangs off it: a remote can be temporarily re-pointed, and
+// losing the facet would orphan the github surfaces for no gain. It does clear when the whole
+// .git directory goes away.
 export async function detectProject(db: AppDatabase, id: string): Promise<ProjectRow | null> {
   const project = await getProject(db, id)
   if (!project?.path || !isDir(project.path)) return project
@@ -213,8 +215,8 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
   if (patch.hidden !== undefined) set.hidden = patch.hidden
   if (patch.sort !== undefined) set.sort = patch.sort
   if (patch.path !== undefined) {
-    // Mapping a folder onto a path-NULL project (the "clone or pick folder" affordance for a
-    // deferred GitHub import). Same checks as createProject, then a facet probe.
+    // Mapping a folder onto a project with no path yet (the "clone or pick folder" affordance for
+    // a deferred GitHub import). Same checks as createProject, then a facet probe.
     if (!isAbsolute(patch.path)) return { ok: false, reason: 'Path must be absolute.' }
     if (!isDir(patch.path)) return { ok: false, reason: 'Directory does not exist.' }
     const [alreadyMapped] = await db
@@ -233,16 +235,9 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
   return { ok: true, project: (await getProject(db, id))! }
 }
 
-// Removes the row only — never touches the folder, and tasks pointing at it keep their absolute
-// worktree paths.
 /**
- * Delete a project and the tasks that belong to it.
- *
- * The tasks go because nothing else would ever collect them: `tasks.project_id` carries no foreign
- * key, so leaving them behind produces rows pointing at a project that no longer exists, invisible in
- * every rail and impossible to remove. Their links go with them for the same reason.
- *
- * Still row-only on disk: the project's folder and any task worktrees are never touched from here.
+ * Delete a project and the tasks that belong to it (docs/workspaces-and-tasks.md § Workspace and
+ * project). Row-only: the project's folder and any task worktrees are never touched from here.
  */
 export async function deleteProject(db: AppDatabase, id: string): Promise<void> {
   const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)
@@ -254,8 +249,8 @@ export async function deleteProject(db: AppDatabase, id: string): Promise<void> 
 }
 
 // Core-only write seam for importer plugins. The public project routes remain the richer UI/config
-// surface; this pair is intentionally limited to the fields a later importer needs to create a
-// deferred remote project and map it to a folder. It is not a general-purpose project mutation API.
+// surface; this pair covers only the fields a later importer needs to create a deferred remote
+// project and map it to a folder, not a general-purpose project mutation API.
 export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefInput): Promise<ProjectRef> {
   const name = input.name.trim()
   if (!name) throw new Error('Project name cannot be blank.')

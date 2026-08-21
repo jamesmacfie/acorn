@@ -9,11 +9,12 @@ import { PLUGIN_DB_DIR } from './pluginStorage'
 import { openSqlite } from './sqlite'
 import { schema } from '../server/db'
 
-// The backup, against a REAL data root and unpacked with the real `tar` (docs/data-layer.md § Backup).
+// The backup, against a real data root and unpacked with the real `tar` (docs/data-layer.md §
+// Backup and import).
 //
-// The archive is the deliverable, so the assertions are about what comes back OUT of it. A test that
-// checked the staging directory would prove the copy and not the thing an owner actually restores from —
-// and the exclusions, which are the security-relevant half, are only observable in the copy.
+// The archive is the deliverable, so the assertions are about what comes back out of it. A test
+// that checked the staging directory would prove the copy, not the thing an owner actually
+// restores from, and the exclusions, the security-relevant half, are only observable in the copy.
 
 let root: string
 let out: string
@@ -21,8 +22,8 @@ let out: string
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'acorn-backup-src-'))
   out = mkdtempSync(join(tmpdir(), 'acorn-backup-out-'))
-  // A real migrated core database with a credential and a device in it — the two things that must not
-  // survive the trip.
+  // A real migrated core database with a credential and a device in it: the two things that must
+  // not survive the trip.
   const db = openDb(join(root, 'core.sqlite'))
   const now = Date.now()
   await db.insert(schema.integrations).values({
@@ -50,8 +51,8 @@ beforeEach(async () => {
     lastSeenAt: null,
     revokedAt: null,
   })
-  // A workspace, so there is something the backup is FOR — an archive that excluded everything would
-  // pass the exclusion assertions perfectly.
+  // A workspace, so the backup has something worth keeping: an archive that excluded everything
+  // would pass the exclusion assertions perfectly.
   await db.insert(schema.workspaces).values({
     id: 'ws-1',
     name: 'Runn',
@@ -64,8 +65,9 @@ beforeEach(async () => {
   })
   db.close()
 
-  // Two plugin databases, DISCOVERED rather than named: pluginStorage's header says the directory exists
-  // so a backup can enumerate it without knowing the plugin list, and this is what tests that claim.
+  // Two plugin databases, discovered rather than named: pluginStorage's header says the directory
+  // exists so a backup can enumerate it without knowing the plugin list, and this test checks that
+  // claim.
   mkdirSync(join(root, PLUGIN_DB_DIR), { recursive: true })
   for (const name of ['agents', 'notes']) {
     const handle = openSqlite(join(root, PLUGIN_DB_DIR, `${name}.sqlite`))
@@ -116,8 +118,7 @@ describe('createBackup', () => {
     const dir = unpack(archive)
     try {
       const core = openSqlite(join(dir, 'core.sqlite'), { readonly: true })
-      // Blanked rather than deleted, so a restored node still shows that a Linear connection existed and
-      // needs re-entering — which is the state docs/data-layer.md describes.
+      // Blanked rather than deleted (docs/data-layer.md § Backup and import).
       expect(core.prepare('SELECT access_token, label FROM integrations').all()).toEqual([
         { access_token: '', label: 'Linear – work' },
       ])
@@ -125,12 +126,12 @@ describe('createBackup', () => {
       expect(core.prepare('SELECT count(*) AS n FROM devices').get()).toEqual({ n: 0 })
       core.close()
 
-      // The strongest form of the assertion: the ciphertext must not be anywhere in the file, including
-      // a freed page. Scanned over the raw bytes rather than through SQL.
+      // The strongest form of the assertion: the ciphertext must not be anywhere in the file,
+      // including a freed page. Scanned over the raw bytes rather than through SQL.
       //
-      // Note what this does NOT prove. It passes with the VACUUM removed — a database this small keeps
-      // the row in place and better-sqlite3's close() checkpoints the WAL away — so the VACUUM is
-      // precautionary for a real data root, not something covered here. Recorded rather than implied.
+      // This does not prove the VACUUM matters here: the test passes even with that line removed,
+      // because a database this small keeps the row in place and better-sqlite3's close()
+      // checkpoints the WAL away. The VACUUM earns its keep on a real data root, not in this test.
       expect(readFileSync(join(dir, 'core.sqlite')).includes('SUPER-SECRET-CIPHERTEXT')).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -160,8 +161,8 @@ describe('createBackup', () => {
   it('leaves the source databases untouched', async () => {
     const before = readFileSync(join(root, 'core.sqlite'))
     await createBackup(root, join(out, 'backup.tar.gz'))
-    // The scrub runs on the COPY. Getting this backwards would blank the owner's live credentials as a
-    // side effect of taking a backup, which is the worst possible failure this file could have.
+    // The scrub runs on the copy. Getting this backwards would blank the owner's live credentials
+    // as a side effect of taking a backup, which is the worst failure this file could have.
     expect(readFileSync(join(root, 'core.sqlite')).equals(before)).toBe(true)
   })
 

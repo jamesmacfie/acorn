@@ -1,27 +1,24 @@
 import { runProcess } from './core/proc'
 
-// Is this machine's disk encrypted? (docs/security.md § On-disk: "Worktrees, mirrors, caches,
-// scrollback rely on OS full-disk encryption; the app warns once if the disk isn't encrypted".)
+// Is this machine's disk encrypted? Application encryption covers only secrets and backup
+// archives; a node's worktrees hold the owner's source, its blob cache holds every patch it has
+// fetched, and its plugin databases hold agent transcripts, none of it protected by anything but
+// the operating system. On a machine without FileVault, someone who steals the laptop reads all of
+// it.
 //
-// It matters because of what application encryption deliberately does NOT cover. Only secrets and backup
-// archives are encrypted by acorn; a node's worktrees hold the owner's source, its blob cache holds every
-// patch it has fetched, its plugin databases hold agent transcripts, and none of that is protected by
-// anything but the operating system. On a machine without FileVault, "someone who steals the laptop" —
-// which security.md's threat model otherwise leaves to the OS — reads all of it.
-//
-// Three answers, and `null` is a real one rather than a failure: on Linux the honest report is "we do not
-// know" (LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count, and probing for
-// them badly would produce a confident wrong answer, which is worse than none for a security warning).
+// `null` is a real answer, not a failure: on Linux the honest report is "we do not know" (LUKS,
+// dm-crypt, ZFS native encryption, and a dozen NAS arrangements all count), and probing for them
+// badly would produce a confident wrong answer, which is worse than none for a security warning.
 
 export type DiskEncryption = boolean | null
 
-// `fdesetup isactive` prints `true`/`false` and exits 0/1 accordingly. Deliberately not `fdesetup status`:
-// that prints prose which has changed wording across macOS releases, and parsing it is how a check like
+// `fdesetup isactive` prints `true`/`false` and exits 0/1 accordingly. Not `fdesetup status`: that
+// prints prose whose wording has changed across macOS releases, and parsing it is how a check like
 // this quietly starts returning the wrong answer after an OS upgrade.
 //
-// Through the process broker rather than a bare execFile, per CLAUDE.md § Process ownership — which also
-// means it runs with the allowlisted environment and a bounded capture rather than inheriting this
-// process's env, tokens included.
+// Runs through the process broker rather than a bare execFile (docs/security.md § Process, path,
+// and configuration controls), so it gets the allowlisted environment and a bounded capture instead
+// of inheriting this process's environment, tokens included.
 async function probe(): Promise<DiskEncryption> {
   if (process.platform !== 'darwin') return null
   try {
@@ -43,9 +40,9 @@ async function probe(): Promise<DiskEncryption> {
   }
 }
 
-// Cached for the life of the process. Turning FileVault on requires a reboot on macOS, so a node that has
-// been running since before the change is going to be restarted anyway — and a check on every settings
-// page open would spawn a process for an answer that cannot have changed.
+// Cached for the life of the process. Turning FileVault on requires a reboot on macOS, so a node
+// that has been running since before the change will be restarted anyway, and a check on every
+// settings-page open would spawn a process for an answer that cannot have changed.
 let cached: Promise<DiskEncryption> | null = null
 
 export function diskEncryption(): Promise<DiskEncryption> {

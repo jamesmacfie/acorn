@@ -4,8 +4,7 @@
 
 import { branchSlug } from './pathGuards'
 
-// Controlled child environment (docs/security.md): preserve the few vars a shell needs, and never copy
-// SESSION_ENC_KEY, GITHUB_CLIENT_SECRET or anything else into the child.
+// Controlled child environment: docs/security.md covers what a child never inherits.
 export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const out: Record<string, string> = {}
   for (const k of ['HOME', 'PATH', 'SHELL', 'LANG', 'LC_ALL', 'LC_CTYPE', 'USER', 'LOGNAME', 'TMPDIR']) {
@@ -36,9 +35,9 @@ export type SessionTaskInfo = {
   title: string
 }
 
-// Environment for every task-scoped session and lifecycle script (docs/terminal-and-agents.md, docs/agent-tools.md §4): the childEnv
-// whitelist (never secrets), plus the ACORN_* identity vars agents / MCP / setup / teardown scripts
-// key off. Caller-supplied opts.env still wins — it's spread last.
+// Environment for every task-scoped session and lifecycle script: the childEnv allowlist plus the
+// ACORN_* identity vars that agents, MCP, setup, and teardown scripts key off. Caller-supplied
+// opts.env wins, since it's spread last.
 export function buildSessionEnv(opts: {
   taskId: string
   cwd: string

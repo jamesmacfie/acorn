@@ -16,17 +16,16 @@ export type DataRoot = {
   readonly preferredPort: number | undefined
   recordPort(port: number): void
   // The operator's answer to "which host should this node advertise?", or undefined if they have
-  // never been asked. '' means they were asked and said loopback only — distinct from undefined,
+  // never been asked. '' means they were asked and said loopback only, distinct from undefined,
   // which is what stops the prompt reappearing every boot (main/advertise.ts).
   readonly advertiseHost: string | undefined
   recordAdvertiseHost(host: string): void
   release(): void
 }
 
-// Atomic 0600 write: tmp + fsync + rename, so a crash mid-write cannot leave a truncated file (the
-// same shape activeIdentity.ts uses for the same reason). Exported because the session key is
-// written with exactly this posture for exactly this reason (main/sessionKey.ts) — a half-written
-// key is an unrecoverable loss of every stored credential.
+// Atomic write: tmp file, fsync, rename, so a crash mid-write cannot leave a truncated file behind
+// (docs/data-layer.md § Data root). Exported because main/sessionKey.ts writes the session key
+// with the same posture: a half-written key would make every stored credential unrecoverable.
 export function writePrivateAtomic(path: string, body: string): void {
   const temporary = `${path}.${process.pid}.tmp`
   const fd = openSync(temporary, 'w', 0o600)
@@ -45,7 +44,7 @@ function processIsAlive(pid: number): boolean {
     process.kill(pid, 0)
     return true
   } catch (error) {
-    // ESRCH: no such process — the holder died without releasing. EPERM: it exists but belongs to
+    // ESRCH: no such process, the holder died without releasing. EPERM: it exists but belongs to
     // another user, so it is live as far as we are concerned.
     return (error as NodeJS.ErrnoException).code === 'EPERM'
   }
@@ -69,7 +68,7 @@ function acquireLock(dir: string): () => void {
         try {
           return readFileSync(path, 'utf8').trim()
         } catch {
-          return '' // vanished between open and read — treat as stale and retry
+          return '' // vanished between open and read, treat as stale and retry
         }
       })()
       const pid = Number.parseInt(raw, 10)
@@ -86,8 +85,8 @@ function acquireLock(dir: string): () => void {
         `Another acorn node already holds ${dir} (pid ${holder}). Stop it first, or delete ${path} if that process is gone.`,
       )
     }
-    // Stale: the previous holder crashed. Take it over — once. A second EEXIST here means a real
-    // race with another starting node, and losing it is correct.
+    // Stale: the previous holder crashed, so take it over, but only once. A second EEXIST here
+    // means a real race with another starting node, and losing it is correct.
     rmSync(path, { force: true })
     const contender = claim()
     if (contender !== null) {
@@ -104,7 +103,7 @@ function acquireLock(dir: string): () => void {
       // Only remove a lock we still own; a stale-takeover by someone else must not be clobbered.
       if (readFileSync(path, 'utf8').trim() === String(process.pid)) rmSync(path, { force: true })
     } catch {
-      // Already gone, or unreadable — nothing useful to do while tearing down.
+      // Already gone, or unreadable: nothing useful to do while tearing down.
     }
   }
   process.on('exit', release)
@@ -120,9 +119,9 @@ function readIdentity(path: string): NodeIdentity | null {
   }
 }
 
-// Open (or initialise) the data root at `dir`. Throws if the directory has a source database, if
-// another node holds it, or if the identity file is unreadable — never falls back to a fresh identity for an existing root,
-// because that would silently orphan the node's paired devices.
+// Open (or initialise) the data root at `dir` (docs/data-layer.md § Data root). Throws rather than
+// falling back to a fresh identity when the directory has a source database, another node holds
+// it, or the identity file is unreadable.
 export function openDataRoot(dir: string): DataRoot {
   if (existsSync(join(dir, V1_DATABASE))) {
     throw new Error(
@@ -142,12 +141,8 @@ export function openDataRoot(dir: string): DataRoot {
     if (existed && !existing) {
       throw new Error(`${identityPath} is unreadable or malformed. Fix or remove it — refusing to mint a second identity for this root.`)
     }
-    // No `protocolVersion` here any more. It was written once at first boot and then read by nothing,
-    // ever — and worse, it was a lie waiting to happen: a root created by protocol 2 and later served by
-    // a protocol 3 binary kept claiming 2 forever, because nothing rewrote it either. The live answer is
-    // NODE_PROTOCOL_VERSION in the running binary, which is what GET /v2/node reports. An existing
-    // node.json still carrying the key parses fine and the key is dropped on the next rewrite
-    // (protocol/node.ts explains why that schema is not strict).
+    // No `protocolVersion` field any more (docs/data-layer.md § Data root; docs/api-reference.md §
+    // Versioning).
     let identity: NodeIdentity = existing ?? { nodeId: randomUUID(), createdAt: Date.now() }
     if (!existing) writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
     else chmodSync(identityPath, 0o600)

@@ -21,20 +21,21 @@ import { ensureCert } from './tls'
 // at startup and handed to the Hono app at the single app.fetch() seam in main/server.ts.
 export type RuntimeBindings = {
   DB: AppDatabase
-  // This node's data root. On c.env because `POST /v2/core/backup` has to enumerate `plugins/*.sqlite`
-  // beside core.sqlite (main/backup.ts), and there is nothing sensitive about a path — every child this
-  // node spawns already receives it as ACORN_DATA_DIR, and pluginStorage computes it from the same
-  // value. A bridge slot was the alternative and would be three files for one string.
+  // This node's data root. It lives on c.env because `POST /v2/core/backup` has to enumerate
+  // `plugins/*.sqlite` beside core.sqlite (main/backup.ts), and a filesystem path carries no
+  // secret: every child process this node spawns already receives it as ACORN_DATA_DIR, and
+  // pluginStorage computes it from the same value. The alternative, a dedicated bridge slot, would
+  // be three files for one string.
   DATA_DIR: string
   // This Node's durable identity, minted into node.json on first start (main/dataRoot.ts). Every
   // resource a client caches is keyed (nodeId, id), so two nodes holding the same UUID never
   // collide (docs/architecture-overview.md § Fleet semantics).
   NODE_ID: string
-  // The sha256 of this node's TLS certificate — the value a client pins (docs/api-reference.md
-  // § Transport and identity), advertised at GET /v2/node.
+  // The sha256 of this node's TLS certificate, the value a client pins (docs/api-reference.md §
+  // Pairing), advertised at GET /v2/node.
   //
-  // The fingerprint, NOT the certificate and emphatically not the private key: c.env reaches every
-  // core and plugin route, so anything placed here is readable by all of them. The key material stays
+  // The fingerprint, not the certificate and not the private key: c.env reaches every core and
+  // plugin route, so anything placed here is readable by all of them. The key material stays
   // inside main/tls.ts and main/server.ts, which are the only modules that need it.
   NODE_FINGERPRINT: string
   // The app version this node is running, reported at GET /v2/node to an authenticated caller
@@ -43,18 +44,17 @@ export type RuntimeBindings = {
   APP_VERSION: string
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
-  // Use-scoped credential access (main/core/secrets.ts). On c.env deliberately: it is strictly less
-  // dangerous than the raw SESSION_ENC_KEY that was already here, and it is the seam that scrubs a
-  // credential out of a provider error before it reaches a log or a client.
+  // Use-scoped credential access (main/core/secrets.ts). It replaces the raw SESSION_ENC_KEY that
+  // used to sit here directly, and it is the seam that scrubs a credential out of a provider error
+  // before it reaches a log or a client.
   SECRETS: SecretService
-  // Bearer for loopback callers that hold no device token — the acorn MCP server and other spawned
-  // children (docs/mcp.md). Injected into task session env (ACORN_API_TOKEN) so agent-spawned servers
-  // inherit it; auth middleware maps it to the machine's single owner. Persisted across boots, because
-  // a tmux-reattached agent keeps the environment of the boot that spawned it.
+  // Bearer for loopback callers with no device token: the acorn MCP server and other spawned
+  // children (docs/mcp.md § Launch environment). Injected into task session env as
+  // ACORN_API_TOKEN; auth middleware maps it to the machine's single owner.
   INTERNAL_TOKEN: string
   // The machine's bound owner identity: an opaque `owner-<uuid>` minted at first boot
   // (ensureBoundIdentity below), read by every principal. Installs that bound a GitHub login under
-  // the old scheme keep that login as the opaque id — no data rewrite. Providers never bind.
+  // the old scheme keep that login as the opaque id, with no data rewrite. Providers never bind.
   ACTIVE_IDENTITY: ActiveIdentityStore
   // Node auth root (docs/api-reference.md § Pairing): paired devices and their revocable bearer
   // tokens, the replay store behind Idempotency-Key, and the one-time pairing window.
@@ -62,8 +62,9 @@ export type RuntimeBindings = {
   IDEMPOTENCY: IdempotencyStore
   PAIRING_CODES: PairingCodes
   // Route handlers receive only this late-binding read surface. It keeps the per-runtime registry
-  // out of the plugin host while allowing a request to resolve the provider that was initialized for
-  // this node. The resolver deliberately exposes no registration or enumeration methods to routes.
+  // out of the plugin host while allowing a request to resolve the provider that was initialized
+  // for this node. The resolver exposes no registration or enumeration methods to routes, only get
+  // and require.
   CAPABILITIES: Pick<CapabilityRegistry, 'get' | 'require'>
 }
 
@@ -74,9 +75,9 @@ export type RuntimeBindings = {
 // at the app.fetch() seam (main/server.ts); tests and non-HTTP callers don't provide them.
 export type Env = RuntimeBindings & Partial<HttpBindings>
 
-// Immutable blob/patch bodies keyed by sha (docs/caching.md) — content never changes for a key, so
-// there is no TTL and no delete. One file per key under `dir`; keys are `filebody:<sha>` /
-// `patch:<sha>` — sanitize the colon for a safe filename.
+// Immutable blob and patch bodies keyed by sha (docs/caching.md § Immutable blob cache). One file
+// per key under `dir`; keys are `filebody:<sha>` and `patch:<sha>`, with the colon sanitized for a
+// safe filename.
 export type BlobCache = {
   get(key: string): Promise<string | null>
   put(key: string, value: string): Promise<void>
@@ -138,8 +139,8 @@ export function openDb(dbPath: string): AppDatabase {
   const sqlite = openSqlite(databasePath)
   // WAL for concurrent read/write, and a short busy timeout instead of immediate SQLITE_BUSY.
   // No foreign_keys pragma: the schema declares no FK constraints (docs/data-layer.md), so
-  // enabling enforcement would be a misleading no-op — and main/sqlite.ts holds it off explicitly,
-  // because node:sqlite would otherwise turn it on where better-sqlite3 did not.
+  // enabling enforcement would be a misleading no-op. main/sqlite.ts holds it off explicitly,
+  // because node:sqlite would otherwise enable it by default where better-sqlite3 did not.
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('busy_timeout = 5000')
 
@@ -151,9 +152,9 @@ export function openDb(dbPath: string): AppDatabase {
     if (existsSync(path)) chmodSync(path, 0o600)
   }
 
-  // `.batch([...])` (which this driver lacks) as a synchronous transaction — all-or-nothing
-  // semantics. Statements are built on `db`, so they run on this connection inside the
-  // BEGIN/COMMIT, keeping the route call sites untouched.
+  // `.batch([...])` (which this driver lacks) as a synchronous, all-or-nothing transaction.
+  // Statements are built on `db`, so they run on this connection inside the BEGIN/COMMIT, keeping
+  // the route call sites untouched.
   const withBatch = db as unknown as AppDatabase
   withBatch.batch = (async (statements: ReadonlyArray<{ run(): unknown }>) =>
     db.transaction((_tx) => statements.map((stmt) => stmt.run()))) as AppDatabase['batch']
@@ -161,11 +162,8 @@ export function openDb(dbPath: string): AppDatabase {
   return withBatch
 }
 
-// Persist the loopback bearer across boots (docs/mcp.md): agent panes run in tmux and are
-// reattached after an acorn restart, so the `claude` process keeps the ACORN_API_TOKEN from the
-// boot that spawned it. A per-boot random token would 404 every reattached session's MCP / notes /
-// memory / context calls ("connected · no tools" after a relaunch). Store it next to the DB (like
-// session.key, 0600) and reuse it; create on first run.
+// Persist the loopback bearer across boots (docs/mcp.md § Launch environment). Store it next to
+// the database (like session.key, mode 0600), reuse it, and mint one only on first run.
 function loadOrCreateInternalToken(dataDir: string): string {
   const file = join(dataDir, 'internal-token')
   try {
@@ -175,7 +173,7 @@ function loadOrCreateInternalToken(dataDir: string): string {
       return existing
     }
   } catch {
-    // not created yet — fall through and mint one
+    // not created yet, so fall through and mint one
   }
   const token = randomUUID()
   mkdirSync(dataDir, { recursive: true, mode: 0o700 })
@@ -201,9 +199,9 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilitie
   const blobCachePath = resolve(blobsDir)
   const db = openDb(databasePath)
   const dataDir = dirname(databasePath)
-  // Was a required env var that threw at boot. It still wins when set — the desktop puts a
-  // safeStorage-backed value there before this runs — but a headless node now mints its own into the
-  // data root instead of refusing to start (main/sessionKey.ts).
+  // Was a required environment variable that threw at boot. It still wins when set, since the
+  // desktop puts a safeStorage-backed value there before this runs, but a headless node now mints
+  // its own into the data root instead of refusing to start (main/sessionKey.ts).
   const encKey = ensureSessionKey(dataDir)
   const activeIdentity = activeIdentityStore(dataDir)
   // Mint the owner id on first boot and adopt any pre-identity ''-scoped rows. Before this ran at
@@ -214,9 +212,9 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilitie
     DB: db,
     DATA_DIR: dataDir,
     NODE_ID: nodeId,
-    // ensureCert is idempotent, so calling it here AND in startListener is not two certificates — it is
-    // the same one read twice, which is what lets the routes hold the public fingerprint without the
-    // bindings ever touching the private key.
+    // ensureCert is idempotent, so calling it here and in startListener does not mint two
+    // certificates. It reads the same one twice, which is what lets the routes hold the public
+    // fingerprint without the bindings ever touching the private key.
     NODE_FINGERPRINT: ensureCert(dataDir).fingerprint,
     APP_VERSION: appVersion,
     BLOBS: diskBlobCache(blobCachePath),

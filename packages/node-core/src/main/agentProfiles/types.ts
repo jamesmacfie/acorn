@@ -37,9 +37,7 @@ export type AgentProfileContribution = {
   backendPreference: 'node-pty' | 'tmux'
   transport: 'pty'
   mcpRegistration?: (name: string, launcher: Launcher) => Promise<{ ok: boolean; reason?: string }>
-  // Extra argv for the INTERACTIVE launch (docs/notes-and-memory.md). A profile that can be told at
-  // launch to fetch its own task context sets this; that standing instruction can't lose a race with
-  // the user's first message, so such a profile gets no pushed launch-context block (terminal.ts).
+  // Extra argv for the interactive launch (docs/notes-and-memory.md § Context integration).
   launchArgs?: string[]
   headlessArgv?: (command: string, opts: HeadlessOpts) => HeadlessArgv
   resumeArgv?: (command: string, sessionRef: string) => HeadlessArgv
