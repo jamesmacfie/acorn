@@ -1,5 +1,4 @@
-/* COZY — warm and unhurried: a reading serif, generous spacing, low density, soft structure.
- *
+/* Cozy: warm and unhurried, a reading serif, generous spacing, low density, soft structure.
  * This is the pack that leans hardest on the space and density axes, which is why it is the real
  * test of whether --space-*, --row-h and --row-h-virt were tokenised properly. Colour is not set
  * here; Cozy composes with all 12 themes.
@@ -21,7 +20,7 @@
   --marker-w: var(--bw-strong);
   --pane-bw: var(--bw-0);
 
-  /* ── Space — the point of this pack ────────────────────────────────────────────────────── */
+  /* ── Space: the point of this pack ─────────────────────────────────────────────────────── */
   --pane-pad: var(--space-10);
   --pane-pad-y: var(--space-8);
   --gap-inline: var(--space-4);
@@ -53,7 +52,7 @@
   --fs-md: 16px;
   --fs-lg: 18px;
   --fs-xl: 22px;
-  --lh: 1.7;             /* the roomiest line-height of any pack — this IS "cozy" */
+  --lh: 1.7;             /* the roomiest line-height of any pack: this is "cozy" */
   --lh-tight: 1.4;
 
   --label-transform: none;
@@ -73,16 +72,13 @@
   --dur-med: 280ms;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────────────────────
-   ESCAPE HATCH — budget 25 selectors. Currently 2.
-   ───────────────────────────────────────────────────────────────────────────────────────────── */
+/* Escape hatch, budget 25 selectors (docs/ui-design.md § Style packs). Currently 2. */
 
-/* See shell.css: a zero-width grid column still emits its gap. */
+/* docs/ui-design.md § Style packs covers the collapsed-pane gap sliver this guards against. */
 :root[data-style='cozy'] .app.left-collapsed .panes {
   grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
   gap: 0 var(--pane-gap);
 }
 
-/* A serif at 1.7 line-height needs the extra optical breathing room around body copy that a
-   fixed --pane-pad cannot give a nested prose block. */
+/* docs/ui-design.md § Style packs covers why this reaches past the token block for .markdown. */
 :root[data-style='cozy'] .markdown { line-height: var(--lh); }

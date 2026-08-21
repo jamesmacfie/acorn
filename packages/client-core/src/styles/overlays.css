@@ -3,7 +3,7 @@
 .overlay-backdrop {
   position: fixed;
   inset: 0;
-  /* Above the terminal drawer (z 50) and its menu (z 60) — modals always sit on top. */
+  /* Above the terminal drawer (z 50) and its menu (z 60): modals always sit on top. */
   z-index: var(--z-modal);
   display: flex;
   align-items: flex-start;
@@ -31,9 +31,9 @@
   border-bottom: var(--chrome-divider);
 }
 
-/* A loaded plugin's `overlay` frame surface (docs/plugins.md): the host draws the box and the dismiss
-   affordance, the frame draws its contents. An explicit height, not max-height — the iframe inside is
-   100% of its container, and a container sized by its content would size to nothing. */
+/* A loaded plugin's `overlay` frame surface (docs/plugins.md): the host draws the box and the
+   dismiss affordance, the frame draws its contents. See docs/ui-design.md § Chrome and overlays
+   for why this takes an explicit height rather than max-height. */
 .plugin-overlay { height: min(60vh, 520px); }
 .plugin-overlay-head { display: flex; align-items: center; gap: var(--space-4); }
 .plugin-overlay-close { margin-left: auto; }
@@ -43,7 +43,7 @@
 /* Padded body for simple form modals (matches the Integrations settings spacing). */
 /* The body is what scrolls: .overlay caps at 70vh and hides its own overflow, so a form taller than
    that (the panel editor) would be silently clipped with its actions unreachable. min-height:0 is
-   the load-bearing half — a flex child refuses to shrink below its content without it. */
+   the load-bearing half: a flex child refuses to shrink below its content without it. */
 .overlay-body {
   display: flex;
   flex-direction: column;
@@ -70,8 +70,8 @@
   padding: var(--pane-pad);
   overflow-y: auto;
 }
-/* `.help-key` is the chord CAPTURE input in the shortcuts editor as well as a static cap in the
-   overlay, so it keeps its own rule — Kbd renders a <kbd>, and an <input> cannot be one. */
+/* `.help-key` is the chord capture input in the shortcuts editor as well as a static cap in the
+   overlay, so it keeps its own rule: Kbd renders a <kbd>, and an <input> cannot be one. */
 .help-key {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
@@ -84,9 +84,8 @@
 }
 .help-desc { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); align-self: center; }
 
-/* File finder: input header + scrollable result list. */
-/* The `.finder-*` family lived here: a near-duplicate of `.palette-*` for github's file finder.
-   PaletteSurface renders both now. */
+/* File finder: input header + scrollable result list. See docs/ui-design.md § Chrome and overlays
+   for why the `.finder-*` family that used to live here is gone. */
 
 /* @mention autocomplete popup (MentionTextarea.tsx): fixed below the textarea. */
 .mention-popup {
@@ -119,9 +118,8 @@
 .mention-at { color: var(--accent); font-weight: 600; }
 
 /* ── Toast ──────────────────────────────────────────────────────────────────────────────────
-   Bottom-right stack, offset by the terminal drawer's published height so a toast never hides
-   behind it (--term-drawer-h is set on documentElement by the terminal plugin; the fallback covers
-   every surface where that plugin is not mounted). */
+   Bottom-right stack. See docs/ui-design.md § Chrome and overlays for why it is offset by
+   --term-drawer-h. */
 .ui-toast-host {
   position: fixed;
   right: var(--space-8);

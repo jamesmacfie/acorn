@@ -1,21 +1,8 @@
-/* INVARIANT TOKENS — owned by neither axis. A theme may not set these (they are not colour in the
- * palette sense) and a style may not either (they are not aesthetics). styles/tokenAxes.test.ts
- * asserts both.
- */
+/* Invariant tokens, owned by neither axis. See docs/ui-design.md § Token axes for why. */
 :root {
   /* ── Stacking ladder ───────────────────────────────────────────────────────────────────────
-     Collapsed from 28 raw z-index declarations spanning 18 distinct values. The two ordering
-     constraints below are load-bearing, not cosmetic, and are asserted by the test:
-
-       --z-picker > --z-modal   A Picker opened from inside a modal (the Database pane's example
-                                multi-select) is portalled to <body>, so it is a SIBLING of the
-                                backdrop rather than a descendant. Without this it renders behind.
-       --z-drawer-menu > --z-drawer   The terminal drawer's own menu.
-       --z-toast > --z-modal    A toast confirming an action taken inside a modal has to be visible
-                                from inside that modal, or the action reads as having done nothing.
-
-     --z-tooltip is deliberately far above everything: RailTips is a single delegated portal that
-     must never be occluded, and it has no interactive children to trap focus against. */
+     Collapsed from 28 raw z-index declarations spanning 18 distinct values. See docs/ui-design.md
+     § Token axes for why the three orderings below are load-bearing rather than cosmetic. */
   --z-base: 1;
   --z-sticky: 3;
   --z-resizer: 6;
@@ -32,8 +19,8 @@
   --z-tooltip: 1000;
 
   /* ── Brand marks ───────────────────────────────────────────────────────────────────────────
-     Third-party identity, so legitimately NOT themeable — GitHub's black stays black in Nord.
-     Kept as tokens anyway so the "no hex outside the axis files" lint has somewhere to point. */
+     Third-party identity, not themeable: GitHub's black stays black in Nord. See docs/ui-design.md
+     § Token axes for why these are kept as tokens anyway. */
   --brand-github: #24292f;
   --brand-linear: #5e6ad2;
   --brand-rollbar: #f24f4f;

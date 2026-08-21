@@ -45,13 +45,12 @@ describe('langFor', () => {
   })
 })
 
-// The engine, not the mapping. Nothing here can see the renderer's CSP — node runs WebAssembly
-// happily, which is exactly why the Oniguruma failure was invisible until it reached a window — so
-// what this pins is the half a test CAN see: every grammar this build bundles loads under the engine
-// this build chose, and colour comes out the far end.
-//
-// This is the MAIN-THREAD highlighter, which is now the fallback rather than the path: diffs tokenize
-// in highlighter.worker.ts under Oniguruma, and no node-environment test can reach a Worker.
+// The engine, not the mapping. Nothing here can see the renderer's CSP: node runs WebAssembly
+// happily, which is why the Oniguruma failure (docs/diff-rendering.md § Syntax highlighting) was
+// invisible until it reached a window. So what this pins is the half a test can see: every
+// grammar this build bundles loads under the engine this build chose, and colour comes out the
+// far end. This is the main-thread highlighter, now the fallback rather than the path, since no
+// node-environment test can reach a Worker.
 describe('the highlighter itself', () => {
   it('builds and tokenizes with colour once its grammar is asked for', async () => {
     // The argument is the point: grammars load on demand now (langs.ts), so a caller that does not

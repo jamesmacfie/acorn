@@ -1,23 +1,6 @@
-/* THEME AXIS — colour, and only colour (docs/ui-design.md).
- *
- * Selected by `data-theme` on <html> (persistence/appStartup.ts). Orthogonal to the STYLE axis in
- * tokens-style.css: the two token sets are disjoint, so neither can override the other and source
- * order between them does not matter. A theme block may ONLY set colour; it must never set a
- * shape/type/space/density token. `styles/tokenAxes.test.ts` enforces both directions.
- *
- * Light is the :root default; dark applies via prefers-color-scheme (scoped to
- * :root:not([data-theme="light"]) so a forced light theme opts out) and via [data-theme="dark"]
- * (a manual toggle, which wins over the media query).
- *
- * PRIMITIVES vs DERIVED. Only the 21 primitive palette tokens are restated per theme. Derived
- * tokens (--danger, --success, --surface-sunken, …) are declared ONCE on :root as var() references
- * into primitives, so they follow every theme automatically — custom properties resolve lazily at
- * use time. Adding a derived colour is a one-line change, not a 12-block edit.
- *
- * PROTECTED NAMES. --bg, --bg-subtle, --bg-hover, --bg-selected, --text, --text-muted,
- * --text-faint are read from JS via getComputedStyle by the canvas bridges (xterm, Monaco) which
- * cannot use CSS. See BRIDGE_TOKENS in core/client/ui/tokenAxes.ts — renaming one breaks the
- * terminal and the editor with no type error, so the test asserts they exist.
+/* The theme axis: colour, and only colour. Selected by `data-theme` on <html>
+ * (persistence/appStartup.ts). See docs/ui-design.md § Token axes for the contract with
+ * tokens-style.css, the primitives/derived split, the bridge tokens, and dark-mode precedence.
  */
 :root {
   --bg: #ffffff;        --bg-subtle: #fafafa;   --bg-hover: #f6f6f6;   --bg-selected: #eeeeee;
@@ -31,27 +14,25 @@
   --warn: #9a6700;      --badge-border: #d4d4d4;
   --shadow-popover: rgba(0, 0, 0, 0.12);
 
-  /* Self-description. --is-dark replaces the old parseInt() on --bg in
-     plugins/terminal/client/theme.ts, which required --bg to be a literal 6-digit hex and
-     silently classified every theme as light for any other colour syntax. --syntax-fg replaces two
-     hardcoded lists of dark theme *names* (previously duplicated in diff.css + checks-panel.css)
-     that had to be edited every time a dark theme was added. Dark blocks below flip all three. */
+  /* docs/ui-design.md § Token axes covers why these three are self-description rather than
+     colour. Dark blocks below flip all three. */
   --is-dark: 0;
   --color-scheme: light;
   --syntax-fg: var(--l);
 }
 
-/* Derived colour — declared once, follows every theme. These also fill the gaps that used to be
-   referenced-but-undefined, where each call site invented its own fallback hex (two different reds
-   for --danger; a dark-only #111 for --surface-sunken that broke under light themes). */
+/* Derived colour, declared once, following every theme (docs/ui-design.md § Token axes). These
+   also fill gaps that used to be referenced-but-undefined, where each call site invented its own
+   fallback hex (two different reds for --danger; a dark-only #111 for --surface-sunken that broke
+   under light themes). */
 :root {
   --danger: var(--del-marker);
   --danger-fg: var(--del-marker);
   --success: var(--add-marker);
   --success-fg: var(--add-marker);
   --surface-sunken: var(--bg-subtle);
-  /* Text drawn ON --accent. The page background is the established contrast here (see
-     .notify-count). Was a hardcoded #fff, which is unreadable on the light accents — Nord's cyan,
+  /* Text drawn on --accent. The page background is the established contrast here (see
+     .notify-count). Was a hardcoded #fff, which is unreadable on the light accents: Nord's cyan,
      Dracula's purple, Catppuccin Latte's blue. */
   --accent-fg: var(--bg);
 
@@ -61,39 +42,29 @@
   --state-warn: var(--warn);
   --state-bad: var(--del-marker);
 
-  /* Deliberately theme-independent: a find highlight has to stay legible over syntax-coloured
-     code in every theme, and the modal scrim is black in all 12 today. */
+  /* Theme-independent: a find highlight has to stay legible over syntax-coloured code in every
+     theme, and the modal scrim is black in all 12 today. */
   --find-hit-bg: rgba(255, 200, 0, 0.28);
   --find-current-bg: rgba(255, 145, 0, 0.6);
   --scrim-color: #000000;
 }
 
-/* SERIES IDENTITY — chart marks that answer "which series is this", never "how is this doing"
-   (docs/dashboards.md § Views are derived, not chosen from a menu). Deliberately NOT the status tones: a line split by source
-   coloured ok-green and warn-amber reads as a judgement nobody made.
-
-   Defaults, not primitives. A theme block may restate these; none has to, and a plugin-contributed
-   theme cannot (they are outside the manifest's palette contract) — it inherits these. See
-   SERIES_TOKENS in ui/tokenAxes.ts.
-
-   ONE SET, NOT A LIGHT/DARK PAIR, and that is a decision rather than an omission. Half the named
-   themes below are dark; a --dark-* flip would only reach the two default paths and leave Monokai and
-   Nord on the light values anyway. So all three sit at L≈0.6 in oklch, which clears 3:1 — the
-   contrast floor for a graphical object — against BOTH the light ground (#ffffff) and the dark one
-   (#121212), and they are hues no status tone occupies (ok green #1a7f37, warn amber #9a6700, bad red
-   #cf222e, and --accent, which is near-black here).
-
-   The accepted ceiling: holding one lightness for both grounds costs the greyscale separation a
-   three-step lightness ramp would have given, so the three are told apart by hue alone. A pack that
-   wants better on its own ground restates them — that is the calibration knob, and it is why these
-   are tokens. Series four onwards folds to --text-faint. */
+/* Series identity: chart marks that answer "which series is this", never "how is this doing"
+   (docs/dashboards.md § Views are derived, not chosen from a menu; docs/ui-design.md § Token axes
+   for why these are a defaults set rather than a light/dark pair). All three sit at L≈0.6 in
+   oklch, clearing the 3:1 contrast floor against both the light ground (#ffffff) and the dark one
+   (#121212), in hues no status tone occupies (ok green #1a7f37, warn amber #9a6700, bad red
+   #cf222e, and --accent, which is near-black here). Holding one lightness for both grounds costs
+   the grey-scale separation a three-step lightness ramp would have given, so the three are told
+   apart by hue alone; a pack that wants better on its own ground restates them. See SERIES_TOKENS
+   in ui/tokenAxes.ts. Series four onwards folds to --text-faint. */
 :root {
   --viz-series-1: oklch(0.58 0.17 255);
   --viz-series-2: oklch(0.60 0.20 328);
   --viz-series-3: oklch(0.62 0.11 195);
 }
 
-/* Dark token VALUES, defined once as --dark-* (inert until mapped below). Two paths apply them —
+/* Dark token values, defined once as --dark-* (inert until mapped below). Two paths apply them:
    the manual data-theme="dark" toggle and the OS preference (unless forced light); the mappings
    are thin var() indirections so a dark tweak is made in exactly one place. */
 :root {
@@ -124,8 +95,7 @@
   --is-dark: 1;  --color-scheme: dark;  --syntax-fg: var(--r);
 }
 
-/* Pre-JS paint: prefs load asynchronously, so until applyTheme() writes an explicit data-theme the
-   OS preference is the only signal. Keeps a dark-mode user from seeing a white flash on boot. */
+/* docs/ui-design.md § Token axes covers why this has to work before any JavaScript runs. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: var(--dark-bg);        --bg-subtle: var(--dark-bg-subtle);   --bg-hover: var(--dark-bg-hover);   --bg-selected: var(--dark-bg-selected);
@@ -143,7 +113,7 @@
 }
 
 /* Named themes (Settings → Appearance). Each restates the 21 primitives; the dark ones also flip
-   the three self-description tokens. Hand-synced with settings/themes.ts — settings/themes.test.ts
+   the three self-description tokens. Hand-synced with settings/themes.ts: settings/themes.test.ts
    reads this file and fails if the two sets drift. */
 :root[data-theme="solarized-light"] {
   --bg: #fdf6e3;        --bg-subtle: #f5eeda;   --bg-hover: #eee8d5;   --bg-selected: #e3ddc8;

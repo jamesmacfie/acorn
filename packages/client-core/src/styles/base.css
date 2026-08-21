@@ -24,7 +24,7 @@ body {
 
 /* Unicode glyphs that are still text, not icons: state markers with no Lucide equivalent worth the
    swap (◆/◇ pin state, ⊘/◉ hidden, ⎇, ▦) plus every inline literal this pass left alone. The brand
-   marks used to live here too and no longer do — they are path data now, see ui/brandMarks.ts.
+   marks used to live here too and no longer do; they are path data now, see ui/brandMarks.ts.
    These only align on a mono stack, so they stay pinned to --font-glyph even when a pack takes the
    surrounding chrome sans. ui/Icon.tsx emits this class on its fallback path.
    See docs/ui-design.md § Icons. */
@@ -33,7 +33,7 @@ body {
   font-variant-numeric: var(--tabular);
 }
 
-/* An Icon rendered inline with text sits slightly low without this — an em-sized svg aligns its
+/* An Icon rendered inline with text sits slightly low without this: an em-sized svg aligns its
    bottom edge to the baseline, where a glyph would have a descender below it. */
 svg.glyph,
 .glyph > svg {
@@ -41,16 +41,10 @@ svg.glyph,
 }
 
 /* ── Null defaults ──────────────────────────────────────────────────────────────────────────
-   Nothing in the app sets `transform` on hover, so a token alone could not add one — a pack would
-   have to ship an override rule per selector. Declaring the property once at `none` costs nothing
-   (no compositing layer is created for `transform: none`) and turns "Cute has a springy press"
-   into a one-line token change. Extend this block rather than adding rules to a pack.
-
-   HAZARD: `:where()` contributes no specificity, but `:hover:not(:disabled)` still totals (0,2,0)
-   — enough to beat a plain `.some-button { transform: … }` at (0,1,0). So a <button> or <a> that
-   relies on a transform for POSITIONING would snap back to none while hovered. Nothing does today
-   (the only positioning transform is on .rail-tip, a div).
-   If you need to position an interactive element, use inset/margin, not transform. */
+   See docs/ui-design.md § Style packs for the null-default pattern and the specificity hazard for
+   an element that relies on `transform` for positioning while hovered. Nothing does today; the
+   only positioning transform is on .rail-tip, a div. Extend this block rather than adding an
+   override rule to a pack. */
 :where(button, a, .ui-row):hover:not(:disabled) { transform: var(--hover-lift); }
 :where(button, .ui-row):active:not(:disabled) { transform: var(--press-scale); }
 
@@ -62,7 +56,7 @@ svg.glyph,
 /* ── Global utilities ─────────────────────────────────────────────────────────────────────── */
 /* Four idioms that had no shared home, so thirteen plugins retyped them: roughly a hundred rules
    between them and none of it domain logic. They are classes rather than props because they apply
-   to arbitrary elements — a <span>, a <ul>, a scroll container — and carry no semantics a component
+   to arbitrary elements, a <span>, a <ul>, a scroll container, and carry no semantics a component
    could own. Anything with meaning (a row, a label, a code block) is a primitive instead. */
 .muted { color: var(--text-muted); }
 .placeholder { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--pane-pad); }
@@ -71,7 +65,7 @@ svg.glyph,
    refuses to shrink below its content and the ellipsis never appears. */
 .truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* The flex child that scrolls. `min-height: 0` for the same reason — a flex item's default
+/* The flex child that scrolls. `min-height: 0` for the same reason: a flex item's default
    `min-height: auto` floors it at content height, so the parent scrolls instead of the child. */
 .scroll { flex: 1; min-height: 0; overflow-y: auto; }
 

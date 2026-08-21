@@ -1,9 +1,6 @@
-/* CUTE — rounded and playful: chunky radii, pill chrome, a springy press.
- *
- * The pack that exercises the radius and motion axes hardest. The springy hover/press comes from
- * the null-default `transform` declarations in base.css — nothing in the app sets transform on
- * hover, so a token alone could not add one; base.css declares it at `none` and this pack just
- * fills the token in. That is the pattern to reuse for any property no rule currently declares.
+/* Cute: rounded and playful, chunky radii, pill chrome, a springy press.
+ * The pack that exercises the radius and motion axes hardest. See docs/ui-design.md § Style packs
+ * for why the springy hover/press comes from a null default in base.css rather than a rule here.
  */
 :root[data-style='cute'] {
   /* ── Shape ─────────────────────────────────────────────────────────────────────────────── */
@@ -17,7 +14,7 @@
   --radius-chip: var(--radius-pill);
   --radius-marker: var(--radius-sm);
 
-  --divider-w: var(--bw-0);      /* no rules at all — shapes do the separating */
+  --divider-w: var(--bw-0);      /* no rules at all: shapes do the separating */
   --marker-w: var(--bw-0);
   --pane-bw: var(--bw);
   --pane-divider-w: var(--bw);
@@ -66,7 +63,7 @@
   --scrim-filter: blur(6px);
   --focus-ring-offset: 3px;
 
-  /* ── Motion — the springy bit ──────────────────────────────────────────────────────────── */
+  /* ── Motion: the springy bit ───────────────────────────────────────────────────────────── */
   --dur-short: 180ms;
   --dur-med: 260ms;
   --ease-interactive: var(--ease-spring);
@@ -74,18 +71,16 @@
   --press-scale: scale(0.97);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────────────────────
-   ESCAPE HATCH — budget 25 selectors. Currently 2.
-   ───────────────────────────────────────────────────────────────────────────────────────────── */
+/* Escape hatch, budget 25 selectors (docs/ui-design.md § Style packs). Currently 2. */
 
-/* See shell.css: a zero-width grid column still emits its gap. */
+/* docs/ui-design.md § Style packs covers the collapsed-pane gap sliver this guards against. */
 :root[data-style='cute'] .app.left-collapsed .panes {
   grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
   gap: 0 var(--pane-gap);
 }
 
-/* With --marker-w: 0 there is no accent bar, so selection has to read from the fill; the rounded
-   pill shape also needs the row inset from the pane edge or the corners clip. */
+/* docs/ui-design.md § Style packs covers why selection needs to read from the fill here; the
+   rounded pill shape also needs the row inset from the pane edge or the corners clip. */
 :root[data-style='cute'] .ui-row[data-selected] {
   background: color-mix(in srgb, var(--accent) 16%, var(--bg));
   border-radius: var(--radius-pill);

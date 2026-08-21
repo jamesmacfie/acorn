@@ -1,22 +1,7 @@
-/* STYLE AXIS — shape, typography, space, density, chrome, motion. Never colour.
- *
- * Selected by `data-style` on <html> (persistence/appStartup.ts). Orthogonal to the THEME axis in
- * tokens-theme.css: the two token sets are disjoint, so neither can override the other and source
- * order between them does not matter. A style pack may ONLY set tokens declared here; it must
- * never set a palette token and must never contain a colour literal. Both directions are enforced
- * by styles/tokenAxes.test.ts.
- *
- * EVERY style token has a value in this file. Packs only override. That completeness contract is
- * what makes it impossible for a pack to leave a var() undefined — the failure mode this codebase
- * already had eight times over (--fs-xs alone had 25 uses and no definition).
- *
- * THIS FILE IS THE 'terminal' PACK. There is no style-terminal.css: Terminal is the attribute-less
- * default, exactly as `light` is for themes. That is also why no FOUC script is needed — a fresh
- * install paints correctly before any JS runs.
- *
- * COLOUR INDIRECTION IS LEGAL, COLOUR LITERALS ARE NOT. --card-bg: var(--bg-subtle) is a style
- * decision ("in this aesthetic a card sits on the secondary surface") while the theme still owns
- * what the secondary surface *is*. --card-bg: #fafafa would not be.
+/* The style axis: shape, typography, space, density, chrome, motion. Never colour.
+ * Selected by `data-style` on <html> (persistence/appStartup.ts). See docs/ui-design.md
+ * § Token axes for the contract with tokens-theme.css and for why this file is also the
+ * Terminal pack.
  */
 :root {
   /* ── Shape ─────────────────────────────────────────────────────────────────────────────────
@@ -27,42 +12,38 @@
   --radius-lg: 8px;   --radius-xl: 12px;  --radius-pill: 999px;  --radius-circle: 50%;
 
   --radius-control: var(--radius-md);      /* buttons, inputs, selects */
-  --radius-surface: var(--radius-0);       /* panes and cards — Terminal is square */
+  --radius-surface: var(--radius-0);       /* panes and cards, Terminal is square */
   --radius-popover: var(--radius-md);      /* menus, tooltips, modals */
-  --radius-chip: var(--radius-md);         /* AESTHETIC: a chip may be square or a pill */
-  --radius-pill-fixed: var(--radius-pill); /* SEMANTIC: a capsule in every pack */
+  --radius-chip: var(--radius-md);         /* aesthetic: a chip may be square or a pill */
+  --radius-pill-fixed: var(--radius-pill); /* semantic: a capsule in every pack */
   --radius-marker: var(--radius-xs);       /* word-diff spans, tiny bars */
   /* Legacy alias, still ~57 call sites. All of them are controls and chips (the floating
      surfaces were promoted to --radius-popover), so it points at --radius-control rather than
-     the raw scale rung — a pack that changes control rounding now moves them too. */
+     the raw scale rung, so a pack that changes control rounding now moves them too. */
   --radius: var(--radius-control);
 
   --bw-0: 0;  --bw: 1px;  --bw-strong: 2px;  --bw-marker: 3px;
 
-  --divider-w: var(--bw);          /* list-row separators — a pack may zero these … */
+  --divider-w: var(--bw);          /* list-row separators, a pack may zero these */
   --chrome-divider-w: var(--bw);   /* … without losing topbar / section-header structure */
   --pane-divider-w: var(--bw);     /* the .pane border-right */
-  --pane-bw: var(--bw-0);          /* the other three pane edges — Modern: var(--bw) */
+  --pane-bw: var(--bw-0);          /* the other three pane edges, Modern: var(--bw) */
   --control-bw: var(--bw);
   --surface-bw: var(--bw);         /* cards, popovers, modals */
-  --marker-w: var(--bw-marker);    /* active-row left rule — Modern/Cute zero this */
-  /* SEMANTIC sibling of --marker-w, and no pack may zero it. --marker-w says "this row is
-     selected", which a pack can legitimately express as a fill instead; --stripe-w carries
-     information in its COLOUR (a workspace's identity colour, warn-vs-sent on a review note),
-     so zeroing it deletes state rather than restyling it. */
+  --marker-w: var(--bw-marker);    /* active-row left rule, Modern/Cute zero this */
+  /* docs/ui-design.md § Border roles covers why --stripe-w is a semantic sibling of --marker-w
+     that no pack may zero. */
   --stripe-w: var(--bw-marker);
   --tab-active-w: var(--bw-strong);
 
-  /* The four composite border recipes, covering ~380 declarations between them. Splitting by ROLE
-     rather than by colour is what lets Modern drop row dividers (--divider-w: 0) while keeping the
-     topbar rule, and give inputs a filled background while surfaces lose their border for a shadow. */
+  /* docs/ui-design.md § Border roles covers why these four recipes split by role. */
   --divider: var(--divider-w) solid var(--border);              /* row / list separators */
   --chrome-divider: var(--chrome-divider-w) solid var(--border); /* topbar, section headers */
   --control-border: var(--control-bw) solid var(--border-strong); /* inputs, buttons */
   --surface-border: var(--surface-bw) solid var(--border-strong); /* popovers, modals, cards */
 
   /* ── Space ─────────────────────────────────────────────────────────────────────────────────
-     Semantics are restated per pack, NOT derived from a --density multiplier. calc() against a
+     Semantics are restated per pack, not derived from a --density multiplier. calc() against a
      scalar yields fractional pixels, which blur 1px borders on non-retina and make every computed
      value unreadable in devtools. Fourteen literal lines per pack is the cheaper trade. */
   --space-0: 0;    --space-1: 2px;  --space-2: 4px;  --space-3: 6px;
@@ -75,7 +56,7 @@
   --gap-row: var(--space-4);
   --gap-stack: var(--space-5);
   --gap-section: var(--space-7);
-  /* Inline only — control height is --control-h (see .ui-btn in primitives.css). */
+  /* Inline only: control height is --control-h (see .ui-btn in primitives.css). */
   --pad-control: 0 var(--space-4);
   --pad-control-lg: 0 var(--space-6);
   --pad-chip: 0 var(--space-4);
@@ -84,13 +65,13 @@
   --pad-body: var(--pane-pad);
 
   /* ── Density ───────────────────────────────────────────────────────────────────────────────
-     --row-h-virt is deliberately separate from --row-h: virtualized lists read it from JS
+     --row-h-virt is kept separate from --row-h: virtualized lists read it from JS
      (core/client/ui/metrics.ts) because they apply an inline height that beats any CSS rule, so
-     the two must be able to move independently during migration. */
+     the two need to be able to move independently during migration. */
   --row-h: 36px;
   --row-h-sm: 30px;
   --row-h-virt: 36px;
-  /* The BUTTON height (primitives.css .ui-btn), and the square side of an icon-only one. */
+  /* The button height (primitives.css .ui-btn), and the square side of an icon-only one. */
   --control-h: 32px;
   --control-h-sm: 26px;
   --control-h-xs: 20px;
@@ -108,17 +89,15 @@
   --avatar-sm: 18px;
   --avatar-md: 24px;
   --diff-line-h: 20px;
-  /* xterm renders to a canvas and cannot read CSS, so TerminalSurface reads this via
-     metrics.ts. Listed in BRIDGE_TOKENS for that reason. */
+  /* docs/ui-design.md § Token axes covers why --term-fs is a bridge token. */
   --term-fs: 15px;
 
   /* ── Typography ────────────────────────────────────────────────────────────────────────────
-     --font-mono is PROTECTED: code, diffs, the terminal and the SQL grid are monospace in every
-     pack, because their alignment is load-bearing and xterm measures cell width from the font.
-     Packs change --font-ui. --font-glyph keeps the remaining Unicode glyphs (◆ ◇ ⊘ ◉ ▦ ⎇) on a mono
-     stack even when the chrome goes sans — those box-drawing characters only align there. The brand
-     marks that used to be on this list are path data now (ui/brandMarks.ts), but the token still
-     earns its keep: pin state, dirty markers, notification and task-state glyphs are all still text. */
+     docs/ui-design.md § Token axes covers why --font-mono cannot be repointed by a style pack.
+     --font-glyph keeps the remaining Unicode glyphs (◆ ◇ ⊘ ◉ ▦ ⎇) on the same mono stack even when
+     the chrome goes sans, since those box-drawing characters only align there. The brand marks
+     that used to be on this list are path data now (ui/brandMarks.ts), but the token still earns
+     its keep: pin state, dirty markers, notification and task-state glyphs are all still text. */
   --font-mono: "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --font-ui: var(--font-mono);
   --font-glyph: var(--font-mono);
@@ -129,7 +108,7 @@
   --lh: 1.5;  --lh-tight: 1.25;  --lh-diff: 1.45;
   --fw-normal: 400;  --fw-medium: 500;  --fw-semibold: 600;  --fw-bold: 700;
 
-  /* The uppercase-tracked-mono label IS the Terminal look. One token turns it into Modern's
+  /* The uppercase-tracked-mono label is the Terminal look. One token turns it into Modern's
      sentence case app-wide: a sweep for uppercase JSX literals finds exactly one hit, and it's
      the acronym "CPU". Everything else is text-transform. */
   --label-transform: uppercase;
@@ -170,11 +149,12 @@
   --scrim: color-mix(in srgb, var(--scrim-color) calc(var(--scrim-alpha) * 100%), transparent);
   --scrim-filter: none;
 
-  /* Which theme slot fills a role. Style-owned indirection — never a colour literal. */
+  /* Which theme slot fills a role: style-owned indirection, never a colour literal (see the file
+     header, above). */
   --card-bg: var(--bg);
   --pane-bg: var(--bg);
   --popover-bg: var(--bg);
-  --input-bg: var(--bg-subtle); /* the shared input surface — .integration-key-input's background */
+  --input-bg: var(--bg-subtle); /* the shared input surface, .integration-key-input's background */
   --chip-bg: var(--bg-subtle);
 
   /* Shell geometry. --shell-pad + --pane-gap are what turn the flat three-pane grid into inset
@@ -184,11 +164,8 @@
   --pane-radius: var(--radius-surface);
 
   /* ── Motion ────────────────────────────────────────────────────────────────────────────────
-     --hover-lift / --press-scale default to `none` and are applied by null-default declarations
-     in base.css. Nothing sets transform today, so a token alone could not add one; declaring it
-     once at `none` costs nothing (no compositing layer) and means a pack that wants a lift sets a
-     token instead of writing an override rule. That pattern generalises: whenever a pack needs a
-     property nobody declares, add the null default here — never an override in the pack. */
+     --hover-lift / --press-scale are applied by the null-default declarations in base.css. See
+     docs/ui-design.md § Style packs for the null-default pattern this follows. */
   --dur-instant: 0ms;  --dur-short: 150ms;  --dur-med: 220ms;  --dur-long: 320ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);

@@ -1,6 +1,5 @@
-/* MODERN - the shadcn / Tailwind-UI register: sans type, real radii, card surfaces, soft elevation,
+/* Modern: the shadcn / Tailwind-UI register, sans type, real radii, card surfaces, soft elevation,
  * roomier rows, sentence-case labels.
- *
  * No colour here. Every value below is a scalar or a var() pointing at a theme slot, so Modern composes
  * with all 12 themes. styles/tokenAxes.test.ts enforces that.
  */
@@ -79,29 +78,22 @@
   --ease-interactive: var(--ease-in-out);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────────────────────
-   ESCAPE HATCH — every rule here is a bug report against the token vocabulary.
-   Budget: 25 selectors (asserted by styles/tokenAxes.test.ts). Currently 3.
-   ───────────────────────────────────────────────────────────────────────────────────────────── */
+/* Escape hatch, every rule here is a bug report against the token vocabulary. Budget 25 selectors
+   (docs/ui-design.md § Style packs). Currently 3. */
 
-/* A zero-width grid column still emits its gap, so collapsing the left pane would otherwise leave
-   an 8px sliver where the pane was. shell.css flags this for exactly this reason. */
+/* docs/ui-design.md § Style packs covers the collapsed-pane gap sliver this guards against. */
 :root[data-style='modern'] .app.left-collapsed .panes {
   grid-template-columns: 0 clamp(360px, 23vw, 430px) minmax(0, 1fr);
   gap: 0 var(--pane-gap);
 }
 
-/* Rows lose their left marker bar (--marker-w: 0), so selection needs to read from the fill alone.
-   A plain --bg-selected is too quiet once rows are inset cards. */
+/* docs/ui-design.md § Style packs covers why selection needs to read from the fill here. */
 :root[data-style='modern'] .ui-row[data-selected] {
   background: color-mix(in srgb, var(--accent) 12%, var(--bg));
   border-radius: var(--radius-control);
 }
 
-/* Buttons read as filled affordances rather than outlined ones. `solid` is excluded as well as
-   `bare`: this selector is (0,3,0) and the variant's own `background: var(--accent)` is (0,2,0), so
-   without the exclusion the pack repaints every solid button in --bg-subtle and leaves its
-   --accent-fg label invisible on it (the Database pane's Save/Generate/Execute). */
+/* docs/ui-design.md § Style packs covers why `solid` is excluded here as well as `bare`. */
 :root[data-style='modern'] .ui-btn:not([data-variant='bare']):not([data-variant='solid']) {
   background: var(--bg-subtle);
   font-weight: var(--fw-medium);
