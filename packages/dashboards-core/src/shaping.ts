@@ -6,16 +6,10 @@ import type {
 } from '@acorn/protocol/collections.ts'
 import type { PanelAggregate, PanelFilter, PanelShaping, PanelTone, PanelView } from './model'
 
-// The shaping layer: filter, sort, limit, visible-field projection. See docs/dashboards.md § Panels.
-//
-// Generic and identical for every collection, and client-side over the returned rows as the baseline.
-// A collection may declare params that narrow its answer, but that is an optimisation it offers, never
-// a requirement. The semantics are the same either way, which stops "filter" meaning one thing on
-// github and another on linear.
-//
-// Every function here is pure over `(rows, schema, shaping)`. Vitest in this repo runs in node with no
-// Solid plugin, so a component test proves nothing about rendering, and the only way this logic gets
-// checked is by living outside a component.
+// The shaping layer: filter, sort, limit, visible-field projection, generic and identical for every
+// collection. See docs/dashboards.md § Panels for why shaping is client-side with server params as
+// an optional optimisation, and § The generated editor for why this logic is pure functions tested
+// outside the component.
 
 const fieldsById = (schema: PluginCollectionSchema): Map<string, PluginCollectionField> =>
   new Map(schema.fields.map((field) => [field.id, field]))
@@ -156,20 +150,15 @@ export const fieldWithRole = (
 
 // ── Grouping ──────────────────────────────────────────────────────────────────────────────────
 //
-// ── Grouping ──────────────────────────────────────────────────────────────────────────────────
-//
-// A kanban is not a component, it is group-by over a field with finite values. Everything a board
-// draws comes out of this function and the ordinary shaping above it: the columns are the grouped
-// field's declared values in declaration order, and the cards inside a column are the already
-// filtered, already sorted rows in the order they arrived. There is no per-column sort or filter to
-// implement. See docs/dashboards.md § Views are derived, not chosen from a menu.
+// See docs/dashboards.md § Views are derived, not chosen from a menu for why a board is group-by
+// over a finite-valued field, not a component.
 
 /** The fields a board may be keyed by: the ones with finite values.
  *
- *  ponytail: `enum` only. `boolean` is finite too, and a two-column yes/no board is a real thing
- *  someone will eventually want, but it has no declared labels or tones, so it would need a
- *  synthesised pair of values that no other part of this layer has. Upgrade path: synthesise them
- *  here, where every caller already asks this one question. */
+ *  `enum` only. `boolean` is finite too, and a two-column yes/no board is a real thing someone will
+ *  eventually want, but it has no declared labels or tones, so it would need a synthesised pair of
+ *  values that no other part of this layer has. Upgrade path: synthesise them here, where every
+ *  caller already asks this one question. */
 export const groupableFields = (schema: PluginCollectionSchema): PluginCollectionField[] =>
   schema.fields.filter((field) => field.type === 'enum')
 

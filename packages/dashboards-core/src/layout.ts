@@ -1,29 +1,20 @@
 import type { PanelId } from './model'
 
 // Grid geometry: where a panel sits in a placement, and what happens to its neighbours when it is
-// moved or resized. Push-down, the right wall, gravity, and why a plugin has no say over a rect are
-// all in docs/dashboards.md § The grid.
-//
-// Everything here is a pure function over `{ order, rects }`, the same rule shaping.ts and mapping.ts
-// follow: vitest in this repo runs in node with no Solid plugin, so anything that lived inside the
-// grid component would be unchecked. The components own pointer math and pixels and contain no layout
-// arithmetic of their own.
+// moved or resized. See docs/dashboards.md § The grid, and § The generated editor for why this
+// logic is pure functions outside the grid component.
 
-/** Fixed, not responsive. 12 divides into halves, thirds, quarters and sixths, and a fixed count is
- *  what makes a rect meaningful across window sizes and across the clients that share the blob.
- *  Grafana's 24 buys precision nobody asked for at twice the drag fussiness.
- *
- *  A constant rather than config, since there is one placement kind's worth of grid. */
+/** Fixed, not responsive. See docs/dashboards.md § The grid for why 12 columns. A constant rather
+ *  than config, since there is one placement kind's worth of grid. */
 export const COLS = 12
 
 /** All four in cells, all non-negative integers. No pixel is ever persisted: the cell size is derived
  *  from the container at render time. */
 export type Rect = { x: number; y: number; w: number; h: number }
 
-/** One placement's geometry. `order` is canonical for reading order, and is what a client with no
- *  rects renders by; `rects` is what this module arranges. An id in `order` with no rect is the normal
- *  case, not an error. It is the migration, the recovery from a write by a client without rects, and
- *  the new-panel default, all at once. */
+/** One placement's geometry: `order` is canonical for reading order and what a client with no rects
+ *  renders by; `rects` is what this module arranges. An id in `order` with no rect is normal, not an
+ *  error (docs/dashboards.md § Persistence). */
 export type PanelLayout = {
   order: readonly PanelId[]
   rects: Readonly<Record<PanelId, Rect>>

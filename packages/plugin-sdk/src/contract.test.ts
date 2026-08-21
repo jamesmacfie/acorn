@@ -3,16 +3,13 @@ import * as sdk from './index.ts'
 import type * as Published from './public.ts'
 import type { AcornBridge, PluginFrameContext } from './index.ts'
 
-// The drift lock for the hand-written published declaration.
+// The drift lock for the hand-written published declaration. See docs/plugins.md § What is
+// published, and what acorn promises about it for why public.ts is hand-written, and what gap this
+// closes that the surface snapshot can't see.
 //
-// `public.ts` is copied verbatim to `dist/sdk.d.ts`, so it's what every out-of-tree plugin type-checks
-// against. Nothing in the compiler connects it to the implementation, which is the price of not running
-// a declaration rollup, so the connection is made here and `tsc --noEmit` enforces it. A shape that
-// moves underneath a stable name fails at the assignment below, which is the gap the surface snapshot
-// can't see: it pins names, and names aren't what breaks a stranger's build.
-//
-// Assignability is asserted in both directions per type. One direction alone passes happily when the
-// published type is a subset: drop a method from `ui` and the published bridge still accepts a real one.
+// Assignability is asserted in both directions per type: one direction alone passes happily when the
+// published type is a subset, so dropping a method from `ui` would still let the published bridge
+// accept a real one.
 
 /** Both directions means structurally identical. A type error here is the point of the file. */
 type Mutual<A, B> = [A extends B ? true : never, B extends A ? true : never]

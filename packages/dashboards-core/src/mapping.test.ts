@@ -364,8 +364,7 @@ describe('value mapping onto the user’s own columns', () => {
   })
 
   it('keeps a reserved writeValue when the values under it are emptied', () => {
-    // Nothing writes it yet, and the shape has to survive being edited or it is not reserved at all
-    // (docs/future/dashboards/write-back.md).
+    // Nothing writes it yet, and the shape has to survive being edited or it isn't reserved at all.
     const reserved: PanelMapping = {
       columns: todoColumns,
       bySource: { 'github:pulls-mine': { c4: { values: ['ready'], writeValue: 'merged' } } },

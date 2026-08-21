@@ -80,8 +80,6 @@ export function activityPoints(
 
 // ── The mark ──────────────────────────────────────────────────────────────────────────────────
 //
-// ── The mark ──────────────────────────────────────────────────────────────────────────────────
-//
 // Abstract units, scaled uniformly by the SVG to whatever the stat body has, the same trade `CHART_BOX`
 // takes. At this size letterboxing is invisible. No axes, no grid, no ticks: the stat's number is the
 // axis.
@@ -165,13 +163,9 @@ export const COMPARE_LABELS: Record<NonNullable<PanelView['compare']>, string> =
   week: 'last week',
 }
 
-/** The baseline is a point looked up, never a window aggregated. "Vs last week" is the sample nearest
- *  to one week ago, not an average of last week: window aggregates drag in bucket alignment, partial
- *  windows, timezone edges and per-panel aggregation config, which are a metrics product's problems.
- *  Datadog's Query Value change mode and Grafana's stat-plus-timeShift both do the same thing.
- *
- *  Searched no further back than twice the window, so a series with a three-week hole says nothing
- *  rather than comparing today against a number from a different month. */
+/** The baseline is a point looked up, never a window aggregated. See docs/dashboards.md § Trends for
+ *  why, and searched no further back than twice the window, so a series with a three-week hole says
+ *  nothing rather than comparing today against a number from a different month. */
 export function baselineValue(
   samples: readonly MeasureSample[],
   compare: NonNullable<PanelView['compare']>,
@@ -191,9 +185,8 @@ export function baselineValue(
 export type TrendDelta = {
   /** Current live measure minus the baseline. Signed; zero is a real answer and says "unchanged". */
   change: number
-  /** `muted` unless the panel declared which direction is good. Direction-goodness is not guessable,
-   *  since open PRs going up is bad for one person's board and good for another's, so an absent `good`
-   *  renders in neutral ink rather than a guessed green. */
+  /** `muted` unless the panel declared which direction is good. See docs/dashboards.md § Trends for
+   *  why direction-goodness isn't guessable. */
   tone: 'ok' | 'bad' | 'muted'
 }
 

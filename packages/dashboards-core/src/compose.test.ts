@@ -7,8 +7,8 @@ import {
   viewsForCollection,
 } from './compose'
 
-// The chrome's own logic. The components around it cannot be rendered here — vitest runs in node
-// with no Solid plugin — so a green suite says nothing about what Home looks like. What it does say
+// The chrome's own logic. The components around it can't be rendered here: vitest runs in node
+// with no Solid plugin, so a green suite says nothing about what Home looks like. What it does say
 // is that the arithmetic and the derivations behind the menu and the picker are right.
 
 // The registry's contribution shape, minus the `fetch` this package has no business knowing about.

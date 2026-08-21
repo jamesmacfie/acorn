@@ -197,7 +197,7 @@ describe('grouping: a board is group-by, not a component', () => {
     const columns = boardColumns(drifted, status)
     expect(columns.map((column) => column.id)).toEqual(['draft', 'open', 'ready', 'archived'])
     const extra = columns[3]
-    // Not pre-toned and not pre-ordered — the schema never promised it — but it is on the board.
+    // Not pre-toned and not pre-ordered, since the schema never promised it, but it is on the board.
     expect(extra.declared).toBe(false)
     expect(extra.tone).toBe('muted')
     expect(extra.label).toBe('archived')
@@ -226,7 +226,7 @@ describe('grouping: a board is group-by, not a component', () => {
     const catchAll = columns[3]
     expect(catchAll.label).toBe('Uncategorised')
     expect(catchAll.rows.map((entry) => entry.id)).toEqual(['n1', 'n2', 'n3'])
-    // Every row lands somewhere. That IS the rule — an unmapped value is never silently dropped.
+    // Every row lands somewhere. That is the rule: an unmapped value is never silently dropped.
     expect(columns.reduce((total, column) => total + column.rows.length, 0)).toBe(withGaps.length)
   })
 })

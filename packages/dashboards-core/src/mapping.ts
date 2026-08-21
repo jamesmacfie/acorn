@@ -12,24 +12,10 @@ import {
   type PanelQuery,
 } from './model'
 
-// The mapping layer (docs/dashboards.md § The mapping layer, and cross-source panels). It sits between
-// queries and shaping, is owned by the host, and is entirely declarative.
-//
-// It exists for one scenario: a personal todo board whose columns are the user's own invention,
-// populated by github pull requests and linear issues, with each provider's statuses mapped onto those
-// columns. The property that makes it work: neither plugin knows the other exists, and no wire format
-// grew. Cross-source composition is a client feature. Nothing here is reachable from a manifest, and a
-// change here that wants a new protocol field is the design failing.
-//
-// Three sub-layers, in the order they apply to a row:
-//
-//   field mapping   per source, which of its fields feeds each panel-local field. Pre-filled from the
-//                   declared roles, which is the only reason roles exist.
-//   value mapping   per source, which of its enum values land in each of the panel's columns.
-//   derived enum    the columns themselves: ids and labels the user invented, belonging to no plugin.
-//
-// Everything here is pure over `(sources, mapping)`, because vitest in this repo runs in node with no
-// Solid plugin, so anything inside a component is unchecked.
+// The mapping layer: field mapping, value mapping, derived enum, in that order. See
+// docs/dashboards.md § The mapping layer, and cross-source panels for what each layer does and why.
+// Pure over `(sources, mapping)`, tested outside the component for the reason docs/dashboards.md §
+// The generated editor gives.
 
 /** One source's answer, as the mapping layer sees it. */
 export type PanelSourcePage = {
@@ -40,21 +26,13 @@ export type PanelSourcePage = {
 
 // ── The panel-local field vocabulary ──────────────────────────────────────────────────────────
 //
-// ── The panel-local field vocabulary ──────────────────────────────────────────────────────────
-//
-// A mapped panel's fields are the role vocabulary and nothing else. That's a real ceiling, and the one
-// the design pays for: a role is the only thing two independently-written collections agree about, so
-// it's the only thing the host can align without asking. github's `repo` and linear's `identifier` are
-// both text and both useful, and neither has a panel-local home.
-//
-// Five role fields, fixed, plus however many the user invented (`mapping.extraFields`). An invented
-// field is the same matrix one row longer, with the person answering the question the role would have
-// answered. Nothing about the wire changed to allow it.
+// Five role fields, fixed, plus however many the user invented (`mapping.extraFields`). See
+// docs/dashboards.md § The mapping layer, and cross-source panels for why the vocabulary is capped
+// at roles.
 
 const ROLE_FIELDS = [
   { id: 'title', name: 'Title', type: 'text', role: 'title' },
-  // The one that's also the derived enum. Its values are the user's columns rather than any
-  // provider's, which is what makes a mapped board the user's board.
+  // Also the derived enum. See docs/dashboards.md § The mapping layer, and cross-source panels.
   { id: 'status', name: 'Status', type: 'enum', role: 'status' },
   { id: 'assignee', name: 'Assignee', type: 'person', role: 'assignee' },
   { id: 'updated', name: 'Updated', type: 'datetime', role: 'updated' },
@@ -66,23 +44,10 @@ export const PANEL_FIELDS: readonly PluginCollectionField[] = ROLE_FIELDS
 /** The panel-local field the derived enum lives on, and therefore what a mapped board groups by. */
 export const PANEL_STATUS_FIELD_ID = 'status'
 
-/** Where a row came from, as an ordinary panel-local field (docs/dashboards.md § Provenance, and what a row may not claim).
- *
- *  A row's source is provenance, not a field, so "split this line by github vs linear" was
- *  unexpressible because `series` names a field. Rather than a special case in the chart, provenance
- *  becomes a field where fields already grow, and then everything downstream works uninvented:
- *  `series` can name it, `groupBy` can, filters can (hide one source without unmapping it), and the
- *  projection can (the Source column, which used to be hardcoded in TableView).
- *
- *  Three properties hold, each deliberate:
- *
- *    Fed by the host's stamp, never by a mapping row. The matrix has no row for it because there's
- *    nothing to answer: it's never absent and never user-fed.
- *
- *    No tone. Provenance is identity, not status: github isn't "ok" and linear isn't "warn". The
- *    chart's series ramp colours it; the status vocabulary doesn't.
- *
- *    Multi-source only. A split over one source is a no-op, and the enum would carry a single value.
+/** Where a row came from, as an ordinary panel-local field, fed by the host's stamp described in
+ *  docs/dashboards.md § Provenance, and what a row may not claim. See docs/dashboards.md § The
+ *  mapping layer, and cross-source panels for why source is a field rather than a special case, and
+ *  why it carries no tone.
  *
  *  No id collision is possible: panel-local ids never cross the wire, and an invented field's id is
  *  minted (`newColumnId`) rather than typed. */
@@ -136,12 +101,9 @@ export const isMapped = (queries: readonly PanelQuery[], mapping: PanelMapping |
 
 // ── Field mapping ─────────────────────────────────────────────────────────────────────────────
 
-/** Which of a source's fields feeds a panel-local field.
- *
- *  The role is the default rather than a one-time copy into the config, so a panel that never opened
- *  the mapping step still unions correctly, and a plugin that later moves a role onto a different field
- *  follows. `''` is the user saying "this source has nothing here", which is why an explicit empty
- *  string differs from an absent key. */
+/** Which of a source's fields feeds a panel-local field. See docs/dashboards.md § The mapping layer,
+ *  and cross-source panels for why the role is the runtime default rather than a copy, and what an
+ *  explicit `''` means. */
 export function sourceFieldFor(
   source: PanelSourcePage,
   panelFieldId: string,
@@ -311,20 +273,16 @@ export function panelSchema(
 
 /** Every source's rows as one list of panel-local rows.
  *
- *  Three rules hold across this:
+ *  Provenance is the host's stamp (docs/dashboards.md § Provenance, and what a row may not claim):
+ *  `pluginId` and `collectionId` are copied off the row the host stamped when it parsed the response
+ *  (plugins/chrome/data.ts), never off the response body.
  *
- *    Provenance is the host's stamp. `pluginId` and `collectionId` are copied off the row the host
- *    stamped when it parsed the response (plugins/chrome/data.ts), never off the response body. The
- *    wire schema doesn't carry the two fields, so a body that states them has them stripped. It's what
- *    routes a card's click into the owning plugin's verb, so a plugin that could state it could capture
- *    another plugin's rows.
+ *  No value is silently dropped. A value no column claims lands in the catch-all, `null`, which
+ *  `boardColumns` draws as one "Uncategorised" column, or is hidden only because the user declared
+ *  that destination.
  *
- *    No value is silently dropped. A value no column claims lands in the catch-all, `null`, which
- *    `boardColumns` draws as one "Uncategorised" column, or is hidden only because the user declared
- *    that destination.
- *
- *    Row ids are qualified by source. A github row and a linear row may both be `42`; the wire promises
- *    uniqueness within a collection and nothing wider (@acorn/protocol/collections.ts). */
+ *  Row ids are qualified by source. A github row and a linear row may both be `42`; the wire promises
+ *  uniqueness within a collection and nothing wider (@acorn/protocol/collections.ts). */
 export function unionRows(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,

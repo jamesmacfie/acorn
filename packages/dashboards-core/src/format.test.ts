@@ -48,7 +48,7 @@ describe('formatCell', () => {
 
   it('renders booleans and people as themselves', () => {
     expect(formatCell(field({ type: 'boolean' }), true)).toEqual({ kind: 'boolean', value: true, text: 'Yes' })
-    // `false` is an answer, not an absence — "Auto-merge: No" is worth a cell.
+    // `false` is an answer, not an absence. "Auto-merge: No" is worth a cell.
     expect(formatCell(field({ type: 'boolean' }), false)).toEqual({ kind: 'boolean', value: false, text: 'No' })
     expect(formatCell(field({ type: 'person' }), 'jamesmacfie'))
       .toEqual({ kind: 'person', name: 'jamesmacfie', initials: 'J' })
