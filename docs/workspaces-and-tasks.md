@@ -127,6 +127,11 @@ That is a plugin contribution called a task check, and it is the only way anythi
 dialog: [plugins.md § Task checks](./plugins.md). A cleanup that fails names its plugin; the task is
 still archived, because it is.
 
+The teardown takes seconds, so while it runs the task's close button and its rail row both spin,
+whichever of the two started the archive. One shared flag in `client-core/tasks/archiveLifecycle.ts`
+holds it, cleared when the archive finishes or fails; on the rail row the teardown marker replaces
+the live status markers instead of stacking on them, because it shares the working spinner's slot.
+
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
 machine-local values.

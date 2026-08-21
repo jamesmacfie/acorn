@@ -13,6 +13,7 @@ export type RailStatusInputs = {
   working: number // agents currently running in the task
   unread: boolean // an agent left an unread notification
   status: TaskStatus | undefined // live worktree status (dirty / missing)
+  archiving: boolean // guarded teardown in flight for this task
 }
 
 export type RailStatusItem = {
@@ -31,7 +32,11 @@ const CHECKS_LABEL: Record<RailChecks, string> = {
   mixed: 'CI checks: some failed, some still running',
 }
 
-export function railStatusItems({ checks, working, unread, status }: RailStatusInputs): RailStatusItem[] {
+export function railStatusItems({ checks, working, unread, status, archiving }: RailStatusInputs): RailStatusItem[] {
+  // Teardown is the only thing worth reporting while it runs, and it shares the working spinner's
+  // slot under the icon, so it replaces the markers rather than stacking on top of them.
+  if (archiving)
+    return [{ key: 'archiving', label: 'Archiving — removing the worktree', overlayCls: 'tabrail-spinner spin', glyph: 'loader-circle', tone: 'accent' }]
   const items: RailStatusItem[] = []
   if (checks)
     items.push({ key: 'checks', label: CHECKS_LABEL[checks], overlayCls: 'tabrail-checks', dotTone: CHECK_TONE[checks] })
