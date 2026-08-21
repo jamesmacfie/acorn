@@ -14,7 +14,7 @@ function StepLog(props: { text: string }) {
   )
   return (
     // CodeBlock owns the box and the copy affordance; the ANSI line spans are children, which is the
-    // component's contract — it is the box, not the highlighter.
+    // component's contract: it is the box, not the highlighter.
     <CodeBlock class="step-log-wrap" copy={props.text} size="xs">
       <Show when={lines()} fallback={props.text}>
         {(ls) => (

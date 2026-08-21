@@ -1,4 +1,4 @@
-/* PR list (left pane). Row owns the box, hover, selected tint and left marker — this list looked
+/* PR list (left pane). Row owns the box, hover, selected tint and left marker. This list looked
    different from every integration browse only because it hand-built all four. */
 .pr-row.ui-row {
   /* The virtualizer's measured height is the truth for a row in a measured list: --row-h and
@@ -29,12 +29,12 @@
 }
 .pr-tabs button:hover { color: var(--text); border-color: var(--border); }
 .pr-tabs button.active { color: var(--text); background: var(--bg-selected); border-color: var(--border); }
-/* Input kind="filter" owns the control. This keeps the list's own sizing — and the class is no
-   longer reached for by the database frame, where it was never served and rendered nothing. */
+/* Input kind="filter" owns the control. This keeps the list's own sizing; the class is no longer
+   reached for by the database frame, where it was never served and rendered nothing. */
 .pr-filter { flex: none; margin-left: auto; width: min(44%, 160px); padding: 5px 7px; }
 
 .pr-num { color: var(--text-muted); flex-shrink: 0; }
-/* "Open as workspace" affordance — Button size="xs" owns the box; this is only the reveal
+/* "Open as workspace" affordance. Button size="xs" owns the box; this is only the reveal
    (docs/workspaces-and-tasks.md). */
 .pr-ws-btn { opacity: 0; }
 .pr-row:hover .pr-ws-btn,

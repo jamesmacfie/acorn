@@ -20,10 +20,8 @@ import './styles/checks-panel.css'
 
 const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 'var(--text-faint)')
 
-// Render plain text with bare Linear identifiers (CRA-404) turned into clickable links — used for
-// the PR title, where the id is plain text. Prefixes gate which ids are real (see splitLinearIds).
-// Mid (Navigator) pane: PR header + description + changed-files + checks + conversation.
-// Bodies are GitHub-sanitized bodyHTML, rendered via innerHTML (docs/ui-design.md).
+// Mid (Navigator) pane: PR header, description, changed files, checks, and conversation. Bodies are
+// GitHub-sanitized HTML, rendered via innerHTML.
 export default function PullDetail(props: { task?: Task } = {}) {
   // A contributed pane is task-scoped and must render without a Router. The route-owned browse
   // surface still uses params, so only acquire router context for that variant.
@@ -61,17 +59,16 @@ export default function PullDetail(props: { task?: Task } = {}) {
     for (const cm of d.comments) texts.push(cm.body)
     for (const rv of d.reviews) texts.push(rv.body)
     for (const th of d.threads) for (const cm of th.comments) texts.push(cm.body)
-    // The host reads every registered recogniser, so this finds any provider's URLs. It is narrowed to
-    // Linear because what is downstream of it — the enrichment route and the chip — still is.
+    // The host reads every registered recogniser, so this finds any provider's URLs. It is narrowed
+    // to Linear because what is downstream of it, the enrichment route and the chip, still is.
     return scanContentRefs(texts).filter((ref) => ref.providerId === 'linear')
   })
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
   const linearConnected = () => (integrations.data?.integrations ?? []).some((i) => i.providerId === 'linear' && i.status === 'connected')
-  // Enrichment through the host, addressed by provider — no import of Linear's own package, which is
-  // what makes github survivable as a loaded plugin. The resolver route is Linear's and answers in the
-  // host's vocabulary (label + state chip), so what this pane renders is the same for any provider that
-  // declares one. The connection check stays: the route 403s with no connection, and asking is a wasted
-  // round trip when the "connect Linear" fallback below is what should render anyway.
+  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § github, "First-
+  // party for one specific reason"). The resolver route is Linear's; the connection check stays
+  // because a 403 with no connection wastes a round trip when the "connect Linear" fallback below is
+  // what should render anyway.
   const linearIssues = createQuery(() => refResolutionsOptions('linear', linearRefs().map((rf) => rf.item), linearConnected()))
   const linearSummary = createMemo(() => new Map((linearIssues.data ?? []).map((i) => [i.identifier, i])))
   // Show a linked ticket without leaving the PR: the linked-ticket list below, and the bare `CRA-404` ids
@@ -97,14 +94,15 @@ export default function PullDetail(props: { task?: Task } = {}) {
     },
   })
 
-  // Open in-app links found inside rendered bodies. The host resolves which provider claims the URL and
-  // shows its reference panel (any provider's, not just Linear's — see contentLinks.ts); GitHub PRs/repos
-  // resolve through the current project's GitHub facet before entering the project-keyed SPA route.
+  // Open in-app links found inside rendered bodies. The host resolves which provider claims the URL
+  // and shows its reference panel (any provider's, not just Linear's; see contentLinks.ts). GitHub
+  // PRs/repos resolve through the current project's GitHub facet before entering the project-keyed
+  // SPA route.
   const navigate = useNavigate()
   const onContentClick = makeContentLinkHandler(navigate)
   // Which bare `CRA-404`-shaped tokens are safe to linkify here, and for whom. Learned from the refs
-  // already CONFIRMED in this PR by their full URLs, so the prefix was witnessed rather than guessed —
-  // the host owns both halves now, and it works for any provider whose links appear in a body.
+  // already confirmed in this PR by their full URLs, so the prefix is witnessed rather than guessed.
+  // The host owns both halves, and it works for any provider whose links appear in a body.
   const refPrefixes = createMemo(() => learnRefPrefixes(linearRefs()))
 
   // After GitHub bodies render (innerHTML, opaque to Solid), wrap those bare ids in clickable anchors.
@@ -145,8 +143,9 @@ export default function PullDetail(props: { task?: Task } = {}) {
   persistDraft(() => (hasPullParams() ? `pr-comment:${o()}/${r()}/${n()}` : null), draftText, setDraftText)
   persistDraft(() => (hasPullParams() ? `review-body:${o()}/${r()}/${n()}` : null), reviewBody, setReviewBody)
   const [actionError, setActionError] = createSignal('')
-  // Reports the failure and RESOLVES, so a caller chaining `.then` is not left hanging. That is fine for a
-  // fire-and-forget action and wrong for anything that clears the user's text — see `runThenClear`.
+  // Reports the failure and resolves, so a caller chaining `.then` is not left hanging. That is fine
+  // for a fire-and-forget action and wrong for anything that clears the user's text; see
+  // `runThenClear`.
   const run = (p: Promise<unknown>) => p.then(refresh).catch((e) => setActionError(String(e.message ?? e)))
   const runThenClear = (p: Promise<unknown>, clear: () => void) =>
     p.then(() => {

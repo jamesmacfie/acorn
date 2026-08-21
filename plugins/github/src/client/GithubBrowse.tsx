@@ -1,22 +1,14 @@
-// The GitHub browse surface: the three-pane review layout behind the `github` rail Source.
+// The GitHub browse surface: the three-pane review layout behind the `github` rail Source
+// (docs/github-integration.md § Reads and writes covers why its layout is pinned by e2e).
 //
-// This was App.tsx's `<Switch>` FALLBACK — the shell rendered it inline, imported five of this plugin's
-// components (PullList, PullDetail, DiffView, CreatePullForm, ComparePreview), and owned the two force-refresh
-// handlers below. Every other Source already went through `sourceRegistry` + `<Dynamic>`; GitHub alone was
-// special-cased, because `client-core/tabs/sources.ts` hardcoded it ahead of the registry.
+// Params-driven, like the components it hosts: PullList reads `useParams()` itself, and the routes
+// exist only to populate params. That is why this component takes no props even though it renders
+// three panes.
 //
-// Nothing about the layout changed in the move. The panes, section headers, refresh buttons, the `+ New PR`
-// affordance and the params-driven branching are carried over verbatim, because they are user-visible and
-// pinned by the e2e suite.
-//
-// Params-driven, like the components it hosts: PullList reads `useParams()` itself, and the routes exist only
-// to populate params. That is why this component takes no props even though it renders three panes.
-//
-// The routed project is the only thing this surface needs to render — the same gate every other Source
-// applies (plugins/http HttpBrowse). It deliberately does NOT require one of this plugin's own routes to
-// match: the rail selects a Source by signal and never navigates, so a route-match gate made the whole
-// surface unreachable from anywhere except a PR link. The routes still exist, and still address a PR; they
-// refine what is shown here rather than deciding whether anything is.
+// The routed project is the only thing this surface needs to render, the same gate every other
+// Source applies (plugins/http HttpBrowse). It does not require one of this plugin's own routes to
+// match (docs/plugins.md § Frame authoring and the UI kit): the routes address a PR, they do not
+// decide whether the surface renders.
 import { createSignal, lazy, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -28,9 +20,9 @@ import PullList from './PullList'
 import { githubCreateRoute } from './routes'
 import { Button, EmptyState, SectionHeader } from '@acorn/plugin-api/ui'
 
-// Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and the
-// create-PR form do not compete with the first interactive paint. PullList is the startup path and is
-// imported eagerly, exactly as it was when the shell owned this.
+// Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and
+// the create-PR form do not compete with the first interactive paint. PullList is the startup path
+// and loads eagerly.
 const PullDetail = lazy(() => import('./PullDetail'))
 const CreatePullForm = lazy(() => import('./CreatePullForm'))
 const ComparePreview = lazy(() => import('./ComparePreview'))
@@ -83,14 +75,12 @@ export default function GithubBrowse() {
       queryClient.setQueryData(filesKey(owner(), repo(), params.number), files)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner(), repo()) }),
-        // Linked tickets (list enrichment + any open detail) — refetch their status too. Keyed by
-        // string, not by importing the plugin that supplies them: these are client-core query keys, and a
-        // force-refresh of a PR should not make this plugin depend on whichever providers enrich it.
+        // Linked tickets (list enrichment and any open detail), refetched too. Keyed by string
+        // rather than by importing the plugin that supplies them, so a force-refresh of a PR does
+        // not make this plugin depend on whichever providers enrich it.
         //
-        // One prefix, the HOST's, covering every provider at once
-        // (client-core/registries/refResolvers.ts). The second line here used to be `['linear-issue']`,
-        // a detail key that stopped existing when Linear became a frame — a frame calls its routes over
-        // the bridge and keeps no query cache, so there was nothing left to invalidate.
+        // One prefix, the host's, covers every provider at once
+        // (client-core/registries/refResolvers.ts).
         queryClient.invalidateQueries({ queryKey: ['plugin-ref-resolutions'] }),
       ])
     } finally {

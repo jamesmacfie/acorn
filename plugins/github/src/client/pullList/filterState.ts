@@ -47,9 +47,10 @@ export function evictPrFilter(workspaceId: string): void {
 
 export { prFilters }
 
-// Everything this module holds is keyed by a NODE-MINTED id, so it must not survive a node switch: the
-// persistence pass reads these maps and writes each scope under the ACTIVE node's storage key, which
-// carried one node's state into another's namespace (client-core's tasks/tasks.ts states the case in full).
+// Everything this module holds is keyed by a node-minted id, so it must not survive a node switch:
+// the persistence pass reads these maps and writes each scope under the active node's storage key,
+// and a stale entry would carry one node's state into another's namespace
+// (client-core's tasks/tasks.ts states the case in full).
 export function clearPrFilters(): void {
   setPrFilters({})
 }

@@ -82,12 +82,13 @@ export default function PullList() {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // Flow A (docs/workspaces-and-tasks.md): promote a PR into a task. origin github-pr, branch = headRef,
-  // pullNumber. Linear ids are seeded from a warmed detail body if we have one (best-effort — the
-  // Linear pane that consumes them is P4); otherwise none. Then activate + navigate to the PR.
-  // +TASK creates inline (no PromoteToTaskModal — a PR already carries its own title and branch), so this
-  // is the only place its failure can be reported. Without it a node-offline createTask threw into an
-  // uncaught rejection and the click looked like it did nothing at all.
+  // Promotes a PR into a task: origin github-pr, branch = headRef, pullNumber
+  // (docs/workspaces-and-tasks.md § Task creation and navigation). Linear ids are seeded from a
+  // warmed detail body when one is available; otherwise none.
+  //
+  // Creates inline rather than through PromoteToTaskModal, since a PR already carries its own title
+  // and branch, so this is the only place a create failure can be reported. Without it, a
+  // node-offline createTask threw an uncaught rejection and the click looked like it did nothing.
   const [taskError, setTaskError] = createSignal('')
   async function openAsTask(e: Event, pr: Pull) {
     e.preventDefault()
@@ -109,10 +110,10 @@ export default function PullList() {
       activateTaskSignals(existing, { pane: 'pr' })
       return navigate(pathForTask(existing))
     }
-    // Fetch the detail (cached if warm) so the body is present, then seed a task_link for EVERY
-    // Linear ticket the PR references — a PR can resolve several, and the task links them all.
+    // Fetch the detail (cached if warm) so the body is present, then seed a task_link for every
+    // Linear ticket the PR references. A PR can resolve several, and the task links them all.
     //
-    // The scan is provider-agnostic (the host reads every registered recogniser); the ATTRIBUTION is
+    // The scan is provider-agnostic (the host reads every registered recogniser); the attribution is
     // not, and cannot be: a task link needs a connection id, and the only one derivable here is the
     // sole connected Linear. Widening this means asking each provider for its own sole connection,
     // which is a promotion-flow change rather than a scanner one.

@@ -4,10 +4,9 @@ import { type Project, setProjectsLookup } from '@acorn/plugin-api/testkit/clien
 import { activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
 import { githubContentLinkContributions, makeContentLinkHandler } from './contentLinks'
 
-// Only github's own recognisers are asserted here. Linear's moved to plugins/linear with the
-// contribution itself — a github test importing linear's client would be a plugin->plugin edge
-// outside contract/, which the arch suite refuses, and rightly: that coupling is the thing finding 10
-// is removing.
+// Only github's own recognisers are asserted here. Linear's recogniser moved to plugins/linear with
+// its contribution; a github test importing linear's client would cross the plugin boundary the arch
+// suite refuses.
 let dispose: (() => void)[] = []
 beforeAll(() => {
   dispose = githubContentLinkContributions.map((c) => contentLinkRegistry.register(c).dispose)
@@ -16,14 +15,14 @@ afterAll(() => dispose.forEach((d) => d()))
 
 describe('parseInAppTarget', () => {
   it('recognises GitHub PR links (ignoring trailing path)', () => {
-    // `item` and `providerId` are what make the reference panel reachable: the host looks a panel up by
-    // provider and hands it `item` as the subject. The spelling matches the pulls collection's row id.
+    // `item`/`providerId` make the reference panel reachable (docs/plugins.md § Frame authoring and
+    // the UI kit). The spelling matches the pulls collection's row id.
     expect(parseInAppTarget('https://github.com/runn/acorn/pull/42/files'))
       .toEqual({ kind: 'pr', providerId: 'github', owner: 'runn', repo: 'acorn', number: '42', item: 'runn/acorn#42' })
   })
   it('recognises bare GitHub repo links but not deep paths or profiles', () => {
-    // No provider on this one, and it is not an oversight: a repository is a LIST, its destination is the
-    // browse route, and there is nothing glance-sized to put in an overlay.
+    // No provider on this one: docs/github-integration.md § Content links explains why a repo has no
+    // reference panel.
     expect(parseInAppTarget('https://github.com/runn/acorn')).toEqual({ kind: 'repo', providerId: undefined, owner: 'runn', repo: 'acorn' })
     expect(parseInAppTarget('https://github.com/runn/acorn/issues')).toBeNull()
     expect(parseInAppTarget('https://github.com/octocat')).toBeNull()
@@ -57,9 +56,9 @@ const hrefAnchor = (href: string) => ({ getAttribute: (name: string) => (name ==
 // A project row as the client sees it. Only the GitHub facet is read by anything under test.
 const project = (id: string, owner: string, name: string) => ({ id, github: { owner, name } }) as unknown as Project
 
-// These used to hand the handler a STUB resolver, which is why the casing bug below survived them: the
-// stub compared the two names the test had just written, so it agreed with itself no matter what the
-// real lookup did. They go through `allProjects` now, like the code does.
+// These tests go through `allProjects`, like the code does, instead of a stub resolver. A stub that
+// echoed back the same owner/repo the test wrote would agree with itself regardless of casing, which
+// is why the case-insensitivity bug below survived earlier versions of this suite.
 describe('project-keyed content navigation', () => {
   afterEach(() => setProjectsLookup(() => []))
 
@@ -75,8 +74,8 @@ describe('project-keyed content navigation', () => {
   })
 
   it('leaves a PR in an untracked repo to the real browser URL', () => {
-    // A DELIBERATE PRODUCT DECISION (see the comment on the branch itself), pinned so a later refactor
-    // cannot quietly turn it into a swallowed click with nowhere to land.
+    // An untracked repo has no in-app route, so the click is left unhandled rather than swallowed
+    // with nowhere to land (docs/github-integration.md § Content links).
     const navigate = vi.fn()
     const { event, preventDefault } = click(hrefAnchor('https://github.com/someone/untracked/pull/7'))
 
@@ -88,10 +87,10 @@ describe('project-keyed content navigation', () => {
 })
 
 describe('bare ref anchors reaching the panel through github’s handler', () => {
-  // The HOST mints these now (client-core § linkifyRefs), and owns both the split and the click rung —
-  // its own suite covers prefix learning and attribution. What is worth pinning HERE is that github's
-  // handler still lets them through: it wraps `handlePluginContentLinkClick` rather than reimplementing
-  // it, and a wrapper that reordered its two branches would break this without breaking anything else.
+  // The host mints these anchors (client-core § linkifyRefs) and covers prefix learning and
+  // attribution in its own suite. What this pins is that github's handler wraps
+  // `handlePluginContentLinkClick` rather than reimplementing it, so reordering its two branches
+  // would break this test too.
   afterEach(() => closeRefPanel())
 
   it('opens the provider reference panel when that provider has one registered', () => {
@@ -106,8 +105,8 @@ describe('bare ref anchors reaching the panel through github’s handler', () =>
   })
 
   it('opens nothing when that provider is not installed on this device', () => {
-    // The anchor has no href, so there is nothing to fall through TO — the click is still consumed, and the
-    // shell must not be left showing an overlay no contribution can fill.
+    // The anchor has no href, so there is nothing to fall through to. The click is still consumed:
+    // the shell must not be left showing an overlay no contribution can fill.
     const { event, preventDefault } = click({ dataset: { refProvider: 'linear', refItem: 'CRA-404' } })
 
     makeContentLinkHandler(vi.fn())(event)
@@ -117,9 +116,9 @@ describe('bare ref anchors reaching the panel through github’s handler', () =>
   })
 })
 
-// The dashboard-row path, end to end through github's OWN registered contribution rather than a stand-in.
-// The host asks `openInAppUrl` before it opens a browser, and everything github contributes to that
-// answer is the `path` resolver below: a project lookup, and the route minted from the pattern.
+// The dashboard-row path, end to end through github's own registered contribution rather than a
+// stand-in. The host asks `openInAppUrl` before it opens a browser; everything github contributes to
+// that answer is the `path` resolver: a project lookup, and the route minted from the pattern.
 describe('openInAppUrl over github rows', () => {
   afterEach(() => setProjectsLookup(() => []))
 
@@ -139,9 +138,9 @@ describe('openInAppUrl over github rows', () => {
     expect(navigate).toHaveBeenCalledWith('/p/proj-1/pulls')
   })
 
-  // THE PAIRING, in one test. A dashboard row asks to go there and gets github's surface; a reader inside
-  // something else asks to glance and gets github's panel. Same URL, same recogniser, different caller —
-  // which is the whole reason `prefer` exists rather than the target deciding.
+  // A dashboard row asks to go there and gets github's surface; a reader inside something else asks
+  // to glance and gets github's panel. Same URL, same recogniser, different caller: this is why
+  // `prefer` is the caller's choice rather than the target's.
   it('gives a dashboard the pull request surface and a reader the panel', () => {
     setProjectsLookup(() => [project('proj-1', 'runn', 'acorn')])
     const panel = refPanelRegistry.register({ id: 'github-pull', providerId: 'github', component: () => null })
@@ -160,21 +159,19 @@ describe('openInAppUrl over github rows', () => {
     panel.dispose()
   })
 
-  // The panel is a preference, not a guarantee, and an untracked repo has no route either. Both rungs
-  // gone means the real github.com URL still opens — the fall-through this plugin has always protected.
+  // The panel is a preference, not a guarantee, and an untracked repo has no route either. With both
+  // rungs gone, the real github.com URL still opens.
   it('leaves a repo this install does not track to the browser', () => {
-    // The deliberate fall-through, now on a second caller. github declares no `providerId` and so has no
-    // reference panel either, which is why there is nothing else for this to land on.
+    // A second caller of the same fall-through. github declares no `providerId` on the repo
+    // recogniser, so there is no reference panel to land on either.
     const navigate = vi.fn()
 
     expect(openInAppUrl('https://github.com/stranger/thing/pull/42', { navigate })).toBe(false)
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  // THE REAL-DATA CASE, and the one every test above was too tidy to catch. These are not invented
-  // spellings: `projects.github_owner` holds `runn-fast` while the plugin's own `repos.owner` — and so
-  // the URL on every row — holds GitHub's canonical `Runn-Fast`. An `===` between them matched nothing,
-  // and because an unmatched repo legitimately falls through to the browser, the failure was invisible.
+// Real casing, not an invented spelling: docs/github-integration.md § Content links covers why the
+// comparison must be case-insensitive.
   it('matches owner and repo case-insensitively, as GitHub does', () => {
     setProjectsLookup(() => [project('proj-runn', 'runn-fast', 'runn')])
     const navigate = vi.fn()

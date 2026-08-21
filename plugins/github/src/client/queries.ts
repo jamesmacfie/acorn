@@ -1,7 +1,6 @@
 // GitHub's TanStack Query definitions. They live with the plugin that owns the routes and the keys
 // (../contract/api.ts) rather than in client-core, so the shell no longer carries a feature's read
-// layer. Moved verbatim from @acorn/client-core/queries.ts — same keys, same staleTime, same refetch
-// and invalidation behaviour.
+// layer.
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import {
   branchesKey,
@@ -163,8 +162,8 @@ export const compareOptions = (owner: string, repo: string, base: string, head: 
   queryFn: async ({ signal }: QueryContext): Promise<Compare> => readJson<Compare>(compareRoute(owner, repo, base, head), { signal }),
 })
 
-// Full head-blob body, fetched on demand (queryClient.fetchQuery) when a gap is expanded. The sha
-// is immutable so the body never goes stale — fetch once per file, reuse for every gap.
+// Full head-blob body, fetched on demand (queryClient.fetchQuery) when a gap is expanded. The sha is
+// immutable so the body never goes stale: fetch once per file, reuse for every gap.
 export const fileBlobOptions = (owner: string, repo: string, sha: string) => ({
   queryKey: fileBlobKey(owner, repo, sha),
   staleTime: Infinity,

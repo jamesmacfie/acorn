@@ -9,18 +9,10 @@ import { parsePullRef } from '../contract/pullRef'
 import { pullDetailOptions } from './queries'
 import './styles/ref-panel.css'
 
-// GitHub's reference panel: one pull request, glance-sized, over whatever the reader was looking at.
-//
-// This is the surface github spent a long time deliberately NOT having, and the old comment was right
-// about the thing it was arguing against: a pull request is a whole review — diff, threads, checks,
-// commits — and that does not belong in an overlay. What changed is the question. Nobody wants to REVIEW
-// here; they want to know what `Runn-Fast/runn#8811` is without losing the Linear issue they are reading.
-// So this deliberately shows less than the pane does and offers the pane as the next step, rather than
-// being a smaller copy of it.
-//
-// Adding it is what makes the second half of the pairing work. A ticket clicked from a PR already opened
-// beside the diff; a PR clicked from a ticket had nowhere to go but the browser, because github declared
-// no `providerId` and the panel rung looks a provider up by exactly that.
+// GitHub's reference panel: one pull request, glance-sized, over whatever the reader was looking at
+// (docs/github-integration.md § Content links). It shows less than the full pane, a pull request is
+// a whole review with diff, threads, checks, and commits, and offers the pane as the next step
+// rather than being a smaller copy of it.
 
 export default function PullRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
@@ -35,10 +27,11 @@ export default function PullRefPanel(props: RefPanelProps) {
   const pull = () => detail.data?.pull
   const checks = () => detail.data?.checks ?? []
 
-  // Through the host's own ladder rather than a path built here, so the panel reaches the pull request
-  // exactly the way a dashboard row does — including selecting the rail source, which navigating alone
-  // does not do. `prefer: 'route'` because this IS the "take me there" affordance; if the repo is not one
-  // acorn tracks there is no route, the URL opens in the browser, and either way the panel is done.
+  // Through the host's own ladder rather than a path built here, so the panel reaches the pull
+  // request exactly the way a dashboard row does, including selecting the rail source, which
+  // navigating alone does not do. `prefer: 'route'` because this is the "take me there" affordance:
+  // if the repo is not one acorn tracks there is no route, the URL opens in the browser, and either
+  // way the panel is done.
   const openFull = (): void => {
     const at = parts()
     if (at) openInAppUrl(`https://github.com/${at.owner}/${at.repo}/pull/${at.number}`, { prefer: 'route', navigate })
