@@ -2,21 +2,17 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Does the facade LOAD? Every other check on this package reads its source — surface.test.ts
-// snapshots the export names, tools/arch/boundaries.test.ts greps the specifiers — and the property
-// that actually breaks people is neither of those. It is: a plugin's node-environment test suite
-// imports @acorn/plugin-api/client, the barrel evaluates every module on it, one of them is a Solid
-// component, and the suite dies on `window is not defined` in someone else's package.
+// Does the facade load in a plugin's own test environment? See docs/plugins.md § The plugin API for
+// the barrel/tier boundary this protects: a `.tsx` module anywhere behind an entrypoint dies on
+// `window is not defined` in someone else's package the moment that plugin's suite imports it.
 //
-// So this file loads them, under exactly the conditions the property protects: vitest,
-// `environment: 'node'`, no jsdom, no Solid transform — the vitest.config.ts beside this file is the
-// same shape every plugin uses. That is why the check lives here as an in-process import rather than
-// as a spawned Node child (the shape apps/node/test/integration/mainBarrelLoad.test.ts needs): the
-// hazard is what a vitest worker can load, so a vitest worker is the honest place to ask.
-//
-// It doubles as enforcement of `"sideEffects": false` in package.json. A barrel that did real work at
-// module scope — opened a database, read a data root, registered into a live registry — would do it
-// here, in a test that passes nothing in and asserts only that names came back.
+// This file loads every entrypoint in process, under vitest's node environment with no jsdom and no
+// Solid transform, rather than spawning a child the way
+// apps/node/test/integration/mainBarrelLoad.test.ts does: the hazard is what a vitest worker can
+// load, so a vitest worker is the honest place to ask. It doubles as enforcement of
+// "sideEffects": false in package.json, since a barrel doing real work at module scope (opening a
+// database, reading a data root, registering into a live registry) would do it here too, in a test
+// that passes nothing in and asserts only that names came back.
 const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json'), 'utf8')) as {
   exports: Record<string, string>
 }
@@ -25,8 +21,8 @@ const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json')
 // which is the difference between a property and an allowlist. The three below are excluded because
 // they legitimately need a browser realm, and each says so in its own header:
 const BROWSER_REALM = new Set([
-  './ui', // frame-safe presentation components — .tsx, so Solid-compiled
-  './ui/host', // registration and connected shell surfaces — also .tsx
+  './ui', // frame-safe presentation components, .tsx, so Solid-compiled
+  './ui/host', // registration and connected shell surfaces, also .tsx
   './ui/editor', // re-exports client-core/editor/theme.ts, which imports monaco-editor; monaco reads
   //                `window` at module scope (monaco-editor/esm/vs/base/browser/window.js). Its own
   //                header already explains that this is why it is a separate entrypoint; it is
@@ -40,9 +36,9 @@ describe('plugin-api entrypoints load in a node environment', () => {
   // Anti-vacuity, and the reason to derive the list: an exports map that stopped parsing, or a
   // BROWSER_REALM that quietly swallowed the whole package, would make every assertion below vacuous.
   it('covers every entrypoint that is not deliberately browser-realm', () => {
-    // `./testkit/client` is node-safe too, and deliberately: it is the CLIENT half of the test seam, but
-    // the suites that import it are bare-node `*.test.ts` like every other plugin suite, so a component
-    // finding its way onto that barrel would make it unloadable by the tests it exists for. Its own header
+    // `./testkit/client` is node-safe too: it is the client half of the test seam, but the suites that
+    // import it are bare-node `*.test.ts` files like every other plugin suite, so a component finding
+    // its way onto that barrel would make it unloadable by the tests it exists for. Its own header
     // states the rule; this is the check.
     expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/sdk'])
     expect([...BROWSER_REALM].every((entry) => entry in PKG.exports)).toBe(true)

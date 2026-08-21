@@ -4,36 +4,24 @@ import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 
-// The plugin API is a contract, and a contract that can grow by accident is not one. This test
-// pins the exported NAMES of every entrypoint against a committed list: adding, removing or
-// renaming an export fails until the snapshot is updated, which is the deliberate act of changing
-// the contract. Regenerate with `UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`, and say
-// in the commit message why the surface moved.
+// The plugin API is a contract: this test pins the exported names of every entrypoint against a
+// committed list, so a surface change is always something someone decided rather than something
+// that slipped in. See docs/plugins.md § The plugin API for the snapshot, the regeneration command,
+// and why adding a name still needs to weigh the same question as taking on a new dependency.
 //
-// ADDING A NAME IS FREE — mechanically. Each name is still a compatibility promise the moment
-// third-party plugins exist, so an addition to `client`/`node` should face the same question a new
-// dependency gets: does a third-party plugin NEED this, or is it convenient for a first-party one
-// that could import deeper? (The 2026-08 architecture review flagged the client barrel's 173 exports
-// as accumulated, not chosen — read every snapshot diff with that in mind.)
+// Removing a name is a major bump. See docs/plugins.md § The plugin API for why PLUGIN_API_MAJOR is
+// compared by exact string match at three places, and for why regeneration refuses to drop a name
+// silently.
 //
-// REMOVING A NAME IS A MAJOR BUMP. That is not advice, it is the rule this file
-// enforces, because `PLUGIN_API_MAJOR` is compared by EXACT STRING MATCH at three places — plugin load
-// (main/pluginLoader.ts), install (main/pluginInstaller.ts) and client bundle resolution
-// (client-core/plugins/resolveBundles.ts). A plugin built against a surface that has since lost a name
-// does not degrade; it fails to resolve a symbol at run time, in someone else's process, with no version
-// having said so. So the snapshot records the major it was written under, and regeneration REFUSES to
-// drop a name while that major is unchanged. You cannot prune quietly: either the name comes back or the
-// number moves. (docs/plugins.md § The plugin API, which records the prune that put the number at 2.)
+// Out of scope for this test: `@deprecated` markers, a removal schedule, a compatible-change commit
+// trailer. See docs/plugins.md § What is published, and what acorn promises about it for why there
+// is no deprecation program.
 //
-// Deliberately not built: `@deprecated` markers, a removal schedule, a compatible-change commit trailer.
-// The ceiling is "the number cannot lie about a removal" — anything past that is a deprecation program,
-// and there is no out-of-tree plugin yet to deprecate anything for.
-//
-// Names, not a rolled-up .d.ts. Every package here is consumed as TypeScript SOURCE — noEmit is
-// set globally and nothing in the repo emits declarations — so a real rollup would mean adding a
-// declaration build and API Extractor to a monorepo that deliberately has neither. What the
-// snapshot cannot catch is an upstream type CHANGING shape underneath a stable name; `tsc
-// --noEmit` across the seventeen plugins that consume this package already catches that, loudly.
+// Names, not a rolled-up .d.ts: every package here is consumed as source, since `noEmit` is set
+// globally and nothing in the repo emits declarations (the same reasoning applies to the published
+// surface, docs/plugins.md § What is published, and what acorn promises about it). What the snapshot
+// cannot catch is an upstream type changing shape underneath a stable name; `tsc --noEmit` across
+// the seventeen plugins that consume this package already catches that, loudly.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -51,8 +39,8 @@ const ENTRYPOINTS = {
 }
 
 // `export { a, b as c, type D } from '…'` and `export type { E, F } from '…'`. The entrypoints are
-// re-export lists by construction — the boundaries test asserts this package adds no behaviour —
-// so there is no local declaration to find.
+// re-export lists by construction (the boundaries test asserts this package adds no behaviour), so
+// there is no local declaration to find.
 const EXPORT_CLAUSE_RE = /\bexport\s+(type\s+)?\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g
 
 function exportedNames(source: string): string[] {
@@ -71,8 +59,8 @@ function exportedNames(source: string): string[] {
   return names
 }
 
-// The snapshot's first line, e.g. `# plugin API major: 2`. It is IN the snapshot rather than beside it so
-// that one file answers both questions a reader has — what the surface is, and which major it is.
+// The snapshot's first line, e.g. `# plugin API major: 2`. It is in the snapshot rather than beside it
+// so that one file answers both questions a reader has: what the surface is, and which major it is.
 const MAJOR_LINE = /^# plugin API major: (.+)$/
 
 function readSnapshot(path: string): { major: string; names: string[] } {
