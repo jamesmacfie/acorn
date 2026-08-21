@@ -10,34 +10,29 @@ import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core/dialect'
 // SQLite via the runtime's own `node:sqlite`, shaped like the slice of better-sqlite3 that Drizzle's
 // driver and this package actually call.
 //
-// ## Why a shim and not a driver swap
+// Drizzle publishes no `node:sqlite` driver (0.45.2 ships better-sqlite3, bun, expo, op and proxy).
+// Its better-sqlite3 driver needs a small surface though: `prepare`, `transaction`, and
+// `run`/`all`/`get`/`raw` on a statement, and every one of those has a `node:sqlite` equivalent.
+// Meeting that shape here is far less code and far less behaviour change than moving to the generic
+// async proxy driver.
 //
-// Drizzle publishes no `node:sqlite` driver (0.45.2 ships better-sqlite3, bun, expo, op and proxy),
-// and its better-sqlite3 driver needs a remarkably small surface: `prepare`, `transaction`, and
-// `run`/`all`/`get`/`raw` on a statement. Every one of those has a `node:sqlite` equivalent, so
-// meeting that shape here is far less code — and far less behaviour change — than moving to the
-// generic async proxy driver.
-//
-// ## Why bother
-//
-// better-sqlite3 is a native module compiled for ONE ABI at a time, which is the whole reason this
-// repo has two rebuild scripts and a test runner that rebuilds before it runs. `node:sqlite` is part
-// of the runtime, so it is right whichever host loads it — Electron 42 bundles Node 24.17 and has
-// it. It also halves the native-dependency problem for a downloadable standalone node
-// (docs/future/bundle.md).
+// better-sqlite3 is a native module compiled for one ABI at a time, which is why this repo has two
+// rebuild scripts and a test runner that rebuilds before it runs. `node:sqlite` is part of the
+// runtime, so it works on whichever host loads it: Electron 42 bundles Node 24.17 and has it. It
+// also reduces the number of native dependencies a future standalone node download would need.
 //
 // On-disk files are untouched: this is the same SQLite, so an existing data root just opens.
 //
-// `@types/better-sqlite3` stays a devDependency after the runtime package is gone — Drizzle's driver
-// declarations import from it, and so does the one cast at each call site. Types compile; they do not
-// need a compiler.
+// `@types/better-sqlite3` stays a devDependency after the runtime package is gone. Drizzle's driver
+// declarations import from it, and so does the one cast at each call site. Types compile; they do
+// not need a compiler.
 
 // The two mismatches that would silently change behaviour, both pinned here rather than discovered
 // later in a route:
 //
-//   Foreign keys. `node:sqlite` enforces them by DEFAULT; better-sqlite3 does not. Core's schema
-//   declares none, but a plugin's might, and having enforcement appear underneath one is a
-//   behaviour change nobody asked for. Matched to the old default explicitly.
+//   Foreign keys. `node:sqlite` enforces them by default; better-sqlite3 does not. Core's schema
+//   declares none, but a plugin's might, and having enforcement appear underneath one would be a
+//   behaviour change nobody asked for. This matches the old default explicitly.
 //
 //   Row prototypes. `node:sqlite` hands back null-prototype objects. Almost everything works on
 //   those, right up to the first `row.hasOwnProperty(...)`. Rows are rebuilt as ordinary objects
@@ -54,8 +49,8 @@ export type SqliteStatement = {
   run(...params: unknown[]): SqliteRunResult
   all(...params: unknown[]): unknown[]
   get(...params: unknown[]): unknown
-  // better-sqlite3's toggle: switches this statement to array rows and returns itself. Drizzle relies
-  // on both halves — it calls `stmt.raw().all(...)` and expects the same statement back.
+  // better-sqlite3's toggle: switches this statement to array rows and returns itself. Drizzle
+  // relies on both halves: it calls `stmt.raw().all(...)` and expects the same statement back.
   raw(toggle?: boolean): SqliteStatement
 }
 
@@ -140,23 +135,24 @@ export function openSqlite(path: string, options: { readonly?: boolean } = {}): 
 
 // Drizzle over one of these handles.
 //
-// Assembled here rather than by calling `drizzle()` from `drizzle-orm/better-sqlite3` because that
-// module opens with a bare `import Client from 'better-sqlite3'` — a static import it needs only for
-// the convenience form `drizzle('/path/to.db')`, which nothing here uses. Importing it would put the
-// native package back on the runtime dependency list to satisfy a binding we never touch, which is
-// the entire thing this file exists to remove.
+// Assembled here rather than by calling `drizzle()` from `drizzle-orm/better-sqlite3`, because that
+// module opens with a bare `import Client from 'better-sqlite3'`. That static import exists only
+// for the convenience form `drizzle('/path/to.db')`, which nothing here uses; importing it would
+// put the native package back on the runtime dependency list to satisfy a binding this file never
+// touches, which is the entire thing it exists to remove.
 //
 // This is `construct()` from that module, minus that import. Every piece is a published export
-// subpath, and the session is drizzle's own — it is the driver's client-object path, entered
-// directly instead of through a front door that loads a compiler on the way past.
+// subpath, and the session is drizzle's own: the driver's client-object path, entered directly
+// instead of through a front door that loads a compiler on the way past.
 class NodeSqliteDatabase<TSchema extends Record<string, unknown>> extends BaseSQLiteDatabase<'sync', unknown, TSchema> {
   // Matched to what the better-sqlite3 driver declares, so drizzle's own `is()` checks see the class
   // they expect rather than a stranger.
   static override readonly [entityKind]: string = 'BetterSQLite3Database'
 }
 
-// Drizzle's own type, plus the handle under it — declared as what it actually is here rather than as
-// better-sqlite3's class, so a caller reaching for `$client` gets the real API and not a fiction.
+// Drizzle's own type, plus the handle under it. Declared as what it actually is here, rather than
+// as better-sqlite3's class, so a caller reaching for `$client` gets the real API and not a
+// fiction.
 export type SqliteDrizzle<TSchema extends Record<string, unknown>> = BetterSQLite3Database<TSchema> & {
   $client: SqliteDatabase
 }
@@ -173,7 +169,7 @@ export function drizzleOverSqlite<TSchema extends Record<string, unknown> = Reco
       })()
     : undefined
   // `as never` twice: drizzle types the client as better-sqlite3's class and the relational config
-  // with internal generics it does not export. The shapes are right — the names are what cannot be
+  // with internal generics it does not export. The shapes are right; the names are what cannot be
   // spelled from out here.
   const session = new BetterSQLiteSession(client as never, dialect, relational as never, { logger: undefined })
   const db = new NodeSqliteDatabase('sync', dialect, session as never, relational as never) as unknown as SqliteDrizzle<TSchema>

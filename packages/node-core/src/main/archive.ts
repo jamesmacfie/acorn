@@ -1,7 +1,8 @@
-// Task archive orchestration (docs/workspaces-and-tasks.md + docs/terminal-and-agents.md). Extracted from the IPC
-// handler so the lifecycle ordering — guard → teardown script (while the worktree still exists) →
-// stop sessions → remove worktree → mark archived — is testable under plain Node against a real
-// temp git repo. Electron/PTY concerns (the live session map, drawer streaming) are injected.
+// Task archive orchestration: docs/workspaces-and-tasks.md § Worktrees and setup covers the
+// lifecycle order.
+//
+// Extracted from the IPC handler so it is testable under plain Node against a real temp git repo,
+// with Electron and PTY concerns (the live session map, drawer streaming) injected.
 import { execFile } from 'node:child_process'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -41,13 +42,14 @@ export type ArchiveDeps = {
   runningCount: (taskId: string) => number
   killRunning: (taskId: string) => void
   dropTaskSessions: (taskId: string) => Promise<void>
-  // Teardown runner — the app streams it through a drawer session; tests use runTeardownProcess.
+  // Teardown runner: the app streams it through a drawer session; tests use runTeardownProcess.
   runTeardown: (script: string, cwd: string, env: Record<string, string>, taskId: string) => Promise<TeardownResult>
   // The plugin cleanups the owner ticked in the archive dialog, resolved and run by the caller
-  // (server/plugin/taskChecks.ts). Injected rather than imported for the reason every other dep here
-  // is: this module is the lifecycle, testable under plain Node against a temp git repo, and it does
-  // not reach into the server layer. Returns the plugin ids whose cleanup failed — the archive still
-  // completes, because a failed cleanup is not a reason to strand the task, but the owner is told.
+  // (server/plugin/taskChecks.ts). Injected rather than imported for the reason every other dep
+  // here is: this module is the lifecycle, testable under plain Node against a temp git repo, and
+  // it does not reach into the server layer. Returns the plugin ids whose cleanup failed; the
+  // archive still completes, since a failed cleanup is not a reason to strand the task, but the
+  // owner is told.
   applyTaskChecks?: (task: { id: string; worktreePath: string | null }, ids: readonly string[]) => Promise<string[]>
 }
 
@@ -69,9 +71,9 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
   const projectRoot = project?.path ? resolve(project.path) : null
   const ownsWorktree = !!t.worktreePath && (!projectRoot || resolve(t.worktreePath) !== projectRoot)
 
-  // Teardown (docs/terminal-and-agents.md): runs while the worktree and any services still exist — before
-  // sessions are stopped and before removal. Non-zero exit pauses the archive so the caller can
-  // choose continue (re-invoke with skipTeardown) or abort; nothing has been torn down yet.
+  // Teardown runs while the worktree and any services still exist, before sessions are stopped and
+  // before removal. A non-zero exit pauses the archive so the caller can choose to continue (by
+  // re-invoking with skipTeardown) or abort; nothing has been torn down yet.
   if (deleteWorktree && ownsWorktree && !opts.skipTeardown && t.worktreePath && deps.isDir(t.worktreePath) && project) {
     const script = await teardownScriptFor(db, project.id)
     if (script) {

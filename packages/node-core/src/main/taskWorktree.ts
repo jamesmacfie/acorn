@@ -1,5 +1,6 @@
-// Task → checkout/worktree resolution shared by every privileged main-process surface. The task ID —
-// never a renderer-supplied absolute path — is the capability; paths are re-derived from the DB per call.
+// Task-to-checkout/worktree resolution shared by every privileged main-process surface. The task
+// ID, never a renderer-supplied absolute path, is the capability; paths are re-derived from the
+// database on every call.
 import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, resolve } from 'node:path'
@@ -15,7 +16,7 @@ import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch,
 import { capabilityId, type CapabilityRegistry } from '../server/plugin/capabilities'
 import { BridgeError } from '../server/bridge'
 
-// Set once by registerTerminalIpc — where workspace worktrees are created (docs/workspaces-and-tasks.md).
+// Set once by registerTerminalIpc, where workspace worktrees are created (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
 export const setWorktreesRoot = (dir: string): void => {
   worktreesRoot = dir
@@ -37,25 +38,17 @@ export const rendererBaseCheckout = (cwd: string | undefined): string | undefine
 
 export type TaskRow = typeof schema.tasks.$inferSelect
 
-// The plugin-facing projection of a task, and the reason it exists is the same one `ProjectRef` gives
-// (main/projects.ts): `TaskRow` is `typeof schema.tasks.$inferSelect`, so returning it from
-// `CoreServices.tasks` put core's own column names on the plugin contract — rename a column and the
-// contract breaks with no signal, because the surface snapshot pins names and cannot see a type change
-// shape underneath a stable one.
-//
-// Six fields, and not a byte more: they are exactly what plugin code reads today, and they are also
-// everything core needs back when a plugin hands the ref straight to `resolveCwd` or `taskContext`.
-// `icon`, `origin`, `status`, `parentId`, `sort`, `createdAt`, `updatedAt` and `archivedAt` are read by
-// nobody outside core, so they stay core's.
-// A TaskRow is structurally assignable to a TaskRef, which is why core's internal callers are untouched.
+// The plugin-facing projection of a task: docs/plugins.md § Activation covers why CoreServices
+// hands back TaskRef rather than the database row, and why it carries only six fields.
 export type TaskRef = {
   id: string
   title: string
   projectId: string
-  // null = run in the project root; non-null = an isolated Git worktree named for this branch.
+  // null runs in the project root; non-null names an isolated worktree branch
+  // (docs/workspaces-and-tasks.md § Task).
   branch: string | null
-  // null until the worktree is first created (Flow C), so a plugin that needs the path asks
-  // `tasks.root(taskId)` rather than reading this and finding nothing.
+  // null until the worktree is first created; a plugin that needs the path calls
+  // `tasks.root(taskId)` instead of reading this field directly.
   worktreePath: string | null
   pullNumber: number | null
 }
@@ -87,10 +80,8 @@ export const loadTask = async (db: AppDatabase, id: string): Promise<TaskRow | u
   return t
 }
 
-// Per-project preferred base ref for NEW branches (docs/terminal-and-agents.md): the prefs key
-// `base_ref:<projectId>`. It is user-owned state, so main-process callers must carry the
-// identity that authorized the operation. A missing identity fails closed to git's normal
-// origin/main fallback instead of selecting a stale preference from another login.
+// Per-project preferred base ref for a new branch (docs/workspaces-and-tasks.md § Worktrees and
+// setup): the prefs key `base_ref:<projectId>`.
 export const baseRefPref = async (db: AppDatabase, userId: string | null, projectId: string): Promise<string | null> => {
   if (!userId) return null
   const [row] = await db
@@ -101,8 +92,9 @@ export const baseRefPref = async (db: AppDatabase, userId: string | null, projec
   return row?.value ?? null
 }
 
-// Startup context injection toggle (docs/notes-and-memory.md): opt-out, so an ABSENT pref means ON.
-// Key mirrors PrefKeys.startupContextInjection (core/client can't be imported from main).
+// Startup context injection toggle: opt-out, so an absent preference means on. The key mirrors
+// PrefKeys.startupContextInjection; core and client can't be imported from main, so it is a
+// literal string here.
 export const contextInjectionEnabled = async (db: AppDatabase, userId: string): Promise<boolean> => {
   const [row] = await db
     .select()
@@ -148,7 +140,7 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
     const missing = (await computeTaskStatuses(db)).filter((s) => s.missing)
     if (missing.length) console.warn(`[worktrees] ${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`)
   } catch {
-    // best-effort — never block startup on status
+    // best-effort: never block startup on status
   }
 }
 
@@ -200,9 +192,8 @@ export async function resolveTaskCwd(
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
   if (t.worktreePath && isDir(t.worktreePath)) {
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
-    // A path persisted once used to be trusted forever. When that worktree later went stale — pruned,
-    // moved, or checked out onto another branch by hand — the task kept being handed another branch's
-    // files, which is the tree its agent then reads, edits and reports from. Verify, don't assume.
+    // A path persisted once used to be trusted forever, until docs/workspaces-and-tasks.md §
+    // Worktrees and setup: verify rather than assume before handing a persisted path back.
     if (!isProjectRoot) assertOnBranch(t.worktreePath, t.branch)
     return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
   }
@@ -221,10 +212,10 @@ export async function resolveTaskCwd(
       t.pullNumber,
       project ? await baseRefPref(db, userId, project.id) : null,
     )
-    // Falling back to the project root here put the task in the MAIN checkout, on whatever branch the
-    // user last left it — silently, and typically alongside whatever other task lives there. The
-    // failures that reach this line (git refusing a branch already checked out in another worktree, a
-    // stale directory) are all ones the user has to act on, so say so instead.
+    // Falling back to the project root here put the task in the main checkout, on whatever branch
+    // the user last left it, silently, and typically alongside whatever other task lives there.
+    // The failures that reach this line (git refusing a branch already checked out in another
+    // worktree, a stale directory) are all ones the user has to act on, so say so instead.
     if (!wt.ok) throw new BridgeError(409, 'worktree-unavailable', wt.reason)
     assertOnBranch(wt.path, branch)
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
@@ -244,7 +235,7 @@ export async function resolveTaskCwd(
 
 // The on-disk root the editor/local-git panes operate on: the task's worktree (created lazily,
 // like the terminal), or null if the repo has no mapped checkout yet. Re-derived per IPC call so
-// the taskId — not a renderer-supplied absolute path — is the capability.
+// the task id, not a renderer-supplied absolute path, is the capability.
 export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null, capabilities?: CapabilityReader): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
@@ -274,9 +265,9 @@ export async function projectSetup(db: AppDatabase, projectId: string): Promise<
   return { script: config?.config.setupScript ?? null, trigger: config?.config.setupScriptTrigger ?? 'terminal' }
 }
 
-// Files-to-copy on a fresh worktree (docs/workflows.md §2): read the config from the SOURCE
-// checkout (the entries are usually gitignored, so only it has them) and copy each into the new
-// worktree. Best-effort — warnings are logged, never thrown.
+// Copy files into a fresh worktree (docs/workspaces-and-tasks.md § Worktrees and setup): read the
+// config from the source checkout, since the entries are usually gitignored and only it has them.
+// Warnings are logged, never thrown, so a failed copy never blocks worktree creation.
 export async function copyConfiguredFiles(db: AppDatabase, t: Pick<TaskRef, 'projectId'>, checkout: string, worktreePath: string): Promise<void> {
   try {
     const project = await projectForTask(db, t)
@@ -295,7 +286,7 @@ export async function workspaceIdForProject(db: AppDatabase, projectId: string):
   return project?.workspaceId ?? null
 }
 
-// The task's workspace id — the scoping key the knowledge + harness surfaces use.
+// The task's workspace id, the scoping key the knowledge and harness surfaces use.
 export async function workspaceIdFor(db: AppDatabase, taskId: string): Promise<string> {
   const t = await loadTask(db, taskId)
   if (!t) throw new Error('Task not found.')

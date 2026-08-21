@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// The FileVault probe (docs/security.md § On-disk). The subprocess is mocked because the answer on
-// the machine running the suite is neither known nor interesting; what is under test is the mapping from
-// what `fdesetup isactive` says to the three-valued answer the client renders — and specifically that
-// every failure mode lands on `null` rather than `false`.
+// The FileVault probe. The subprocess is mocked because the answer on the machine running the
+// suite is neither known nor interesting: what is under test is the mapping from what `fdesetup
+// isactive` says to the three-valued answer the client renders, specifically that every failure
+// mode lands on `null` rather than `false`.
 //
-// Reporting "your disk is not encrypted" because a probe timed out would train the owner to dismiss a
-// warning that matters, which is the failure this file exists to prevent.
+// Reporting "your disk is not encrypted" because a probe timed out would train the owner to
+// dismiss a warning that matters, which is the failure this file exists to prevent.
 
 const proc = vi.hoisted(() => ({ runProcess: vi.fn() }))
 vi.mock('./core/proc', () => proc)
@@ -23,8 +23,8 @@ const result = (over: Record<string, unknown> = {}) => ({
   ...over,
 })
 
-// Imported after the mock, and re-imported per case so the module-level cache starts empty — the cache is
-// the point of the last case, so it must not be shared by the others.
+// Imported after the mock, and re-imported per case so the module-level cache starts empty: the
+// cache is the point of the last case, so it must not be shared by the others.
 async function probeWith(over: Record<string, unknown>, platform = 'darwin') {
   vi.resetModules()
   proc.runProcess.mockReset()

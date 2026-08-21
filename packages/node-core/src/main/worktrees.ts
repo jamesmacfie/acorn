@@ -5,11 +5,12 @@ import type { WorktreeResult } from '@acorn/protocol/terminal.ts'
 import { isContainedPath, isDirty, worktreeBranchDirName } from './pathGuards'
 
 
-// Workspace worktrees (docs/workspaces-and-tasks.md): a workspace edits its branch in an isolated git
-// worktree instead of dirtying the main checkout, and we get a clean cleanup affordance. Worktrees
-// live under the app data dir, keyed by branch. All git runs in the *main checkout* (it owns the
-// .git the worktree links to). execFile with arg arrays — no shell; owner/repo are validated
-// upstream, the branch is slugged for the dir name and isContainedPath guards the result.
+// Workspace worktrees: docs/workspaces-and-tasks.md § Worktrees and setup owns why they exist and
+// how their paths are derived and revalidated.
+//
+// All git commands here run in the main checkout, which owns the .git the worktree links to.
+// execFile takes an argument array, never a shell; the branch is slugged for the directory name
+// and isContainedPath guards the result.
 
 async function branchExists(checkout: string, branch: string): Promise<boolean> {
   try {
@@ -31,9 +32,7 @@ async function refExists(checkout: string, ref: string): Promise<boolean> {
   }
 }
 
-// Base-ref precedence for a NEW branch (docs/terminal-and-agents.md, verne's order): per-project
-// preferred ref (prefs key `base_ref:<projectId>`, resolved by the caller) → origin/main →
-// origin/master → null (= HEAD, today's behaviour).
+// Base-ref precedence for a new branch: docs/workspaces-and-tasks.md § Worktrees and setup.
 export async function resolveBaseRef(checkout: string, preferred?: string | null): Promise<string | null> {
   for (const candidate of [...(preferred?.trim() ? [preferred.trim()] : []), 'origin/main', 'origin/master']) {
     if (await refExists(checkout, candidate)) return candidate
@@ -49,11 +48,11 @@ const isValidBranch = (branch: string): boolean => !branch.startsWith('-') && /^
 
 // The branch a linked worktree actually has checked out, read straight off disk: `<dir>/.git` is a
 // file pointing at the repo's admin dir for that worktree, whose HEAD holds the ref. `null` means
-// the directory is not a live linked worktree — pruned, moved, or on a detached HEAD.
+// the directory is not a live linked worktree: pruned, moved, or on a detached HEAD.
 //
 // Read rather than shelled out to `git branch --show-current` because resolveTaskCwd calls this on
-// EVERY task→cwd resolution, which is once per editor file read, not once per session.
-// Trusts the pointer file: a worktree relinked to a DIFFERENT repo with the same owner/name/branch
+// every task-to-cwd resolution, once per editor file read rather than once per session.
+// Trusts the pointer file: a worktree relinked to a different repo with the same owner/repo/branch
 // still passes. Compare the admin dir against the checkout if that ever matters.
 export function worktreeBranch(dir: string): string | null {
   try {
@@ -67,13 +66,13 @@ export function worktreeBranch(dir: string): string | null {
   }
 }
 
-// Why a worktree directory can't be handed to the task that owns it. Shared so the two callers —
-// reuse below and the persisted-path shortcut in taskWorktree — say the same thing.
+// Why a worktree directory can't be handed to the task that owns it. Shared with the reuse check
+// below and the persisted-path shortcut in taskWorktree.ts, so both callers give the same reason.
 export const staleWorktreeReason = (path: string, branch: string, on: string | null): string =>
   `${path} is ${on ? `checked out on '${on}', not '${branch}'` : `no longer a live git worktree for '${branch}'`}. Remove the directory and reopen the task.`
 
-// `created` distinguishes a fresh `git worktree add` from reuse of an existing dir — the caller
-// runs the workspace setup script only on the fresh path (docs/workspaces-and-tasks.md).
+// `created` distinguishes a fresh `git worktree add` from reuse of an existing directory; only the
+// fresh path runs setup (docs/terminal-and-agents.md).
 type EnsureWorktreeResult = { ok: true; path: string; created: boolean } | { ok: false; reason: string }
 
 export async function ensureWorktree(
@@ -91,10 +90,8 @@ export async function ensureWorktree(
   // identifiers too, docs/security.md).
   if (!isContainedPath(worktreesRoot, path)) return { ok: false, reason: 'Invalid worktree path.' }
   if (existsSync(path)) {
-    // Reuse — but only a LIVE worktree still on this branch. The directory name is keyed by
-    // owner/repo/branch alone, and a `git worktree prune`, a manual checkout inside it or a moved
-    // repo all leave the folder behind holding some other branch's files. Handing that back is how
-    // a task's agent ended up reading, editing and reporting on a tree that was not its own.
+    // Reuse only a live worktree still on this branch: docs/workspaces-and-tasks.md § Worktrees
+    // and setup covers why and what happens otherwise.
     const on = worktreeBranch(path)
     if (on === branch) return { ok: true, path, created: false }
     return { ok: false, reason: staleWorktreeReason(path, branch, on) }
@@ -103,17 +100,17 @@ export async function ensureWorktree(
   mkdirSync(worktreesRoot, { recursive: true })
 
   if (pullNumber != null) {
-    // PR workspace: fetch the head (uses the checkout's git credentials) and check it out on the
-    // PR's branch (`branch` == pr.headRef) so the worktree tracks a real branch, not a detached
-    // commit — new branch from the fetched head, or reuse the branch if it already exists locally.
-    // `--` ends option parsing before positionals.
+    // PR workspace: fetch the head using the checkout's git credentials, then check it out on the
+    // PR's branch (`branch` equals pr.headRef) so the worktree tracks a real branch rather than a
+    // detached commit. Create a new branch from the fetched head, or reuse the branch if it
+    // already exists locally. `--` ends option parsing before positionals.
     //
-    // Into a PRIVATE PER-PR REF, never FETCH_HEAD. That file lives in the repo's COMMON dir, shared
-    // by the checkout and every worktree, and `git fetch` rewrites it — so anything else fetching in
-    // this repo between the two commands below (another task resolving its worktree, the PR-conflicts
-    // route) decided which commit this branch was created at. The branch then carried another PR's
-    // tree under the right name, with a clean status and no diff, and the bad ref outlived the
-    // worktree. The ref is kept afterwards: it costs 41 bytes and records what the branch came from.
+    // Fetch into a private per-PR ref, never FETCH_HEAD. FETCH_HEAD lives in the repo's common
+    // dir, shared by the checkout and every worktree, and any other fetch running in this repo
+    // between the two commands below (another task resolving its worktree, the PR-conflicts route)
+    // can rewrite it first. That let a branch get created from another PR's head: right name,
+    // clean status, no diff, but the wrong tree. The ref is kept afterwards; it costs 41 bytes and
+    // records what the branch came from.
     const head = `refs/acorn/pull/${pullNumber}`
     try {
       await gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], { cwd: checkout, timeoutMs: 60_000 })
@@ -132,9 +129,9 @@ export async function ensureWorktree(
     return { ok: true, path, created: true }
   }
 
-  // Local-first workspace: add a worktree on the branch. A NEW branch starts from the resolved
-  // base ref (per-repo preference → origin/main → origin/master → HEAD, docs/terminal-and-agents.md). `--`
-  // ends option parsing so a branch/path can never be mistaken for a flag (argv-injection guard).
+  // Local-first workspace: add a worktree on the branch. A new branch starts from the resolved
+  // base ref (docs/workspaces-and-tasks.md § Worktrees and setup). `--` ends option parsing so a
+  // branch or path can never be mistaken for a flag.
   const exists = await branchExists(checkout, branch)
   const baseRef = exists ? null : await resolveBaseRef(checkout, preferredBaseRef)
   const args = exists
@@ -148,10 +145,9 @@ export async function ensureWorktree(
   return { ok: true, path, created: true }
 }
 
-// Files-to-copy (docs/workflows.md §2): carry gitignored files (.env.local, …) from the source
-// checkout into a freshly-created worktree without a setup script. Repo-relative paths only
-// (absolute / traversal entries are rejected), missing sources warn, existing targets are never
-// overwritten. Best-effort: a bad entry never fails worktree creation.
+// Copy files into a freshly created worktree without a setup script (docs/workspaces-and-tasks.md
+// § Worktrees and setup). Repo-relative paths only, missing sources warn, existing targets are
+// never overwritten, and a bad entry never fails worktree creation.
 export type CopyFilesResult = { copied: string[]; warnings: string[] }
 
 export function copyWorktreeFiles(checkout: string, worktree: string, entries: string[]): CopyFilesResult {
@@ -206,8 +202,8 @@ export async function worktreePorcelain(path: string): Promise<{ dirty: boolean;
 }
 
 
-// Remove a worktree via the main checkout. Refuses a dirty worktree unless force is set (which
-// discards uncommitted changes) — surfaced to the UI so removal is never silently destructive.
+// Remove a worktree via the main checkout. Refuses a dirty worktree unless force is set, which
+// discards uncommitted changes; the UI surfaces this so removal is never silently destructive.
 export async function removeWorktree(checkout: string, path: string, force = false): Promise<WorktreeResult> {
   if (!force && (await worktreeDirty(path))) {
     return { ok: false, reason: 'Worktree has uncommitted changes — confirm to discard.' }

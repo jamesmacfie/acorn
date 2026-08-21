@@ -48,10 +48,10 @@ describe('archiveTask teardown ordering', () => {
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'acorn-archive-'))
     checkout = join(dir, 'checkout')
-    // Base repo copied from a template built once (see beforeAll) — five fewer git spawns per test.
-    // The worktree itself is still created for real below: `worktree add` records absolute paths in
-    // .git/worktrees, so it cannot be part of a copied fixture, and these tests are precisely about
-    // real worktree teardown and removal.
+    // Base repo copied from a template built once (see beforeAll), five fewer git spawns per
+    // test. The worktree itself is still created for real below: `worktree add` records absolute
+    // paths in .git/worktrees, so it cannot be part of a copied fixture, and these tests are
+    // precisely about real worktree teardown and removal.
     cpSync(join(template, 'checkout'), checkout, { recursive: true })
     worktree = join(dir, 'wt')
     git(checkout, 'worktree', 'add', '-q', '-b', 'feat/x', worktree)
@@ -177,8 +177,8 @@ describe('archiveTask teardown ordering', () => {
       ...deps(),
       applyTaskChecks: async () => ['docker'],
     })
-    // `ok` is true because the task IS archived — offering a retry for something already done would be
-    // worse than saying what did not happen.
+    // `ok` is true because the task is archived; offering a retry for something already done
+    // would be worse than saying what did not happen.
     expect(res).toEqual({ ok: true, cleanupFailed: ['docker'] })
     const [row] = await t.db.select().from(schema.tasks)
     expect(row.status).toBe('archived')
@@ -196,7 +196,7 @@ describe('archiveTask teardown ordering', () => {
   })
 
   it('current-checkout task (worktreePath === checkout) archives without removing the checkout', async () => {
-    // Point the task at the main checkout itself, and dirty it — a real worktree would be refused.
+    // Point the task at the main checkout itself, and dirty it; a real worktree would be refused.
     await t.db.update(schema.tasks).set({ worktreePath: checkout }).where(eq(schema.tasks.id, 'task1'))
     writeFileSync(join(checkout, 'scratch.txt'), 'wip')
     const res = await archiveTask(t.db, 'task1', {}, deps())
