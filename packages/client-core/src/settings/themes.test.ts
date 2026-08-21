@@ -3,20 +3,21 @@ import { readStyleSheets, stripComments } from '../styles/readStyleSheets'
 import { PLUGIN_THEME_PREFIX } from '../plugins/chrome/themes'
 import { THEMES } from './themes'
 
-// Drift guard (docs/ui-design.md): the Appearance THEMES picker is hand-synced with the
-// `:root[data-theme="…"]` blocks in styles/tokens-theme.css. This reads the stylesheets and asserts
-// the two sets match, so adding/removing a theme in one place fails the suite until both agree.
+// Drift guard (docs/ui-design.md § Plugin themes): the Appearance themes picker is hand-synced with
+// the `:root[data-theme="…"]` blocks in styles/tokens-theme.css. This reads the stylesheets and
+// asserts the two sets match, so adding or removing a theme in one place fails the suite until both
+// agree.
 //
 // Globs the stylesheets rather than naming one file: the token layer has already been split once
-// (tokens-layout.css → tokens-{invariant,style,theme}.css + base.css + shell.css) and a test that
-// hardcodes a path just breaks on the next split.
+// (tokens-layout.css into tokens-{invariant,style,theme}.css plus base.css and shell.css), and a test
+// that hardcodes a path just breaks on the next split.
 //
 // The invariant is "no theme in the picker without a definition, and none defined without a picker
-// entry", and a plugin-contributed theme has a definition the host GENERATES rather than a block in a
-// file (plugins/chrome/themes.ts). So the set comparison below is scoped to the built-in half and the
-// namespace that separates the two halves is asserted in both directions — a stylesheet may not define
-// a `plugin:` theme, and the built-in list may not contain one. The generated half is pinned by
-// plugins/chrome/themes.test.ts, which asserts a registration produces a block whose selector is
+// entry", and a plugin-contributed theme has a definition the host generates rather than a block in a
+// file (plugins/chrome/themes.ts). So the set comparison below is scoped to the built-in half, and
+// the namespace that separates the two halves is asserted in both directions: a stylesheet may not
+// define a `plugin:` theme, and the built-in list may not contain one. The generated half is pinned
+// by plugins/chrome/themes.test.ts, which asserts a registration produces a block whose selector is
 // exactly the registered id.
 describe('THEMES ↔ stylesheets', () => {
   const css = stripComments(readStyleSheets().map((f) => f.text).join('\n'))

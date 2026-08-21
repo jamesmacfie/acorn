@@ -1,12 +1,8 @@
 import type { NodeConnectionState } from '@acorn/protocol/broker.ts'
 
-// docs/ui-design.md § Connection and staleness vocabulary: "Every node-backed surface can render
-// exactly one of: live, refreshing, stale (with age), offline (cached), disabled (plugin off), error
-// (with retry). No infinite spinners: anything past its deadline resolves to stale/offline/error."
-//
-// Six values from two inputs — the node's connection state and the query's own status — because that
-// is all the information there is. Deriving it in one place is what stops the same badge being
-// computed three subtly different ways.
+// Every Node-backed surface renders exactly one of these six values (docs/ui-design.md § States),
+// derived from the node's connection state and the query's own status. Deriving it in one place is
+// what stops the same badge being computed three subtly different ways.
 export type Freshness = 'live' | 'refreshing' | 'stale' | 'offline' | 'disabled' | 'error'
 
 // A structural subset of TanStack's query object, so callers pass the query itself and tests pass a
@@ -18,10 +14,9 @@ export type FreshnessQuery = {
   disabled?: boolean
 }
 
-// Precedence, and why: `disabled` is not a data state at all. An unreachable node comes next and wins
-// over `refreshing`, because a fetch against an offline node is going to fail and calling it
-// "refreshing" would be the infinite spinner docs/ui-design.md forbids. `degraded` is WS-down/HTTP-up: reads still
-// work, but there are no live events, so what is on screen is stale by definition.
+// Precedence follows docs/ui-design.md § States: `disabled`, then an unreachable node (which outranks
+// `refreshing`), then `degraded` (WS-down/HTTP-up, which reads as `stale`), then the query's own
+// status.
 export const freshnessOf = (state: NodeConnectionState, query: FreshnessQuery = {}): Freshness => {
   if (query.disabled) return 'disabled'
   if (state !== 'online' && state !== 'degraded') return 'offline'
@@ -40,7 +35,7 @@ export const FRESHNESS_LABELS: Record<Freshness, string> = {
   error: 'Error',
 }
 
-// Ages are shown next to `stale`/`offline` per docs/ui-design.md ("stale (with age)"); "never" rather than a
+// Ages are shown next to `stale`/`offline` per docs/ui-design.md § States; "never" rather than a
 // fabricated 0 when the node has not answered once in this session.
 export function formatLastSeen(lastSeenAt: number | undefined, now = Date.now()): string {
   if (lastSeenAt === undefined) return 'never'

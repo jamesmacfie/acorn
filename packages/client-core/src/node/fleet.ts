@@ -6,30 +6,31 @@ import type { NodeConnectionState, NodeRecord, NodeStatus } from '@acorn/protoco
 import { fleetBridge, nodeTransport } from '../platform'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
-// cache per node (docs/architecture-overview.md § Fleet semantics, docs/data-layer.md § Client cache).
+// cache per node (docs/architecture-overview.md § Client state and fleet behavior,
+// docs/data-layer.md § Preferences and client persistence).
 //
-// Membership itself is NOT owned here. Main owns it, because main owns the device tokens and the
-// pinned certificates (docs/architecture-overview.md § What runs where); this is a projection of `fleetList()` plus
-// the `onNodeStatus` push stream, and every mutation is a request to main.
+// Membership itself is not owned here. Main owns it, because main owns the device tokens and the
+// pinned certificates (docs/architecture-overview.md § Process ownership); this is a projection of
+// `fleetList()` plus the `onNodeStatus` push stream, and every mutation is a request to main.
 //
 // ## Why a QueryClient per node rather than a nodeId in every query key
 //
-// docs/data-layer.md calls the cache "keyed by (nodeId, queryKey)". Partitioning at the CLIENT satisfies that
-// without a nodeId in the key, and it is the cheaper half of the trade by a wide margin:
+// Partitioning at the client gives each node its own persister and cache without a nodeId in the key,
+// and it is the cheaper half of the trade by a wide margin:
 //
 //   - Prefixing keys means touching all 34 `*Options()` factories, the 44 cache-mutation call sites,
 //     the 3 inline key literals, and `shouldPersistQueryKey`, which reads `key[0]`/`key[4]`
-//     POSITIONALLY. A client per node touches this file and index.tsx.
-//   - "Two nodes may coincidentally hold the same UUID; that must never collide" becomes true by
-//     CONSTRUCTION rather than by every future call site remembering the convention.
+//     positionally. A client per node touches this file and index.tsx.
+//   - "Two nodes may coincidentally hold the same UUID" cannot collide by construction, rather than by
+//     every future call site remembering the convention.
 //   - IndexedDB partitions for free: one persister key per node.
 //
 // The invariant that makes it safe is stated in activeNode.ts: only the active node's provider is
 // mounted, and `setActiveNode` runs before the swap.
 const CACHE_KEY_PREFIX = 'acorn-cache:'
 
-// The partition used when there is no broker at all — the renderer served directly by a node
-// (`dev:node` in a browser), where the origin IS the node and no nodeId is ever known. A named
+// The partition used when there is no broker at all: the renderer served directly by a node
+// (`dev:node` in a browser), where the origin is the node and no nodeId is ever known. A named
 // constant rather than `''` so the IndexedDB key stays readable.
 export const ORIGIN_NODE_ID = 'origin'
 
@@ -44,9 +45,9 @@ export const nodeStatus = (nodeId: string): NodeStatus | undefined => statuses()
 // "may I trust what I have?", and the answer for a node the broker has not reported on is no.
 export const nodeState = (nodeId: string): NodeConnectionState => statuses()[nodeId]?.state ?? 'offline'
 
-// The node this window opens on when nothing else is selected, and the one a notification with no node
-// of its own is attributed to. NOT a prefs home: preferences follow the resource they describe, so this
-// pick no longer decides where anything is stored (docs/state.md § Scope rules).
+// The node this window opens on when nothing else is selected, and the one a notification with no
+// node of its own is attributed to. Not a prefs home: preferences follow the resource they describe
+// (docs/state.md § Scope rules), so this pick no longer decides where anything is stored.
 export const homeNode = (): NodeRecord | undefined => nodes().find((node) => node.local) ?? nodes()[0]
 export const homeNodeId = (): string | null => homeNode()?.nodeId ?? null
 
@@ -86,10 +87,11 @@ export function clientFor(nodeId: string): NodeCache {
   if (existing) return existing
   const cache: NodeCache = {
     client: new QueryClient({
-      // Keep focus refreshes useful without turning every quick app switch into a fan-out across every
-      // active query. Domain queries that genuinely need fresher data override this (running checks,
-      // integration detail, the one-minute PR-list poll).
-      // gcTime must outlive a session so persisted entries survive reload (docs/caching.md 3-tier).
+      // Keep focus refreshes useful without turning every quick app switch into a fan-out across
+      // every active query. Domain queries that genuinely need fresher data override this (running
+      // checks, integration detail, the one-minute PR-list poll).
+      // gcTime must outlive a session so persisted entries survive reload (docs/caching.md § Renderer
+      // query cache).
       defaultOptions: {
         queries: {
           refetchOnWindowFocus: true,
@@ -98,8 +100,9 @@ export function clientFor(nodeId: string): NodeCache {
         },
       },
     }),
-    // Persist to IndexedDB → instant render from last-known data + offline browsing of recently-seen
-    // PRs. One key per node: a shared key would let node A's snapshot rehydrate into node B.
+    // Persist to IndexedDB for an instant render from last-known data and offline browsing of
+    // recently-seen PRs. One key per node: a shared key would let node A's snapshot rehydrate into
+    // node B.
     persister: createAsyncStoragePersister({
       storage: { getItem: get, setItem: set, removeItem: del },
       key: cacheKeyFor(nodeId),
@@ -114,9 +117,9 @@ export function clientFor(nodeId: string): NodeCache {
 
 export const homeClient = (): QueryClient => clientFor(homeNodeId() ?? ORIGIN_NODE_ID).client
 
-// Forget everything this client cached for a node. The whole point of the per-node partition: there is
-// exactly one place a node's data lives, so eviction is this function and nothing else — contrast
-// `runtime:task-archived`, which has to fan out to ten state owners.
+// Forget everything this client cached for a node. The whole point of the per-node partition: there
+// is exactly one place a node's data lives, so eviction is this function and nothing else, in
+// contrast to `runtime:task-archived`, which has to fan out to ten state owners.
 //
 // Clearing the in-memory client as well as the IndexedDB key matters because the two are independent
 // tiers: dropping only the key would leave a live cache that re-persists itself on the next write.

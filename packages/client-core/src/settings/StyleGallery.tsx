@@ -4,12 +4,12 @@ import { STYLES } from './uiStyles'
 import { THEMES } from './themes'
 
 // Dev-only style gallery: one instance of every primitive × variant × tone, plus the surfaces the
-// packs restyle most. It exists to make authoring a style pack a tight loop — switch the pack here
-// and see the whole vocabulary move at once, instead of hunting the app for an affected surface.
+// packs restyle most. It exists to make authoring a style pack a tight loop: switch the pack here and
+// see the whole vocabulary move at once, instead of hunting the app for an affected surface.
 //
-// The pickers below write to the DOM attributes directly rather than to prefs, so previewing does
-// not clobber the user's real appearance settings. Closing settings restores them, because
-// appStartup's effect re-applies from prefs on the next change.
+// The pickers below write to the DOM attributes directly rather than to prefs, so previewing does not
+// clobber the user's real appearance settings. Closing settings restores them, because appStartup's
+// effect re-applies from prefs on the next change.
 export default function StyleGallery() {
   const [style, setStyle] = createSignal(document.documentElement.dataset.style ?? 'terminal')
   const [theme, setTheme] = createSignal(document.documentElement.dataset.theme ?? 'light')

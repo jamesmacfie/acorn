@@ -3,37 +3,21 @@ import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { clientFor, nodes, nodeState, nodeStatus } from './fleet'
 import { freshnessOf, type Freshness } from './freshness'
 
-// The one fan-out primitive (docs/architecture-overview.md § Fleet semantics: "Aggregate surfaces fan out
-// per-node requests with per-node timeouts and merge results. A slow or offline node yields a
-// partial-result banner, never a failed page.").
+// The one fan-out primitive. Aggregate surfaces fan out per-node requests with per-node timeouts and
+// merge results into a partial-result banner rather than a failed page
+// (docs/architecture-overview.md § Client state and fleet behavior). Agent Center, the workspace
+// picker, the attention inbox and the palette all share this one implementation instead of each
+// reimplementing the deadline, the cache fallback, and the "partial results are data" rule.
 //
-// It exists once so that Agent Center, the workspace picker, the attention inbox and the palette all get
-// the same three properties without each reimplementing them:
+// Not a TanStack `useQueries`: each node has its own QueryClient, so `fetchQuery` against an
+// explicitly named client is the only shape that reaches the right cache. It writes through, so a
+// later single-node read of the same key is warm.
 //
-//   1. **A per-node deadline.** docs/ui-design.md forbids infinite spinners; a node behind a dropped VPN answers
-//      nothing and its socket may not have been marked offline yet, so the timeout — not the connection
-//      state — is what bounds the page.
-//   2. **Cache as the fallback.** A node that times out still has whatever it last said in its own
-//      QueryClient, so its rows render with a `stale`/`offline` badge instead of vanishing. That is only
-//      possible because the cache is partitioned per node (fleet.ts) — there is a real place to look.
-//   3. **Partial results are data, not an error.** `unavailable` is a list the caller renders as a
-//      banner; nothing rejects, so one dead node cannot fail the surface.
-//
-// Deliberately NOT a TanStack `useQueries`: the whole point is that each node has its OWN QueryClient,
-// and a hook resolves the one from context. `fetchQuery` against an explicitly named client is the only
-// shape that reaches the right cache, and it writes through it, so a later single-node read of the same
-// key is warm.
-//
-// ## The one rule that matters when picking `queryKey`
-//
-// **Sharing a key with another reader means sharing the value's SHAPE.** `fetchQuery` writes through, which is
-// the feature — a fan-out over `tasksKey` warms the same cache the rail and the palette read — and it is also
-// the trap. A fan-out must reuse a domain key only when the response has exactly that domain's value shape;
-// otherwise a private aggregate key prevents one reader from corrupting another reader's cache entry.
-//
-// So: reuse a domain key when the fetch returns exactly that domain value (fleet home now fetches the task
-// LIST and counts in the component), and use a private key otherwise (`['node-stat', id]`,
-// `['attention', id]`).
+// The one rule for picking a `queryKey`: sharing a key with another reader means sharing the value's
+// shape (docs/caching.md § Fan-out cache safety). Reuse a domain key only when the response is
+// exactly that domain's value (fleet home fetches the task list and counts it in the component); use
+// a private key otherwise (`['node-stat', id]`, `['attention', id]`), or one reader can corrupt
+// another reader's cache entry.
 
 // Matches the broker's DEGRADED_AFTER_MS. Past this a node is treated as not-answering for aggregation
 // purposes, whatever its socket says.
@@ -44,8 +28,8 @@ export type FleetRow<T> = {
   node: NodeRecord
   data: T
   // `live` for a fresh answer; `stale`/`offline` when the row came from that node's cache after a
-  // timeout or an error. Rows carry it individually because a fleet surface's whole job is to show that
-  // one node's data is older than another's.
+  // timeout or an error. Carried per row, since a fleet surface's job is to show that one node's data
+  // is older than another's.
   freshness: Freshness
 }
 
@@ -68,12 +52,13 @@ export type FleetQueryOptions = {
 }
 
 // What each node's own QueryClient already holds under this key. Serve-then-revalidate: a remounted
-// surface renders the list it last had instead of flashing "Loading…" while the fan-out re-runs — the
-// same bargain `fetchOne` already strikes when a node times out, taken one step earlier. Badged
-// `refreshing` rather than `stale`, because a fetch IS in flight; the real answer replaces these rows.
-// Exported for its test: `createResource` cannot run in this suite (solid resolves to its server build
-// under a node env with no solid plugin), so the seeding rule is covered here rather than through the
-// resource that calls it.
+// surface renders the list it last had instead of showing a spinner while the fan-out re-runs, the
+// same bargain `fetchOne` strikes when a node times out, taken one step earlier. Badged `refreshing`
+// rather than `stale`, because a fetch is actually in flight.
+//
+// Exported for its own test: `createResource` cannot run in this suite (Solid resolves to its server
+// build under a node environment with no Solid plugin), so the seeding rule is covered here instead
+// of through the resource that calls it.
 export function cachedFleet<T>(queryKey: readonly unknown[], options: FleetQueryOptions = {}): FleetResult<T> {
   const wanted = options.nodeIds ? new Set(options.nodeIds) : null
   const rows: FleetRow<T>[] = []
@@ -94,8 +79,8 @@ const reasonOf = (error: unknown): string =>
 // rather than repeating the generic message every failure would otherwise share.
 function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    // Seconds above a second, milliseconds below. `Math.round(ms/1000)` produced "no answer within 0s" for
-    // every sub-second deadline — a string the banner shows the owner verbatim.
+    // Seconds above a second, milliseconds below. `Math.round(ms/1000)` used to produce "no answer
+    // within 0s" for every sub-second deadline, a string the banner shows the owner verbatim.
     const label = ms >= 1_000 ? `${Math.round(ms / 1000)}s` : `${ms}ms`
     const timer = setTimeout(() => reject(new Error(`no answer within ${label}`)), ms)
     promise.then(
@@ -136,10 +121,10 @@ async function fetchOne<T>(
   } catch (error) {
     const cached = client.getQueryData<T>(queryKey)
     if (cached === undefined) return { unavailable: { nodeId: node.nodeId, label: node.label, reason: reasonOf(error) } }
-    // `isStale`, NOT `isError`. docs/ui-design.md's `error` means "no data, offer a retry"; a row served from cache
-    // has data, and the honest label for it is `stale` — or `offline` when the connection state already
-    // says the node is gone, which freshnessOf decides on its own. Passing `isError` here would paint an
-    // error badge over a perfectly readable row.
+    // `isStale`, not `isError`: a row served from cache has data, and the honest label for it is
+    // `stale`, or `offline` when the connection state already says the node is gone, which
+    // `freshnessOf` decides on its own (docs/ui-design.md § States). Passing `isError` here would
+    // paint an error badge over a perfectly readable row.
     return { row: { nodeId: node.nodeId, node, data: cached, freshness: freshnessOf(state, { isStale: true }) } }
   }
 }
@@ -167,8 +152,8 @@ export async function fetchFleet<T>(
   return { rows, unavailable }
 }
 
-// The reactive half. Re-runs when the fleet changes or when `deps` changes — pass a memo of whatever the
-// fetch closes over (a workspace id, a search string) so a stale closure cannot be reused.
+// The reactive half. Re-runs when the fleet changes or when `deps` changes: pass a memo of whatever
+// the fetch closes over (a workspace id, a search string) so a stale closure cannot be reused.
 export function createFleetQuery<T, D = void>(
   queryKey: (dep: D) => readonly unknown[],
   fetch: (nodeId: string, dep: D, signal: AbortSignal) => Promise<T>,

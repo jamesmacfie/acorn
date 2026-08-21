@@ -69,10 +69,10 @@ describe('savePref', () => {
   })
 
   it('writes a DEVICE pref locally and never reaches a node', async () => {
-    // The whole point of the tier: `theme` is a property of this installation, `localStorage.setItem` cannot
-    // fail in a way a retry would fix, and the optimistic-write-and-roll-back dance above exists for a network
-    // round trip that no longer happens. The cache write still happens, because that is what every reactive
-    // reader sees.
+    // The point of the tier: `theme` is a property of this installation, `localStorage.setItem`
+    // cannot fail in a way a retry would fix, and the optimistic-write-and-roll-back dance above
+    // exists for a network round trip that no longer happens. The cache write still happens, because
+    // that is what every reactive reader sees.
     await withLocalStorage(async () => {
       const client = new QueryClient()
       client.setQueryData(prefsKey, { theme: 'light' })
@@ -84,14 +84,14 @@ describe('savePref', () => {
   })
 
   it('has the DEVICE value in localStorage before the cache notifies', async () => {
-    // Readers see prefs through `prefsOptions.select` = mergePrefs(raw, readDevicePrefs()), where device
-    // wins. So the cache write must land AFTER localStorage or select recomputes against the old device
-    // value and discards the new one — which is how a theme or style change used to appear to do nothing
-    // until an unrelated pref write re-ran select seconds later.
+    // Readers see prefs through `prefsOptions.select` = mergePrefs(raw, readDevicePrefs()), where
+    // device wins. So the cache write must land after localStorage, or select recomputes against the
+    // old device value and discards the new one: that is how a theme or style change used to appear
+    // to do nothing until an unrelated pref write re-ran select seconds later.
     await withLocalStorage(async () => {
       const client = new QueryClient()
       client.setQueryData(prefsKey, { style: 'terminal' })
-      // Seed the device tier, which is the whole point: with localStorage empty the stale read the bug
+      // Seed the device tier, which is the point: with localStorage empty the stale read the bug
       // depends on contributes nothing and the assertion below passes either way.
       localStorage.setItem('acorn-pref:style', 'terminal')
       // The shape every reader actually observes: prefsOptions' select over the raw cache.

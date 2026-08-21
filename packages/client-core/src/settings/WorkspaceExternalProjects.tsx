@@ -5,23 +5,9 @@ import { integrationProjectsOptions, integrationsOptions, workspaceExternalProje
 import { setWorkspaceExternalProjects } from '../workspaces/mutations'
 import { Alert, Button, Checkbox } from '../ui/primitives'
 
-// Settings → per-workspace page: which of a connected integration's projects this workspace follows.
-//
-// The HOST draws this, for every provider, and that is the point. `workspace_external_projects` is
-// core's table on a core route, and the only writer it ever had lived inside the Linear plugin's browse
-// pane — so when that pane became a host-drawn rail, the mapping became unwritable and every
-// integration silently showed everything (docs/integrations.md § Linear). A plugin cannot get it back:
-// every workspace mutation is permanently unmappable on the frame bridge, and `CoreServices.projects`
-// has a provider-scoped READ and no write at all, both deliberately.
-//
-// Which providers appear is decided by the providers themselves, through the `projects` contribution
-// they either declare or do not (node-core/server/integrations/types.ts). A provider with nothing to
-// enumerate is absent rather than present and empty.
-//
-// Not its own settings page. The `workspace` group has exactly one, and that page already answers
-// "what is in this workspace" — its projects and their build config. Which external projects it follows
-// is one more answer to the same question at the same scope, so a second page would split one thought
-// across two screens and put a tab bar over two items.
+// Settings → per-workspace page: which of a connected integration's projects this workspace follows
+// (docs/workspaces-and-tasks.md § Workspace and project, docs/integrations.md § Project sources). The
+// host draws this for every provider, on core's table and core's route; a plugin cannot write it.
 export default function WorkspaceExternalProjects(props: { workspace: Workspace }) {
   const queryClient = useQueryClient()
   const integrations = createQuery(() => integrationsOptions(true))
@@ -30,8 +16,8 @@ export default function WorkspaceExternalProjects(props: { workspace: Workspace 
   const [error, setError] = createSignal('')
 
   // Only connections whose provider declared a project source, and only ones the owner has not turned
-  // off. `needs-auth` stays in: the route reports it per connection, and a row that says "reconnect" is
-  // more use than a connection that quietly vanished from the list.
+  // off. `needs-auth` stays in: the route reports it per connection, and a row that says "reconnect"
+  // is more use than a connection that quietly vanished from the list.
   const candidates = (): Integration[] => {
     const supported = new Set((integrations.data?.providers ?? []).filter((provider) => provider.supportsProjects).map((provider) => provider.id))
     return (integrations.data?.integrations ?? []).filter((row) => supported.has(row.providerId) && row.status !== 'disabled')
@@ -45,10 +31,10 @@ export default function WorkspaceExternalProjects(props: { workspace: Workspace 
    * Add or remove exactly one pair and write the whole set back, because the route replaces the whole
    * set for the workspace.
    *
-   * Deriving the next set from the CURRENT one is what keeps sibling mappings safe by construction
-   * rather than by a merge step someone has to remember: editing Linear's selection carries Rollbar's
-   * rows through verbatim, and so does a connection whose own list failed to load — its rows are still
-   * in `current()` even though the picker cannot show them.
+   * Deriving the next set from the current one keeps sibling mappings safe by construction rather
+   * than by a merge step someone has to remember: editing Linear's selection carries Rollbar's rows
+   * through verbatim, and so does a connection whose own list failed to load, since its rows are
+   * still in `current()` even though the picker cannot show them.
    */
   const toggle = async (connectionId: string, externalId: string, next: boolean): Promise<void> => {
     setBusy(true)

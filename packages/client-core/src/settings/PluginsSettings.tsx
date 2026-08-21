@@ -32,21 +32,13 @@ import {
 } from '../registries/exclusiveSlots'
 import './settings.css'
 
-// Settings → Plugins (docs/ui-design.md § New surfaces: "the list of plugins with enable/disable toggles
-// (per node)"), and since phase 5 the whole install lifecycle as well
-// (docs/plugins.md).
+// Settings → Plugins: per-node install, toggle, and the install lifecycle
+// (docs/plugins.md § Activation). Per node because a fleet is a set of independently administered
+// nodes; there is no install-everywhere or disable-everywhere here.
 //
-// Per NODE, and the node picker at the top is the whole reason this is not a plain list: which plugins a
-// node runs decides which routes exist and which SQLite files it opens, so "disable docker" is a statement
-// about one machine. The build box may want docker off and the laptop may want it on. Install is per node
-// for the same reason, and more strongly — a fleet is a set of independently administered nodes, so there
-// is no "install everywhere" here and no pretending there could be.
-//
-// Two facts per row, not one. A toggle takes effect at the node's next start — a plugin's routes, tables
-// and jobs are wired at init — so between saving and restarting, `disabled` (what will happen) and
-// `running` (what is happening) differ. Collapsing them would either lie about the checkbox or lose the
-// banner, and this page is the only place the owner can see the difference. An install has exactly the
-// same shape, which is why it reuses the same banner rather than growing its own.
+// Two facts per row, not one: `disabled` (what will happen at the node's next start) and `running`
+// (what is happening now) can differ between saving and restarting, and this page is the only place
+// the owner can see the difference (docs/plugins.md § Activation).
 
 type SourceKind = 'github' | 'npm' | 'url' | 'path'
 
@@ -57,9 +49,9 @@ const PLACEHOLDER: Record<SourceKind, string> = {
   path: '/absolute/path/to/the/plugin',
 }
 
-// `name@version` collapsed into one field rather than two, because that is how everyone already writes
-// it. The split is on the LAST '@' and only past position 0, so a scoped npm name (`@scope/pkg`) keeps
-// its own.
+// `name@version` collapsed into one field rather than two, because that is how everyone already
+// writes it. The split is on the last `@` and only past position 0, so a scoped npm name
+// (`@scope/pkg`) keeps its own.
 export function buildInstallSource(kind: SourceKind, raw: string): PluginInstallSource {
   const text = raw.trim()
   if (kind === 'url') return { url: text }
@@ -72,16 +64,10 @@ export function buildInstallSource(kind: SourceKind, raw: string): PluginInstall
     : { npm: name, ...(suffix ? { version: suffix } : {}) }
 }
 
-// The seeded prompt behind "Create a plugin". Two sentences of process and one blank line for the owner
-// to finish the thought in, which is all bb's equivalent is — the teaching is not in this text, it is in
-// the `plugin_authoring` tool this text tells the agent to call (node-core/server/agentTools/
-// pluginAuthoring.ts, whose test asserts this file still names it).
-//
-// Scoped down, deliberately, and worth being plain about: this does NOT open a new task. `TaskSeed` has
-// no prompt field and Settings has no project in scope, so "open a task with this prompt" would mean a
-// protocol field, a column and a create-modal seed path — new plumbing for an entry point. What exists
-// already is `sendReferenceToAgent`, the "drop this text into the task's agent composer as a draft" seam
-// the editor and changes panes use, and it degrades honestly when there is no session to drop into.
+// The seeded prompt behind "Create a plugin" (docs/plugins.md § Teaching the agent). The teaching
+// lives in the `plugin_authoring` tool this text tells the agent to call
+// (node-core/server/agentTools/pluginAuthoring.ts, whose test asserts this file still names it), not
+// in this text.
 export const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
 
 Call the \`plugin_authoring\` tool first. It returns the authoring contract and this node's own manifest
@@ -98,9 +84,9 @@ export default function PluginsSettings() {
   const [busy, setBusy] = createSignal(false)
   const [kind, setKind] = createSignal<SourceKind>('github')
   const [spec, setSpec] = createSignal('')
-  // Which row is mid-uninstall. Inline rather than a modal because the question is not yes/no — keeping
-  // or deleting the plugin's data is a third answer, and burying it in a checkbox inside a confirmation
-  // is how someone deletes a year of notes by reflex.
+  // Which row is mid-uninstall. Inline rather than a modal, because keeping or deleting the plugin's
+  // data is a third answer, not yes/no, and burying it in a checkbox inside a confirmation is how
+  // someone deletes a year of notes by reflex.
   const [removing, setRemoving] = createSignal<string | null>(null)
 
   const [state, { mutate, refetch }] = createResource<NodePluginState | null, string>(
@@ -109,30 +95,29 @@ export default function PluginsSettings() {
   )
 
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
-  // A required plugin cannot be disabled, so it is not a checkbox — the route refuses one and the host
-  // ignores it, and offering the control would be an affordance that silently does nothing.
+  // A required plugin cannot be disabled, so it is not a checkbox. The route refuses one and the host
+  // ignores it; offering the control would be an affordance that silently does nothing.
   const optional = createMemo(() => rows().filter((row) => !row.required))
   const required = createMemo(() => rows().filter((row) => row.required))
   const restartRequired = () => state()?.restartRequired === true
 
   // The device's own answers, which the node knows nothing about: it served the bundle, and this
-  // machine declined to run it — or put it into development mode (plugins/distribution.ts,
+  // machine declined to run it, or put it into development mode (plugins/distribution.ts,
   // docs/security.md § The dev grant). Refetched after the one control on this page that changes them.
   const [custody, { refetch: refetchCustody }] = createResource(async () => await readPluginHostState())
   const blockedHere = (row: NodePluginRow): boolean => {
     const hash = row.installed?.client?.hash
     return !!hash && (custody()?.acks ?? []).some((ack) => ack.pluginId === row.name && ack.hash === hash && ack.decision === 'rejected')
   }
-  // A plugin in development on THIS device, against THIS node. Both halves matter: the same plugin may be
-  // a plain install on the owner's other laptop, and a bundle offered under this name by a different node
-  // is not covered by the grant.
+  // A plugin in development on this device, against this node (docs/security.md § The dev grant).
+  // Both halves matter: the same plugin may be a plain install on the owner's other laptop, and a
+  // bundle offered under this name by a different node is not covered by the grant.
   const devGrant = (row: NodePluginRow) =>
     (custody()?.devGrants ?? []).find((grant) => grant.pluginId === row.name && grant.nodeId === nodeId())
 
-  // Ending development mode is one act with two halves (main/pluginTrustStore.ts): the grant goes, and so
-  // does every bundle it auto-trusted. What is left is whatever the owner answered by hand, so the current
-  // bundle is undecided again and the normal per-hash prompt asks about it on the next distribution pass —
-  // which is exactly what promoting a plugin to a normal install has to mean.
+  // Ending development mode drops the grant and every acknowledgement it wrote (docs/security.md
+  // § The dev grant), so promoting a plugin to a normal install re-enters per-hash trust at the
+  // current bundle.
   const endDevMode = (row: NodePluginRow) =>
     run(async () => {
       await setPluginDevGrant({ pluginId: row.name, nodeId: nodeId() ?? '', grant: false })
@@ -160,22 +145,21 @@ export default function PluginsSettings() {
   const restart = () =>
     run(async () => {
       await restartLocalNode()
-      // The renderer is reloaded by main after a successful restart, so this refetch only matters when it
-      // is not (a build with no supervision) — in which case the list should still be re-read.
+      // Main reloads the renderer after a successful restart, so this refetch only matters when that
+      // did not happen (a build with no supervision), in which case the list still needs a re-read.
       await refetch()
     })
 
-  // The node has the package; this device has not seen its bytes yet. The boot pass is what fetches them,
-  // hashes them locally and queues the trust prompt — so an install walks straight into consent rather
-  // than waiting for the next launch to ask (plugins/distribution.ts).
+  // The node has the package; this device has not seen its bytes yet (docs/security.md § Third-party
+  // plugin bundles). The boot pass fetches them, hashes them locally, and queues the trust prompt, so
+  // an install walks straight into consent rather than waiting for the next launch to ask.
   const settle = async () => {
     await refetch()
     await syncPluginDistribution()
   }
 
-  // The agent writes the package; the owner still installs it. So this button reaches an agent, never the
-  // install route — the whole point of the approval split is that nothing on the agent's side of it can
-  // put code on the node.
+  // The agent writes the package; the owner still installs it (docs/plugins.md § Approval-mediated
+  // install). This button reaches an agent, never the install route.
   const createPlugin = () =>
     run(async () => {
       const taskId = activeTaskId()
@@ -184,10 +168,10 @@ export default function PluginsSettings() {
       if (!result.ok) throw new Error(result.reason ?? 'That task has no agent session to send to.')
     })
 
-  // Offered only for a LOCAL node, and that is not a polish detail: the dialog browses this device's
-  // filesystem and the path is resolved by the node, so picking a folder for a remote node would hand it
-  // an absolute path that means something else there, or nothing at all. Remote nodes keep the text
-  // field, where the owner is typing a path on the remote machine and knows it.
+  // Offered only for a local node: the dialog browses this device's filesystem and the path is
+  // resolved by the node, so picking a folder for a remote node would hand it a path that means
+  // something else there, or nothing at all. Remote nodes keep the text field, where the owner types a
+  // path on the remote machine.
   const canBrowse = () => kind() === 'path' && node()?.local === true && canPickFolder()
 
   const browse = () =>
@@ -204,10 +188,10 @@ export default function PluginsSettings() {
       await settle()
     })
 
-  // No background checking and no "an update is available" badge: re-resolving every source on every
-  // roster read would mean this page phones GitHub for each installed plugin, and an update is the one
-  // moment a compromised maintainer gets to run new code (docs/security.md § Supply
-  // chain). The owner asks, and the node answers with whatever the source resolves to now.
+  // No background checking and no "an update is available" badge (docs/security.md § Supply chain):
+  // re-resolving every source on every roster read would phone the provider for each installed plugin,
+  // and an update is the one moment a compromised maintainer gets to run new code. The owner asks, and
+  // the node answers with whatever the source resolves to now.
   const update = (id: string) =>
     run(async () => {
       const result = await updateNodePlugin(id, {}, nodeId() ?? undefined)
@@ -436,15 +420,9 @@ export default function PluginsSettings() {
   )
 }
 
-// The arbitration for the exclusive slots (registries/exclusiveSlots.ts).
-//
-// HERE rather than in Appearance, and the difference is what the choice is ABOUT. Appearance is two axes
-// the app owns — colour and shape — and every option in it exists whether or not anything is installed.
-// This picker has options only because packages are installed, its options are named after them, and the
-// person who wants to change it back is a person looking for the plugin that did it. That is this page.
-//
-// Hidden entirely when nobody has offered, because a select with one option is a control that cannot do
-// anything, and a permanent row saying "no plugin replaces your task list" is chrome earning nothing.
+// The exclusive-slot picker (registries/exclusiveSlots.ts, docs/plugins.md § Replacing a core
+// surface). Lives here rather than in Appearance, and hidden entirely when nobody has offered a
+// replacement, per that section.
 function ReplacedSurfaces() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
@@ -489,6 +467,7 @@ function ReplacedSurfaces() {
   )
 }
 
-// Core's own name for each designated surface. Core's, not the plugin's: the label beside the picker has
-// to say which of ACORN's surfaces is being replaced, and a plugin's own label is already the option text.
+// Core's own name for each designated surface. Core's, not the plugin's: the label beside the picker
+// says which of acorn's surfaces is being replaced, and a plugin's own label is already the option
+// text.
 const CORE_SLOT_LABEL: Record<CoreExclusiveSlot, string> = { 'rail.taskList': 'Task list in the rail' }

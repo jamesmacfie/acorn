@@ -14,8 +14,8 @@ const ROWS: NodePluginRow[] = [
 
 describe('nextDisabledList', () => {
   it('adds a name while keeping the others, sorted by nothing in particular but stable', () => {
-    // The route takes the WHOLE list, so a toggle is a recompute rather than a flag flip — which is the
-    // trap: dropping the rows that were already off would silently re-enable them.
+    // The route takes the whole list, so a toggle is a recompute rather than a flag flip: dropping
+    // the rows that were already off would silently re-enable them.
     expect(nextDisabledList(ROWS, 'docker', true)).toEqual(['rollbar', 'docker'])
   })
 

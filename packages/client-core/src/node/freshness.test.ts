@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { formatLastSeen, freshnessOf } from './freshness'
 
-// docs/ui-design.md § Connection and staleness vocabulary. Six values, and every input combination must
-// land on exactly one — "no infinite spinners: anything past its deadline resolves to
-// stale/offline/error".
+// docs/ui-design.md § States. Six values, and every input combination must land on exactly one: no
+// infinite spinners, since anything past its deadline resolves to stale/offline/error.
 describe('freshnessOf', () => {
   it('reads an online node with fresh data as live', () => {
     expect(freshnessOf('online')).toBe('live')
@@ -16,7 +15,7 @@ describe('freshnessOf', () => {
   })
 
   it('treats degraded as stale, because there are no live events to trust', () => {
-    // WS down, HTTP up: reads still work, so this is not offline — but nothing on screen is being
+    // WS down, HTTP up: reads still work, so this is not offline, but nothing on screen is being
     // updated by events either.
     expect(freshnessOf('degraded')).toBe('stale')
     expect(freshnessOf('degraded', { isStale: false })).toBe('stale')
@@ -24,7 +23,7 @@ describe('freshnessOf', () => {
 
   it('reads every unreachable state as offline, fetching or not', () => {
     // An in-flight fetch against an unreachable node is going to fail; calling it "refreshing" is the
-    // infinite spinner docs/ui-design.md forbids.
+    // infinite spinner docs/ui-design.md § States forbids.
     for (const state of ['offline', 'incompatible', 'revoked'] as const) {
       expect(freshnessOf(state)).toBe('offline')
       expect(freshnessOf(state, { isFetching: true })).toBe('offline')

@@ -4,8 +4,8 @@ import { clientFor, refreshFleet, _resetFleet } from './fleet'
 import { cachedFleet, fetchFleet } from './fanout'
 
 // The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed
-// page" (docs/architecture-overview.md § Fleet semantics) true once instead of four times. These cases
-// are the three properties it exists to provide.
+// page" (docs/architecture-overview.md § Client state and fleet behavior) true once instead of four
+// times. These cases are the three properties it exists to provide.
 
 const record = (nodeId: string, label: string, local = false): NodeRecord => ({
   nodeId,
