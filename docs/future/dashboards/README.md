@@ -81,8 +81,8 @@ confirmation is the consent machinery it reuses.
   deliberately, not inherit.)
 - **A screen-reader data table inside a chart** — the chart exposes its own rows without the flip
   to `table`, with no second rendering path for cells.
-- **`core:backup`** (lives in [`../cron/engine.md § migration`](../cron/engine.md)) — one
-  `scheduler.register` block behind one product decision: how many backups should a node keep?
+- **`core:backup`** (`docs/schedules.md § Not built yet`) — one `scheduler.register` block behind
+  one product decision: how many backups should a node keep?
 
 ## Reading order for a fresh session
 

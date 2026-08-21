@@ -301,5 +301,6 @@ retention.
 - **Unattended backup.** `main/backup.ts` is route-triggered only, and a `core:backup` schedule is one
   registration away — but it needs a retention policy nobody has asked for yet, and a weekly archive of
   every database written forever to one directory is unbounded disk growth. The open question is *how
-  many backups should a node keep*; `docs/future/cron/engine.md § migration` has the reasoning.
+  many backups should a node keep*; see git history (`git log --follow -- docs/future/cron`) for the
+  fuller reasoning.
 - **`agent-run`**, named in the vocabulary and gated on a headless agent runtime.
