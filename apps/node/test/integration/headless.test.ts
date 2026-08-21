@@ -78,7 +78,7 @@ describe('runHeadless against the committed fake agent (no real CLIs)', () => {
     ...(structured ? { FAKE_AGENT_STRUCTURED: structured } : {}),
   })
 
-  // The fake agent rides the SAME argv-template path a real profile would.
+  // The fake agent rides the same argv-template path a real profile would.
   const argv = () => buildHeadlessArgv('claude-code', FAKE_AGENT, { prompt: 'Review.', schema: { type: 'object' } })!
 
   it('success: captures result + validated structured output + session id + cost', async () => {

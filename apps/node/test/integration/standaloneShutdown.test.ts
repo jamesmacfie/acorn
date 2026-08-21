@@ -7,8 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-// Generous relative to the 30s deadline the drain itself carries — the point is to catch a HANG, not to
-// police the drain's speed on a loaded runner (CLAUDE.md § the suite is load-sensitive).
+// Generous relative to the 30s deadline the drain itself carries. The point is to catch a hang, not
+// to police the drain's speed on a loaded runner (CLAUDE.md § the suite is load-sensitive).
 const EXIT_BUDGET_MS = 25_000
 
 type Handshake = { nodeId: string; endpoint: string; deviceToken: string }
@@ -38,8 +38,9 @@ class StandaloneNode {
       let buffered = ''
       this.child.stdout?.on('data', (chunk: Buffer) => {
         buffered += chunk.toString()
-        // The handshake is ONE line of JSON among free-form logging (server/standalone.ts's head comment
-        // calls it the contract), so scan lines rather than assuming it arrives first or alone.
+        // The handshake is one line of JSON among free-form logging (server/standalone.ts's head
+        // comment calls it the contract), so scan lines rather than assuming it arrives first or
+        // alone.
         for (const line of buffered.split('\n')) {
           try {
             const parsed = JSON.parse(line) as Partial<Handshake>
@@ -62,8 +63,8 @@ class StandaloneNode {
     return this.handshake
   }
 
-  // Resolves with the exit code, or null if the budget expires first — never hangs the suite on the very
-  // failure it is looking for.
+  // Resolves with the exit code, or null if the budget expires first. Never hangs the suite on the
+  // very failure it is looking for.
   terminate(budgetMs: number): Promise<number | null> {
     return new Promise((resolveExit) => {
       const timer = setTimeout(() => resolveExit(null), budgetMs)

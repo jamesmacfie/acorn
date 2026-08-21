@@ -10,7 +10,7 @@ import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // The pairing surface end to end over the assembled app (docs/api-reference.md § Pairing): what the
 // two pre-auth routes may leak, that every pairing failure is byte-identical, and that a paired token
-// then works everywhere a session does — and stops working the instant the device is revoked.
+// then works everywhere a session does, and stops working the instant the device is revoked.
 
 const NODE_ID = '11111111-2222-3333-4444-555555555555'
 const FINGERPRINT = 'a'.repeat(64)
@@ -23,7 +23,7 @@ let env: Env
 beforeEach(() => {
   harness = makeTestDb()
   app = createApp()
-  // A real device service and a real pairing window over a real DB — the uniformity being asserted
+  // A real device service and a real pairing window over a real DB. The uniformity being asserted
   // below is a property of those two working together, so stubbing either would prove nothing.
   env = {
     DB: harness.db,
@@ -33,7 +33,7 @@ beforeEach(() => {
     DEVICES: deviceService(harness.db),
     PAIRING_CODES: pairingCodes(),
     ACTIVE_IDENTITY: { get: (): string | null => 'james', set: () => {}, clear: () => {} },
-    // Only the bindings these routes read — the double cast is this suite's existing idiom for a
+    // Only the bindings these routes read. The double cast is this suite's existing idiom for a
     // partial env (linear.test.ts, rollbar.test.ts).
   } as unknown as Env
 })
@@ -79,8 +79,8 @@ describe('GET /v2/node', () => {
     const res = await send('/v2/node')
     expect(res.status).toBe(200)
     const info = (await res.json()) as NodeInfo
-    // Key-exact, not a subset match: the point of this route is what it does NOT say to anything that
-    // can reach the port.
+    // Key-exact, not a subset match: the point of this route is what it does not say to anything
+    // that can reach the port.
     expect(Object.keys(info).sort()).toEqual(['fingerprint', 'protocolVersion'])
     expect(info).toEqual({ protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT })
   })
@@ -104,14 +104,14 @@ describe('POST /v2/pair', () => {
     expect(await env.DEVICES.authenticate(paired.deviceToken)).toEqual({ deviceId: paired.device.id })
   })
 
-  // The no-oracle rule: a caller must not be able to tell "wrong code" from "no window open" — that
+  // The no-oracle rule: a caller must not be able to tell "wrong code" from "no window open". That
   // difference is what tells an attacker whether guessing is worth continuing.
   it('fails identically for a wrong code and for a code whose window is gone', async () => {
     const { token: seed } = await env.DEVICES.issue('seed')
     const code = await openWindow(seed)
     const body = { code, deviceName: 'attacker' }
 
-    // Same X-Request-Id on both, since requestIdMiddleware echoes a valid one — so the envelopes are
+    // Same X-Request-Id on both, since requestIdMiddleware echoes a valid one, so the envelopes are
     // comparable in full rather than after deleting the one field that is meant to differ.
     const wrong = await send('/v2/pair', { method: 'POST', body: { code: 'not-the-code', deviceName: 'attacker' }, requestId: 'fixed-id' })
     await send('/v2/pair', { method: 'POST', body }) // consumes the window (single use)
@@ -165,9 +165,9 @@ describe('device administration', () => {
     expect(((await after.json()) as ApiError).error.code).toBe('unauthenticated')
   })
 
-  // Regression guard for the csrf() removal on /v2 (server/index.ts). hono/csrf treats a MISSING
-  // content-type as form-submittable, so while it was mounted here this exact request — the one the
-  // renderer sends to revoke a device, bodyless and therefore header-less — came back 403 instead of
+  // Regression guard for the csrf() removal on /v2 (server/index.ts). hono/csrf treats a missing
+  // content-type as form-submittable, so while it was mounted here this exact request, the one the
+  // renderer sends to revoke a device, bodyless and therefore header-less, came back 403 instead of
   // 204. /v2 is bearer-only, so the Origin check was protecting a credential no browser can attach.
   it('accepts a bearer DELETE that carries no content-type at all', async () => {
     const paired = await pairDevice('laptop')

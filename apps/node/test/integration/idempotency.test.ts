@@ -42,7 +42,7 @@ const makeApp = (principal: Principal, gate = idempotency) =>
     .use('/v2/*', gate)
     .post('/v2/core/things', async (c) => {
       executions += 1
-      // Read the body AFTER the middleware already read it — the route must still see it, or every
+      // Read the body after the middleware already read it. The route must still see it, or every
       // mutation under this middleware would silently lose its payload.
       const body = (await c.req.json().catch(() => ({}))) as { name?: string }
       return c.json({ execution: executions, name: body.name ?? null })
@@ -116,7 +116,7 @@ describe('Idempotency-Key on /v2', () => {
   })
 
   // The realistic 5xx is a throw (a failed statement, a dead child process). It must leave the same
-  // nothing behind, and it must not leave the in-flight entry wedged — a retry has to get through.
+  // nothing behind, and it must not leave the in-flight entry wedged. A retry has to get through.
   it('stores nothing when the handler throws, and the retry still runs', async () => {
     const key = randomUUID()
     // Hono's own error handler renders the 500 here; createApp() swaps in the ApiError envelope.

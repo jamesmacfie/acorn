@@ -45,8 +45,9 @@ describe('plugin route registry', () => {
 // table below, this file verifies the current mount shape: core answers under /v2/core and plugins under
 // /v2/p/<plugin>.
 const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
-  // The two pre-auth pairing routes. Core-owned but deliberately outside /v2/core, because that
-  // namespace is the gated one and these are how an unpaired client gets a credential at all.
+    // The two pre-auth pairing routes, outside /v2/core because that namespace is the gated one:
+    // they're how an unpaired client gets a credential at all (docs/api-reference.md § Request
+    // processing).
   ['GET', '/v2/node'],
   ['POST', '/v2/pair'],
   ['POST', '/v2/core/pair/start'],
@@ -55,7 +56,8 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['DELETE', '/v2/core/devices/:id'],
   ['PUT', '/v2/core/prefs'],
   ['GET', '/v2/core/workspaces'],
-  // Linear/Rollbar projects linked to a workspace — NOT acorn projects, which live under /v2/core/projects.
+  // Linear/Rollbar projects linked to a workspace, not acorn projects, which live under
+  // /v2/core/projects.
   ['GET', '/v2/core/workspaces/:id/external-projects'],
   ['GET', '/v2/core/tasks'],
   ['PATCH', '/v2/core/tasks/:id'],
@@ -79,29 +81,28 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['GET', '/v2/core/integrations'],
 ]
 
-// Every route the compiled plugins mount, as a GOLDEN LIST in `routeRegistry.snapshot.json` — see
-// ./golden.ts for the one command that regenerates it. This used to be one hand-typed REPRESENTATIVE route
-// per contribution, checked with `some()`; it is the whole mount table now, checked with exact equality, so
-// it caught a table going stale in one direction only and now catches both. It is also where the deliberate
-// segment doubling is visible (see the note in routes.ts): a router that names its own top-level segment
-// repeats it under its plugin namespace, e.g. `/v2/p/memory/memory`.
+// Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;
+// docs/plugins.md § The golden lists covers the mechanism and why it's exact equality now instead of
+// a representative `some()` check per contribution. The segment doubling is visible here too
+// (docs/api-reference.md § Plugin routes): a router that names its own top-level segment repeats it
+// under its plugin namespace, e.g. `/v2/p/memory/memory`.
 //
-// Duplicates are kept rather than deduped. Several github routers register under one path with different
-// handlers, and collapsing them would stop the list noticing nine of them disappearing.
+// Duplicates are kept rather than deduped. Several github routers register under one path with
+// different handlers, and collapsing them would stop the list noticing nine of them disappearing.
 //
-// What is NOT in here, and would be a real change if it appeared: any route from a LOADED package. Linear's
-// `/v2/p/linear/projects` and http's `/v2/p/http/projects/:projectId/requests` both left when their plugins
-// did — their routes reach the mount table through the loader's fetch carrier, which this suite does not
-// assemble. `pluginLoader.test.ts` is where a loaded plugin's routes are exercised, `httpLoaded.test.ts`
-// drives http's through the carrier the host actually uses, and `linear.test.ts` drives linear's router
-// directly.
+// What's not in here, and would be a real change if it appeared: any route from a loaded package.
+// Linear's and http's routes left when those plugins did; a loaded plugin's routes reach the mount
+// table through the loader's fetch carrier (docs/plugins.md § Loaded plugins), which this suite
+// doesn't assemble. `pluginLoader.test.ts` exercises a loaded plugin's routes, `httpLoaded.test.ts`
+// drives http's through that carrier, and `linear.test.ts` drives linear's router directly.
 const PLUGIN_ROUTES = 'routeRegistry.snapshot.json'
 
 describe('assembled routes', () => {
   // A plugin that declares periodic work resolves the scheduler through the capability registry at
-  // registration time, so a graph assembled without one throws — which is what both composition roots
-  // already avoid by providing it before initPlugins. Never started: this suite asserts the MOUNT TABLE,
-  // and a running loop would fire jobs at a temp data root while the assertions run.
+  // registration time, so a graph assembled without one throws; both composition roots provide it
+  // before initPlugins for that reason (docs/schedules.md § Why the node, and only the node). Never
+  // started: this suite asserts the mount table, and a running loop would fire jobs at a temp data
+  // root while the assertions run.
   const schedulerCapable = (capabilities: CapabilityRegistry, db: TestDb['db']): CapabilityRegistry => {
     capabilities.provide(SCHEDULER, new Scheduler(db))
     return capabilities
@@ -115,15 +116,16 @@ describe('assembled routes', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-routes-'))
     plugins = await initPlugins(
       nodePlugins(dataDir, {
-        // agents is `required` too, so it initializes here as well. Same treatment as terminal below: the
-        // deps are inert, because this suite asserts the MOUNT TABLE and nothing it exercises starts a
-        // provider child.
+        // agents is `required` too, so it initializes here as well, the same treatment as terminal
+        // below: the deps are inert because this suite asserts the mount table and nothing it
+        // exercises starts a provider child.
         agents: { internalEnv: () => ({}) },
-        // Inert: this suite asserts the MOUNT TABLE, and preview contributes agent tools, not routes.
+        // Inert: this suite asserts the mount table, and preview contributes agent tools, not
+        // routes.
         preview: { browser: {} as never },
         notes: { internalEnv: () => ({}) },
         // terminal is `required`, so it initializes here whatever this test asks for. Its four
-        // composition-root deps are inert stubs: this suite asserts the MOUNT TABLE, and nothing it
+        // composition-root deps are inert stubs: this suite asserts the mount table, and nothing it
         // exercises spawns a pseudo-terminal.
         terminal: {
           internalEnv: () => ({}),
@@ -131,8 +133,9 @@ describe('assembled routes', () => {
           memoryReviewTrigger: async () => {},
           reconciled: Promise.resolve(),
         },
-        // Same treatment: this suite asserts the MOUNT TABLE, so nothing here starts a run. `failingChecks`
-        // answers null — "no PR to check" — which is the honest inert value rather than a fake green.
+        // Same treatment: this suite asserts the mount table, so nothing here starts a run.
+        // `failingChecks` answers null, "no PR to check", the honest inert value rather than a fake
+        // green.
         workflows: {
           internalEnv: () => ({}),
           reconciled: Promise.resolve(),
@@ -166,9 +169,9 @@ describe('assembled routes', () => {
       .map((route) => `${route.method} ${route.path}`)
       .sort()
     writeGolden(PLUGIN_ROUTES, actual)
-    // Anti-vacuity: the assertion below is an exact match against a file, so a boot that mounted nothing
-    // would pass against an empty golden. A floor rather than a count — the compiled tier shrinks by
-    // decision, so this comes down as plugins ship loaded instead.
+    // Anti-vacuity: the assertion below is an exact match against a file, so a boot that mounted
+    // nothing would pass against an empty golden. A floor, not a count: the compiled tier shrinks by
+    // design, so this comes down as plugins ship loaded instead.
     expect(actual.length).toBeGreaterThanOrEqual(30)
     expect(actual).toEqual(readGolden<string[]>(PLUGIN_ROUTES))
   })
@@ -178,15 +181,15 @@ describe('assembled routes', () => {
   })
 
   it('registers every built-in provider from its own plugin, in both registries', () => {
-    // One left. github is the only provider still compiled in; linear, openai and anthropic all come
-    // from loaded packages, and this suite assembles the COMPILED list only — so their absence is the
-    // assertion, and any of them appearing would mean something in the binary had started registering
-    // a provider again.
+    // One left: github is the only provider still compiled in. linear, openai and anthropic all come
+    // from loaded packages, and this suite assembles the compiled list only, so their absence is the
+    // assertion; any of them appearing would mean something in the binary had started registering a
+    // provider again.
     const expected = ['github']
     expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
-    // The integration registry holds only providers with mirrored resources. github happens to have
-    // them, so the two lists coincide today; they are still asserted separately because a connection
-    // provider need not be an integration one.
+    // The integration registry holds only providers with mirrored resources (docs/integrations.md §
+    // Connection and integration contributions). github happens to have them, so the two lists
+    // coincide today, but they're asserted separately since that won't always be true.
     expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
     expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual([])
   })

@@ -16,7 +16,7 @@ import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 describe('composition graph parity', () => {
   it('uses one plugin graph and one drain order for both Node hosts', async () => {
     // No install directory at this data root, so the loader contributes nothing and the graph is
-    // exactly the compiled-in list — which is the assertion that matters here.
+    // exactly the compiled-in list, which is the assertion that matters here.
     const graph = await assembleNodeGraph('', {} as never)
     expect(graph.plugins.map((plugin) => plugin.name)).toEqual(nodePluginNames())
     expect(graph.loaded.size).toBe(0)
@@ -26,9 +26,9 @@ describe('composition graph parity', () => {
 })
 
 describe('plugin-state parity', () => {
-  // Both roots build the PLUGIN_STATE bridge through buildPluginStateBridge, so the copies cannot drift
-  // again. What CAN still differ is what each root passes in, and there are exactly two such deltas —
-  // both deliberate, both asserted here so the third one is a red test rather than an archaeology dig.
+  // Both roots build the PLUGIN_STATE bridge through buildPluginStateBridge, so the copies cannot
+  // drift again. What can still differ is what each root passes in. There are exactly two such
+  // deltas, both asserted here, so a third one shows up as a red test rather than an archaeology dig.
   it('unions the file with the start-config override, and the file alone when there is none', () => {
     const store = { get: () => ['github'], set: () => {} }
     // The Electron root: a start config may pin a list without writing one (`dev:node`, an integration
@@ -39,10 +39,10 @@ describe('plugin-state parity', () => {
   })
 
   it('reconciles bundled packages only when a bundled root is configured', () => {
-    // Both roots now call the same reporter, so the account of what reconciliation did cannot exist on
-    // one root only. What still differs is the input: the Electron root always has application resources,
-    // while a standalone node's bundled root comes from the environment and is unset on every
-    // service-managed node — which is the documented "there is nothing to reconcile FROM" case
+    // Both roots now call the same reporter, so the account of what reconciliation did cannot exist
+    // on one root only. What still differs is the input: the Electron root always has application
+    // resources, while a standalone node's bundled root comes from the environment and is unset on
+    // every service-managed node, the documented "there is nothing to reconcile from" case
     // (docs/node-distribution.md § Plugins).
     const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-data-'))
     const resources = mkdtempSync(join(tmpdir(), 'acorn-parity-resources-'))
@@ -65,9 +65,10 @@ describe('plugin-state parity', () => {
   })
 
   it('names a package frozen by an ownership row even with no bundled root to refuse an update from', () => {
-    // The `preserved` list can only report a package it declined to replace THIS boot, so a standalone
-    // node — which has nothing to replace it with — used to say nothing at all while a `build:plugin`
-    // output outlived every later build. The row itself is the fact, so it is read directly.
+    // The `preserved` list can only report a package it declined to replace this boot, so a
+    // standalone node, which has nothing to replace it with, used to say nothing at all while a
+    // `build:plugin` output outlived every later build. The row itself is the fact, so it is read
+    // directly.
     const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-frozen-'))
     const lines: string[] = []
     const log = console.log
