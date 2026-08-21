@@ -57,7 +57,7 @@ describe('FleetStore', () => {
   })
 
   it('scopes the local node\'s token by the data dir, not its nodeId', () => {
-    // The local token has to be readable BEFORE the service starts, and starting it is the only thing
+    // The local token has to be readable before the service starts, and starting it is the only thing
     // that can report the nodeId (deviceTokenStore.ts).
     new FleetStore(dir).remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
 
@@ -78,9 +78,10 @@ describe('FleetStore', () => {
 
   it('keeps the local node a singleton when the data root comes back under a new identity', () => {
     // The local node is one node whose nodeId can change: replace the data root and the same machine
-    // reports a new one. A leftover `local: true` row is never connected — the boot loop skips local rows
-    // and `adoptLocalNode` only upserts the id it just started — so `homeNode()`, which takes the FIRST
-    // local row, would point the whole window at an address the broker answers `Unknown node` for.
+    // reports a new one. A leftover `local: true` row is never connected: the boot loop skips local
+    // rows and `adoptLocalNode` only upserts the id it just started, so `homeNode()`, which takes the
+    // first local row, would point the whole window at an address the broker answers `Unknown node`
+    // for.
     const fleet = new FleetStore(dir)
     fleet.remember({ ...remote }, 'tok-remote')
     fleet.remember({ nodeId: 'node-was', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-old')

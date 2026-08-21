@@ -3,43 +3,14 @@ import { pathToFileURL } from 'node:url'
 import type { PluginCache } from './pluginCache'
 import { pluginFrameStyles } from './pluginFrameStyles'
 
-// `app-plugin://<sha256>/…` — the origin a third-party plugin's UI runs on
-// (docs/plugins.md).
-//
-// The host part is the bundle hash, which is doing three jobs at once:
-//
-//   Isolation.   A different bundle is a different origin, so no plugin can reach another's frame, its
-//                storage, or the shell's — the iframe is cross-origin to app://acorn by construction,
-//                and Chromium may put it out of process as a bonus we do not rely on.
-//   Immutability.There is nothing mutable at this origin. The bytes behind a hash cannot change, so
-//                there is no cache to invalidate and no version skew to reason about.
-//   Custody.     The handler serves from main's content-addressed cache and from nowhere else. It
-//                cannot be pointed at a path, and a hash this device does not hold is a 404 rather than
-//                a fetch — an unacknowledged bundle has no way to become a request.
-//
-// `index.html` is GENERATED here rather than shipped by the plugin. The plugin owns what runs; it does
-// not own the document, the CSP or the bootstrap. That is what keeps the policy below un-overridable by
-// markup.
+// `app-plugin://<sha256>/...` is the origin a plugin's UI runs on. Why the hash is the host, what it
+// buys (isolation, immutability, custody), and why index.html is generated here rather than shipped
+// by the plugin: docs/electron.md § The plugin frame origin, docs/plugins.md.
 
 export const PLUGIN_SCHEME = 'app-plugin'
 
-// The whole security posture of a plugin frame, in one header on every response.
-//
-// `connect-src 'none'` is the line worth reading twice: a plugin frame has NO network. Not a restricted
-// one — none. fetch, XHR, WebSocket, sendBeacon and EventSource all fail, so a malicious bundle cannot
-// exfiltrate what it sees even to its own server. Its only I/O is the MessagePort the host hands it,
-// where every call is checked against the manifest (client-core/plugins/frames/scopes.ts).
-//
-// `default-src 'none'` then makes every other directive opt-in, so a fetch type nobody thought about
-// here is denied rather than inherited. `style-src 'unsafe-inline'` is present because the appearance
-// tokens arrive over the port and are applied as inline custom properties on `:root`; `img-src data:`
-// so a plugin can draw an inlined icon without an asset pipeline.
-//
-// `'self'` here means the bundle hash, and it works because the frame keeps that origin: the iframe is
-// sandboxed `allow-scripts allow-same-origin` (client-core/plugins/frames/PluginFrame.tsx explains why
-// both tokens). Dropping `allow-same-origin` makes the origin opaque, at which point `'self'` matches
-// nothing, the frame's own module script is a cross-origin fetch on a scheme with no CORS, and the
-// document renders blank — which is the failure this comment exists to stop someone rediscovering.
+// The plugin frame's CSP, one header on every response, and the reasoning behind each directive:
+// docs/electron.md § The plugin frame origin.
 const CSP = [
   "default-src 'none'",
   "script-src 'self'",
@@ -55,22 +26,22 @@ const CSP = [
 
 const HASH_RE = /^[0-9a-f]{64}$/
 
-// The generated document. Deliberately tiny: the host's shared presentation stylesheet and the
+// The generated document is deliberately tiny: the host's shared presentation stylesheet and the
 // plugin's module script. No inline script (the CSP has no `unsafe-inline` for scripts and must not
 // need one), no favicon, no title a plugin could use to impersonate the shell in a devtools list.
 //
-// The inline block sits BEFORE the stylesheet link, and that order is the whole point of it. It used to
-// sit after, where `html, body { … font: inherit }` beat `base.css`'s `body { font-family: var(--font-ui) }`
-// on nothing but source order — same selector, same specificity, later wins. `font` is a shorthand, so
-// `inherit` reset family, size, line-height and weight to the parent, `html` declared none of them, and
-// every frame in the app rendered in the browser's default serif at the browser's default size. It looked
-// exactly like a plugin that had ignored the design system, which is the expensive kind of wrong.
-// (`color: var(--fg, …)` was fighting the same fight and losing worse: there is no `--fg` token, so that
-// declaration was always the fallback.)
+// The inline block sits before the stylesheet link, and that order matters. It used to sit after,
+// where `html, body { ... font: inherit }` beat `base.css`'s `body { font-family: var(--font-ui) }`
+// on nothing but source order (same selector, same specificity, later wins). `font` is a shorthand, so
+// `inherit` reset family, size, line-height and weight to the parent, `html` declared none of them,
+// and every frame in the app rendered in the browser's default serif at the browser's default size.
+// It looked exactly like a plugin that had ignored the design system, the expensive kind of wrong.
+// (`color: var(--fg, ...)` was fighting the same fight and losing worse: there is no `--fg` token, so
+// that declaration was always the fallback.)
 //
-// So: nothing here may restate a property `/ui.css` owns. Ground the document, let the shared sheet
-// dress it. `color-scheme` is the exception and keeps its fallback inline, because it has to be right in
-// the frames of a second before the appearance tokens arrive over the port.
+// Nothing here may restate a property `/ui.css` owns. Ground the document, let the shared sheet dress
+// it. `color-scheme` is the exception and keeps its fallback inline, since it has to be right in the
+// fraction of a second before the appearance tokens arrive over the port.
 const documentFor = (): string => `<!doctype html>
 <html>
 <head>
@@ -94,15 +65,12 @@ const respond = (body: string | ReadableStream<Uint8Array> | null, status: numbe
       'content-security-policy': CSP,
       // The bundle is served as a module script; a sniffed type is a type an attacker chose.
       'x-content-type-options': 'nosniff',
-      // Frames are hash-addressed, so the only correct cache lifetime is forever — but this is a local
-      // scheme with a content-addressed store behind it, so there is nothing to gain and one more place
-      // for stale bytes to live.
+      // Frames are hash-addressed, so the only correct cache lifetime is forever, but this is a local
+      // scheme with a content-addressed store behind it, so there is nothing to gain and one more
+      // place for stale bytes to live.
       'cache-control': 'no-store',
-      // Deliberately no `x-frame-options` and no `frame-ancestors`: the shell frames these from
-      // app://acorn, which is a different origin, so SAMEORIGIN would block the only embed that is meant
-      // to work. What bounds who can frame a plugin is that nothing else in this process can — the
-      // shell's own CSP is the only one naming this scheme in `frame-src`, and top-level navigation to it
-      // is denied in electron.ts.
+      // No `x-frame-options` or `frame-ancestors`, and why: docs/electron.md § The plugin frame
+      // origin.
     },
   })
 
@@ -129,7 +97,7 @@ export function registerPluginScheme(cache: Pick<PluginCache, 'path'>): void {
 
     const file = cache.path(hash)
     // A hash the cache does not hold. The normal case for this is a bundle the owner rejected or one
-    // that was swept — either way the answer is nothing, not a fetch from the node that offered it.
+    // that was swept; either way the answer is nothing, not a fetch from the node that offered it.
     if (!file) return respond(null, 404, 'text/plain')
 
     // net.fetch over the file rather than readFile, for the same reason app:// does it: a streamed body

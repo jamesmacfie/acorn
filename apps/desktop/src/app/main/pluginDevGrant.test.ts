@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { PluginTrustStore, type PluginAck } from './pluginTrustStore'
 
-// The dev trust grant (docs/security.md § The dev grant): one decision that replaces the per-hash prompt
-// for one plugin while the owner is developing it. Everything below tests the two properties that make it
-// a bounded grant rather than a hole — it covers exactly one (plugin, node) pair, and ending it puts the
-// plugin back where it was.
+// The dev trust grant (docs/security.md § The dev grant): one decision that replaces the per-hash
+// prompt for one plugin while the owner is developing it. Everything below tests the two properties
+// that make it a bounded grant rather than a hole: it covers exactly one (plugin, node) pair, and
+// ending it puts the plugin back where it was.
 
 const NONE: NodePluginPermissions = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
 const HASH_A = 'a'.repeat(64)
@@ -85,9 +85,9 @@ describe('a dev grant auto-trusts new bundles', () => {
   })
 
   it('covers that node only — a second node offering the same name gets nothing', () => {
-    // The design note says "per (pluginId, device)". The node half is an addition, and it matters: fleet
-    // resolution picks the highest version across every paired node, so a grant keyed on the name alone
-    // would auto-trust a bundle a DIFFERENT node started serving under it.
+    // The design note says "per (pluginId, device)". The node half is an addition, and it matters:
+    // fleet resolution picks the highest version across every paired node, so a grant keyed on the
+    // name alone would auto-trust a bundle a different node started serving under it.
     const trust = store()
     trust.grantDev({ pluginId: 'sparkline', nodeId: 'node-a', grantedAt: 1 })
     expect(trust.recordDevAccept(bundle({ nodeId: 'node-b' }))).toBe(false)
@@ -170,7 +170,7 @@ describe('ending dev mode', () => {
 describe('the file', () => {
   it('reads a trust file written before dev mode existed as "nothing is in development"', () => {
     // Not a migration: the schema defaults, so an older file keeps every acknowledgement it holds and
-    // simply has no grants. The alternative — an unreadable file — would erase every decision on the
+    // simply has no grants. The alternative, an unreadable file, would erase every decision on the
     // device, which is the failure this store is most careful about.
     const trust = store()
     trust.record(handAck())

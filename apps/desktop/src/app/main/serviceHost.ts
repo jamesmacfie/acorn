@@ -39,16 +39,16 @@ export class ServiceHost {
     serviceStartConfigSchema.parse(config)
   }
 
-  // Resolves with where the service bound, who it is, and the bearer to reach it with — everything
-  // the connection broker needs. The caller supplies the previously-remembered device token so the
-  // service can reuse it instead of creating a new device row on every launch.
+  // Resolves with where the service bound, who it is, and the bearer to reach it with: everything the
+  // connection broker needs. The caller supplies the previously-remembered device token so the service
+  // can reuse it instead of creating a new device row on every launch.
   async start(rememberedDeviceToken?: string): Promise<ServiceStartResult> {
     if (this.child) throw new Error('Service host is already started')
     this.stopping = false
     const child = spawn(process.execPath, [this.entry], {
       // ELECTRON_RUN_AS_NODE makes Electron's binary behave as `node`, so the child needs no system
-      // Node install and keeps Electron's V8 — which is the ABI the bundled better-sqlite3/node-pty
-      // are built against.
+      // Node install and keeps Electron's V8, the ABI the bundled node-pty is built against
+      // (docs/electron.md § Build and packaging).
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       // stdin closed (the service never reads it); stdout/stderr inherited so its logs land wherever
       // the app's do; fd 3 is the IPC channel that gives the child `process.send`.
@@ -125,9 +125,10 @@ export class ServiceHost {
   }
 
   // SIGTERM, then SIGKILL if it is ignored. The service installs its own SIGTERM handler to drain
-  // cleanly, so the polite signal is the one that matters — but a wedged child holding the data root's
-  // exclusive lock blocks the next launch, and commit 9dbb343 already taught this repo what happens when
-  // nothing follows up a signal a child can ignore (a probe found alive as an orphan four days later).
+  // cleanly, so the polite signal is the one that matters. But a wedged child holding the data root's
+  // exclusive lock blocks the next launch, and commit 9dbb343 already taught this repo what happens
+  // when nothing follows up a signal a child can ignore: a probe found alive as an orphan four days
+  // later.
   private terminate(child: ChildProcess): void {
     child.kill('SIGTERM')
     const escalate = setTimeout(() => child.kill('SIGKILL'), KILL_ESCALATION_MS)

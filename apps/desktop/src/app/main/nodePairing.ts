@@ -14,17 +14,18 @@ import { nodeRequest } from './nodeRequest'
 
 const PROBE_TIMEOUT_MS = 8_000
 
-// Step 1–2: reach the node and learn the certificate it presents.
+// Step 1-2: reach the node and learn the certificate it presents.
 //
-// This connection is UNVERIFIED by construction — we do not yet know what to trust, and there is no CA
-// in this architecture. What makes pairing safe is not this request; it is the owner comparing the
+// This connection is unverified by construction: there is no CA in this architecture, and nothing yet
+// knows what to trust. What makes pairing safe is not this request; it is the owner comparing the
 // returned fingerprint against the one the node itself displays, out of band (nodePairRequestSchema).
 // Everything here does is get an honest value in front of them:
 //
-//   - the fingerprint reported is the one the SOCKET presented, not the one the body claims;
+//   - the fingerprint reported is the one the socket presented, not the one the body claims;
 //   - the body's self-reported fingerprint must agree with it, which is what catches a middlebox
 //     re-terminating TLS and forwarding the real node's response;
-//   - a protocol major we cannot speak is reported as incompatible instead of paired and then broken.
+//   - a protocol major this client cannot speak is reported as incompatible instead of paired and
+//     then broken.
 //
 // No token is sent and nothing is remembered, so an unverified request here grants nothing.
 export async function probeNode(endpoint: string): Promise<NodeProbeResult & { certPem: string }> {
@@ -36,12 +37,12 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
   const parsedInfo = nodeInfoSchema.safeParse(payload)
   if (!parsedInfo.success) {
     // Two very different failures wore one message here. `nodeInfoSchema` is additive-forever now, so
-    // a NEWER node still parses — but a future major that reshaped this response would not, and telling
+    // a newer node still parses, but a future major that reshaped this response would not, and telling
     // its owner "this is not an acorn node" sends them to check the URL instead of the version.
     //
     // So: if the body announces a protocol at all, it is an acorn node and the answer is the version.
-    // Read straight off the payload rather than through a second schema — the whole point is that this
-    // is the case where our schema does not fit what came back.
+    // Read straight off the payload rather than through a second schema, since the whole point is that
+    // this is the case where the schema does not fit what came back.
     const claimed = (payload as { protocolVersion?: unknown } | null)?.protocolVersion
     if (typeof claimed === 'number') {
       throw new Error(`${endpoint} speaks acorn protocol ${claimed}; this app speaks ${NODE_PROTOCOL_VERSION}. Upgrade whichever is older.`)
@@ -63,7 +64,7 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
   }
 }
 
-// Step 3: spend the owner's pairing code, this time over a PINNED connection — the fingerprint they
+// Step 3: spend the owner's pairing code, this time over a pinned connection. The fingerprint they
 // just confirmed is now the identity, so the code cannot be handed to an impostor.
 export async function pairWithNode(
   probe: { endpoint: string; fingerprint: string; certPem: string },
@@ -94,7 +95,7 @@ export async function pairWithNode(
 }
 
 // A single GET with the certificate captured off the socket. Written out rather than routed through
-// nodeRequest because it needs the peer certificate, which only the raw request exposes — and because
+// nodeRequest because it needs the peer certificate, which only the raw request exposes, and because
 // `rejectUnauthorized: false` must appear exactly once in this codebase, here, next to the reason.
 function unverifiedGet(url: URL): Promise<{ body: string; certPem: string; fingerprint: string }> {
   return new Promise((resolve, reject) => {

@@ -42,13 +42,13 @@ const putSchema = z.strictObject({
   version: z.string().min(1),
 })
 
-// The DECISION, split from the disclosure that came with it, because the two have different failure
-// budgets. This half identifies the bytes and says yes or no; it is entirely this app's own vocabulary,
-// so nothing a node does can make it unparseable, and it must always be recordable.
+// The decision, split from the disclosure that came with it, because the two have different failure
+// budgets. This half identifies the bytes and says yes or no; it is entirely this app's own
+// vocabulary, so nothing a node does can make it unparseable, and it must always be recordable.
 //
-// A plain object rather than a strict one, because both halves are parsed out of the SAME payload and
-// each would otherwise reject the other's keys. Nothing is read from the raw payload after this — the
-// stored record is built from parsed fields only — so stripping an unknown key is exactly as safe as
+// A plain object rather than a strict one, because both halves are parsed out of the same payload and
+// each would otherwise reject the other's keys. Nothing is read from the raw payload after this: the
+// stored record is built from parsed fields only, so stripping an unknown key is exactly as safe as
 // refusing it, and it is what lets a newer renderer add a field without wedging an older main.
 const decisionSchema = z.object({
   pluginId: z.string().min(1),
@@ -58,11 +58,11 @@ const decisionSchema = z.object({
   decision: z.enum(['accepted', 'rejected']),
 })
 
-// The SNAPSHOT, kept only so a later update can show what changed. Parsed, not cast — it is the
+// The snapshot, kept only so a later update can show what changed. Parsed, not cast: it is the
 // disclosure the owner consents to, so it has to be provably the shape the node parsed off disk
-// (@acorn/protocol/pluginContract.ts) — but parsed SEPARATELY, because a node running a newer manifest
+// (@acorn/protocol/pluginContract.ts). But parsed separately, because a node running a newer manifest
 // schema than this shell can produce a grant this schema refuses. When that happened with one combined
-// schema the whole handler threw, so neither accept NOR reject could be recorded and the prompt
+// schema the whole handler threw, so neither accept nor reject could be recorded, and the prompt
 // re-queued on every boot: a plugin the owner had explicitly turned away asked again forever.
 const disclosureSchema = z.object({
   permissions: pluginPermissionsSchema,
@@ -77,8 +77,8 @@ const disclosureSchema = z.object({
     chords: z.array(z.string().min(1).max(64)).min(1).max(32),
   })).max(32) as z.ZodType<PluginKeyClaimGrant[]>,
   // Defaulted, not required: a node running a manifest schema that predates the cooperative seam sends
-  // a disclosure with no such field, and refusing it would put us back in the loop this schema was split
-  // up to escape — a decision that cannot be recorded is a prompt that re-queues forever.
+  // a disclosure with no such field, and refusing it would put us back in the loop this schema was
+  // split up to escape. A decision that cannot be recorded is a prompt that re-queues forever.
   extensions: z.array(z.strictObject({
     kind: z.enum(['hosts', 'extends', 'replaces']),
     target: z.string().min(1).max(130),
@@ -133,8 +133,8 @@ export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): 
   ipcMain.handle(PLUGINS_CACHE_PUT, async (_event, raw: unknown): Promise<PutResult> => {
     const { nodeId, pluginId, hash, version } = putSchema.parse(raw)
     const result = await cache.putFromNode(nodeId, pluginId, { hash, version })
-    // The dev grant's whole effect, and it lives HERE rather than in the renderer for the same reason
-    // the hash does: the acknowledgement is written beside the bytes main verified, by the process that
+    // The dev grant's whole effect lives here rather than in the renderer, for the same reason the
+    // hash does: the acknowledgement is written beside the bytes main verified, by the process that
     // holds the grant. `recordDevAccept` is a no-op without one, so a renderer that asked for a bundle
     // main has no grant for gets exactly the prompt it would have got anyway.
     if ('hash' in result) trust.recordDevAccept({ pluginId, nodeId, hash: result.hash, version })
@@ -150,8 +150,8 @@ export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): 
   ipcMain.handle(PLUGINS_TRUST_RECORD, async (_event, raw: unknown): Promise<void> => {
     const decision = decisionSchema.parse(raw)
     // Recording a decision about a bundle this device does not hold would leave an acknowledgement
-    // pointing at nothing — and, on the accept path, would be an approval granted before the bytes
-    // were ever seen. The hash has to be one main computed itself.
+    // pointing at nothing, and on the accept path would be an approval granted before the bytes were
+    // ever seen. The hash has to be one main computed itself.
     if (!cache.has(decision.hash)) throw new Error(`No cached bundle for ${decision.pluginId}@${decision.hash.slice(0, 12)}`)
 
     const disclosure = disclosureSchema.safeParse(raw)
@@ -163,10 +163,10 @@ export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): 
     // it can never become the baseline of a later "what changed" diff, which would otherwise report
     // grants as newly requested that the owner had already seen (main/pluginTrustStore.ts).
     //
-    // Recording rather than refusing, on BOTH arms. A rejection needs no snapshot at all — nothing
-    // ever diffs against one. And an acceptance is still informed: the lines the owner read were
-    // rendered by the renderer from the roster row, which already classifies anything this shell does
-    // not recognise into its own "requests this version of acorn does not recognise" line rather than
+    // Recording rather than refusing, on both arms. A rejection needs no snapshot at all; nothing ever
+    // diffs against one. An acceptance is still informed: the lines the owner read were rendered by
+    // the renderer from the roster row, which already classifies anything this shell does not
+    // recognise into its own "requests this version of acorn does not recognise" line rather than
     // echoing it. Refusing here would leave the owner unable to answer the prompt at all.
     console.warn(
       `[plugins] the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record:`,

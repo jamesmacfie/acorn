@@ -14,7 +14,7 @@ import { ensureCert } from '@acorn/node-core/main/tls.ts'
 import { NodeBroker } from './nodeBroker'
 
 // Drives the real broker against a real http/https server. The pin in particular cannot be
-// meaningfully faked: the whole failure mode worth testing is that it fails CLOSED.
+// meaningfully faked: the whole failure mode worth testing is that it fails closed.
 
 type Received = { method: string; path: string; headers: Record<string, string | string[] | undefined>; body: Buffer }
 
@@ -23,10 +23,10 @@ let certPem: string
 let keyPem: string
 let fingerprint: string
 
-// The node's OWN certificate machinery, not a lookalike: ensureCert is what a real node mints, so a
+// The node's own certificate machinery, not a lookalike: ensureCert is what a real node mints, so a
 // change to its extensions (the SAN, CA:TRUE) has to keep the broker working or this file goes red.
-// Importing across apps would be a boundary violation; node-core is a package, so this is legal — and
-// it is the closest a desktop-side test can legitimately get to the real thing.
+// Importing across apps would be a boundary violation, but node-core is a package, so this is legal,
+// and it is the closest a desktop-side test can legitimately get to the real thing.
 beforeAll(() => {
   certDir = mkdtempSync(join(tmpdir(), 'acorn-broker-cert-'))
   const cert = ensureCert(certDir)
@@ -91,10 +91,10 @@ const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_00
   }
 }
 
-// Select by path, never by index. upsert() probes `/v2/node` and then opens the WebSocket, so the call
-// under test is never the first request the server sees — indexing into `received` silently asserts
-// against the probe or the upgrade instead (and used to pass, because the upgrade carries the same
-// bearer).
+// Select by path, never by index. upsert() probes `/v2/node` and then opens the WebSocket, so the
+// call under test is never the first request the server sees. Indexing into `received` silently
+// asserts against the probe or the upgrade instead, and used to pass, because the upgrade carries the
+// same bearer.
 const requestTo = (path: string): Received => {
   const match = received.find((r) => r.path === path)
   if (!match) throw new Error(`no request to ${path}; saw ${received.map((r) => r.path).join(', ')}`)
@@ -113,7 +113,7 @@ describe('broker HTTP', () => {
     const res = await broker.fetch('n1', { requestId: 'r1', path: '/v2/core/tasks' })
     expect(res.status).toBe(200)
     expect(JSON.parse(text(res.body))).toEqual({ ok: true })
-    // The renderer never supplies this — the broker exists so the token stays in main.
+    // The renderer never supplies this: the broker exists so the token stays in main.
     expect(requestTo('/v2/core/tasks').headers.authorization).toBe('Bearer acorn_dt_secret')
   })
 
@@ -229,8 +229,8 @@ describe('broker HTTP', () => {
     expect(statuses.at(-1)).toMatchObject({ state: 'revoked', error: { code: 'unauthorized' } })
   })
 
-  // The regression this exists for: reading the STATUS alone, a fresh node was marked `revoked` — a
-  // security state that also stops the socket being retried — by the ordinary 403 a never-connected
+  // The regression this exists for: reading the status alone, a fresh node was marked `revoked`, a
+  // security state that also stops the socket being retried, by the ordinary 403 a never-connected
   // GitHub integration answers with. The two-node e2e caught it as "the local node is revoked" seconds
   // after a clean boot. Route-level 401s (`linear_reauth`, `provider_needs_auth`) are the same mistake
   // one status code over, so both are asserted.
@@ -390,7 +390,7 @@ describe('broker WebSocket', () => {
 
     await waitFor(() => statuses.some((s) => s.state === 'online'), 'the online transition')
     // Two things, and both matter. The socket is torn down despite the peer never closing it, and the
-    // broker then does what a dropped socket already made it do — reconnect, so a node that comes back
+    // broker then does what a dropped socket already made it do: reconnect, so a node that comes back
     // is picked up rather than left needing a relaunch.
     await waitFor(() => statuses.some((s) => s.state !== 'online'), 'the node to stop reading online', 8_000)
     await waitFor(() => connections >= 2, 'a reconnect after the silence', 8_000)
@@ -400,7 +400,7 @@ describe('broker WebSocket', () => {
     const { origin, server } = await listen(false)
     let connections = 0
     // The default `autoPong`, i.e. an ordinary healthy peer. Without this case a heartbeat that
-    // terminated EVERY socket on a timer would satisfy the case above.
+    // terminated every socket on a timer would satisfy the case above.
     const wss = new WebSocketServer({ server, path: WS_PATH })
     wss.on('connection', () => {
       connections += 1
@@ -458,11 +458,11 @@ describe('broker protocol version', () => {
 
     await waitFor(() => statuses.some((s) => s.state === 'incompatible'), 'the incompatible transition')
     expect(statuses.at(-1)?.error?.code).toBe('protocol_mismatch')
-    // The point of gating BEFORE the socket: a client that cannot speak the protocol should not be
-    // interpreting frames from it.
+    // The point of gating before the socket opens: a client that cannot speak the protocol should
+    // not be interpreting frames from it.
     await new Promise((r) => setTimeout(r, 200))
     expect(upgrades).toBe(0)
-    // Sticky like `revoked` — retrying cannot change a version, so it must not churn.
+    // Sticky like `revoked`: retrying cannot change a version, so it must not churn.
     expect(statuses.at(-1)?.state).toBe('incompatible')
   })
 
@@ -493,8 +493,8 @@ describe('broker protocol version', () => {
   })
 
   it('notices a major that changed while the app was running', async () => {
-    // The case a pairing-time-only check misses entirely: a node upgrades, which restarts it, which drops
-    // the socket — so the reconnect is where the new version arrives.
+    // The case a pairing-time-only check misses entirely: a node upgrades, which restarts it, which
+    // drops the socket, so the reconnect is where the new version arrives.
     const { origin, server } = await listen(false)
     const wss = new WebSocketServer({ server, path: WS_PATH })
     let major = NODE_PROTOCOL_VERSION

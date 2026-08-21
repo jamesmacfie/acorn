@@ -29,8 +29,8 @@ let dir = ''
 let trust: InstanceType<typeof PluginTrustStore>
 let dispose = () => {}
 
-// Only the members the handlers touch. `putFromNode` answers with the hash it says it computed, which is
-// what the dev grant keys off — the renderer's claim never reaches the acknowledgement.
+// Only the members the handlers touch. `putFromNode` answers with the hash it says it computed,
+// which is what the dev grant keys off: the renderer's claim never reaches the acknowledgement.
 const cache = {
   has: () => true,
   list: () => ({}),
@@ -86,7 +86,7 @@ describe('recording a trust decision', () => {
   it('still records an ACCEPTANCE when the disclosure is from a newer schema, marked partial', async () => {
     // The lines the owner actually read were rendered from the roster row, and the renderer already
     // folds anything it does not recognise into its own "requests this version of acorn does not
-    // recognise" line — so the consent was informed. What is lost is only the stored snapshot.
+    // recognise" line, so the consent was informed. What is lost is only the stored snapshot.
     await record(decision({ permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: 'yes', net: [] } } }))
     const ack = trust.decisionFor('sparkline', HASH)
     expect(ack).toMatchObject({ decision: 'accepted', partial: true })
@@ -97,7 +97,7 @@ describe('recording a trust decision', () => {
   })
 
   it('refuses a decision whose identity half is malformed', async () => {
-    // This half is entirely our own vocabulary, so nothing a node does can make it unparseable — a
+    // This half is entirely our own vocabulary, so nothing a node does can make it unparseable: a
     // bad one is a renderer bug, and storing it would leave a row nothing can ever match.
     await expect(record(decision({ hash: 'not-a-hash' }))).rejects.toThrow()
     expect(trust.list()).toEqual([])

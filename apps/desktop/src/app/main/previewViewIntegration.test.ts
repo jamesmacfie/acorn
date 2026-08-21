@@ -86,11 +86,11 @@ const fakeElectron = {
 // the right seam for it.
 vi.mock('electron', () => fakeElectron)
 
-// previewService.ts is PLUGIN code, and it resolves electron with `createRequire(import.meta.url)`
+// previewService.ts is plugin code, and it resolves electron with `createRequire(import.meta.url)`
 // inside registerPreviewIpc so that plugins/preview's main barrel stays loadable outside Electron
 // (apps/node/test/integration/mainBarrelLoad.test.ts is what enforces that). A real Node `require`
-// does not consult vitest's module registry, so the fake is installed in the CJS require cache as
-// well — the same door the production code walks through.
+// does not consult vitest's module registry, so the fake is installed in the CommonJS require cache
+// too, the same door the production code walks through.
 const nodeRequire = createRequire(import.meta.url)
 const electronModulePath = nodeRequire.resolve('electron')
 nodeRequire.cache[electronModulePath] = {

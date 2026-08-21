@@ -9,51 +9,33 @@ import { isAllowedExternalUrl } from '@acorn/node-core/main/urlGuards.ts'
 
 const PRELOAD = join(import.meta.dirname, '../preload/index.cjs')
 
-// Must run at module scope, BEFORE app.whenReady(): Chromium reads the privileged-scheme table while
-// it initialises, and registering later is a silent no-op. Every privilege here earns its place:
-//   standard          hierarchical URLs — what makes base:'/', history.pushState and @solidjs/router's
-//                     path routes work at all. Without it every route is an opaque path.
-//   secure            treats the origin as a secure context: IndexedDB (the persisted query cache),
-//                     crypto.subtle, clipboard.
-//   supportFetchAPI   fetch()/module scripts over the scheme — the renderer is ESM, and Monaco loads
-//                     its five ?worker chunks this way.
-//   stream            lets the handler answer with net.fetch's streamed body instead of buffering.
-//   codeCache         V8 code cache across launches, which is most of the startup win.
-// Deliberately NOT corsEnabled (nothing the renderer touches is cross-origin — node traffic is IPC)
-// and NOT allowServiceWorkers (there is no offline story here, and no worker may cache the shell).
-//
-// `app-plugin` is the second origin: one per third-party plugin bundle, hashed, hosting its sandboxed UI
-// (main/pluginScheme.ts). It gets `standard` so each hash is a real origin with its own storage — that
-// separation IS the sandbox — plus `secure` and `supportFetchAPI` because plugin bundles are ESM modules.
-// Deliberately NOT `codeCache`: a cache keyed by a hash that is already content-addressed buys nothing,
-// and one fewer place third-party code persists is worth more than the milliseconds.
+// Both schemes register here, at module scope and before app.whenReady(), because Chromium reads
+// the privileged-scheme table during its own startup, and registering later is a silent no-op.
+// docs/electron.md § Main process has what each privilege buys and why app:// and app-plugin://
+// differ.
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
   { scheme: PLUGIN_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ])
 
-// Writable app-data root (DB, blobs, worktrees, notes). Packaged builds must not write next to the
-// module (that's the read-only asar) — use the OS-standard userData dir. Dev keeps the repo-local
-// apps/node/.acorn so a checkout's data stays with the checkout; it belongs to apps/node because the
-// node owns SQLite, blobs and the node identity (node-core/main/serverPaths.ts).
+// Data directory selection: docs/electron.md § Startup: data directory, environment, and the
+// singleton lock.
 const e2e = process.env.ACORN_E2E === '1'
 const dataDir = e2e && process.env.ACORN_E2E_DATA_DIR
   ? resolve(process.env.ACORN_E2E_DATA_DIR)
   : app.isPackaged ? app.getPath('userData') : devDataDir()
 
-// Dev: load secrets from .env. Packaged builds have no bundled .env (that load no-ops); instead a
-// user-provided .env in the data dir (~/Library/Application Support/acorn/.env) supplies the runtime
-// secrets. SESSION_ENC_KEY falls through to safeStorage (resolveSessionKey, in whenReady below) either way.
+// .env load order and the SESSION_ENC_KEY fallback: docs/electron.md § Startup: data directory,
+// environment, and the singleton lock.
 for (const envFile of [join(import.meta.dirname, '../../.env'), join(dataDir, '.env')]) {
   try {
     process.loadEnvFile(envFile)
   } catch {
-    // no .env at this location — secrets must come from the other file / environment / keychain
+    // Fine if this file is missing: secrets can still come from the other file, the environment, or the keychain.
   }
 }
-// Single-instance: a second launch focuses the existing window. The data root's exclusive lock
-// (node-core/main/dataRoot.ts) is the real mutual exclusion; this keeps a second launch from getting
-// as far as fighting over it.
+// Single-instance lock: docs/electron.md § Startup: data directory, environment, and the singleton
+// lock.
 if (!app.requestSingleInstanceLock()) app.quit()
 
 let mainWindow: BrowserWindow | null = null
@@ -61,8 +43,8 @@ let serviceReady = false
 let quitApproved = false
 let quitPromptPending = false
 
-// Renderer will-phase: Cmd-Q asks the client event service to collect concerns, then replies. Once
-// approved, app.quit() re-enters with the guard open and bootstrap's ordered will-quit disposal runs.
+// Quit negotiation with the renderer: docs/electron.md § Startup: data directory, environment, and
+// the singleton lock.
 app.on('before-quit', (event) => {
   if (quitApproved) return
   const win = mainWindow
@@ -79,45 +61,34 @@ ipcMain.on('acorn:quit-response', (_event, approved: boolean) => {
   app.quit()
 })
 
-// The node recovery screen's two native actions (client-core/node/NodeGate.tsx). `force-quit` skips
-// the renderer will-quit prompt on purpose: that prompt is answered by the app shell, which is not
-// mounted when the gate is showing, so routing through it would hang.
+// NodeGate's two native actions, and why force-quit skips the renderer prompt: docs/electron.md
+// § Startup: data directory, environment, and the singleton lock.
 ipcMain.on('acorn:open-data-folder', () => void shell.openPath(dataDir))
 ipcMain.on('acorn:force-quit', () => {
   quitApproved = true
   app.quit()
 })
 
-// There is deliberately NO app.on('certificate-error') handler for the node's self-signed certificate.
-// That event only fires for requests Chromium makes, and nothing in this process asks Chromium to talk
-// to a node: the window loads app://acorn, and every byte to or from a node goes through the broker's
-// own node:https agent, which does the pinning itself (main/nodeBroker.ts). Adding one "just in case"
-// would install a certificate-override path for a trust decision that is made somewhere else entirely.
+// No certificate-error handler here: docs/electron.md § Connection broker.
 
 function hardenNavigation(win: BrowserWindow) {
-  // Anything leaving the renderer for the OS goes through the scheme allowlist first: the pane
-  // content that produces these links (GitHub bodies, Linear issues/attachments, Rollbar) is
-  // third-party, so a `file:`/custom-scheme href would otherwise be an arbitrary-app launch.
+  // Scheme allowlist for external opens: docs/security.md § Process, path, and configuration
+  // controls. The links reaching this path come from third-party content (GitHub bodies, Linear
+  // issues and attachments, Rollbar), so an unfiltered `file:` or custom-scheme href would be an
+  // arbitrary-app launch.
   const openExternal = (url: string): void => {
     if (!isAllowedExternalUrl(url)) return void console.warn('[electron] blocked external open:', url)
     void shell.openExternal(url)
   }
 
-  // The main window may only ever sit on the bundled app origin; everything else opens in the system
-  // browser. There is no longer an OAuth exception: GitHub is connected by device flow against the node
-  // (POST /v2/p/github/auth/device/start), so no window of ours ever has to visit github.com.
+  // Main-frame navigation policy, and why there is no OAuth exception: docs/electron.md
+  // § The plugin frame origin.
   win.webContents.on('will-navigate', (e, url) => {
     if (url.startsWith(APP_ORIGIN)) return
     e.preventDefault()
     openExternal(url)
   })
-  // Subframes. `will-navigate` above is the MAIN frame only, and a plugin frame lives on
-  // app-plugin://<hash> (main/pluginScheme.ts). Two things must not happen: a plugin frame navigating
-  // itself somewhere else, and anything at all navigating a subframe to a scheme that is not ours. Both
-  // are the same check — a frame may only ever sit on the origin the shell gave it.
-  //
-  // Not handed to openExternal either: a plugin's link becoming a browser tab is a plugin choosing what
-  // the machine opens. Its CSP has no network, and this is the same rule at the navigation layer.
+  // Subframe navigation policy: docs/electron.md § The plugin frame origin.
   win.webContents.on('will-frame-navigate', (e) => {
     if (e.frame === win.webContents.mainFrame) return // handled by will-navigate, which runs too
     if (e.url.startsWith(`${PLUGIN_SCHEME}://`)) return
@@ -125,14 +96,12 @@ function hardenNavigation(win: BrowserWindow) {
     console.warn('[electron] blocked subframe navigation:', e.url)
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
-    // Includes `window.open` from a plugin frame: denied like everything else, and the URL is not even
-    // offered to the OS unless the scheme allowlist accepts it.
+    // window.open denial, plugin frames included: docs/electron.md § The plugin frame origin.
     openExternal(url)
     return { action: 'deny' }
   })
-  // The browser-preview pane is now a main-owned WebContentsView (previewService.ts), not
-  // a <webview> guest — its http(s)-only navigation guard lives per-view there, so no
-  // will-attach-webview handler here anymore.
+  // Preview's navigation guard lives on its own WebContentsView, not here: docs/electron.md
+  // § Host-owned webviews.
 }
 
 async function createMainWindow() {
@@ -149,10 +118,10 @@ async function createMainWindow() {
     },
   })
   hardenNavigation(win)
-  // Cmd/Ctrl+W closes the FOCUSED pane (terminal tab / editor file), not the whole window. We
-  // intercept in main because a menu accelerator can't be suppressed from the page — preventing
-  // before-input-event disables it (Electron docs). The renderer decides what "focused pane" is;
-  // if none owns focus, nothing closes (this is a single-window app — Cmd-Q quits).
+  // Cmd/Ctrl+W closes the focused pane (a terminal tab or editor file), not the window. Main
+  // intercepts it because a menu accelerator can't be suppressed from the page, only by preventing
+  // before-input-event. The renderer decides what counts as the focused pane; if none owns focus,
+  // nothing closes, since this is a single-window app and Cmd-Q is what quits it.
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return
     if (input.key.toLowerCase() === 'w' && (input.meta || input.control) && !input.alt && !input.shift) {
@@ -160,21 +129,21 @@ async function createMainWindow() {
       win.webContents.send('acorn:close-pane')
     }
   })
-  // Under e2e the window still has to be visible (Playwright drives a real renderer), but it must not
-  // steal the developer's focus mid-run: showInactive keeps whatever they were doing on top.
+  // Under e2e the window must still be visible, since Playwright drives a real renderer, but it must
+  // not steal focus mid-run: showInactive leaves whatever the developer was doing on top.
   win.once('ready-to-show', () => (e2e ? win.showInactive() : win.show()))
-  // The renderer comes from the app scheme, not from a node. Nothing about the window depends on where
-  // the service bound any more — that endpoint is the broker's business (main/nodeBroker.ts).
+  // The renderer always loads from the app scheme, independent of where the node bound:
+  // docs/electron.md § Renderer origin and protocol handler.
   await win.loadURL(`${APP_ORIGIN}/`)
   return win
 }
 
 app.whenReady().then(async () => {
-  // One call into the composition root: it migrates, constructs services, installs bridges, starts
-  // the loopback listener, then creates the window (main/bootstrap.ts owns the order + teardown).
+  // bootstrap.ts owns the boot order and teardown: docs/electron.md § Main process.
   try {
-    // Accessory apps can't become the active app on macOS, so a test run never takes the foreground
-    // (no dock icon either). CDP input still reaches the renderer, so the specs are unaffected.
+    // An accessory app can't become the active app on macOS, so an e2e run never takes the
+    // foreground and shows no dock icon. CDP input still reaches the renderer, so the specs are
+    // unaffected.
     if (e2e && process.platform === 'darwin') app.setActivationPolicy('accessory')
     resolveSessionKey(dataDir) // safeStorage-backed SESSION_ENC_KEY before any binding reads it
     registerAppScheme() // protocol.handle must wait for ready; registerSchemesAsPrivileged could not
@@ -186,9 +155,9 @@ app.whenReady().then(async () => {
       },
     })
   } catch (e) {
-    // Boot is all-or-nothing: a failure here (migration, a data root already locked, …) means no node
-    // to talk to — surface it and quit rather than sit headless in the dock forever (this macOS build
-    // has no window-all-closed quit).
+    // Boot is all-or-nothing. A failure here (a migration error, a data root already locked) means
+    // there is no node to talk to, so this shows the error and quits rather than sitting headless in
+    // the dock (this macOS build has no window-all-closed quit).
     dialog.showErrorBox('acorn failed to start', e instanceof Error ? (e.stack ?? e.message) : String(e))
     app.quit()
   }
@@ -202,12 +171,12 @@ app.on('second-instance', () => {
 })
 
 app.on('activate', () => {
-  // serviceReady ⇒ bootstrap finished and the broker has adopted the local node. Before that a
-  // Dock-click window would render NodeGate's recovery screen against an empty fleet — and bootstrap is
-  // about to create its own window anyway.
+  // serviceReady means bootstrap finished and the broker adopted the local node. Before that, a
+  // dock-click window would render NodeGate's recovery screen against an empty fleet, and bootstrap
+  // is about to create its own window anyway.
   if (serviceReady && mainWindow && BrowserWindow.getAllWindows().length === 0) {
     void createMainWindow().then((w) => (mainWindow = w))
   }
 })
 
-// macOS-only build; standard behavior is to stay alive until Cmd-Q (no window-all-closed quit).
+// macOS-only build. No window-all-closed handler: the standard behavior is to stay running until Cmd-Q.

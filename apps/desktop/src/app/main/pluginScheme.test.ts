@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Electron is mocked the way previewService.test.ts does it: capture what the module registers, then
-// call the handler directly. The two things worth pinning here are the response POLICY (every response
-// carries the frame CSP, whatever the outcome) and the custody rule (nothing but a hash the cache holds
-// can produce bytes) — neither needs a browser.
+// call the handler directly. The two things worth pinning here are the response policy (every
+// response carries the frame CSP, whatever the outcome) and the custody rule (nothing but a hash the
+// cache holds can produce bytes); neither needs a browser.
 const handlers = new Map<string, (request: Request) => Promise<Response>>()
 let fetched: string[] = []
 
@@ -80,7 +80,7 @@ describe('the response policy', () => {
   })
 
   it('does not send x-frame-options, which would block the only embed that is meant to work', async () => {
-    // The shell frames these from app://acorn — a different origin. SAMEORIGIN here would be a
+    // The shell frames these from app://acorn, a different origin. SAMEORIGIN here would be a
     // plausible-looking header that breaks every plugin pane.
     const response = await get(`${PLUGIN_SCHEME}://${HASH}/index.html`)
     expect(response.headers.get('x-frame-options')).toBeNull()
@@ -96,7 +96,7 @@ describe('the generated document', () => {
     expect(html).toContain('<script type="module" src="/client.js">')
     // No inline script anywhere: the CSP has no `unsafe-inline` for scripts and must never need one.
     expect(html).not.toMatch(/<script(?![^>]*\bsrc=)/)
-    // The cache is not touched to answer this — the document does not depend on the bundle existing.
+    // The cache is not touched to answer this: the document does not depend on the bundle existing.
     expect(fetched).toEqual([])
   })
 
