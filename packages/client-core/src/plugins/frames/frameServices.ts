@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey } from '@acorn/protocol/api.ts'
+import { parsePluginChannel } from '@acorn/protocol/pluginState.ts'
 import { sendRaw } from '../../apiClient'
 import { toast } from '../../notifications/toast'
 import { clientEvents, openPane } from '../../registries/clientEvents'
@@ -10,6 +11,7 @@ import { saveJsonPref } from '../../settings/savePref'
 import { activeTaskId } from '../../tasks/tasks'
 import type { FrameBinding, FrameServices } from './broker'
 import { isSubscribable } from './channels'
+import { onPluginFrame } from '../pluginChannel'
 
 // The fourteen host effects a plugin frame's bridge is allowed to cause (docs/plugins.md).
 //
@@ -85,6 +87,11 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     subscribe: (channel, listener) => {
       // Second half of the check the broker starts: it verifies the manifest declared the channel, this
       // verifies the shell has one. Subscribing never creates a channel.
+      //
+      // The plugin's own live channel is checked first and separately, because ownership is the whole
+      // question there: `plugin:<id>:<verb>` reaches its own node half, and another plugin's namespace is
+      // refused for the same reason its routes are. `onPluginFrame` throws on both counts.
+      if (parsePluginChannel(channel)) return onPluginFrame(props.binding.pluginId, channel, listener)
       if (!isSubscribable(channel)) throw new Error(`${channel} is not a channel a plugin frame can subscribe to`)
       return clientEvents.on(channel, (payload) => listener(payload))
     },

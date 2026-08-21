@@ -55,3 +55,8 @@ remain executable actions and are trust-checked.
 Authoring remains file-based. The desktop must be open for app-open-triggered reconciliation and UI
 interaction, although the Node continues work while the renderer is closed. There is no general DAG
 editor or automatic retry of an operation whose external outcome is unknown.
+
+An agent cannot start or drive a run: no workflow or session tool is registered, so orchestration is
+declarative only. [`docs/future/orchestration.md`](./future/orchestration.md) analyses what an
+agent-driven path would cost, including database-truth definitions and an extensible step-kind
+registry.

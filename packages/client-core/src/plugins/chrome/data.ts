@@ -27,6 +27,7 @@ import {
 import { emptyCollectionPage } from '../../registries/collections'
 import { readJson, writeJson } from '../../apiClient'
 import { wsOnStatus } from '../../wsClient'
+import { onPluginPush } from '../pluginChannel'
 import { ownsTaskOrigin } from './ownership'
 
 // Reads a plugin's descriptor routes (badges, rail items, collections, agent context). The manifest's
@@ -53,39 +54,73 @@ export const ownsRoute = (pluginId: string, path: string): boolean => {
 
 // ── Freshness ─────────────────────────────────────────────────────────────────────────────────────
 
-// One revision for all chrome, bumped by the node's content-free status ping and by the polling
-// fallback. `ctx.events.status()` carries no payload by design (node-core/server/plugin/types.ts
-// calls the channel "an invalidation channel, not an event log"), so there is nothing finer to key on
-// without inventing an event type the phase doc explicitly says not to invent.
+// Two revisions, and a descriptor read watches both.
 //
-// ponytail: one signal for all chrome. Chrome is a handful of tiny reads; split it per contribution
-// only if a refetch cost ever actually shows up.
+// The shared one is bumped by the node's content-free status ping and by the polling fallback.
+// `ctx.events.status()` carries no payload by design (node-core/server/plugin/types.ts calls the
+// channel "an invalidation channel, not an event log"), so a global signal is all it can drive.
+//
+// The per-plugin one is for a plugin pushing on its own channel (plugins/pluginChannel.ts). That
+// refetch cost the `ponytail:` note here was waiting for did show up: a plugin sampling machine
+// statistics every two seconds would have re-read every *other* plugin's badges and rail rows at the
+// same cadence, which is the global ping's problem restated. So the split is per plugin, not per
+// contribution — a plugin's own descriptors are the ones its own data invalidates.
 const [chromeRevision, setChromeRevision] = createSignal(0)
 export { chromeRevision }
 
-export const bumpChrome = (): void => {
-  // Same rule the poller registry applies: a hidden window is not worth a fan-out.
-  if (typeof document !== 'undefined' && document.hidden) return
-  setChromeRevision((revision) => revision + 1)
+// Created on demand, because a plugin that never pushes should not cost a signal. Plain signals at
+// module scope need no reactive owner; only computations would.
+const pluginRevisions = new Map<string, { read: () => number; bump: () => void }>()
+
+const revisionFor = (pluginId: string): { read: () => number; bump: () => void } => {
+  let entry = pluginRevisions.get(pluginId)
+  if (!entry) {
+    const [read, set] = createSignal(0)
+    entry = { read, bump: () => void set((revision) => revision + 1) }
+    pluginRevisions.set(pluginId, entry)
+  }
+  return entry
 }
 
-// Subscribed on the first pass that registers any chrome rather than at module scope, because
-// `wsOnStatus` opens the socket as a side effect and a bare import must not do that.
+/** One plugin's own freshness. */
+export const pluginRevision = (pluginId: string): number => revisionFor(pluginId).read()
+
+/** The freshness dependency a descriptor read watches: the shared revision plus this plugin's own, so a
+ *  status ping invalidates everyone's and a push invalidates only its sender's. Summed because both
+ *  counters only ever increase, which makes the total strictly increasing too and so incapable of
+ *  landing back on a value a query has already seen. */
+export const chromeDeps = (pluginId: string): number => chromeRevision() + pluginRevision(pluginId)
+
+/** Nudge chrome. With no argument every descriptor refetches, which is what a content-free status ping
+ *  means; with a plugin id, only that plugin's. */
+export const bumpChrome = (pluginId?: string): void => {
+  // Same rule the poller registry applies: a hidden window is not worth a fan-out.
+  if (typeof document !== 'undefined' && document.hidden) return
+  if (pluginId === undefined) return void setChromeRevision((revision) => revision + 1)
+  revisionFor(pluginId).bump()
+}
+
+// Subscribed on the first pass that registers any chrome rather than at module scope, because both
+// subscriptions open the socket as a side effect and a bare import must not do that.
 let unsubscribe: (() => void) | null = null
+let unsubscribePush: (() => void) | null = null
 let interval: ReturnType<typeof setInterval> | null = null
 
 /** Start (or restart) the freshness wiring for the descriptors currently registered. `refreshSeconds`
  * is the smallest polling fallback any of them declared, or undefined when none did. */
 export function watchChrome(refreshSeconds: number | undefined): void {
-  unsubscribe ??= wsOnStatus(bumpChrome)
+  unsubscribe ??= wsOnStatus(() => bumpChrome())
+  unsubscribePush ??= onPluginPush(bumpChrome)
   if (interval) clearInterval(interval)
-  interval = refreshSeconds === undefined ? null : setInterval(bumpChrome, refreshSeconds * 1_000)
+  interval = refreshSeconds === undefined ? null : setInterval(() => bumpChrome(), refreshSeconds * 1_000)
 }
 
 /** Torn down with the contributions themselves, so a disabled plugin stops costing a timer. */
 export function unwatchChrome(): void {
   unsubscribe?.()
   unsubscribe = null
+  unsubscribePush?.()
+  unsubscribePush = null
   if (interval) clearInterval(interval)
   interval = null
 }

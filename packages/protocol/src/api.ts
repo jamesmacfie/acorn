@@ -465,6 +465,9 @@ export type InstalledPluginRow = {
   // hand. A display string rather than the structured source, because only the node's lockfile has to
   // re-resolve it.
   source?: string
+  // The app seeded this package; it has no lockfile, so the node cannot update it and the settings row
+  // offers no update or uninstall. Structured rather than sniffed from `source`, which is display text.
+  bundled?: true
   // Epoch millis.
   installedAt?: number
 }

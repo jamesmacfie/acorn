@@ -5,7 +5,7 @@ import { createFleetQuery } from '../../node/fanout'
 import { extensionDeliveries, type ExtensionContribution } from '../../registries/extensionPoints'
 import { Badge, Row, SectionHeader } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
-import { chromeKey, chromeRevision } from './data'
+import { chromeDeps, chromeKey } from './data'
 import './extension-points.css'
 
 // The one place another plugin's rows are drawn inside a plugin's surface, by the host, with the
@@ -28,7 +28,7 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
     // contributor with nothing to say. The owner's pane is not the place to report somebody else's
     // fetch failure; the node's own banner already covers an unreachable node.
     (_node, _revision, signal) => props.contribution.fetch(signal).catch((): PluginExtensionItem[] => []),
-    chromeRevision,
+    () => chromeDeps(props.contribution.pluginId),
     { nodeIds: [nodeId] },
   )
   const items = (): PluginExtensionItem[] => result().rows[0]?.data ?? []

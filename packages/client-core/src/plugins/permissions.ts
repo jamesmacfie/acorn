@@ -2,7 +2,7 @@ import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, 
 import { pluginExtensionGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../tasks/paneShortcuts'
-import { describeChannel, isSubscribable } from './frames/channels'
+import { describeChannel, isFrameChannel } from './frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
 
 // What a plugin's declared permissions read as in the trust prompt (PluginTrustDialog.tsx): a `node`
@@ -85,7 +85,7 @@ export const uiPermissionLines = (permissions: NodePluginPermissions): Permissio
     return description ? [line(scope, description)] : []
   })
   const events = permissions.events.flatMap((channel) => {
-    if (!isSubscribable(channel)) return []
+    if (!isFrameChannel(channel)) return []
     const description = describeChannel(channel)
     return description ? [line(channel, description)] : []
   })

@@ -24,6 +24,7 @@ import { modelProviderRegistry } from '../modelProviders/registry'
 import { SCHEDULER } from '../schedules'
 import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
+import { parsePluginChannel, pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
 import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
 
@@ -207,7 +208,23 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
     // main/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
     // `streams` return disposers, which the host records like any other contribution.
     events: {
-      send: wsBroadcast,
+      // Confined to the plugin's own channel namespace for a loaded plugin, unrestricted for a
+      // built-in. A built-in owns real prefixes through `channel` below and is compiled into this
+      // binary; a loaded package is neither, and an unconfined `send` let one post frames on `term:`
+      // or `workflow:` and impersonate core's own streams. The confinement is also the definition:
+      // `plugin:<id>:*` is the namespace its frames may subscribe to and the one a push invalidates
+      // its chrome from (client-core/plugins/pluginChannel.ts).
+      //
+      // A throw rather than a silent drop, because a broadcast that goes nowhere is invisible and the
+      // author would be left debugging the renderer.
+      send: permissions
+        ? (frame) => {
+          if (parsePluginChannel(frame.channel)?.pluginId !== plugin) {
+            throw new Error(`plugin '${plugin}' may only broadcast on ${pluginChannel(plugin, '<verb>')}, not '${frame.channel}'`)
+          }
+          wsBroadcast(frame)
+        }
+        : wsBroadcast,
       status: broadcastStatus,
       notice: broadcastWorkflowNotice,
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,

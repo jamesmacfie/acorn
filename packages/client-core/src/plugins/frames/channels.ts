@@ -4,6 +4,7 @@
 // plugin may be showing has gone or moved.
 // A type-only import, so it is erased and creates no runtime edge back to the module that consumes
 // these descriptions.
+import { parsePluginChannel } from '@acorn/protocol/pluginState.ts'
 import type { GrantDescription } from '../permissions'
 
 export const SUBSCRIBABLE_CHANNELS = [
@@ -24,8 +25,26 @@ const CHANNEL_DESCRIPTIONS = {
   'runtime:node-switched': { text: 'Receive active-node change events', icon: 'radio' },
 } as const satisfies Record<SubscribableChannel, GrantDescription>
 
+/** One of the shell's own channels. Stays a narrow predicate, because its callers go on to index
+ *  `ClientEventMap` with what it accepted. */
 export const isSubscribable = (channel: string): channel is SubscribableChannel =>
   (SUBSCRIBABLE_CHANNELS as readonly string[]).includes(channel)
 
-export const describeChannel = (channel: string): GrantDescription | undefined =>
-  isSubscribable(channel) ? CHANNEL_DESCRIPTIONS[channel] : undefined
+// Anything a frame may name at all, which is the shell's list plus the plugin's own live channel. That
+// second half is admitted by shape rather than by name, because core cannot enumerate verbs it never
+// sees: `plugin:<id>:<verb>` is declared by the manifest and served by that plugin's own node half
+// (plugins/pluginChannel.ts). Whether *this* frame owns the id is a different question, and
+// frameServices.ts is where it gets asked — the same split the api verb makes between "is this shaped
+// like a plugin route" and "is it yours".
+export const isFrameChannel = (channel: string): boolean =>
+  isSubscribable(channel) || parsePluginChannel(channel) !== null
+
+export const describeChannel = (channel: string): GrantDescription | undefined => {
+  if (isSubscribable(channel)) return CHANNEL_DESCRIPTIONS[channel]
+  // One host-owned sentence rather than one per verb. The verb is manifest text, and every sentence the
+  // trust prompt draws under "Enforced" has to be copy the host owns (plugins/permissions.ts says why),
+  // so it does not get interpolated in however well-formed it parsed.
+  return parsePluginChannel(channel)
+    ? { text: 'Receive live updates from its own node half', icon: 'radio' }
+    : undefined
+}

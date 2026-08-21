@@ -51,6 +51,24 @@ describe('the two permission groups', () => {
     ])
   })
 
+  it('discloses a plugin\'s own live channel without echoing the verb it named', () => {
+    // The channel is admitted by shape, since core cannot enumerate a plugin's verbs
+    // (frames/channels.ts). The sentence stays the host's: a verb is manifest copy, and the whole point
+    // of this group is that everything in it is copy acorn owns and enforces.
+    const lines = texts(uiPermissionLines(permissions({ events: ['plugin:machine-stats:sample'] })))
+    expect(lines).toEqual(['Receive live updates from its own node half'])
+    expect(lines.join(' ')).not.toContain('sample')
+  })
+
+  it('ignores a channel dressed up as another plugin\'s namespace, and a malformed one', () => {
+    // Ownership is not decided here — frameServices.ts refuses another plugin's channel at subscribe
+    // time — so a prompt line for one is honest about what was asked for. What must not happen is a
+    // malformed name reaching the prompt as a grant.
+    expect(texts(uiPermissionLines(permissions({ events: ['plugin:Other:sample', 'plugin:a:b:c'] })))).toEqual([
+      '2 requests this version of acorn does not recognise (ignored)',
+    ])
+  })
+
   it('never echoes unknown manifest copy as an enforced grant', () => {
     const lines = texts(uiPermissionLines(permissions({
       api: ['core.tasks:read', 'read-only access to nothing'],

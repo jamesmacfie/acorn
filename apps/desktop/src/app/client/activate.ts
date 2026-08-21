@@ -18,6 +18,12 @@ import { clientPlugins } from './plugins'
 import { activateScopedStateEviction } from './scopedEviction'
 import { shellSlotContributions } from './slotContributions'
 import { coreSourceContributions } from './sourceContributions'
+import { ensurePluginChannel } from '@acorn/client-core/plugins/pluginChannel.ts'
+
+// The one WS prefix core claims on every loaded plugin's behalf, since a loaded plugin cannot claim one
+// itself (plugins/pluginChannel.ts). Claimed here with core's own three so the set is fixed at boot and
+// the prefix test can pin it; the socket still opens on the first subscriber, not now.
+ensurePluginChannel()
 
 for (const kind of noticeKindContributions) noticeKindRegistry.register(kind)
 for (const page of settingsPageContributions) settingsRegistry.register(page)

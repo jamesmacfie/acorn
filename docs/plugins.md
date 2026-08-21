@@ -370,6 +370,12 @@ frozen package on a node that has no newer copy to decline.
 Bundled client bytes are trusted only after Electron main reads and hashes its own application
 resource directory; a node cannot acquire that trust by labelling a roster row as bundled.
 
+A bundled package has no lockfile, so the node has no source to re-resolve and its update route can
+only refuse. The roster row says so structurally (`installed.bundled` on `InstalledPluginRow`), and
+Settings → Plugins uses that to show neither update nor uninstall on a bundled row: update would only
+ever error, and the checkbox already covers "stop running this" without the tombstone that uninstall
+leaves behind.
+
 ### The dev loop
 
 Seeing a change to a loaded plugin run used to be four steps and a page of host knowledge: rebuild by
@@ -1167,6 +1173,65 @@ slot context carries shell callbacks a descriptor cannot receive. `topbar.left` 
 manifest naming one would parse and never appear. `tabrail.task-row` is per-task while a slot's `data`
 route is node-scoped — opening it would mean either the same badge on every row or one fetch per
 visible row per tick.
+
+### Keeping a descriptor fresh
+
+A descriptor's data comes from a route on the plugin's node half, so something has to say when to read
+it again. There are three answers and they are not interchangeable.
+
+**A declared `refresh`** is the fallback: seconds, floored at 30 and capped at a day. The floor is not
+timidity — a descriptor read is one HTTP call *per node*, and one interval serves every plugin's chrome
+at the lowest value anyone declared, so a plugin that asked for two seconds would be spending every
+other plugin's budget as well as its own. Declare it for data that changes with nothing to trigger on.
+
+**`ctx.events.status()`** is core's content-free ping. It refetches every descriptor of every plugin
+and marks whatever each client is showing stale, which is right for "something happened" and wrong for
+"here is another number". Use it after an action, not on a timer.
+
+**The plugin's own channel** is the fast path, and the one to reach for when data actually streams.
+
+#### The live channel
+
+A loaded plugin owns the WS channel namespace `plugin:<its-id>:*`. Its node half broadcasts on it with
+the `ctx.events.send` it already had, its own frames subscribe to it by declaring the channel in
+`permissions.events`, and each frame that arrives nudges that plugin's descriptors and nobody else's.
+
+```js
+// node half
+ctx.events.send({ channel: `plugin:${ID}:sample`, cpu: 0.34, memory: 0.81 })
+```
+
+```js
+// its frame
+bridge.events.on(`plugin:${ID}:sample`, (sample) => paint(sample))
+```
+
+What a plugin puts on the frame beside `channel` is the payload, delivered to its frames unchanged.
+Core reads the channel and nothing else, which is the same promise the WS envelope makes everywhere
+(`@acorn/protocol/ws.ts`).
+
+Four properties worth knowing before building on it:
+
+- **`send` is confined to that namespace, and the confinement is the definition.** A loaded plugin
+  naming another prefix gets a throw, not a dropped frame. Before this it could post on `term:` or
+  `workflow:` and impersonate core's own streams; a built-in still can, because a built-in owns real
+  prefixes through `ctx.events.channel` and is compiled into the binary.
+- **A loaded plugin still cannot claim a prefix.** `ctx.events.channel` remains withheld. Core claims
+  the one `plugin` prefix on every loaded plugin's behalf and routes by the id inside the name
+  (`client-core/plugins/pluginChannel.ts`), which is what lets this work across a message-passing
+  boundary that a handler function could never cross.
+- **Frames get every frame; chrome gets a coalesced one.** A subscribed frame is delivered each
+  broadcast, paying for it through the bridge's own message budget. Chrome is nudged at most twice a
+  second per plugin, because a rail row is a network read per node and a plugin sampling in a loop must
+  not turn that into a refetch storm.
+- **`nodeStats` does not participate**, and neither the declared interval nor a push reaches it: Fleet
+  home reads it through a fan-out with no dependency accessor, so it refetches when the fleet list
+  changes and not otherwise. A node statistic is a number on a card, not a live readout.
+
+A frame may subscribe only to its **own** plugin's channel. Another plugin's is refused, structurally,
+for the same reason another plugin's routes are — two plugins that need to talk use a capability. The
+trust prompt draws one host-owned sentence for the grant and never the verb the manifest named, which
+is the rule for every line in that group.
 
 ### Context menus
 

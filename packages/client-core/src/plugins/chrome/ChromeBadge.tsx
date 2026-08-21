@@ -5,7 +5,7 @@ import { createFleetQuery } from '../../node/fanout'
 import { Badge, Button } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import { runChromeAction } from './actions'
-import { chromeKey, chromeRevision, readBadge } from './data'
+import { chromeDeps, chromeKey, readBadge } from './data'
 
 // The generic slot badge. It has to be live when no plugin frame is mounted anywhere, so its data comes
 // from the plugin's node half rather than from plugin UI code.
@@ -22,7 +22,7 @@ export default function ChromeBadge(props: ChromeBadgeProps) {
   const [result] = createFleetQuery(
     () => chromeKey(props.pluginId, props.descriptor.id),
     (node, _revision, signal) => readBadge(props.pluginId, props.descriptor.data, node, signal),
-    chromeRevision,
+    () => chromeDeps(props.pluginId),
     { nodeIds: [nodeId] },
   )
 
