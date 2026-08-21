@@ -4,6 +4,7 @@ import { reposResource } from '../resourceKeys'
 import { gh, ghError } from '..'
 import type { Repo } from '../../contract/api'
 import { deleteRepoMirrorStatements } from '../mirrorRetention'
+import { repoMatches } from '../repoMatch'
 import { repos, syncState } from '../../node/schema'
 
 // Every exported helper here already took the handle as a parameter, which is why this module needed no
@@ -129,7 +130,7 @@ export const resolveRepoForUser = async (
   const [cached] = await db
     .select({ id: repos.id })
     .from(repos)
-    .where(and(eq(repos.userId, userId), eq(repos.owner, owner), eq(repos.name, repo)))
+    .where(and(eq(repos.userId, userId), repoMatches(owner, repo)))
   if (cached) return { ok: true, value: { repoId: cached.id } }
 
   const res = await fetcher(token, `/repos/${owner}/${repo}`)

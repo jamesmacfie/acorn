@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { type AppEnv, ownerId, type PluginDatabase } from '@acorn/plugin-api/node'
 import { comments, pullRequests, repos, reviewThreads, reviews } from '../../node/schema'
+import { repoMatches } from '../repoMatch'
 
 // Participant logins for @-mention autocomplete, read straight from the mirror tables. Mirror-only and
 // best-effort: an unmirrored repo yields an empty list, so the client just gets no suggestions, which is
@@ -17,7 +18,7 @@ export const mentions = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/
   const [repoRow] = await db
     .select({ id: repos.id })
     .from(repos)
-    .where(and(eq(repos.userId, uid), eq(repos.owner, owner), eq(repos.name, repo)))
+    .where(and(eq(repos.userId, uid), repoMatches(owner, repo)))
   if (!repoRow) return c.json([] as string[])
 
   const rid = repoRow.id

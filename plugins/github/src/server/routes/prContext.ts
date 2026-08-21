@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import { prResource } from '../resourceKeys'
 import { type AppEnv, ownerId, type PluginDatabase } from '@acorn/plugin-api/node'
 import { githubToken } from '../githubToken'
+import { repoMatches } from '../repoMatch'
 import { pullRequests, repos, syncState } from '../../node/schema'
 
 // The write paths reach the mirror through the handle resolvePr was given, which is what keeps prActions
@@ -38,7 +39,7 @@ export async function resolvePr(db: PluginDatabase, c: Context<AppEnv>): Promise
   const [repoRow] = await db
     .select({ id: repos.id })
     .from(repos)
-    .where(and(eq(repos.userId, userId), eq(repos.owner, owner), eq(repos.name, repo)))
+    .where(and(eq(repos.userId, userId), repoMatches(owner, repo)))
   if (!repoRow) return { error: 'repo_not_found' as const, status: 404 as const }
   const [pr] = await db
     .select({ nodeId: pullRequests.nodeId, headSha: pullRequests.headSha })
