@@ -134,14 +134,22 @@ const railLink = (value: unknown): NonNullable<NonNullable<PluginRailItem['task'
   return link
 }
 
+// Empty strings stay: `fields` is positional (protocol/api.ts § PluginRailItem), so an empty cell
+// holds its column.
+const fieldList = (value: unknown): string[] | undefined =>
+  Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string')
+    ? value : undefined
+
 /** Parse plugin row data field by field. A malformed optional task claim loses that claim; it does
  * not get to erase an otherwise useful row from the host-owned source list. */
 export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem | null => {
   const item = row as PluginRailItem
   if (!item || typeof item !== 'object' || !str(item.id) || !str(item.title)
     || !opt(item.subtitle) || !opt(item.icon) || !opt(item.badge)) return null
+  const fields = fieldList(item.fields)
   if (!item.task || typeof item.task !== 'object') {
     return { id: item.id, title: item.title, ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
+      ...(fields ? { fields } : {}),
       ...(str(item.icon) ? { icon: item.icon } : {}), ...(str(item.badge) ? { badge: item.badge } : {}) }
   }
   const task = item.task
@@ -150,6 +158,7 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
     id: item.id,
     title: item.title,
     ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
+    ...(fields ? { fields } : {}),
     ...(str(item.icon) ? { icon: item.icon } : {}),
     ...(str(item.badge) ? { badge: item.badge } : {}),
     task: {

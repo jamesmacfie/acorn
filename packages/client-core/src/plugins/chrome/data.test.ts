@@ -34,6 +34,19 @@ describe('descriptor source row parsing', () => {
     })?.task?.origin).toBe('rollbar:error')
   })
 
+  it('keeps positional fields, empty cells included, and drops a malformed list', () => {
+    expect(sanitizeRailItem('linear', {
+      id: 'c:FAST-6352', title: 'Planner crash', fields: ['FAST-6352', ''],
+    })).toEqual({
+      id: 'c:FAST-6352', title: 'Planner crash', fields: ['FAST-6352', ''],
+    })
+    expect(sanitizeRailItem('linear', {
+      id: 'c:FAST-6352', title: 'Planner crash', fields: ['FAST-6352', 7],
+    })).toEqual({
+      id: 'c:FAST-6352', title: 'Planner crash',
+    })
+  })
+
   it('strips a malformed task link while retaining valid task fields', () => {
     expect(sanitizeRailItem('rollbar', {
       id: '142', title: 'Checkout failed', task: { origin: 'rollbar', link: { connectionId: 7 } },
