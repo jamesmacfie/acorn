@@ -143,6 +143,15 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     expect(res.isWorktree).toBe(true)
   })
 
+  // What the rail's "use the project folder and its current branch" tick produces: a Git project, but
+  // no branch, so the task shares the checkout instead of getting a worktree.
+  it('runs a branchless task in a Git project from the checkout without creating a worktree', async () => {
+    await t.db.update(schema.tasks).set({ branch: null })
+    const result = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    expect(result).toEqual({ cwd: checkout, isWorktree: false, created: false })
+    expect(created).toEqual([])
+  })
+
   it('runs a branchless task from the project root without creating a worktree', async () => {
     const plain = join(dir, 'plain')
     mkdirSync(plain)
