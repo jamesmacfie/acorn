@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -8,7 +8,7 @@ import { panelRegion, regionScope, sourceRegionOwner } from '../../dashboards/re
 import { activeNodeId } from '../../node/activeNode'
 import { createFleetQuery } from '../../node/fanout'
 import { FRESHNESS_LABELS } from '../../node/freshness'
-import { Alert, Badge, Button, EmptyState, Row, SectionHeader } from '../../ui/primitives'
+import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import { runChromeAction } from './actions'
 import { chromeKey, chromeRevision, readRailItems, scopedSourceItemsPath } from './data'
@@ -70,7 +70,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   // reaches the cache key as well as the path. Both halves of the pair have to agree on scope now that
   // the fan-out serves its last answer on mount.
   const scope = () => ({ revision: chromeRevision(), projectId: params.projectId })
-  const [result] = createFleetQuery(
+  const [result, { refetch }] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(
       props.pluginId,
@@ -83,8 +83,28 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   )
 
   const row = () => result().rows[0]
-  const items = () => row()?.data ?? []
+  const allItems = () => row()?.data ?? []
   const unavailable = () => result().unavailable[0]
+
+  // Client-side title filter over the loaded list, the same bargain github's PR filter strikes
+  // (plugins/github pullList/model.ts): it narrows what the source already returned rather than
+  // asking the plugin to search, so no descriptor field and no plugin route change is involved.
+  const [filter, setFilter] = createSignal('')
+  const items = createMemo(() => {
+    const query = filter().trim().toLowerCase()
+    if (!query) return allItems()
+    return allItems().filter((item) => item.title.toLowerCase().includes(query))
+  })
+
+  const [refreshing, setRefreshing] = createSignal(false)
+  const refresh = async (): Promise<void> => {
+    setRefreshing(true)
+    try {
+      await refetch()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const tasks = createQuery(() => tasksOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
@@ -145,10 +165,35 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
       <section class="pane pane-left">
         <SectionHeader
           count={items().length}
-          actions={<Show when={row() && row()!.freshness !== 'live'}><span class="muted">{FRESHNESS_LABELS[row()!.freshness]}</span></Show>}
+          actions={(
+            <>
+              <Show when={row() && row()!.freshness !== 'live'}><span class="muted">{FRESHNESS_LABELS[row()!.freshness]}</span></Show>
+              <Button
+                variant="bare"
+                iconOnly
+                data-tip={`Refresh ${props.descriptor.label}`}
+                aria-label={`Refresh ${props.descriptor.label}`}
+                busy={refreshing()}
+                onClick={() => void refresh()}
+              >
+                ↻
+              </Button>
+            </>
+          )}
         >
           {props.descriptor.label}
         </SectionHeader>
+
+        <Toolbar size="sm" ariaLabel={`${props.descriptor.label} filter`}>
+          <Input
+            kind="filter"
+            size="sm"
+            placeholder="Filter…"
+            aria-label={`Filter ${props.descriptor.label} by title`}
+            value={filter()}
+            onInput={(event) => setFilter(event.currentTarget.value)}
+          />
+        </Toolbar>
 
         {/* A node that did not answer and had nothing cached is a banner, never a failed pane. */}
         <Show when={unavailable()}>
