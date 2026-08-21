@@ -72,10 +72,9 @@ export const isCollectionCacheKey = (key: readonly unknown[]): boolean => key[0]
  *  panel was just placed or another panel over the same collection fetched, leaves the form cold until it
  *  is closed and reopened.
  *
- *  Not the editor issuing its own fetch. Whether an editor may run a collection to learn its shape is the
- *  question run-once-and-pin answers properly, with a person pressing the button
- *  (docs/future/dashboards/dynamic-collections.md), and it must not be answered a second time by a side
- *  effect. */
+ *  Not the editor issuing its own fetch. Whether an editor may run a collection to learn its shape is
+ *  a separate question, answered properly by a person pressing a button, and it must not be answered
+ *  a second time by a side effect. */
 export function createCollectionCacheRevision(nodeId: string): Accessor<number> {
   const [revision, setRevision] = createSignal(0)
   if (!nodeId) return revision

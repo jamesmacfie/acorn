@@ -25,8 +25,8 @@ import {
 import { MAX_PANEL_REFRESH_SECONDS, MIN_PANEL_REFRESH_SECONDS, type PanelDefinition } from './model'
 import { parsePanelDefinition } from './persist'
 
-// The generated editor's derivations. The component that composes them cannot be rendered here —
-// vitest runs in node with no Solid plugin — so a green suite says nothing about the form. What it
+// The generated editor's derivations. The component that composes them cannot be rendered here:
+// vitest runs in node with no Solid plugin, so a green suite says nothing about the form. What it
 // does say is that the form can only offer valid choices, which is the whole architectural claim.
 
 const schema: PluginCollectionSchema = {
@@ -127,9 +127,9 @@ describe('the view and group-by selectors', () => {
   })
 
   it('prefers the ANSWERED schema, which is what unblocks a response-only collection', () => {
-    // linear's issues declare no static schema on purpose — only the workspace's own state names are
-    // meaningful — so until the last page is read out of the node's cache there is no board and no
-    // filter to offer. With it, the editor sees exactly what the panel sees.
+    // linear's issues declare no static schema: only the workspace's own state names are meaningful,
+    // so until the last page is read out of the node's cache there is no board and no filter to
+    // offer. With it, the editor sees exactly what the panel sees.
     expect(schemaOf(undefined, schema)).toEqual(schema)
     expect(viewsFor(undefined, schema)).toEqual(['stat', 'list', 'table', 'board', 'chart'])
     // An empty answer is not an answer: fall back to whatever was declared.
@@ -150,7 +150,7 @@ describe('the view and group-by selectors', () => {
 describe('the trend selector', () => {
   it('offers activity only where there is a date to bucket the rows by', () => {
     expect(trendsFor(schema)).toEqual(['activity', 'history'])
-    // No datetime: the recorded tier still stands, because it asks nothing of the schema — it asks
+    // No datetime: the recorded tier still stands, because it asks nothing of the schema. It asks
     // the node's sampler, and an empty series is a cold state rather than a missing feature.
     expect(trendsFor({ fields: [field('title')] })).toEqual(['history'])
   })
@@ -161,7 +161,7 @@ describe('the trend selector', () => {
     expect(retainView({ kind: 'stat', trend: 'history' }, swapped)).toEqual({ kind: 'stat', trend: 'history' })
     expect(retainView({ kind: 'stat', trend: 'activity' }, schema)).toEqual({ kind: 'stat', trend: 'activity' })
     // A response-only collection promises no fields, so there is nothing to check against and the
-    // person's choice survives — the same escape hatch `retainShaping` takes.
+    // person's choice survives, the same escape hatch `retainShaping` takes.
     expect(retainView({ kind: 'stat', trend: 'activity' }, { fields: [] })).toEqual({ kind: 'stat', trend: 'activity' })
   })
 

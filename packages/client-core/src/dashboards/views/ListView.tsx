@@ -9,12 +9,12 @@ import type { PanelViewProps } from './props'
 // The list view: the title-role field leads, everything else projected trails as meta.
 //
 // Built on `Row`, which is what makes a panel over a third-party plugin's collection pixel-identical
-// to one over github's under every appearance pack — the same argument the descriptor rail makes.
+// to one over github's under every appearance pack, the same argument the descriptor rail makes.
 
 export default function ListView(props: PanelViewProps) {
   const lead = () => titleField(props.schema)
   const status = () => props.fields.find((field) => field.role === 'status' && field.type === 'enum')
-  // Everything the panel projects except the ones the row already draws in their own slots — the
+  // Everything the panel projects except the ones the row already draws in their own slots: the
   // lead, the status chip, and the source, whose slot is the provenance badge below. A `source`
   // field is an ordinary projected field now (mapping.ts § PANEL_SOURCE_FIELD_ID), so without this
   // it would print beside the badge that already says it.

@@ -130,18 +130,13 @@ export default function PanelGrid(props: {
 
   // ── Measurement ─────────────────────────────────────────────────────────────────────────────
   //
-  // ── Measurement ─────────────────────────────────────────────────────────────────────────────
+  // The one pixel measurement in the whole feature (docs/dashboards.md § The grid): square cells,
+  // measured by a `ResizeObserver`, with the accepted consequence that panel heights breathe with
+  // window width.
   //
-  // The one pixel measurement in the whole feature, and it exists to make cells square, which is what
-  // makes the overlay read as graph paper and "3 wide, 2 tall" mean something visually. The browser owns
-  // every other pixel through CSS grid.
-  //
-  // The gap is read off the resolved `column-gap` rather than by token name, so the grid and the overlay
-  // agree to the pixel whatever a style pack sets and nothing here joins the JS-reads-a-token list
-  // (ui/tokenAxes.ts, `BRIDGE_TOKENS`).
-  //
-  // The accepted consequence: panel heights breathe with window width. If that proves annoying the knob
-  // is one line, clamping `size` to a range, and the persisted model does not change.
+  // The gap is read off the resolved `column-gap` rather than by token name, so the grid and the
+  // overlay agree to the pixel whatever a style pack sets, and nothing here joins the
+  // JS-reads-a-token list (ui/tokenAxes.ts, `BRIDGE_TOKENS`).
   const measure = () => {
     const el = gridEl
     if (!el) return
@@ -162,8 +157,6 @@ export default function PanelGrid(props: {
     onCleanup(() => observer.disconnect())
   })
 
-  // ── Pointer gestures ────────────────────────────────────────────────────────────────────────
-  //
   // ── Pointer gestures ────────────────────────────────────────────────────────────────────────
   //
   // Pointer events with capture, not HTML5 drag-and-drop. The house mechanic (ui/split.ts) is already
@@ -324,11 +317,9 @@ export default function PanelGrid(props: {
 
   // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
   //
-  // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
-  //
-  // Move up and move down survive because they are the path that works with no pointer at all. On a
-  // one-column window they behave exactly as they did before geometry existed, which is the continuity
-  // that matters; on a wide one they swap toward the neighbour in reading order.
+  // Move up and move down survive, reinterpreted onto geometry as a swap toward the neighbour in
+  // reading order (docs/dashboards.md § The grid). On a one-column window they behave exactly as
+  // they did before geometry existed, which is the continuity that matters.
 
   const moveTo = (id: PanelId, delta: -1 | 1) => {
     const current = committed()
@@ -348,15 +339,13 @@ export default function PanelGrid(props: {
 
   // ── Moving between placements ───────────────────────────────────────────────────────────────
   //
-  // ── Moving between placements ───────────────────────────────────────────────────────────────
-  //
   // The Home tabs other than this one (docs/dashboards.md § Placements). A flat labelled group rather
   // than a submenu: `Menu` has no submenu and one is not worth inventing for a list of at most seven
   // names that is already keyboard-operable as rows.
   //
-  // Only tabs. Moving to a task pane is the same two calls and a different destination, and it waits for
-  // someone to want it (docs/future/dashboards/README.md). Aiming at a pane from Home would put a panel
-  // where nobody is looking, which is the argument the wizard's Where control already makes.
+  // Only tabs today. Moving to a task pane would be the same two calls and a different destination;
+  // nobody has asked for it yet, and aiming a pane's panel at Home would put it where nobody is
+  // looking, which is the argument the wizard's Where control already makes.
 
   const moveTargets = () => props.scope.surface !== 'home'
     ? []
@@ -423,15 +412,15 @@ export default function PanelGrid(props: {
             </For>
           </Show>
           <Menu.Separator />
-          {/* REMOVE AND DELETE ARE TWO DIFFERENT THINGS now that a panel can be placed in more than
+          {/* Remove and Delete are two different things now that a panel can be placed in more than
               one surface (docs/dashboards.md § Placements). Taking a board off Home must not destroy
               the definition the same board renders from in a task pane. */}
           <Menu.Item context={menu} onSelect={() => unplacePanel(props.scope, definition.id)}>
             Remove from here
           </Menu.Item>
-          {/* Armed, because the editor has made a definition genuinely expensive to recompose —
-              filters, a sort, a projection, a whole mapping matrix — and one misclick used to cost
-              all of it. The idiom every other destructive row in the app uses. */}
+          {/* Armed, because the editor has made a definition genuinely expensive to recompose:
+              filters, a sort, a projection, a whole mapping matrix. One misclick used to cost all of
+              it, the idiom every other destructive row in the app uses. */}
           <Menu.Item
             context={menu}
             tone="danger"
@@ -455,23 +444,20 @@ export default function PanelGrid(props: {
 
   // ── Rendering ───────────────────────────────────────────────────────────────────────────────
   //
-  // ── Rendering ───────────────────────────────────────────────────────────────────────────────
+  // Panels are positioned absolutely from the measured cell rather than by `grid-area`
+  // (docs/dashboards.md § The grid): `grid-area` cannot be transitioned, so push-down and
+  // compaction jumped between frames and a drag read as a reshuffle rather than a chain reaction.
+  // FLIP transforms over CSS grid were the alternative and were refused: they are fragile under the
+  // re-layout this grid does every frame, and they fight the sub-cell translate the dragged panel
+  // already carries.
   //
-  // Twelve columns, rows one square cell tall, but slots are positioned absolutely from the same
-  // measurement rather than by `grid-area`. The reason is motion: `grid-area` cannot be transitioned, so
-  // push-down and compaction jumped between frames and a drag read as a reshuffle rather than a chain
-  // reaction. `top`, `left`, `width` and `height` can be transitioned, and computing them is `measure`
-  // run backwards, so the browser and this file cannot disagree about where a cell is. FLIP transforms
-  // over CSS grid were the alternative and were refused: they are fragile under the re-layout this grid
-  // does every frame, and they fight the sub-cell translate the dragged panel already carries.
+  // The container therefore has no in-flow children and must state its own height, which follows
+  // the live layout, so a mid-gesture preview resizes the container and the ResizeObserver above
+  // sees it. That is only safe because `measure` reads the width and writes nothing back into the
+  // layout. An observer that re-applied the committed model would stomp the preview every frame.
   //
-  // The container therefore has no in-flow children and must state its own height, which follows the
-  // live layout, so a mid-gesture preview resizes the container and the ResizeObserver above sees it.
-  // That is only safe because `measure` reads the width and writes nothing back into the layout. An
-  // observer that re-applied the committed model would stomp the preview every frame.
-  //
-  // The collapsed state emits none of it and the slots fall back into ordinary block flow, stacked in
-  // document order, which `placements` is kept sorted to on every commit.
+  // The collapsed state emits none of it and the slots fall back into ordinary block flow, stacked
+  // in document order, which `placements` is kept sorted to on every commit.
 
   /** The gap, back out of the two measurements: pitch is a cell plus one gap. */
   const gap = () => pitch() - cell()
@@ -549,7 +535,7 @@ export default function PanelGrid(props: {
             }}
             {...(collapsed() ? { 'data-collapsed': '' } : {})}
           >
-            {/* Visible ONLY while a gesture is live — it appears on arm and vanishes on release,
+            {/* Visible only while a gesture is live: it appears on arm and vanishes on release,
                 iOS-widget style. Nothing about the layout is discoverable chrome until a gesture
                 makes it relevant. */}
             <Show when={gesture()}>
@@ -596,7 +582,7 @@ export default function PanelGrid(props: {
                 </div>
               )}
             </For>
-            {/* The candidate cells, under the panel that is floating above them — the shape of the
+            {/* The candidate cells, under the panel that is floating above them: the shape of the
                 panel that will land there rather than a wireframe of it. */}
             <Show when={gesture()?.kind === 'move'}>
               <div class="dash-placeholder" aria-hidden="true" style={placeholderStyle()} />
@@ -605,11 +591,10 @@ export default function PanelGrid(props: {
           <div class="dash-live" aria-live="polite">{announcement()}</div>
         </Show>
 
-        {/* CREATION IS STAGED, EDITING IS NOT (docs/dashboards.md § The generated editor). The
-            wizard exists because a panel that does not exist yet cannot be judged from a form; an
-            existing one is already on screen, so its editor is the whole sheet at once. The sheet
-            remains able to do everything the wizard can — the wizard's footer hands the draft
-            straight to it. */}
+        {/* Creation is staged, editing is not (docs/dashboards.md § The generated editor): a panel
+            that does not exist yet cannot be judged from a form, while an existing one is already on
+            screen, so its editor is the whole sheet at once. The sheet remains able to do everything
+            the wizard can; the wizard's footer hands the draft straight to it. */}
         <Show when={adding()}>
           <PanelWizard
             collections={collections()}

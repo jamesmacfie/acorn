@@ -41,7 +41,6 @@ const isViewKind = (value: string): value is PanelViewKind =>
   (PANEL_VIEW_KINDS as readonly string[]).includes(value)
 
 /**
-/**
  * The host's own reading of what a manifest declared. Every closed vocabulary is intersected with this
  * build's, never trusted: a newer node can name a view kind or a field role this shell has no renderer
  * for, and the honest answer is a narrower offer rather than a refusal, the same posture chrome/data.ts
@@ -91,7 +90,6 @@ export const regionCollections = (
 /** The view kinds this region allows, before the schema's own gates narrow them further. */
 export const regionViews = (region: PanelRegion): readonly PanelViewKind[] => region.views ?? PANEL_VIEW_KINDS
 
-/**
 /**
  * The render-time half: may this already-composed panel be drawn here?
  *

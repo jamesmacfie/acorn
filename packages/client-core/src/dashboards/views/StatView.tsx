@@ -12,16 +12,13 @@ import { createMeasureHistory } from '../history'
 import { aggregateRows } from '../shaping'
 import type { PanelViewProps } from './props'
 
-// The stat view: one number over the SHAPED rows. A count by default, because "how many of these are
-// there" is the question a filter has already been written to answer.
+// The stat view: one number over the shaped rows. Count by default, since "how many of these are
+// there" is the question a filter has already been written to answer. Unit comes from the
+// aggregated field, not the view (docs/dashboards.md § The two vocabularies, and the budget).
 //
-// The unit comes from the aggregated field, not from the view — so a panel that sums a field
-// declared in MB says MB, and says it again if the panel later becomes a table.
-//
-// THE TREND IS OPTIONAL AND IN TWO TIERS (docs/dashboards.md § Trends). Everything it draws — the
-// path data, the end dot, the delta and its tone — comes out of `trend.ts`, which is pure and tested;
-// this file turns that into SVG and picks a class name, exactly as `ChartView` does, because vitest
-// here runs in node with no Solid plugin and nothing written in a component is checked by anything.
+// Trend tiers and their rules are docs/dashboards.md § Trends. This file turns `trend.ts`'s pure
+// output into SVG and picks a class name, exactly as ChartView does, because vitest here runs in
+// node with no Solid plugin.
 
 const AGGREGATE_LABELS: Record<string, string> = { sum: 'Total', avg: 'Average', min: 'Lowest', max: 'Highest' }
 
@@ -30,7 +27,7 @@ export default function StatView(props: PanelViewProps) {
   const field = () => props.schema.fields.find((candidate) => candidate.id === props.view.field)
   const value = () => aggregateRows(props.rows, props.schema, props.view)
 
-  /** The measure as a person reads it: rounded, and in the units the FIELD declared. Shared by the
+  /** The measure as a person reads it: rounded, and in the units the field declared. Shared by the
    *  number and by the delta beside it, so "▲ 2 MB" cannot ever disagree with the total above it. */
   const measureText = (answer: number): string => {
     const rounded = Number.isInteger(answer) ? answer : Math.round(answer * 10) / 10
@@ -51,8 +48,8 @@ export default function StatView(props: PanelViewProps) {
     return `${AGGREGATE_LABELS[aggregate()] ?? aggregate()} · ${field()?.name ?? props.view.field ?? ''}`
   }
 
-  // Only the HISTORY tier costs a read. Activity is bucketed from the rows already on screen, which
-  // is the whole difference between the two tiers and the reason they are never blurred in the UI.
+  // Only the history tier costs a read; activity is bucketed from rows already on screen
+  // (docs/dashboards.md § Trends).
   const samples = createMeasureHistory(() => props.panelId, () => props.view.trend === 'history')
 
   const points = createMemo(() => {
@@ -75,10 +72,10 @@ export default function StatView(props: PanelViewProps) {
       <span class="dash-stat-value">{text()}</span>
       <span class="dash-stat-label">{label()}</span>
 
-      {/* No axes, no grid, no ticks — the number above IS the axis.
+      {/* No axes, no grid, no ticks: the number above is the axis.
           `xMinYMid meet` scales uniformly and pins left: stretching would thin the line and turn the
           end dot into an ellipse, and a mark whose ink weight varies with the panel's width reads as
-          data something that is only geometry. */}
+          data, something that is only geometry. */}
       <Show when={mark()}>
         {(spark) => (
           <svg
@@ -106,7 +103,7 @@ export default function StatView(props: PanelViewProps) {
         )}
       </Show>
 
-      {/* Absence is a fact and it is not zero: no sample old enough to be a baseline draws NOTHING
+      {/* Absence is a fact and it is not zero: no sample old enough to be a baseline draws nothing
           rather than "▲ 0", which would claim a comparison nobody could make. */}
       <Show when={delta()}>
         <span class="dash-stat-delta" data-tone={delta()!.tone}>{deltaText()}</span>

@@ -265,8 +265,6 @@ export const defaultGroupBy = (schema: PluginCollectionSchema): string | undefin
 
 // ── Composition ───────────────────────────────────────────────────────────────────────────────
 //
-// ── Composition ───────────────────────────────────────────────────────────────────────────────
-//
 // The two composed rules the sheet used to hold in its own handlers, lifted here so the wizard can
 // re-host them rather than restate them. Both are over the pair `{ view, shaping }` rather than a whole
 // `PanelDefinition`, because that's the pair they touch and what the sheet holds as two signals.

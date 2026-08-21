@@ -1,7 +1,7 @@
 /* User-composed panels (dashboards/Panel.tsx and dashboards/views/).
    Co-located with the components, per the manifest note in styles.css.
 
-   Thin on purpose. The frame is `.ui-card`, the rows are `.ui-row`, the table is `.ui-table` and the
+   The file stays thin. The frame is `.ui-card`, the rows are `.ui-row`, the table is `.ui-table` and the
    empty states are `.ui-empty`. Everything here is the space between those, so a panel over a
    third-party plugin's collection restyles with every appearance pack for free. No new appearance
    tokens: a panel that needed one would be asserting a shape the packs do not already have a rung for.
@@ -79,18 +79,14 @@
 
 /* ── The grid ────────────────────────────────────────────────────────────────────────────── */
 
-/* Twelve columns, square cells. The browser owns every pixel except the cell height, which is the one
-   ResizeObserver measurement PanelGrid makes. A square cell is what makes the drag lattice read as a
-   surface and "3 wide, 2 tall" mean something visually.
+/* Twelve columns of square cells, positioned absolutely off one ResizeObserver measurement rather
+   than by `grid-area` (docs/dashboards.md § The grid). The template stays here because a style pack
+   owns it and PanelGrid reads the resolved `column-gap` off it; the container's height is stated
+   inline from the live layout.
 
-   The tracks and the gap are declared here and nothing is in flow in them. Slots are positioned
-   absolutely off the same measurement, because `grid-area` cannot be transitioned and neighbours
-   gliding through push-down is the whole point of the gesture restyle. The template stays because it is
-   what a style pack owns and what PanelGrid reads the resolved `column-gap` off; the container's height
-   is stated inline from the live layout.
-
-   `--dash-cell` and `--dash-pitch` are overwritten inline by that measurement. The values here are the
-   pre-measure fallback, so the first paint is a plausible grid rather than a stack of zero-height rows. */
+   `--dash-cell` and `--dash-pitch` are overwritten inline by that measurement. The values here are
+   the pre-measure fallback, so the first paint is a plausible grid rather than a stack of
+   zero-height rows. */
 .dash-grid {
   --dash-cell: var(--row-h);
   --dash-pitch: var(--row-h);
@@ -102,10 +98,9 @@
   min-width: 0;
 }
 
-/* Too narrow for cells to mean anything: one column in reading order, heights content-driven as they
-   were before geometry existed. Purely presentational: nothing in storage changes and the component
-   stops emitting boxes, so widening the window restores the arrangement exactly. Gestures disarm here;
-   move up and move down still work. */
+/* The collapse docs/dashboards.md § The grid describes: one column in reading order, heights
+   content-driven as they were before geometry existed. Purely presentational, so widening the
+   window restores the arrangement exactly. */
 .dash-grid[data-collapsed] {
   grid-template-columns: minmax(0, 1fr);
   grid-auto-rows: auto;
@@ -351,7 +346,7 @@
 
 /* A pack that asks for stillness gets it: everything above still draws and positions still update
    live, they just do not animate on the way. Reduced motion asks for less movement, not less
-   information. Last on purpose, at the same specificity as the rules it cancels, so it has to come
+   information. It runs last, at the same specificity as the rules it cancels, so it has to come
    after them. Move a transition below this block and it comes back to life. */
 @media (prefers-reduced-motion: reduce) {
   .dash-grid-overlay,
@@ -881,7 +876,7 @@
   stroke: var(--border-strong);
 }
 
-/* No `font-size` here on purpose. Inside the chart's scaled viewBox a CSS length is a user unit, so a
+/* No `font-size` here. Inside the chart's scaled viewBox a CSS length is a user unit, so a
    token size scales with the drawing. At `--fs-2xs` the ticks rendered around 28px on a large panel.
    The size is geometry and comes off the frame as an SVG attribute (dashboards/chart.ts, TICK_FONT);
    colour and figure style stay here, where the appearance pack owns them. */

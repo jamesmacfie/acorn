@@ -7,12 +7,9 @@ import type { PanelViewProps } from './props'
 import StatView from './StatView'
 import TableView from './TableView'
 
-// THE ONE WAY A PANEL'S BODY IS DRAWN. Two callers: the placed panel (Panel.tsx) and the wizard's
-// live preview (PanelPreview.tsx), which is a real rendering of the draft rather than a thumbnail —
-// there is exactly one view switch in the app, and this is it.
-//
-// The fallback is the inert case: a view kind this build cannot draw, written by a client that has
-// more of them. Same answer as an unresolved collection — say so, change nothing.
+// The one place a panel's body is drawn, for both the placed panel (Panel.tsx) and the wizard's live
+// preview (PanelPreview.tsx). docs/dashboards.md § The generated editor and § Placements cover why
+// there is exactly one view switch and what an unresolved view kind falls back to.
 
 export default function PanelBody(props: PanelViewProps) {
   return (

@@ -15,11 +15,11 @@ import {
 import { placementScopeKey } from './persist'
 
 // The constraints a plugin declares over a rectangle it reserved for the user's panels
-// (docs/dashboards.md § Placements). Both halves are here — what the editor OFFERS and what the
-// host RE-CHECKS at render — because the whole promise is that the two cannot disagree.
+// (docs/dashboards.md § Placements). Both halves are here: what the editor offers and what the
+// host re-checks at render, because the whole promise is that the two cannot disagree.
 //
-// The components are not covered: this suite runs in bare node with no Solid plugin, so a green run says
-// nothing about the markup.
+// The components are not covered: this suite runs in bare node with no Solid plugin, so a green run
+// says nothing about the markup.
 
 const collection = (pluginId: string, collectionId: string, schema?: PluginCollectionSchema): CollectionContribution => ({
   id: `${pluginId}:${collectionId}`,
@@ -61,8 +61,8 @@ describe('panel region constraints', () => {
   it('honours an explicit list, including one naming another plugin', () => {
     const region = panelRegion('tracker', { collections: ['github:pulls', 'tracker:issues'], max: 4 })
     expect(regionCollections(region, all).map((entry) => entry.id)).toEqual(['tracker:issues', 'github:pulls'])
-    // A reference to something not installed matches nothing rather than erroring — the same outcome as
-    // the plugin being disabled, which is the point of not validating it against a registry.
+    // A reference to something not installed matches nothing rather than erroring. That is the same
+    // outcome as the plugin being disabled, and the reason it is never validated against a registry.
     expect(regionCollections(panelRegion('tracker', { collections: ['gone:away'], max: 4 }), all)).toEqual([])
   })
 
@@ -79,7 +79,7 @@ describe('panel region constraints', () => {
     const region = panelRegion('tracker', { views: ['table', 'sankey'], fieldRole: 'severity', max: 4 })
     expect(regionViews(region)).toEqual(['table'])
     expect(region.fieldRole).toBeUndefined()
-    // …and an allow-list this build understands NONE of falls back to every kind, rather than stranding
+    // And an allow-list this build understands none of falls back to every kind, rather than stranding
     // somebody in front of a picker with no options and no reason.
     expect(regionViews(panelRegion('tracker', { views: ['sankey'], max: 4 }))).toHaveLength(5)
   })
@@ -88,14 +88,14 @@ describe('panel region constraints', () => {
     const region = panelRegion('tracker', { views: ['list'], max: 4 })
     const own = panel([{ pluginId: 'tracker', collectionId: 'issues' }])
     expect(regionAllows(region, own, lookup)).toBe(true)
-    // One disallowed source is a disallowed panel: the allowance is about what may be SEEN here.
+    // One disallowed source is a disallowed panel: the allowance is about what may be seen here.
     expect(regionAllows(region, panel([
       { pluginId: 'tracker', collectionId: 'issues' },
       { pluginId: 'github', collectionId: 'runs' },
     ]), lookup)).toBe(false)
     // A view the owner narrowed away, over a collection it allows.
     expect(regionAllows(region, panel([{ pluginId: 'tracker', collectionId: 'issues' }], 'table'), lookup)).toBe(false)
-    // An UNRESOLVED collection is admitted and draws inert, so a disabled plugin never looks like a
+    // An unresolved collection is admitted and draws inert, so a disabled plugin never looks like a
     // policy refusal.
     expect(regionAllows(region, panel([{ pluginId: 'gone', collectionId: 'away' }]), lookup)).toBe(true)
   })
