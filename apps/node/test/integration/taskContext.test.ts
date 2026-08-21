@@ -28,11 +28,12 @@ vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
 
 describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   let t: TestDb
-  // The github mirror is a SECOND database now (docs/data-layer.md § Plugin DBs), so the `pr` section's
-  // fixture is seeded into the plugin's own migrated file and reaches the section through the same
-  // injected source production uses. Two handles in one test is the honest shape: the assertions below
-  // still exercise `mirroredPullRequest` for real rather than a hand-written stand-in, which is what keeps
-  // them able to catch a drift between the section's contract and the mirror's columns.
+  // The github mirror is a second database now (docs/data-layer.md § Plugin databases), so the `pr`
+  // section's fixture is seeded into the plugin's own migrated file and reaches the section through
+  // the same injected source production uses. Two handles in one test is the honest shape: the
+  // assertions below still exercise `mirroredPullRequest` for real rather than a hand-written
+  // stand-in, which is what keeps them able to catch a drift between the section's contract and the
+  // mirror's columns.
   let gh: TestPluginDb
   let app: Hono<AppEnv>
   let notesSource: ContextNotesSource

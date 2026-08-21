@@ -56,7 +56,7 @@ describe('Linear provider parity', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    // Through the portable carrier, exactly as production mounts it — linear has no compiled router
+    // Through the portable carrier, exactly as production mounts it: linear has no compiled router
     // to hand `app.route` any more. `servePluginFetch` builds the identity-bound request context the
     // routes' helpers require.
     const fetch = createLinearFetch()
@@ -108,10 +108,10 @@ describe('Linear provider parity', () => {
     expect(vi.mocked(linearFetch).mock.calls.map(([secret]) => secret)).toEqual(['token-b'])
   })
 
-  // The reference-panel path, and the one with no connection to name: github scans `ENG-42` out of a PR
-  // body and cannot know which connected Linear owns it. Asking each workspace in turn IS the resolution
-  // — it replaced a hand-rolled cache read plus a second fan-out — so this is the case that has to keep
-  // working, and the one nothing covered before.
+  // The reference-panel path, and the one with no connection to name: github scans `ENG-42` out of a
+  // PR body and cannot know which connected Linear owns it. Asking each workspace in turn is the
+  // resolution. It replaced a hand-rolled cache read plus a second fan-out, so this is the case that
+  // has to keep working, and the one nothing covered before.
   it('resolves a bare identifier by asking each connection until one answers', async () => {
     vi.mocked(linearFetch).mockImplementation(async (secret) =>
       graphQl({ issues: { nodes: secret === 'token-b' ? [node('Workspace B')] : [] } }))
@@ -132,7 +132,7 @@ describe('Linear provider parity', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'provider_resource_not_found' } })
   })
 
-  // The declarative rail source. This router carries no `projects` scope — the loaded package's does —
+  // The declarative rail source. This router carries no `projects` scope, the loaded package's does,
   // so nothing is mapped for any connection here.
   it('contributes no rows when a connection has no linked projects, rather than the viewer’s own issues', async () => {
     // The fallback this replaces showed whatever was assigned to you, which answered a question nobody
@@ -190,7 +190,7 @@ describe('Linear provider parity', () => {
 
     expect(response.status).toBe(200)
     // The host's ref-resolver shape, not a Linear-flavoured one: a bare array, `label` rather than
-    // `title`, and no `providerId` — the device stamps that from the plugin whose route answered.
+    // `title`, and no `providerId`. The device stamps that from the plugin whose route answered.
     expect((await response.json()) as PluginRefResolutionBody[]).toMatchObject([{ label: 'Workspace A' }])
     expect(linearFetch).not.toHaveBeenCalled()
   })

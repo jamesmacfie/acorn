@@ -20,9 +20,9 @@ import { assembleNodeGraph } from '../../src/server/composition'
 import { buildPluginStateBridge } from '../../src/server/pluginState'
 
 // The dogfood (docs/plugins.md). Rollbar's two halves are built into a real package and loaded off
-// disk, which exercises the whole path end to end — manifest, bundles, shape check, permission-shaped
-// context, provider registration and descriptor projection — against production plugin code rather
-// than a fixture.
+// disk, which exercises the whole path end to end (manifest, bundles, shape check, permission-shaped
+// context, provider registration, descriptor projection) against production plugin code rather than
+// a fixture.
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 describe('loading rollbar from disk', () => {
@@ -34,7 +34,7 @@ describe('loading rollbar from disk', () => {
     dataRoot = mkdtempSync(join(tmpdir(), 'acorn-dogfood-'))
     core = makeTestDb()
     // The same script a developer runs. Building here rather than committing a fixture bundle keeps
-    // the test honest about the CURRENT source of the plugin.
+    // the test honest about the current source of the plugin.
     execFileSync(process.execPath, [join(NODE_APP, 'scripts/build-plugin.mjs'), 'rollbar'], {
       cwd: NODE_APP,
       env: { ...process.env, ACORN_DATA_DIR: dataRoot },
@@ -74,8 +74,8 @@ describe('loading rollbar from disk', () => {
       })
       expect(plugins.failed).toEqual([])
       expect(plugins.enabled).toEqual(['rollbar'])
-      // Registered through ctx from inside the bundle, into the HOST's registries — the seam that
-      // has to work for a loaded plugin to be indistinguishable from a built-in one.
+      // Registered through ctx from inside the bundle, into the host's registries. That's the seam
+      // that has to work for a loaded plugin to be indistinguishable from a built-in one.
       expect(integrationProviderRegistry.list().map((provider) => provider.id)).toContain('rollbar')
       expect(connectionProviderRegistry.list().map((provider) => provider.id)).toContain('rollbar')
       const providerRoute = integrationProviderRegistry.routes().find((route) => route.providerId === 'rollbar')
@@ -153,9 +153,9 @@ describe('loading rollbar from disk', () => {
   })
 
   it('reports a package whose bundle will not import on the roster route, with its reason', async () => {
-    // A SECOND data root holding a copy of the built package, because Node's ESM registry is keyed by
-    // resolved URL: the tests above already imported this entrypoint, so corrupting the same file in place
-    // would hand the loader the cached module and succeed.
+    // A second data root holding a copy of the built package, because Node's ESM registry is keyed
+    // by resolved URL. The tests above already imported this entrypoint, so corrupting the same file
+    // in place would hand the loader the cached module and succeed.
     const broken = mkdtempSync(join(tmpdir(), 'acorn-dogfood-broken-'))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -170,15 +170,15 @@ describe('loading rollbar from disk', () => {
 
       const { loaded, installed, failures } = await loadExternalPlugins(broken, { builtins: [] })
       expect(loaded).toEqual([])
-      // Deliberately absent from `installed` too: a package whose node half declared itself and then
-      // failed to import is broken rather than client-only, so its UI is not distributed either.
+      // Absent from `installed` too: a package whose node half declared itself and then failed to
+      // import is broken rather than client-only, so its UI is not distributed either.
       expect(installed).toEqual([])
       expect(failures).toHaveLength(1)
       expect(failures[0]).toMatchObject({ id: 'rollbar', reason: expect.stringContaining(`could not import ${manifest.node}`) })
 
-      // And the whole point: what the owner is told. The route is parse → call → respond over this, and
-      // the row it serves used to say 'pending-restart' with a Restart banner that restarting could never
-      // clear, because restarting re-runs the same failing import.
+      // And the whole point: what the owner is told. The route is parse, call, respond over this
+      // (docs/plugins.md § Loaded plugins covers why a load failure used to read as a permanently
+      // stuck Restart banner).
       const state = pluginState(buildPluginStateBridge({
         dataDir: broken,
         roster: () => [],
@@ -201,9 +201,8 @@ describe('loading rollbar from disk', () => {
   })
 
   it('lets a newer bundled package replace what build:plugin wrote, without touching a user install', () => {
-    // The script marked what it wrote (`.acorn-dev-build`), which is the whole fix: before it, this
-    // directory was indistinguishable from an owner install, got stamped `user`, and then outlived every
-    // rebuild of the app — a feature that reads as missing until someone deletes the data root.
+    // The script marked what it wrote (`.acorn-dev-build`), the whole fix: docs/plugins.md § Loaded
+    // plugins covers what happened before it existed.
     const built = pluginDir(dataRoot, 'rollbar')
     expect(existsSync(join(built, DEV_BUILD_MARKER))).toBe(true)
 
@@ -226,7 +225,8 @@ describe('loading rollbar from disk', () => {
       }
       expect(readBundledPluginState(dataRoot, 'rollbar')).toMatchObject({ status: 'installed', version: `${manifest.version}-bundled` })
 
-      // And the protection that must not have moved: an owner install still wins outright.
+      // The protection that must not move: docs/plugins.md § Loaded plugins covers why an owner
+      // install wins outright.
       markPluginUserManaged(dataRoot, 'rollbar')
       writeFileSync(join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'), JSON.stringify({ ...manifest, version: '9.9.9' }))
       expect(reconcileBundledPlugins(dataRoot, resources)).toMatchObject({ preserved: ['rollbar'], updated: [] })

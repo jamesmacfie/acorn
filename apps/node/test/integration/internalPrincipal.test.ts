@@ -112,8 +112,9 @@ describe('the internal principal cannot administer devices', () => {
     expect(((await res.json()) as { error?: { code?: string } }).error?.code).toBe('interactive_user_required')
   })
 
-  // The whole escalation in one test: window → code → token. If this ever returns 200 at the first
-  // step, the rest follows and the internal token becomes owner-permanent.
+  // The whole escalation in one test: window → code → token (docs/security.md § Transport and auth
+  // covers why `requireDevice` exists). If this ever returns 200 at the first step, the rest follows
+  // and the internal token becomes owner-permanent.
   it('cannot escalate to an owner-authority device token', async () => {
     const started = await call('/v2/core/pair/start', { method: 'POST', headers: asAgent })
     expect(started.status).toBe(403)
@@ -203,7 +204,7 @@ describe('a task-scoped credential is confined to its own task', () => {
   it('is refused another task tool surface', async () => {
     const own = await call('/v2/core/tasks/task-1/tools', { headers: asAgent })
     const other = await call('/v2/core/tasks/task-2/tools', { headers: asAgent })
-    // Own task: 503 (no tool registry wired in this harness) proves it got PAST the scope check.
+    // Own task: 503 (no tool registry wired in this harness) proves it got past the scope check.
     expect(own.status).toBe(503)
     expect(other.status).toBe(404)
   })
@@ -223,8 +224,8 @@ describe('the task-scope gate covers the plugin namespace', () => {
     return () => removePluginRoutes('probe')
   }
 
-  // The two mount shapes real plugins use: `prefix: '/tasks'` with `/:id/...` (changes, database,
-  // editor) and `prefix: ''` with `/tasks/:id/...` (memory, workflows, docker).
+  // The two mount shapes real plugins use: docs/security.md § Transport and auth covers why (the
+  // task-scope gate matches a `:id` out of the URL).
   for (const [label, prefix, path] of [
     ["a '/tasks' prefix router", '/tasks', '/:id/thing'],
     ['a root router with task paths', '', '/tasks/:id/thing'],
@@ -237,7 +238,7 @@ describe('the task-scope gate covers the plugin namespace', () => {
         expect((await own.json()) as { reached: string }).toEqual({ reached: 'task-1' })
         // The hole: before the mount this was a 200 into another task's resource.
         expect((await call('/v2/p/probe/tasks/task-2/thing', { headers: asAgent })).status).toBe(404)
-        // A device is the owner and the service scope is unbound — both reach either task.
+        // A device is the owner and the service scope is unbound, both reach either task.
         const { token } = await devices.issue('laptop')
         for (const headers of [asService, { authorization: `Bearer ${token}` }]) {
           expect((await call('/v2/p/probe/tasks/task-2/thing', { headers })).status).toBe(200)
@@ -248,11 +249,10 @@ describe('the task-scope gate covers the plugin namespace', () => {
     })
   }
 
-  // What the mount deliberately does NOT reach, so the limit is recorded rather than assumed: a route
-  // addressed by an opaque id carries no `:id`, so the middleware never matches and the router itself
-  // has to resolve the owning task (terminal's /sessions/:sid, agents' /sessions/:sessionId, workflows'
-  // /runs/:runId). If this ever starts returning 404, a mount has begun covering these by accident and
-  // the in-router checks are no longer the thing being relied on.
+  // What the mount does not reach, so the limit is recorded rather than assumed: docs/security.md §
+  // Transport and auth covers why these opaque-id routes resolve their own owning task. If this ever
+  // starts returning 404, a mount has begun covering them by accident and the in-router checks are
+  // no longer what's being relied on.
   it('does not reach an opaque-id route, which is why those resolve their own owner', async () => {
     const cleanup = await probeRoutes('', '/widgets/:wid/act')
     try {

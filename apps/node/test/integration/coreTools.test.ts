@@ -27,8 +27,8 @@ describe('agent note contributions', () => {
   })
 
   it('defaults writes to task scope and stamps agent provenance', async () => {
-    // `workspaceId` throws here on purpose: nothing below asks for the workspace scope, so a call to it
-    // would be the bug this fails on rather than a silently different location.
+    // `workspaceId` throws here: nothing below asks for the workspace scope, so a call to it would
+    // be the bug this fails on rather than a silently different location.
     const core = { tasks: { workspaceId: async () => { throw new Error('no workspace scope in this test') } } } as never
     const tools = notesAgentTools(notesStore, core)
     const append = tools.find((tool) => tool.name === 'notes_append')!
@@ -58,7 +58,7 @@ describe('the full agent-tool manifest', () => {
     'pr_changed_files',
     'linked_issues',
     'repo_info',
-    // How to write a plugin against THIS node, read off its own schemas so the agent never answers a
+    // How to write a plugin against this node, read off its own schemas so the agent never answers a
     // manifest question from memory (docs/agent-tools.md, docs/plugins.md § Teaching the agent).
     'plugin_authoring',
     // The only core tool that can change what code this node runs, and it does so by asking: it raises a

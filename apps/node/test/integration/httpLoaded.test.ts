@@ -17,14 +17,14 @@ import { openSqlite } from '@acorn/node-core/main/sqlite.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 
-// http is the first plugin to ship LOADED with tables of its own, so this is the suite the storage path
-// never had: a manifest-declared migrations directory staged inside the package, a host-opened database
-// bound to the manifest id, and — the part nothing exercised before — a SCHEMA CHANGE arriving through
-// the installer against a database that already has rows in it (docs/third-party/README.md § "http has moved").
+// http is the first plugin to ship loaded with tables of its own, so this is the suite the storage
+// path never had: a manifest-declared migrations directory staged inside the package, a host-opened
+// database bound to the manifest id, and a schema change arriving through the installer against a
+// database that already has rows in it (docs/third-party/README.md § "http has moved").
 //
-// Deliberately not folded into pluginLoader.test.ts. That suite is about the load path being the same for
-// a loaded plugin as for a built-in; this one is about what happens on the SECOND boot, which is a
-// different question and needs a data root that survives between two loads.
+// Not folded into pluginLoader.test.ts. That suite is about the load path being the same for a loaded
+// plugin as for a built-in; this one is about what happens on the second boot, which is a different
+// question and needs a data root that survives between two loads.
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 const secrets = () => new SecretService('0'.repeat(64))
@@ -149,8 +149,9 @@ describe('http as a loaded plugin with its own tables', () => {
     await running?.dispose()
     running = null
 
-    // Stand in for the app's resources holding a NEWER package: same id, one version up, with a second
-    // migration appended to the chain. This is what an installer-driven update looks like on disk.
+    // Stands in for the app's resources holding a newer package: same id, one version up, with a
+    // second migration appended to the chain. This is what an installer-driven update looks like on
+    // disk.
     const resources = mkdtempSync(join(tmpdir(), 'acorn-http-resources-'))
     try {
       const built = pluginDir(dataRoot, 'http')
@@ -222,8 +223,8 @@ describe('http as a loaded plugin with its own tables', () => {
     const dir = pluginDir(dataRoot, 'http')
     const parked = mkdtempSync(join(tmpdir(), 'acorn-http-parked-'))
     try {
-      // Uninstall WITHOUT purge: the package leaves, the data stays. Reinstalling has to find the same
-      // rows, which is the promise the manifest-bound filename makes.
+      // Uninstall without purge: the package leaves, the data stays. Reinstalling has to find the
+      // same rows, which is the promise the manifest-bound filename makes.
       cpSync(dir, join(parked, 'http'), { recursive: true })
       rmSync(dir, { recursive: true, force: true })
       expect(existsSync(pluginDbPath(dataRoot, 'http'))).toBe(true)

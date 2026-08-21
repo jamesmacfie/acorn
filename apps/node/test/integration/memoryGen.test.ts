@@ -99,7 +99,7 @@ describe('the pipeline over the fake agent + real proposal store (docs/notes-and
     expect(out.proposed).toBe(1)
     expect(out.rejected).toEqual([{ name: 'dangling', issues: ['references a missing file: src/gone.ts'] }])
     expect((await store.list('pending')).map((p) => p.name)).toEqual(['null-token-redirect-guard'])
-    // The gate has not run — no memory dir, no files.
+    // The gate has not run, so there's no memory dir and no files.
     expect(existsSync(memoryDir())).toBe(false)
   })
 
