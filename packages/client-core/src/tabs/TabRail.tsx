@@ -34,7 +34,7 @@ import Icon from '../ui/Icon'
 import IconPicker, { randomIconName } from '../ui/IconPicker'
 import './tabrail.css'
 import { taskOriginAppearance } from '../tasks/origin'
-import { Alert, Button, Select, StatusDot } from '../ui/primitives'
+import { Alert, Button, Checkbox, Select, StatusDot } from '../ui/primitives'
 import { Menu } from '../ui/Menu'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
@@ -85,6 +85,10 @@ export default function TabRail() {
   // wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
+  // Opt out of the branch entirely: a task with no branch runs in the project folder on whatever is
+  // already checked out, no worktree (docs/workspaces-and-tasks.md § Worktrees and setup). Non-git
+  // projects are always like this, so the toggle only shows for git.
+  const [noBranch, setNoBranch] = createSignal(false)
   // The selected project's branch prefix. Desktop-only: project config is behind the main-process
   // bridge, and on web there's no checkout to prefix branches for. Read through taskBridge, not
   // the terminal plugin's client, because core must not import plugins (core/boundaries.test.ts).
@@ -232,6 +236,7 @@ export default function TabRail() {
     setIconDraft(randomIconName())
     setBranchText('')
     setBranchTouched(false)
+    setNoBranch(false)
     setDraft({ mode: 'new' })
   }
 
@@ -252,7 +257,7 @@ export default function TabRail() {
       if (d.mode === 'new') {
         const project = selectedProject()
         if (!project) return setDraft(null)
-        const branch = project.vcs === 'git' ? effectiveBranch() : undefined
+        const branch = project.vcs === 'git' && !noBranch() ? effectiveBranch() : undefined
         const seed = { origin: 'local' as const, projectId: project.id, branch, title: value, icon: iconDraft() ?? undefined }
         const w = await createTask(seed)
         await invalidate()
@@ -479,7 +484,7 @@ export default function TabRail() {
               <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
               <div class="overlay-body">
                 <Show when={d().mode === 'new'}>
-                  <p class="muted">{selectedProject()?.vcs === 'git' ? 'A local-first task on a new branch.' : 'Runs in the project folder.'}</p>
+                  <p class="muted">{selectedProject()?.vcs === 'git' && !noBranch() ? 'A local-first task on a new branch.' : 'Runs in the project folder.'}</p>
                   <Select value={newProject()} onChange={(e) => setNewProject(e.currentTarget.value)}>
                     <For each={newProjectOptions()}>
                       {(project) => <option value={project.id}>{project.name}</option>}
@@ -501,19 +506,28 @@ export default function TabRail() {
                     />
                   </div>
                   <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
-                    <input
-                      class="ui-input"
-                      type="text"
-                      placeholder="branch (from title)"
-                      title="Branch name — defaults to a slug of the title"
-                      value={branchTouched() ? branchText() : effectiveBranch()}
-                      onInput={(e) => {
-                        setBranchTouched(true)
-                        setBranchText(e.currentTarget.value)
-                      }}
-                      />
+                    <Show when={!noBranch()}>
+                      <input
+                        class="ui-input"
+                        type="text"
+                        placeholder="branch (from title)"
+                        title="Branch name — defaults to a slug of the title"
+                        value={branchTouched() ? branchText() : effectiveBranch()}
+                        onInput={(e) => {
+                          setBranchTouched(true)
+                          setBranchText(e.currentTarget.value)
+                        }}
+                        />
+                    </Show>
+                    <Checkbox
+                      size="sm"
+                      label="Use the project folder and its current branch"
+                      title="The task works in the project folder on whatever branch is checked out, with no worktree"
+                      checked={noBranch()}
+                      onChange={(e) => setNoBranch(e.currentTarget.checked)}
+                    />
                   </Show>
-                  <Button type="submit" disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !effectiveBranch())}>
+                  <Button type="submit" disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch() && !effectiveBranch())}>
                     {d().mode === 'new' ? 'Create' : 'Save'}
                   </Button>
                 </form>
