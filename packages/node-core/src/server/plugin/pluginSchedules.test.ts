@@ -11,9 +11,9 @@ import { CapabilityRegistry } from './capabilities'
 import { clearRegistrations, initPlugins } from './host'
 import type { NodePlugin, PluginStorage } from './types'
 
-// The two feeders, one registry (docs/schedules.md). A built-in registers a FUNCTION through
-// `ctx.schedules`; a loaded plugin declares a ROUTE in its manifest and the host mints the runner. Both
-// have to land on the same scheduler, under the same `<pluginId>:<id>` key, with the same clamps — and
+// The two feeders, one registry (docs/schedules.md). A built-in registers a function through
+// `ctx.schedules`; a loaded plugin declares a route in its manifest and the host mints the runner. Both
+// have to land on the same scheduler, under the same `<pluginId>:<id>` key, with the same clamps, and
 // both have to survive the lifecycle table, which is the part a fake would never catch.
 
 const PLUGIN = 'acme'
@@ -114,7 +114,7 @@ describe('plugin schedules', () => {
 
       await time.advance(3_600_000)
       // Mount-relative, exactly as an HTTP-served handler sees it, and as the node's own service
-      // principal — there is no device here.
+      // principal. There is no device here.
       expect(seen).toEqual([{ method: 'POST', path: '/refresh', body: '{"scheduleId":"refresh"}', userId: 'owner-1' }])
       expect((await scheduler.runs('acme:refresh'))[0]).toMatchObject({ status: 'ok' })
     } finally {
@@ -152,7 +152,7 @@ describe('plugin schedules', () => {
     try {
       await initPlugins([plugin], options)
       await scheduler.start()
-      // Declared under a plugin key, so the plugin floor applies on read — 30s would be a poll, and
+      // Declared under a plugin key, so the plugin floor applies on read. 30s would be a poll, and
       // polling belongs to a client with a person in front of it.
       await scheduler.patch('acme:poll', { cadence: { every: 30 } })
       expect((await scheduler.list())[0]?.cadence).toEqual({ every: 300 })
@@ -202,7 +202,7 @@ describe('plugin schedules', () => {
     try {
       const host = await initPlugins([plugin], { ...options, loaded })
       await scheduler.start()
-      // The owner pauses it. That is an OVERRIDE, and it has to outlive the definition.
+      // The owner pauses it. That is an override, and it has to outlive the definition.
       await scheduler.patch('acme:refresh', { enabled: false })
 
       await host.dispose()
@@ -211,7 +211,7 @@ describe('plugin schedules', () => {
       expect(gone).toMatchObject({ key: 'acme:refresh', registered: false })
       expect(await core.db.select().from(schema.scheduleState).where(eq(schema.scheduleState.key, 'acme:refresh'))).toHaveLength(1)
 
-      // Back it comes — same key, same pause, and no second registration despite the first host's run.
+      // Back it comes: same key, same pause, and no second registration despite the first host's run.
       await initPlugins([plugin], { ...options, loaded })
       const back = (await scheduler.list())[0]
       expect(back).toMatchObject({ key: 'acme:refresh', registered: true, enabled: false })

@@ -7,9 +7,9 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
 // Called directly rather than through a bridge slot. It had one, filled by a wireConfigTrust() in the
-// composition roots, but both ends of that indirection were CORE: the route is core's, the
+// composition roots, but both ends of that indirection were core's: the route is core's, the
 // implementation is core's (main/repoConfigTrust.ts), and the handle is core's `c.env.DB`. A bridge
-// slot exists so a route handler can reach something it cannot import — a plugin's engine — and
+// slot exists so a route handler can reach something it cannot import, a plugin's engine, and
 // nothing here was ever a plugin's. Deleting it removes a module-global, a setter, a null-check on
 // every request, and a wiring function each composition root had to remember to call.
 
@@ -24,11 +24,10 @@ export const configTrust = new Hono<AppEnv>()
       // A hash that no longer matches the repo's config means it changed under the owner mid-review, so
       // the acknowledgement is refused rather than recorded against stale content.
       const review = await acknowledgeRepoConfig(getDb(c.env), c.req.param('id'), parsed.data.hash)
-      // Recorded AFTER the acknowledgement succeeds, so a rejected hash is not written as a trust
-      // decision. This
-      // is the one moment the owner says "yes, run this repo's scripts", so security.md § Audit lists
-      // it beside pairing. The hash, not the snapshot: the snapshot is the executable content itself,
-      // and config_acks already keeps it.
+      // Recorded after the acknowledgement succeeds, so a rejected hash is not written as a trust
+      // decision. This is the one moment the owner says "yes, run this repo's scripts", so security.md
+      // § Audit lists it beside pairing. The hash, not the snapshot: the snapshot is the executable
+      // content itself, and config_acks already keeps it.
       auditRequest(c, {
         action: 'config.trusted',
         subject: c.req.param('id'),

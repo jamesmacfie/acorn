@@ -1,9 +1,9 @@
-// What a MANIFEST-declared schedule actually does when it fires (docs/schedules.md).
+// What a manifest-declared schedule actually does when it fires (docs/schedules.md).
 //
 // A loaded plugin declares periodic work as a route rather than as a function, because a manifest is
 // data and a manifest is what the owner is shown at install. So the node has to call one of its own
-// plugin routes with no client and no request in sight — which is ./dispatch.ts, shared with the
-// measure sampler's collection reads.
+// plugin routes with no client and no request in sight: ./dispatch.ts, shared with the measure
+// sampler's collection reads.
 import type { Env } from '../../main/bindings'
 import type { PluginScheduleDescriptor } from '../../main/pluginManifest'
 import { dispatchPluginRoute } from './dispatch'

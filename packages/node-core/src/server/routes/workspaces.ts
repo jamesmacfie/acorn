@@ -10,7 +10,7 @@ import type { Workspace, WorkspaceExternalProjectsResponse, WorkspaceProjectRef,
 import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '@acorn/protocol/workspaceIdentity.ts'
 import { getConnection } from '../integrations/connections'
 
-// Workspaces (docs/workspaces-and-tasks.md): named groups of Projects — the top-level unit.
+// Workspaces (docs/workspaces-and-tasks.md): named groups of Projects, the top-level unit.
 
 const workspaceExternalProjectsBody = z.object({
   projects: z.array(z.object({ integrationId: z.string().min(1), externalId: z.string().min(1) })).optional(),
@@ -111,7 +111,7 @@ export const workspaces = new Hono<AppEnv>()
     await db.delete(schema.workspaces).where(eq(schema.workspaces.id, id))
     return c.json({ ok: true })
   })
-  // External projects (Linear/Rollbar/…) linked to this workspace — (integrationId, externalId) pairs.
+  // External projects (Linear/Rollbar/…) linked to this workspace: (integrationId, externalId) pairs.
   .get('/:id/external-projects', async (c) => {
     const db = getDb(c.env)
     const rows = await db.select().from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, c.req.param('id')))

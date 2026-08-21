@@ -33,7 +33,7 @@ export const TASK_SESSIONS = routeCapability<TaskSessionsBridge>('terminal.taskS
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
 export const setTaskSessionsBridge = (bridge: TaskSessionsBridge | null): void => setRouteTestCapability(TASK_SESSIONS, bridge)
 
-// Fired after a task's worktree is first created — the terminal plugin registers the hook that runs
+// Fired after a task's worktree is first created. The terminal plugin registers the hook that runs
 // the repo's setup script as a background tab. Set by the runtime capability registry so `on-created`
 // can seed PR notes without core importing the notes plugin.
 export type TaskCreatedHook = (taskId: string) => Promise<void>
@@ -82,8 +82,8 @@ async function capturePreviewUrl(
   return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
 }
 
-// MCP config inspector (docs/mcp.md): read ONLY the known candidate files and mask secrets HERE, so
-// raw values never cross to the renderer. Read-only — acorn never launches these servers.
+// MCP config inspector (docs/mcp.md): read only the known candidate files and mask secrets here, so
+// raw values never cross to the renderer. Read-only, since acorn never launches these servers.
 async function inspectTaskMcp(db: ReturnType<typeof getDb>, taskId: string, capabilities: AppEnv['Bindings']['CAPABILITIES']): Promise<{ file: string; servers: McpServerSummary[] }[]> {
   const root = taskId ? await taskRoot(db, taskId, null, capabilities) : null
   const out: { file: string; servers: McpServerSummary[] }[] = []
@@ -100,7 +100,7 @@ async function inspectTaskMcp(db: ReturnType<typeof getDb>, taskId: string, capa
   return out
 }
 
-// Archive is the ONLY path allowed to tear a worktree down, and never automatic. The guard →
+// Archive is the only path allowed to tear a worktree down, and never automatic. The guard →
 // teardown → stop sessions → remove worktree → mark archived orchestration is main/archive.ts's; the
 // live-session half comes from the slot.
 async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: ArchiveOpts, sessions: TaskSessionsBridge): Promise<ArchiveResult> {
@@ -123,7 +123,7 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
 
 // Mounted at /v2/core (server/index.ts): /task-statuses and /tasks/:id/* lifecycle.
 export const worktree = new Hono<AppEnv>()
-  // Live dirty/changed-file status for every active task with a worktree — polled by the rail/footer.
+  // Live dirty/changed-file status for every active task with a worktree, polled by the rail/footer.
   .get('/task-statuses', async (c) => c.json(await computeTaskStatuses(getDb(c.env))))
   // --- task lifecycle ---
   .post('/tasks/:id/preview-url', async (c) => {
@@ -145,7 +145,7 @@ export const worktree = new Hono<AppEnv>()
     if (!project || !task.branch || !project.path) return c.json({ ok: true })
     const { script, trigger } = await projectSetup(db, project.id)
     if (trigger !== 'created' || !script?.trim()) return c.json({ ok: true })
-    // Re-read after the hook's await — a pane may have created the worktree meanwhile.
+    // Re-read after the hook's await: a pane may have created the worktree meanwhile.
     task = await loadTask(db, taskId)
     if (!task || (task.worktreePath && isDir(task.worktreePath))) return c.json({ ok: true })
     if (!isDir(project.path)) return c.json({ ok: true })

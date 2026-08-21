@@ -14,8 +14,7 @@ export const backup = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     try {
       const result = await createBackup(c.env.DATA_DIR, parsed.data.destPath)
-      // Audited AFTER it succeeds, and the path is part of the record: "where did my data go" is the
-      // question this row exists to answer, and a failed attempt wrote nothing to answer it about.
+      // Audited after it succeeds, and the path is part of the record: "where did my data go" is the
       auditRequest(c, { action: 'backup.created', subject: result.path, details: { bytes: result.bytes } })
       return c.json(result)
     } catch (error) {

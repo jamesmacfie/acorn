@@ -1,13 +1,13 @@
-// Node-side capability registry (docs/plugins.md § Cross-plugin collaboration): a plugin
-// exports a named typed function, and another plugin consumes it WITHOUT importing it. Before this
-// existed, `agents.sessionExecute` was 234 lines of app-layer glue in apps/node/src/wiring/ whose
-// only reason to live in the app was that neither plugin may import the other.
+// Node-side capability registry (docs/plugins.md § Collaboration rules): a plugin exports a named
+// typed function, and another plugin consumes it without importing it. Before this existed,
+// `agents.sessionExecute` was 234 lines of app-layer glue in apps/node/src/wiring/ whose only reason
+// to live in the app was that neither plugin may import the other.
 //
-// Deliberately not a DI container. It is a Map with a phantom-typed key, because the entire problem
-// is "two packages need to agree on a function type without an import edge" — the key carries the
-// type, the provider's contract/ entrypoint exports the key, and that is the whole mechanism.
+// Not a DI container. It is a Map with a phantom-typed key, because the entire problem is "two
+// packages need to agree on a function type without an import edge": the key carries the type, the
+// provider's contract/ entrypoint exports the key, and that is the whole mechanism.
 //
-// The signature lives in the PROVIDER's contract/, never here: core has no business knowing what
+// The signature lives in the provider's contract/, never here: core has no business knowing what
 // `agents.sessionExecute` returns.
 
 export type Disposable = { dispose(): void }
@@ -37,9 +37,10 @@ export class CapabilityRegistry {
     }
   }
 
-  // Optional by default — an absent capability means "that plugin is disabled", which consumers must
-  // degrade around rather than crash on. Resolve at CALL time, not at init time: init order between
-  // two plugins is not defined, so a consumer that caches the result at init may cache `undefined`.
+  // Optional by default: an absent capability means "that plugin is disabled", which consumers must
+  // degrade around rather than crash on. Resolve at call time, not at init time, since init order
+  // between two plugins is not defined and a consumer that caches the result at init may cache
+  // `undefined`.
   get<T>(id: CapabilityId<T>): T | undefined {
     return this.#impls.get(id) as T | undefined
   }
@@ -57,12 +58,12 @@ export class CapabilityRegistry {
   }
 }
 
-// Deliberately NOT a module singleton (unlike routeRegistry.ts, whose contributions arrive by
+// Not a module singleton (unlike routeRegistry.ts, whose contributions arrive by
 // side-effect import and so are naturally once-per-process). The plugin graph belongs to a service
-// RUNTIME, not to the module: startServiceRuntime is a construct-and-teardown unit that a single
+// runtime, not to the module: startServiceRuntime is a construct-and-teardown unit that a single
 // process can run several times, and a shared registry would throw "already provided" on the second
 // boot. The composition root creates one and threads it through; nothing reaches for a global.
 //
-// It is also kept off `Env`/RuntimeBindings on purpose — `c.env` reaches every core and plugin route
+// It is also kept off `Env`/RuntimeBindings on purpose: `c.env` reaches every core and plugin route
 // (main/bindings.ts), and capabilities are a plugin-composition seam, not something a route handler
 // should be able to enumerate.

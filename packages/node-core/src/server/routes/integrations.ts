@@ -46,8 +46,8 @@ export const integrations = new Hono<AppEnv>()
     const request: ConnectIntegrationRequest = { providerId, credentials: credentialsFromBody(body) }
     try {
       const integration = await connectProvider(getDb(c.env), ownerId(c), request, c.env.SECRETS)
-      // Audited HERE rather than inside connections.ts, for two reasons: the actor only exists on a
-      // request, and it is the route — not the storage helper — that decides an action succeeded. The
+      // Audited here rather than inside connections.ts, for two reasons: the actor only exists on a
+      // request, and it is the route, not the storage helper, that decides an action succeeded. The
       // provider and the label go in; the credential never does.
       auditRequest(c, {
         action: 'secret.created',
@@ -76,7 +76,7 @@ export const integrations = new Hono<AppEnv>()
   })
   // What this connection offers to be mapped to a workspace. A core route, because the mapping it
   // feeds (`workspace_external_projects`) is core's table and the picker that reads it is core's
-  // surface — asking each provider's own `/v2/p/<id>/...` namespace by convention would put the host
+  // surface: asking each provider's own `/v2/p/<id>/...` namespace by convention would put the host
   // in the position of guessing at a path a plugin defines.
   //
   // Nothing is cached: see integrations/projectSource.ts for why a picker must not serve a stale list.
@@ -113,7 +113,7 @@ export const integrations = new Hono<AppEnv>()
   .delete('/:id', async (c) => {
     try {
       await disconnectConnection(getDb(c.env), ownerId(c), c.req.param('id'))
-      // The row is gone by now, and the audit row is what is left of it — which is exactly why the
+      // The row is gone by now, and the audit row is what is left of it. That is exactly why the
       // subject is an opaque id rather than a foreign key.
       auditRequest(c, { action: 'secret.deleted', subject: c.req.param('id') })
       return c.body(null, 204)

@@ -23,9 +23,9 @@ const assertOwnedProvider = (pluginId: string, providerId: string): void => {
 // services, but their inputs and results are plain data and their call shape can move to RPC without
 // widening the plugin contract when loaded plugins move out of process.
 //
-// Env + Principal rather than a Hono Context, because a SCHEDULED run has neither a request nor a
+// Env + Principal rather than a Hono Context, because a scheduled run has neither a request nor a
 // route (server/plugin/scheduleRun.ts). The two arguments are exactly what the Hono form read off `c`,
-// so the scheduled path gets the same runtime and the same ownership checks as an HTTP one — including
+// so the scheduled path gets the same runtime and the same ownership checks as an HTTP one, including
 // the provider-credential gate, which a background run passes as the node's own 'service' principal.
 export function buildPluginRequestContext(env: Env, principal: Principal, pluginId: string): PluginRequestContext {
   const providers: PluginProviderRuntime = {
@@ -51,8 +51,8 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
     },
     items: (providerId) => {
       // Synchronous because the store itself does no work until a method is called, and both checks
-      // are synchronous too — a plugin naming a provider it does not own should fail at the ask.
-      // The store is then built FOR that provider, so the check at the ask is the truth about every
+      // are synchronous too: a plugin naming a provider it does not own should fail at the ask.
+      // The store is then built for that provider, so the check at the ask is the truth about every
       // row the store can reach, not just about the argument.
       assertProviderAccess(principal)
       assertOwnedProvider(pluginId, providerId)

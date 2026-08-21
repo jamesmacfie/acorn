@@ -61,7 +61,7 @@ describe('requestIdMiddleware', () => {
   })
 
   // A hostile header must not reach a log line or a response header verbatim. (Control characters
-  // never get this far — the HTTP layer rejects them when the Request is built — so the grammar's
+  // never get this far, since the HTTP layer rejects them when the Request is built, so the grammar's
   // job is the transportable-but-unwanted rest: spaces, quotes, CRLF-adjacent punctuation.)
   it('replaces a malformed client-supplied id', async () => {
     for (const bad of ['bad id with spaces', 'has"quote', 'semi;colon', '<angle>']) {

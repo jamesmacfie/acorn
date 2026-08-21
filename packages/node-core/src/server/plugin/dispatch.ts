@@ -1,18 +1,18 @@
 // Calling one of this node's own plugin routes with no client and no request in sight.
 //
-// Two callers need it — a manifest-declared schedule firing (./scheduleRun.ts) and the measure
-// sampler reading a collection (../collections/registry.ts) — and they needed the same six steps, so
-// the steps live here once. It dispatches IN PROCESS rather than over loopback HTTP: the listener is
+// Two callers need it: a manifest-declared schedule firing (./scheduleRun.ts) and the measure
+// sampler reading a collection (../collections/registry.ts), and they needed the same six steps, so
+// the steps live here once. It dispatches in process rather than over loopback HTTP: the listener is
 // TLS with a self-signed certificate and its origin is a property of the composition root, so a
 // self-call would mean teaching this module about certificates and ports to reach a handler sitting
-// in the same heap. What the HTTP path contributes — the auth gate, the mount stripping, the request
-// context — is reproduced here exactly, from the same two functions the route uses, so there is one
+// in the same heap. What the HTTP path contributes, the auth gate, the mount stripping, the request
+// context, is reproduced here exactly, from the same two functions the route uses, so there is one
 // plugin-route contract and not two.
 //
 // The principal is the node's own: 'internal' with the 'service' scope, which is what every other
-// loopback caller presents and what `requireProviderAccess` already admits. It is deliberately NOT
-// task-scoped — a schedule and a sampling pass belong to no task — and deliberately not a device,
-// because nobody is here.
+// loopback caller presents and what `requireProviderAccess` already admits (docs/security.md §
+// Credential handling). It is not task-scoped, since a schedule and a sampling pass belong to no
+// task, and not a device, because nobody is here.
 import type { Env } from '../../main/bindings'
 import type { Principal } from '../middleware/auth'
 import { PLUGIN_NAMESPACE, resolvePluginFetch } from '../routeRegistry'
@@ -23,8 +23,8 @@ import { buildPluginRequestContext } from './requestContext'
 const IN_PROCESS_ORIGIN = 'https://acorn.invalid'
 
 /** The device-side re-check, on the node. The manifest parser already confined a declared path, but
- *  the parser ran once against bytes on disk and this runs on every call — and confinement is the
- *  rule that stops a plugin making the host call core's routes, or another plugin's, on its behalf.
+ *  the parser ran once against bytes on disk and this runs on every call. Confinement is the rule
+ *  that stops a plugin making the host call core's routes, or another plugin's, on its behalf.
  *
  *  Throws rather than returning a flag: every caller's answer to a path outside the namespace is to
  *  fail the run, and a boolean nobody could sensibly ignore is a worse spelling of that. */
@@ -43,7 +43,7 @@ export type PluginDispatchInit = {
   body?: string
 }
 
-/** Call a plugin's own route as this node. Returns the raw `Response` — status handling belongs to
+/** Call a plugin's own route as this node. Returns the raw `Response`; status handling belongs to
  *  the caller, because "not ok" means different things to a schedule (fail and back off) and to a
  *  sampler (skip this panel, and say which source went missing). */
 export async function dispatchPluginRoute(

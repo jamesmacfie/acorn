@@ -62,16 +62,16 @@ export function mcpInputSchema(input: AgentToolContribution['input']): Record<st
 }
 
 async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<Response> {
-  // Authorize BEFORE checking whether the registry is wired: a caller with no right to this task must
+  // Authorize before checking whether the registry is wired: a caller with no right to this task must
   // not learn from a 503 whether the tool surface exists on this node.
   const principal = c.get('principal')
   // 'device' is the interactive owner (the client's broker holds the bearer); 'internal' is a child this
   // node spawned. The two surfaces are mutually exclusive: an agent cannot reach renderer-only tools,
   // and the renderer cannot impersonate an agent.
   if (opts.renderer ? principal?.kind !== 'device' : principal?.kind !== 'internal') return respondError(c, 404, 'not_found')
-  // Task scope enforced against the CREDENTIAL, not the URL. toolContext() below reads the taskId from
+  // Task scope enforced against the credential, not the URL. toolContext() below reads the taskId from
   // the path, so before internal tokens carried a task a credential minted for task A could invoke task
-  // B's tools — the token said nothing about which task it belonged to
+  // B's tools: the token said nothing about which task it belonged to
   // (server/auth/internalTokens.ts). 404, matching every other denial here, so the surface reveals
   // nothing about which tasks exist.
   if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')

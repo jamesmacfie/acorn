@@ -6,14 +6,14 @@ import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
 // service or child process carrying a scoped HMAC token. Provider credentials are separate encrypted
 // integration records and are not part of Principal.
 export type PrincipalKind = 'device' | 'internal'
-// `userId` is the node owner's opaque id — the scope key for every user-scoped table. `deviceId` is set
+// `userId` is the node owner's opaque id, the scope key for every user-scoped table. `deviceId` is set
 // only for kind 'device'; the internal principal has no device row to revoke.
 export type Principal = {
   kind: PrincipalKind
   userId: string
   deviceId?: string
   // Set only for kind 'internal'. A route that must not be reachable from an agent-spawned child checks
-  // this rather than the kind — `kind === 'internal'` cannot distinguish the service from an agent.
+  // this rather than the kind: `kind === 'internal'` cannot distinguish the service from an agent.
   scope?: InternalScope
   // The task an 'internal' credential is bound to. Route handlers compare it against the task in the
   // URL; before this existed, a token minted for task A could drive task B's tools.
@@ -27,11 +27,11 @@ export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; 
 
 // Internal loopback auth (docs/mcp.md): a child process holds no device token; it presents a scoped
 // internal token instead (server/auth/internalTokens.ts). The identity is the machine's single owner,
-// resolved from the explicit active-identity binding — minted at boot (main/core/identity/identity.ts),
+// resolved from the explicit active-identity binding, minted at boot (main/core/identity/identity.ts),
 // so after first boot it is always present. The fail-closed null stays for the one context that can
 // still see an unbound store: a bare test Env built without ensureBoundIdentity.
 //
-// The token is verified by HMAC against INTERNAL_TOKEN, which is now the signing KEY rather than the
+// The token is verified by HMAC against INTERNAL_TOKEN, which is now the signing key rather than the
 // credential itself. secretEquals is no longer used here; verifyInternalToken does its own
 // constant-time comparison over the signature.
 function internalPrincipal(c: { env: Env; req: { header(name: string): string | undefined } }): Principal | null {
@@ -46,15 +46,15 @@ function internalPrincipal(c: { env: Env; req: { header(name: string): string | 
 // Device bearer: the client's connection broker in Electron main authenticates with a paired device
 // token.
 //
-// A comma in the merged Authorization value means the request carried more than one such header
-// (fetch joins repeats with ", "), and a valid bearer contains no comma. That is ambiguous, so it is
-// rejected rather than resolved by picking one.
+  // A comma in the merged Authorization value means the request carried more than one such header
+  // (fetch joins repeats with ", "), and a valid bearer contains no comma. That is ambiguous, so it is
+  // rejected rather than resolved by picking one.
 async function devicePrincipal(c: { env: Env }, header: string): Promise<Principal | null> {
   if (!c.env.DEVICES || header.includes(',')) return null
   const authenticated = await c.env.DEVICES.authenticate(header.slice('Bearer '.length).trim())
   if (!authenticated) return null
   // The device is the owner, so it inherits the machine's bound identity exactly as the internal
-  // principal does. The '' fallback is vestigial — the identity is minted at boot now — and kept only
+  // principal does. The '' fallback is vestigial: the identity is minted at boot now, and kept only
   // so a bare test Env without a bound store still authenticates.
   return { kind: 'device', userId: c.env.ACTIVE_IDENTITY.get() ?? '', deviceId: authenticated.deviceId }
 }
@@ -62,10 +62,10 @@ async function devicePrincipal(c: { env: Env }, header: string): Promise<Princip
 // Resolve the caller and attach it to the context. Never throws and never enforces: requireUser is the
 // single gate that turns "no principal" into a 401 (server/index.ts mounts them in that order).
 //
-// There is nothing to re-issue and no cookie to set any more, which is the point — a bearer is presented
+// There is nothing to re-issue and no cookie to set any more: a bearer is presented
 // per request and the node holds no session state at all.
 export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
-  // A presented bearer that fails does NOT fall through to the internal token: presenting a credential
+  // A presented bearer that fails does not fall through to the internal token: presenting a credential
   // and having it rejected is a rejection, not an invitation to try the next mechanism. (The WS hub has
   // always applied this rule at upgrade; the HTTP path only inherited it once there were two mechanisms
   // left instead of three.)

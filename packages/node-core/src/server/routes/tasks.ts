@@ -13,8 +13,8 @@ import { ownerId } from '../middleware/requireUser'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { getProject } from '../../main/projects'
 
-// Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects /
-// terminal_sessions — no user_id — but still auth-gated (it's a logged-in app). CRUD: create /
+// Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
+// and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
 // list-active / rename / archive. Worktree teardown on archive is the main process's job (it owns
 // git/fs); this route only flips the status.
 
@@ -55,11 +55,11 @@ function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<type
 }
 
 // The wire names only. This accepted `integrationId` and `provider` as aliases for `connectionId` and
-// `providerId`, which was not input leniency but naming history leaking outward: those two ARE the
+// `providerId`, which was not input leniency but naming history leaking outward: those two are the
 // storage column names (`task_links.integration_id`, `task_links.provider`), so the request body
 // documented the schema instead of the API.
 //
-// The columns keep their names — renaming them is a migration for no behavioural gain, and `rowLink`
+// The columns keep their names. Renaming them is a migration for no behavioural gain, and `rowLink`
 // below is the one place that maps between the two vocabularies, which is where a mapping belongs.
 type LinkInput = Partial<TaskLinkSeed>
 
@@ -214,7 +214,7 @@ export const tasks = new Hono<AppEnv>()
   })
   // Links grow/shrink after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
   // with its birth links" into "a task that accumulates context as work unfolds". Mirrors the
-  // create-time insert above — same onConflictDoNothing, so a duplicate add is a no-op.
+  // create-time insert above, same onConflictDoNothing, so a duplicate add is a no-op.
   .post('/:id/links', async (c) => {
     const id = c.req.param('id')
     const body = (await c.req.json().catch(() => ({}))) as LinkInput

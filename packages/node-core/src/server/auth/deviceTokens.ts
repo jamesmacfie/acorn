@@ -36,8 +36,8 @@ export type DeviceService = {
   // which is how a route decides between 204 and 404.
   //
   // `actor` is who to blame in the audit trail. Optional because the two non-route callers (a test, and
-  // a node revoking on its own behalf) have no principal, and defaulting to 'system' is honest for them
-  // — but a revoke that arrived over HTTP should say which device asked, because "which of my machines
+  // a node revoking on its own behalf) have no principal, and defaulting to 'system' is honest for them.
+  // A revoke that arrived over HTTP should say which device asked, because "which of my machines
   // unpaired this one?" is the question the trail exists to answer.
   revoke(id: string, actor?: AuditActor): Promise<boolean>
   // Fires after a successful revoke so live sockets for that device close immediately
@@ -50,11 +50,9 @@ export type DeviceService = {
 
 // The token a node's own launcher should use: reuse the one it remembered when it still
 // authenticates, and issue a fresh one otherwise (first run, a reset data root, or a device the owner
-// revoked). Shared by the two things that boot a node — the Electron supervisor, which passes the
+// revoked). Shared by the two things that boot a node, the Electron supervisor, which passes the
 // token back from the OS keychain (apps/node/src/service/runtime.ts), and the standalone entry, which
 // takes it from ACORN_DEVICE_TOKEN. Without the reuse each launch would add a device row.
-//
-// The node never persists the result: custody belongs to whoever started it.
 export async function resolveDeviceToken(devices: DeviceService, remembered: string | undefined, name: string): Promise<string> {
   if (remembered && (await devices.authenticate(remembered))) return remembered
   const { token } = await devices.issue(name)
@@ -79,7 +77,7 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       const createdAt = now()
       await db.insert(schema.devices).values({ id, name, secretHash: sha256(secret), createdAt, lastSeenAt: null, revokedAt: null })
       // The actor is 'system': whoever holds the pairing code is by definition not yet a device, and the
-      // bundled local node pairs with no code at all because the client spawned it. The NAME is the only
+      // bundled local node pairs with no code at all because the client spawned it. The name is the only
       // thing the owner will have to recognise this row by, so it goes in the details.
       recordAudit(db, { actor: 'system', action: 'device.paired', subject: id, details: { name } })
       return {
@@ -88,7 +86,7 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       }
     },
 
-    // Missing, malformed, unknown, revoked and wrong-secret ALL return null. That uniformity is the
+    // Missing, malformed, unknown, revoked and wrong-secret all return null. That uniformity is the
     // point: distinguishing them would turn this into a token-status oracle, letting a caller learn
     // that an id exists or that a token was revoked rather than never valid.
     async authenticate(bearer) {

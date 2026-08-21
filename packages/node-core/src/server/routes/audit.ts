@@ -10,7 +10,7 @@ import type { AppEnv } from '../middleware/auth'
 // design, and a route that could remove rows would make the trail worth less than the prune already
 // makes it. Retention is enforced at boot (server/audit.ts's pruneAudit).
 //
-// Gated to `requireDevice` at the MOUNT in server/index.ts, alongside pair/devices/plugins. It has to
+// Gated to `requireDevice` at the mount in server/index.ts, alongside pair/devices/plugins. It has to
 // be: the trail names every device that has ever paired and every credential that has been connected,
 // which is precisely the enumeration security.md forbids an agent-spawned child.
 const query = z.object({
@@ -28,7 +28,7 @@ export const audit = new Hono<AppEnv>().get('/', async (c) => {
   return c.json({
     entries,
     // The cursor for the next page, or null at the end. Computed here so the client never has to know
-    // that the cursor is a timestamp — it can stay an opaque token if paging ever changes shape.
+    // that the cursor is a timestamp; it can stay an opaque token if paging ever changes shape.
     nextBefore: entries.length > 0 ? entries[entries.length - 1].at : null,
   })
 })

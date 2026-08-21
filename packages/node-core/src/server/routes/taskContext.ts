@@ -8,7 +8,7 @@ import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
 
 // Task context HTTP surface (docs/agent-tools.md §4): a thin route over the shared section registry
-// (../agentTools/contextSections.ts). Both delivery paths compose from that ONE assembler — push
+// (../agentTools/contextSections.ts). Both delivery paths compose from that one assembler: push
 // (formatContextBlock → sendToAgent) fetches this route; pull is the MCP task_context tool. The
 // context-read agent tools call assembleContext directly (no self-fetch). Also serves repo facts
 // for the repo_info tool.

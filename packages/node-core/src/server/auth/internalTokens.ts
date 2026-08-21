@@ -1,13 +1,11 @@
-// Internal tokens are stateless HMAC credentials. Claims distinguish Node service calls from child
-// calls and bind task credentials to one task. The signing key persists so tmux-reattached sessions
-// can reconnect after a Node restart; rotating the key revokes outstanding tokens. Tokens do not
-// expire, so scope and key rotation are the active lifetime controls.
+// Internal tokens: scope and signing (docs/security.md § Credential handling for the scope split and
+// the signing-key lifecycle).
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 
-// 'service' — the node calling its own HTTP surface over loopback (notes seeding, workflow context
-//   assembly). Full reach, minted in-process, and NEVER placed in a child's environment.
-// 'task'    — everything handed to a child process: PTYs, agent sessions, workflow steps, MCP servers.
+// 'service': the node calling its own HTTP surface over loopback (notes seeding, workflow context
+//   assembly). Full reach, minted in-process, and never placed in a child's environment.
+// 'task': everything handed to a child process, PTYs, agent sessions, workflow steps, MCP servers.
 //   Task-addressed routes only; cannot read a provider credential, cannot pair, cannot administer
 //   devices, cannot mint anything.
 export type InternalScope = 'service' | 'task'
@@ -15,7 +13,7 @@ export type InternalScope = 'service' | 'task'
 export type InternalClaims = {
   scope: InternalScope
   // Present for 'task' scope. The credential's task, which is what route handlers compare against the
-  // task in the URL — that comparison is the escalation this closes.
+  // task in the URL (docs/security.md § Transport and auth: the escalation this comparison closes).
   taskId?: string
   // The terminal/agent session, when the child belongs to one. Carried for attribution and for a future
   // per-session revocation sweep; nothing enforces on it yet.
@@ -24,7 +22,7 @@ export type InternalClaims = {
 
 const PREFIX = 'acorn_it_'
 // '.' separates payload from signature, as in a JWT, and for the same reason: base64url's alphabet is
-// [A-Za-z0-9_-], so it can contain '_' but never '.'. Splitting on '_' looked fine and was wrong — a
+// [A-Za-z0-9_-], so it can contain '_' but never '.'. Splitting on '_' looked fine and was wrong: a
 // payload or signature containing an underscore produced more than the expected number of parts and
 // every such token failed to verify. Caught by auth.test.ts on the first run.
 const SEPARATOR = '.'
@@ -45,7 +43,7 @@ export function mintInternalToken(key: string, claims: InternalClaims): string {
   return `${PREFIX}${payload}${SEPARATOR}${sign(key, payload)}`
 }
 
-// Returns null for anything wrong — bad shape, bad signature, unknown scope, task scope with no task.
+// Returns null for anything wrong: bad shape, bad signature, unknown scope, task scope with no task.
 // Uniformly null, so a caller cannot distinguish "malformed" from "forged" (the same rule pairing
 // already follows).
 //
@@ -71,9 +69,9 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
 }
 
 // The environment a spawned child needs to call this node back, with a token minted for that child's
-// scope. A FACTORY rather than the single shared record it replaces: one object meant every PTY, agent
+// scope. A factory rather than the single shared record it replaces: one object meant every PTY, agent
 // session and workflow step presented the same credential, which is what made scope unrepresentable.
 //
-// ACORN_API_URL is deliberately absent from the claims — it is a property of the listener, not the
-// caller — so the composition root closes over it and fills it in once the port is known.
+// ACORN_API_URL is absent from the claims: it is a property of the listener, not the
+// caller, so the composition root closes over it and fills it in once the port is known.
 export type InternalEnvFactory = (claims: InternalClaims) => Record<string, string>

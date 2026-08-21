@@ -1,7 +1,7 @@
-// The reload path's acceptance list, written down in agent-authored-plugins.md before any of it existed:
-// candidate-then-commit, contained failure, a stale handle that throws — plus the thing that made all
-// three pointless until it was fixed, which is that a reloaded plugin's ROUTES have to serve the new
-// handler.
+// The reload path's acceptance list (docs/plugins.md § The dev loop § Reloading one plugin without a
+// restart): candidate-then-commit, contained failure, a stale handle that throws, plus the fix that
+// made all three pointless until it landed, which is that a reloaded plugin's routes have to serve
+// the new handler.
 //
 // Everything here uses the real host, the real context builder and the real module-singleton registries,
 // because the whole question is what those do when a second instance of one plugin arrives.
@@ -45,7 +45,7 @@ const hostOptions = () => ({
 })
 
 // One loaded plugin that contributes the three things a reload has to move: a route (mounted through the
-// portable carrier), an agent tool (a registry that REJECTS duplicates, which is what makes the candidate
+// portable carrier), an agent tool (a registry that rejects duplicates, which is what makes the candidate
 // buffer necessary) and a captured context (so the test can prove the old one is revoked).
 const acme = (body: string, extra?: Partial<NodePlugin>): { plugin: NodePlugin; context: () => NodePluginContext } => {
   let captured: NodePluginContext | null = null
@@ -93,7 +93,7 @@ describe('plugin reload', () => {
 
     expect(outcome).toEqual({ ok: false, error: 'the new bundle is broken' })
     // Fully live means all three: the route still serves, the tool is still the old one and there is
-    // exactly ONE of each — a candidate that had written through would have left duplicates.
+    // exactly one of each. A candidate that had written through would have left duplicates.
     expect(await (await request(`/v2/p/${PLUGIN}`)).text()).toBe('v1')
     expect(toolDescriptions()).toEqual(['v1'])
     expect(pluginRouteContributions().filter((route) => route.plugin === PLUGIN)).toHaveLength(1)
@@ -152,7 +152,7 @@ describe('plugin reload', () => {
       init: (ctx) => ctx.routes.fetch(() => new Response('early'), { prefix: '/early' }),
     }], hostOptions())
     // Nothing was mounted at this path when the app was built, so a boot-time mount table could never
-    // answer it — and the fall-through keeps that the app's own 404 rather than the dispatcher's.
+    // answer it. The fall-through keeps that the app's own 404 rather than the dispatcher's.
     expect((await request(`/v2/p/${PLUGIN}/late`)).status).toBe(404)
 
     await host.reload(PLUGIN, {
@@ -175,7 +175,7 @@ describe('plugin reload', () => {
 
   it('never shadows a built-in router, which is mounted before it', async () => {
     // The regression this change could have caused. createApp mounts every built-in's Hono router first
-    // and the dispatcher last, so a path a router already answers must never reach the dispatcher — and a
+    // and the dispatcher last, so a path a router already answers must never reach the dispatcher, and a
     // path under a built-in's namespace that nothing claims must still be the app's own 404.
     const host = await initPlugins([acme('loaded').plugin], hostOptions())
     const app = new Hono<AppEnv>()
@@ -214,12 +214,12 @@ describe('plugin reload', () => {
   it('re-provides a capability the previous instance held, which a live registry would refuse', async () => {
     // The case the candidate buffer exists for, in its sharpest form: CapabilityRegistry.provide throws
     // on a duplicate id, so a candidate init run straight at the live registry would fail on the
-    // plugin's OWN capability every single time.
+    // plugin's own capability every single time.
     const id = capabilityId<() => string>('acme.version')
     const versioned = (version: string): PluginReloadRequest => {
       // The plugin releases what it provided in its own dispose, because the host never holds the
-      // handle — the same contract a contained failure at boot already relies on. A plugin that keeps
-      // its capability through dispose fails the REPLAY instead, which is the commit-window ceiling
+      // handle: the same contract a contained failure at boot already relies on. A plugin that keeps
+      // its capability through dispose fails the replay instead, which is the commit-window ceiling
       // written down in host.ts.
       let handle: { dispose(): void } | null = null
       return {

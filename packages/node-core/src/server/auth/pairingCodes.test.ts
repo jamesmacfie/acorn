@@ -40,13 +40,13 @@ describe('pairing codes', () => {
   it('exhausts after 5 attempts and closes the window', () => {
     const code = codes.issue()
     for (let i = 0; i < 5; i++) expect(codes.consume('AAAAAAAAAAAAAAAAAAAAAA')).toBe(false)
-    // The budget is spent, so even the correct code no longer works — the owner must reissue.
+    // The budget is spent, so even the correct code no longer works. The owner must reissue.
     expect(codes.consume(code)).toBe(false)
     expect(codes.isOpen()).toBe(false)
   })
 
-  // docs/security.md § Transport: "Failures are uniform — no oracle for 'right code, wrong
-  // something'". Every one of these must be the same `false` to the caller.
+  // docs/api-reference.md § Pairing: failures are uniform, no oracle for "right code, wrong
+  // something". Every one of these must be the same `false` to the caller.
   it('fails identically for no window, expired, wrong and malformed', () => {
     expect(codes.consume('AAAAAAAAAAAAAAAAAAAAAA')).toBe(false) // no window open
 

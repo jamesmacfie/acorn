@@ -5,7 +5,7 @@ import { createApp } from './index'
 import type { PluginRequestContext } from './plugin/types'
 import { registerRoute, removePluginRoutes } from './routeRegistry'
 
-// The fetch-shaped route seam a LOADED plugin gets instead of a Hono router
+// The fetch-shaped route seam a loaded plugin gets instead of a Hono router
 // (docs/security.md § Design rules: a Hono instance cannot cross a process
 // boundary, a (Request) → Response function can). What matters here is that the seam behaves like
 // the router seam it replaces: same mount, same auth envelope, same relative paths.
@@ -76,7 +76,7 @@ describe('a fetch-shaped plugin route', () => {
     const res = await createApp().fetch(new Request('http://127.0.0.1:4317/v2/p/ntfy'), ENV)
     expect(res.status).toBe(401)
     expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'unauthenticated' })
-    // Not merely rejected downstream — the handler is never reached at all.
+    // Not merely rejected downstream: the handler is never reached at all.
     expect(seen).toEqual([])
   })
 })
