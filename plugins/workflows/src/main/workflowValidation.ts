@@ -14,7 +14,7 @@ export type WorkflowValidationCatalog = {
   stepKinds: ReadonlySet<string>
   policies: ReadonlySet<string>
   profiles: ReadonlySet<string>
-  // Profiles with a one-shot structured (aiArgv) mode — the only ones `decide` can run on.
+  // Profiles with a one-shot structured (aiArgv) mode: the only ones `decide` can run on.
   structuredProfiles: ReadonlySet<string>
   validateStepKind?: (kind: string, step: WorkflowStepDef, context: StepValidationContext) => string[]
 }

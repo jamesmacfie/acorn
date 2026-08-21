@@ -10,10 +10,9 @@ const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
   init: (ctx) => {
-    // The three reads plugins/agents' task sidebar needs, published under the id that plugin declares
-    // (contract/workflowControl.ts). Consumer-declared because workflows already depends on agents on
-    // the node side, and importing back would close a package cycle. A node with workflows disabled
-    // simply never provides it, and the sidebar renders agent sessions alone.
+    // The three reads plugins/agents' task sidebar needs (docs/plugins.md § Collaboration rules:
+    // this is the package-cycle example). Published under the id agents declares
+    // (contract/workflowControl.ts); a node with workflows disabled just never provides it.
     ctx.capability(WORKFLOW_CONTROL, {
       runs: workflowApi.runs,
       steps: workflowApi.steps,

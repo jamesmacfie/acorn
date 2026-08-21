@@ -1,11 +1,11 @@
-// Rollbar occurrence normalization (docs/security.md). Rollbar occurrence payloads are variable and
-// can carry secrets and personal data even when an SDK scrubbed common keys. Acorn applies its OWN
-// allowlist here before anything is persisted or rendered: only the fields below survive, every
-// string is control-char-stripped and length-capped, and the whole detail is size-bounded so it
-// stays well below the 256 KB generic cache ceiling. Raw request bodies, headers, cookies, query
-// values, locals, arbitrary `custom`/`extra`, telemetry, and raw crash reports are dropped.
+// Rollbar occurrence normalization. See docs/security.md § Untrusted provider data for why this
+// file keeps its own allowlist rather than trusting the SDK's scrub. Every string here is
+// control-char-stripped and length-capped, and CAPS.maxDetailBytes (192 KiB) keeps the whole detail
+// well below the 256 KB generic cache ceiling. Fields outside the allowlist, including raw request
+// bodies, headers, cookies, custom/extra data, and crash reports, are dropped.
 //
-// Pure and network-free: unit-tested against synthetic fixtures (no real occurrence value, no token).
+// Pure and network-free: tested only against synthetic fixtures, never a real occurrence value or
+// token.
 
 import type {
   RollbarItemDetail,
@@ -18,7 +18,7 @@ import type {
 import { levelName, type RollbarApiInstance, type RollbarApiItem } from './'
 import { isRecord } from '@acorn/plugin-api/node'
 
-// Suggested caps (docs/integrations.md § Rollbar). Exported so tests assert against the same numbers.
+// Caps: docs/integrations.md § Rollbar. Exported so tests assert against the same numbers.
 export const CAPS = {
   traceChains: 10,
   framesTotal: 200,
@@ -27,7 +27,7 @@ export const CAPS = {
   maxDetailBytes: 192 * 1024,
 } as const
 
-// eslint-disable-next-line no-control-regex -- deliberately matching C0 controls to strip them.
+// eslint-disable-next-line no-control-regex -- this matches C0 controls, to strip them.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g
 
 // Render-as-text hygiene: drop control chars (keep \n and \t), then byte-cap. Returns null for empties
@@ -100,7 +100,6 @@ export function normalizeOccurrence(instance: RollbarApiInstance): RollbarOccurr
   const body = isRecord(occurrence.body) ? occurrence.body : {}
   let truncated = false
 
-  // Determine the trace(s) to read.
   const chain = Array.isArray(body.trace_chain) ? body.trace_chain : null
   const trace = isRecord(body.trace) ? body.trace : null
   const message = isRecord(body.message) ? body.message : null
@@ -183,7 +182,6 @@ export function occurrenceSummary(detail: RollbarOccurrenceDetail): RollbarOccur
   }
 }
 
-// Build the item summary row from a list/canonical item response.
 export function normalizeSummary(integrationId: string, integrationLabel: string, raw: RollbarApiItem): RollbarItemSummary {
   return {
     integrationId,
@@ -204,8 +202,6 @@ export function normalizeSummary(integrationId: string, integrationLabel: string
   }
 }
 
-// Assemble the full detail. If the normalized detail somehow still exceeds the byte target (huge
-// frames), drop the most sensitive field first (email), then progressively trim frames.
 export function normalizeItemMetadata(
   summary: RollbarItemSummary,
   item: RollbarApiItem,
@@ -226,7 +222,8 @@ export function composeItemDetail(
   let latest = occurrence
   if (latest) {
     let guard = 0
-    // Email is diagnostic but the most sensitive field — drop it first under pressure.
+    // If this still exceeds CAPS.maxDetailBytes (huge frame sets), drop the most sensitive field
+    // first, the person's email, then progressively trim frames.
     while (Buffer.byteLength(JSON.stringify(latest), 'utf8') > CAPS.maxDetailBytes && guard++ < 64) {
       if (latest.person?.email) {
         latest = { ...latest, person: { ...latest.person, email: null }, truncated: true }

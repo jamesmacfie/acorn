@@ -25,15 +25,9 @@ export type RollbarResourceInput = { kind: 'list' } | { kind: 'detail'; identifi
 export type RollbarListResult = { items: RollbarItemSummary[]; capped: boolean }
 export type RollbarResourceOutput = RollbarListResult | RollbarItemMetadata
 
-// A Rollbar credential is a PROJECT access token — "one connection per project", as the field hint
-// says — so this provider has exactly one project to offer and already knows which: `normalize` wrote
-// it into the connection's config and account when the token was validated. No fetch, and the secret
-// goes unused.
-//
-// Worth declaring anyway rather than leaving Rollbar out of the picker. Rollbar's rail scoping reads
-// only the CONNECTION ids out of a workspace's mapping (routes/rollbar.ts § scopedConnections), so
-// without a writable mapping a workspace shows every connected Rollbar — the same silent
-// unscoping Linear had. One row the owner can tick is what makes that mapping expressible.
+// See docs/integrations.md § Rollbar for why this always declares one project rather than none:
+// no fetch, and the secret goes unused, since `normalize` already wrote the project onto the
+// connection when the token was validated.
 const rollbarProjectSource: ProviderProjectSource = {
   list({ connection }) {
     const config = parseJson(connection.config)
@@ -58,8 +52,9 @@ const metadataOf = (value: RollbarItemMetadata): RollbarItemMetadata => ({
 })
 
 // Widen an old (pre-itemId) summary/legacy row into the v4 summary. itemId/label are unknown for
-// legacy rows — left blank; a detail fetch resolves the real id via the counter, and the list refresh
-// restamps label. Migrated rows never carry the current listFetchedAt, so they stay out of the list.
+// legacy rows, so they are left blank; a detail fetch resolves the real id via the counter, and the
+// list refresh restamps label. Migrated rows never carry the current listFetchedAt, so they stay out
+// of the list.
 function widen(o: Record<string, unknown>): RollbarItemSummary {
   const itemId = typeof o.itemId === 'string' ? o.itemId : ''
   return {
@@ -178,10 +173,10 @@ const resourceKey = (connectionId: string, input: RollbarResourceInput) =>
 
 type RefreshCtx = ProviderResourceRefreshContext
 
-// The read-modify-write below is the reason every persist path reads first: an item's cached envelope
-// carries BOTH list membership and detail freshness, and each refresh only owns one of them. The store
-// exposes exactly that read/upsert pair over core's `issues` table, already scoped to this owner
-// (integrations/itemStore.ts explains why the table is core's and not rollbar's).
+// The read-modify-write below is why every persist path reads first: an item's cached envelope
+// carries both list membership and detail freshness, and each refresh owns only one of them. The
+// store exposes exactly that read/upsert pair over core's `issues` table, already scoped to this
+// owner (integrations/itemStore.ts explains why the table is core's, not rollbar's).
 async function upsertIssue(context: RefreshCtx, summary: RollbarItemSummary, cached: RollbarCached): Promise<void> {
   const data = encodeCached(cached, context.limits.maxCachedItemBytes)
   await context.items.write({
@@ -209,7 +204,8 @@ async function persistDetail(context: RefreshCtx, detail: RollbarItemMetadata): 
   const previous = await context.items.read(detail.integrationId, detail.identifier)
   const parsed = previous ? parseCached(rollbarCodec, previous.data, ref) : null
   const base = rollbarCodec.withDetail(ref, summary, detail, context.now)
-  // Detail write must NOT touch list membership (docs/caching.md): preserve the existing listFetchedAt.
+  // Detail write must not touch list membership (docs/caching.md): preserve the existing
+  // listFetchedAt.
   await upsertIssue(context, summary, { ...base, listFetchedAt: parsed?.ok ? parsed.value.listFetchedAt : undefined })
 }
 
@@ -246,7 +242,7 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
       context.items.listForConnection(context.connection.id),
     ])
     if (listAt == null) return null // never listed → cold, force a refresh
-    // Current membership is exact: only rows stamped with THIS list's fetch time (docs/caching.md).
+    // Current membership is exact: only rows stamped with this list's fetch time (docs/caching.md).
     const items = rows.flatMap((row) => {
       const parsed = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: row.integrationId, displayId: row.identifier })
       return parsed.ok && parsed.value.listFetchedAt === listAt ? [parsed.value.summary] : []
@@ -284,11 +280,12 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
         if (raw.length < ROLLBAR_PER_PAGE) break
       }
       // Restamp every current-list summary with this refresh's time (mergeSummary keeps detail).
-      // Absent rows are NOT deleted — they may still be linked to a task; they simply drop out of the
+      // Absent rows are not deleted; they may still be linked to a task. They simply drop out of the
       // list because they no longer carry the current listFetchedAt.
       for (const summary of summaries) await persistSummary(context, summary)
-      // Stamped LAST, and only on success: the marker is what `read` compares each row's listFetchedAt
-      // against, so writing it before the rows would publish a membership that is still being filled in.
+      // Stamped last, and only on success: the marker is what `read` compares each row's
+      // listFetchedAt against, so writing it before the rows would publish a membership that is
+      // still being filled in.
       await context.items.writeMarker(resourceKey(context.connection.id, input), context.now)
       return { ok: true }
     } catch {
@@ -398,7 +395,7 @@ export const rollbarProvider = publicProvider({
   memory: { linkedItems: true, mutations: [], triggers: [], summarize: 'context-formatter', acceptedWrites: false },
   conformance: {
     ref: { providerId: 'rollbar', connectionId: 'rollbar-test', displayId: '142' },
-    // Legacy bare RollbarItem row (pre-itemId) — must migrate.
+    // Legacy bare RollbarItem row (pre-itemId). Must migrate.
     legacyCache: {
       integrationId: 'rollbar-test', identifier: '142', title: 'TypeError', level: 'error', environment: 'prod',
       status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,

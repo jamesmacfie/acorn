@@ -33,7 +33,7 @@ import { rollbarRailItem } from '../../shared/rail'
 const PROVIDER = 'rollbar'
 const RESOURCE = ROLLBAR_ITEMS_RESOURCE
 
-// Rollbar ships loaded, so these routes run on ONE tier: the host gets `router.fetch`
+// Rollbar ships loaded, so these routes run on one tier: the host gets `router.fetch`
 // (createRollbarFetch below) and the identity-bound runtime rides in through `c.env`. The carrier
 // itself is the host's (@acorn/plugin-api/node).
 const { requestContext, portableFetch } = portableCarrier(PROVIDER)
@@ -171,7 +171,7 @@ export const createRollbarRoutes = (projects?: RollbarProjectScope) => new Hono<
     return c.json(composeItemDetail(metadata.value, latestOccurrence) satisfies RollbarItemDetail)
   })
 
-// The Hono routes over the portable carrier — the only way in. Its request context supplies the
+// The Hono routes over the portable carrier, the only way in. Its request context supplies the
 // identity-bound provider runtime without exposing host database or secret-service handles to the
 // bundle. `projects` is optional for the suites that drive these routes without a project scope.
 export const createRollbarFetch = (projects?: RollbarProjectScope): PluginFetchHandler =>

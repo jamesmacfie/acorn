@@ -15,12 +15,13 @@ import { workflowRuns } from './schema'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory
-  // Resolves when the composition root's post-window reconcile pass is done (always resolves, even on
-  // failure). workflow:start/gate/cancel/kill await it: reconcile() sweeps EVERY 'running' step to
-  // 'pending', so a run started before the sweep would have its live step re-queued underneath it.
+  // Resolves when the composition root's post-window reconcile pass finishes, always, even on
+  // failure. workflow:start/gate/cancel/kill all await it: reconcile() sweeps every 'running' step
+  // to 'pending', so a run started before the sweep would have its live step re-queued underneath
+  // it.
   reconciled: Promise<void>
   // plugins/memory's auto-generation trigger, as a thunk (see the header). Optional so a node with
-  // memory disabled still runs workflows — the run simply produces no memory proposals.
+  // memory disabled still runs workflows; the run simply produces no memory proposals.
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
   // '' when every check passed, a rendered list when some failed, null when there is nothing to check
   // (no PR, no identity, no mirrored repo). The three-valued answer is load-bearing: the ci-loop step
@@ -45,8 +46,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
 
       const runner = new WorkflowRunner(store, {
         runStep: async (taskId, def, opts) => {
-          // Resolved per call, not at init: plugin init order is not defined, and reading the capability
-          // once here would cache `undefined` whenever agents happened to initialize second.
+          // Resolved per call, not at init (docs/plugins.md § Collaboration rules): plugin init
+          // order is not defined.
           const managed = await ctx.capabilities.get(AGENTS_SESSION_EXECUTE)?.({
             taskId,
             profileId: def.profileId,
@@ -66,7 +67,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           // The headless fallback: a profile with no managed driver, or a node with agents disabled.
           const task = await core.tasks.load(taskId)
           // The identity is passed through because creating the worktree consults the owner's per-repo
-          // base_ref preference — dropping it would silently fall back to git's origin/main.
+          // base_ref preference; dropping it would silently fall back to git's origin/main.
           const { cwd } = task ? await core.tasks.resolveCwd(task, undefined, core.identity.active()) : { cwd: homedir() }
           const project = task?.projectId ? await core.projects.byId(task.projectId) : null
           const profile = requireProfile(def.profileId ?? DEFAULT_PROFILE_ID)
@@ -98,11 +99,11 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             .require(NOTES_STORE)
             .append({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, `## ${stepName}\n${body}\n`, { author: 'workflow', originTaskId: taskId })
         },
-        // De-included rather than deleted when the run ends: the handoff trail stays readable in the
-        // pane, it just stops being injected into every later agent session for this task.
-        // `async`, not a bare arrow returning the promise: the runner calls this as
-        // `finishHandoffs?.(…).catch(…)`, so a SYNCHRONOUS throw from `require` would escape that catch
-        // and propagate out of finishRun, leaving a terminal run un-finished.
+        // De-included rather than deleted when the run ends: the handoff trail stays readable in
+        // the pane, it just stops being injected into every later agent session for this task.
+        // This is `async`, not a bare arrow returning the promise, because the runner calls it as
+        // `finishHandoffs?.(…).catch(…)`, and a synchronous throw from `require` would escape that
+        // catch and propagate out of finishRun, leaving a terminal run unfinished.
         finishHandoffs: async (taskId, runId) => {
           await ctx.capabilities.require(NOTES_STORE).setIncluded({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, false)
         },
@@ -121,7 +122,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             return ''
           }
         },
-        // Policy verdicts are RE-DERIVED here — a lying step result is ignored by construction.
+        // Policy verdicts are re-derived here: a lying step result is ignored by construction.
         evaluatePolicy: async (taskId, policy) => {
           if (policy === 'checks-green') {
             const failing = await deps.failingChecks(taskId)
@@ -152,9 +153,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const status = await runTargets.status(taskId, targetId)
           return { ok: true, url: status.url }
         },
-        // Fan-out (14 P4): materialise a child task on its own (de-duped, slugged) branch. Core owns
-        // `tasks`, so the insert is core's — this plugin has no handle to that file. The child's worktree
-        // is created lazily by resolveCwd the moment its step runs.
+        // Materialises a child task (docs/workflows.md covers fan-out, branch dedup, and lazy
+        // worktree creation). Core owns `tasks`, so the insert is core's; this plugin has no handle
+        // to that table.
         createChildTask: (parentTaskId, seed) => core.tasks.createChild(parentTaskId, seed),
         cancelChildTask: (taskId) => core.tasks.cancel(taskId),
         authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
@@ -163,13 +164,13 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       live = runner
 
       routeCapability = ctx.capabilities.provide(WORKFLOW_ROUTE, {
-        // One column off this plugin's own runs table — see WorkflowBridge for why the router needs it.
+        // One column off this plugin's own runs table. See WorkflowBridge for why the router needs it.
         taskIdForRun: async (runId) => {
           const [row] = await store.select({ taskId: workflowRuns.taskId }).from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1)
           return row?.taskId ?? null
         },
         // Declared workflows for a task (docs/workflows.md): `.acorn/workflows/*.toml` from the
-        // worktree/checkout + ~/.acorn, parse/cycle errors surfaced as palette rows (13 §B).
+        // worktree/checkout plus ~/.acorn, with parse/cycle errors surfaced as palette rows.
         defs: async (taskId) => {
           const task = await core.tasks.load(taskId)
           if (!task) return { workflows: [], errors: [] }
@@ -224,19 +225,19 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // route builders and server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
 
-      // reconcile() is NOT called here. It has to run after the listener binds and before the
+      // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
       // (main/workflowRunner.ts explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, { reconcile: () => runner.reconcile() })
     },
     // The bridge slot is cleared explicitly rather than trusting teardown order: a second
-    // startServiceRuntime in one process would otherwise serve workflow requests through the first boot's
-    // closed database handle.
+    // startServiceRuntime in one process would otherwise serve workflow requests through the first
+    // boot's closed database handle.
     //
-    // In-flight steps are aborted HERE, which is still before the handle closes: the host drains it after
-    // this returns. A headless child outliving its database wrote its outcome onto a closed connection;
-    // the run rows stay 'running' and reconcile() sweeps them to 'pending' on the next boot, which is
-    // what that sweep exists for.
+    // In-flight steps are aborted here, still before the handle closes; the host drains it after
+    // this returns. A headless child that outlives its database would write its outcome onto a
+    // closed connection, so the run rows stay 'running' and reconcile() sweeps them to 'pending' on
+    // the next boot. That is what the sweep is for.
     dispose: () => {
       live?.stop()
       live = null

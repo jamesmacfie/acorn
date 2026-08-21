@@ -21,7 +21,7 @@ type PageState =
 
 const detailOf = (error: unknown): string => error instanceof Error ? error.message : String(error)
 
-/** Solid owns synchronization inside the isolated frame; the bridge remains the only data/I/O seam. */
+/** Frame authoring and the UI kit (docs/plugins.md) covers why the bridge is the frame's only data and I/O seam. */
 export function RollbarFrameApp(props: { bridge: AcornBridge }) {
   const [linkedTargets, setLinkedTargets] = createSignal<RollbarRailTarget[]>([])
   const [view, setView] = createSignal<RollbarViewState | null>(null)
@@ -169,9 +169,9 @@ export function RollbarFrameApp(props: { bridge: AcornBridge }) {
   )
 }
 
-// Kept as the PageState→primitive mapping, but it no longer draws anything: `.rb-placeholder` and
-// `.rb-error` were this frame's private spellings of two shared components, and primitives.css is
-// already served to plugin frames, so the frame now looks like the shell without re-declaring a rule.
+// PageStatus only maps PageState to a primitive class now. `.rb-placeholder` and `.rb-error` were
+// this frame's private copies of two shared components; primitives.css already ships to plugin
+// frames, so referencing it skips redeclaring the rule.
 function PageStatus(props: { state: PageState }) {
   return props.state.kind === 'error'
     ? <Alert variant="banner" title={props.state.title}>{props.state.detail}</Alert>

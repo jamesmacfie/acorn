@@ -1,3 +1,3 @@
-// How fast rollbar's mirrored items go stale. Moved out of @acorn/node-core/server/sync/policy.ts
-// (finding 8): errors move fast, and that is a fact about Rollbar rather than about the sync engine.
+// How fast Rollbar's mirrored items go stale. See docs/caching.md for why this constant lives
+// here and not in the sync engine's own policy.
 export const ROLLBAR_ITEMS_STALE_AFTER_MS = 120_000
