@@ -58,9 +58,9 @@ async function inheritLoginShellPath(isPackaged: boolean): Promise<void> {
   }
 }
 
-// Electron-free composition root. This process exclusively owns SQLite, Hono/WS, PTYs, workflow
-// runners, child processes, caches, and reconciliation. Native UI operations are injected through
-// DesktopCapabilities, so importing this module in a plain Node test never loads Electron.
+// Electron-free composition root (docs/architecture-overview.md § Process ownership). Importing
+// this module in a plain Node test never loads Electron: native UI operations arrive through
+// DesktopCapabilities.
 export async function startServiceRuntime({ config, desktop, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
   const mark = bootTimer()
   await inheritLoginShellPath(config.isPackaged)
@@ -93,8 +93,8 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     stateChanged('failed', error instanceof Error ? error.message : String(error))
     throw error
   }
-  // Both hosts go through one reporter (server/composition.ts), so the account of what reconciliation
-  // did — and of a package that has quietly stopped taking updates — cannot exist on one root only.
+    // One reporter for both hosts (docs/node-distribution.md § Plugins), so the account of what
+    // reconciliation did cannot exist on only one root.
   reconcileBundledPackages({
     dataDir: config.dataDir,
     bundledRoot: config.bundledPluginsDir,
@@ -118,19 +118,18 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     if (stopped) return
     stopped = true
     stateChanged('draining')
-    // Bounded, and in this order — the same list, in the same order, as server/standalone.ts's:
-    //   - the LISTENER first, so nothing new arrives while the rest tears down. This is also what stops
-    //     the port outliving the drain, which is what made the two-node e2e reach for SIGKILL.
-    //   - plugins before core's DB and before the root lock: each table-owning plugin has a WAL-mode
-    //     SQLite file of its own (main/pluginStorage.ts), and the invariant below applies to those too.
-    //     The plugin host closes each of them immediately after that plugin's dispose, inside this step
-    //     (server/plugin/host.ts). This is also where the terminal engine's idle watch and session
-    //     displays, the docker streams, the database plugin's pg pools and the agent runtime's live
-    //     provider children / reconnect timers / webhook pump are closed — each in its own plugin's
-    //     dispose, rather than in a list here that a new plugin has to remember to join.
-    //   - the root lock LAST: only drop it once SQLite is closed, or a restart could open the database
-    //     while this process still holds its WAL. A drain that hits the deadline leaves it to
-    //     dataRoot's own `process.on('exit')` hook, which is why missing it here is survivable.
+    // Same bounded order as server/standalone.ts (docs/node-distribution.md § Operations): the
+    // listener closes first, so nothing new arrives while the rest tears down.
+    //
+    // Each table-owning plugin's WAL-mode SQLite file closes inside that plugin's own dispose
+    // (server/plugin/host.ts). That is also where the terminal engine's idle watch and session
+    // displays, the docker streams, the database plugin's pg pools, and the agent runtime's live
+    // provider children, reconnect timers and webhook pump all close, so this list never has to grow
+    // when a new plugin needs its own teardown.
+    //
+    // The root lock releases last, once SQLite is closed, or a restart could open the database while
+    // this process still holds its WAL. A drain that hits the deadline leaves the lock to dataRoot's
+    // own `process.on('exit')` hook, which is why missing it here is still safe.
     const outcome = await drainNode({
       listener: async () => { if (server) await closeListener(server) },
       reconciliation: async () => { if (reconcileTask) await reconcileTask },
@@ -157,37 +156,20 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
   }
 
   try {
-    // Audit retention and the expired-replay-row sweep both used to be boot-time calls here. Both are
-    // core-declared schedules now (docs/schedules.md), which is what makes them happen on a node that
-    // is left running for a month — the case a boot-only sweep serves exactly never.
+    // Audit retention and the idempotency sweep run as node-owned schedules now, not boot-time calls
+    // (docs/data-layer.md § Retention).
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
     setWorktreesRoot(worktreesDir)
-    // One factory, not one record. Every child gets a token minted for ITS scope — a PTY, an agent
-    // session and a workflow step are all 'task'-scoped and bound to their own task, while the node's own
-    // loopback calls are 'service' (server/auth/internalTokens.ts). Before this, all five presented the
-    // same node-wide string, so the auth layer could not tell the service from a child an agent spawned.
+    // The four values a spawned child needs, and why each is a factory call rather than a record
+    // (docs/mcp.md § Launch environment; docs/authentication.md § Internal tokens): the signing key
+    // persists across restarts so a tmux-reattached agent session keeps authenticating, and the port
+    // is ephemeral so a baked URL would point at nothing.
     //
-    // INTERNAL_TOKEN is now the signing KEY rather than the credential. It is still persisted across
-    // boots, and for the same reason: an agent pane runs in tmux and is reattached after a restart,
-    // keeping the environment of the boot that spawned it. A per-boot key would 404 every reattached
-    // session's MCP / notes / memory / context calls.
-    //
-    // ACORN_API_URL is mutable on purpose — the listener's origin is not known until it binds, and every
-    // consumer calls this factory at spawn time rather than at wire time (terminal.ts spreads it per
-    // session; seedTaskNotes and the workflow runner read it per call). So seeding the token here and
-    // assigning the URL right after startListener is enough; the wiring order exists for a different
-    // reason, which is that bridges must be installed before requests arrive.
-    //
-    // ACORN_DATA_DIR is the stable thing a long-lived child needs. An agent pane runs in tmux and is
-    // reattached after a restart with the environment of the boot that spawned it, and the port is
-    // ephemeral now — so a baked URL points at nothing, and mcp/api.ts resolves the current one from
-    // <dataDir>/node.json instead.
-    //
-    // NODE_EXTRA_CA_CERTS is how a child trusts the node's self-signed certificate with zero code. The
-    // certificate is a CA with an IP:127.0.0.1 SAN (main/tls.ts), so the child validates FULLY — no
-    // `rejectUnauthorized: false` anywhere. Ceiling documented in mcp/api.ts.
+    // Seeding the token here and assigning `apiUrl` right after `startListener` binds is enough,
+    // because every consumer calls this factory at spawn time rather than at wire time. The ordering
+    // that actually matters is that these bridges are installed before any request can arrive.
     let apiUrl = ''
     const internalEnv: InternalEnvFactory = (claims) => ({
       ACORN_API_URL: apiUrl,
@@ -199,26 +181,23 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 
-    // The plugin composition seam (docs/plugins.md § Cross-plugin collaboration). Owned by this
-    // runtime rather than by the module, so a process that starts the service more than once (the
-    // tests do) gets a clean graph each time instead of "capability already provided".
+    // The plugin composition seam (docs/plugins.md § Collaboration rules). Owned by this runtime
+    // rather than by the module, so a process that starts the service more than once (the tests do)
+    // gets a clean graph each time instead of "capability already provided".
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
     const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser }))
-    // The node's one scheduler. Built here rather than in makeBindings for the same reason the data
-    // root's lock is: its lifetime is the process's, so it belongs to whoever owns teardown. Created
-    // before the PLUGINS, so a manifest-declared or code-declared schedule has somewhere to land, and
-    // therefore well before the listener binds; STARTED after it, because a catch-up run may call this
-    // node's own routes.
+    // The node's one scheduler (docs/schedules.md § Why the node, and only the node): built and
+    // provided before the plugins so a declared schedule has somewhere to land, started after the
+    // listener binds because a catch-up run may call this node's own routes.
     scheduler = createScheduler(db, { env: runtime })
     schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
     const plugins = await initPlugins(
       graph.plugins,
-      // The persisted per-node list UNION the start config's. The file is the owner's setting, and it is
-      // the only form a remote node can have — nothing about a launchd boot consults a client's fleet
-      // file. The start config stays an override for tests and `dev:node`, which want to pin a list
-      // without writing into a data root.
+      // The persisted list unioned with the start config's (docs/node-distribution.md § Plugins): the
+      // file is the only form a remote node has, and the start config stays a test/`dev:node`
+      // override.
       { capabilities, core, env: runtime, dataDir: config.dataDir, disabled: disabled(), loaded: graph.loaded },
     )
     disposePlugins = plugins.dispose
@@ -262,10 +241,10 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     })()
 
     return {
-      // preview's one node-side read, resolved through its capability at CALL time rather than wired as a
-      // query. `[]` when the plugin is disabled is the right answer, not a degradation: with no preview
-      // plugin there are no page rules to report, and an empty list is already the "none configured" case
-      // the browser automation handles.
+      // preview's one node-side read, resolved through its capability at call time rather than wired
+      // as a query. `[]` when the plugin is disabled is the right answer, not a degradation: with no
+      // preview plugin there are no page rules to report, and an empty list is already the "none
+      // configured" case the browser automation handles.
       previewRules: async (taskId) => (await capabilities.get(PREVIEW_RULES)?.forTask(taskId)) ?? [],
       stop,
       started: {
@@ -273,11 +252,11 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
         nodeId: dataRoot.nodeId,
         endpoint,
         ...identity,
-        // The local bundle pairs without a code: the client spawned this node, which is proof enough
-        // of owner intent (docs/api-reference.md § Pairing, "Local bundle: no code"). The client
-        // passes back the token it remembered from the OS keychain, and resolveDeviceToken reuses it
-        // when it still authenticates, so the steady state is ONE device row rather than one per
-        // launch. The service never persists it — custody belongs to the client.
+        // The local bundle pairs without a code: the client spawned this node, proof enough of owner
+        // intent (docs/authentication.md § Pairing). The client passes back the token it remembered
+        // from the OS keychain, and resolveDeviceToken reuses it while it still authenticates, so the
+        // steady state is one device row per install rather than one per launch. The service never
+        // persists it; custody stays with the client.
         deviceToken: await resolveDeviceToken(runtime.DEVICES, config.deviceToken, 'This computer'),
       },
     }

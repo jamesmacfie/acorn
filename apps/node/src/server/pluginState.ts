@@ -6,31 +6,27 @@ import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/serve
 import type { PluginLoadFailure } from '@acorn/node-core/main/pluginLoader.ts'
 import { nodePluginNames } from './composition'
 
-// The PLUGIN_STATE bridge, built once for both composition roots — the other half of the extraction
-// pluginDeps.ts started. It was written out twice (service/runtime.ts and server/standalone.ts) and had
-// already drifted four ways: which builds allowed `{ path }` installs (a divergence that is gone — a
-// folder is a first-class source on every build now), whether the disabled set was the file alone or the
-// file plus the start config, and which of those two the plugin host was handed. Kept in step by hand,
-// invisible to every test. The differences that are real are options now.
+// The PLUGIN_STATE bridge, built once for both composition roots (docs/node-distribution.md §
+// Plugins). It used to be written out twice, in service/runtime.ts and server/standalone.ts, and the
+// two copies drifted on which build allowed `{ path }` installs and on whether the disabled set was
+// the file alone or the file plus the start config. Building it once here removes that risk.
 export type DisabledPluginsStore = {
   get(): readonly string[]
   set(names: readonly string[]): void
 }
 
-// The file is the owner's setting; the start config is a test/`dev:node` override. Both are honoured,
-// and both have to be visible to the route, or it reports a state a restart cannot reach: a plugin
-// disabled at start showed as enabled-but-not-running with a Restart banner nothing could clear. The
-// Electron root had that fix and the standalone one did not, because the fix landed in one copy of a
-// paste. The union lives here now, so a root that grows an override gets it for free.
+// The file is the owner's setting; the start config is a test/`dev:node` override
+// (docs/node-distribution.md § Plugins). Both have to stay visible to the route: a plugin disabled
+// only in the start config used to show as enabled but not running, with a Restart banner nothing
+// could clear.
 export const effectiveDisabled =
   (store: DisabledPluginsStore, extra: readonly string[] = []): (() => string[]) =>
   () => [...new Set([...store.get(), ...extra])]
 
 export type PluginStateInput = {
   dataDir: string
-  // What the plugin host assembled in THIS process, and at which versions. Snapshots rather than
-  // thunks would be wrong for the roster (a plugin's state can move), so both are passed as closures
-  // the roots already hold.
+  // What the plugin host assembled in this process, and at which versions. The roster needs
+  // closures, not snapshots, because a plugin's state can move after the roots capture it.
   roster(): readonly PluginRosterEntry[]
   booted(): readonly { id: string; version: string }[]
   // What the loader refused at this boot, and why. A closure over the graph both roots already hold; a
@@ -46,19 +42,19 @@ export type PluginStateInput = {
 
 export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
   const { dataDir } = input
-  // Built here rather than in each root, so the two cannot drift the way install/uninstall once did. The
-  // built-in names come from the BUILD (composition.ts), not from the assembled graph: they are only used
-  // to warn when a disk package shadows a compiled one.
+  // Built here, not in each root, so the two cannot drift the way install/uninstall once did. The
+  // built-in names come from the build (composition.ts), not the assembled graph: they only warn when
+  // a disk package shadows a compiled one.
   const reloader = createPluginReloader({ dataDir, builtins: nodePluginNames(), host: input.reloadHost })
   return {
     roster: input.roster,
     // Re-scanned per call, not the boot snapshot: an install has to show up in the roster before the
     // restart that runs it, and the device fetches its bundle from that same row to ask about it.
     installed: () => scanInstalled(dataDir).installed.map(installedPluginInfo),
-    // What this process loaded, which is how the roster tells "installed and running" from
-    // "installed since the last restart". A reloaded plugin's version lands AFTER the boot snapshot on
-    // purpose: the consumer builds a Map from this list, so the later entry wins and a plugin swapped in
-    // place stops claiming a restart is pending for code that is already live.
+    // What this process loaded, which lets the roster tell "installed and running" from "installed
+    // since the last restart". A reloaded plugin's version lands after the boot snapshot in this
+    // list: the consumer builds a map from it, so the later entry wins and a plugin swapped in place
+    // stops claiming a restart is pending for code that is already live.
     booted: () => [...input.booted(), ...reloader.reloaded()],
     loadFailures: input.loadFailures,
     clientBundle: (id) => readClientBundle(scanInstalled(dataDir).installed, id),
