@@ -1,17 +1,17 @@
 import { Registry } from './registry'
 
-// A number a plugin can put on a Fleet home node card (docs/ui-design.md § New surfaces).
+// A number a plugin can put on a Fleet home node card (docs/frontend.md § Registries and plugins).
 //
-// Core supplies the task count, since `tasks` is core's table. Everything else on the card belongs to a
-// plugin: "agents running" is the agents plugin's, "workflow runs" is workflows'. Fleet home lives in
-// client-core and can't import either, and a card that hardcoded two plugin numbers would break the
-// moment one was disabled on that node.
+// Core supplies the task count, since `tasks` is core's table. Everything else on the card belongs to
+// a plugin: "agents running" is the agents plugin's, "workflow runs" is workflows'. Fleet home lives
+// in client-core and can't import either, and a card that hardcoded two plugin numbers would break
+// the moment one was disabled on that node.
 //
 // Not merged with the attention registry, even though both fetch per node. An attention item is a
 // navigable row with a severity and a target; a stat is one integer with a label.
 export type NodeStatContribution = {
   id: string
-  // Card order, declared — same rule as every other registry here.
+  // Card order, declared, same rule as every other registry here.
   order: number
   // Singular and plural, so the card reads "1 agent running" rather than "1 agents running".
   label: [one: string, many: string]

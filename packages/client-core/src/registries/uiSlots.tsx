@@ -4,8 +4,8 @@ import { hasClientCapability } from '../capabilities'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
 import { taskSlotRegistry, uiSlotRegistry, type TaskSlotId, type UiSlotContext, type UiSlotId } from './slots'
 
-// The two slot HOSTS. The registries and their contribution types live in ./slots.ts, JSX-free, and are
-// re-exported here so `registries/uiSlots.tsx` stays the one import path callers already use.
+// The two slot hosts. The registries and their contribution types live in ./slots.ts, JSX-free, and
+// are re-exported here so `registries/uiSlots.tsx` stays the one import path callers already use.
 export {
   taskSlotRegistry,
   uiSlotRegistry,

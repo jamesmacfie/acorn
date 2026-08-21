@@ -6,17 +6,16 @@ import { onScopeEvicted } from './scopeEviction'
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
   | { kind: 'editor:reveal'; path: string; line: number; column?: number }
-  // Show the editor pane's find-in-files panel and focus its box. Find-in-files stopped being its own
-  // pane (docs/panes.md), so the palette row and ⌘⇧F that used to open that pane now open this one with
-  // an intent — and it has to be an intent for the same reason `editor:reveal` is: the pane may not be
-  // mounted yet, and the request has to survive until it is.
+  // Show the editor pane's find-in-files panel and focus its box (docs/panes.md § Contributions
+  // covers the fold into the editor pane). It has to be an intent for the same reason `editor:reveal`
+  // is: the pane may not be mounted yet, and the request has to survive until it is.
   | { kind: 'editor:search' }
   | { kind: 'integration:show-ref'; ref: ExternalRef }
   | { kind: 'context:reveal'; sectionId: string; itemId?: string } // → pane 'context'
   // A row a plugin's declarative rail source was selected on, carried to that plugin's own pane
-  // (docs/plugins.md). It reuses this mechanism
-  // rather than inventing one because the problem is identical: the pane may not be mounted yet, and
-  // the intent has to survive until it is.
+  // (docs/plugins.md § "Loaded plugins: the client half"). It reuses this mechanism rather than
+  // inventing one because the problem is identical: the pane may not be mounted yet, and the intent
+  // has to survive until it is.
   | { kind: 'plugin:select'; item: string }
 
 export type ClientEventMap = {
@@ -25,28 +24,29 @@ export type ClientEventMap = {
   'presentation:terminal-focus': { taskId: string; sessionId: string }
   'presentation:file-scroll': { routeKey: string; path: string }
   // Deep-link into a settings page from a pane. The shell owns the modal, and a pane cannot reach the
-  // UiSlotContext's `openSettings` — so the request is an event rather than a prop threaded through
+  // UiSlotContext's `openSettings`, so the request is an event rather than a prop threaded through
   // every pane that might ever need one.
   'presentation:open-settings': { tab: string }
   // A surface-scoped plugin command, on its way to the frame region of a composed pane
-  // (docs/third-party/monaco.md § Communication between regions). NOT retained like a pane intent, and the
-  // difference is the point: an intent describes a destination the reader is being taken to, so it waits
-  // for the pane to exist, whereas this is a verb fired at a frame that is already on screen. Replaying
-  // "run the query" into a pane that opens ten minutes later would be a surprise, not a fix.
+  // (docs/third-party/monaco.md § Communication between regions). Not retained like a pane intent:
+  // an intent describes a destination the reader is being taken to, so it waits for the pane to
+  // exist, whereas this is a verb fired at a frame that is already on screen. Replaying "run the
+  // query" into a pane that opens ten minutes later would be a surprise, not a fix.
   'plugin:surface-action': { pluginId: string; surface: string; command: string }
   'runtime:task-archived': { taskId: string }
   'runtime:workspace-removed': { workspaceId: string }
-  // A node left the fleet (unpaired or revoked). Emitted by the renderer AFTER main confirms the
+  // A node left the fleet (unpaired or revoked). Emitted by the renderer after main confirms the
   // removal, because main is the authority on membership.
   'runtime:node-removed': { nodeId: string }
-  // The active node changed. Emitted by `setActiveNode` BEFORE the QueryClient provider swaps, so a
+  // The active node changed. Emitted by `setActiveNode` before the QueryClient provider swaps, so a
   // listener clearing module state runs while the outgoing node's components are still mounted rather
   // than after the incoming node has rendered against stale data.
   //
-  // It exists because the per-node QueryClient partition covers cached QUERIES only. Feature state that
-  // lives in module-level Solid signals — the managed-agent roster, terminal sessions, the notice feed,
-  // per-workspace view memory — sat outside it, so switching nodes showed node A's agent sessions and
-  // notices under node B, keyed by ids that may collide across nodes by construction.
+  // It exists because the per-node QueryClient partition covers cached queries only. Feature state
+  // that lives in module-level Solid signals, such as the managed-agent roster, terminal sessions, the
+  // notice feed, and per-workspace view memory, sat outside it, so switching nodes showed node A's
+  // agent sessions and notices under node B, keyed by ids that may collide across nodes by
+  // construction.
   'runtime:node-switched': { from: string | null; to: string | null }
 }
 

@@ -81,7 +81,20 @@ whatever the reader was already looking at, and it is dismissed rather than clos
 one keyed by the provider whose items it renders and may only name its own provider
 (`client-core/registries/refPanels.ts`); the shell holds which ref is open and draws it in exactly one
 place, so *any* surface that renders content can call `openRefPanel({ providerId, displayId })` and get
-*any* installed provider's panel. One at a time: opening a second replaces the first.
+*any* installed provider's panel. One at a time: opening a second replaces the first. `openRefPanel`
+refuses and returns `false` rather than opening the panel when the named provider has no registered
+contribution: a claim can arrive from a plugin-supplied recognizer or from another plugin naming a
+provider it does not own, and opening anyway would leave the shell showing an empty overlay with no
+dismiss affordance. A refusal is not a dead end; the caller's next rung, such as the real browser URL,
+is still there.
+
+Any reference panel can offer a "find or create a task for this" action through one shared,
+host-drawn component (`client-core/registries/RefPanelTaskLink.tsx`), instead of each panel drawing
+its own. Creating a task is a core write that makes a worktree on disk and needs `core.tasks:write`;
+a plugin drawing this button itself would have to hold that permission for everything it ever does,
+just to earn one click. The host draws the button and does the write instead, and the same component
+works whether the host wraps the panel (a loaded plugin's `refPanel` frame) or the panel draws its own
+chrome (a first-party panel), so the logic lives in one place rather than two that can drift.
 
 The pair matters because a content link has both destinations available and they answer different
 questions. The pane is "show me this provider's items for this task" — richer, and it costs the reader the
@@ -98,6 +111,14 @@ palette rows, commands/keybindings, agent-tool renderers, and persisted state th
 
 Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.
+
+A pane contribution has no `freshness` hook of its own. A pane's query status can only be read
+reactively, so a `freshness(task)` field returning a plain value would render a badge that never
+updates after the first read; making it reactive would mean either a query subscription per pane
+inside the host's render loop, or every pane publishing a signal it does not otherwise need. What the
+host renders instead is the Node's own connection state, which is already reactive and is the
+live/refreshing/stale/offline/error vocabulary `docs/ui-design.md` § States describes. A pane that
+wants to say more about its own data draws it in its own header, where the query is already in scope.
 
 Find-in-files is backed by a ripgrep subprocess, not an editor feature, and that is not a stopgap:
 Monaco is an editor component with no filesystem or process access, so it provides find-within-a-file

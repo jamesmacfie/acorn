@@ -14,18 +14,9 @@ import {
 
 // The exclusive-slot arbitration (docs/plugins.md § Replacing a core surface).
 //
-// The two claims worth pinning are the ones a rendering test could never make anyway, and the ones that
-// would go wrong quietly:
-//
-//   REGISTERING SEIZES NOTHING. An offer with no choice behind it does not replace anything, however
-//   many packages make one. If this ever inverted, installing a plugin would silently take away the list
-//   of somebody's own work — and it would look like a feature.
-//   CORE IS THE FALLBACK IN THE STRONG SENSE. Not "when nothing is set" but "whenever anything at all is
-//   off": nobody chosen, the chosen plugin absent, disabled, or its surface having thrown.
-//
-// The component is never rendered here. This repo's vitest runs in bare Node with no Solid transform, so
-// the arbitration was deliberately written as a plain function over a registry precisely so that it CAN
-// be tested; what the chosen provider draws cannot be, and is not claimed to be.
+// The component is never rendered here: this repo's vitest runs in bare Node with no Solid transform
+// (docs/frontend.md § Registries and plugins), so the arbitration is a plain function over a
+// registry, which can be tested; what the chosen provider draws cannot be, and is not claimed to be.
 
 const NOTHING = (() => null) as unknown as Component
 
@@ -88,7 +79,7 @@ describe('resolveExclusiveSlot', () => {
     noteExclusiveSlotFailure('rail.taskList', 'board')
     expect(exclusiveSlotFailed('rail.taskList', 'board')).toBe(true)
     expect(resolveExclusiveSlot('rail.taskList', 'board')).toBeNull()
-    // Still an offer — Settings has to keep showing it, or the owner cannot tell why their choice is
+    // Still an offer. Settings has to keep showing it, or the owner cannot tell why their choice is
     // not in effect.
     expect(exclusiveSlotOffers('rail.taskList').map((entry) => entry.pluginId)).toEqual(['board'])
     // A contribution sync is the one moment the bytes can have changed, so it is the one moment the
@@ -103,14 +94,14 @@ describe('the stored arbitration', () => {
   it('round-trips a choice and forgets it again', () => {
     const stored = withExclusiveSlotChoice(undefined, 'rail.taskList', 'board')
     expect(exclusiveSlotChoices(stored)).toEqual({ 'rail.taskList': 'board' })
-    // Choosing core REMOVES the entry rather than storing a sentinel, so the preference holds only the
-    // replacements the owner actually asked for.
+    // Choosing core removes the entry rather than storing a sentinel, so the preference holds only
+    // the replacements the owner actually asked for.
     expect(exclusiveSlotChoices(withExclusiveSlotChoice(stored, 'rail.taskList', CORE_SLOT_PROVIDER))).toEqual({})
   })
 
   it('reads a malformed preference as core rather than throwing', () => {
-    // A bad preference must not be able to take somebody's task list away, and must not be able to crash
-    // the rail either — this value is read on every render of the shell's left edge.
+    // A bad preference must not be able to take somebody's task list away, and must not be able to
+    // crash the rail either. This value is read on every render of the shell's left edge.
     for (const raw of ['', 'not json', '[]', 'null', '"board"', '{"rail.taskList": 3}', '{"rail.taskList": ""}']) {
       expect(exclusiveSlotChoices(raw)).toEqual({})
     }

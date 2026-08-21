@@ -6,12 +6,12 @@ import { sourceRegistry, type SourceContribution } from './sources'
 import { integrationFlowRegistry } from './integrationFlows'
 import { uiSlotRegistry } from './slots'
 
-// The client half of packages/node-core/src/server/plugin/host.test.ts. What it can and cannot prove is
-// worth stating: registration itself is verified end to end by the e2e suite (S1 asserts the rail's four
-// Source labels in order, S3 the nine pane labels a local task offers), because vitest here runs in a
-// bare Node environment with no Solid transform and the plugin entrypoints import .tsx components. What
-// vitest CAN reach is the host's rules — declaration order, ownership, duplicate names, enable/disable,
-// and re-activation — and those are exactly what the e2e cannot isolate.
+// The client half of packages/node-core/src/server/plugin/host.test.ts. Registration itself is
+// verified end to end by the e2e suite (S1 asserts the rail's four Source labels in order, S3 the
+// nine pane labels a local task offers), because vitest here runs in a bare Node environment with no
+// Solid transform and the plugin entrypoints import .tsx components. What vitest can reach is the
+// host's rules: declaration order, ownership, duplicate names, enable/disable, and re-activation, and
+// those are exactly what the e2e suite cannot isolate.
 
 const pane = (id: string, extra: Partial<PaneContribution> = {}): PaneContribution => ({
   id, label: id, glyph: 'x', order: 1, component: () => null, ...extra,
@@ -31,7 +31,7 @@ const source = (id: string, extra: Partial<SourceContribution<never>> = {}): Sou
 })
 
 // Registries are module singletons, so every test cleans up after itself by re-activating its plugins
-// with an init that registers nothing — which is the host's own removal path, exercised for free.
+// with an init that registers nothing, which is the host's own removal path, exercised for free.
 const clear = (...names: string[]) =>
   initClientPlugins(names.map((name) => ({ name, init: () => {} })))
 
@@ -48,17 +48,17 @@ describe('the client plugin host', () => {
     clear('first', 'second')
   })
 
-  // `activate` is the phase two plugins needed and did not have: plugins/http enumerated `localStorage`
-  // and plugins/agents issued a `fetch`, both inside a synchronous `init` that documents itself as
-  // registration-only. Three properties make it useful rather than decorative.
+  // `activate` is the phase two plugins needed and did not have (docs/plugins.md § "Frame authoring
+  // and the UI kit"): plugins/http enumerated `localStorage` and plugins/agents issued a `fetch`,
+  // both inside a synchronous `init` that documents itself as registration-only.
   it('runs activate after EVERY init, in declaration order, and never for a disabled plugin', () => {
     const log: string[] = []
     const plugins: ClientPlugin[] = [
       {
         name: 'first',
         init: () => log.push('init:first'),
-        // The whole reason for a second pass: by here every enabled plugin has registered, so this can
-        // see a sibling's descriptor. Inside `init` the registry would still be half empty.
+        // The whole reason for a second pass: by here every enabled plugin has registered, so this
+        // can see a sibling's descriptor. Inside `init` the registry would still be half empty.
         activate: () => log.push(`activate:first(${paneRegistry.get('host.late') ? 'sees-late' : 'blind'})`),
       },
       { name: 'second', init: (ctx) => { log.push('init:second'); ctx.panes.register(pane('host.late')) } },
@@ -78,7 +78,7 @@ describe('the client plugin host', () => {
     expect(() => initClientPlugins([
       { name: 'linear', init: (ctx) => ctx.panes.register(pane('host.impostor', { providerId: 'rollbar' })) },
     ])).toThrow(/registered 'host.impostor' under provider 'rollbar'/)
-    // And the plugin's OWN provider id is accepted, so the rule is not simply rejecting providerId.
+    // And the plugin's own provider id is accepted, so the rule is not simply rejecting providerId.
     initClientPlugins([
       { name: 'linear', init: (ctx) => ctx.panes.register(pane('host.own', { providerId: 'linear' })) },
     ])
@@ -107,8 +107,8 @@ describe('the client plugin host', () => {
       },
     }]
     initClientPlugins(plugins)
-    // Without the host taking its previous contributions back, this second call throws
-    // "pane contribution already registered" and takes the whole shell down on the first pane.
+    // Without the host taking its previous contributions back, this second call throws "pane
+    // contribution already registered" and takes the whole shell down on the first pane.
     expect(() => initClientPlugins(plugins)).not.toThrow()
     expect(paneRegistry.entries().filter((entry) => entry.id === 'host.again')).toHaveLength(1)
     expect(uiSlotRegistry.entries().filter((entry) => entry.id === 'host.again.slot')).toHaveLength(1)
@@ -132,7 +132,8 @@ describe('the client plugin host', () => {
     ]
     initClientPlugins(plugins)
     expect(plugin.get('host.owned')).toBeDefined()
-    // Re-activation replaces rather than appending — a second bare `register` would throw on the duplicate id.
+    // Re-activation replaces rather than appending: a second bare `register` would throw on the
+    // duplicate id.
     expect(() => initClientPlugins(plugins)).not.toThrow()
     expect(plugin.entries()).toHaveLength(1)
     initClientPlugins(plugins, { disabled: ['publisher'] })

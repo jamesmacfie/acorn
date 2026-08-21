@@ -1,9 +1,10 @@
-// `.ts`, not `.tsx`, and that is load-bearing. @acorn/plugin-api/client reaches this file through
+// `.ts`, not `.tsx`, and that is load-bearing. `@acorn/plugin-api/client` reaches this file through
 // palette/overlay.ts, and a plugin's node-environment test suite has to be able to import that
-// barrel — Solid compiles JSX to code that touches `window` at module scope. KeybindingDispatcher
-// below is a component that returns null and needs no JSX, so nothing here costs an extension.
-// If this file ever needs markup, the markup moves to its own .tsx module rather than the extension
-// changing; packages/plugin-api/src/entrypoints.test.ts is what fails if it does not.
+// barrel, since Solid compiles JSX to code that touches `window` at module scope.
+// `KeybindingDispatcher` below is a component that returns null and needs no JSX, so nothing here
+// costs an extension. If this file ever needs markup, the markup moves to its own `.tsx` module
+// rather than the extension changing; `packages/plugin-api/src/entrypoints.test.ts` is what fails if
+// it does not.
 import { createMemo, onCleanup, onMount } from 'solid-js'
 import { isTerminalTarget, isTypingTarget } from '../lib/isTypingTarget'
 import { eventChord } from '../tasks/paneShortcuts'

@@ -16,16 +16,18 @@ describe('paletteRowSources', () => {
   const add = (id: string, order: number) => void disposables.push(paletteRowRegistry.register(source(id, order)))
 
   it('sorts by declared order, not registration order', () => {
-    // Registered in the WRONG order on purpose: 20 first, then 10. Terminal's run/layout rows are order 10 and
-    // workflows' are 20, and the palette shows run → layout → workflow, so this is the user-visible sequence.
+    // Registered out of declared order: 20 first, then 10. Terminal's run/layout rows are
+    // order 10 and workflows' are 20, and the palette shows run, then layout, then workflow, so this
+    // is the user-visible sequence.
     add('workflows.defs', 20)
     add('terminal.run', 10)
     expect(paletteRowSources().map((s) => s.id)).toEqual(['terminal.run', 'workflows.defs'])
   })
 
   it('does not mutate the registry list while sorting it', () => {
-    // `.slice()` before `.sort()` — without it the sort reorders the registry's own array in place, so a
-    // registration made afterwards would land in a list already shuffled by a previous palette open.
+    // `.slice()` before `.sort()`. Without it, the sort reorders the registry's own array in place, so
+    // a registration made afterwards would land in a list already shuffled by a previous palette
+    // open.
     add('b', 2)
     add('a', 1)
     paletteRowSources()

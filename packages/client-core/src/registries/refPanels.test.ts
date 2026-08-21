@@ -1,18 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { activeRefPanel, closeRefPanel, openRefPanel, refPanelRegistry } from './refPanels'
 
-// The single-slot shell state, and the one function allowed to write it.
+// The single-slot shell state, and the one function allowed to write it (docs/panes.md § Not a pane:
+// the reference panel).
 //
-// `setOpenRef` is deliberately not exported: a panel with no subject has a dismiss button and nothing
-// else, so "can this be shown at all" is a decision rather than a setter. The suite pins the refusals
-// because they are what a content-link recogniser — plugin-supplied code returning an open record — is
-// checked against.
+// `setOpenRef` is not exported: a panel with no subject has a dismiss button and nothing else, so
+// "can this be shown at all" is a decision rather than a setter. The suite pins the refusals because
+// they are what a content-link recogniser, plugin-supplied code returning an open record, is checked
+// against.
 //
-// What this suite CANNOT reach is the other half of the same failure: the props the host hands the
-// panel component. That is JSX, client-core's vitest config has no Solid transform on purpose, and the
-// defect that produced a blank panel in the app lived precisely there — a props member named `ref`,
-// which Solid compiles into a setter. tools/arch/boundaries.test.ts holds that line instead, and the
-// two together are the whole invariant.
+// What this suite cannot reach is the other half of the same failure: the props the host hands the
+// panel component. That is JSX, this package's vitest config has no Solid transform
+// (docs/frontend.md § Registries and plugins), and the defect that produced a blank panel in the app
+// lived precisely there, a props member named `ref`, which Solid compiles into a setter.
+// `tools/arch/boundaries.test.ts` holds that line instead, and the two together are the whole
+// invariant.
 
 afterEach(closeRefPanel)
 
@@ -50,9 +52,9 @@ describe('openRefPanel', () => {
   })
 
   it('refuses a panel whose plugin is stopped on the node being looked at', () => {
-    // Registered is not available. Without the `when` gate this returned true, the shell put the target
-    // in its one slot, and `RefPanelHost` re-resolved to nothing — a claimed click and an empty overlay.
-    // Degrading at render was never the same as declining, because declining is what lets
+    // Registered is not available. Without the `when` gate this returned true, the shell put the
+    // target in its one slot, and `RefPanelHost` re-resolved to nothing, a claimed click and an empty
+    // overlay. Degrading at render was never the same as declining, because declining is what lets
     // `openContentTarget` try the pane rung or the real URL.
     let running = false
     const panel = refPanelRegistry.register({ id: 'board-ref', providerId: 'board', when: () => running, component: () => null })

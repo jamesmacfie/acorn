@@ -1,10 +1,7 @@
-// The two slot registries and their contribution types, split out of uiSlots.tsx, which re-exports every
-// name below so existing imports keep working.
-//
-// The split exists because uiSlots.tsx contains JSX (the two host components) and this repo's vitest
-// configs run in a bare Node environment with no Solid transform, so a module that reaches a JSX file
-// can't be imported by a test at all. Keeping the registries JSX-free is what lets registries/plugin.ts
-// have a unit test.
+// The two slot registries and their contribution types, split out of uiSlots.tsx, which re-exports
+// every name below so existing imports keep working. This module holds no JSX import
+// (docs/frontend.md § Registries and plugins), which is what lets registries/plugin.ts have a unit
+// test.
 import type { Component } from 'solid-js'
 import type { ClientCapabilityRequirement } from '../capabilities'
 import type { Task } from '../queries'

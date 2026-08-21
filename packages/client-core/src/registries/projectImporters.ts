@@ -11,7 +11,8 @@ export type ProjectImporterProps = {
    */
   onImported: (projectIds?: readonly string[]) => void
   /**
-   * Whether the importer draws its own close control. False where the host already owns the way out —
+  /**
+   * Whether the importer draws its own close control. False where the host already owns the way out:
    * the first-run wizard has a back button in its footer, and two of them read as a mistake.
    */
   showClose?: boolean
