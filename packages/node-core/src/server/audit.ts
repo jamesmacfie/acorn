@@ -6,8 +6,8 @@ import { schema } from './db'
 // The audit trail's write side (docs/security.md § Audit, docs/data-layer.md § Core DB).
 //
 // security.md names five classes of action, and this is the closed set that implements them. A closed
-// union rather than free-form strings because the settings surface groups and filters on it, and an
-// action nobody can enumerate is one nobody reviews — the same argument as the error-code set in
+// union rather than free-form strings, because the settings surface groups and filters on it, and an
+// action nobody can enumerate is one nobody reviews. Same argument as the error-code set in
 // docs/api-reference.md § Errors.
 export type AuditAction =
   // Pairing and devices. The window open/close pair matters as much as the grant: a pairing window is
@@ -16,8 +16,8 @@ export type AuditAction =
   | 'pairing.window.closed'
   | 'device.paired'
   | 'device.revoked'
-  // Credentials, write side only. security.md § Audit also lists secret *use*, and it is deliberately
-  // absent — see the note at the bottom of this file.
+  // Credentials, write side only. `secret.used` is not recorded (docs/security.md § Audit explains
+  // why).
   | 'secret.created'
   | 'secret.replaced'
   | 'secret.deleted'
@@ -54,12 +54,11 @@ export type AuditEntry = AuditActor & {
 
 export const AUDIT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 
-// Fire-and-forget by design, and the `void` at each call site is the point rather than an oversight.
-//
-// A failed audit write must not fail the action it describes. Refusing to revoke a stolen device
-// because a logging insert threw would be strictly worse for the owner than a missing row — the row is
-// evidence, and the revoke is the thing that protects them. Same reasoning as `lastSeenAt` in
-// auth/deviceTokens.ts, which is best-effort for the same reason.
+// Fire-and-forget, and the `void` at each call site matters: a failed audit write must not fail the
+// action it describes. Refusing to revoke a stolen device because a logging insert threw would be
+// strictly worse for the owner than a missing row. The row is evidence, and the revoke is the thing
+// that protects them. Same reasoning as `lastSeenAt` in auth/deviceTokens.ts, which is best-effort
+// for the same reason.
 export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
   void (async () => {
     try {
@@ -78,29 +77,8 @@ export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
   })()
 }
 
-// ## Why `secret.used` is not here, though security.md § Audit lists it
-//
-// Every credential read goes through `SecretService.use` (main/core/secrets.ts), whose whole design is
-// that the encryption key has exactly one holder: it is constructed from a hex key and nothing else —
-// no database, no request, no connection id. Its `ref` argument is the CIPHERTEXT, so a row written
-// from there could only name the credential by a hash of it.
-//
-// Recording every read would also turn this table into a request log — a mirror refresh reads the
-// GitHub token on a timer — and bury the handful of decisions an owner actually reviews. Recording a
-// deduplicated first-use-per-process would avoid the flood but answer a much weaker question ("something
-// read a credential at some point this run") for a real cost: threading a database and a connection id
-// into the one class deliberately built to hold neither.
-//
-// The nearest cheap alternative was auditing `githubToken(c)`, the single read site for that one
-// provider. Rejected because partial coverage recorded as if it were complete is worse than none: an
-// owner reading a trail that names only GitHub would reasonably conclude nothing else spends a
-// credential. Recorded as a deliberate divergence rather than silently skipped.
-
-// 90-day retention (docs/data-layer.md § Retention defaults). Now a core-declared schedule
-// (server/schedules/index.ts) rather than a boot-time call: the old argument was that a node nobody
-// restarts is also one nobody accumulates a backlog on, which had it backwards — a node left running
-// for a month pruned nothing at all. Returns the number of rows it removed, which is the one line the
-// run row carries.
+// 90-day retention (docs/schedules.md § What is registered today, `core:audit-prune`). Returns the
+// number of rows it removed, which is the one line the run row carries.
 export async function pruneAudit(db: AppDatabase, now: number = Date.now()): Promise<number> {
   const result = await db.delete(schema.audit).where(lt(schema.audit.at, now - AUDIT_RETENTION_MS))
   return Number(result.changes ?? 0)
@@ -117,7 +95,7 @@ export type AuditRow = {
 }
 
 // The read side: most recent first, one page at a time. `before` is a timestamp cursor rather than an
-// offset because rows are only ever appended and pruned from the far end — an offset would skip or
+// offset, because rows are only ever appended and pruned from the far end. An offset would skip or
 // repeat rows as the prune runs underneath a paging reader.
 export async function readAudit(db: AppDatabase, options: { before?: number; limit?: number } = {}): Promise<AuditRow[]> {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 500)

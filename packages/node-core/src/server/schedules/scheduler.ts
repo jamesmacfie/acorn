@@ -16,13 +16,12 @@ import { BridgeError } from '../bridge'
 import { type AppDatabase, schema } from '../db'
 import { nextRunAt } from './cadence'
 
-// The node's one scheduler. See docs/schedules.md for the cadence, consent and catch-up rules.
-// A schedule is a promise to run when nobody is looking, so it lives in the long-lived process, never in
-// a client, which closes, hides and sleeps.
+// The node's one scheduler (docs/schedules.md § Why the node, and only the node, for the cadence,
+// consent and catch-up rules).
 //
-// Everything below is one class on purpose: the registry, the store and the loop are the same fact, what
-// runs next and what happened last time, and splitting them would mean three files passing the same
-// three tables between each other. The pure arithmetic that can be separated already is (./cadence.ts).
+// One class: the registry, the store and the loop are the same fact, what runs next and what
+// happened last time, and splitting them would mean three files passing the same three tables
+// between each other. The pure arithmetic that can be separated already is (./cadence.ts).
 
 /** What a runner is handed and what it gives back: an abort signal it is expected to honour, and one line
  *  for the run row. The same signal shape collection fetches already take. */
@@ -42,8 +41,9 @@ export type DeclaredSchedule = {
   run: ScheduleRunner
 }
 
-/** What a user schedule may do. Phase 1 registers none, which is why an unknown kind has to render inert
- *  rather than fail: the row is created by a later version of this node and read by this one. */
+/** What a user schedule may do. The vocabulary is closed; an unknown kind renders inert rather than
+ *  failing, since the row may have been created by a later version of this node and read by an
+ *  earlier one (docs/schedules.md § Targets). */
 export type ScheduleTarget = {
   kind: string
   /** The tier stamped onto the row at creation, the consent record, taken once, over the parsed target. A
@@ -173,8 +173,8 @@ export class Scheduler {
     }
   }
 
-  /** Register what a user schedule of `kind` actually does. Phase 3 fills this; until then every user row
-   *  is inert and says so. */
+  /** Register what a user schedule of `kind` actually does: one `parse`/`risk`/`run` set per kind
+   *  name. A kind with nothing registered for it renders inert (docs/schedules.md § Targets). */
   registerTarget(target: ScheduleTarget): { dispose(): void } {
     if (this.#targets.has(target.kind)) throw new Error(`Schedule target already registered: ${target.kind}`)
     this.#targets.set(target.kind, target)
@@ -232,9 +232,7 @@ export class Scheduler {
     }))
   }
 
-  /** Create a user schedule. The one non-tolerant edge in this module: a create names a target that must
-   *  resolve now, and the risk tier is read off that target and stamped onto the row here. That stamp is
-   *  the consent record. 3am cannot answer a confirmation strip, so consent is taken once, at creation. */
+  /** Create a user schedule (docs/schedules.md § Routes): the one non-tolerant edge in this module. */
   async create(input: CreateScheduleInput): Promise<ScheduleRow> {
     const target = this.#targets.get(input.kind)
     if (!target) throw new BridgeError(400, 'bad_request', `This node has nothing that can run a '${input.kind}' schedule.`)
@@ -279,12 +277,9 @@ export class Scheduler {
     return this.#row(key)
   }
 
-  /** Re-take consent for a user schedule whose target now declares a higher tier, by re-stamping the row
-   *  from the registry's current answer.
-   *
-   *  Deliberately takes no tier from the caller. The client's part is to show what the host says and relay
-   *  that the owner accepted it; letting it post a tier would make the confirmation something a client
-   *  could quietly widen, which is the one property the arming rule exists to prevent. */
+  /** Re-take consent for a user schedule whose target now declares a higher tier, by re-stamping the
+   *  row from the registry's current answer. Takes no tier from the caller (docs/schedules.md
+   *  § Routes, `confirm`). */
   async confirm(key: string): Promise<ScheduleRow> {
     if (keyOwner(key).owner !== 'user') throw new BridgeError(409, 'conflict', 'Only a schedule you created carries a consent stamp.')
     const row = (await this.#db.select().from(schema.userSchedules).where(eq(schema.userSchedules.id, key.slice(5))))[0]
@@ -321,8 +316,6 @@ export class Scheduler {
     return (await this.runs(key))[0]!
   }
 
-  // ── the loop ────────────────────────────────────────────────────────────────────────────────────
-  //
   // ── The loop ────────────────────────────────────────────────────────────────────────────────────
   //
   // One timer, armed for the earliest nextRunAt and re-armed after every run and every mutation. Not one

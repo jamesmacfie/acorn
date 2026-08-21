@@ -17,15 +17,15 @@ describe('secret box', () => {
 
   it('returns null for a tampered ciphertext (AEAD tag mismatch)', async () => {
     const sealed = await encryptSecret('s', KEY)
-    // The tamper has to be guaranteed to change a DECODED byte, and the obvious spellings do not.
+    // The tamper has to be guaranteed to change a decoded byte, and the obvious spellings do not.
     // Overwriting the last two characters with a fixed `xy` collides with the original roughly once in
-    // 4096 seals (base64url has 64 symbols), which is a red suite with no bug behind it — seen in the
-    // wild and mistaken for the suite's load sensitivity. Flipping the final character is worse: the tag
-    // is 16 bytes, so its base64url tail is 22 characters carrying 132 bits, and the last character's low
-    // four bits are padding a lenient decoder discards. So tamper the first character of the ciphertext
-    // segment, where every bit is significant.
+    // 4096 seals (base64url has 64 symbols), which is a red suite with no bug behind it. That has been
+    // seen in the wild and mistaken for the suite's load sensitivity. Flipping the final character is
+    // worse: the tag is 16 bytes, so its base64url tail is 22 characters carrying 132 bits, and the
+    // last character's low four bits are padding a lenient decoder discards. So tamper the first
+    // character of the ciphertext segment, where every bit is significant.
     const parts = sealed.split('.')
-    expect(parts).toHaveLength(5) // header.key.iv.ciphertext.tag — compact JWE
+    expect(parts).toHaveLength(5) // header.key.iv.ciphertext.tag, compact JWE
     parts[3] = `${parts[3][0] === 'A' ? 'B' : 'A'}${parts[3].slice(1)}`
     const tampered = parts.join('.')
     expect(tampered).not.toBe(sealed)

@@ -1,7 +1,7 @@
-// Serve-then-revalidate helpers: routes answer from the local mirror and kick the refresh off
-// here, fire-and-forget, in the long-lived Node process. Failures are logged, never surfaced —
-// the stale response already went out. The set exists so tests can await completion via
-// settleBackground(); production never awaits.
+// Serve-then-revalidate helpers (docs/caching.md § Provider mirrors): routes answer from the local
+// mirror and kick the refresh off here, fire-and-forget, in the long-lived Node process. Failures are
+// logged, never surfaced, since the stale response already went out. The set exists so tests can
+// await completion via settleBackground(); production never awaits.
 const background = new Set<Promise<unknown>>()
 
 export const trackBackgroundRefresh = (label: string, promise: Promise<unknown>) => {
