@@ -25,7 +25,7 @@ import { registerKeybindings } from '../registries/keybindings'
 import { confirmWillEvent } from '../registries/willPhase'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../persistence/prefKeys'
-import { completeTaskArchive } from '../tasks/archiveLifecycle'
+import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
 import { TaskSlotHost } from '../registries/uiSlots'
 import ExclusiveSlotHost from '../plugins/ExclusiveSlotHost'
 import { registerContextMenuItems, type TaskRowTarget } from '../registries/contextMenus'
@@ -299,6 +299,13 @@ export default function TabRail() {
   }
 
   async function archive(w: Task, applyChecks: string[] = []) {
+    if (isArchiving(w.id)) return
+    // Wrapped so the row keeps a spinner for the whole teardown, the same one the task pane's close
+    // button shows (tasks/archiveLifecycle.ts).
+    await withArchiving(w.id, () => archiveInner(w, applyChecks))
+  }
+
+  async function archiveInner(w: Task, applyChecks: string[]) {
     if (capabilities().terminal) {
       // `force`, matching the task pane's own archive. This used to send no options at all, so a
       // task with a dirty worktree came back "uncommitted changes, confirm to discard" after the
@@ -359,6 +366,7 @@ export default function TabRail() {
                 working: workingCountFor(w.id),
                 unread: !!unreadForTask(w.id),
                 status: st(),
+                archiving: isArchiving(w.id),
               })
             // Workspace identity derived onto the row: a 3px accent in the workspace's colour,
             // matching the active-row accent convention.

@@ -20,7 +20,7 @@ import TaskPaneHost from '@acorn/client-core/tasks/TaskPaneHost.tsx'
 import { confirmWillEvent } from '@acorn/client-core/registries/willPhase.tsx'
 import { Alert, Button } from '@acorn/client-core/ui/primitives.tsx'
 import { TaskSlotHost } from '@acorn/client-core/registries/uiSlots.tsx'
-import { completeTaskArchive } from '@acorn/client-core/tasks/archiveLifecycle.ts'
+import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-core/tasks/archiveLifecycle.ts'
 import { defaultSourceId } from '@acorn/client-core/registries/sources.ts'
 import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
 import '@acorn/client-core/tasks/task-view.css'
@@ -169,21 +169,22 @@ export default function TaskView(props: {
   })
 
   // While the guarded teardown runs (it can take seconds: teardown script plus worktree removal),
-  // the pane-switcher's close button shows a spinner so the archive visibly has feedback.
-  const [archiving, setArchiving] = createSignal(false)
+  // this task's close button and its rail row both spin, off the one shared flag in
+  // client-core/tasks/archiveLifecycle.ts.
+  const closing = () => isArchiving(props.task.id)
   // The plugin cleanups this archive is carrying, from the dialog to the request (and to the retry).
   const [pendingChecks, setPendingChecks] = createSignal<string[]>([])
 
   async function confirmClose(skipTeardown = false) {
-    if (archiving()) return
+    if (closing()) return
     const archivedTaskId = props.task.id
     const next = nextTask()
-    // The guarded teardown (stop sessions → teardown script → remove worktree) is served through the
-    // node's TASK_SESSIONS bridge, which the terminal plugin fills; without it the route 503s, so a node
-    // that does not run terminals gets the plain status flip instead.
-    if (hasEngine()) {
-      setArchiving(true)
-      try {
+    // Held to the end, not just around the request: the spinner runs until the row leaves the rail.
+    await withArchiving(archivedTaskId, async () => {
+      // The guarded teardown (stop sessions → teardown script → remove worktree) is served through the
+      // node's TASK_SESSIONS bridge, which the terminal plugin fills; without it the route 503s, so a node
+      // that does not run terminals gets the plain status flip instead.
+      if (hasEngine()) {
         const result = await bridge.task.archive(archivedTaskId, {
           deleteWorktree: true, force: true, skipTeardown, applyChecks: pendingChecks(),
         })
@@ -195,24 +196,22 @@ export default function TaskView(props: {
         // Archived either way (`ok` is true), but the owner ticked something that did not happen.
         if (result.cleanupFailed?.length) console.warn('[tasks] cleanup failed for:', result.cleanupFailed.join(', '))
         setPendingChecks([])
-      } finally {
-        setArchiving(false)
-      }
-    } else {
-      await archiveTask(archivedTaskId)
-    }
-    completeTaskArchive(archivedTaskId, () => {
-      if (next) {
-        activateTaskSignals(next)
-        navigate(pathForTask(next))
       } else {
-        const source = defaultSourceId()
-        if (source) setSelectedSource(source)
-        setActiveTaskId(null)
-        navigate('/')
+        await archiveTask(archivedTaskId)
       }
+      completeTaskArchive(archivedTaskId, () => {
+        if (next) {
+          activateTaskSignals(next)
+          navigate(pathForTask(next))
+        } else {
+          const source = defaultSourceId()
+          if (source) setSelectedSource(source)
+          setActiveTaskId(null)
+          navigate('/')
+        }
+      })
+      await queryClient.invalidateQueries({ queryKey: tasksKey })
     })
-    await queryClient.invalidateQueries({ queryKey: tasksKey })
   }
 
   const extraButtons = () => (
@@ -240,7 +239,7 @@ export default function TaskView(props: {
   return (
     <div class="workspace-wrap">
       <main class="panes panes-workspace task-layout">
-        <TaskPaneHost task={props.task} extraButtons={extraButtons()} onCloseTask={openClose} closing={archiving()} shortcutFor={shortcutFor} />
+        <TaskPaneHost task={props.task} extraButtons={extraButtons()} onCloseTask={openClose} closing={closing()} shortcutFor={shortcutFor} />
 
         <Show when={runError() || closeError()}>
           <Alert

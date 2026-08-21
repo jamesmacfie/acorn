@@ -6,11 +6,11 @@ const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreeP
 
 describe('railStatusItems', () => {
   it('emits nothing when the task is idle and clean', () => {
-    expect(railStatusItems({ checks: null, working: 0, unread: false, status: status({}) })).toEqual([])
+    expect(railStatusItems({ checks: null, working: 0, unread: false, status: status({}), archiving: false })).toEqual([])
   })
 
   it('surfaces each active marker with a glyph or dot and a meaning', () => {
-    const items = railStatusItems({ checks: 'failure', working: 2, unread: true, status: status({ dirty: true, dirtyCount: 3 }) })
+    const items = railStatusItems({ checks: 'failure', working: 2, unread: true, status: status({ dirty: true, dirtyCount: 3 }), archiving: false })
     expect(items.map((i) => i.key)).toEqual(['checks', 'working', 'needs', 'dirty'])
     expect(items.every((i) => i.label && (i.glyph || i.dotTone))).toBe(true)
     expect(items.find((i) => i.key === 'working')?.label).toBe('2 agents working')
@@ -18,7 +18,13 @@ describe('railStatusItems', () => {
   })
 
   it('shows repair, not dirty, when the worktree is missing', () => {
-    const keys = railStatusItems({ checks: null, working: 0, unread: false, status: status({ dirty: true, dirtyCount: 1, missing: true }) }).map((i) => i.key)
+    const keys = railStatusItems({ checks: null, working: 0, unread: false, status: status({ dirty: true, dirtyCount: 1, missing: true }), archiving: false }).map((i) => i.key)
     expect(keys).toEqual(['repair'])
+  })
+
+  it('reports only the teardown while a task is archiving', () => {
+    const items = railStatusItems({ checks: 'failure', working: 2, unread: true, status: status({ dirty: true }), archiving: true })
+    expect(items.map((i) => i.key)).toEqual(['archiving'])
+    expect(items[0]!.overlayCls).toContain('spin')
   })
 })
