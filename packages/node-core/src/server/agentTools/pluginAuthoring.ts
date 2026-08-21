@@ -1,39 +1,9 @@
-// Teaching the agent to write a plugin — the third piece of the dev loop, and the one the mechanics are
-// useless without (docs/plugins.md § The dev loop, docs/plugin-authoring.md).
-//
-// Two doors onto ONE text, built here:
-//
-//   - `plugin_authoring`, a read-tier agent tool. This is the door the agent uses, and it is the reason
-//     the module exists: bb's rule is never answer an API question from a built bundle, and the only way
-//     to keep that promise is for the answer to come from the process that enforces the contract.
-//   - a `plugin-authoring` context section with `defaultIncluded: false`. This is the door a HUMAN uses —
-//     tick it in the composer's context picker and the guide rides along with the send.
-//
-// Why a context section and not an `agentContexts` descriptor: `agentContexts` is a manifest key, so a
-// core-owned entry would mean core pretending to be a plugin, and its contract is an `options` GET plus a
-// `capture` POST on a plugin's OWN namespace — a picker over rows, which this is not. `contextSections`
-// already has exactly the dial this needs, which is `defaultIncluded: false`: a task that is not writing a
-// plugin assembles this section never, pays zero bytes, and does not know it exists. bb pays 1,678 lines
-// on every session because it has no such dial. We do, so the guide costs nothing until it is asked for.
-//
-// Why the vocabulary below is DERIVED and not written: every list here — manifest keys, caps, action
-// verbs, bridge kinds, permission facets — is one an author gets wrong by remembering it. A hand-copied
-// list in an agent-facing guide is worse than no list, because the agent believes it. So each one is read
-// off the thing that enforces it: the zod manifest schema via `z.toJSONSchema`, the bridge wire union via
-// `satisfies` (a new message kind is a COMPILE error here), and the core facet map via its own export.
-//
-// Neither door is a new route, which is why nothing had to be added to the frame allowlist
-// (client-core/plugins/frames/scopes.ts): the agent-tool surfaces are already permanently unmappable
-// there, and the one place this text is reachable from a frame is `GET /v2/core/tasks/:id/context` with
-// an explicit `include=plugin-authoring` — a read of acorn's own published contract, under a scope the
-// owner already granted for reading tasks.
-//
-// What is deliberately NOT here: the `@acorn/plugin-api` export list. A hand-written plugin cannot import
-// that package at all — a bare specifier has nothing to resolve against and the frame origin serves one
-// file — so the names are not vocabulary this profile can use, and a packaged node has no copy of
-// `packages/plugin-api/src/surface.snapshot.txt` to read anyway. The snapshot has its own drift gate
-// (surface.test.ts) and is the answer for a plugin that IS built; what this projection carries about it is
-// the major, which is the field a hand-written manifest actually has to get right.
+// Teaching the agent to write a plugin: the third piece of the dev loop, and the one the mechanics
+// are useless without. Full rationale (the two doors, why a context section and not an
+// `agentContexts` descriptor, why the vocabulary below is derived rather than written, what it
+// deliberately omits, and why neither door needed a frame-allowlist entry):
+// docs/agent-tools.md § plugin_authoring, docs/plugins.md § Teaching the agent,
+// docs/plugin-authoring.md.
 import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 import { pluginManifestShape } from '@acorn/protocol/pluginContract.ts'
@@ -55,8 +25,8 @@ import type { AgentToolContribution } from './registry.ts'
 // `z.toJSONSchema` rather than reaching into `_def`: it is the same projection the tool registry already
 // uses for MCP input schemas, so it is a supported door rather than an internals read that a zod bump
 // turns into a runtime throw. `unrepresentable: 'any'` because the manifest is full of refinements
-// (`entry`, the chord parser, the content-link matcher) that have no JSON Schema spelling; the fields this
-// module reads — keys, caps, enums, literal verbs — all do.
+// (`entry`, the chord parser, the content-link matcher) that have no JSON Schema spelling. The fields
+// this module reads, keys, caps, enums, literal verbs, all do.
 type JsonSchema = {
   properties?: Record<string, JsonSchema>
   items?: JsonSchema
@@ -83,9 +53,10 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 
 // ── Derived from the bridge wire union ────────────────────────────────────────────────────────────
 //
-// `satisfies Record<Union, string>` is the whole guard: add a message kind to
-// `@acorn/protocol/pluginBridge.ts` and this file stops compiling until it is described here. That is a
-// stronger check than any test could make, because the union is a TYPE and has no runtime value to read.
+// `satisfies Record<Union, string>` is the guard: add a message kind to
+// `@acorn/protocol/pluginBridge.ts` and this file stops compiling until it is described here. A type
+// has no runtime value to read, so this catches drift that no test could (docs/agent-tools.md §
+// plugin_authoring).
 const BRIDGE_KINDS = {
   api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v2/p/<id>/ namespace always passes",
   subscribe: 'subscribe to a shell channel the manifest declared in `permissions.events`',
@@ -156,20 +127,17 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       contributionCaps: Object.fromEntries(caps),
       frameTargets: at(contributions, 'frames')?.items?.properties?.target?.enum ?? [],
       slots: at(contributions, 'slots')?.items?.properties?.slot?.enum ?? [],
-      // Read off the schema like the slot enum, for the same reason: both are short lists that grow
-      // only when a host surface appears to draw them, and a guessed member is a contribution that
-      // parses on a newer node and never appears on this one.
+      // Read off the schema, not hand-typed: this and the enums below are short lists that grow only
+      // when a host surface appears to draw them, so a guessed member is a contribution that parses
+      // on a newer node and never appears on this one.
       contextMenuLocations: at(contributions, 'contextMenus')?.items?.properties?.location?.enum ?? [],
-      // The two cooperative/exclusive vocabularies, read off the schema for the same reason as the two
-      // above: both are short lists that grow only when a host surface appears to draw them, and a
-      // guessed member is a declaration that parses on a newer node and never appears on this one.
       extensionPointLocations: at(contributions, 'extensionPoints')?.items?.properties?.location?.enum ?? [],
       coreSlots: at(contributions, 'frames')?.items?.properties?.coreSlot?.enum ?? [],
       commandCategories: at(contributions, 'commands')?.items?.properties?.category?.enum ?? [],
-      // A `themes` entry is a map of EXACTLY these token names, so the list is the contract rather than
-      // a hint — a theme missing one is refused at parse. Read off the strict object the schema builds
-      // from the palette (@acorn/protocol/themeTokens.ts), so a token added to the appearance contract
-      // reaches the agent without anyone remembering to retype it here.
+      // A `themes` entry must carry exactly these token names, nothing else; a theme missing one is
+      // refused at parse. Read off the strict object the schema builds from the palette
+      // (@acorn/protocol/themeTokens.ts), so a token added to the appearance contract reaches the
+      // agent with no edit here.
       themeTokens: at(contributions, 'themes')?.items?.properties?.tokens?.required ?? [],
     },
     actions: {
@@ -182,11 +150,9 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
     permissions: {
       node: Object.keys(at(schema, 'permissions', 'node')?.properties ?? {}),
       core: [...NODE_CORE_FACETS],
-      // No list of grantable `permissions.api` scopes, deliberately: the allowlist that decides them lives
-      // in the client (client-core/plugins/frames/scopes.ts) and the node cannot import it, so any list
-      // here would be a copy — and a wrong scope name in an agent-facing guide is worse than none,
-      // because the agent believes it. What is stated instead is the part that makes an unknown scope
-      // survivable, which is the part an author needs.
+      // No list of grantable `permissions.api` scopes: that allowlist lives in the client and the
+      // node cannot import it (docs/agent-tools.md § plugin_authoring). What the `note` field states
+      // instead is what makes an unknown scope survivable, which is what an author actually needs.
       note: 'permissions.node is least privilege for cooperative code, not a sandbox: gating is by omission, so an undeclared facet is absent from ctx and the first call is a TypeError. permissions.api is different — it IS enforced, by an allowlist of (path, method) pairs at the frame bridge. Your own /v2/p/<id>/ namespace needs no scope and is always allowed; another plugin\'s namespace is always denied; a scope this acorn does not know is denied at the bridge rather than rejected at parse, so declare only scopes you have confirmed against this node.',
     },
     bridge: {
@@ -202,10 +168,9 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
 
 // ── The brief ─────────────────────────────────────────────────────────────────────────────────────
 //
-// Process, not vocabulary. Everything an author gets WRONG by remembering is above, derived; what is left
-// here is the sequence of acts, which no schema states and which nothing else in the tree can be read off.
-// It is deliberately short: docs/plugin-authoring.md is the long form for a human with the repository
-// checked out, this is what a node can tell an agent that has neither.
+// Process, not vocabulary: the sequence of acts, which no schema states and nothing else in the
+// tree can be read off. Deliberately short; docs/plugin-authoring.md is the long form for a human
+// with the repository checked out.
 const BRIEF = `# Writing an acorn plugin, by hand
 
 A plugin is a DIRECTORY the node loads. There is no build step in this profile and no bundler on the
@@ -399,8 +364,8 @@ export const pluginAuthoringTool = (): AgentToolContribution => ({
   },
 })
 
-// `defaultIncluded: false` is the whole reason this is affordable. Order 50 puts it after memory (40), so
-// the four sections every existing prompt assumes — pr, issues, notes, memory — keep their wire order.
+// `defaultIncluded: false` is the whole reason this is affordable; order 50 keeps it after memory
+// (docs/agent-tools.md § Context sections).
 export const pluginAuthoringSection: ContextSectionContribution = {
   id: PLUGIN_AUTHORING_SECTION,
   order: 50,

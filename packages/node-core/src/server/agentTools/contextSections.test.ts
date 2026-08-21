@@ -24,14 +24,14 @@ const section = (id: string, over: Partial<PluginContextSection> = {}): PluginCo
 })
 
 // `repo` is the display pair; `github` is the facet, null on a plain or non-GitHub project. Both are
-// passed to plugin sections — the github facet is how a section knows whether it has anything to fetch.
+// passed to plugin sections; the github facet is how a section knows whether it has anything to fetch.
 const args = { userLogin: 'james', task: { id: 't1' } as never, repo: 'acme/api', github: { owner: 'acme', name: 'api' } }
 
 describe('the context-section registry', () => {
-  // BEFORE as well as after, because importing this module now registers core's real `issues` section at
-  // module scope (that is the fix for a standalone node losing it). Every case below builds a synthetic
-  // registry, and two of them register their own 'issues' — which would collide with the real one on the
-  // FIRST case, before any afterEach has run.
+  // Runs before each case too, not just after: importing this module now registers core's real `issues`
+  // section at module scope (that is the fix for a standalone node losing it). Every case below builds a
+  // synthetic registry, and two of them register their own 'issues', which would collide with the
+  // real one on the first case, before any afterEach has run.
   beforeEach(() => {
     for (const owner of ['a', 'b', 'core', 'github']) removeContextSections(owner)
   })
@@ -40,9 +40,9 @@ describe('the context-section registry', () => {
   })
 
   it('orders sections by the wire contract, not by registration order', () => {
-    // Registered backwards on purpose. The assembled block's section order is what every existing prompt,
-    // the client's Manifest preview and the byte-exactness invariant assume, so it must not be able to
-    // change when the plugin list is reordered by domain — the exact trap `ready()` exists for elsewhere.
+    // Registered backwards: the assembled block's section order must not change when the plugin
+    // list is reordered by domain, which is the trap `ready()` exists to catch elsewhere
+    // (docs/agent-tools.md § Context sections).
     registerContextSection('a', asContextSection(section('memory')))
     registerContextSection('a', asContextSection(section('notes')))
     registerContextSection('b', asContextSection(section('issues')))
@@ -56,8 +56,8 @@ describe('the context-section registry', () => {
     expect(getContextSections().map((s) => s.id)).toEqual(['memory', 'experimental'])
   })
 
-  // The point of declaring order rather than ranking a list in core: a new section can land BETWEEN two
-  // existing ones. Under the old hardcoded section list it could only ever go last.
+  // A new section can land between two existing ones (docs/agent-tools.md § Context sections);
+  // under the old hardcoded list it could only go last.
   it('lets a new section slot between two existing ones', () => {
     registerContextSection('a', asContextSection(section('pr')))
     registerContextSection('b', asContextSection(section('memory')))
@@ -71,12 +71,14 @@ describe('the context-section registry', () => {
   })
 
   it('removes one owner contributions as a unit, leaving the rest', () => {
-    // What the plugin host calls before re-registering. Without it, a second startServiceRuntime in one
-    // process would either throw on the duplicate id or keep sections closed over the first boot's handles.
+    // What the plugin host calls before re-registering. Without it, a second startServiceRuntime in
+    // one process would either throw on the duplicate id or keep sections closed over the first
+    // boot's handles.
     //
-    // Owner 'a' gets TWO sections, deliberately. With one, a `remove` that stopped after the first match — the
-    // easiest way to write that loop wrong, and the reason the registry iterates backwards with a splice —
-    // passed this case. Two is the smallest number that can tell "as a unit" from "one of them".
+    // Owner 'a' gets two sections. With one, a `remove` that stopped after the first match, the
+    // easiest way to write that loop wrong and the reason the registry iterates backwards with a
+    // splice, would still pass this case. Two is the smallest number that can tell "as a unit" from
+    // "one of them".
     registerContextSection('a', asContextSection(section('notes')))
     registerContextSection('a', asContextSection(section('pr')))
     registerContextSection('b', asContextSection(section('memory')))

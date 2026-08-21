@@ -33,11 +33,7 @@ export class ToolError extends Error {
   }
 }
 
-// ─── Permission tiers (docs/security.md) ──────────────────────────────────────────────────────
-// Per-tier and per-tool toggles persisted as one prefs slice under `agentTools.perms`. A per-tool toggle
-// wins over its tier, and both default to on. Consulted by every projection, so turning a tier off
-// removes those tools from tools/list and rejects a direct harness call. Permissions apply before
-// workflow and profile ceilings, which can only narrow further.
+// Permission tiers: docs/agent-tools.md § Projections.
 export const TOOL_PERMS_PREF_KEY = AGENT_TOOLS_PERMS_PREF_KEY
 
 export type ToolPerms = {
@@ -59,8 +55,6 @@ export function isToolPermitted(tool: Pick<AgentToolContribution, 'name' | 'risk
   if (tool.risk === 'read') return perms.tools?.[tool.name] ?? true
   return perms.tools?.[tool.name] ?? perms.tiers?.[tool.risk] ?? true
 }
-
-// ─── The contribution point ─────────────────────────────────────────────────────────────────────
 
 // ─── The contribution point ─────────────────────────────────────────────────────────────────────
 // Who contributed a tool. The plugin host binds a plugin id, so a plugin can't register on another's
