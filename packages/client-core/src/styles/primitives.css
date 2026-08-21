@@ -961,4 +961,13 @@ a.ui-row { text-decoration: none; cursor: pointer; }
 a.ui-row:hover { background: var(--bg-hover); }
 /* The multi-line row. rollbar overrode `.ui-row`'s centring three times to get this. */
 .ui-row[data-variant='stacked'] { align-items: flex-start; padding-block: var(--space-3); }
-.ui-row[data-variant='stacked'] .ui-row-body { white-space: normal; overflow: visible; }
+/* The body is a column here, not a paragraph: a stacked row's children ARE its lines (a title, a
+   meta line, a warning), and left inline they ran together into one wrapping sentence. */
+.ui-row[data-variant='stacked'] .ui-row-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  white-space: normal;
+  overflow: visible;
+}
