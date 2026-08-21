@@ -1,7 +1,6 @@
-// The renderer's notes surface (docs/notes-and-memory.md). Was the `window.acorn.notes` preload bridge;
-// now loopback HTTP. Backed by the main-process NotesStore, so it 503s in dev:node. Note
-// shapes are canonical in shared/notes.ts (main's NotesStore imports the same types) — re-exported
-// here so existing feature imports keep working.
+// The renderer's notes surface (docs/notes-and-memory.md), backed by loopback HTTP to the
+// main-process NotesStore, so it 503s in dev:node. Note shapes are canonical in
+// @acorn/protocol/notes.ts; re-exported here so existing feature imports keep working.
 import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '../shared/api'
 import { openPane, readJson, writeJson } from '@acorn/plugin-api/client'
 import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'

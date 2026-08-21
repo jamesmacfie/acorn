@@ -16,8 +16,8 @@ const LAUNCH_LEADINS: Record<string, string> = {
   notes: 'The user has written the following notes you may find relevant:',
 }
 
-// Trailer so the agent treats the injected material as reference, not a to-do list — without it the
-// agent sometimes acts on the notes/PR immediately instead of waiting for the user's actual ask.
+// Trailer so the agent treats the injected material as reference, not a to-do list. Without it the
+// agent sometimes acts on the notes or PR immediately instead of waiting for the user's actual ask.
 const LAUNCH_TRAILER =
   'Use the above only for reference — do not take any action based on it yet. Wait for the user to give you direction in their next message.'
 

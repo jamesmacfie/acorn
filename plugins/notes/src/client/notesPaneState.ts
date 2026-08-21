@@ -1,6 +1,7 @@
-// Notes pane view state (docs/agent-tools.md): which note you were on and whether the library
-// column is collapsed, per task. Session-only (matches the house session-first guidance — only the
-// Manifest's section selection has a stated durability requirement). Evicted on task archive.
+// Notes pane view state (docs/notes-and-memory.md § Notes): which note you were on and whether
+// the library column is collapsed, per task. Session-only, matching the house session-first
+// guidance; only the Manifest's section selection has a stated durability requirement. Evicted on
+// task archive.
 import { createSignal } from 'solid-js'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import { onScopeEvicted } from '@acorn/plugin-api/client'

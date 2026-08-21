@@ -66,9 +66,10 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     })
   })
 
-  // Reconcile the task's main-owned view + home URL, position it over the host, and hide it when the
-  // pane has no URL or an overlay covers it. Main owns home identity across renderer remounts, so a
-  // changed run target updates the view while ordinary pane/task switches preserve browse state.
+  // Reconciles the task's main-owned view against the host element (docs/electron.md § Host-owned
+  // webviews covers positioning and hide-on-cover). Main owns home identity across renderer
+  // remounts, so a changed run target updates the view while an ordinary pane or task switch
+  // preserves whatever the user was browsing.
   createEffect(() => {
     const taskId = props.taskId
     const url = props.url

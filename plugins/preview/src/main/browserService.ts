@@ -1,7 +1,8 @@
-// Drivable browser — the CDP service (docs/panes.md): drives the task's EXISTING preview
-// WebContentsView via webContents.debugger. One driver per task; refs come from the last snapshot
-// (browserAuto.ts owns the pure transforms). Commands originate from main/agent only — never from
-// page script (docs/security.md posture); navigation stays http(s)-only like the preview navigation guard.
+// Drives the task's existing preview WebContentsView via webContents.debugger. One driver per task;
+// refs come from the last snapshot (browserAuto.ts owns the pure transforms). Commands originate
+// from main and the agent only, never from page script; docs/security.md § Host-owned webviews and
+// browser automation covers the posture, including the CDP method allowlist and the http(s)-only
+// navigation guard.
 import type { WebContents } from 'electron'
 import { buildAxTree, isAllowedBrowserUrl, isBenignNavError, renderAxTree, resolveRef, type AxSnapshot } from './browserAuto'
 
@@ -115,8 +116,8 @@ export class BrowserDriver {
   }
 }
 
-// Per-task drivers over the preview WebContentsView (previewService.ts binds each view's webContents
-// on creation — main-owned, so no renderer round-trip).
+// Per-task drivers over the preview WebContentsView. previewService.ts binds each view's
+// webContents on creation; main owns the binding, so there is no renderer round trip.
 const drivers = new Map<string, BrowserDriver>()
 const contentsByTask = new Map<string, DrivableContents>()
 

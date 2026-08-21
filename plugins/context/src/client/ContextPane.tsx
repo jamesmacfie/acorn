@@ -17,9 +17,9 @@ export default function ContextPane(props: { task: Task }) {
   const api = taskBridge()
   const [msg, setMsg] = createSignal('')
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
-  // Pending-item counts reported UP by section contributions, keyed by section id. Was a single
-  // `pendingMemory` signal, which named the one plugin that happens to have any — so a second contributor
-  // would have silently overwritten the first's count in the header.
+  // Pending-item counts reported up by section contributions, keyed by section id. This used to be
+  // a single `pendingMemory` signal, named after the one plugin that happened to have any, so a
+  // second contributor would have silently overwritten the first's count in the header.
   const [pending, setPending] = createSignal<Record<string, number>>({})
   const pendingFor = (sectionId: string) => pending()[sectionId] ?? 0
   const [previewOpen, setPreviewOpen] = createSignal(false)
@@ -39,7 +39,7 @@ export default function ContextPane(props: { task: Task }) {
     bumpContextRevision(props.task.id)
   }
 
-  // The exact block a send would deliver — assembled locally from the include=* inventory.
+  // The exact block a send would deliver, assembled locally from the include=* inventory.
   const assembled = createMemo(() => (ctx() ? assembleBlockFrom(ctx()!, effective()) : null))
 
   const visibleSections = createMemo(() =>
@@ -76,10 +76,11 @@ export default function ContextPane(props: { task: Task }) {
 
   function followJump(item: ContextItem) {
     if (!item.jump?.itemId) return
-    // The same call notes' own `requestNoteOpen` makes. Inlined rather than imported: `openPane` and the
-    // `notes:open` PaneIntent variant are both client-core's, so borrowing notes' one-line wrapper was
-    // the entire context → notes coupling edge — a plugin dependency for a function that reaches nothing
-    // of that plugin's. Every other jump below already goes straight through openPane.
+    // The same call notes' own `requestNoteOpen` makes. Inlined rather than imported, since
+    // `openPane` and the `notes:open` PaneIntent variant are both client-core's: borrowing notes'
+    // one-line wrapper would have been the only context-to-notes coupling for a function that
+    // reaches nothing of that plugin's own. Every other jump below already goes straight through
+    // openPane.
     if (item.jump.pane === 'notes' && item.jump.noteScope) {
       openPane(props.task.id, 'notes', { kind: 'notes:open', slug: item.jump.itemId, scope: item.jump.noteScope })
       return

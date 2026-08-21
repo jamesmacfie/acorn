@@ -1,12 +1,14 @@
 // Session-only sync bookkeeping for the Manifest (docs/agent-tools.md). Two concerns:
 //
-// 1. Staleness — what *this pane* last sent to each agent session via Sync. No hashing: we keep the
-//    raw per-section compact strings (a few KB, one entry per live session). It's a heuristic —
-//    agent-pulled context (MCP task_context) and workflow pushes don't update it (tooltip says so).
-//    Dead sessions fall out of the picker, so no exit hook is needed; task archive evicts explicitly.
+// 1. Staleness: what this pane last sent to each agent session via Sync. No hashing. It keeps the
+//    raw per-section compact strings (a few KB, one entry per live session). This is a heuristic:
+//    agent-pulled context (MCP task_context) and workflow pushes do not update it (the tooltip
+//    says so). Dead sessions fall out of the picker, so no exit hook is needed; task archive
+//    evicts explicitly.
 //
-// 2. Target session — which agent session Sync targets, per task (the activeByTask pattern), always
-//    validated against the live list so a killed target falls back to the most-recent session.
+// 2. Target session: which agent session Sync targets, per task (the activeByTask pattern),
+//    always validated against the live list so a killed target falls back to the most-recent
+//    session.
 import { createSignal } from 'solid-js'
 import { agentSessionsFor, onScopeEvicted } from '@acorn/plugin-api/client'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
