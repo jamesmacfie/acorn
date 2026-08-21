@@ -29,13 +29,11 @@ export default function DockerSettings() {
       </p>
 
       <Checkbox
-        class="settings-field"
         label="Ask twice before destructive actions (remove, prune, compose down)"
         checked={current().confirmDestructive}
         onChange={() => toggle('confirmDestructive')}
       />
       <Checkbox
-        class="settings-field"
         label="Show stopped containers in the Docker source"
         checked={current().showStopped}
         onChange={() => toggle('showStopped')}

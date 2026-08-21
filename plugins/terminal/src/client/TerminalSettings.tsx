@@ -39,7 +39,6 @@ export default function TerminalSettings() {
         </Select>
       </label>
       <Checkbox
-        class="settings-field"
         label="Send task context (PR, linked issues, notes) to new agent sessions at startup"
         checked={injectContext()}
         onChange={(e) => void savePref(qc, PrefKeys.startupContextInjection, e.currentTarget.checked ? 'true' : 'false')}
