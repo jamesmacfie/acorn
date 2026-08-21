@@ -25,5 +25,5 @@ export type FileHits = {
 
 export type SearchResult = {
   files: FileHits[]
-  truncated: boolean // hit the total-match cap — the pane shows a "results truncated" note
+  truncated: boolean // hit the total-match cap, so the pane shows a "results truncated" note
 }

@@ -11,8 +11,8 @@ export default function FileTree(props: {
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
 }) {
-  // The tree CONTAINER semantics live here, which is what TreeRow's contract asks for — a row cannot
-  // know its tree. There were none of these before.
+  // The tree's container semantics live here, which is what TreeRow's contract requires: a row
+  // cannot know its tree. There were none of these before.
   return (
     <div role="tree" aria-label="Worktree files">
       <Tree
@@ -75,8 +75,8 @@ function TreeNode(props: {
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
 }) {
-  // The <li>, not the row: TreeRow has no `ref` prop on purpose — a props member named `ref` becomes
-  // a DOM setter in Solid, silently.
+  // The <li>, not the row: TreeRow has no `ref` prop. A props member named `ref` silently becomes a
+  // DOM setter in Solid, so naming it that would break rather than warn.
   let fileRow: HTMLLIElement | undefined
   const path = () => (props.parent ? `${props.parent}/${props.entry.name}` : props.entry.name)
   const open = () => editorTreeDirectoryOpen(props.taskId, path())

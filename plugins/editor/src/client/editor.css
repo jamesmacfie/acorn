@@ -3,11 +3,11 @@
   flex-direction: column;
   overflow: hidden;
 }
-/* The split, the sidebar width, the divider and both columns' flex/overflow are ListDetail's, so
-   `.editor-layout` is gone and `.editor-side` keeps only what is this pane's own: one column holding
-   the file tree and the find-in-files panel, one visible at a time (docs/panes.md — find-in-files is
-   a panel here, not a pane of its own). The `--bg-subtle` tint went with the flat list column. */
-/* The shared tab strip, narrowed: 88px minimums do not fit two tabs and the pane's padding at 240px. */
+/* ListDetail now owns the split, sidebar width, divider and both columns' flex/overflow
+   (docs/ui-design.md § Two-column panes), so `.editor-layout` is gone. `.editor-side` keeps only
+   what is this pane's own: one column holding the file tree and the find-in-files panel, one
+   visible at a time (docs/panes.md § Contributions). */
+/* The shared tab strip, narrowed: 88px minimums do not fit two tabs at the pane's 240px padding. */
 .editor-side .ui-tabs { flex: none; padding: 0; }
 .editor-side .ui-tab { flex: 1; min-width: 0; padding: 0 var(--space-4); }
 .editor-tree {
@@ -18,7 +18,8 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
 }
-/* `.editor-main` is ListDetail's detail column — the flex column it used to declare is the default. */
+/* `.editor-main` is ListDetail's detail column now; the flex column it used to declare is the
+   default. */
 .editor-bar {
   flex: none;
   display: flex;
@@ -55,15 +56,15 @@
   min-height: 0;
 }
 
-/* File tree — flat rows, no button chrome; hover/active are the app's row states. */
-/* TreeRow owns the row, the twist and the depth indentation — which replaces the nested-<ul> padding
-   this tree used, and is why `.tree .tree` is gone. What is left is the tree's tighter row height. */
+/* File tree: flat rows, no button chrome. Hover and active states come from the app's row styles. */
+/* TreeRow owns the row, the twist and the depth indentation, replacing the nested-<ul> padding this
+   tree used, which is why `.tree .tree` is gone. What is left is the tree's tighter row height. */
 .tree { list-style: none; margin: 0; padding: 0; }
 .tree-file.ui-row,
 .tree-dir.ui-row { min-height: auto; padding-block: 3px; }
 
-/* File tab bar (docs/panes.md): flat/square, 1px borders; italic = ephemeral preview tab. */
-/* DocumentTabs owns the strip, the tabs, the dirty dot and the close buttons. What is left is this
-   pane's tighter row height and its mono filenames. */
+/* File tab bar: flat/square, 1px borders; italic marks the ephemeral preview tab. DocumentTabs owns
+   the strip, the tabs, the dirty dot and the close buttons. What is left is this pane's tighter row
+   height and its mono filenames. */
 .editor-tabs { min-height: 30px; }
 .editor-tabs .ui-doctab-label { min-height: 30px; font-family: var(--font-mono); }

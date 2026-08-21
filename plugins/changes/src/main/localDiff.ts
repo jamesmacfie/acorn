@@ -1,8 +1,8 @@
-// Local (uncommitted) diff source (docs/panes.md): parsed `git status --porcelain=v2`, unified
-// patches per file/scope, and blob reads — all against a task's worktree. Patches are emitted as
-// HUNKS-ONLY bodies (like GitHub's per-file `patch`), so the renderer's existing diff.ts/synth +
-// gitdiff-parser path works unchanged. execFile with arg arrays only; repo-relative paths are
-// validated at this boundary (reject `..`/absolute — the editor-IPC discipline).
+// Local diff source for uncommitted changes. Parses `git status --porcelain=v2` into unified
+// patches per file and scope, plus blob reads, all against a task's worktree. Patches carry only
+// hunks, like GitHub's per-file patch, so the renderer's existing diff.ts synth and gitdiff-parser
+// path handles them unchanged. Every git call uses execFile with an argument array, and
+// repo-relative paths are validated at this boundary: no `..` segments, no absolute paths.
 
 import { git, gitOrThrow, gitText } from '@acorn/plugin-api/node'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
@@ -13,7 +13,8 @@ type LocalChangeStatus = LocalChange['status']
 
 export type LocalScope = 'unstaged' | 'staged'
 
-// Repo-relative only: no absolute paths, no `..` segments, no leading dash (argv guard).
+// Repo-relative only: rejects absolute paths, `..` segments, and a leading dash, which argv could
+// mistake for a flag.
 export const isValidRelPath = (p: string): boolean =>
   typeof p === 'string' && !!p && !p.startsWith('/') && !p.startsWith('-') && !p.split('/').includes('..') && !p.includes('\0')
 
@@ -25,9 +26,9 @@ const statusFor = (xy: string, index: boolean): LocalChangeStatus => {
   return 'modified'
 }
 
-// Pure parser for `git status --porcelain=v2` (no -z; git C-quotes exotic paths — accepted as-is).
-// A file changed in BOTH index and worktree yields two entries (one per scope), mirroring the
-// staged/unstaged groups the pane shows.
+// Pure parser for `git status --porcelain=v2` output taken without `-z`, so git C-quotes unusual
+// paths and this accepts them as-is. A file changed in both the index and the worktree yields two
+// entries, one per scope, matching the staged and unstaged groups the pane shows.
 export function parsePorcelainV2(stdout: string): LocalChange[] {
   const out: LocalChange[] = []
   for (const line of stdout.split('\n')) {
@@ -51,7 +52,7 @@ export function parsePorcelainV2(stdout: string): LocalChange[] {
       if (xy[0] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, true), staged: true, additions: null, deletions: null })
       if (xy[1] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, false), staged: false, additions: null, deletions: null })
     } else {
-      // unmerged — surface as an unstaged modification so the reviewer sees it
+      // Unmerged: treated as an unstaged modification so the reviewer sees it.
       const path = parts.slice(10).join(' ')
       out.push({ path, status: 'modified', staged: false, additions: null, deletions: null })
     }
@@ -66,7 +67,8 @@ export function mergeNumstat(changes: LocalChange[], numstat: string, staged: bo
     if (!line.trim()) continue
     const [a, d, ...rest] = line.split('\t')
     const path = rest.join('\t')
-    // Renames appear as `old => new` or `{old => new}` in --numstat path; the tab-split form is `old\tnew`? git numstat uses "old => new" inline only with -M... keep the raw path key.
+    // A rename shows as "old => new" in the numstat path field only with -M; keep the raw path as
+    // the map key either way.
     stats.set(path, { a: a === '-' ? null : Number(a), d: d === '-' ? null : Number(d) })
   }
   return changes.map((c) => {
@@ -86,13 +88,13 @@ export async function localChanges(worktree: string): Promise<LocalChange[]> {
     ])
     changes = mergeNumstat(mergeNumstat(changes, unstaged, false), staged, true)
   } catch {
-    // stats are decoration — the list still renders
+    // Stats are decoration. The list still renders without them.
   }
   return changes
 }
 
-// Everything before the first hunk header is git's file header — the renderer re-synthesizes its
-// own (client diff.ts synth), so emit hunks-only like GitHub's per-file patch.
+// Everything before the first hunk header is git's file header. The renderer re-synthesizes its
+// own (client diff.ts synth), so this emits hunks-only, like GitHub's per-file patch.
 export const stripToHunks = (patch: string): string => {
   const i = patch.indexOf('\n@@')
   if (patch.startsWith('@@')) return patch
@@ -104,12 +106,11 @@ export const stripToHunks = (patch: string): string => {
 export async function localDiff(worktree: string, path: string, scope: LocalScope, context?: number): Promise<{ patch: string }> {
   if (!isValidRelPath(path)) throw new Error('Invalid path.')
   const ctx = context != null && Number.isInteger(context) && context >= 0 ? [`-U${context}`] : []
-  // Untracked files aren't in the index: render an all-additions patch via --no-index (exits 1 on
-  // "differences found" — that IS success for a diff).
+  // Untracked files aren't in the index, so this renders an all-additions patch via --no-index.
   const tracked = (await git(['ls-files', '--error-unmatch', '--', path], { cwd: worktree, timeoutMs: 10_000 })).code === 0
   if (!tracked && scope === 'unstaged') {
-    // --no-index exits 1 on "differences found", which IS success for a diff. The broker returns the
-    // exit code as data, so this no longer needs a catch that inspects an exec error's shape.
+    // --no-index exits 1 on "differences found", which counts as success for a diff. The broker
+    // returns the exit code as data, so this needs no catch that inspects an exec error's shape.
     const result = await git(['diff', '--no-index', ...ctx, '--', '/dev/null', path], { cwd: worktree, timeoutMs: 15_000 })
     if (result.code !== 0 && result.code !== 1) throw new Error(result.stderr.trim() || 'git diff failed')
     return { patch: stripToHunks(result.stdout) }
@@ -120,8 +121,8 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
   return { patch: stripToHunks(stdout) }
 }
 
-// --- Stage/commit actions (docs/panes.md): one-line git calls; the pane can land the work it
-// reviewed. Stops here per the doc — no hunk staging, no rebase UI. ---
+// Stage, commit and discard: one-line git calls so the pane can land the work it reviewed. Stops
+// here. No hunk staging, no rebase UI.
 
 export type GitActionResult = { ok: true } | { ok: false; reason: string }
 
@@ -143,17 +144,18 @@ export async function unstageFile(worktree: string, path: string): Promise<GitAc
   return run(worktree, ['restore', '--staged', '--', path])
 }
 
-// Discard = restore the worktree copy (destructive — the caller MUST confirm first). Untracked
-// files aren't restorable; delete them via git clean, scoped to the one path.
+// Discard restores the worktree copy. It is destructive, so the caller must confirm first.
+// Untracked files aren't restorable; delete them via git clean, scoped to the one path.
 export async function discardFile(worktree: string, path: string, untracked: boolean): Promise<GitActionResult> {
   if (!isValidRelPath(path)) return { ok: false, reason: 'Invalid path.' }
   return untracked ? run(worktree, ['clean', '-f', '--', path]) : run(worktree, ['restore', '--', path])
 }
 
-// Bulk variants for the ChangesPane toolbar — the whole working tree at once.
+// Bulk variants for the ChangesPane toolbar: the whole working tree at once.
 export const stageAll = (worktree: string): Promise<GitActionResult> => run(worktree, ['add', '-A'])
 export const unstageAll = (worktree: string): Promise<GitActionResult> => run(worktree, ['reset'])
-// Discard everything (destructive — caller MUST confirm): drop staged+unstaged AND untracked files.
+// Discard everything. Destructive, so the caller must confirm first: drops staged, unstaged, and
+// untracked files.
 export async function discardAll(worktree: string): Promise<GitActionResult> {
   const reset = await run(worktree, ['reset', '--hard'])
   return reset.ok ? run(worktree, ['clean', '-fd']) : reset
@@ -170,7 +172,7 @@ export async function pushBranch(worktree: string): Promise<GitActionResult> {
   return run(worktree, ['push', '--set-upstream', 'origin', 'HEAD'])
 }
 
-// Recent commits on the branch (the MCP git_log tool, docs/mcp.md).
+// Recent commits on the branch, for the MCP git_log tool.
 export type GitLogEntry = { sha: string; subject: string; author: string; committedAt: number }
 
 export function parseGitLog(stdout: string): GitLogEntry[] {

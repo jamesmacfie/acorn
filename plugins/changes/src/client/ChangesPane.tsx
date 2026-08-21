@@ -10,10 +10,9 @@ import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
 
-// ChangesPane (docs/panes.md): a PR-style "Files changed" view over the task worktree's
-// UNCOMMITTED changes — client-core's shared diff viewer (synth → gitdiff-parser → DiffRows)
-// fed by the local:changes/local:diff IPC instead of GitHub patches. Refreshes on the existing
-// dirty-poll signal (taskStatus). Read-only in P1; stage/commit actions land in P4.
+// ChangesPane: a PR-style "Files changed" view over the task worktree's uncommitted changes, using
+// client-core's shared diff viewer (synth, gitdiff-parser, DiffRows) fed by local:changes/local:diff
+// instead of GitHub patches. Refreshes on the existing dirty-poll signal (taskStatus).
 export default function ChangesPane(props: { task: Task }) {
   const api = taskBridge()
   const projects = createQuery(() => projectsOptions(true))
@@ -29,7 +28,8 @@ export default function ChangesPane(props: { task: Task }) {
     async (id) => await localGitApi.changes(id),
     { initialValue: [] },
   )
-  // The rail's dirty poll is the refresh signal — when the worktree's change count moves, re-list.
+  // The rail's dirty poll is the refresh signal: when the worktree's change count moves, this
+  // re-lists.
   createEffect(() => {
     const st = taskStatus(props.task.id)
     void st?.dirtyCount
@@ -49,8 +49,8 @@ export default function ChangesPane(props: { task: Task }) {
       const res = await localGitApi.diff(src.taskId, src.sel.path, src.sel.staged ? 'staged' : 'unstaged')
       if ('error' in res) return []
       const file = toPullFile(src.sel, res.patch)
-      // Whole-file view: the patch carries full context (server -U1e6), so drop the expand gaps and
-      // hunk-header rows — every line is already shown, just with +/- highlights.
+      // Whole-file view: the patch carries full context (server -U1e6), so this drops the expand
+      // gaps and hunk-header rows. Every line is already shown, with +/- highlights.
       const diff = (await buildDiffRowsAsync(file, tokenizeDocument)).filter((r) => r.kind !== 'gap' && r.kind !== 'hunk')
       return [{ kind: 'file', file }, ...(diff.length ? diff : [{ kind: 'nodiff' } as DiffRow])]
     },
@@ -59,16 +59,16 @@ export default function ChangesPane(props: { task: Task }) {
 
   const noop = async () => {}
 
-  // "Add file/line to agent" (docs/panes.md): drop a path[:line] draft into the agent composer.
+  // "Add file/line to agent": drops a path[:line] draft into the agent composer.
   async function sendRef(ref: string) {
     const res = await sendReferenceToAgent(props.task.id, ref)
     if (!res.ok && res.reason) setActionError(res.reason)
     else setActionError('')
   }
 
-  // Review notes (docs/panes.md): inline annotations on the local diff. Created via the shared
-  // line composer, rendered under their anchor line, sent as one prompt via sendToAgent
-  // ('after-ready' — queued until the agent idles) and stamped sentAt on delivery.
+  // Review notes: inline annotations on the local diff. Created via the shared line composer,
+  // rendered under their anchor line, sent as one prompt via sendToAgent ('after-ready', queued
+  // until the agent idles), and stamped sentAt on delivery.
   const [notes, { refetch: refetchNotes }] = createResource(
     () => props.task.id,
     (id) => readJson<ReviewNote[]>(reviewNotesRoute(id)),
@@ -99,7 +99,7 @@ export default function ChangesPane(props: { task: Task }) {
     await refetchNotes()
   }
 
-  // Stage/commit actions (docs/panes.md). Discard is destructive → explicit confirm.
+  // Stage and commit actions. Discard is destructive, so it requires explicit confirmation.
   const [commitMsg, setCommitMsg] = createSignal('')
   async function gitAction(fn: () => Promise<{ ok: boolean; reason?: string }>) {
     const res = await fn()
@@ -111,7 +111,8 @@ export default function ChangesPane(props: { task: Task }) {
     if (!discardArmed.request(`file:${path}`)) return
     await gitAction(() => localGitApi.discard(props.task.id, path, untracked))
   }
-  // Bulk toolbar actions (docs/panes.md): whole working tree at once. Discard-all is destructive → confirm.
+  // Bulk toolbar actions: whole working tree at once. Discard-all is destructive, so it requires
+  // confirmation.
   async function discardAll() {
     if (!discardArmed.request('all')) return
     await gitAction(() => localGitApi.discardAll(props.task.id))
@@ -124,8 +125,8 @@ export default function ChangesPane(props: { task: Task }) {
     setCommitMsg('')
     await refetch()
   }
-  // Push HEAD to origin (docs/panes.md). Network-bound → show pending; errors go to an alert
-  // (git's reason is multi-line and would look shouty in the uppercased header).
+  // Push HEAD to origin. Network-bound, so this shows pending; errors go to an alert, since git's
+  // reason is multi-line and would look shouty in the uppercased header.
   const [pushing, setPushing] = createSignal(false)
   const [pushMsg, setPushMsg] = createSignal('')
   async function push() {

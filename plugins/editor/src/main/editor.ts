@@ -1,8 +1,7 @@
-// Monaco editor pane backing (docs/workspaces-and-tasks.md): read/write/list files on the task's worktree.
-// Was the `editor:*` IPC channels; now the EditorBridge behind the HTTP routes
-// in server/routes/editor.ts. The taskId is the capability — every call re-derives the
-// worktree root from the DB and confines the renderer-supplied relative path with resolveInRoot,
-// so a traversal (`../`) or a symlink pointing outside the worktree is rejected. Pure-Node, so it
+// Monaco editor pane backing: read/write/list files on the task's worktree. Was the `editor:*` IPC
+// channels; now the EditorBridge behind the HTTP routes in server/routes/editor.ts. The taskId is
+// the capability, and every call re-derives the worktree root from the DB. Path confinement is
+// `resolveInRoot` (docs/security.md § Process, path, and configuration controls). Pure Node, so it
 // works in dev:node too; wired in main/serverBridges.ts.
 import { BridgeError, type CoreServices, gitOrThrow } from '@acorn/plugin-api/node'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
@@ -35,8 +34,8 @@ export const editorBridge = (core: EditorCoreServices): EditorBridge => ({
       .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
   },
 
-  // Flat file list for ⌘P quick-open. `git ls-files` gives the tracked + untracked (non-ignored)
-  // set — the same files VS Code's Cmd+P offers — without walking node_modules.
+  // Flat file list for the quick-open palette. `git ls-files` gives the tracked and untracked
+  // (non-ignored) set, the same files VS Code's Cmd+P offers, without walking node_modules.
   files: async (taskId) => {
     const root = await core.tasks.root(taskId)
     if (!root) return []
@@ -57,9 +56,10 @@ export const editorBridge = (core: EditorCoreServices): EditorBridge => ({
     }
   },
 
-  // Write keeps the {ok, reason} contract (never throws) — EditorPane surfaces reason inline and
+  // Write keeps the {ok, reason} contract and never throws: EditorPane surfaces reason inline, and
   // the autosave loop must not see a rejected promise. A path escape is a benign {ok:false}, not a
-  // 4xx: the renderer already confined the path, so this is defense-in-depth, not a caller error.
+  // 4xx, because the renderer already confined the path; this check is defense-in-depth, not a
+  // caller error.
   write: async (taskId, relPath, content) => {
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)

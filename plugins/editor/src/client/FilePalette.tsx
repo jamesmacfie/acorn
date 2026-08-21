@@ -5,10 +5,10 @@ import { activeTaskId, createOverlayPalette, dispatchActiveLayout, fuzzyScore } 
 import { PaletteSurface } from '@acorn/plugin-api/ui/host'
 
 // ⌘P quick-open: fuzzy-jump to a file in the active task's worktree. Monaco has no built-in file
-// finder (that's a VS Code workbench feature, not the editor core), so this reuses OUR command-
-// palette shell (PaletteSurface + fuzzyScore + createOverlayPalette) over `git ls-files`. Selecting a
-// file opens an ephemeral tab via shared editorState and reveals the editor pane — EditorPane's
-// active() effect swaps it in.
+// finder (that is a VS Code workbench feature, not part of the editor core), so this reuses the
+// app's own command-palette shell (PaletteSurface, fuzzyScore, createOverlayPalette) over
+// `git ls-files`. Selecting a file opens an ephemeral tab through editorState and reveals the
+// editor pane, where EditorPane's active() effect swaps it in.
 const MAX_ROWS = 100 // Keep palette rendering bounded for repositories with thousands of files.
 
 export default function FilePalette() {

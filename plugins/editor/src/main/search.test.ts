@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseRgJson, ripgrepExecutablePath } from './search'
 
-// A `rg --json` line for a match. Mirrors the real event shape (see searchIpc.ts RgEvent).
+// A `rg --json` line for a match. Mirrors the real event shape (see main/search.ts's RgEvent).
 const begin = (path: string) => JSON.stringify({ type: 'begin', data: { path: { text: path } } })
 const match = (path: string, line: number, text: string, start: number, end: number) =>
   JSON.stringify({ type: 'match', data: { path: { text: path }, lines: { text }, line_number: line, submatches: [{ start, end }] } })

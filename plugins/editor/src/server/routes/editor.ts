@@ -2,10 +2,10 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
-// Editor pane (docs/workspaces-and-tasks.md): read/write/list files on the task's worktree. Was the `editor:*`
-// IPC channels; now task-scoped HTTP behind the EditorBridge (main/editor.ts).
-// The bridge confines every relative path to the worktree root, so traversal/symlink escapes are
-// rejected (403) and an unmapped repo is a 404 — see server/routes/editor.test.ts.
+// Editor pane: read/write/list files on the task's worktree. Was the `editor:*` IPC channels; now
+// task-scoped HTTP behind the EditorBridge (main/editor.ts). The bridge confines every relative
+// path to the worktree root (docs/security.md § Process, path, and configuration controls), so a
+// traversal or symlink escape is a 403 and an unmapped repo is a 404; see server/routes/editor.test.ts.
 
 export type EditorEntry = { name: string; dir: boolean }
 export type EditorWriteResult = { ok: boolean; reason?: string }

@@ -1,11 +1,11 @@
-// The changes plugin's wire contract: the working-tree review pane and its acorn-owned inline notes.
+// The changes plugin's wire contract: the working-tree review pane and its inline notes.
 //
-// Types, route builders and the query key together, following the docker and http convention: the
-// plugin that owns the namespace owns the shape of what crosses it. Moved verbatim out of
-// @acorn/protocol/api.ts, with route strings and the query key byte-identical, because the persisted
-// query cache has no buster and a changed key would orphan a user's IndexedDB.
+// Types, route builders and the query key live together, following the docker and http
+// convention: the plugin that owns the namespace owns the shape of what crosses it. Moved verbatim
+// out of @acorn/protocol/api.ts with routes and the query key byte-identical; see docs/caching.md
+// for why a changed key would orphan a user's IndexedDB.
 
-// Local review notes (docs/panes.md): inline annotations on uncommitted changes, acorn-owned.
+// Inline annotations on uncommitted changes, owned by this plugin rather than mirrored from GitHub.
 export type ReviewNote = {
   id: string
   taskId: string
@@ -25,8 +25,8 @@ export const reviewNoteRoute = (taskId: string, noteId: string) => `/v2/p/change
 export const reviewNotesSentRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/sent`
 export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 
-// Local-changes review (docs/panes.md): working-tree status, diff and blob, plus stage, commit, discard
-// and push. Replaced the `local:*` IPC channels.
+// Local-changes review: working-tree status, diff and blob reads, plus stage, commit, discard and
+// push. Replaced the `local:*` IPC channels.
 export const localChangesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/changes`
 export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
   `/v2/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`

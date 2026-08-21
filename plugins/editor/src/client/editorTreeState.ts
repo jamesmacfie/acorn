@@ -2,9 +2,9 @@ import { createSignal } from 'solid-js'
 import { onScopeEvicted } from '@acorn/plugin-api/client'
 
 // Session-only expanded-directory state, scoped to the task whose worktree the tree represents.
-// Keeping this outside EditorPane lets pane/task navigation unmount the lazy tree without losing
-// the user's place. Collapsing a parent deliberately retains its descendants, so reopening it
-// restores the nested expansion exactly as it was.
+// Keeping this outside EditorPane lets pane and task navigation unmount the lazy tree without
+// losing the user's place. Collapsing a parent retains its descendants, so reopening it restores
+// the nested expansion exactly as it was.
 const [expandedByTask, setExpandedByTask] = createSignal<ReadonlyMap<string, ReadonlySet<string>>>(new Map())
 
 export const editorTreeDirectoryOpen = (taskId: string, path: string): boolean =>
@@ -32,13 +32,13 @@ export function evictEditorTreeState(taskId: string): void {
   })
 }
 
-// Same reason as clearEditorStates: keyed by a node-minted task id, must not outlive a node switch.
+// Keyed by a node-minted task id; must not outlive a node switch (docs/state.md § Scope rules).
 export function clearEditorTreeStates(): void {
   setExpandedByTask(new Map())
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered beside the signal it clears rather than in the shell's evictor list
+// (docs/state.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorTreeState(e.taskId)
   else if (e.scope === 'node-switched') clearEditorTreeStates()

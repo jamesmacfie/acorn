@@ -1,5 +1,5 @@
-// Review-notes prompt formatter (docs/panes.md): plain, copy-pasteable, exactly the doc's shape.
-// Pure — unit tested; delivered via sendToAgent as one bracketed-paste block.
+// Review-notes prompt formatter: plain and copy-pasteable, matching the ReviewNote shape exactly.
+// Pure and unit tested; delivered via sendToAgent as one bracketed-paste block.
 import type { ReviewNote } from './api'
 
 const lineRef = (n: Pick<ReviewNote, 'startLine' | 'endLine'>): string =>

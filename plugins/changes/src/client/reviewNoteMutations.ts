@@ -4,7 +4,7 @@
 import { postJson, writeJson } from '@acorn/plugin-api/client'
 import { reviewNoteRoute, reviewNotesRoute, reviewNotesSentRoute, type ReviewNote, type ReviewNoteSeed } from '../shared/api'
 
-// Local review notes (docs/panes.md): task-scoped, never sent to GitHub until the review is submitted.
+// Task-scoped local review notes; never sent to GitHub until the review is submitted.
 export const addReviewNote = (taskId: string, seed: ReviewNoteSeed) => postJson<ReviewNote>(reviewNotesRoute(taskId), seed)
 export const editReviewNote = (taskId: string, noteId: string, body: string) =>
   writeJson<{ ok: true }>(reviewNoteRoute(taskId, noteId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) })

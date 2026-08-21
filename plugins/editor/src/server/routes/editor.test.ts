@@ -14,9 +14,9 @@ import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { editor, setEditorBridge } from './editor'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Editor is a write/read boundary confined to the worktree, so its route test runs against a REAL
-// worktree (the filesystem-containment contract): path traversal, symlink escape, missing worktree. The path
-// confinement lives in taskWorktree.resolveInRoot; exercising it end-to-end is the point.
+// Editor is a write/read boundary confined to the worktree, so its route test runs against a real
+// worktree exercising the filesystem-containment contract end to end: path traversal, symlink
+// escape, missing worktree. Confinement lives in taskWorktree.resolveInRoot.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

@@ -1,5 +1,5 @@
-// ChangesPane model (docs/panes.md): pure grouping/ordering/selection over LocalChange[] and the
-// adapter that feeds a local patch into the shared diff pipeline (DiffFile shape → diff.ts).
+// ChangesPane model: pure grouping, ordering and selection over LocalChange[], plus the adapter
+// that feeds a local patch into the shared diff pipeline (DiffFile shape, diff.ts).
 import type { DiffFile } from '@acorn/plugin-api/ui/diff'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
@@ -17,8 +17,8 @@ export function groupChanges(changes: LocalChange[]): ChangesGroups {
 // Stable row identity: a file can appear in both groups.
 export const changeKey = (c: Pick<LocalChange, 'staged' | 'path'>): string => `${c.staged ? 'staged' : 'unstaged'}:${c.path}`
 
-// Keep the current selection while it still exists, else fall back to the first row
-// (staged group first — it renders on top).
+// Keep the current selection while it still exists, else fall back to the first row (staged group
+// first, since it renders on top).
 export function pickSelected(groups: ChangesGroups, selectedKey: string | null): LocalChange | null {
   const all = [...groups.staged, ...groups.unstaged]
   if (selectedKey) {

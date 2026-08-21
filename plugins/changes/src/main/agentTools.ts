@@ -1,10 +1,10 @@
-// The changes plugin's agent tools: read-only git over the task worktree, as the `tools` contribution
-// point (docs/plugins.md § Agent tools and MCP).
+// The changes plugin's agent tools: read-only git over the task worktree. Registered through the
+// tools contribution point (docs/agent-tools.md § Contribution).
 //
-// These three were defined in apps/node/src/wiring/agentToolsWiring.ts, which had to import this
-// plugin's localDiff module to do it — an app reaching into a plugin's internals to declare a
-// capability the plugin owns. They read the SAME module the review pane's LocalGitBridge reads
-// (main/localGit.ts), so the agent and the human see one truth about the working tree.
+// These three tools used to be defined in apps/node/src/wiring/agentToolsWiring.ts, which had to
+// import this plugin's localDiff module to declare a capability the plugin owns. They read the same
+// module the review pane's LocalGitBridge reads (main/localGit.ts), so the agent and the human see
+// one truth about the working tree.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
 import { gitLog, localChanges, localDiff } from './localDiff'
@@ -13,8 +13,8 @@ import { gitLog, localChanges, localDiff } from './localDiff'
 // changes in that state should get an explanation rather than a failed tool call.
 const NO_WORKTREE = { status: 'no-worktree', hint: 'This task has no worktree — git tools need a checked-out worktree.' }
 
-// `load`, deliberately NOT `root`: root() CREATES the worktree on first use, and a read-only tool must
-// never have that side effect. Same reason the app-layer version called loadTask directly.
+// `load`, not `root`: `root()` creates the worktree on first use, and a read-only tool must never
+// have that side effect. The app-layer version called loadTask directly for the same reason.
 type ToolCore = Pick<CoreServices, 'tasks'>
 
 const worktreeFor = async (core: ToolCore, taskId: string): Promise<string | null> => (await core.tasks.load(taskId))?.worktreePath ?? null

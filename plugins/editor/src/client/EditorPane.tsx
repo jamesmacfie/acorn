@@ -11,16 +11,13 @@ import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeRevea
 import SearchPanel from './search/SearchPanel'
 import './editor.css'
 
-// The extension→language map and the Monaco theme both moved to the host
-// (@acorn/protocol/languageIds.ts + client-core/editor/), because this file and DatabasePane.tsx were
-// each carrying a copy and the theme NAME is a Monaco global — two panes writing the same global and
-// agreeing by luck. Same reason the host now owns the whole document surface a loaded plugin gets
-// (docs/third-party/monaco.md).
+// The extension-to-language map and the Monaco theme both moved to the host
+// (docs/third-party/monaco.md § Status).
 
-// The Monaco editor pane (docs/panes.md): a lazy file tree on the left, a file TAB BAR + one reused
-// Monaco instance on the right. Single-click opens an ephemeral (italic) preview tab; editing or
-// double-click promotes it. ⌘S saves; dirty dot on the tab; reload-on-focus with a dirty guard
-// (the agent and the human share the worktree).
+// The Monaco editor pane: a lazy file tree on the left, a file tab bar and one reused Monaco
+// instance on the right. Single-click opens an ephemeral (italic) preview tab; editing or
+// double-click promotes it. Cmd+S saves; a dirty dot marks the tab; reload-on-focus with a dirty
+// guard, since the agent and the human share the worktree.
 export default function EditorPane(props: { task: Task }) {
   const api = editorApi()
   const taskId = props.task.id
@@ -34,9 +31,9 @@ export default function EditorPane(props: { task: Task }) {
   let host: HTMLDivElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
   let stopTheme: (() => void) | undefined
-  // ONE Monaco instance reused across tab switches, with the current path tracked EXPLICITLY
-  // rather than trusting props/signals mid-swap (verne's documented gotcha: a stale model write
-  // lands in the wrong file without this). Models are kept per path and disposed on tab close.
+  // One Monaco instance reused across tab switches, with the current path tracked explicitly
+  // rather than trusted from props or signals mid-swap (verne's documented gotcha: a stale model
+  // write lands in the wrong file without this). Models are kept per path and disposed on tab close.
   let currentPath: string | null = null
   const models = new Map<string, monaco.editor.ITextModel>()
   const savedVersion = new Map<string, number>() // alternativeVersionId at last load/save
@@ -91,7 +88,7 @@ export default function EditorPane(props: { task: Task }) {
 
   onMount(() => {
     onCleanup(() => {
-      saveViewState() // pane unmounting (task/workspace switch) — remember where we were
+      saveViewState() // pane unmounting (task/workspace switch), remember where we were
       disposed = true
       scheduleSave.flush()
       stopTheme?.()
@@ -130,7 +127,8 @@ export default function EditorPane(props: { task: Task }) {
     model = monaco.editor.createModel(content, monacoLanguageForPath(relPath))
     savedVersion.set(relPath, model.getAlternativeVersionId())
     model.onDidChangeContent(() => {
-      // Dirty derives from the version id vs the last saved one — undo back to saved clears it.
+      // Dirty derives from the version id versus the last saved one, so undoing back to the saved
+      // state clears it.
       const dirty = model!.getAlternativeVersionId() !== savedVersion.get(relPath)
       editorSetDirty(taskId, relPath, dirty)
       if (dirty) scheduleSave(relPath)
@@ -139,7 +137,7 @@ export default function EditorPane(props: { task: Task }) {
     return model
   }
 
-  // Swap the reused instance to a path. THE only place currentPath changes.
+  // Swaps the reused instance to a path. The only place currentPath changes.
   async function show(relPath: string) {
     if (!editor) return
     scheduleSave.flush() // persist the outgoing file (pending arg is its path) before the swap
@@ -156,8 +154,9 @@ export default function EditorPane(props: { task: Task }) {
     maybeReveal(relPath)
   }
 
-  // Consume a pending cross-pane reveal for the just-shown file: center the target position and put
-  // the cursor there. One-shot — cleared once applied so it doesn't re-fire on the next tab switch.
+  // Consumes a pending cross-pane reveal for the just-shown file: centers the target position and
+  // places the cursor there. One-shot, cleared once applied so it does not re-fire on the next tab
+  // switch.
   function maybeReveal(relPath: string) {
     const r = pendingReveal()
     if (!editor || !r || r.path !== relPath) return
@@ -217,8 +216,8 @@ export default function EditorPane(props: { task: Task }) {
     savedVersion.delete(relPath)
   }
 
-  // External-change reload on window focus (docs/panes.md): the agent edits the same worktree.
-  // A clean model reloads silently; a dirty one is guarded (never clobber unsaved human edits).
+  // External-change reload on window focus: the agent edits the same worktree. A clean model
+  // reloads silently; a dirty one is guarded so it never clobbers unsaved human edits.
   async function onFocus() {
     const p = currentPath
     const model = p ? models.get(p) : undefined
@@ -233,9 +232,9 @@ export default function EditorPane(props: { task: Task }) {
     }
   }
 
-  // Single driver for the reused Monaco surface: whenever the active file changes — task switch,
-  // tree click, tab close, or the ⌘P quick-open palette (a separate component writing editorState) —
-  // swap the model here. Deferred so onMount owns the first paint.
+  // Single driver for the reused Monaco surface. Whenever the active file changes, from a task
+  // switch, a tree click, a tab close, or the quick-open palette (a separate component writing
+  // editorState), the model swaps here. Deferred so onMount owns the first paint.
   createEffect(
     on(active, (next) => {
       if (!editor) return

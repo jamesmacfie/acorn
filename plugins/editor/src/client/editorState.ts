@@ -1,13 +1,15 @@
-// Editor session state (docs/panes.md): open-file tabs per task — ephemeral preview slot, dirty
-// flags, active file — persisted to the 'editor_open_files' pref so relaunch restores the tabs
-// (dirty resets: content isn't persisted). Pure list ops + a thin signal store, like tasks.ts.
+// Editor session state: open-file tabs per task (ephemeral preview slot, dirty flags, active
+// file), persisted to the 'editor_open_files' pref so relaunch restores the tabs (see
+// docs/state.md § Scope rules for why open files live in Node prefs). Dirty flags reset on reload
+// since content itself is not persisted. Pure list ops plus a thin signal store, like tasks.ts.
 import { createSignal } from 'solid-js'
 import { onScopeEvicted, openPane } from '@acorn/plugin-api/client'
 
 export type OpenFile = { path: string; ephemeral: boolean; dirty: boolean }
 
-// Open (or focus) a file. Ephemeral opens reuse the single preview slot (verne's model): the
-// previous ephemeral tab is replaced unless it's dirty (an edit promoted it in spirit — keep it).
+// Open, or focus, a file. Ephemeral opens reuse the single preview slot (verne's model): the
+// previous ephemeral tab is replaced unless it is dirty, since an edit already promoted it in
+// spirit and should stay.
 export function openFileIn(list: OpenFile[], path: string, ephemeral: boolean): OpenFile[] {
   const existing = list.find((f) => f.path === path)
   if (existing) {
@@ -27,7 +29,7 @@ export function closeFile(list: OpenFile[], path: string): OpenFile[] {
   return list.filter((f) => f.path !== path)
 }
 
-// An edit both marks dirty AND promotes an ephemeral tab (editing a preview keeps it).
+// An edit marks the file dirty and promotes an ephemeral tab; editing a preview keeps it open.
 export function setFileDirty(list: OpenFile[], path: string, dirty: boolean): OpenFile[] {
   return list.map((f) => (f.path === path ? { ...f, dirty, ephemeral: dirty ? false : f.ephemeral } : f))
 }
@@ -112,15 +114,15 @@ export function hydrateTaskEditorState(taskId: string, state: TaskEditorState): 
 
 export { byTask as editorStateByTask }
 
-// Everything this module holds is keyed by a NODE-MINTED id, so it must not survive a node switch: the
-// persistence pass reads these maps and writes each scope under the ACTIVE node's storage key, which
-// carried one node's state into another's namespace (client-core's tasks/tasks.ts states the case in full).
+// Every map here is keyed by a node-minted task id and must not survive a node switch
+// (docs/state.md § Scope rules): the persistence pass used to write each scope under the active
+// node's storage key, which let one node's state leak into another's namespace.
 export function clearEditorStates(): void {
   setByTask({})
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered beside the signal it clears rather than in the shell's evictor list
+// (docs/state.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorState(e.taskId)
   else if (e.scope === 'node-switched') clearEditorStates()
