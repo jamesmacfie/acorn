@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { clientFor, refreshFleet, _resetFleet } from './fleet'
-import { cachedFleet, fetchFleet } from './fanout'
+import { cachedFleet, fetchFleet, onFleetInvalidation } from './fanout'
 
 // The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed
 // page" (docs/architecture-overview.md § Client state and fleet behavior) true once instead of four
@@ -175,5 +175,38 @@ describe('cachedFleet', () => {
     clientFor('a').client.setQueryData(KEY, 'remembered-a')
     clientFor('b').client.setQueryData(KEY, 'remembered-b')
     expect(cachedFleet(KEY, { nodeIds: ['b'] }).rows.map((row) => row.nodeId)).toEqual(['b'])
+  })
+})
+
+// The link between a mutation and the fan-out. `createFleetQuery` is a resource, so this suite cannot
+// mount it (Solid resolves to its server build here); the subscription it depends on is covered
+// directly instead, the same way `cachedFleet` is.
+describe('onFleetInvalidation', () => {
+  it('fires when any node invalidates the key, and stops on unsubscribe', async () => {
+    // The fan-out's own fetch is what puts the entry in each node's cache; nothing can be invalidated
+    // before that happens.
+    clientFor('b').client.setQueryData(KEY, 'fetched-by-the-fan-out')
+    let fired = 0
+    const stop = onFleetInvalidation(KEY, () => { fired += 1 })
+
+    await clientFor('b').client.invalidateQueries({ queryKey: KEY })
+    expect(fired).toBe(1)
+
+    stop()
+    await clientFor('b').client.invalidateQueries({ queryKey: KEY })
+    expect(fired).toBe(1)
+  })
+
+  it('ignores another key, and ignores the fan-out\'s own writes so a refetch cannot loop', async () => {
+    clientFor('a').client.setQueryData(KEY, 'fetched-by-the-fan-out')
+    clientFor('a').client.setQueryData(['fanout', 'other'], 'someone else')
+    let fired = 0
+    const stop = onFleetInvalidation(KEY, () => { fired += 1 })
+
+    await clientFor('a').client.invalidateQueries({ queryKey: ['fanout', 'other'] })
+    clientFor('a').client.setQueryData(KEY, 'written-by-the-fan-out')
+    expect(fired).toBe(0)
+
+    stop()
   })
 })
