@@ -46,27 +46,9 @@ export type AgentContextContribution = {
   capture(scope: AgentContextCaptureScope, optionIds?: readonly string[]): Promise<AgentContextSnapshot[]>
 }
 
-// ── What a loaded plugin's agent-context routes may answer ─────────────────────────────────────────
-//
-// A loaded plugin declares `agentContexts` in its manifest and the HOST performs both fetches on its
-// behalf (node-core/main/pluginManifest.ts, client-core/plugins/chrome/data.ts). Unlike the rest of
-// the descriptor chrome — which decorates the shell, where a malformed row costs a badge — these
-// bodies end up inside a model's prompt. That is why this is the one descriptor response with a real
-// parser instead of a field-by-field sniff, and why the schemas live here beside the contract rather
-// than in the reader: the host owns the shape, and the host is the one being handed it.
-//
-// Three groups of fields are ABSENT on purpose, because the host binds them:
-//
-//   `type` and `source` — `source` is derived from the supplying plugin's id, the same rule that
-//   stops a descriptor row claiming another plugin's task origin. A plugin does not get to name the
-//   namespace its snapshots appear under, because the composer groups and replaces by it.
-//
-//   `capturedAt` — a fact about when the host captured, not something a plugin may backdate.
-//
-//   `byteSize` and `estimatedTokens` — `agentContextBudget` above trusts these over the real content
-//   when they are present, which is exactly the wrong way round for plugin-supplied data: a snapshot
-//   claiming `byteSize: 1` on five megabytes of content would walk straight through the composer's
-//   512 KiB ceiling. The host measures the content it actually received.
+// What a loaded plugin's agent-context routes may answer. See docs/plugins.md § Loaded plugins: the
+// client half (the `agentContexts` entry) for the full contract: why this is the one descriptor
+// response with a real parser, and which fields the host binds rather than the plugin.
 export const MAX_PLUGIN_AGENT_CONTEXT_OPTIONS = 200
 export const MAX_PLUGIN_AGENT_CONTEXT_SNAPSHOTS = 50
 
@@ -77,7 +59,7 @@ export const pluginAgentContextOptionsSchema = z.array(z.object({
   defaultSelected: z.boolean().optional(),
 })).max(MAX_PLUGIN_AGENT_CONTEXT_OPTIONS)
 
-// `content` is bounded by the shared ceiling as a coarse pre-check — `.max()` counts UTF-16 units, so
+// `content` is bounded by the shared ceiling as a coarse pre-check. `.max()` counts UTF-16 units, so
 // the real refusal is the byte measurement the reader does with `agentContextBudget`.
 export const pluginAgentContextSnapshotsSchema = z.array(z.object({
   contextId: z.string().min(1).max(200),
@@ -85,7 +67,7 @@ export const pluginAgentContextSnapshotsSchema = z.array(z.object({
   content: z.string().max(MAX_AGENT_CONTEXT_BYTES),
   resourceId: z.string().min(1).max(200).optional(),
   provenance: z.string().min(1).max(500).optional(),
-  // `pane` is checked against the panes the SAME manifest declares before it survives; a deep link
+  // `pane` is checked against the panes the same manifest declares before it survives; a deep link
   // into another plugin's pane is the navigation twin of a route outside its own namespace.
   deepLink: z.object({ pane: z.string().min(1).max(64) }).optional(),
   freshness: z.enum(['live', 'cached', 'stale', 'unknown']).optional(),

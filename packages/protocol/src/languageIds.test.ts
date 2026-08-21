@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { isLanguageId, languageIdForPath, LANGUAGE_IDS } from './languageIds'
 
-// This vocabulary replaced two maps that disagreed — the editor pane fell back to `plaintext`, the
+// This vocabulary replaced two maps that disagreed: the editor pane fell back to `plaintext`, the
 // highlighter to `text`, and each knew extensions the other did not. What is worth pinning is that
-// there is now ONE answer per path and one fallback, because a manifest names one of these ids and a
+// there is now one answer per path and one fallback, because a manifest names one of these ids and a
 // value that parses on the node has to mean the same thing in the renderer.
 
 describe('languageIdForPath', () => {

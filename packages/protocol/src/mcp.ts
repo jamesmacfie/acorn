@@ -1,7 +1,7 @@
-// MCP config inspector (docs/mcp.md): pure parse + secret masking over the agents' own config
-// files (.mcp.json / .cursor/mcp.json / ~/.claude.json). Read-only — acorn never launches or
-// manages these servers (the agent does; orca's stance). Masking happens in MAIN before anything
-// crosses to the renderer.
+// MCP config inspector (docs/mcp.md): pure parse and secret masking over the agents' own config
+// files (.mcp.json / .cursor/mcp.json / ~/.claude.json). Read-only. Acorn never launches or manages
+// these servers, the agent does (orca's stance). Masking happens in main before anything crosses to
+// the renderer.
 
 export type McpServerSummary = {
   name: string
@@ -13,7 +13,7 @@ export type McpServerSummary = {
 }
 
 // A value is masked when the key or value smells like a credential: sk-/ghp_/xox prefixes,
-// *_TOKEN / *_KEY / *_SECRET keys. Keys stay intact so the user can see WHAT is configured.
+// *_TOKEN / *_KEY / *_SECRET keys. Keys stay intact so the user can see what is configured.
 const SECRET_KEY_RE = /(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL)S?$/i
 const SECRET_VALUE_RE = /^(sk-|ghp_|gho_|ghs_|github_pat_|xox[bapsr]?-)/
 
@@ -74,7 +74,7 @@ export function inspectMcpConfig(jsonText: string): McpServerSummary[] {
 // The starter file the Settings button seeds (orca's touch).
 export const STARTER_MCP_JSON = `${JSON.stringify({ mcpServers: {} }, null, 2)}\n`
 
-// The known candidate files, relative to a root kind — the ONLY paths main will read.
+// The known candidate files, relative to a root kind: the only paths main will read.
 export const MCP_CANDIDATES: { rel: string; root: 'worktree' | 'home' }[] = [
   { rel: '.mcp.json', root: 'worktree' },
   { rel: '.cursor/mcp.json', root: 'worktree' },

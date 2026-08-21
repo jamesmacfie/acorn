@@ -4,8 +4,8 @@ import { NODE_PROTOCOL_VERSION, nodeIdentitySchema, nodeInfoSchema, pairRequestS
 // The compatibility contract, as assertions (docs/api-reference.md § Versioning).
 //
 // These schemas are the surface that decides whether two versions of acorn can talk at all, so what is
-// pinned here is their TOLERANCE — a property that is invisible until the day it is missing, and by then
-// the client that needed it has shipped.
+// pinned here is their tolerance. It is a property that is invisible until the day it is missing, and
+// by then the client that needed it has shipped.
 
 const FINGERPRINT = 'a'.repeat(64)
 

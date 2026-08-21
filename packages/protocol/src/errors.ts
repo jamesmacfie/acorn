@@ -10,13 +10,13 @@ import { z } from 'zod'
 // Transport-level codes: the floor every consumer can rely on, used verbatim for failures that have
 // no domain meaning.
 //
-// docs/api-reference.md calls this "a small closed set". It is the closed *floor*, not an exclusive whitelist,
-// and the deviation is deliberate: 37 domain codes are already load-bearing on the client — a
-// `needs-trust` opens the config-trust modal, `provider_needs_auth` rewrites the message — so
-// collapsing them all into ten would delete real behaviour. A closed set buys interop discipline
-// across an API boundary, and there isn't one here: client and Node ship from the same repo and are
-// released together (docs/api-reference.md § Versioning). So a route may return its own documented code, and
-// anything without one falls back to these.
+// docs/api-reference.md calls this "a small closed set". It is the closed *floor*, not an exclusive
+// whitelist. 37 domain codes are already load-bearing on the client: `needs-trust` opens the
+// config-trust modal, `provider_needs_auth` rewrites the message, and collapsing them all into ten
+// would delete real behaviour. A closed set buys interop discipline across an API boundary, and there
+// isn't one here: client and Node ship from the same repo and are released together
+// (docs/api-reference.md § Versioning). So a route may return its own documented code, and anything
+// without one falls back to these.
 export const ERROR_CODES = [
   'bad_request',
   'unauthorized',
@@ -58,9 +58,9 @@ export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>
 // The name every existing call site uses for this shape.
 export type ApiError = ErrorEnvelope
 
-// Statuses where an identical retry can plausibly succeed. 5xx is deliberately excluded apart from
-// the two "come back later" codes: a 500 usually means the request itself is broken, and marking it
-// retryable invites clients to hammer it.
+// Statuses where an identical retry can plausibly succeed. 5xx is excluded apart from the two "come
+// back later" codes: a 500 usually means the request itself is broken, and marking it retryable
+// invites clients to hammer it.
 const RETRYABLE_STATUS = new Set([408, 429, 502, 503, 504])
 
 export const statusIsRetryable = (status: number): boolean => RETRYABLE_STATUS.has(status)

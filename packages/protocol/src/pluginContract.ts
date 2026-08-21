@@ -123,8 +123,7 @@ const frameSurface = z.object({
   // A Lucide name, resolved client-side; an unmatched name renders as-is.
   glyph: z.string().min(1).max(64).default('puzzle'),
   order: z.number().int().min(0).max(100_000).default(500),
-  // Lets a future mobile shell skip a desktop-shaped pane instead of rendering it unusably
-  // (docs/future/remote.md).
+  // Lets a mobile shell skip a desktop-shaped pane instead of rendering it unusably.
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
   // `refPanel` only. The client adapter checks it against the plugin id: a panel may only name its
   // own provider.
@@ -613,7 +612,7 @@ export const isTaskPaneSurface = (frame: { target: string; scope?: string }): bo
 export const isProjectPaneSurface = (frame: { target: string; scope?: string }): boolean =>
   frame.target === 'pane' && frame.scope === 'project'
 
-/** A full-screen picker the host places. Not a pane — it belongs to no task's layout. */
+/** A full-screen picker the host places. Not a pane: it belongs to no task's layout. */
 export const isOverlaySurface = (frame: { target: string }): boolean => frame.target === 'overlay'
 
 /** A replacement for a designated core surface. Not a pane and not an overlay: it has no layout key,

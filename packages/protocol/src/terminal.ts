@@ -1,8 +1,6 @@
-// Shared terminal protocol (docs/terminal-and-agents.md). Imported by main, preload, and renderer — so it holds the
-// wire contract only, never node-pty types: main owns the PTY, this just describes what crosses IPC.
-// The ONE AgentState vocabulary (docs/terminal-and-agents.md, README decision 15) — defined here, reused verbatim
-// by the agent surfaces (15); no other module redeclares it. Each transport emits only the subset
-// it can detect: PTY sessions 'working|idle|blocked|unknown'; managed/headless agents the full set.
+// Shared terminal protocol (docs/terminal-and-agents.md). Imported by main, preload, and renderer, so
+// it holds the wire contract only, never node-pty types: main owns the PTY, this just describes what
+// crosses IPC. See docs/terminal-and-agents.md § Sessions for the `AgentState` vocabulary.
 export type AgentState = 'starting' | 'working' | 'waiting' | 'idle' | 'blocked' | 'permission' | 'done' | 'unknown'
 
 export type TerminalSession = {
@@ -14,10 +12,11 @@ export type TerminalSession = {
   status: 'running' | 'exited'
   idle: boolean // agent has produced no output for a while (docs/terminal-and-agents.md); always false for shells
   agentState: AgentState // docs/terminal-and-agents.md — PTY tier emits working|idle|blocked|unknown
-  // cwd is the task's isolated worktree. DERIVED, never stored: tasks.worktreePath is the truth
-  // (docs/workspaces-and-tasks.md) and main computes cwd === task.worktreePath at session create AND during
-  // reconcileTmux, so the flag survives app restarts. It stays on the wire as a denormalized copy
-  // so the renderer doesn't need the task join for a per-session badge/cleanup affordance.
+  // cwd is the task's isolated worktree, derived and never stored: `tasks.worktreePath` is the truth
+  // (docs/workspaces-and-tasks.md), and main computes `cwd === task.worktreePath` at session create
+  // and during `reconcileTmux`, so the flag survives app restarts. It stays on the wire as a
+  // denormalized copy so the renderer doesn't need the task join for a per-session badge/cleanup
+  // affordance.
   isWorktree: boolean
   taskId: string // → tasks.id (docs/workspaces-and-tasks.md); a session always belongs to a task
   agentSessionId?: string // managed→terminal controller handoff lineage
@@ -55,7 +54,7 @@ export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: s
 // (running sessions / dirty worktree) for the UI to surface. A failed teardown script
 // (docs/terminal-and-agents.md) sets teardownFailed so the UI can offer continue (re-archive with
 // skipTeardown) or abort; `output` is the script's tail for display.
-// `cleanupFailed` names the plugins whose opted-in cleanup threw. `ok` is still true: the task IS
+// `cleanupFailed` names the plugins whose opted-in cleanup threw. `ok` is still true: the task is
 // archived, and reporting a failure would have the caller offering to retry something already done.
 export type ArchiveResult =
   | { ok: true; cleanupFailed?: string[] }
@@ -79,7 +78,7 @@ export type TaskArchiveConcern = {
   pluginId: string
   message: string
   severity: 'warn' | 'danger'
-  // At most five, with `detailsMore` counting what did not fit — the host draws "+N more".
+  // At most five, with `detailsMore` counting what did not fit. The host draws "+N more".
   details?: string[]
   detailsMore?: number
   // Present only when the plugin declared a cleanup route to go with it.
@@ -98,9 +97,9 @@ export type TaskStatus = {
 }
 
 // A launchable profile as the renderer sees it (docs/terminal-and-agents.md). `available` is false when the command
-// isn't on PATH — the UI disables it. command/backend stay in main. `tmuxMissing` is true when the
+// isn't on PATH, the UI disables it. command/backend stay in main. `tmuxMissing` is true when the
 // profile prefers the durable tmux backend but tmux isn't installed, so a session would silently
-// degrade to node-pty (no restart survival) — the drawer surfaces the hint.
+// degrade to node-pty (no restart survival). The drawer surfaces the hint.
 export type TerminalProfile = {
   id: string
   label: string
@@ -109,8 +108,9 @@ export type TerminalProfile = {
   tmuxMissing?: boolean
 }
 
-// Run targets as the renderer sees them (docs/workflows.md §2): the merged config list + live status.
-// CANONICAL shapes for the run surface — main/runtime.ts imports these; nothing redeclares them.
+// Run targets as the renderer sees them (docs/workflows.md): the merged config list plus live
+// status. Canonical shapes for the run surface; main/runtime.ts imports these and nothing redeclares
+// them.
 export type RunTargetInfo = {
   id: string
   command: string

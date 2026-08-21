@@ -68,8 +68,8 @@ export type PublicIntegrationProvider = {
   glyph: string
   connection: {
     authKind: IntegrationAuthKind
-    // How the settings UI OBTAINS the credential, which is a different question from `authKind` (what
-    // the credential is). 'fields' renders the descriptor's form — the default, and what every provider
+    // How the settings UI obtains the credential, which is a different question from `authKind` (what
+    // the credential is). 'fields' renders the descriptor's form: the default, and what every provider
     // but one does. 'device-flow' means the owner supplies nothing by hand: the node fetches a code
     // from the provider, the owner approves it in a browser, and `fields` is legitimately empty.
     //
@@ -84,7 +84,7 @@ export type PublicIntegrationProvider = {
   // Whether this provider can enumerate a connection's projects, so core's workspace picker knows
   // which connections it may ask (`GET /v2/core/integrations/:id/projects`). Absent means no, and a
   // provider with nothing to enumerate is meant to be absent from the picker rather than present and
-  // empty. Not in `capabilities`: that map describes what a CONNECTION was granted after validation,
+  // empty. Not in `capabilities`: that map describes what a connection was granted after validation,
   // this is a fact about the provider's contribution.
   supportsProjects?: boolean
   models?: ModelCatalogEntry[]

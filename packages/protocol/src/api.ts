@@ -131,7 +131,7 @@ export type ProjectConfigResponse = { projectId: string; config: ProjectConfig }
 // connectionId pins the link to a specific credential. providerId is stamped by core from that row.
 export type TaskLink = { connectionId: string; providerId: string; identifier: string; ref?: ExternalRef }
 export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>; providerId?: string }
-// A workspace's linked provider projects (docs/workspaces-and-tasks.md) — (integrationId, externalId) pairs.
+// A workspace's linked provider projects (docs/workspaces-and-tasks.md): (integrationId, externalId) pairs.
 export type WorkspaceExternalProject = { integrationId: string; externalId: string }
 export type WorkspaceExternalProjectsResponse = { projects: WorkspaceExternalProject[] }
 // The projects one connection offers, for core's workspace picker. `id` is what a chosen row's
@@ -224,8 +224,8 @@ export type AgentToolCatalogEntry = { name: string; description: string; risk: T
 export const rendererAgentToolRoute = (taskId: string, name: string) => `/v2/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
 
 
-// Run targets (docs/workflows.md §2): the renderer shares the RunBridge routes the MCP run tools use
-// (server/routes/harness.ts). Replaced the `run:*` IPC channels.
+// Run targets (docs/workflows.md § Routes and UI): the renderer shares the RunBridge routes the MCP
+// run tools use (server/routes/harness.ts). Replaced the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run/default-url`
 export const runStartRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
@@ -261,15 +261,14 @@ export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/sta
 
 
 export const prefsRoute = '/v2/core/prefs'
-// Settings → Plugins (docs/ui-design.md § New surfaces). Per node: which plugins a node runs decides
-// which routes exist and which SQLite files open, so this is node state, not a client preference.
+// Settings → Plugins (docs/plugins.md § Activation): per node, since which plugins a node runs
+// decides which routes exist and which SQLite files open. `running` and `disabled` answer two
+// different questions: a toggle takes effect at the node's next start, so the page has to show the
+// gap between saving and restarting rather than hide it.
 //
-// `running` and `disabled` are separate answers. A toggle takes effect at the node's next start, so
-// between the save and the restart the two differ, and the page has to render that rather than lie.
-//
-// `state` is the third answer and the only one a restart can't change: a plugin loaded from disk whose
-// init threw is 'failed'. Deliberately not folded into `running`, because `restartRequired` is computed
-// from `running` and a restart can't fix a broken plugin (docs/plugins.md).
+// `state` is the third answer, the only one a restart cannot change: a plugin loaded from disk whose
+// init threw is `'failed'`. It stays out of `running` because `restartRequired` is computed from
+// `running` alone, and a restart cannot fix a broken plugin (docs/plugins.md § Loaded plugins).
 export type NodePluginRow = {
   name: string
   required: boolean
@@ -301,12 +300,14 @@ export type NodePluginRow = {
 // calls a `ctx` member that no longer exists.
 //
 // Here rather than derived from packages/plugin-api/package.json, whose version is decorative because
-// the package is private. This constant is a compatibility contract that changes deliberately.
-// @acorn/plugin-api re-exports it so plugin authors can assert against it.
+// the package is private. This constant is the compatibility contract itself, and @acorn/plugin-api
+// re-exports it so plugin authors can assert against it. See docs/plugins.md § Activation for what
+// bumping it costs.
 //
-// In protocol because both sides hold it against the same manifest: the node decides what to load, the
-// device decides which of a fleet's bundles it can run.
-// ── The loaded-plugin manifest contract ───────────────────────────────────────────────────────────
+// In protocol because both sides hold it against the same manifest: the node decides what to load,
+// and the device decides which of a fleet's bundles it can run.
+
+// The loaded-plugin manifest contract.
 //
 // One declaration, two consumers. The manifest's shape is the Zod schema in ./pluginContract.ts and
 // the types below are `z.infer` of it. This file used to carry a hand-written twin, ~330 lines kept in
@@ -416,8 +417,8 @@ export type PluginRailItems = { items: PluginRailItem[] }
 export const railItemId = (connectionId: string, identifier: string): string =>
   `${encodeURIComponent(connectionId)}:${encodeURIComponent(identifier)}`
 
-/** The inverse. `null` for anything that is not one of ours — a truncated id, a bad escape, an empty
- * half — so a caller branches once instead of validating the parts itself. */
+/** The inverse. `null` for anything that is not one of ours: a truncated id, a bad escape, an
+ * empty half. A caller branches once instead of validating the parts itself. */
 export function parseRailItemId(value: string): [connectionId: string, identifier: string] | null {
   const separator = value.indexOf(':')
   if (separator <= 0 || separator === value.length - 1) return null
@@ -456,8 +457,8 @@ export type InstalledPluginRow = {
   icons?: Record<string, { d: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
   // the sha256 the node computed, and it's a cache-key hint only: the device hashes the bytes it
-  // received and refuses a mismatch, because a compromised node can lie here (docs/plugins.md § Trust
-  // binds to bytes, not to claims).
+  // received and refuses a mismatch, because a compromised node can lie here
+  // (docs/security.md § Third-party plugin bundles).
   client: { hash: string; bytes: number } | null
   // Where the package came from, as one line for the settings row ("github:owner/repo@v1.2.0",
   // "npm:acorn-board", a URL). Absent for a package that predates the installer or was copied in by
@@ -534,11 +535,11 @@ export const corePluginBundleRoute = (id: string) => `/v2/core/plugins/${encodeU
 export const coreDevicesRoute = '/v2/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeURIComponent(deviceId)}`
 
-// Settings → Security (docs/security.md § Audit, § On-disk).
+// Settings → Security (docs/security.md § Audit, § Filesystem and backup).
 //
-// `diskEncrypted` is three-valued on purpose. `null` means "this node can't tell", the honest answer
-// off macOS, where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count.
-// A security warning that cries wolf is worse than no warning.
+// `diskEncrypted` is three-valued. `null` means "this node can't tell", the honest answer off macOS,
+// where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count. A security
+// warning that cries wolf is worse than no warning.
 export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
 export const coreSecurityRoute = '/v2/core/security'
 
@@ -567,7 +568,7 @@ export type BackupSuggestion = { suggestedPath: string }
 export const coreBackupRoute = '/v2/core/backup'
 
 // Schedules: periodic work owned by the node (docs/schedules.md). The row and cadence types live in
-// ./schedules.ts, which needs zod for the cadence parser this module deliberately doesn't carry.
+// ./schedules.ts, which needs zod for the cadence parser. This module does not carry that dependency.
 //
 // A key contains a colon ('core:audit-prune'), so every builder below encodes it.
 export const schedulesRoute = '/v2/core/schedules'
@@ -592,12 +593,12 @@ export const dashboardHistoryRoute = '/v2/core/dashboards/history'
 export type DashboardMeasureSample = { bucket: number; value: number }
 export type DashboardHistoryResponse = { signature: string; samples: DashboardMeasureSample[] }
 
-// Workspaces (named groups of Projects) — the top-level unit.
+// Workspaces (named groups of Projects): the top-level unit.
 export const workspacesRoute = '/v2/core/workspaces'
 export const workspaceRoute = (id: string) => `/v2/core/workspaces/${id}`
 export const workspaceBootstrapRoute = '/v2/core/workspaces/bootstrap'
 export const workspaceExternalProjectsRoute = (id: string) => `/v2/core/workspaces/${id}/external-projects`
-// Tasks (Project -> Task units of work) — rail rows.
+// Tasks (Project -> Task units of work): rail rows.
 export const tasksRoute = '/v2/core/tasks'
 export const taskRoute = (id: string) => `/v2/core/tasks/${id}`
 export const taskLinksRoute = (id: string) => `/v2/core/tasks/${id}/links`

@@ -1,6 +1,6 @@
 // Branch-name normalisation for the task-create flow (docs/terminal-and-agents.md, after verne's slugify):
-// lowercase, [a-z0-9/-] only, collapse runs, trim edge separators, ≤ 60 chars. Pure + shared —
-// the renderer derives the default branch from the task title; main validates separately
+// lowercase, [a-z0-9/-] only, collapse runs, trim edge separators, ≤ 60 chars. Pure and shared: the
+// renderer derives the default branch from the task title; main validates separately
 // (worktrees.ts isValidBranch guards the git arg).
 
 export function slugifyBranch(input: string): string {
@@ -11,7 +11,7 @@ export function slugifyBranch(input: string): string {
     .replace(/\/{2,}/g, '/')
     .replace(/(^[-/]+|[-/]+$)/g, '')
     .slice(0, 60)
-  // A 60-char cut can land mid-separator — trim again so the result stays git-legal.
+  // A 60-char cut can land mid-separator. Trim again so the result stays git-legal.
   return slug.replace(/(^[-/]+|[-/]+$)/g, '')
 }
 

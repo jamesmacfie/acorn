@@ -41,16 +41,16 @@ export const nodeFetchResponseSchema = z.strictObject({
 })
 export type NodeFetchResponse = z.infer<typeof nodeFetchResponseSchema>
 
-// docs/architecture-overview.md § Fleet semantics lists exactly these five. A fingerprint mismatch is
-// deliberately NOT a sixth: it surfaces as `offline` carrying an `identity_mismatch` error, because it
-// is a reason a node is unreachable rather than a distinct steady state.
+// docs/architecture-overview.md § Client state and fleet behavior lists exactly these five. A
+// fingerprint mismatch is not a sixth: it surfaces as `offline` carrying an `identity_mismatch`
+// error, because it is a reason a node is unreachable rather than a distinct steady state.
 export const nodeConnectionStateSchema = z.enum(['online', 'degraded', 'offline', 'incompatible', 'revoked'])
 export type NodeConnectionState = z.infer<typeof nodeConnectionStateSchema>
 
 export const nodeStatusSchema = z.strictObject({
   nodeId: z.string(),
   state: nodeConnectionStateSchema,
-  // Set when the state has a nameable cause the UI must render differently — above all
+  // Set when the state has a nameable cause the UI must render differently. Above all
   // `identity_mismatch`, which docs/security.md makes a hard stop, never an auto-retrust.
   error: z
     .strictObject({
@@ -62,16 +62,17 @@ export const nodeStatusSchema = z.strictObject({
 })
 export type NodeStatus = z.infer<typeof nodeStatusSchema>
 
-// A node the client knows about. Membership is client-side state (docs/architecture-overview.md § What runs where),
-// so this is main's record, not something a node reports about itself.
+// A node the client knows about. Membership is client-side state
+// (docs/architecture-overview.md § Client state and fleet behavior), so this is main's record, not
+// something a node reports about itself.
 export const nodeRecordSchema = z.strictObject({
   nodeId: z.string().min(1),
   label: z.string(),
   endpoint: z.string().url(),
   // Absent for a plain-http local node; present once there is a certificate to pin against.
   fingerprint: z.string().optional(),
-  // True for the node this client spawned and supervises. Exactly one, and it cannot be unpaired —
-  // only the app's own data root defines it.
+  // True for the node this client spawned and supervises. Exactly one, and it cannot be unpaired.
+  // Only the app's own data root defines it.
   local: z.boolean(),
 })
 export type NodeRecord = z.infer<typeof nodeRecordSchema>
@@ -82,14 +83,14 @@ export type NodeRecord = z.infer<typeof nodeRecordSchema>
 // nodeBrokerIpc.ts exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
 // compromised renderer asked for…" reasoning about the files that hold device tokens.
 //
-// There is deliberately no "add this node with this token" shape. The only route into the fleet is
-// probe-then-pair, which is what forces the fingerprint confirmation to happen.
+// There is no "add this node with this token" shape. The only route into the fleet is probe-then-pair,
+// which forces the fingerprint confirmation to happen.
 
 export const nodeProbeRequestSchema = z.strictObject({ endpoint: z.string().url() })
 export type NodeProbeRequest = z.infer<typeof nodeProbeRequestSchema>
 
 // What the owner is asked to compare against the fingerprint the node itself displays. That
-// out-of-band comparison IS the security of pairing (docs/api-reference.md § Pairing) — reading a
+// out-of-band comparison is the security of pairing (docs/api-reference.md § Pairing): reading a
 // fingerprint over the very connection being authenticated proves nothing on its own.
 //
 // The certificate stays in main and is never part of this reply: main remembers the probe, so `pair`
@@ -98,8 +99,8 @@ export type NodeProbeResult = {
   endpoint: string
   fingerprint: string
   protocolVersion: number
-  // False for a protocol major the client cannot speak — the `incompatible` state, decided before
-  // pairing rather than after (docs/architecture-overview.md § Fleet semantics).
+  // False for a protocol major the client cannot speak: the `incompatible` state, decided before
+  // pairing rather than after (docs/architecture-overview.md § Client state and fleet behavior).
   compatible: boolean
 }
 
@@ -118,19 +119,18 @@ export const nodeRenameRequestSchema = z.strictObject({
 })
 export type NodeRenameRequest = z.infer<typeof nodeRenameRequestSchema>
 
-// Unpair vs revoke, the distinction docs/ui-design.md § Node management insists is labeled: `revoke: false` is
-// this client forgetting the node, `revoke: true` also asks the node to forget this client. Confusing
-// them loses access to a remote node, so the two are one flag on one route rather than two verbs that
-// look alike.
+// Unpair vs revoke (docs/authentication.md § Device tokens): `revoke: false` is this client
+// forgetting the node, `revoke: true` also asks the node to forget this client. Confusing them loses
+// access to a remote node, so the two are one flag on one route rather than two verbs that look alike.
 export const nodeForgetRequestSchema = z.strictObject({
   nodeId: z.string().min(1),
   revoke: z.boolean(),
 })
 export type NodeForgetRequest = z.infer<typeof nodeForgetRequestSchema>
 
-// Opening a preview tunnel (docs/api-reference.md § Streams). The renderer names a task and a port on the
-// node and gets back a LOOPBACK port on this machine — never an endpoint, never a token. The pipe itself is
-// main's, like every other byte to or from a node.
+// Opening a preview tunnel (docs/api-reference.md § WebSocket). The renderer names a task and a port
+// on the node and gets back a loopback port on this machine, never an endpoint and never a token. The
+// pipe itself is main's, like every other byte to or from a node.
 export const nodeTunnelRequestSchema = z.strictObject({
   nodeId: z.string().min(1),
   taskId: z.string().min(1),
