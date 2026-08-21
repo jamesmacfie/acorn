@@ -1,4 +1,5 @@
-import { createResource, type Accessor, type InitializedResourceReturn } from 'solid-js'
+import { createEffect, createResource, onCleanup, type Accessor, type InitializedResourceReturn } from 'solid-js'
+import { hashKey } from '@tanstack/solid-query'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { clientFor, nodes, nodeState, nodeStatus } from './fleet'
 import { freshnessOf, type Freshness } from './freshness'
@@ -163,11 +164,29 @@ export function createFleetQuery<T, D = void>(
   // hold IS the pre-answer state, and an empty one renders as "no rows, nothing unavailable" rather
   // than as a spinner with no deadline.
 ): InitializedResourceReturn<FleetResult<T>> {
-  return createResource(
+  const resource = createResource(
     // The fleet is part of the source so pairing, unpairing or a node coming back re-runs the fan-out.
     // `nodeIds` is joined into the key rather than compared by identity, which an array literal would fail.
     () => ({ dep: deps(), fleet: nodes().map((node) => `${node.nodeId}:${nodeStatus(node.nodeId)?.state ?? ''}`).join(',') }),
     ({ dep }) => fetchFleet(queryKey(dep), (nodeId, signal) => fetch(nodeId, dep, signal), options),
     { initialValue: cachedFleet<T>(queryKey(deps()), options) },
   )
+  createEffect(() => onCleanup(onFleetInvalidation(queryKey(deps()), () => void resource[1].refetch())))
+  return resource
+}
+
+// A write invalidates the domain key on the node's own QueryClient, which is all a `createQuery`
+// reader needs. A resource hears nothing, so the topbar workspace picker went on showing the list
+// from before the write until something else happened to re-run the fan-out. Listen for the
+// invalidation the mutation already sends, on every node, since the write may target any of them.
+//
+// Only the `invalidate` action, so the fan-out's own `fetchQuery` writes cannot loop back into a
+// refetch.
+export function onFleetInvalidation(queryKey: readonly unknown[], run: () => void): () => void {
+  const wanted = hashKey(queryKey)
+  const off = nodes().map((node) => clientFor(node.nodeId).client.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action.type !== 'invalidate') return
+    if (hashKey(event.query.queryKey) === wanted) run()
+  }))
+  return () => { for (const unsubscribe of off) unsubscribe() }
 }
