@@ -3,9 +3,9 @@ import { z } from 'zod'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
-// Local-changes review (docs/panes.md): the ChangesPane's working-tree status/diff/blob reads and
-// stage/commit/discard/push actions. Was the `local:*` IPC channels; now task-
-// scoped HTTP behind the LocalGitBridge (main/localGit.ts). Pure-Node → works in dev:node.
+// The ChangesPane's working-tree status, diff and blob reads, plus stage, commit, discard and push
+// actions. Was the `local:*` IPC channels; now task-scoped HTTP behind the LocalGitBridge
+// (main/localGit.ts). Pure Node, so it works in dev:node.
 
 export type LocalScope = 'unstaged' | 'staged'
 export type GitActionResult = { ok: boolean; reason?: string }
@@ -27,7 +27,8 @@ export const LOCAL_GIT = routeCapability<LocalGitBridge>('changes.localGit')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
 export const setLocalGitBridge = (bridge: LocalGitBridge | null): void => setRouteTestCapability(LOCAL_GIT, bridge)
 
-// Stage/discard/commit run git against the worktree, so path/message bodies are validated (§1).
+// Stage, discard and commit run git against the worktree, so the path and message bodies get zod
+// validation and a malformed-body test.
 const pathBody = z.object({ path: z.string().min(1) })
 const discardBody = z.object({ path: z.string().min(1), untracked: z.boolean().optional() })
 const commitBody = z.object({ message: z.string() })

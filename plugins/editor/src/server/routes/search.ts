@@ -3,10 +3,10 @@ import { z } from 'zod'
 import type { SearchResult } from '../../shared/search'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
-// Find-in-files (docs/panes.md): project-wide text search over the task's worktree via ripgrep.
-// Replaced the `search:findInFiles` IPC channel. The taskId in the path is the capability: the renderer
-// never hands us a worktree path, and the bridge re-derives it from the DB and runs rg with cwd:root.
-// Server-backed and pure Node, so it works in dev:node too.
+// Find-in-files: project-wide text search over the task's worktree via ripgrep. Replaced the
+// `search:findInFiles` IPC channel. The taskId in the path is the capability: the renderer never
+// hands us a worktree path, and the bridge re-derives it from the DB and runs rg with cwd:root.
+// Server-backed and pure Node, so it also works in dev:node.
 
 // The main-process backing (main/search.ts): resolve the task worktree and run ripgrep.
 export type SearchBridge = {
@@ -18,8 +18,8 @@ export const SEARCH = routeCapability<SearchBridge>('editor.searchRoute')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
 export const setSearchBridge = (bridge: SearchBridge | null): void => setRouteTestCapability(SEARCH, bridge)
 
-// Search spawns a process, so the body is validated: the privileged-boundary contract asks for a zod
-// schema plus a malformed-body test. Unknown keys are stripped, and toggles default to off.
+// Search spawns a process, so the body gets zod validation and a malformed-body test. Unknown
+// keys are stripped, and toggles default to off.
 const searchBody = z.object({
   query: z.string().min(1),
   opts: z

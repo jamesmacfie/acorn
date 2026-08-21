@@ -1,7 +1,6 @@
-// Find-in-files (docs/panes.md): project-wide text search over the task's worktree, backed by
-// ripgrep. Keyed by taskId → taskRoot (the taskId is the capability; the renderer never hands us a
-// path — rg runs with cwd:root and searches `.`), mirroring editor:files in localGitIpc.ts.
-// Exposed as the SearchBridge (server/routes/search.ts); no longer an IPC channel.
+// Find-in-files: project-wide text search over the task's worktree, backed by ripgrep. Keyed by
+// taskId, not path: the renderer never hands us a path, so this resolves taskId to taskRoot and rg
+// runs with cwd:root, searching `.`. Exposed as the SearchBridge (server/routes/search.ts).
 import { execFile } from 'node:child_process'
 import { sep } from 'node:path'
 import { promisify } from 'node:util'
@@ -10,8 +9,8 @@ import type { SearchBridge, SearchOpts } from '../server/routes/search'
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { FileHits, SearchResult } from '../shared/search'
 
-// Only the task→worktree resolution, from core, which owns `tasks`. This plugin owns no tables and so
-// holds no database handle at all (docs/data-layer.md § Plugin DBs).
+// Only the task-to-worktree resolution, from core, which owns `tasks`. This plugin owns no tables
+// (docs/data-layer.md § Plugin databases).
 export type SearchCoreServices = Pick<CoreServices, 'tasks'>
 
 const MAX_TOTAL_HITS = 2000 // Bound the response; the pane reports when results are truncated.
@@ -65,19 +64,19 @@ export function parseRgJson(stdout: string): SearchResult {
     try {
       ev = JSON.parse(raw) as RgEvent
     } catch {
-      continue // non-JSON noise — skip defensively
+      continue // non-JSON noise, skip defensively
     }
     if (ev.type === 'begin') {
       const raw = ev.data?.path?.text
       // Strip rg's `./` prefix (from searching path `.`) so paths match the git-ls-files-relative
-      // form the tree / editor tabs / editorOpen use — otherwise a hit opens a mismatched tab.
+      // form the tree, editor tabs, and editorOpen use. Otherwise a hit opens a mismatched tab.
       const path = raw?.startsWith('./') ? raw.slice(2) : raw
       current = path ? { path, hits: [] } : null // no text = non-UTF8 filename; skip the file
       if (current) files.push(current)
     } else if (ev.type === 'match' && current) {
       const line = ev.data?.line_number
       const text = ev.data?.lines?.text
-      if (line == null || text == null) continue // bytes payload (non-UTF8 line) — skip
+      if (line == null || text == null) continue // bytes payload (non-UTF8 line), skip
       const content = text.replace(/\r?\n$/, '')
       const preview = content.slice(0, MAX_PREVIEW_LEN)
       for (const sm of ev.data?.submatches ?? []) {
@@ -100,20 +99,22 @@ export function parseRgJson(stdout: string): SearchResult {
   return { files: files.filter((f) => f.hits.length), truncated }
 }
 
-// Run ripgrep over the task's worktree. Unknown task / unmapped repo → empty result (the pane just
-// shows no hits), never an error — the taskId is the capability and a stale one is benign.
+// Run ripgrep over the task's worktree. An unknown task or unmapped repo returns an empty result,
+// never an error: the taskId is the capability, and a stale one is benign, so the pane just shows
+// no hits.
 export async function searchInFiles(core: SearchCoreServices, taskId: string, query: string, opts: SearchOpts): Promise<SearchResult> {
   const root = await core.tasks.root(taskId)
   if (!root || !query) return { files: [], truncated: false }
-  // --json: robust structured output (no path:line:text colon ambiguity). rg already honours
-  // .gitignore and skips binary/hidden — the same set editor:files offers. --no-config so a
-  // user's RIPGREP_CONFIG_PATH can't change the flags we depend on.
+  // --json avoids path:line:text colon ambiguity. rg already honours .gitignore and skips
+  // binary/hidden files, the same set editor:files offers. --no-config keeps a user's
+  // RIPGREP_CONFIG_PATH from changing the flags this depends on.
   const args = ['--json', '--no-config']
   if (!opts.regex) args.push('--fixed-strings')
   if (!opts.caseSensitive) args.push('--ignore-case')
   if (opts.wholeWord) args.push('--word-regexp')
-  // The trailing `.` is REQUIRED: with no path arg and stdin not a TTY (execFile pipes it), rg
-  // blocks reading stdin forever and only dies at the timeout. `.` = search cwd (the worktree).
+  // The trailing `.` is required: with no path argument and stdin not a TTY (execFile pipes it),
+  // rg blocks reading stdin forever and only dies at the timeout. `.` means search the cwd, the
+  // worktree.
   args.push('--', query, '.')
   const { stdout } = await promisify(execFile)(ripgrepExecutablePath(rgPath), args, {
     cwd: root,

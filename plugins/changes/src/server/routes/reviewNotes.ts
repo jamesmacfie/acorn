@@ -5,14 +5,12 @@ import type { ReviewNote } from '../../shared/api'
 import { type AppEnv, type CoreServices, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { reviewNotes as reviewNotesTable } from '../../node/schema'
 
-// Local review notes (docs/panes.md): CRUD over this plugin's review_notes table. The send loop:
-// create (unsent) → deliver via sendToAgent → POST /sent stamps sentAt → an edit clears it, so the UI
-// always shows sent/unsent truthfully. Mounted under /v2/p/changes/tasks.
+// CRUD over this plugin's review_notes table, mounted under /v2/p/changes/tasks. The send loop:
+// create as unsent, deliver via sendToAgent, POST /sent stamps sentAt, and an edit clears it again,
+// so the UI always shows sent/unsent truthfully.
 //
-// A FACTORY over the plugin's own database, not a module-scope router reading getDb(c.env). Two
-// reasons: the table lives in <data-root>/plugins/changes.sqlite now, and c.env deliberately does not
-// carry per-plugin handles (docs/data-layer.md § Plugin DBs). The handle arrives at plugin init, so
-// there is no request that can reach an unmigrated database.
+// A factory over the plugin's own database, not a module-scope router reading getDb(c.env); see
+// docs/data-layer.md § Plugin databases.
 
 type Row = typeof reviewNotesTable.$inferSelect
 
@@ -67,7 +65,7 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
       await db.insert(reviewNotesTable).values(row)
       return c.json(rowToNote(row))
     })
-    // Edit clears sentAt (orca's pattern) — an edited note is unsent again.
+    // Edit clears sentAt, so an edited note counts as unsent again (orca's pattern).
     .patch('/:id/review-notes/:noteId', async (c) => {
       const body = (await c.req.json().catch(() => ({}))) as { body?: string }
       if (!body.body?.trim()) return respondError(c, 400, 'bad_request')

@@ -5,16 +5,10 @@ import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import './search.css'
 
-// Find-in-files (docs/panes.md): project-wide text search over the task's worktree via ripgrep.
-// Substring by default, with case / whole-word / regex toggles. Double-clicking a hit opens the file
-// in the editor beside it, centered on the match.
-//
-// A PANEL in the editor pane's sidebar rather than a pane of its own, the way VS Code's sidebar works:
-// one surface for one mental model ("find something in this project, open it"), and a result click is
-// now a selection inside the pane that already owns the file tree and tabs.
-//
-// HIDDEN, not unmounted, when the sidebar is showing the tree — a query and its results survive
-// flipping to Files and back, which is the whole reason the sidebar is a toggle and not a router.
+// Find-in-files panel: substring search by default, with case, whole-word and regex toggles.
+// Double-clicking a hit opens the file in the editor beside it, centered on the match. Why this is
+// a sidebar panel rather than its own pane, and why it stays mounted when hidden, is in
+// docs/panes.md § Contributions (and the migration history in docs/third-party/editor.md).
 export default function SearchPanel(props: { taskId: string; active: boolean }) {
   const [query, setQuery] = createSignal('')
   const [debounced, setDebounced] = createSignal('')
@@ -22,8 +16,8 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   const [wholeWord, setWholeWord] = createSignal(false)
   const [regex, setRegex] = createSignal(false)
 
-  // Debounce keystrokes so we don't spawn ripgrep per character; toggles apply immediately (they're
-  // part of the resource source, not debounced).
+  // Debounces keystrokes so ripgrep does not spawn per character; toggles apply immediately since
+  // they are part of the resource source, not debounced.
   const pushDebounced = debounce((q: string) => setDebounced(q), 200)
   const onInput = (v: string) => {
     setQuery(v)
@@ -41,16 +35,16 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
 
   const totalHits = createMemo(() => (results()?.files ?? []).reduce((n, f) => n + f.hits.length, 0))
 
-  // Still the retained pane intent, not a callback prop, even though the editor is now this panel's own
-  // pane: the reveal path is one code path whether the request came from here or from another pane, and
-  // the panel does not have to know how the pane it lives in swaps Monaco models.
+  // Still the retained pane intent rather than a callback prop; see docs/third-party/editor.md §
+  // "What it cost, now that it is done".
   function openHit(path: string, hit: SearchHit) {
     requestEditorReveal(props.taskId, path, hit.line, hit.col)
   }
 
-  // Focus the box when the sidebar flips to Search — including when ⌘⇧F did the flipping, which is the
-  // entry point that replaced the old pane's chord. A microtask, because the panel is display:none until
-  // the same render that sets `active` and a hidden input cannot take focus.
+  // Focus the box whenever the sidebar flips to Search, including when the retained `editor:search`
+  // intent does the flipping (docs/panes.md § Contributions). Deferred to a microtask because the
+  // panel is display:none until the same render that sets `active`, and a hidden input cannot take
+  // focus.
   let input: HTMLInputElement | undefined
   createEffect(on(() => props.active, (active) => {
     if (active) queueMicrotask(() => input?.focus())
@@ -77,7 +71,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
           onInput={(e) => onInput(e.currentTarget.value)}
         />
         <Toolbar.Group class="search-toggles">
-          {/* Three independent booleans, so three ToggleButtons — not a radiogroup, which would make
+          {/* Three independent booleans, so three ToggleButtons, not a radiogroup, which would make
               them mutually exclusive. */}
           <ToggleButton variant="bare" size="sm" class="search-toggle" title="Match case" pressed={caseSensitive()} onPressedChange={setCaseSensitive}>Aa</ToggleButton>
           <ToggleButton variant="bare" size="sm" class="search-toggle" title="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>

@@ -1,9 +1,9 @@
-/* ChangesPane (docs/panes.md): file list + local diff, flat/1px-bordered per docs/ui-design.md. */
+/* ChangesPane: file list and local diff. See docs/ui-design.md § Two-column panes. */
 .changes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
-/* ListDetail owns the split, the column width and the divider, so `.changes-body` is gone entirely.
-   The non-Git fallback had borrowed it purely for the class name and was getting `display: flex` with
-   it, which laid its two paragraphs side by side; it is `.changes-empty` alone now and they stack.
-   The `--bg-subtle` tint went with the flat list column. */
+/* ListDetail now owns the split, column width and divider (docs/ui-design.md § Two-column panes),
+   so `.changes-body` is gone. The non-Git fallback had borrowed it only for the class name and
+   picked up `display: flex`, which laid its two paragraphs side by side; it is `.changes-empty`
+   alone now, and they stack. */
 .changes-list { overflow-y: auto; }
 /* Group heads reuse .section-header (see JSX) so the two lists match the pane title; just size the
    divider down a touch inside the scrolling list. */
@@ -23,14 +23,14 @@
 .changes-empty { padding: var(--space-5); font-size: var(--fs-sm); }
 .changes-diff { flex: 1; min-width: 0; overflow: auto; }
 
-/* File-row "add to agent" affordance (docs/panes.md). */
-/* :focus-within as well as :hover — a keyboard user could not reach this at all. */
+/* File-row "add to agent" affordance. :focus-within as well as :hover, since a keyboard user could
+   not otherwise reach it. */
 .changes-toolbar .changes-to-agent { visibility: visible; }
 .changes-toolbar .changes-to-agent:disabled { opacity: 0.35; cursor: default; color: var(--text-faint); }
 
-/* Review notes (docs/panes.md): flat inline annotation under its anchor line. */
+/* Review notes: flat inline annotation under its anchor line. */
 .changes-header { display: flex; align-items: center; gap: var(--space-5); }
-/* Push status sits in the uppercased .section-header — opt back out of the shouty casing. */
+/* Push status sits inside the uppercased .section-header; this opts back out of that casing. */
 .changes-push-status { text-transform: none; letter-spacing: normal; font-weight: 400; color: var(--text-muted); }
 .review-note {
   display: flex;
@@ -47,7 +47,7 @@
 .review-note-status { flex: none; color: var(--text-muted); }
 .review-note-body { flex: 1; min-width: 0; white-space: pre-wrap; }
 
-/* Commit box (docs/panes.md) at the bottom of the file list. */
+/* Commit box at the bottom of the file list. */
 .changes-commit { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: var(--chrome-divider); }
 
-/* Armed for a second click (createArmedConfirm) — the button IS the prompt. */
+/* Armed for a second click via createArmedConfirm; the button itself is the prompt. */

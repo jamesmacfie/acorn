@@ -18,13 +18,13 @@ export function evictEditorViewStates(taskId: string): void {
   for (const key of viewStates.keys()) if (key.includes(suffix)) viewStates.delete(key)
 }
 
-// Same reason as clearEditorStates: keyed by a node-minted task id, must not outlive a node switch.
+// Keyed by a node-minted task id; must not outlive a node switch (docs/state.md § Scope rules).
 export function clearEditorViewStates(): void {
   viewStates.clear()
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered beside the signal it clears rather than in the shell's evictor list
+// (docs/state.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorViewStates(e.taskId)
   else if (e.scope === 'node-switched') clearEditorViewStates()
