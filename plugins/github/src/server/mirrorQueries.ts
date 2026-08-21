@@ -2,6 +2,7 @@ import { and, count, eq } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import type { MirroredPullRequest } from '../contract/mirror'
 import { checks, prFiles, pullRequests, repos, syncState } from '../node/schema'
+import { repoMatches } from './repoMatch'
 
 // A mirrored repo row's GitHub id, for a (userId, owner, name). The mirror is keyed by the numeric
 // GitHub repo id everywhere below, and nothing outside this plugin can resolve owner/name to that
@@ -11,7 +12,7 @@ async function mirroredRepoId(db: PluginDatabase, userId: string, repoOwner: str
   const [row] = await db
     .select({ id: repos.id })
     .from(repos)
-    .where(and(eq(repos.userId, userId), eq(repos.owner, repoOwner), eq(repos.name, repoName)))
+    .where(and(eq(repos.userId, userId), repoMatches(repoOwner, repoName)))
   return row?.id ?? null
 }
 

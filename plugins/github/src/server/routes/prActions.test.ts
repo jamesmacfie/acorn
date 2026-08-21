@@ -48,6 +48,14 @@ describe('prActions auth + ApiError envelope (no GitHub call paths)', () => {
     expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'repo_not_found' })
   })
 
+  // Core folds the project facet it hands the client (`runn-fast`), the mirror keeps GitHub's own
+  // spelling (`Runn-Fast`), so a case-sensitive match reported every such repo as unmirrored.
+  it('resolves a mirrored repo whose owner differs only in case', async () => {
+    await plugin.db.insert(repos).values({ userId: 'james', id: 2, owner: 'Acme-Corp', name: 'Widget', fetchedAt: Date.now() })
+    const res = await req(PRINCIPAL, 'POST', '/api/repos/acme-corp/widget/pulls/1/viewed', { path: 'src/a.ts', viewed: true })
+    expect(res.status).toBe(200)
+  })
+
   it('bad_number (ApiError) for a non-integer PR number', async () => {
     const res = await req(PRINCIPAL, 'POST', '/api/repos/acme/widget/pulls/abc/merge', { method: 'merge' })
     expect(res.status).toBe(400)

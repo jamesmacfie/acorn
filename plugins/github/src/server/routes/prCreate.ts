@@ -6,6 +6,7 @@ import type { Branch, Compare } from '../../contract/api'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { githubToken } from '../githubToken'
 import { repos, syncState } from '../../node/schema'
+import { repoMatches } from '../repoMatch'
 
 // Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror,
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
@@ -132,7 +133,7 @@ export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
     const [repoRow] = await db
       .select({ id: repos.id })
       .from(repos)
-      .where(and(eq(repos.userId, uid), eq(repos.owner, owner), eq(repos.name, repo)))
+      .where(and(eq(repos.userId, uid), repoMatches(owner, repo)))
     if (repoRow)
       await db
         .delete(syncState)

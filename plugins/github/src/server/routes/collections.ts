@@ -12,6 +12,7 @@ import {
   pullsSearchQuery,
 } from '../../contract/collections'
 import { pullRequests, repos } from '../../node/schema'
+import { repoMatches } from '../repoMatch'
 
 // The collection half of the PR mirror (@acorn/protocol/collections.ts). One route, one question:
 // the open pull requests this user has mirrored, across every repository, newest first.
@@ -142,7 +143,7 @@ export const collections = (db: PluginDatabase) => new Hono<AppEnv>().get(`/${PU
     .where(and(
       eq(pullRequests.userId, userId),
       eq(pullRequests.state, 'open'),
-      ...(owner && name ? [eq(repos.owner, owner), eq(repos.name, name)] : []),
+      ...(owner && name ? [repoMatches(owner, name)] : []),
     ))
     .orderBy(desc(pullRequests.updatedAt))
     .limit(MAX_COLLECTION_ROWS)

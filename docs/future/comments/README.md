@@ -20,14 +20,18 @@ For every comment in the repo, one of three outcomes:
    then do (1). `docs/architecture-overview.md § Package boundaries` is the worked example: it was
    lifted wholesale out of `tools/arch/boundaries.test.ts`, which until then was the only record of
    nineteen enforced rules.
-3. **It is a fact about *this code*** → keep it, rewritten plainly. Unit traps, invariants, "checked
+3. **It is a fact about *this code* that is non obvious** → keep it, rewritten plainly. Unit traps, invariants, "checked
    below", "read per call, not per registration", "node:sqlite refuses a second close". None of that is
-   doc material and none of it should move.
+   doc material and none of it should move. Keep if useful to a developer or agent. Assume
+   the agent or developer has some sense, do not keep comments for comments sake. Only keep if
+   actually useful.
 
 The test for (1) versus (2): open the doc and search. Do not guess. If the doc says it, the comment is
 a duplicate however well written.
 
 ## The style, for anything that stays
+
+Read through the `/readable` skill and use that.
 
 Plain English, said the way you would say it to a colleague at your desk. The house rules, which are
 the Google developer documentation style guide plus an anti-slop pass:
@@ -80,25 +84,9 @@ Before and after, from `pluginContract.ts`:
 comment says "git history". The retired specs were deleted on purpose and their behaviour moved into
 the docs above.
 
-## What is already done
+Work through docs/future/comments/groups.md
 
-Commit `4a13b7e7`. Do not redo any of it.
-
-- **Every dead doc pointer is fixed.** 58 references cited docs retired when their features shipped
-  (`docs/future/dashboards/{charts,measure-history,placements,tabs,wizard}.md`, `docs/next/context-ui.md`,
-  `docs/third-party/linear.md`, `docs/future/node-first/platform-seam.md`, the
-  `docs/workspaces-and-tasks.md/03` sub-paths). 52 files repointed. Every doc reference in the repo now
-  resolves or explicitly says "git history". **Re-run the audit below before you finish, because it is
-  easy to reintroduce one.**
-- **`docs/architecture-overview.md § Package boundaries` is new**, lifted from `boundaries.test.ts`.
-- **A prose pass over ~155 files**, and the full lift on four: `protocol/src/pluginContract.ts` (−47%
-  comment text), `tools/arch/boundaries.test.ts` (−53%), `node-core/server/plugin/host.ts` (−18%),
-  `node-core/server/plugin/types.ts` (−24%).
-
-## What is left
-
-Do not work from a file list; generate one. A file is unconverted if its comments still carry em dashes
-or shouted emphasis:
+A file is unconverted if its comments still carry em dashes or shouted emphasis:
 
 ```bash
 python3 - <<'PY'
