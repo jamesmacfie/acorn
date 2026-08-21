@@ -2,7 +2,7 @@
 .agent-pricing-heading { margin: 0 0 var(--space-4); }
 /* Table owns the h-scroll wrapper, the min-width floor and the cell/header styling. This keeps the
    settings page's boxed frame around it. */
-/* The boxed frame goes on the scroll wrapper, which Table renders — hence `:has()`, since the call
+/* The boxed frame goes on the scroll wrapper, which Table renders. Hence `:has()`, since the call
    site's class lands on the <table> itself. */
 .ui-table-scroll:has(> .agent-pricing-table) {
   border: var(--surface-border);

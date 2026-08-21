@@ -35,8 +35,8 @@ type LiveSession = {
 }
 
 export type AgentRuntimeOptions = {
-  // This plugin's OWN SQLite file (main/pluginStorage.ts), not core's handle. Everything the engine
-  // reads and writes is in the ten `agent_*` tables now (node/schema.ts).
+  // This plugin's own SQLite file (main/pluginStorage.ts), not core's handle. Everything the engine reads
+  // and writes is in the ten `agent_*` tables (node/schema.ts).
   db: PluginDatabase
   dataDir: string
   // The three questions this engine has to ask about a task and can no longer answer itself: where its
@@ -82,11 +82,11 @@ export class ManagedAgentEngine {
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
   protected readonly live = new Map<string, LiveSession>()
-  // Every in-flight provider reconnect delay (onProviderClosed schedules up to three per session).
-  // Tracked so stop() can cancel them: an untracked timer fires up to five seconds AFTER teardown and
-  // calls ensureSession, which would spawn a provider child and query a closed SQLite handle. It is a
-  // real failure and not a theoretical one — apps/node/src/service/runtime.test.ts starts the whole
-  // runtime four times in ONE process, so a leaked timer from boot 1 lands inside boot 2.
+  // Every in-flight provider reconnect delay (onProviderClosed schedules up to three per session). Tracked
+  // so stop() can cancel them: an untracked timer that fires after teardown calls ensureSession, which
+  // spawns a provider child against a closed SQLite handle.
+  // `apps/node/src/service/runtime.test.ts` starts the runtime several times in one process, so a leaked
+  // timer from an earlier boot lands inside a later one.
   protected readonly reconnectTimers = new Set<ReturnType<typeof setTimeout>>()
   protected readonly listeners = new Set<RuntimeListener>()
   protected readonly providerEvents: DurableAgentEventBuffer
@@ -109,10 +109,10 @@ export class ManagedAgentEngine {
     this.store = new AgentStore(options.db, options.core)
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
-    // The redaction list is now COLLECTED rather than computed once: each session gets its own
-    // scoped internal token (server/auth/internalTokens.ts), so there is no single env record whose
-    // secrets stand for every session's. #mintedSecrets accumulates them as sessions start, and the
-    // materializer reads it live — one shared array it keeps a reference to.
+    // The redaction list is collected as sessions start, not computed once, because each session mints its
+    // own scoped internal token (docs/security.md § Credential handling) rather than sharing one env
+    // record. #mintedSecrets accumulates them and the materializer keeps a live reference to the same
+    // array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
@@ -168,11 +168,8 @@ export class ManagedAgentEngine {
     await this.webhooks.reconcile()
   }
 
-  // Release everything this engine holds, in the order that cannot resurrect any of it: cancel the
-  // pending reconnects FIRST (each one would otherwise call ensureSession and repopulate `live`), then
-  // stop the live sessions, flush the durable event buffer's own per-session timers, and stop the
-  // webhook pump. Called from the plugin's dispose (node/index.ts) before the database is closed,
-  // because every step above may still write a final row.
+  // Releases what this engine holds, in the order docs/managed-agents.md § Operations and failure
+  // describes. Called from the plugin's dispose (node/index.ts) before the database closes.
   async stop(): Promise<void> {
     this.stopped = true
     for (const timer of this.reconnectTimers) clearTimeout(timer)
@@ -186,9 +183,9 @@ export class ManagedAgentEngine {
   }
 
   protected async ensureSession(session: AgentSession): Promise<LiveSession> {
-    // Checked here rather than only at the call sites: this is the ONE door into spawning or
-    // reconnecting a provider child, and after stop() the database handle is about to close. Without
-    // it, a turn already in flight through pump() could start a provider during teardown.
+    // The only door into spawning or reconnecting a provider child. Checked here, not just at each call
+    // site, because after stop() the database handle is about to close; without it, a turn already in
+    // flight through pump() could start a provider mid-teardown.
     if (this.stopped) throw new Error('The managed agent runtime is shutting down.')
     const existing = this.live.get(session.id)
     if (existing?.handle) return existing
@@ -219,15 +216,13 @@ export class ManagedAgentEngine {
     live.stopping = false
     this.live.set(session.id, live)
     const noProviderExecutionHistory = !(await this.store.hasProviderExecutionHistory(session.id))
-    // Scoped to THIS session's task: an agent's credential can no longer drive another task's tools,
-    // and cannot read the owner's provider credentials at all (server/auth/internalTokens.ts).
+    // Scoped to this session's task (docs/security.md § Credential handling). The credential cannot
+    // drive another task's tools or read the owner's provider credentials.
     const sessionEnv = this.internalEnv({ scope: 'task', taskId: session.taskId, sessionId: session.id })
     for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
     live.startPromise = driver.start({
       session,
       cwd,
-      // Scoped to THIS session's task: an agent's credential can no longer drive another task's tools,
-      // and cannot read the owner's provider credentials at all (server/auth/internalTokens.ts).
       env: sessionEnv,
       noProviderExecutionHistory,
       onEvent: (event) => this.onProviderEvent(session.id, event),

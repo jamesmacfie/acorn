@@ -9,8 +9,8 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { AgentAttachmentStore } from './attachmentStore'
 
-// TWO databases, which is the point of the exercise: the attachment rows are in this plugin's file and
-// the `tasks` row the upload guard checks is in CORE's. The store cannot join them any more, so the test
+// Two databases, which is the point of the exercise: the attachment rows are in this plugin's file and
+// the `tasks` row the upload guard checks is in core's. The store cannot join them any more, so the test
 // seeds each through its own handle and hands the store a real CoreServices over core's.
 let coreDb: TestDb
 let pluginDb: TestPluginDb

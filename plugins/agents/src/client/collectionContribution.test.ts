@@ -15,7 +15,7 @@ const session = {
   updatedAt: 1_700_000_000_000,
 } as AgentSession
 
-// The one thing worth pinning: the declared schema and the row mapping drift apart silently — rename a
+// The one thing worth pinning: the declared schema and the row mapping can drift apart silently. Rename a
 // field id on one side and the panel renders empty cells with nothing thrown anywhere.
 describe('agent sessions collection', () => {
   it('fills every declared field, and falls back to the provider for an untitled session', () => {

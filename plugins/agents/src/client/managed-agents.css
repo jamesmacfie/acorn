@@ -158,7 +158,7 @@
 }
 .agent-copy:hover { color: var(--text); }
 /* `.ui-markdown` owns the type, the links, the headings and the code backgrounds. What is left is
-   what a TRANSCRIPT needs that a document does not: a height cap on long tool output, wrapped rather
+   what a transcript needs that a document does not: a height cap on long tool output, wrapped rather
    than scrolled pre, and remote images suppressed by policy (`.agent-remote-image` stands in). */
 .agent-markdown pre,
 .agent-tool pre {

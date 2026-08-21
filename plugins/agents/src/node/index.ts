@@ -21,11 +21,10 @@ export function registerBuiltInProfiles(): void {
   builtInProfileDisposables = [claudeCodeProfile, codexProfile, aiderProfile].map((profile) => agentProfileRegistry.register(profile))
 }
 
-// Registered once per PROCESS, not once per boot. The driver registry is a module singleton whose
-// `register` throws on a duplicate id, and apps/node/src/service/runtime.test.ts starts the runtime four
-// times in one process — which is exactly the shape of bug the capability and route registries were both
-// made per-runtime to avoid. Guarding here is the cheaper fix: a driver factory is stateless (it returns
-// a fresh driver per session), so there is nothing per-boot for it to hold.
+// Guards against a duplicate-registration error, not per-boot state: `apps/node/src/service/runtime.test.ts`
+// starts the runtime several times in one process (docs/plugins.md § Collaboration rules), and the driver
+// registry throws on a repeat id. A driver factory is stateless, so nothing else needs resetting between
+// boots.
 let driversRegistered = false
 function registerBuiltInDrivers(): void {
   if (driversRegistered) return
@@ -38,12 +37,8 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")
 
 // The one thing this plugin still cannot resolve for itself.
 export type AgentsPluginDeps = {
-  // Mints the per-session loopback credential every provider child runs under. It stays an app-supplied
-  // dep for the same stated reason plugins/terminal's does: it closes over the listener's ORIGIN, which
-  // does not exist until after every plugin's init has run, and over INTERNAL_TOKEN — the signing KEY.
-  // Putting that on CoreServices would let any plugin mint a token for any scope, which is the opposite
-  // of what scoping the tokens bought. The engine calls it per session start with
-  // `{ scope: 'task', taskId, sessionId }`, so each agent gets a credential bound to its own task.
+  // Mints the per-session loopback credential, from the composition root rather than CoreServices.
+  // See docs/security.md § Credential handling.
   internalEnv: InternalEnvFactory
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
 }
@@ -57,16 +52,14 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   return {
     name: 'agents',
     required: true,
-    // This module's own URL: the chain sits at plugins/agents/migrations beside it, and the host owns
-    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    // docs/data-layer.md § Migrations: this plugin's migration chain, opened and closed by the host.
     migrationsModule: import.meta.url,
     init: (ctx) => {
       registerBuiltInProfiles()
       registerBuiltInDrivers()
-      // Opened and migrated by the host before init returns: the runtime below closes over the handle and
-      // fills both bridges in this same call, so no request and no provider spawn can reach an
-      // unmigrated database. This chain also creates `agent_events_fts` and its three triggers by hand
-      // — drizzle-kit cannot model a virtual table (node/schema.ts).
+      // Migrated before init returns, so no request or provider spawn can reach an unmigrated
+      // database. See docs/data-layer.md § Migrations, which also covers the hand-written
+      // `agent_events_fts` triggers (node/schema.ts).
       const store = ctx.storage.open()
       const core = ctx.core
 
@@ -126,18 +119,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing — account-scoped provider usage' })
 
-      // Unattended usage collection (docs/schedules.md; cron use case 6). Until now the only thing that
-      // refreshed the plan probes was the usage panel being on screen — `createAgentUsageStore` polls
-      // every five minutes while a consumer is mounted — so the snapshot was as old as the last time
-      // someone looked at it.
-      //
-      // DECLARED DISABLED, and that is the substantive choice. Refreshing spawns the provider CLIs
-      // (main/usage/claudeUsage.ts, codexUsage.ts) and the snapshot is an in-process cache that nothing
-      // reads while no client is open — so on by default this would be child processes every half hour,
-      // forever, on a laptop, warming a value for nobody. Off by default it is a visible, pausable row
-      // the owner turns on if they want their usage numbers already fresh when they open the panel,
-      // which is the whole difference between a schedule and an invisible interval. The client's own
-      // poll is untouched: that is freshness for a person who is present, and it is not this system.
+      // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
       ctx.schedules.register({
         scheduleId: 'usage-refresh',
         name: 'Refresh agent plan usage',
@@ -159,21 +141,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // time and falls back to its own headless runner when it is absent, so a node with this plugin
       // unavailable still runs non-managed workflow steps.
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, createSessionExecute(runtime))
-      // reconcile() is NOT called here, for the same reason workflows' is not: it has to run AFTER the
-      // listener binds (a resumed session's tools call the node's own loopback surface) and it sweeps
-      // every unsettled session, so the composition root drives it through this capability.
+      // reconcile() runs from the composition root, not here, for the same reason workflows' does
+      // (contract/runtime.ts): it must run after the listener binds and it interrupts every unsettled
+      // session.
       ctx.capabilities.provide(AGENTS_RUNTIME, { reconcile: () => runtime!.reconcile() })
     },
-    // Everything init reached out and touched, in reverse. The runtime's stop() is the load-bearing part
-    // and it does four things a second boot in one process would otherwise inherit: cancel the pending
-    // provider-reconnect timers, stop every live provider child, flush the durable event buffer's
-    // per-session timers, and stop the webhook delivery pump. All of it still runs BEFORE the WAL-mode
-    // SQLite file is closed, because the host closes it after this resolves — which is the ordering that
-    // keeps the final transcript rows durable, since every step above may still write one.
-    //
-    // The two bridge slots are cleared explicitly rather than trusting teardown order: without that, a
-    // second startServiceRuntime in one process would serve agent requests through the first boot's
-    // closed database handle.
+    // Releases what init acquired, in the order docs/managed-agents.md § Operations and failure
+    // describes.
     dispose: async () => {
       await runtime?.stop()
       runtime = null

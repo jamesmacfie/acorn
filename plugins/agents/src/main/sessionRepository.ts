@@ -23,16 +23,15 @@ type SessionSearchFilter = {
 }
 
 /**
+/**
  * Session projection, request-resolution, deletion, and search repository.
  *
  * The append-only event transaction lives here because it is the authority that advances the
  * session sequence and all query projections atomically. Turn queue operations remain in
  * AgentStore; both slices share one inherited database handle.
  *
- * `core` answers exactly one question here: which tasks belong to a workspace. The repository asks
- * `CoreServices.tasks.idsForWorkspace()` for those task ids, then filters its own session tables with
- * `inArray`. Cross-plugin references remain plain IDs; the owning plugin validates them when it reads
- * them.
+ * See docs/managed-agents.md § Session model for how a workspace-scoped read resolves task ids
+ * through core before filtering this plugin's own tables.
  */
 export class AgentSessionRepository {
   constructor(
@@ -40,9 +39,9 @@ export class AgentSessionRepository {
     protected readonly core: CoreServices,
   ) {}
 
-  // The workspace filter, resolved once per query. `null` means "no workspace filter"; an empty array
-  // means "this workspace has no tasks", which is a real answer and must narrow to nothing rather than
-  // fall through to unfiltered — the one way an id round trip can go wrong where a JOIN could not.
+  // `null` means no workspace filter; an empty array means this workspace has no tasks, and the
+  // query must narrow to nothing rather than fall through to unfiltered (docs/managed-agents.md §
+  // Session model).
   protected async workspaceTaskIds(workspaceId: string | undefined): Promise<string[] | null> {
     if (!workspaceId) return null
     return this.core.tasks.idsForWorkspace(workspaceId)

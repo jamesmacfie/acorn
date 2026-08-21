@@ -67,8 +67,8 @@ export default function AgentPane(props: { task: Task }) {
 
   // The dep must be the memo, not an inline `() => selected()?.id`. Solid's `on()` runs its callback on
   // every notification without comparing the input, so an inline getter re-fires whenever `selected()`
-  // changes identity — and `loadSnapshot` below ends in `upsertSession`, which replaces that object.
-  // That was an infinite reload loop; a memo dedupes with `===` and keeps it quiet.
+  // changes identity, and `loadSnapshot` below ends in `upsertSession`, which replaces that object. That
+  // was an infinite reload loop; a memo dedupes with `===` and keeps it quiet.
   createEffect(on(selectedSessionId, (sessionId) => {
     setError('')
     if (!sessionId) return

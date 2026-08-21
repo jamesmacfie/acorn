@@ -193,14 +193,14 @@ class FailingStartDriver implements AgentDriver {
 }
 
 describe('managed agent runtime conformance', () => {
-  // Two real databases, because that is now the shape of the thing under test. `testDb` is CORE's — it
-  // holds the workspace/project/task rows seedTask writes, and it is what the runtime reaches
-  // through CoreServices. `pluginDb` is this plugin's own migrated file, holding every `agent_*` table
-  // and the `agent_events_fts` virtual table the workspace search case exercises.
+  // Two real databases, matching the shape of the thing under test. `testDb` is core's: it holds the
+  // workspace/project/task rows seedTask writes, which is what the runtime reaches through CoreServices.
+  // `pluginDb` is this plugin's own migrated file, holding every `agent_*` table and the
+  // `agent_events_fts` virtual table the workspace search case exercises.
   //
   // The workspace-scoping case below is the load-bearing one: before the split it passed through a SQL
-  // JOIN across these two, and it still passes through an id round trip. If `idsForWorkspace` ever
-  // returned the wrong set, or fell back to "unfiltered" on an empty workspace, this is what fails.
+  // join across these two, and it still passes through an id round trip. If `idsForWorkspace` ever
+  // returned the wrong set, or fell back to unfiltered on an empty workspace, this is what fails.
   let testDb: TestDb
   let pluginDb: TestPluginDb
   let core: CoreServices
@@ -382,8 +382,7 @@ describe('managed agent runtime conformance', () => {
     await expect(runtime.store.requireSession(session.id)).rejects.toThrow('Managed agent session not found')
   })
 
-  // Archiving a task retires its agents: they leave the live list every glance surface reads (the
-  // dashboard collection, the Fleet stat, the attention inbox) and turn up in the archived one.
+  // Archiving a task retires its agents (docs/managed-agents.md § Client surfaces).
   it('retires the sessions of an archived task from the live list', async () => {
     const seed = await seedTask(testDb, dataDir)
     runtime = new ManagedAgentRuntime({
@@ -412,7 +411,8 @@ describe('managed agent runtime conformance', () => {
     const archived = await runtime.store.listSessions({ archived: true })
     expect(live.sessions).toEqual([])
     expect(archived.sessions.map((row) => row.id)).toEqual([session.id])
-    // The task drawer pins a task id and is exempt — it is looking at that task.
+    // Exempt: a pinned task id is the task pane looking at its own task (docs/managed-agents.md § Client
+    // surfaces).
     const pinned = await runtime.store.listSessions({ taskId: seed.taskId, archived: false })
     expect(pinned.sessions.map((row) => row.id)).toEqual([session.id])
   })

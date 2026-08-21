@@ -30,13 +30,14 @@ import {
 } from '../../shared/schemas'
 
 export type ManagedAgentsBridge = {
-  // Ownership resolvers, for the task-scope guard below. Three, because this surface is addressed by
-  // three different opaque ids and every one of them is a path to another task's agent: a session id
-  // (turns, cancel, fork, handoff, export), an attachment id, an artifact id. `null` = no such row,
-  // which the guard treats identically to "not yours" so the surface is not an id oracle.
+  // Ownership resolvers for the task-scope guard below (docs/security.md § Transport and auth: routes
+  // addressed by an opaque id resolve their own scope). Three resolvers, because this surface is addressed
+  // by three different opaque ids and each one is a path to another task's agent: a session id (turns,
+  // cancel, fork, handoff, export), an attachment id, an artifact id. `null` means no such row, and the
+  // guard treats that identically to "not yours" so the surface cannot be used to probe which ids exist.
   //
-  // Narrow reads on purpose. The obvious alternative — resolve through `snapshot()` — loads every turn,
-  // event and request for a session just to read one column, on every request.
+  // Narrow reads, not a resolve through `snapshot()`, which would load every turn, event and request for a
+  // session just to read one column, on every request.
   taskIdForSession(sessionId: string): Promise<string | null>
   taskIdForAttachment(attachmentId: string): Promise<string | null>
   taskIdForArtifact(artifactId: string): Promise<string | null>
@@ -107,13 +108,13 @@ const idempotencyKey = (headers: Headers): string | null => {
   return key && key.length >= 8 && key.length <= 200 ? key : null
 }
 
-// A managed agent session drives a provider CLI in a task's worktree, so reaching another task's
-// session is the same class of hole `requireTaskScope` closes for core: read its transcript, enqueue a
-// turn, fork it, hand it to a terminal. None of these paths carries a taskId, so the mount over
-// /v2/p/:plugin/tasks/:id cannot see them and the router resolves the owner itself.
+// Reaching another task's session is the same class of hole `requireTaskScope` closes for core: read its
+// transcript, enqueue a turn, fork it, hand it to a terminal. None of these paths carries a taskId, so the
+// mount over /v2/p/:plugin/tasks/:id cannot see them, and this router resolves the owner itself
+// (docs/security.md § Transport and auth).
 //
-// One factory over three id kinds rather than three middlewares, because the shape is identical and only
-// the resolver differs.
+// One factory over three id kinds rather than three middlewares, since the shape is identical and only the
+// resolver differs.
 const owns = (param: string, resolve: (b: ManagedAgentsBridge, id: string) => Promise<string | null>) =>
   createMiddleware<AppEnv>(async (c, next) => {
     const id = c.req.param(param)
@@ -127,8 +128,8 @@ const owns = (param: string, resolve: (b: ManagedAgentsBridge, id: string) => Pr
 
 const ownsSession = owns('sessionId', (b, id) => b.taskIdForSession(id))
 
-// Pin a list/search filter to a confined caller's own task. Returns null when the caller explicitly
-// asked for a DIFFERENT task, which the route turns into the same 404 every other denial uses — silently
+// Pin a list/search filter to a confined caller's own task. Returns null when the caller explicitly asked
+// for a different task, which the route turns into the same 404 every other denial uses. Silently
 // rewriting that request would answer a question nobody asked.
 const confineFilter = <F extends { taskId?: string }>(c: Context<AppEnv>, filter: F): F | null => {
   const principal = c.get('principal')
@@ -144,15 +145,14 @@ export const managedAgents = new Hono<AppEnv>()
     maxSize: 12 * 1024 * 1024,
     onError: (c) => respondError(c, 413, 'request_too_large'),
   }))
-  // ONE mount per id kind, not a bare/`/*` pair: measured, Hono's trailing `/*` matches zero segments, so
-  // `/sessions/:sessionId/*` already covers `/sessions/:sessionId` itself. (Core's index.ts registers both
-  // forms; that redundancy is harmless and pre-existing, and is not worth reproducing here.)
+  // One mount per id kind, not a bare/`/*` pair: Hono's trailing `/*` matches zero segments, so
+  // `/sessions/:sessionId/*` already covers `/sessions/:sessionId` itself (core's index.ts registers both
+  // forms; that redundancy is harmless and not worth reproducing here).
   //
-  // The same zero-segment match is why `/sessions/search` needs an explicit skip: it is a STATIC sibling
-  // of `/sessions/:sessionId`, Hono applies `.use()` by path regardless of registration order, and
-  // without the skip the guard resolves a session literally named "search", gets null, and 404s a
-  // legitimate query for every confined caller — a working feature broken by its own guard. The search
-  // handler confines its own filter instead (below).
+  // The same zero-segment match is why `/sessions/search` needs an explicit skip. It is a static sibling of
+  // `/sessions/:sessionId`, and Hono applies `.use()` by path regardless of registration order, so without
+  // the skip the guard would resolve a session literally named "search", get null, and 404 a legitimate
+  // query for every confined caller. The search handler confines its own filter instead (below).
   .use('/sessions/:sessionId/*', (c, next) => (c.req.param('sessionId') === 'search' ? next() : ownsSession(c, next)))
   .use('/attachments/:attachmentId/*', owns('attachmentId', (b, id) => b.taskIdForAttachment(id)))
   .use('/artifacts/:artifactId/*', owns('artifactId', (b, id) => b.taskIdForArtifact(id)))
@@ -161,7 +161,7 @@ export const managedAgents = new Hono<AppEnv>()
   .post('/attachments', async (c) => {
     const parsed = attachmentQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    // taskId is a QUERY param here, so no mount and no resolver reaches it.
+    // taskId is a query param here, so no mount and no resolver reaches it.
     if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
     const declaredSize = Number(c.req.header('content-length') ?? 0)
     if (!Number.isFinite(declaredSize) || declaredSize < 0) return respondError(c, 400, 'bad_content_length')
@@ -205,10 +205,10 @@ export const managedAgents = new Hono<AppEnv>()
       'cache-control': 'private, no-store',
     })
   })
-  // Both list surfaces take an OPTIONAL taskId filter, so for a confined caller the filter is the
-  // authorization: omit it (or name another task) and the answer spans the node. Overriding it is
-  // narrower than 404ing the call — an agent legitimately lists and searches its own task's sessions,
-  // and `workspaceId` is left alone because the taskId pin already bounds the result either way.
+  // Both list surfaces take an optional taskId filter, so for a confined caller the filter is the
+  // authorization: omit it, or name another task, and the answer spans the node. Overriding it is narrower
+  // than 404ing the call, since an agent legitimately lists and searches its own task's sessions;
+  // `workspaceId` is left alone because the taskId pin already bounds the result either way.
   .get('/sessions', (c) => {
     const parsed = listQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')

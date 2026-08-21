@@ -83,25 +83,17 @@ export class AgentStore extends AgentSessionRepository {
 
   async listSessions(filter: SessionListFilter = {}): Promise<AgentSessionList> {
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), 100)
-    // The fourth of the workspace joins (sessionRepository.ts holds the other three). Resolved to task
-    // ids through core rather than joined, because `tasks` and workspace membership are in core's database
-    // file and this table is in the plugin's. An empty workspace narrows to nothing — deliberately not
-    // to "unfiltered", which is how an id round trip could silently leak another workspace's sessions
-    // into the Agent Center.
+    // The fourth workspace-scoped read (sessionRepository.ts holds the other three). Resolved to
+    // task ids through core rather than joined, since `tasks` lives in core's database and this
+    // table lives in the plugin's; an empty result narrows to nothing, not to unfiltered
+    // (docs/managed-agents.md § Session model).
     const taskIds = await this.workspaceTaskIds(filter.workspaceId)
     if (taskIds?.length === 0) return { sessions: [], nextCursor: null }
-    // A session outlives its task's worktree but not its task. Archiving a task retires its agents
-    // with it, so the live list — the Agent Center, the Fleet stat, the attention inbox and the
-    // dashboard collection all read it — stops offering runs whose task is gone, and the archived
-    // list picks them up on the other side. Resolved at read time rather than cascaded onto
-    // `archivedAt` when the task is archived, because removing a project hard-deletes its tasks and
-    // no cascade would ever visit those rows.
+    // A session outlives its task's worktree but not its task; a caller already pinned to a task id
+    // is exempt (docs/managed-agents.md § Client surfaces).
     //
-    // A caller that already pinned a task is exempt: the task drawer is looking AT that task, and
-    // asking core again per read would be a query for an answer the caller has.
-    //
-    // ponytail: one extra core read per list call. Fine while `active()` is a small table scan; if
-    // it stops being one, core grows an `activeIds()` and this asks for that instead.
+    // One extra core read per list call. Fine while `active()` is a small table scan; if it stops
+    // being one, core grows an `activeIds()` and this asks for that instead.
     const activeIds = filter.taskId ? null : (await this.core.tasks.active()).map((task) => task.id)
     const liveTask = activeIds && (activeIds.length ? inArray(schema.agentSessions.taskId, activeIds) : sql`0`)
     const retiredTask = activeIds && (activeIds.length ? notInArray(schema.agentSessions.taskId, activeIds) : sql`1`)

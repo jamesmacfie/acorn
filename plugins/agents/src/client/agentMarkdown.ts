@@ -1,6 +1,6 @@
-// Managed-agent Markdown is deliberately stricter than integration Markdown: provider output is
-// untrusted, raw HTML is escaped, remote images never load, and only explicit http(s)/mailto links
-// become anchors. Fenced code carries a validated language hint for the owned Shiki renderer.
+// Managed-agent Markdown is stricter than integration Markdown: provider output is untrusted, raw HTML is
+// escaped, remote images never load, and only explicit http(s)/mailto links become anchors. Fenced code
+// carries a validated language hint for the owned Shiki renderer.
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, (character) => ESCAPES[character])

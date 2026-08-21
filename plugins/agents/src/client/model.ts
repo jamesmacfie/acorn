@@ -1,6 +1,6 @@
 // Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events
-// to the ONE AgentState enum (05 — never redeclared), activity-feed items, and task-sidebar roster
-// composition (PTY sessions + workflow steps merged into one list).
+// to the single AgentState enum (05, never redeclared), activity-feed items, and task-sidebar roster
+// composition (PTY sessions and workflow steps merged into one list).
 import type { AgentState, TerminalSession } from '@acorn/protocol/terminal.ts'
 import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 
@@ -78,8 +78,8 @@ export function stepFeed(step: WorkflowStepRow): { items: FeedItem[]; costUsd: n
   }
 }
 
-// Open-in-terminal (15 P2): the resume command for a step's captured session id, per profile —
-// the same seam the headless argv templates use. Runs through the drawer's $SHELL -lc path.
+// Open-in-terminal (15 P2): the resume command for a step's captured session id, per profile, the
+// same seam the headless argv templates use. Runs through the drawer's $SHELL -lc path.
 export function resumeCommandFor(step: { profileId: string | null; sessionId: string | null; resumeCommand?: string | null }): string | null {
   if (!step.sessionId) return null
   if (/[^A-Za-z0-9_-]/.test(step.sessionId)) return null // session ids are opaque tokens; never shell metachars

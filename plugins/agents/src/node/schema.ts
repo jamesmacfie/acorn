@@ -1,16 +1,10 @@
-// The agents plugin's own tables (docs/data-layer.md § Plugin DBs). Lives in
+// The agents plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
 // <data-root>/plugins/agents.sqlite with its own Drizzle chain, migrated at plugin init.
 //
-// Managed-agent transcript data is owned by this plugin. Nothing here references another database: a
-// `taskId` is a plain ID resolved through CoreServices.tasks, and plugin queries remain local to this
-// SQLite file.
-//
-// The companion FTS5 virtual table (`agent_events_fts`, plus its three append/update/delete triggers
-// over `agent_events`) is created BY HAND in this chain's migration — drizzle-kit does not model
-// virtual tables, so it cannot appear here and it could not be dropped from core's chain
-// automatically either. main/sessionRepository.ts's search path reads it with raw SQL, and
-// migrations/0000_*.sql is the only place its shape is stated; keep the two in step
-// (src/node/ftsSchema.test.ts is the guard).
+// The companion FTS5 virtual table (`agent_events_fts`, plus its three triggers over `agent_events`)
+// is hand-written into the migration rather than declared here; see docs/data-layer.md § Migrations
+// for why. main/sessionRepository.ts's search path reads it with raw SQL, migrations/0000_*.sql is
+// the only place its shape is stated, and node/ftsSchema.test.ts guards the two staying in step.
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Managed agent sessions are task-scoped execution records. Provider-specific resumability remains
@@ -49,8 +43,9 @@ export const agentSessions = sqliteTable(
   ],
 )
 
-// A durable queue entry and the canonical turn projection. One active turn per session is enforced
-// by the service scheduler because SQLite partial uniqueness would be awkward in Drizzle.
+// A durable queue entry and the canonical turn projection. One active turn per session (docs/managed-
+// agents.md § Operations and failure) is enforced by the service scheduler, not a SQLite constraint,
+// since Drizzle models partial uniqueness awkwardly.
 export const agentTurns = sqliteTable(
   'agent_turns',
   {
@@ -78,9 +73,9 @@ export const agentTurns = sqliteTable(
   ],
 )
 
-// Append-only normalized event ledger — the durable ordered history docs/api-reference.md § Streams describes.
-// `searchText` feeds the migration-owned FTS5 virtual table; large bytes and verbose command output
-// live in agent_artifacts instead of this row.
+// Append-only normalized event ledger, the durable ordered history docs/api-reference.md § Streams
+// describes. `searchText` feeds the migration-owned FTS5 virtual table; large bytes and verbose command
+// output live in agent_artifacts instead of this row.
 export const agentEvents = sqliteTable(
   'agent_events',
   {
@@ -179,9 +174,10 @@ export const agentArtifacts = sqliteTable(
   ],
 )
 
-// Idempotency for commands whose resource row does not naturally carry the caller key (session
-// creation and lifecycle changes). Results are small, normalized JSON only. Distinct from core's
-// `idempotency` table, which keys on the caller's deviceId at the HTTP layer.
+// Idempotency for commands whose resource row does not naturally carry the caller's key (session creation
+// and lifecycle changes): internal callers get no device-keyed replay (docs/api-reference.md § Request
+// processing), so this table stands in for it here. Results are small, normalized JSON only, and this is
+// distinct from core's `idempotency` table, which keys on deviceId at the HTTP layer.
 export const agentOperations = sqliteTable(
   'agent_operations',
   {

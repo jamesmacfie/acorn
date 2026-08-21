@@ -129,7 +129,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
       search: async (_q, filter) => (filters.push(filter), []),
     }))
     const app = asTask1()
-    // No taskId given: the filter is INJECTED, so an omitted filter cannot span the node.
+    // No taskId given: the filter is injected, so an omitted filter cannot span the node.
     expect((await app.fetch(req('/api/sessions'), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/sessions/search?q=hi'), {} as Env)).status).toBe(200)
     expect(filters).toEqual([{ taskId: 'task1' }, { taskId: 'task1' }])
@@ -142,7 +142,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
 
   it('leaves /sessions/search reachable, despite colliding with /sessions/:sessionId', async () => {
     // Hono applies `.use()` by path regardless of registration order, so the ownership middleware also
-    // matches the static sibling. Without the explicit skip this 404s for every confined caller — a
+    // matches the static sibling. Without the explicit skip this 404s for every confined caller, a
     // working feature broken by a guard, which is the failure mode worth pinning.
     setManagedAgentsBridge(fake({ search: async () => [] }))
     expect((await asTask1().fetch(req('/api/sessions/search?q=hi'), {} as Env)).status).toBe(200)

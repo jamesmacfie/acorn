@@ -175,10 +175,10 @@ export const managedAgentStore = {
   upsertSession,
   removeSession,
   // Drop every node-scoped entry. Called on a node switch (apps/desktop's scopedEviction.ts): sessions,
-  // snapshots and session ids are all minted by ONE node, and two nodes may hold the same UUID by
-  // construction (docs/architecture-overview.md § Fleet semantics) — so without this the Agent Center
-  // rendered node A's roster under node B and `loadSnapshot` could merge B's transcript into A's cached
-  // snapshot for a colliding id.
+  // snapshots and session ids are all minted by one node, and two nodes may hold the same UUID by
+  // construction (docs/architecture-overview.md § Fleet semantics). Without this the Agent Center rendered
+  // node A's roster under node B, and `loadSnapshot` could merge B's transcript into A's cached snapshot
+  // for a colliding id.
   //
   // The dedupe sets go too: `noticedEventIds` suppressing a notice and `deletedSessionIds` suppressing an
   // upsert are both judgements about one node's ids, and keeping them would silently swallow the new
@@ -197,8 +197,8 @@ export const managedAgentStore = {
 // even when neither Agent Center nor a task Agent pane is currently mounted.
 export function activateManagedAgentNotifications(): void {
   managedAgentStore.activate()
-  // Caught, not just `void`ed. This prime runs at activation, so on a node that is still connecting —
-  // or one whose agents plugin is disabled — the rejection had nothing between it and an unhandled
+  // Caught, not just `void`ed. This prime runs at activation, so on a node that is still connecting,
+  // or one whose agents plugin is disabled, the rejection had nothing between it and an unhandled
   // promise rejection. An empty roster is the correct degraded state; Agent Center refetches.
   managedAgentStore.loadAll().catch((error: unknown) => {
     console.warn('[agents] could not prime the managed-session roster:', error)

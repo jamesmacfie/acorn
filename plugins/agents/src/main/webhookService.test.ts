@@ -12,9 +12,9 @@ const ENCRYPTION_KEY = '22'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
 
 describe('managed-agent signed webhooks', () => {
-  // The webhook and delivery rows live in this plugin's file; `coreDb` exists only so the create-time
-  // "does this task exist" guard has a real core database to fail against — which is what the last case
-  // in this file asserts.
+  // The webhook and delivery rows live in this plugin's file. `coreDb` exists only so the create-time
+  // "does this task exist" guard has a real core database to fail against, which is what the last case in
+  // this file asserts.
   let testDb: TestPluginDb
   let coreDb: TestDb
   let service: AgentWebhookService

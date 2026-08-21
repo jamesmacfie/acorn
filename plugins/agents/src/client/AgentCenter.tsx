@@ -21,8 +21,9 @@ const elapsed = (timestamp: number): string => {
   return `${Math.round(minutes / 1_440)}d`
 }
 
-// One row, whichever scope produced it. `nodeId` is always present — in workspace scope it is the active
-// node — so `open` has one code path instead of branching on the scope that happened to be selected.
+// One row, whichever scope produced it. `nodeId` is always present: in workspace scope it is the
+// active node, so `open` has one code path instead of branching on the scope that happened to be
+// selected.
 type AgentRow = { session: AgentSession; nodeId: string; nodeLabel: string; task: Task | undefined }
 
 export default function AgentCenter() {
@@ -66,8 +67,8 @@ export default function AgentCenter() {
   )
 
   // The fleet halves. Sessions and tasks are two fan-outs because a row needs both: the session comes from
-  // the agents plugin's route and the task title from core's, on the SAME node — and a remote node's tasks
-  // are not in `tasks.data`, which is the active node's query.
+  // the agents plugin's route and the task title from core's, on the same node. A remote node's tasks are
+  // not in `tasks.data`, which is the active node's own query.
   const [fleetSessions] = createFleetQuery(
     () => ['agents', 'sessions', 'fleet'] as const,
     async (nodeId, dep: boolean, signal) =>
@@ -95,8 +96,8 @@ export default function AgentCenter() {
 
   const taskById = createMemo(() => new Map(workspaceTasks().map((task) => [task.id, task])))
 
-  // Rows, in whichever scope is selected. Both branches produce the same shape so everything downstream —
-  // filters, counts, sort, open — is written once.
+  // Rows, in whichever scope is selected. Both branches produce the same shape, so everything downstream
+  // (filters, counts, sort, open) is written once.
   const rows = createMemo<AgentRow[]>(() => {
     if (fleetScope()) {
       // Per node, because a task id is only meaningful on its own node (docs/architecture-overview.md § Fleet semantics:
@@ -132,7 +133,7 @@ export default function AgentCenter() {
       if (stateFilter() === 'active' && !isActiveAgent(session)) return false
       if (stateFilter() === 'attention' && !needsAttention(session)) return false
       // Fleet search is client-side over the fetched rows. The server search takes a workspaceId, which
-      // only names a workspace on ONE node, so there is nothing to fan a server search out with.
+      // only names a workspace on one node, so there is nothing to fan a server search out with.
       if (needle && !`${session.title} ${session.providerId} ${task?.title ?? ''} ${task?.github?.name ?? task?.projectId ?? ''}`.toLowerCase().includes(needle)) return false
       return true
     }).sort((a, b) =>
@@ -143,10 +144,10 @@ export default function AgentCenter() {
 
   function open(row: AgentRow) {
     if (!row.task) return setError('The session’s task is no longer available.')
-    // The node FIRST. Everything below resolves against the active node — `activateTaskSignals` writes
-    // per-task client state and `navigate` lands on a route the shell reads through the active node's
-    // query cache — so opening a remote row without switching would address the wrong machine, or collide
-    // with a local task holding the same id.
+    // The node switches first. Everything below resolves against the active node: `activateTaskSignals`
+    // writes per-task client state, and `navigate` lands on a route the shell reads through the active
+    // node's query cache. Opening a remote row without switching first would address the wrong machine, or
+    // collide with a local task holding the same id.
     if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
     activateTaskSignals(row.task, { pane: 'agents' })
     openManagedSession(row.task.id, row.session.id)

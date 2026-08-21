@@ -2,19 +2,19 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { codexProfile } from './codex'
 
-// The argv this profile hands the process broker — see the claude-code suite for why that is the one thing
-// worth pinning in a profile package.
+// The argv this profile hands the process broker. See the claude-code suite for why that is the one
+// thing worth pinning in a profile package.
 
 describe('the codex profile', () => {
   it('declares the identity terminal and workflows resolve it by', () => {
-    // `id` is persisted (a session row's profileId, a workflow step's `profile =`), so it is a compatibility
-    // surface rather than a label.
+    // `id` is persisted; see docs/managed-agents.md § Providers.
     expect(codexProfile).toMatchObject({ id: 'codex', label: 'Codex', kind: 'agent', command: 'codex', transport: 'pty' })
   })
 
-  // THE WHOLE ARRAY, not a prefix slice plus a last-element check. Those two together left the MIDDLE of the
-  // argv unasserted, so anything inserted between `--json` and the prompt — a sandbox opt-out, an extra
-  // `--config` — passed. Same change as the claude suite, same reason: these arrays are the command line.
+  // Asserts the whole array, not a prefix slice plus a last-element check: together those left the middle
+  // of the argv unasserted, so anything inserted between `--json` and the prompt, such as a sandbox opt-out
+  // or an extra `--config`, would pass. Same reasoning as the claude suite: these arrays are the command
+  // line.
   it('builds a headless turn as `exec --json`, with the prompt last', () => {
     const { file, args } = codexProfile.headlessArgv!('codex', { prompt: 'do the thing' })
     expect(file).toBe('codex')
@@ -22,8 +22,9 @@ describe('the codex profile', () => {
   })
 
   it('materializes a schema to a FILE, because codex takes a path where claude takes JSON', () => {
-    // The divergence worth a test: `--output-schema` wants a path, so the profile writes a temp file. A change
-    // that passed the JSON inline would produce an invocation codex rejects — or worse, treats as a filename.
+    // The divergence worth a test: `--output-schema` wants a path, so the profile writes a temp
+    // file. A change that passed the JSON inline would produce an invocation codex rejects, or
+    // worse, treats as a filename.
     const { args } = codexProfile.headlessArgv!('codex', { prompt: 'p', schema: { type: 'object' } })
     const path = args[args.indexOf('--output-schema') + 1]
     expect(path).toMatch(/schema\.json$/)
