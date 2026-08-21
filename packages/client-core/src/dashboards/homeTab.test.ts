@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { addTab, homeTabDomId, renameTab, shiftTab } from './homeTab'
 import { emptyDashboards, homeTabs, hydrateDashboards, MAX_TABS, setHomeTabs, dashboards } from './persist'
 
-// The tab bar's arithmetic. The bar itself is not covered here — this suite runs in bare node with no
-// Solid plugin, so a green run says nothing about the markup (see the vitest note in the repo docs).
+// The tab bar's arithmetic. The bar itself is not covered here: this suite runs in bare node with no
+// Solid plugin, so a green run says nothing about the markup.
 
 describe('home tab verbs', () => {
   it('names the default tab on the way past when the second dashboard is created', () => {

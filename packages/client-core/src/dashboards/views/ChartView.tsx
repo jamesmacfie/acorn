@@ -3,20 +3,14 @@ import { EmptyState } from '../../ui/primitives'
 import { buildChart, CHART_FRAME, TICK_GAP } from '../chart'
 import type { PanelViewProps } from './props'
 
-// The chart view, and deliberately almost nothing. Every number on screen comes out of `chart.ts`,
-// which is pure and tested. This file turns that into SVG and picks a class name, and it must stay that
-// way, because vitest here runs in node with no Solid plugin and nothing written here is checked.
+// The chart view. Every number on screen comes out of `chart.ts`, which is pure and tested; this
+// file turns that into SVG and picks a class name, because vitest here runs in node with no Solid
+// plugin and nothing written here is checked.
 //
-// Colour is an attribute, never a literal. Each mark carries `data-tone` (the plugin declared what this
-// value means) or `data-series` (an ordinal slot with no declared meaning), never both, and
-// `dashboards.css` turns either into a colour the appearance pack owns. No `fill="#…"` in this file.
-// The legend's swatches wear the same two attributes on the same two classes, which is what stops a
-// swatch and its mark drifting apart.
-//
-// Accessibility floor: the SVG names the shape and both axes, every mark carries a `<title>` tooltip,
-// and the full data is one view flip away in `table`. The legend is part of that floor rather than
-// polish, since it's the secondary encoding the identity ramp needs to be legal for
-// colour-vision-deficient readers (docs/dashboards.md § Views are derived, not chosen from a menu).
+// Colour is an attribute, never a literal, here: `data-tone` or `data-series`, never both, with
+// `dashboards.css` owning the actual colour. No `fill="#…"` in this file, so a swatch and its mark
+// can never drift apart. The design behind the two attributes and the legend's accessibility role
+// is docs/dashboards.md § Views are derived, not chosen from a menu.
 
 const LABEL_DROP = 10
 
@@ -56,9 +50,9 @@ export default function ChartView(props: PanelViewProps) {
     >
       <Show when={props.rows.length} fallback={<EmptyState align="start" size="sm">No rows.</EmptyState>}>
         <div class="dash-chart-wrap">
-          {/* One row above the plot, wrapping rather than truncating. Identity lives in the SWATCH and
-              never in coloured text: the label is ordinary ink, so the legend reads the same whether or
-              not the reader can tell the swatches apart. */}
+          {/* One row above the plot, wrapping rather than truncating (docs/dashboards.md § Views are
+              derived, not chosen from a menu): identity lives in the swatch, never in coloured text,
+              so the legend reads the same whether or not the reader can tell the swatches apart. */}
           <Show when={legend()}>
             {(keys) => (
               <ul class="dash-chart-legend">
@@ -99,7 +93,7 @@ export default function ChartView(props: PanelViewProps) {
               </ul>
             )}
           </Show>
-          {/* `font-size` in USER UNITS, from the frame — inside a scaled viewBox a CSS px is a user
+          {/* `font-size` in user units, from the frame: inside a scaled viewBox a CSS px is a user
               unit, so type set in the stylesheet scales with the drawing and `--fs-2xs` came out
               enormous on a large panel. It is geometry here, like the point radius (chart.ts
               § TICK_FONT), and the stylesheet keeps the colour. */}
@@ -178,7 +172,7 @@ export default function ChartView(props: PanelViewProps) {
               )}
             </For>
 
-            {/* Centred on its gridline, EXCEPT at the edges: `chart.ts` anchors a label that would
+            {/* Centred on its gridline, except at the edges: `chart.ts` anchors a label that would
                 otherwise hang half of itself outside the box, which is what cut "Aug 18" to "Aug 1". */}
             <For each={xTicks()}>
               {(tick) => (

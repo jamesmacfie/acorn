@@ -21,16 +21,11 @@ import {
 } from './PanelForm'
 import './dashboards.css'
 
-// THE panel editor as ONE SHEET (docs/dashboards.md § The generated editor) — every decision at once,
-// in one scroll, for a panel that already exists.
+// The panel editor as one sheet (docs/dashboards.md § The generated editor): every decision at
+// once, for a panel that already exists.
 //
-// It is the EDIT path. Creation is staged instead (PanelWizard.tsx), because nobody can pick a view by
-// reading a select — but this remains able to do everything the wizard can: the wizard is a staging of
-// creation, not a capability tier. Both render the same sections over the same draft (PanelForm.tsx,
-// draft.ts), so there is no second implementation of any rule here.
-//
-// It still serves the add flow when there is no wizard to open it from — `panel` absent is a fresh
-// draft, exactly as it always was, which is also what the wizard's "Open in editor" escape hands over.
+// It also serves the add flow when there is no wizard to open it from: `panel` absent is a fresh
+// draft, which is also what the wizard's "Open in editor" escape hands over.
 
 export default function PanelEditor(props: {
   collections: readonly CollectionContribution[]
@@ -47,8 +42,8 @@ export default function PanelEditor(props: {
 }) {
   const draft = createPanelDraft(props)
   const existing = draft.existing
-  /** The WORDS, which are about whether this panel has ever been saved rather than about whether
-   *  there is a draft to edit — the wizard hands over both at once. */
+  /** The words, about whether this panel has ever been saved rather than about whether there is a
+   *  draft to edit; the wizard hands over both at once. */
   const creating = () => !existing || !!props.creating
 
   let pickerHost: HTMLDivElement | undefined

@@ -109,7 +109,7 @@ describe('codec', () => {
 
   it('round-trips the mapping layer, including the write-back key nothing reads', () => {
     // `writeValue` is the reserved seam (model.ts § PanelMappingColumn): this build never sets it and
-    // never looks at it, and it still survives — a reserved shape the codec quietly deletes is not
+    // never looks at it, and it still survives, a reserved shape the codec quietly deletes is not
     // reserved. `bySource` is keyed by `(pluginId, collectionId)`, not by the query's array index.
     const mapping = {
       columns: [{ id: 'c2', label: 'Doing', tone: 'accent' as const }, { id: 'c4', label: 'Done' }],
@@ -135,7 +135,7 @@ describe('codec', () => {
     expect(parsed?.mapping).toEqual({
       columns: [{ id: 'c1', label: 'Todo' }],
       // `c9` had nothing in it; `c1` kept only the strings. An entry naming a column this blob does
-      // not carry is retained for the same reason an unknown pane id is — the render side ignores it.
+      // not carry is retained for the same reason an unknown pane id is: the render side ignores it.
       bySource: { 'github:pulls-mine': { c1: { values: ['open'] } } },
     })
   })
@@ -274,7 +274,7 @@ describe('the arranged layout', () => {
   it('reading it never rewrites the stored blob', () => {
     const stored = { home: { a: { x: 3, y: 9, w: 4, h: 4 } } }
     hydrateDashboards({ panels: { a: panel('a') }, placements: { home: ['a'] }, layouts: stored })
-    // Gravity moved it for the render; nothing was written back. A client that only LOOKS at a board
+    // Gravity moved it for the render; nothing was written back. A client that only looks at a board
     // must not be the one that changes it for every other client paired with the node.
     expect(layoutAt(HOME_PLACEMENT).rects.a).toEqual({ x: 3, y: 0, w: 4, h: 4 })
     expect(dashboards().layouts).toEqual(stored)
@@ -292,7 +292,7 @@ describe('committing a gesture', () => {
       order: ['a', 'b'],
       rects: { a: { x: 0, y: 4, w: 6, h: 4 }, b: { x: 0, y: 0, w: 6, h: 4 } },
     })
-    // `b` is now the top row, so it is first — which is what an old client with no rects renders,
+    // `b` is now the top row, so it is first, which is what an old client with no rects renders,
     // and what a screen reader reads.
     expect(dashboards().placements.home).toEqual(['b', 'a'])
     expect(dashboards().layouts.home.a).toEqual({ x: 0, y: 4, w: 6, h: 4 })
@@ -316,7 +316,7 @@ describe('committing a gesture', () => {
     })
     savePanel(panel('b'))
     placePanelAt(HOME_PLACEMENT, 'b', { w: 6, h: 4 })
-    // Beside `a` rather than under it: a preset is a starting WIDTH and the position is the ordinary
+    // Beside `a` rather than under it: a preset is a starting width and the position is the ordinary
     // first fit, which is what makes a small panel land in the gap a wide one left.
     expect(dashboards().layouts.home.b).toEqual({ x: 4, y: 0, w: 6, h: 4 })
     expect(dashboards().placements.home).toEqual(['a', 'b'])
@@ -325,8 +325,8 @@ describe('committing a gesture', () => {
   it('drops a preset below the view kind’s minimum onto the minimum, without a migration', () => {
     hydrateDashboards(emptyDashboards())
     savePanel(panel('board', { view: { kind: 'board' } }))
-    // `normalize` is what enforces the per-kind minimums, so the commit path gets them for free —
-    // nothing persisted has to know a preset was ever involved.
+    // `normalize` is what enforces the per-kind minimums, so the commit path gets them for free.
+    // Nothing persisted has to know a preset was ever involved.
     placePanelAt(HOME_PLACEMENT, 'board', { w: 1, h: 1 })
     expect(dashboards().layouts.home.board).toEqual({ x: 0, y: 0, w: 4, h: 3 })
   })
@@ -366,7 +366,7 @@ describe('the store', () => {
 
     unplacePanel(HOME_PLACEMENT, 'b')
     expect(panelsAt(HOME_PLACEMENT).map((entry) => entry.id)).toEqual(['a'])
-    // Taking a panel off a surface leaves the definition — that is the point of the split.
+    // Taking a panel off a surface leaves the definition, that is the point of the split.
     expect(dashboards().panels.b).toBeDefined()
   })
 

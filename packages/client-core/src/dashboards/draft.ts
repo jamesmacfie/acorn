@@ -96,8 +96,8 @@ export function createPanelDraft(props: {
   // the wizard's preview in place rather than waiting for a reopen.
   //
   // The rows are the cache's too, and they are the wizard preview's only data path. Neither surface
-  // issues a fetch of its own: whether an editor may run a collection is the run-once-and-pin question,
-  // answered in docs/future/dashboards/dynamic-collections.md by a person pressing a button.
+  // issues a fetch of its own: whether an editor may run a collection is a separate question, with a
+  // person pressing a button the answer.
   const cacheRevision = createCollectionCacheRevision(nodeId)
   const pages = createMemo((): PanelSourcePage[] => {
     cacheRevision()
@@ -262,7 +262,6 @@ export function createPanelDraft(props: {
     return next
   })
 
-  // ── Projection ────────────────────────────────────────────────────────────────────────────────
   // ── Projection ────────────────────────────────────────────────────────────────────────────────
   // `shaping.fields` is the visible list, in order, and everything the schema declares that the list
   // does not name is hidden. Deriving both from that one array is what keeps "show it again" and "move

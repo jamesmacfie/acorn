@@ -7,18 +7,10 @@ import type { PanelDefinition, PanelId } from './model'
 
 export { parsePanelDefinition }
 
-// The persisted dashboard model (docs/dashboards.md § Persistence). Three decisions:
-//
-//   Node prefs, not device storage. Panel definitions describe a node's resources, so they follow the
-//   resource (docs/state.md § Scope rules). Writes go through `savePref` to `/v2/core/prefs`.
-//
-//   Panel definitions persist independently of any surface; placements reference them by id. Embedding
-//   panel config inside a "home dashboard" blob works until panels need a second home, and then it's a
-//   migration.
-//
-//   Unknown ids survive. Parsing answers "is this shaped like a panel?", never "is that collection
-//   registered in this build?". The registry lookup happens at render time and an unresolved panel
-//   draws as inert, so a composition is never collateral damage of switching a plugin off.
+// The persisted dashboard model (docs/dashboards.md § Persistence): node prefs, not device storage,
+// written through `savePref` to `/v2/core/prefs`; panel definitions persist independently of any
+// surface, with placements referencing them by id; and an unresolved id survives as inert rather
+// than being dropped.
 
 /** `(surface, ownerId, projectId?)`. All three surfaces are drawn: `home` (a tab per `ownerId`),
  *  `pane`, and `plugin-region`, a rail source's side panel or a plugin pane's aside owned as
@@ -78,21 +70,10 @@ export type DashboardTab = { id: string; name: string }
 
 export const emptyDashboards = (): DashboardState => ({ panels: {}, placements: {}, layouts: {} })
 
-// ── The geometry codec ────────────────────────────────────────────────────────────────────────
-//
-// ── The geometry codec ────────────────────────────────────────────────────────────────────────
-//
-// A rect is one more thing the codec tolerates the absence of, not a new validity requirement. Three
-// rules, and between them no blob can produce an unrenderable grid:
-//
-//   A malformed rect is dropped rather than repaired. The panel becomes rect-less, which already has a
-//   defined answer.
-//   A placed panel with no rect is auto-placed at render time (layout.ts § firstFit). That one rule is
-//   the migration for every existing blob, the old-client-write recovery, and the new-panel default.
-//   An entry naming a panel not placed in that scope is retained unread. It costs bytes, not
-//   correctness, and dropping it would make a partially-written blob destructive.
-//
-// No version bump: the change is additive and still parses under the old parser.
+// The geometry codec (docs/dashboards.md § Persistence): a malformed rect is dropped rather than
+// repaired, a placed panel with no rect is auto-placed at render (layout.ts § firstFit), and an
+// entry naming a panel not placed in that scope is retained unread. No version bump: the change is
+// additive and still parses under the old parser.
 
 const parseRect = (raw: unknown): Rect | undefined => {
   if (!isRecord(raw)) return undefined
@@ -109,14 +90,9 @@ const parseRect = (raw: unknown): Rect | undefined => {
   }
 }
 
-// ── The tab codec ─────────────────────────────────────────────────────────────────────────────
-//
-// ── The tab codec ─────────────────────────────────────────────────────────────────────────────
-//
-// Two caps that are product decisions rather than storage ones: a person with nine dashboards has a
-// navigation problem tabs can't fix, and a 200-character tab name isn't a tab name. An over-long name
-// is truncated rather than dropped, because dropping it would strand its panels behind a recovered
-// "Untitled".
+// The tab codec (docs/dashboards.md § Persistence): at most `MAX_TABS`, names trimmed to
+// `MAX_TAB_NAME` characters rather than dropped, because dropping a name would strand its panels
+// behind a recovered "Untitled".
 
 export const MAX_TABS = 8
 const MAX_TAB_NAME = 60

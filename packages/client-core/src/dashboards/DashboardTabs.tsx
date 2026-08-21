@@ -8,16 +8,16 @@ import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
 
 // The Home tab bar (docs/dashboards.md § Persistence). It draws a list of names and calls three
-// functions; a tab's CONTENT is the ordinary `home/<tabId>` placement the grid beside it renders, so
+// functions; a tab's content is the ordinary `home/<tabId>` placement the grid beside it renders, so
 // there is nothing here about panels at all.
 //
-// IT IS NOT `ui/Tabs.tsx`, and that is the one judgement call in the file. A tab here carries an
+// This is not `ui/Tabs.tsx`, which is the one judgement call in the file. A tab here carries an
 // inline rename input and an overflow trigger, and neither can live inside a `<button role="tab">`
-// without nesting interactive elements. Growing the shared strip a JSX-label and a trailing slot for
+// without nesting interactive elements. Growing the shared strip a JSX label and a trailing slot for
 // one consumer buys a worse primitive; the roving/arrow behaviour it would have supplied is
-// `createListNavigation`, which is the same three lines either way.
+// `createListNavigation`, the same three lines either way.
 //
-// The root is a `<span>` because the bar takes the section header's LABEL seat — tabs are the heading
+// The root is a `<span>` because the bar takes the section header's label seat: tabs are the heading
 // when there are several (`SectionHeader`, primitives.tsx).
 
 export default function DashboardTabs(props: {
@@ -59,7 +59,7 @@ export default function DashboardTabs(props: {
   }
 
   const commitRename = (tab: DashboardTab, value: string) => {
-    // Enter commits and then returns focus to the tab, which blurs the input — so both paths land
+    // Enter commits and then returns focus to the tab, which blurs the input, so both paths land
     // here and the first one to arrive is the one that counts.
     if (renaming() !== tab.id) return
     setRenaming(undefined)
@@ -75,7 +75,7 @@ export default function DashboardTabs(props: {
     if (props.active === tab.id) props.onSelect('')
   }
 
-  /** The same items on the overflow and on the context menu — one list, so the two cannot drift. */
+  /** The same items on the overflow and on the context menu, one list, so the two cannot drift. */
   const verbs = (tab: DashboardTab, menu: MenuContext) => (
     <>
       <Menu.Item context={menu} onSelect={() => { props.onSelect(tab.id); setRenaming(tab.id) }}>Rename</Menu.Item>
@@ -154,7 +154,7 @@ export default function DashboardTabs(props: {
                 width="auto"
                 class="dash-tab-rename"
                 aria-label={`Rename ${tab().name}`}
-                // Uncontrolled on purpose: the input owns the text until it commits, so nothing in the
+                // The input is uncontrolled: it owns the text until it commits, so nothing in the
                 // model changes per keystroke and Escape has something to go back to.
                 value={tab().name}
                 // Bare `autofocus` is unreliable inside a conditional in Solid; the microtask is the
@@ -191,7 +191,7 @@ export default function DashboardTabs(props: {
         )}
       </Index>
 
-      {/* The ghost `+`. Past the cap it stays visible and disabled — a button that vanishes at eight
+      {/* The ghost `+`. Past the cap it stays visible and disabled: a button that vanishes at eight
           is a bug report. */}
       <Button
         size="xs"

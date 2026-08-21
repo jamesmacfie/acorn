@@ -213,10 +213,10 @@ export function ViewOptions(props: { draft: PanelDraft }) {
   const draft = () => props.draft
   return (
     <>
-      {/* The chart's own two decisions. The SHAPE picker only lists shapes the schema can support,
-          and the axis picker only lists fields of the type that shape needs — the same gate as the
-          view list, one level down, so a chart that cannot draw is unrepresentable rather than
-          validated. The measure below is shared with `stat`. */}
+      {/* The chart's own two decisions, gated the same way the view list is one level up
+          (docs/dashboards.md § Views are derived, not chosen from a menu): the shape picker only
+          lists shapes the schema can support, and the axis picker only lists fields of the type
+          that shape needs. The measure below is shared with `stat`. */}
       <Show when={draft().view().kind === 'chart'}>
         <div class="dash-editor-pair">
           <Field label="Shape">
@@ -237,10 +237,10 @@ export function ViewOptions(props: { draft: PanelDraft }) {
             />
           </Field>
         </div>
-        {/* Optional on both shapes, and the SAME key: a bar split by a second enum is the grouped
-            bar, which is a third shape by arithmetic but not by config
-            (docs/dashboards.md § Views are derived, not chosen from a menu). Offered only where the split is representable —
-            any enum for a line, any enum but the category axis for a bar — so a schema with one enum
+        {/* Optional on both shapes, and the same key: a bar split by a second enum is the grouped
+            bar, which is a third shape by arithmetic but not by config (docs/dashboards.md § Views
+            are derived, not chosen from a menu). Offered only where the split is representable: any
+            enum for a line, any enum but the category axis for a bar, so a schema with one enum
             never sees the control on a bar. */}
         <Show when={draft().seriesFields().length}>
           <Field
@@ -278,7 +278,7 @@ export function ViewOptions(props: { draft: PanelDraft }) {
               </For>
             </Select>
           </Field>
-          {/* Only a number can be summed or averaged, so only number fields are offered — the same
+          {/* Only a number can be summed or averaged, so only number fields are offered: the same
               gate as the view list, one level down. */}
           <Show when={(draft().view().aggregate ?? 'count') !== 'count'}>
             <Field label="Field">
@@ -293,11 +293,11 @@ export function ViewOptions(props: { draft: PanelDraft }) {
         </div>
       </Show>
 
-      {/* The stat's trend (docs/dashboards.md § Trends). Offered per TIER, because the two are gated
-          on different things: `Activity` needs a datetime to bucket the rows by, and `Recorded` needs
-          only the node's sampler — an empty series is a cold state, not a reason to withhold the
-          choice. The comparison hangs off `Recorded` alone: a delta is a lookback into the store, and
-          a panel that records nothing has no baseline to find. */}
+      {/* The stat's trend (docs/dashboards.md § Trends). Offered per tier, because the two are gated
+          on different things: `Activity` needs a datetime to bucket the rows by, and `Recorded`
+          needs only the node's sampler. An empty series is a cold state, not a reason to withhold
+          the choice. The comparison hangs off `Recorded` alone: a delta is a lookback into the
+          store, and a panel that records nothing has no baseline to find. */}
       <Show when={draft().view().kind === 'stat'}>
         <div class="dash-editor-pair">
           <Field
@@ -439,9 +439,10 @@ export function MappingSection(props: { draft: PanelDraft }) {
             at zero gap however carefully the rows themselves are spaced. One stack, and the fold reads
             like the rest of the form. */}
         <div class="dash-editor-stack">
-          {/* THE ROLE CEILING'S RELEASE VALVE (model.ts § PanelFieldDef). The five roles are what the
-              host can align without asking; anything else — github's repo, linear's identifier — the
-              person names here and then answers for, per source, in the same matrix below. */}
+          {/* The role ceiling's release valve (docs/dashboards.md § The mapping layer, and
+              cross-source panels, and model.ts § PanelFieldDef): anything the five roles cannot
+              align, github's `repo`, linear's `identifier`, the person names here and answers for
+              per source in the matrix below. */}
           <SectionHeader
             level="sub"
             actions={(
@@ -600,9 +601,9 @@ export function ShapingSection(props: { draft: PanelDraft }) {
         )}
       </Index>
 
-      {/* Reorder is two buttons, not a drag list — the same trade the panel grid's own reorder makes.
+      {/* Reorder is two buttons, not a drag list: the same trade the panel grid's own reorder makes.
           Keyboard- and screen-reader-operable by construction, where drag needs a parallel keyboard
-          path built anyway to be usable at all. Upgrade path: pointer drag ON TOP of this. */}
+          path built anyway to be usable at all. Upgrade path: pointer drag on top of this. */}
       <SectionHeader level="sub">Fields</SectionHeader>
       <ul class="dash-editor-fields">
         <Index each={draft().visible()}>

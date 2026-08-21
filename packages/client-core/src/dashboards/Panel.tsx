@@ -32,8 +32,8 @@ export type PanelProps = {
   actions?: JSX.Element
   /** Spread onto the header. The header is the placement's drag surface and the body is not: the body
    *  scrolls, selects and clicks, and a drag starting on a row would fight the row's own action. It also
-   *  keeps a press inside a board body free for a future card gesture
-   *  (docs/future/dashboards/write-back.md), and the two must never be ambiguous.
+   *  keeps a press inside a board body free for a future card gesture, and the two must never be
+   *  ambiguous.
    *
    *  Opaque here, because the panel does not know whether its surface offers dragging. */
   headProps?: JSX.HTMLAttributes<HTMLDivElement>
@@ -158,9 +158,10 @@ export default function Panel(props: PanelProps) {
             </EmptyState>
           )}
         >
-          {/* PARTIAL AVAILABILITY IS DATA. One source that could not be read is a banner naming that
-              source; the others keep rendering. A mixed panel that blanked because linear was slow
-              would be the fleet machinery's mistake made one tier down (node/fanout.ts). */}
+          {/* Partial availability is data (docs/dashboards.md § The mapping layer, and cross-source
+              panels): one source that could not be read is a banner naming that source, with the
+              others still rendering. A mixed panel that blanked because linear was slow would be the
+              fleet machinery's mistake made one tier down (node/fanout.ts). */}
           {/* The armed step for a risky row action. A strip rather than a modal because the row it
               is about is still on screen behind it, and an explicit Continue rather than a second
               click on the row because "press it again" is the wrong shape for something that
@@ -198,9 +199,9 @@ export default function Panel(props: PanelProps) {
               </EmptyState>
             )}
           >
-            {/* The view switch is `views/PanelBody.tsx`, shared with the wizard's live preview —
-                there is exactly one way to draw a panel and a preview that redrew it would be a
-                second one. */}
+            {/* The view switch is `views/PanelBody.tsx`, shared with the wizard's live preview
+                (docs/dashboards.md § The generated editor): there is exactly one way to draw a
+                panel. */}
             <PanelBody {...viewProps()} />
           </Show>
         </Show>

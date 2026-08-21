@@ -297,9 +297,9 @@ export default function PanelWizard(props: {
                     return (
                       <Card interactive pad="sm" class="dash-card" onActivate={() => draft.addSource(entry)}>
                         <span class="dash-card-title">
-                          {/* The plugin's own mark where it registered one, its id where it did not —
-                              `Icon` renders an unmatched name as text, so naming a brand blind would
-                              print the literal string (views/Provenance.tsx says the same). */}
+                          {/* The plugin's own mark where it registered one, its id where it did not
+                              (docs/ui-design.md § Icons): an unmatched name renders as text, so
+                              naming a brand blind would print the literal string. */}
                           <Show when={brandMarkRegistry.get(entry.pluginId)}>
                             <Icon name={`brand:${entry.pluginId}`} title={entry.pluginId} />
                           </Show>
@@ -324,7 +324,7 @@ export default function PanelWizard(props: {
                 </For>
               </div>
             </Show>
-            {/* A param changes what the rows ARE, so it is asked here rather than beside the shaping. */}
+            {/* A param changes what the rows are, so it is asked here rather than beside the shaping. */}
             <ParamInputs draft={draft} />
             <ColdNotice draft={draft} />
           </Show>
