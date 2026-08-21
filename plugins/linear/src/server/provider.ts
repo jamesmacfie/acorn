@@ -74,8 +74,8 @@ function buildAttachments(node: LinearNode): LinearAttachment[] {
 }
 
 // Normalize the issue graph. Outgoing `relations` read forward (this issue blocks X); `inverseRelations`
-// read backward (X blocks this issue → this is blocked by X). Linear stores one relation record per
-// link, surfaced via `relations` on the source issue and `inverseRelations` on the target — so a
+// read backward (X blocks this issue, so this is blocked by X). Linear stores one relation record per
+// link, surfaced via `relations` on the source issue and `inverseRelations` on the target, so a
 // symmetric "related" link must be mapped on both sides or the target issue never shows it.
 function buildRelations(node: LinearNode): LinearRelation[] {
   const forward: Record<string, { kind: LinearRelationKind; label: string }> = {
@@ -214,7 +214,7 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
       const detail = linearNodeToDetail(node)
       const ref = refForIdentifier(context.connection.id, detail.identifier, detail.url)
       const data = encodeCached(linearCodec.withDetail(ref, linearSummaryOf(detail), detail, context.now), context.limits.maxCachedItemBytes)
-      // `write` is an upsert keyed on (owner, connection, identifier) — the same conflict target the
+      // `write` is an upsert keyed on (owner, connection, identifier), the same conflict target the
       // raw statement declared, kept in one place now that two providers share the table.
       await context.items.write({ connectionId: context.connection.id, identifier: detail.identifier, data, fetchedAt: context.now })
       return { ok: true }
@@ -224,10 +224,10 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
   },
 }
 
-// The projects a Linear workspace offers, for the HOST's workspace-mapping picker. This is the fetch
+// The projects a Linear workspace offers, for the host's workspace-mapping picker. This is the fetch
 // that used to sit behind `GET /v2/p/linear/projects`, moved onto the provider contribution so core
-// can ask it without knowing it is asking Linear — that route had no caller left, because the browse
-// pane that called it is a host-drawn rail now.
+// can ask it without knowing it is asking Linear. That route had no caller left, since the browse pane
+// that called it is a host-drawn rail now.
 //
 // No error handling beyond "no projects": the host runs this inside the secret scope and the request
 // budget and turns a throw into a per-connection failure the picker can retry, so swallowing a 401

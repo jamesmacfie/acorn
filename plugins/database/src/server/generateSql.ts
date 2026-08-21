@@ -1,11 +1,11 @@
-// Prompt construction and response cleanup for AI SQL generation (docs/pg.md). Pure functions, so the
-// contract with the model ("the reply is the query") is unit-testable without a provider.
+// Prompt construction and response cleanup for AI SQL generation (docs/data-layer.md § Database
+// plugin: the Postgres pane). Pure functions, so the contract with the model, "the reply is the
+// query," is unit-testable without a provider.
 
 import type { DbSavedQuery } from '../shared/database'
 
 export const GENERATE_MAX_OUTPUT_TOKENS = 2048
-// Budget for the notes and examples block. The schema itself is capped at SCHEMA_CHAR_CAP (80k) in
-// main/database.ts, so 80k plus 16k stays under the model runtime's MAX_SYSTEM_CHARS (100k).
+// Budget for the notes and examples block: docs/data-layer.md § Database plugin: the Postgres pane.
 export const GENERATE_MAX_CONTEXT_CHARS = 16_000
 
 export const SQL_SYSTEM_PREAMBLE = [

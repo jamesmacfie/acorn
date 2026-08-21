@@ -19,7 +19,7 @@ describe('linear frame helpers', () => {
 
   it('recognises a linear.app issue link with or without the title slug, and normalises the case', () => {
     // The slug form is what Linear's own "copy link" produces, and it is lower-cased. Both arities
-    // matter — the host's bounded content-link grammar needs one entry each, which is the finding.
+    // matter: the host's bounded content-link grammar needs one entry each, which is the finding.
     expect(linearIdentifierFromHref('https://linear.app/acme/issue/ENG-42')).toBe('ENG-42')
     expect(linearIdentifierFromHref('https://linear.app/acme/issue/cra-275/some-slug')).toBe('CRA-275')
     expect(linearIdentifierFromHref('https://linear.app/acme/project/abc')).toBeNull()

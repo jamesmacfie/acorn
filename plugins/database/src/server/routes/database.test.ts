@@ -12,8 +12,8 @@ import type { DbSavedQuery } from '../../shared/database'
 import type { DatabaseBridge } from '../../main/database'
 import { createDatabaseFetch } from './database'
 
-// These routes run over the PORTABLE CARRIER now — no host Hono stack, no middleware-set principal, and
-// the identity arriving as the request context the host binds. So does the bridge: it is a closure
+// These routes run over the portable carrier now: no host Hono stack, no middleware-set principal,
+// and the identity arrives as the request context the host binds. So does the bridge: it is a closure
 // argument rather than a capability resolved out of `c.env`, which is what lets a fake be handed in
 // without a global registry to reset afterwards.
 const principal = (userId: string, kind: Principal['kind'] = 'device'): Principal => ({ kind, userId })
@@ -174,7 +174,7 @@ describe('database routes', () => {
   })
 
   // Generation and the picker behind it spend the owner's provider key, billed to the owner. A
-  // task-scoped agent token must not reach either — the compiled route enforced this through the host's
+  // task-scoped agent token must not reach either. The compiled route enforced this through the host's
   // `canUseProviderCredential`, which reads a middleware-set principal a loaded bundle does not have, so
   // this is the same rule read off the request context instead.
   it('refuses generation and the connection list to a task-scoped agent token', async () => {
@@ -185,7 +185,7 @@ describe('database routes', () => {
   })
 })
 
-// The document surface's two routes. What the HOST does with them is its business; what this plugin owes
+// The document surface's two routes. What the host does with them is its business; what this plugin owes
 // is `{ text }` back, `{ text }` in, and a task that exists.
 describe('the scratch document', () => {
   let f: Fixture
@@ -319,7 +319,7 @@ describe('saved queries', () => {
     expect(captured).toHaveLength(1)
     expect(captured[0]).toMatchObject({ contextId: mine.id, label: 'Database · paid orders', deepLink: { pane: 'database' } })
     expect(captured[0].content).toContain('SELECT 1;')
-    // The connection URL is resolved per connect and never persisted, so there is nothing here to leak —
+    // The connection URL is resolved per connect and never persisted, so there is nothing here to leak;
     // this asserts that the snapshot really is only the query and its notes.
     expect(captured[0].content).not.toContain('postgres://')
   })

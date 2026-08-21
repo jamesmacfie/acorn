@@ -14,22 +14,16 @@ import { canonicalIdentifier, linearIdentifierFromHref, targetKey, taskLinearTar
 import { LinearIssueView } from './LinearIssueView'
 import { inlineUploadImages, uploadImageUrls } from './uploads'
 
-// One bundle, two manifest surfaces. What it renders is decided by `bridge.context`, which is the whole
-// point of the frame contract: the HOST says what this rectangle was opened to look at, and the plugin
-// never gets to name a surface, a node or a task.
+// One bundle, two manifest surfaces, decided by `bridge.context` (docs/integrations.md § Linear).
 //
-//   refPanel   `context.refId` — a ticket another plugin found in its own content. Unscoped by design:
-//              a PR body carries `ENG-42` and not which of several connected Linears owns it, so the
-//              connection stays absent and the route resolves it across all of them.
-//   pane       `context.item` when a rail row opened it, `context.taskId` otherwise — in which case the
-//              tickets are whatever this task links, read once from core.
+//   refPanel   `context.refId`, unscoped: resolved across every connected workspace.
+//   pane       `context.item` from a rail row, or `context.taskId` for whatever the task links.
 //
-// Both pane surfaces — the task one and the project-scoped one — come through the same branch, and they do
-// not need telling apart beyond what `context` already says. The project surface arrives with an `item` and
-// no `taskId`, so it takes the same path a rail selection into a task pane takes; the difference is only
-// that its selection comes from the URL, which is the HOST's problem and never reaches here.
+// Both pane surfaces, the task one and the project-scoped one, come through the same branch: the
+// project surface arrives with an `item` and no `taskId`, the same shape a rail selection into a task
+// pane takes, so they need no further telling apart here.
 //
-// A selection into an ALREADY-mounted pane arrives as `onSelect` rather than a new context, because
+// A selection into an already-mounted pane arrives as `onSelect` rather than a new context, because
 // remounting per click would throw away everything drawn so far.
 
 type Target = { connectionId?: string; identifier: string }
@@ -47,22 +41,22 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
   const [issue, setIssue] = createSignal<LinearIssueDetail | null>(null)
   const [page, setPage] = createSignal<Page>({ kind: 'loading' })
   const [activeTab, setActiveTab] = createSignal('overview')
-  // A relation row re-points the detail request without disturbing which ticket the HOST opened, so the
+  // A relation row re-points the detail request without disturbing which ticket the host opened, so the
   // back affordance has somewhere to return to and a later `onSelect` still lands on the host's choice.
   const [override, setOverride] = createSignal<string | null>(null)
   const [refreshing, setRefreshing] = createSignal(false)
   const [posting, setPosting] = createSignal(false)
   const [postError, setPostError] = createSignal('')
   // Private Linear uploads, keyed by their https URL, resolved to `data:` URLs the frame's CSP allows.
-  // Cumulative across tickets on purpose: it is a pure URL→bytes map, the URLs are content-addressed by
-  // Linear, and re-pointing the view at a related ticket and back should not refetch the screenshots.
+  // Cumulative across tickets: it is a pure URL to bytes map, the URLs are content-addressed by Linear,
+  // and re-pointing the view at a related ticket and back should not refetch the screenshots.
   const [images, setImages] = createSignal<Record<string, string>>({})
   let load = 0
 
   const activeIdentifier = () => override() ?? target()?.identifier ?? ''
 
   /**
-   * Resolve every upload this ticket draws, in ONE state write.
+   * Resolve every upload this ticket draws, in one state write.
    *
    * The batch matters more than it looks. Each resolution changes `renderBody`, which changes an
    * `innerHTML`, and an innerHTML rewrite drops whatever the reader had selected in that block. Writing
@@ -108,7 +102,7 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
     }
   }
 
-  /** Point the whole view at a ticket the HOST named: clears the relation override and the tab. */
+  /** Point the whole view at a ticket the host named: clears the relation override and the tab. */
   const open = (next: Target): void => {
     setOverride(null)
     setActiveTab('overview')
@@ -123,19 +117,12 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
     void fetchIssue(canonicalIdentifier(identifier), target()?.connectionId)
   }
 
-  // Every link in rendered content, in the order the two answers are worth trying.
+  // A linear.app ticket link stays local rather than going through the host: docs/integrations.md §
+  // Linear. From the project surface specifically there is no task, so the pane rung could not fire
+  // even if it went through the host; re-pointing in place is what makes the back affordance work.
   //
-  // A linear.app ticket link is kept LOCAL rather than handed to the host, and that is a real preference
-  // rather than a leftover. Going through `ui.openUrl` would work — the host's recogniser claims the URL
-  // and this frame is what it would resolve into — but the trip is lossy in both directions: from a ref
-  // panel it swaps the panel and remounts the frame, throwing away the tab and the scroll position and
-  // the back affordance; from the project surface there is no task, so the pane rung cannot fire and the
-  // reader gets an overlay on top of the surface they are already reading the ticket in. Re-pointing in
-  // place keeps `override`, which is what makes "← back" mean anything.
-  //
-  // Everything else goes over the port. The host resolves it in-app if some provider recognises it — a
-  // GitHub PR in a ticket description, another provider's item — and opens the owner's browser if not.
-  // Which of those happened is deliberately not reported back.
+  // Everything else goes over the port to the host's usual in-app-or-browser resolution. Which one
+  // happened is not reported back.
   const onContentClick = (event: MouseEvent): void => {
     const identifier = linearIdentifierFromHref((event.target as HTMLElement | null)?.closest('a')?.getAttribute('href'))
     if (identifier) {
@@ -184,7 +171,7 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
 
     void (async () => {
       const context = props.bridge.context
-      // A ref panel is told exactly one thing and needs nothing else — in particular no task, which is
+      // A ref panel is told exactly one thing and needs nothing else, in particular no task, which is
       // why the host's binding does not give a refPanel frame one.
       if (context.refId) return open({ identifier: context.refId })
       if (context.item) {
@@ -192,8 +179,8 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
         return open(selected ?? { identifier: context.item })
       }
       // No task and no item: the project-scoped surface, sitting beside the rail list with nothing
-      // addressed yet. `taskId` is what tells the two pane surfaces apart, because the host gives one to a
-      // task pane and never to a project-scoped one — the frame does not get to ask which it is.
+      // addressed yet. `taskId` is what tells the two pane surfaces apart. The host gives one to a task
+      // pane and never to a project-scoped one, and the frame does not get to ask which it is.
       if (!context.taskId) {
         return setPage({ kind: 'empty', message: 'Pick an issue from the list.' })
       }

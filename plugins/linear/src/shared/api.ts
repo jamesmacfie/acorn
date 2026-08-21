@@ -1,12 +1,12 @@
 // Linear's wire contract (docs/integrations.md): issues, projects and their comment threads.
 //
-// Types and route builders together, following the docker/http convention — the plugin that owns the
-// namespace owns the shape of what crosses it. Moved verbatim out of @acorn/protocol/api.ts, and the
-// route strings are byte-identical for it.
+// Types and route builders together, following the docker/http convention: the plugin that owns the
+// namespace owns the shape of what crosses it. Moved verbatim out of @acorn/protocol/api.ts, with
+// byte-identical route strings.
 //
-// NO query keys left. The last one, `linearIssuesKey`, belonged to github's batch query through
-// `contract/issues.ts`; both are gone, replaced by the host's `refResolvers` carrier, which owns the key
-// for every provider (client-core/registries/refResolvers.ts). A frame calls these routes over the
+// No query keys left. The last one, `linearIssuesKey`, belonged to github's batch query through
+// `contract/issues.ts`; both are gone, replaced by the host's `refResolvers` carrier, which owns the
+// key for every provider (client-core/registries/refResolvers.ts). A frame calls these routes over the
 // bridge and keeps no query cache of its own, so a key with no client is a value nothing can compare
 // against.
 
@@ -26,9 +26,9 @@ export type LinearRelatedIssue = { id: string; identifier: string; title: string
 // `label` is the ready-to-render string ("Blocked by", "Blocks", "Duplicate of", "Related").
 export type LinearRelationKind = 'blocks' | 'blocked-by' | 'duplicate' | 'duplicated-by' | 'related'
 export type LinearRelation = { id: string; kind: LinearRelationKind; label: string; issue: LinearRelatedIssue }
-// New detail fields are OPTIONAL: fresh fetches always populate them, but short-TTL cached rows
-// written before this change stay valid (self-heal on next fetch), and the strict public schema
-// tolerates their absence. See docs plan. Summary fields (above) stay lean for PR-reference resolution.
+// New detail fields are optional: fresh fetches always populate them, but short-TTL cached rows
+// written before this change stay valid and self-heal on next fetch, and the strict public schema
+// tolerates their absence. Summary fields (above) stay lean for PR-reference resolution.
 export type LinearIssueDetail = LinearIssueSummary & {
   id: string
   description: string | null
@@ -55,13 +55,13 @@ export type LinearCommentRequest = { body: string; parentId?: string }
 // What /uploads answers: the fetched image as a `data:` URL, which is the one image source a plugin
 // frame's CSP allows (see linearUploadRoute).
 export type LinearUploadResponse = { dataUrl: string }
-// The request half only. What the batch route ANSWERS is the host's `PluginRefResolutionBody[]`
+// The request half only. What the batch route answers is the host's `PluginRefResolutionBody[]`
 // (@acorn/protocol/refResolvers.ts), because it is declared as this plugin's ref resolver and the
 // vocabulary belongs to whoever renders it.
 export type LinearIssuesRequest = { identifiers: string[] }
-// A project LIST is no longer a Linear wire type. Core's workspace picker reads projects through the
-// provider's `projects` contribution and its own `IntegrationProject` shape, so the plugin no longer
-// owns a response type for them (docs/workspaces-and-tasks.md).
+// A project list is no longer a Linear wire type. Core's workspace picker reads projects through the
+// provider's `projects` contribution and its own `IntegrationProject` shape (docs/workspaces-and-tasks.md
+// § Workspace and project).
 //
 // Browse-row triage fields ride the live /project-issues fetch (internal only, not the public
 // schema), so they are required here.

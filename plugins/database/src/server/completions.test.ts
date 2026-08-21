@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { DbCatalogTable } from '../shared/database'
 import { completeSql, resolveQualifier, textBeforeCursor } from './completions'
 
-// The whole point of the completions capability is that the HOST never learns SQL — every judgement
-// below is this plugin's, so this is where it gets tested. Pure over an injected catalog, because a live
-// Postgres is not a unit test.
+// The whole point of the completions capability is that the host never learns SQL, so every judgement
+// below is this plugin's, and this is where it gets tested. Pure over an injected catalog, because a
+// live Postgres is not a unit test.
 
 const TABLES: DbCatalogTable[] = [
   { schema: 'public', name: 'orders', columns: [{ name: 'id', dataType: 'uuid' }, { name: 'total', dataType: 'numeric' }] },

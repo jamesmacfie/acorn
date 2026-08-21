@@ -1,13 +1,13 @@
 // Typed wrapper over the /v2/p/database routes, now over the frame bridge rather than core's fetch
 // helpers.
 //
-// A frame has no network at all — `connect-src 'none'` — so there is no `readJson` to reach for and no
-// CSRF envelope to share: every call is a message on the one MessagePort, and the host checks the path
+// A frame has no network at all, `connect-src 'none'`, so there is no `readJson` to reach for and no
+// CSRF envelope to share. Every call is a message on the one MessagePort, and the host checks the path
 // against this plugin's own namespace before forwarding it (client-core/plugins/frames/scopes.ts).
 //
-// `connect()` is awaited per call rather than threaded through every component, because it resolves once
-// per frame and memoizes. That keeps the call sites identical to the compiled versions they replace,
-// which is what makes most of this directory a move rather than a rewrite.
+// `connect()` is awaited per call rather than threaded through every component, because it resolves
+// once per frame and memoizes. That keeps the call sites identical to the compiled versions they
+// replace, which is what makes most of this directory a move rather than a rewrite.
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import { connect } from '@acorn/plugin-api/ui/sdk'
 import {
@@ -77,7 +77,8 @@ export const deleteSavedQuery = async (taskId: string, queryId: string): Promise
 }
 
 // The Generate button's precondition, answered by this plugin's node half. A frame cannot read core's
-// integrations — there is no bridge scope for them, and minting one to serve a dropdown would hand every
-// installed plugin the whole connection roster. This returns ids and labels; the key never leaves the node.
+// integrations, since there is no bridge scope for them, and minting one to serve a dropdown would hand
+// every installed plugin the whole connection roster. This returns ids and labels; the key never
+// leaves the node.
 export const listModelConnections = async (taskId: string): Promise<AvailableModelConnection[]> =>
   (await (await api()).get<{ connections: AvailableModelConnection[] }>(databaseModelConnectionsRoute(taskId))).connections

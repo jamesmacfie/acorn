@@ -1,6 +1,6 @@
-// Thin Linear client (mirrors the GitHub client). Personal API key goes raw in Authorization
-// (no "Bearer" — that prefix is for OAuth tokens). Returns parsed GraphQL data or throws; callers
-// map errors via linearError on the fetch Response. Linear has one endpoint: POST /graphql.
+// Thin Linear client (mirrors the GitHub client). Personal API key goes raw in Authorization,
+// with no "Bearer" prefix, since that one is for OAuth tokens. Returns parsed GraphQL data or throws;
+// callers map errors via linearError on the fetch Response. Linear has one endpoint: POST /graphql.
 
 const LINEAR_GRAPHQL = 'https://api.linear.app/graphql'
 
@@ -29,11 +29,12 @@ export async function linearData<T>(res: Response): Promise<T> {
 export const VIEWER_QUERY = `query { viewer { name organization { name } } }`
 export type Viewer = { viewer: { name: string; organization: { name: string } } }
 
-// Projects in the workspace, for the per-repo project picker (docs/workspaces-and-tasks.md — Linear source).
+// Projects in the workspace, for the per-repo project picker (docs/workspaces-and-tasks.md § Workspace
+// and project).
 export const PROJECTS_QUERY = `query { projects(first: 250) { nodes { id name } } }`
 export type LinearProjectNode = { id: string; name: string }
 
-// The fields a rail/browse row needs. branchName is Linear's suggested git branch — the promote default.
+// The fields a rail/browse row needs. branchName is Linear's suggested git branch, the promote default.
 const TRIAGE_FIELDS = `id identifier title url branchName priority priorityLabel updatedAt
       state { name type color } assignee { name }
       labels { nodes { id name color } }`
@@ -53,9 +54,9 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
 })
 
 // The same query with a different filter: active issues assigned to whoever owns the credential, across
-// the whole workspace rather than the linked projects. That difference is the difference between the two
-// surfaces — a rail is scoped to the project someone is looking at, a dashboard panel is scoped to the
-// person, and "my issues" is only ever a question about the second.
+// the whole workspace rather than the linked projects. A rail is scoped to the project someone is
+// looking at; a dashboard panel is scoped to the person, and "my issues" is only ever a question about
+// the second.
 export const myIssuesFilter = (): Record<string, unknown> => ({
   assignee: { isMe: { eq: true } },
   state: { type: { nin: ['completed', 'canceled'] } },
@@ -66,7 +67,7 @@ export const myIssuesFilter = (): Record<string, unknown> => ({
 // It exists because of a gap the loaded tier has, not because anyone asked for a second rail mode.
 
 // A single issue-history event. Linear records each change with from/to fields; one event may
-// carry several changes (state + assignee at once). Labels arrive as IDs — resolved to names via
+// carry several changes (state + assignee at once). Labels arrive as IDs, resolved to names via
 // the issue's current label set where possible. actor is the user; botActor covers integrations.
 export type LinearHistoryNode = {
   id: string
@@ -131,7 +132,7 @@ export const ISSUES_QUERY = `query($filter: IssueFilter) {
 
 // Full detail for the side panel: description, comments (threaded via parent), activity history,
 // plus context fields (priority/estimate/cycle/team/project), external attachments, and the issue
-// graph (parent, sub-issues, relations). All ride this one request — see the plan.
+// graph (parent, sub-issues, relations). All ride this one request.
 export const ISSUE_DETAIL_QUERY = `query($filter: IssueFilter) {
   issues(filter: $filter, first: 1) {
     nodes {

@@ -1,12 +1,5 @@
-// Database pane backing (docs/pg.md): a per-task Postgres connection for browsing + editing the
-// task's dev database. Mirrors the local-git/editor surfaces — the taskId is the capability, and
-// everything is re-derived from the DB per call. Was the `db:*` IPC channels; now the
-// DatabaseBridge behind the HTTP routes in server/routes/database.ts. Pure-Node (pg).
-//
-// SQL-injection posture: values are ALWAYS parameterized ($1…). Identifiers (schema/table/column
-// names) can't be parameterized, so every identifier used in generated SQL is validated against
-// the live introspected schema (assertTable / assertColumns) and double-quoted (qid). Arbitrary SQL
-// from the editor (query) runs verbatim — it's the user's own DB and writes are wanted.
+// Database pane backing: docs/data-layer.md § Database plugin: the Postgres pane. Was the `db:*` IPC
+// channels; now the DatabaseBridge behind the HTTP routes in server/routes/database.ts. Pure-Node (pg).
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -17,11 +10,10 @@ import type { QueryResult, QueryResultRow } from 'pg'
 import { type CoreServices, loadRepoConfig } from '@acorn/plugin-api/node'
 import type { DbCatalogResult, DbCatalogTable, DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
 
-// The Postgres surface this plugin's routes call. Declared here, beside the implementation, rather than
-// in the route file that consumes it: the indirection it used to travel through — a route CAPABILITY
-// provided at init and resolved per request — existed to cross the old main/renderer process boundary,
-// and this plugin has not had one since it became loopback HTTP. A test that wants a fake passes one to
-// the route factory.
+// The Postgres surface this plugin's routes call. Declared beside the implementation rather than in
+// the route file that consumes it: a route capability provided at init and resolved per request used
+// to carry this across the old main/renderer boundary, and this plugin has had none since it became
+// loopback HTTP. A test that wants a fake passes one to the route factory.
 export type DatabaseBridge = {
   connect(taskId: string): Promise<DbConnectResult>
   disconnect(taskId: string): Promise<{ ok: true }>
@@ -67,10 +59,8 @@ const qid = (id: string): string => `"${id.replace(/"/g, '""')}"`
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-// Resolve the connection URL for a task WITHOUT persisting it: repo dbUrlScript (committed
-// .acorn/config.toml [database].url_script wins over the project-config fallback; run in the worktree)
-// → <worktree>/.env DATABASE_URL → process.env.DATABASE_URL. Returns null if none found.
-// Exported for database.test.ts: this is where the repo-config trust gate sits, and it's the only
+// Resolves the connection URL for a task without persisting it: docs/data-layer.md § Database plugin:
+// the Postgres pane states the fallback order. Exported for database.test.ts, since this is the only
 // place the "did the untrusted script execute?" question can be asked without a live Postgres.
 export async function resolveDbUrl(core: DatabaseCoreServices, taskId: string): Promise<string | null> {
   const t = await core.tasks.load(taskId)
@@ -81,17 +71,16 @@ export async function resolveDbUrl(core: DatabaseCoreServices, taskId: string): 
   const cfg = loadRepoConfig(root ?? project?.path ?? null, homedir(), { dbUrlScript: config?.config.dbUrlScript })
   const script = cfg.dbUrlScript?.trim()
   if (script && root) {
-    // A committed `[database].url_script` is executable content from the checkout, so it carries the
-    // same trust gate as repo-authored run targets and workflows (core/main/repoConfigTrust.ts):
-    // cloning a repo must not be enough to run its commands. Deliberately OUTSIDE the try below —
-    // a trust failure must propagate to the caller, never fall through to the .env/env fallbacks as
-    // if the script had merely errored. User/DB-authored scripts (dbUrlFromRepo false) are the
-    // user's own input and are not gated.
+    // Executable content from the checkout, so it carries the same trust gate as other repo-authored
+    // run targets (docs/data-layer.md § Database plugin: the Postgres pane; core/main/repoConfigTrust.ts).
+    //
+    // This check sits outside the try block below: a trust failure must propagate to the caller rather
+    // than fall through to the .env/env fallbacks as if the script had merely errored.
     if (cfg.dbUrlFromRepo) await core.projects.assertConfigTrusted(taskId)
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })
-      // Scripts may echo noise before the URL — strip ANSI escapes (some CLIs emit them even when
-      // piped) and take the last non-empty line.
+      // Scripts may echo noise before the URL. Strip ANSI escapes, since some CLIs emit them even when
+      // piped, and take the last non-empty line.
       const line = stdout.replace(/\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g, '').split('\n').map((l) => l.trim()).filter(Boolean).pop()
       if (line) return line
     } catch {
@@ -105,7 +94,8 @@ export async function resolveDbUrl(core: DatabaseCoreServices, taskId: string): 
   return process.env.DATABASE_URL?.trim() || null
 }
 
-// Pull DATABASE_URL out of a .env file (tolerates `export `, quotes). Best-effort — missing file → null.
+// Pull DATABASE_URL out of a .env file, tolerating `export ` and quotes. Best effort: a missing file
+// returns null.
 async function readEnvUrl(envPath: string): Promise<string | null> {
   try {
     const text = await readFile(envPath, 'utf8')
@@ -126,14 +116,12 @@ async function readEnvUrl(envPath: string): Promise<string | null> {
 const getPool = (taskId: string): InstanceType<typeof Pool> | null => pools.get(taskId)?.pool ?? null
 
 // The introspected catalog behind table/column completions, cached per task. Monaco asks its provider
-// once per completion SESSION and filters client-side as the reader types, so this is one lookup per
-// trigger rather than per keystroke — but a full introspection per trigger would still be a visible
-// stall on a remote node, and it is the same answer every time.
+// once per completion session and filters client-side as the reader types, so this is one lookup per
+// trigger rather than per keystroke, and a full introspection per trigger would still stall on a
+// remote node.
 //
-// Invalidated on connect/disconnect and after any statement that was not a plain read or write, which
-// is the cheap approximation of "DDL ran through this pane". Stale columns in a popup is a small bug,
-// but it is a visible one, and someone running a migration in the editor above the grid is exactly the
-// person who would hit it.
+// Invalidated on connect/disconnect and after a non-read/write statement: docs/data-layer.md §
+// Database plugin: the Postgres pane.
 const catalogs = new Map<string, DbCatalogTable[]>()
 const DML_COMMANDS = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
 
@@ -164,14 +152,13 @@ async function tableColumns(pool: InstanceType<typeof Pool>, schema: string, nam
   return cols.rows.map((r) => ({ name: r.column_name, dataType: r.data_type, nullable: r.is_nullable === 'YES', isPk: pkSet.has(r.column_name) }))
 }
 
-// Cap on the AI-generation schema text (docs/pg.md) — the model runtime rejects system prompts over
-// 100k chars, so truncate below that with a visible marker rather than failing the whole request.
+// Cap on the AI-generation schema text: docs/data-layer.md § Database plugin: the Postgres pane.
 const SCHEMA_CHAR_CAP = 80_000
 
 const capSchema = (text: string): string =>
   text.length <= SCHEMA_CHAR_CAP ? text : `${text.slice(0, SCHEMA_CHAR_CAP)}\n-- (schema truncated)`
 
-// Compact CREATE TABLE-ish text from introspected tables — for the AI prompt, not for execution.
+// Compact CREATE TABLE-ish text from introspected tables, for the AI prompt rather than execution.
 export function formatSchema(tables: { schema: string; name: string; columns: DbColumn[] }[]): string {
   return tables
     .map((t) => {
@@ -183,8 +170,8 @@ export function formatSchema(tables: { schema: string; name: string; columns: Db
     .join('\n\n')
 }
 
-// Validate a renderer-supplied table against the live schema; returns the matched {schema,name} or
-// throws. Prevents identifier injection — we only ever quote names Postgres itself reported.
+// Validates a renderer-supplied table against the live schema, returning the matched {schema,name} or
+// throwing. Only names Postgres itself reported are ever quoted, which prevents identifier injection.
 async function assertTable(pool: InstanceType<typeof Pool>, schema: string, name: string): Promise<{ schema: string; name: string }> {
   const match = (await listTables(pool)).find((t) => t.schema === schema && t.name === name)
   if (!match) throw new Error(`Unknown table ${schema}.${name}`)
@@ -198,8 +185,8 @@ async function assertColumns(pool: InstanceType<typeof Pool>, schema: string, na
   return meta
 }
 
-// Shutdown disposal (composition-root ownership): end every open pg pool so quit doesn't leak connections. Called
-// by the composition root's reverse-order teardown. Idempotent — an empty map is a no-op.
+// Shutdown disposal, composition-root owned: ends every open pg pool so quit doesn't leak connections.
+// Called by the composition root's reverse-order teardown. Idempotent, since an empty map is a no-op.
 export async function endDbPools(): Promise<void> {
   for (const [taskId, { pool }] of pools) {
     await pool.end().catch(() => {})
@@ -268,7 +255,7 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
       }
     },
 
-    // Arbitrary SQL from the Monaco editor — runs verbatim (writes wanted). Timed for the footer.
+    // Arbitrary SQL from the Monaco editor, run verbatim since writes are wanted. Timed for the footer.
     query: async (taskId, sql): Promise<DbQueryResult> => {
       const pool = getPool(taskId)
       if (!pool) return { error: 'Not connected.' }
@@ -290,8 +277,8 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
       }
     },
 
-    // Row edits happen in the detail panel (docs/pg.md): update one column, insert a row, or
-    // delete by PK. All identifiers validated; all values parameterized.
+    // Row edits happen in the detail panel: update one column, insert a row, or delete by PK. All
+    // identifiers validated; all values parameterized.
     update: async (taskId, schema, name, column, value, pk): Promise<DbWriteResult> => {
       const pool = getPool(taskId)
       if (!pool) return { ok: false, error: 'Not connected.' }
@@ -340,8 +327,8 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
       }
     },
 
-    // Schema text for AI query generation (docs/pg.md): per-repo source (repo-level-settings) — a
-    // shell script's stdout, a worktree file, or (default) live introspection of the connected pool.
+    // Schema text for AI query generation: per-repo source (repo-level settings), a shell script's
+    // stdout, a worktree file, or by default live introspection of the connected pool.
     schema: async (taskId): Promise<DbSchemaResult> => {
       try {
         const t = await core.tasks.load(taskId)

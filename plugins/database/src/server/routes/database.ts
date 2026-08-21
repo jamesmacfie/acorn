@@ -1,23 +1,18 @@
 // Routes for the Database pane, mounted at /v2/p/database by this plugin's init (node/index.ts):
-// per-task Postgres browse + edit, the project's saved queries, the task's scratch DOCUMENT, and
+// per-task Postgres browse and edit, the project's saved queries, the task's scratch document, and
 // table/column completions.
 //
-// database ships LOADED, so these routes run on one tier: the host gets `router.fetch`
-// (createDatabaseFetch at the bottom) and the identity-bound runtime rides in through `c.env` behind
-// `portableCarrier` — literally the same carrier rollbar, linear and http use. The identity therefore comes off
-// the request context rather than out of `ownerId(c)`/`c.get('principal')`: a loaded bundle is not
-// inside the host's Hono stack, so those middleware-set values are simply not there.
+// database ships loaded, so these routes run on the one tier a loaded plugin gets (docs/plugins.md §
+// Loaded plugins): the host gets `router.fetch` (createDatabaseFetch at the bottom), and identity rides
+// in through `c.env` rather than `ownerId(c)`/`c.get('principal')`, which a loaded bundle's Hono stack
+// never sets.
 //
-// The route CAPABILITY this file used to declare is gone, and it is worth saying why rather than
-// leaving a reader to wonder where `DATABASE` went. It was `routeCapability<DatabaseBridge>` provided at
-// init and resolved per request through `viaBridge` — an indirection whose whole job was to cross the
-// old main/renderer process boundary. The pane has been loopback HTTP for a while and this plugin has
-// had no such boundary since; the bridge is now a plain closure argument, which is also what makes a
-// fake injectable without a global registry. Nothing outside `plugins/database/` ever consumed it.
+// The route capability this file used to declare (`routeCapability<DatabaseBridge>`, resolved through
+// `viaBridge`) is gone: it existed to cross the old main/renderer process boundary, and the pane has
+// been loopback HTTP for a while. The bridge is now a plain closure argument, which also makes a fake
+// injectable without a global registry.
 //
-// SQL-injection posture is unchanged and is main/database.ts's: values are always parameterized,
-// identifiers are validated against the live introspected schema, and arbitrary SQL from the editor
-// runs verbatim because it is the reader's own database and writes are the point.
+// SQL-injection posture is main/database.ts's: docs/data-layer.md § Database plugin: the Postgres pane.
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
@@ -49,7 +44,7 @@ const owner = (c: Context<AppEnv>): string => requestContext(c).userId
 
 // AI generation spends the owner's provider key, billed to the owner, so a task-scoped agent credential
 // must not reach it. The host's `canUseProviderCredential` reads `c.get('principal')`, which a loaded
-// bundle does not have — same rule, read off the request context instead.
+// bundle does not have, so this is the same rule read off the request context instead.
 const isInteractiveOwner = (c: Context<AppEnv>): boolean => {
   const { principal } = requestContext(c)
   return principal.kind === 'device' || principal.scope === 'service'
@@ -91,7 +86,7 @@ export type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models' | 'pro
 
 export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge) => {
   // Saved queries are project-scoped but addressed through the task, like everything else in this
-  // pane — the frame holds the task and core resolves its project without a cross-file join.
+  // pane. The frame holds the task and core resolves its project without a cross-file join.
   const taskOf = (taskId: string) => core.tasks.load(taskId)
   const projectOf = async (t: { projectId: string }) => core.projects.byId(t.projectId)
   const projectScope = (projectId: string) => eq(dbSavedQueries.projectId, projectId)
@@ -159,15 +154,11 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json(await bridge.remove(id(c), p.data.schema, p.data.name, p.data.pk))
     })
 
-    // ── The document surface (docs/third-party/monaco.md) ───────────────────────────────────────────────
+    // The document surface: docs/third-party/monaco.md. This plugin owns a column of text; the host
+    // owns the editor, its theme, workers, autosave, and the flush before unmount.
     //
-    // Two routes and a language id is the ENTIRE declaration behind the query editor now. The host owns
-    // the editor, its theme, its workers, the dirty model, the autosave debounce, ⌘S, the flush before
-    // unmount and the scroll position; this plugin owns a column of text.
-    //
-    // It persists, which the compiled pane's editor did not — an unbacked Monaco started empty every
-    // time. Task-scoped, because a scratch buffer is what you are doing now and what you meant to keep
-    // has a Save button (node/schema.ts § dbScratch).
+    // It persists, unlike the compiled pane's unbacked Monaco, because a scratch buffer is task-scoped:
+    // what you meant to keep has a Save button (node/schema.ts § dbScratch).
     .get('/tasks/:taskId/scratch', async (c) => {
       const taskId = id(c)
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
@@ -178,7 +169,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       const p = scratchBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
       const taskId = id(c)
-      // The taskId is a plain ID into core's tables, so core validates it. Checked on the WRITE as well
+      // The taskId is a plain ID into core's tables, so core validates it. Checked on the write as well
       // as the read: an autosave for an archived task should not quietly create a row nothing will
       // ever read again.
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
@@ -190,7 +181,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json({ ok: true })
     })
 
-    // Table/column completions — the first LSP-shaped capability. The host POSTs a position and maps
+    // Table/column completions, the first LSP-shaped capability. The host POSTs a position and maps
     // what comes back onto its editor; every judgement about SQL is in ../completions.ts, on this side.
     .post('/tasks/:taskId/completions', async (c) => {
       const p = completionsBody.safeParse(await c.req.json().catch(() => null))
@@ -203,7 +194,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json({ items: items.slice(0, MAX_COMPLETION_ITEMS) } satisfies PluginCompletionResponse)
     })
 
-    // --- saved queries (project-scoped, this plugin's own table — no database connection needed) ---
+    // --- saved queries (project-scoped, this plugin's own table, no database connection needed) ---
     .get('/tasks/:taskId/queries', async (c) => {
       const saved = await savedFor(id(c))
       if (!saved) return respondError(c, 404, 'not_found')
@@ -245,7 +236,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json({ ok: true })
     })
 
-    // Which model connections this owner could generate with. The frame cannot ask core directly —
+    // Which model connections this owner could generate with. The frame cannot ask core directly:
     // `/v2/core/integrations` has no bridge scope, and minting one would hand every installed plugin the
     // whole connection roster to serve one dropdown. This answers ids and labels; the key stays on the
     // node and is resolved inside `models.generateText`.
@@ -264,7 +255,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
       const schemaRes = await bridge.schema(id(c))
       if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
-      // Unknown/foreign ids just do not resolve — a stale pick should not fail the whole generate.
+      // Unknown/foreign ids just do not resolve; a stale pick should not fail the whole generate.
       const examples = await loadExamples(id(c), p.data.queryIds ?? [])
       try {
         const result = await core.models.generateText({

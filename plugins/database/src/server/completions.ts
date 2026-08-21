@@ -1,22 +1,9 @@
 import type { PluginCompletionItem } from '@acorn/protocol/documentSurface.ts'
 import type { DbCatalogTable } from '../shared/database'
 
-// Table and column completions for the query editor. See docs/third-party/monaco.md § Language smarts.
-//
-// The host never learns SQL. It POSTs `{ text, position }` to the route this file backs and maps the
-// items straight onto its editor; every line below, what counts as a keyword, what `alias.` means, which
-// clause wants tables, is this plugin's, because this is where the schema knowledge already lives. That
-// boundary is the reason the same host provider serves a GraphQL console or a YAML config plugin with no
-// host change at all.
-//
-// Worth recording, because it looks like the host is shirking: SQL is not one of Monaco's language-service
-// workers. The 14.58 MiB of workers cover TypeScript, JSON, CSS and HTML; for SQL, Monaco ships
-// tokenization only and completions are a provider someone has to write. So the host-owned document
-// surface loses nothing here: every path, including the frame-bundled Monaco that was measured dead,
-// would have had to write this exact function.
-//
-// Pure, and takes the catalog as an argument, because this is the part worth testing and a live Postgres
-// is not.
+// Table and column completions for the query editor: docs/third-party/monaco.md § Language smarts.
+// Pure, and takes the catalog as an argument, because this is the part worth testing and a live
+// Postgres is not.
 
 // Enough to be useful in an editor whose author knows SQL, deliberately not a dialect reference. The
 // long tail is what the reader types anyway, and a completion list that offers three hundred keywords
@@ -46,8 +33,8 @@ export function textBeforeCursor(text: string, position: { line: number; column:
 }
 
 /**
- * Which table an `alias.` refers to. Aliases are read out of the statement itself — `FROM orders o`,
- * `JOIN users AS u` — because that is the only place they exist.
+ * Which table an `alias.` refers to. Aliases are read out of the statement itself, `FROM orders o` or
+ * `JOIN users AS u`, because that is the only place they exist.
  *
  * Falls back to matching the qualifier against real table names, so `public.` and `orders.` work
  * without an alias ever having been declared.

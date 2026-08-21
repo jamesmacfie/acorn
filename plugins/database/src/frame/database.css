@@ -1,22 +1,24 @@
-/* The Database pane's FRAME half — the region below the host's SQL editor and its drag handle
-   (docs/third-party/monaco.md § document-over-frame, concretely).
+/* The Database pane's frame half: the region below the host's SQL editor and its drag handle
+   (docs/third-party/monaco.md § Composed panes: decided).
 
-   Tokens only, and they are the host's: the SDK pushes the shell's resolved theme + style tokens onto
-   this document's `:root` on connect and on every appearance change, so `var(--accent)` here is the same
-   value it is in the shell. That is what makes a frame stylesheet look like first-party CSS instead of
-   an approximation of it.
+   Tokens only, and they are the host's: the SDK pushes the shell's resolved theme and style tokens
+   onto this document's `:root` on connect and on every appearance change, so `var(--accent)` here is
+   the same value it is in the shell. That is what makes a frame stylesheet look like first-party CSS
+   instead of an approximation of it.
 
    Inlined into the bundle by src/frame/index.tsx, because a plugin origin serves one file. */
 
-/* No `html`/`body` rule here on purpose. base.css is the first module of the host stylesheet a frame is
-   served, and it already sets the margin, the height, the background, the colour, the font family, the
-   size and the line height. This file used to restate them, and the font line was `font: var(--font-ui)`
-   — the SHORTHAND, which needs a size and a family and was handed only a family. A var() that substitutes
-   into something invalid does not get dropped the way a syntax error does: the property becomes invalid at
-   computed-value time, which sets it to `inherit`. `font-family` is inherited, `html` declares none, so
-   the whole pane fell to the browser's default serif and base.css never got a chance to win. Linear and
-   Rollbar use the `font-family` longhand and were unaffected, which is what made this look plugin-specific.
-   Cheapest way not to lose that argument twice: declare nothing base.css already declares. */
+/* No `html`/`body` rule here. base.css is the first module of the host stylesheet a frame is served,
+   and it already sets the margin, the height, the background, the colour, the font family, the size
+   and the line height. This file used to restate them, and the font line was `font: var(--font-ui)`,
+   the shorthand, which needs a size and a family and was handed only a family. A var() that
+   substitutes into something invalid does not get dropped the way a syntax error does: the property
+   becomes invalid at computed-value time, which sets it to `inherit`. `font-family` is inherited,
+   `html` declares none, so the whole pane fell to the browser's default serif and base.css never got
+   a chance to win. Linear and Rollbar use the `font-family` longhand and were unaffected, which is
+   what made this look plugin-specific.
+
+   Declare nothing base.css already declares, so the argument can't be lost twice. */
 
 /* Was `.db-pane`, a whole pane. It is the bottom region of one now, and the two rules it needs are the
    same: fill the rectangle, and let the children scroll rather than the frame. */
@@ -29,9 +31,9 @@
 .db-empty { padding: var(--space-6); }
 
 /* SectionHeader owns the header itself (its base rule is in the shared primitives sheet, which a frame
-   IS served — see packages/client-core/src/styles/primitives.css § SectionHeader). The database name
-   rides in the LABEL slot beside the word Database rather than in `actions`, because it names what this
-   pane is looking at — so the gap goes on that slot, not on the header's own flex row. */
+   is served, see packages/client-core/src/styles/primitives.css § SectionHeader). The database name
+   rides in the label slot beside the word Database rather than in `actions`, because it names what
+   this pane is looking at, so the gap goes on that slot, not on the header's own flex row. */
 .db-head .ui-section-header-label { display: flex; align-items: center; gap: var(--space-4); }
 .db-status {
   font-size: var(--fs-sm);
@@ -55,7 +57,7 @@
 }
 
 /* ListDetail owns the split, the column width, the divider and both columns' flex/overflow, which is
-   all `.db-body` / `.db-sidebar` / `.db-main` ever declared — so all three classes are gone with it. */
+   all `.db-body` / `.db-sidebar` / `.db-main` ever declared, so all three classes are gone with it. */
 
 .db-filter {
   margin: var(--space-4);
@@ -66,13 +68,13 @@
   min-height: 0;
   overflow: auto;
 }
-/* The table list is `Row` at compact density now. `.db-table-row` was that primitive spelled out —
-   the box, the left marker, the hover and the selected tint — a full row taller than every other
+/* The table list is `Row` at compact density now. `.db-table-row` was that primitive spelled out:
+   the box, the left marker, the hover and the selected tint, a full row taller than every other
    browse list in the app for no reason anyone recorded. */
 
-/* Main — the button bar over the results grid. The editor and the splitter that used to be here are the
-   host's, in the region above this frame, and `.db-editor` / `.db-editor-host` / `.db-split` are gone
-   with them. The column itself is ListDetail's. */
+/* Main: the button bar over the results grid. The editor and the splitter that used to be here are
+   the host's, in the region above this frame, and `.db-editor` / `.db-editor-host` / `.db-split` are
+   gone with them. The column itself is ListDetail's. */
 /* The bar keeps its class name and its layout; only its position changed, from above the splitter to
    below it. `border-bottom` rather than `border-top` now, because what it is separating itself from is
    the grid underneath rather than an editor above. */
@@ -155,10 +157,10 @@
   min-height: 0;
   background: var(--bg);
 }
-/* `.db-detail-head` was the shared `.section-header` recipe copied by hand — height, pane padding,
-   divider, label transform, muted text — because that class's base rule used to live in shell.css, which
-   a frame is not served. It is SectionHeader now, and the only rule left is the one the flex column
-   needs from its own parent. */
+/* `.db-detail-head` was the shared `.section-header` recipe copied by hand: height, pane padding,
+   divider, label transform, muted text, because that class's base rule used to live in shell.css,
+   which a frame is not served. It is SectionHeader now, and the only rule left is the one the flex
+   column needs from its own parent. */
 .db-detail > .section-header { flex: none; }
 .db-detail-fields {
   flex: 1;
@@ -212,7 +214,8 @@
   border-top: var(--chrome-divider);
 }
 
-/* AI SQL generation modal (docs/pg.md): overlay base + a right-aligned action row. */
+/* AI SQL generation modal (docs/data-layer.md § Database plugin: the Postgres pane): overlay base
+   and a right-aligned action row. */
 .db-generate-actions {
   display: flex;
   justify-content: flex-end;
@@ -226,7 +229,7 @@
 .db-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 /* Chip owns the box and the × affordance; these keep the pill radius and text size this modal uses.
    The add-chip is Picker's trigger, so it gets Chip's dashed look through the same class rather than
-   its own copy of the recipe — which is what `Badge dashed` was originally built for. */
+   its own copy of the recipe, which is what `Badge dashed` was originally built for. */
 .db-chip, .db-chip-add { border-radius: var(--radius-pill); font-size: var(--fs-sm); }
 .db-chip-add {
   background: none;
@@ -243,4 +246,4 @@
 /* CodeBlock owns the box; this modal wants a shorter cap and a muted tone. */
 .db-sql-preview .ui-code { max-height: 120px; color: var(--text-muted); }
 
-/* Armed for a second click (createArmedConfirm) — the button IS the prompt. */
+/* Armed for a second click (createArmedConfirm): the button is the prompt. */

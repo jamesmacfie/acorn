@@ -32,10 +32,7 @@ describe('linear as a collection', () => {
 
   it('groups by the state TYPE and labels the group with the workspace\'s own name', () => {
     // The one place Linear strains the vocabulary, and the place self-describing responses pay for
-    // themselves. A status is `{ name, type, color }`: only `type` means the same thing in every
-    // workspace, so it is what a row belongs to — and `name` is what this workspace calls it, so it is
-    // the label on the column. Writing the name onto the row would make every workspace its own set of
-    // groups and no cross-source board could ever line up.
+    // themselves (docs/dashboards.md § Self-describing responses, and the cold case).
     const page = linearIssuesCollection([issue(), issue({ identifier: 'ENG-9', state: { name: 'Shipped', type: 'completed', color: '#0f0' } })])
     expect(page.rows.map((row) => row.values.status)).toEqual(['started', 'completed'])
     const status = page.schema.fields.find((field) => field.role === 'status')

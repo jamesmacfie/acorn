@@ -24,19 +24,16 @@ import SaveQueryModal from './SaveQueryModal'
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
 // and a row-detail panel that doubles as the edit/insert/delete surface.
 //
-// WHAT IS NOT HERE ANY MORE, which is the entire point of the move: the SQL editor. It is the host's, in
-// the region above this frame, and this file reaches it through three bridge methods —
-// `document.read()` behind Execute, `document.write()` when the picker or Generate loads a query in, and
-// `document.flush()` which the host has already called by the time a surface action arrives. Gone with
-// it: `monaco.editor.create` and its options, the theme application, the appearance subscription for it,
-// the ⌘Enter `addCommand`, the splitter signal and its pointer handlers, and 7.9 MiB of editor this
-// bundle would otherwise have had to carry without language services.
+// The SQL editor lives in the host now, in the region above this frame (docs/third-party/monaco.md §
+// Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
+// behind Execute, `document.write()` when the picker or Generate loads a query in, and
+// `document.flush()`, which the host has already called by the time a surface action arrives.
 //
 // ⌘Enter still runs the query, and that is the acceptance test for the whole design: the chord is
-// pressed with focus in the host's editor, where this frame has no keyboard at all. The host resolves it
-// against the manifest's surface-scoped keybinding, flushes the document, and posts `execute` here —
-// which is handled below exactly as the Execute button's click is, because the frame does not care which
-// one it was.
+// pressed with focus in the host's editor, where this frame has no keyboard at all. The host resolves
+// it against the manifest's surface-scoped keybinding, flushes the document, and posts `execute` here,
+// handled below exactly as the Execute button's click is, since the frame does not care which one it
+// was.
 
 type Selected = { schema: string; name: string } | null
 
@@ -62,7 +59,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
 
   // AI SQL generation is offered only when a model-provider key is connected. Read from this plugin's own
-  // route, because a frame cannot see core's integrations — see databaseClient.ts.
+  // route, because a frame cannot see core's integrations. See databaseClient.ts.
   const [modelConnections] = createResource(
     () => props.taskId,
     (taskId) => listModelConnections(taskId).catch(() => []),
@@ -70,8 +67,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const connections = () => modelConnections() ?? []
 
   // Saved queries are project-scoped, so they outlive this task; the route resolves the project from the
-  // task id. Failures surface in the pane's error line rather than rejecting — a resource in an error
-  // state re-throws on read, which would take the whole panel down over a missing list of snippets.
+  // task id. Failures surface in the pane's error line rather than rejecting, since a resource in an
+  // error state re-throws on read, which would take the whole panel down over a missing list of snippets.
   const [saved, { refetch: refetchSaved }] = createResource(
     () => props.taskId,
     (taskId) => listSavedQueries(taskId).catch((e: unknown) => (fail(e), [] as DbSavedQuery[])),
@@ -193,7 +190,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   // Loading a saved query is the picker's whole job, and it writes into the host's editor. Kept as an
   // effect-free handler rather than a signal→document sync, because the document is not this frame's
-  // state — it is a thing on the other side of the port that the reader may also be typing into.
+  // state. It is a thing on the other side of the port that the reader may also be typing into.
   const loadSaved = (q: DbSavedQuery) => {
     writeSql(q.sql)
     setLoadedName(q.name)
@@ -427,7 +424,7 @@ function RowDetail(props: {
   const save = () => {
     const d = draft()
     if (props.insert) {
-      // Only send columns the user actually set (non-null) — everything else takes its DB default.
+      // Only send columns the user actually set (non-null); everything else takes its DB default.
       const values: Record<string, DbCell> = {}
       for (const c of props.columns) if (!d[c].isNull) values[c] = d[c].value
       void props.onInsert?.(values)

@@ -12,8 +12,8 @@ export default function ResultGrid(props: {
   onRowClick?: (index: number) => void
   // The frame's appearance subscription, passed in rather than imported. `watchAppearance` reads the
   // shell's own signal and there is no shell here; the same event reaches a frame as a bridge push, and
-  // the SDK has already written the tokens onto `:root` by the time it fires — so re-reading the token
-  // below is the correct thing to do from it.
+  // the SDK has already written the tokens onto `:root` by the time it fires, so re-reading the token
+  // below is the correct thing to do.
   onAppearance: (listener: () => void) => () => void
 }) {
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
