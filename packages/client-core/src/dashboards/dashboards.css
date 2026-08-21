@@ -68,15 +68,6 @@
 .dash-tab-add { opacity: 0.6; }
 .dash-tab-add:hover:not(:disabled), .dash-tab-add:focus-visible { opacity: 1; }
 
-/* The task-pane placement (dashboards/DashboardPane.tsx). Nothing but the pane's own padding and a
-   scroll. The grid inside is the same component Home draws, at a different scope. */
-.dash-pane {
-  height: 100%;
-  overflow: auto;
-  padding: var(--pane-pad-y) var(--pane-pad);
-  min-width: 0;
-}
-
 /* ── The grid ────────────────────────────────────────────────────────────────────────────── */
 
 /* Twelve columns of square cells, positioned absolutely off one ResizeObserver measurement rather

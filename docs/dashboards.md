@@ -1,6 +1,6 @@
 # Dashboards
 
-The home page, and a pane beside a task, are grids of panels a person composed themselves and
+The home page is a grid of panels a person composed themselves and
 dragged and resized where they wanted them. A panel draws rows that came from a plugin, and it can
 draw rows from two plugins at once: a board whose columns are the user's own invention, fed by GitHub
 pull requests and Linear issues, with each provider's statuses mapped onto those columns. A panel can
@@ -326,7 +326,7 @@ requirement, which keeps the plugin obligation at "answer with your rows".
 
 **Where a panel is placed is not one of the four**, and that is the split the whole persistence
 section below rests on: a definition is surface-free, and a placement references it by id and owns
-its geometry. The same panel can therefore be on Home and in a task pane at two different sizes.
+its geometry. The same panel can therefore be on Home and in a plugin region at two different sizes.
 
 ### Views are derived, not chosen from a menu
 
@@ -595,9 +595,11 @@ writes them back.
 **Placements reference panel definitions by id; they never embed them.** Embedding panel config
 inside a "home dashboard" blob works right up until panels need to live in a second place, and then
 it is a migration. A placement scope key is `(surface, ownerId?, projectId?)` with segments encoded,
-so an owner id that itself contains a separator can never be read as two. All three surfaces are drawn:
-`home` (a tab per `ownerId`), `pane`, and `plugin-region` (a rail source's side panel or a pane's
-aside, `<pluginId>:<somethingId>`). The split did its job — every one of them arrived as a container
+so an owner id that itself contains a separator can never be read as two. Two surfaces are drawn:
+`home` (a tab per `ownerId`) and `plugin-region` (a rail source's side panel or a pane's
+aside, `<pluginId>:<somethingId>`). `pane` stays in the key grammar although its one owner, the
+per-task dashboard pane, is retired: stored `pane/dashboard` entries keep parsing, they just have no
+container to render in. The split did its job — every surface arrived as a container
 and a scope constant, and none of them touched the key format or the panel.
 
 **Geometry is a third top-level key, `layouts`, keyed by the same scope then by panel id** — four
@@ -611,7 +613,7 @@ auto-placement while the panels, their definitions and their order all survive. 
 keeping composition is the right way round.
 
 A rect belongs to a `(scope, panel)` pair, never to the definition, so the same panel placed on Home
-and in the task pane has two of them. **A placed panel with no rect is auto-placed at render**, which
+and in a plugin region has two of them. **A placed panel with no rect is auto-placed at render**, which
 is one rule serving three cases at once: the migration for every existing blob, the recovery from an
 old client's write, and the default for a newly added panel.
 
@@ -693,13 +695,14 @@ it; which of its dashboards this screen happens to be showing is a property of t
 it would move somebody else's view under them. A remembered tab that has since been deleted falls back
 to the default rather than drawing an empty grid.
 
-**The task pane** is the third, and it is the same `PanelGrid` at a different scope. It is keyed by
-*pane*, not by task: definitions are per-user-per-node and surface-free, so the same board renders in
-that pane in every task. A board per task is a non-goal — a task is ephemeral, and composing one is
-labour nobody repeats. If per-something boards are ever wanted the answer is the scope's `projectId`
-segment, which the key format already carries, not a task segment.
+**The task pane placement is retired.** It was keyed by *pane*, not by task, so the same board
+rendered beside every task — which turned out to be noise beside the work rather than context for
+it, and the pane was removed from the switcher. The `pane` surface stays in the scope-key grammar so
+stored `pane/dashboard` placements parse instead of corrupting the slice; nothing draws them. If a
+per-task or per-project board is ever wanted, the answer is still the scope's `projectId` segment,
+which the key format already carries, not a task segment.
 
-**Plugin regions** are the fourth and fifth, and they are the same `PanelGrid` again — a rectangle a
+**Plugin regions** are the remaining placements, and they are the same `PanelGrid` again — a rectangle a
 plugin reserved in one of *its own* surfaces for panels the user composes. Two surfaces reserve one
 today: a rail source's side panel, beside its list, and a `pane.aside` extension point, beside a
 plugin pane's frame. Both are stored under `plugin-region/<pluginId>:<somethingId>`, which is why the

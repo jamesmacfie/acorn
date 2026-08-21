@@ -395,14 +395,6 @@ export default function PanelWizard(props: {
                 options={[
                   { value: 'home', label: 'Home' },
                   {
-                    value: 'pane',
-                    label: 'Task pane',
-                    // Reachable only from the pane itself: there is one dashboard pane scope, and aiming
-                    // at it from Home would place a panel where nobody is looking.
-                    disabled: props.scope.surface !== 'pane',
-                    title: 'Add it from a task’s dashboard pane.',
-                  },
-                  {
                     value: 'plugin-region',
                     label: 'Plugin area',
                     // Reachable only from the region itself, exactly as the task pane is, plus one this

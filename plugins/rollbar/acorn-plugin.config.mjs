@@ -28,7 +28,9 @@ export default {
     node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: ['api.rollbar.com'] },
   },
   contributions: {
-    frames: [{ target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'brand:rollbar', order: 100 }],
+    // `providerId` marks the pane as a linked-items view: the host hides it on tasks with no rollbar
+    // link (client-core plugins/frames/register.ts).
+    frames: [{ target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'brand:rollbar', order: 100, providerId: 'rollbar' }],
     sources: [{
       id: 'rollbar-items',
       label: 'Rollbar',
