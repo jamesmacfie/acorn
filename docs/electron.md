@@ -24,11 +24,12 @@ device tokens are encrypted with, the target broker pushes go to, the recovery d
 projections the renderer talks to, then wires window creation, native folder dialogs, preview and
 browser capabilities, and quit-time shutdown.
 
-`main/helper/` is the other half, composed by `main/helper/index.ts`: service supervision and the
-restart policy, the connection broker and its fleet, device-token custody, the plugin cache and trust
-store, and the preview tunnels. Nothing in that folder imports Electron, and a rule in
-`tools/arch/boundaries.test.ts` keeps it that way, because that folder is what becomes a separate
-desktop helper process under a non-Electron shell (see `docs/future/tauri/architecture.md`).
+`@acorn/desktop-helper` is the other half, composed by its `main/index.ts`: service supervision and
+the restart policy, the connection broker and its fleet, device-token custody, the plugin cache and
+trust store, and the preview tunnels. It is its own workspace package, and nothing in it imports
+Electron, which a rule in `tools/arch/boundaries.test.ts` keeps true. That is what lets the Tauri
+shell run the same code as a separate desktop helper process (see
+`docs/future/tauri/architecture.md`).
 
 The main process must not import plugin engines, database handles, or Node source. Domain behavior
 belongs in the Electron-free service graph.
@@ -75,16 +76,17 @@ certificate fingerprint/PEM, and local device token. Electron adopts that record
 after the listener is ready. Startup failures fail closed; a crash after startup is retried with
 bounded exponential backoff and eventually shows the recovery UI without creating a new data root.
 
-The crash budget (`main/helper/crashBudget.ts`) allows five restarts inside a ten-minute window, waiting
-1, 2, 4, 8, then 16 seconds before each one; a sixth crash inside the window gives up and shows the
-recovery screen instead of restarting into the same fault. An earlier, tighter policy (roughly
-250ms doubling, capped at three crashes in sixty seconds) meant a service crashing on something
-durable, a corrupt database or a port it could never bind, burned its whole budget in under two
-seconds and gave up before a person could read anything on screen. Each start persists whatever
-device token the Node ended up using and is reused on every start, including crash recovery, since a
-restart must not mint a new device row and the Node's endpoint can change between restarts. Reconnecting
-every remembered node (the local one included) happens as part of registering the connection broker's
-IPC, before the renderer exists, since the broker's first act on load is to ask for the fleet.
+The crash budget (`@acorn/desktop-helper/main/crashBudget.ts`) allows five restarts inside a ten-minute
+window, waiting 1, 2, 4, 8, then 16 seconds before each one; a sixth crash inside the window gives
+up and shows the recovery screen instead of restarting into the same fault. An earlier, tighter
+policy (roughly 250ms doubling, capped at three crashes in sixty seconds) meant a service crashing
+on something durable, a corrupt database or a port it could never bind, burned its whole budget in
+under two seconds and gave up before a person could read anything on screen. Each start persists
+whatever device token the Node ended up using and is reused on every start, including crash
+recovery, since a restart must not mint a new device row and the Node's endpoint can change between
+restarts. Reconnecting every remembered node (the local one included) happens as part of registering
+the connection broker's IPC, before the renderer exists, since the broker's first act on load is to
+ask for the fleet.
 
 The Node owns SQLite, migrations, HTTP/WebSocket listeners, PTYs, tmux, worktrees, Git, processes,
 workflows, Docker, provider clients, reconciliation, and shutdown draining. `will-quit` asks it to
@@ -164,10 +166,10 @@ That surface is the *implementation* of the platform seam, and the renderer neve
 `boundaries.test.ts`. The two are checked against each other rather than assumed to agree:
 `platform/contract.ts` states what a live capability group has to look like, and
 `main/preload.test.ts` runs it against the real preload loaded headless, so a renamed key fails a test
-instead of quietly nulling a group. Presence of a preload key is therefore never a product capability. The folder
-picker in particular is a folder picker — it used to sit under a `terminal` key whose presence gated
-the whole terminal/agents/run-targets/workflows block, which are ordinary `/v2` + WebSocket surfaces
-(`git history: docs/future/node-first/platform-seam.md`).
+instead of quietly nulling a group. Presence of a preload key is therefore never a product
+capability. The folder picker in particular is a folder picker — it used to sit under a `terminal`
+key whose presence gated the whole terminal/agents/run-targets/workflows block, which are ordinary
+`/v2` + WebSocket surfaces (`git history: docs/future/node-first/platform-seam.md`).
 
 ## The plugin frame origin
 
@@ -229,8 +231,8 @@ scheme with no CORS.
 
 ## Connection broker
 
-`main/helper/nodeBroker.ts` is Electron-free apart from its use by the main composition root. For each Node
-it owns:
+`@acorn/desktop-helper/main/nodeBroker.ts` is Electron-free apart from its use by the main
+composition root. For each Node it owns:
 
 - endpoint and certificate fingerprint;
 - a pinned `https.Agent` and device token;
@@ -252,11 +254,11 @@ would only add a certificate-override path for a trust decision this process doe
 
 ### Fleet membership
 
-`main/helper/fleetStore.ts` holds which Nodes this client knows, where they are, and what certificate to pin,
-in `fleet.json`. It lives in main because main is what already holds the two things fleet membership
-is inseparable from: device tokens and pinned certificates. The renderer gets a token-free `NodeRecord`
-projection built by explicit field selection, not a spread with keys deleted, so a field added to the
-stored record cannot leak to the renderer by default.
+`@acorn/desktop-helper/main/fleetStore.ts` holds which Nodes this client knows, where they are, and
+what certificate to pin, in `fleet.json`. It lives with the host because the host already holds the
+two things fleet membership is inseparable from: device tokens and pinned certificates. The renderer
+gets a token-free `NodeRecord` projection built by explicit field selection, not a spread with keys
+deleted, so a field added to the stored record cannot leak to the renderer by default.
 
 The file and the tokens are split into two stores on purpose. `fleet.json` holds the non-secret record
 (`0600` regardless, since an endpoint list is still information about the owner's machines), and each
@@ -280,17 +282,18 @@ one token scope, so the write is what refreshes the live node's own token rather
 
 ## Host-owned webviews
 
-`webviewService.ts` owns every native `WebContentsView`. Preview is one kept-alive view per task and uses a task-specific
-ephemeral session, no preload, denied permission requests, HTTP(S)-only navigation, and an external
-chrome layer rendered by the desktop. Main positions the native view over the renderer's pane host
-and hides it while overlays cover the pane.
+`webviewService.ts` owns every native `WebContentsView`. Preview is one kept-alive view per task and
+uses a task-specific ephemeral session, no preload, denied permission requests, HTTP(S)-only
+navigation, and an external chrome layer rendered by the desktop. Main positions the native view
+over the renderer's pane host and hides it while overlays cover the pane.
 
 A loaded plugin may also declare a `webview` pane. Its manifest hosts are checked by the renderer
 broker and again in main, including `will-navigate` and `will-redirect`. Each surface gets an
 ephemeral isolated partition and no CDP attachment, devtools, tunnel header, preload, or page bridge.
 
-For a task whose dev server is served by another Node process, `main/helper/previewTunnel.ts` opens an
-authenticated loopback listener that forwards raw bytes to the Node's own tunnel endpoint over its
+For a task whose dev server is served by another Node process,
+`@acorn/desktop-helper/main/previewTunnel.ts` opens an authenticated loopback listener that forwards
+raw bytes to the Node's own tunnel endpoint over its
 pinned agent, so the preview pane can reach a dev server without the renderer ever touching the
 network directly. It binds `127.0.0.1` explicitly; binding `0.0.0.0` would publish another machine's
 dev server to the local network, the opposite of the tunnel's purpose. Because a task's preview URL

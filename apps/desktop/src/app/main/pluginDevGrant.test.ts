@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
-import { PluginTrustStore, type PluginAck } from './helper/pluginTrustStore'
+import { PluginTrustStore, type PluginAck } from '@acorn/desktop-helper/main/pluginTrustStore.ts'
 
 // The dev trust grant (docs/security.md § The dev grant): one decision that replaces the per-hash
 // prompt for one plugin while the owner is developing it. Everything below tests the two properties

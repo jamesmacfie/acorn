@@ -4,9 +4,9 @@ import { registerPreviewIpc } from '@acorn/plugin-preview/main/index.ts'
 import { registerFolderPickerIpc } from '@acorn/plugin-terminal/main/index.ts'
 import type { ServiceStartResult } from '@acorn/protocol/serviceProtocol.ts'
 import { registerDesktopCapabilityHandlers } from './desktopCapabilities'
-import { createHelper } from './helper'
-import { MAX_CRASHES_PER_WINDOW } from './helper/crashBudget'
-import type { TokenCipher } from './helper/deviceTokenStore'
+import { createHelper } from '@acorn/desktop-helper/main/index.ts'
+import { MAX_CRASHES_PER_WINDOW } from '@acorn/desktop-helper/main/crashBudget.ts'
+import type { TokenCipher } from '@acorn/desktop-helper/main/deviceTokenStore.ts'
 import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
 import { registerPluginIpc } from './pluginIpc'
 import { registerPluginScheme } from './pluginScheme'
@@ -20,7 +20,7 @@ export type BootstrapOptions = {
 
 // Electron main's boot order and teardown (docs/electron.md § Main process). Everything that is not
 // Electron — the broker, the fleet, the tokens, the plugin stores, the tunnels, and the supervised
-// node — is composed by main/helper/, which knows nothing about windows or IPC. This file is the
+// node — is composed by @acorn/desktop-helper/main/, which knows nothing about windows or IPC. This file is the
 // Electron half of that seam: it supplies the encryption, the push target, the recovery dialog, and
 // the IPC projections the renderer talks to.
 

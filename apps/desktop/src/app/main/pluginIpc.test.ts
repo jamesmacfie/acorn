@@ -16,7 +16,7 @@ const electron = vi.hoisted(() => {
 vi.mock('electron', () => ({ ipcMain: electron.ipcMain }))
 
 const { PLUGINS_CACHE_PUT, PLUGINS_DEV_GRANT, PLUGINS_STATE, PLUGINS_TRUST_RECORD, registerPluginIpc } = await import('./pluginIpc')
-const { PluginTrustStore } = await import('./helper/pluginTrustStore')
+const { PluginTrustStore } = await import('@acorn/desktop-helper/main/pluginTrustStore.ts')
 
 // Recording a trust decision must not be defeatable by a node running a newer manifest schema than
 // this shell. It used to be: one combined schema meant an unparseable disclosure threw before

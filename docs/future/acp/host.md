@@ -106,7 +106,7 @@ an unrecorded grant can never read as newly requested:
 - Rendered in `packages/client-core/src/plugins/trustModel.ts` `trustTiers()` (Enforced block,
   lines 56-73).
 - Persisted by `recordTrustDecision` (`trustModel.ts:117-141`).
-- Stored in `apps/desktop/src/app/main/helper/pluginTrustStore.ts` schema (lines 63-77), `.default([])`
+- Stored in `packages/desktop-helper/src/main/pluginTrustStore.ts` schema (lines 63-77), `.default([])`
   like its siblings so old trust files stay readable.
 
 **Golden lists.** Registering harnesses shows up in `pluginDisable.snapshot.json` and friends;

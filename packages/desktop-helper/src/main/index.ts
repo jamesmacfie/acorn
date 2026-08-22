@@ -10,12 +10,14 @@ import { PreviewTunnels } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 
 // The custody stack, composed in one place: the broker and its fleet, the device tokens, the plugin
-// cache and trust store, the preview tunnels, and the supervised node service. Nothing in this folder
-// imports Electron, which is what lets the whole folder move into the Tauri desktop helper as a
-// relocation rather than a rewrite (docs/future/tauri/architecture.md § Process model).
+// cache and trust store, the preview tunnels, and the supervised node service. Nothing in this
+// package imports Electron, which is what lets both shells run the same code: Electron main composes
+// it in process, and the Tauri shell composes it inside the desktop helper
+// (docs/future/tauri/architecture.md § Process model).
 //
-// What stays outside: the window, the dialogs, the IPC projections, and the encryption. Those reach
-// this seam through the options below, so a shell supplies four small things and gets a warm broker.
+// What stays outside: the window, the dialogs, the renderer projection, and the encryption. Those
+// reach this seam through the options below, so a shell supplies four small things and gets a warm
+// broker.
 //
 // Boot order is the shell's to drive and matters: build the helper, register whatever the renderer
 // talks to, then `start()`, then `bootComplete()`. Between start and bootComplete an unexpected exit

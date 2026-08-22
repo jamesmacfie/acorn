@@ -27,6 +27,11 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+// One runtime pin, two consumers: this tarball's engines floor and the Node binary the Tauri bundle
+// ships as an external binary (docs/future/tauri/node-runtime.md). Keeping them in one file is what
+// stops a desktop build from shipping a runtime the standalone artifact would refuse.
+const RUNTIME_PIN = JSON.parse(readFileSync(new URL('../node-runtime.json', import.meta.url), 'utf8'))
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const NODE_APP = join(ROOT, 'apps/node')
 const OUT = join(ROOT, 'apps/node/release')
@@ -191,7 +196,7 @@ writeFileSync(
       // The real floor is the node:sqlite surface main/sqlite.ts touches: enableForeignKeyConstraints
       // landed in 22.18/24.4, backup() and setReturnArrays earlier. npm only warns on a mismatch, but
       // a warning that names the requirement beats "unknown option" from deep inside boot.
-      engines: { node: '>=22.18 <23 || >=24.4' },
+      engines: { node: RUNTIME_PIN.engines },
       dependencies,
     },
     null,

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "acorn",
+  "version": "../package.json",
+  "identifier": "com.acorn.desktop",
+  "build": {
+    "frontendDist": "../dist/client",
+    "devUrl": "http://localhost:4319",
+    "beforeDevCommand": "vite",
+    "beforeBuildCommand": "vite build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "dmg",
+      "app"
+    ],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.icns"
+    ],
+    "externalBin": [
+      "binaries/node"
+    ],
+    "resources": {
+      "../dist/client": "client",
+      "../dist/bridge": "bridge",
+      "../dist/helper": "helper",
+      "../dist/bundled-plugins": "plugins"
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    }
+  }
+}

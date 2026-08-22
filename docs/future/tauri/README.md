@@ -1,6 +1,6 @@
 # Tauri migration
 
-Status: proposal, 2026-08-22; phases 0 and 1 executed 2026-08-23. Phases 2 to 5 are not scheduled. This
+Status: proposal, 2026-08-22; phases 0, 1 and 2 executed 2026-08-23. Phases 3 to 5 are not scheduled. This
 folder plans the replacement of the Electron host with a Tauri v2 shell, written for the agents and
 developers who will implement the phases. The reference implementation we steal mechanics from is
 `references/proliferate`, a shipped Tauri v2 app in this repo's references directory.
@@ -55,7 +55,16 @@ root, with an arch rule keeping Electron out of it. Two injections were needed a
 2 wants anyway: the device-token cipher, and the service's shell-only capability handlers.
 [sequencing.md](./sequencing.md) has the detail.
 
-**Coexist, then cut over.** The Tauri shell is a new package (working name `apps/desktop-tauri`)
+**Phase 2 landed on trunk, 2026-08-23.** `pnpm dev:tauri` boots the Rust shell, the desktop helper
+under a bundled Node 24.11.0, the node service, and an HMR renderer on `app://acorn`. The custody
+stack became `packages/desktop-helper` rather than staying in `apps/desktop` until cutover, because
+the arch rule against apps importing each other left no other place for code two shells run. Four
+design details changed on contact and are recorded in [sequencing.md](./sequencing.md): the helper
+wire is one WebSocket rather than a socket plus loopback HTTP, `connect-src` also names Tauri's own
+IPC protocol, dev proxies Vite through `app://` instead of loading `devUrl`, and a dev build skips
+the keychain.
+
+**Coexist, then cut over.** The Tauri shell is a new package (`apps/desktop-tauri`)
 consuming the same renderer source, node artifact, bundled-plugins build, and protocol. CI builds
 both from the same commit; Electron ships until the cutover checklist in
 [sequencing.md](./sequencing.md) is green. In-place conversion was rejected: no fallback artifact,
@@ -108,14 +117,14 @@ path. [distribution.md](./distribution.md) records the convergence points with
 | --- | --- | --- | --- |
 | 0 | De-risk spikes | ✅ Done, go (2026-08-23) | M |
 | 1 | Groundwork that lands in Electron | ✅ Done (2026-08-23) | M |
-| 2 | Rust shell skeleton + helper | ⬜ Not started | L |
+| 2 | Rust shell skeleton + helper | ✅ Done (2026-08-23) | L |
 | 3 | Feature parity | ⬜ Not started | L |
 | 4 | Packaging and CI | ⬜ Not started | M |
 | 5 | Cutover and deletion | ⬜ Not started | M |
 
-Ordering and exit criteria live in [sequencing.md](./sequencing.md), which records what phase 1
-actually landed. Phase 2 is clear to start: the seam has a contract suite, the renderer config is
-shared, and the custody stack it moves is already gathered and proven Electron-free.
+Ordering and exit criteria live in [sequencing.md](./sequencing.md), which records what each finished
+phase actually landed. Phase 3 is clear to start: the shell boots, the seam has two hosts running one
+contract suite, and the two groups phase 3 fills are the two the bridge currently resolves null.
 
 ## Invariants
 

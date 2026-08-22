@@ -1,6 +1,6 @@
 # Dev workflow
 
-Status: proposal, 2026-08-22; the renderer config extraction landed 2026-08-23 (phase 1).
+Status: proposal, 2026-08-22; phase 2 built it, 2026-08-23.
 
 ## The problem
 
@@ -21,19 +21,40 @@ filename match depends on, and Monaco's plain `[name]` pattern
 ([docs/electron.md](../../electron.md) § The syntax-highlighter worker's separate policy).
 
 **Wire `tauri dev` the proliferate way** (`references/proliferate/apps/desktop/vite.config.ts` and
-`tauri.conf.json`): `devUrl` at the Vite port, `beforeDevCommand` runs the Vite dev server,
-`strictPort` with explicit port and HMR-port env overrides, `clearScreen: false`, and
-`server.watch.ignored: ['**/src-tauri/**']` so Rust edits do not retrigger Vite.
+`tauri.conf.json`): `beforeDevCommand` runs the Vite dev server, `strictPort` on port 4319, `clearScreen:
+false`, and `server.watch.ignored: ['**/src-tauri/**']` so Rust edits do not retrigger Vite.
+
+One thing is not the proliferate way. `devUrl` is in the config only so `tauri dev` waits for Vite to
+answer before launching; the window never loads it. The shell declares no windows in its config and
+builds the window itself on `app://acorn`, and in dev the scheme handler proxies Vite. Loading
+`devUrl` directly would put every developer on `http://localhost:4319` while the shipped app runs on a
+custom scheme, and the origin is the one thing this migration cannot afford to leave unexercised:
+phase 0's findings are all about how that origin behaves. The proxy costs about forty lines of Rust
+and keeps HMR.
+
+The dev origin pays for that with two extra CSP entries, and only in dev: Vite's HMR WebSocket in
+`connect-src`, and `'unsafe-inline'` in `script-src` for the preamble its plugins inject. Both come
+from one branch in `renderer_csp`, so a packaged build cannot pick them up by accident, and a Rust
+test asserts it does not.
 
 **Overlay dev config.** A `tauri.dev.json` (proliferate's pattern) gives the dev shell a distinct
 `identifier` and `productName`, so a dev build never collides with an installed build's data, and
 empties any updater endpoints.
 
 **The node in dev.** The Rust shell spawns the helper exactly as packaged, but pointed at
-`apps/node/dist` and the checkout data root (`apps/node/.acorn`), the same contract `serviceHost`
-has today. Service and bundled-plugin builds stay a prerequisite step ahead of `beforeDevCommand`,
-mirroring the current `dev` script's ordering. Staging detects missing artifacts, not stale ones —
-the same rule as today.
+`apps/desktop-tauri/dist/helper` and the checkout data root (`apps/node/.acorn`), the same contract
+`serviceHost` has today. The shell's own custody root is `apps/node/.acorn/shell`, so a developer's
+fleet and device tokens sit beside the node's data without mixing into it.
+
+`pnpm run stage` is the prerequisite step, ahead of `beforeDevCommand`, mirroring the current `dev`
+script's ordering: it builds the service, the bundled plugins, the helper bundle and the bridge, then
+copies the service and every migration chain next to the helper and the pinned Node into
+`src-tauri/binaries/`. It detects missing artifacts, not stale ones, the same rule as today.
+
+**Secrets.** The helper loads `.env` files in the order Electron reads them, and the shell decides the
+list because only it knows whether this is a bundle or a checkout. A dev build reads
+`apps/desktop/.env`, where a developer's file already is, then the data directory's, which wins. That
+path goes at cutover with the package it names.
 
 **Scripts during coexistence.** Root `pnpm dev` keeps launching Electron unchanged; `pnpm
 dev:tauri` launches the new shell. Flipping the default is a phase 5 line item. The `.env` loading
@@ -45,11 +66,11 @@ One improvement worth naming: the renderer gains real HMR under `dev:tauri`, whi
 
 ## Why not keep electron-vite for the renderer during coexistence
 
-We do — until phase 2 needs the standalone config. The extraction is designed so the Electron
-config imports the shared renderer config rather than forking it, which is why it lands in phase 1
-while Electron still ships.
+We do. Both shells import `apps/desktop/vite.renderer.config.ts` rather than forking it, so the
+client they build cannot drift. The Tauri config adds an output directory and a dev-server port and
+changes nothing else.
 
 ## Exit criteria
 
-`pnpm dev:tauri` boots shell, helper, node, and an HMR renderer against the checkout data root
-with no manual steps.
+`pnpm dev:tauri` boots shell, helper, node, and an HMR renderer against the checkout data root with
+no manual steps. **Met 2026-08-23.**

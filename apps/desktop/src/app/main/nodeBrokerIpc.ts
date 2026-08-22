@@ -11,10 +11,10 @@ import {
   type NodeTunnelResult,
 } from '@acorn/protocol/broker.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
-import { toNodeRecord, type FleetStore } from './helper/fleetStore'
-import type { NodeBroker } from './helper/nodeBroker'
-import { pairWithNode, probeNode } from './helper/nodePairing'
-import type { PreviewTunnels } from './helper/previewTunnel'
+import { toNodeRecord, type FleetStore } from '@acorn/desktop-helper/main/fleetStore.ts'
+import type { NodeBroker } from '@acorn/desktop-helper/main/nodeBroker.ts'
+import { pairWithNode, probeNode } from '@acorn/desktop-helper/main/nodePairing.ts'
+import type { PreviewTunnels } from '@acorn/desktop-helper/main/previewTunnel.ts'
 
 // The IPC projection of the broker and the fleet store. Deliberately thin: every decision lives in
 // nodeBroker.ts / fleetStore.ts / nodePairing.ts, which are Electron-free and therefore testable, and
@@ -49,7 +49,7 @@ export type NodeBrokerIpcDeps = {
   // machine, and nothing this app can do restarts it; Settings → Plugins says "restart required" there
   // instead, which is honest rather than a button that would lie.
   restartLocalNode?: () => Promise<void>
-  // The preview tunnel's loopback listeners (main/helper/previewTunnel.ts). Absent in a build with no preview.
+  // The preview tunnel's loopback listeners (@acorn/desktop-helper/main/previewTunnel.ts). Absent in a build with no preview.
   tunnels?: PreviewTunnels
 }
 
@@ -182,7 +182,7 @@ export function registerNodeBrokerIpc(broker: NodeBroker, fleet: FleetStore, dep
   })
 
   // The preview tunnel. The renderer sends a task and a port on the node and gets back a port on this
-  // machine; it never learns the endpoint or the token, and the pipe is main's (main/helper/previewTunnel.ts).
+  // machine; it never learns the endpoint or the token, and the pipe is main's (@acorn/desktop-helper/main/previewTunnel.ts).
   ipcMain.handle(NODE_TUNNEL_OPEN, async (_event, raw: unknown): Promise<NodeTunnelResult> => {
     const request = nodeTunnelRequestSchema.parse(raw)
     if (!deps.tunnels) throw new Error('This build cannot open a preview tunnel.')

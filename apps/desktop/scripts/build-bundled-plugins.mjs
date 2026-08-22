@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 const DESKTOP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(DESKTOP, '../..')
-const output = resolve(DESKTOP, 'out/bundled-plugins')
+// Defaults to the Electron build's staging dir; the Tauri package passes its own, because the two
+// shells stage the same packages into different bundles.
+const output = process.argv[2] ? resolve(process.cwd(), process.argv[2]) : resolve(DESKTOP, 'out/bundled-plugins')
 
 // The distribution roster. Adding another bundled plugin is one row here; package construction,
 // desktop resources, boot reconciliation, update ownership, uninstall tombstones and client trust

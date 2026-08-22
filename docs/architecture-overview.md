@@ -101,11 +101,11 @@ and is the likelier form on a barrel.
 barrel in plain Node — and the arch rule is the fast first line that also catches an *unused* static
 import, which esbuild elides before Node ever sees it.
 
-**The custody stack stays shell-free.** Nothing under `apps/desktop/src/app/main/helper/` imports
-Electron either. That folder is the broker, the fleet, the device tokens, the plugin cache and trust
-store, the tunnels, and the supervised node service, composed by `helper/index.ts`; it is a whole
-process under a non-Electron shell (`docs/future/tauri/architecture.md`), so the encryption and the
-shell-only service capabilities are injected rather than imported.
+**The custody stack stays shell-free.** Nothing in `@acorn/desktop-helper` imports Electron either.
+That package is the broker, the fleet, the device tokens, the plugin cache and trust store, the
+tunnels, and the supervised node service, composed by its `main/index.ts`. Electron main and the
+Tauri desktop helper are both consumers of it (`docs/future/tauri/architecture.md`), so the
+encryption and the shell-only service capabilities are injected rather than imported.
 
 **The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/platform/`.
 The global is read rather than imported, so this is a source scan rather than a graph edge. Tests are
@@ -114,8 +114,8 @@ permanently exempt: stubbing `globalThis.window` is how the platform implementat
 **Core seams are not reachable around.** The raw identity store is confined to `packages/node-core`
 plus the two composition roots that construct it — the node's identity used to be *written* by
 `plugins/github`, which made "who is the user" a side effect of connecting one provider. The plugin
-trust and bundle stores are confined to `apps/desktop`, because trust binds to a hash the main process
-computed and the renderer must stay inert. A plugin's production code never imports core's `db` module.
+trust and bundle stores are confined to `@acorn/desktop-helper`, because trust binds to a hash the host
+process computed and the renderer must stay inert. A plugin's production code never imports core's `db` module.
 Every child process goes through the process broker, with a written list of considered exceptions — a
 PTY, a long-lived agent driver, a `docker logs -f` stream and a pg client are none of the things the
 broker models.
