@@ -87,6 +87,13 @@ helper's existing `crashBudget` and surface as today's recovery UI. The recovery
 native actions as Tauri commands, `open-data-folder` and `force-quit`, because the shell handler is
 unmounted behind the gate.
 
+Two supervision requirements came out of phase 0 and are load-bearing
+([node-runtime.md](./node-runtime.md) has the run). Rust spawns the helper in its own process group
+and kills the group, never the single process: killing the helper alone leaves the node holding the
+data root's lock, and the replacement helper's node cannot start. And the helper installs its stdin
+command handler before it starts the node, queueing whatever arrives early, because a quit can reach
+it mid-boot.
+
 ## The one CSP change
 
 The renderer CSP's `connect-src` widens from `'self'` to `'self'` plus the helper's exact loopback
@@ -97,6 +104,16 @@ proposed change against [docs/electron.md](../../electron.md), where `connect-sr
 load-bearing directive. Everything else that directive protected still holds: the renderer still
 cannot reach a node directly, because nodes require the pinned agent and bearer that only the
 helper holds.
+
+Phase 0 checked both halves of this, since a directive that cannot be widened would take the helper
+design with it ([webviews-and-frames.md](./webviews-and-frames.md) records the run). Under
+`connect-src 'self'` a fetch to the loopback port failed and a `WebSocket` to it threw
+`SecurityError: The operation is insecure`. With the port named in the directive, the same
+`WebSocket` was allowed to open and the same fetch returned 200. Two details for `helperServer.ts`:
+a loopback `ws://` is reachable from the custom-scheme origin even though that origin is a secure
+context, and the fetch only worked once the loopback server sent
+`Access-Control-Allow-Origin` — a widened `connect-src` is necessary but not sufficient, because the
+app origin and the helper origin are different origins.
 
 ## Keys and custody
 

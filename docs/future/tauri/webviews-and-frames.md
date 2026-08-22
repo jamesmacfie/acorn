@@ -20,35 +20,75 @@ WKWebView is not Chromium, and the differences land exactly where
 
 ## Spike findings
 
-Filled in by executing phase 0. Each spike's deliverable is a subsection here, not code.
+Run 2026-08-23 on macOS (Darwin 25.5.0), Tauri 2.11.5, wry 0.55.1, WKWebView 605.1.15. The throwaway
+app is deliberately not in this repo; it was run from `~/Source/acorn-tauri-spike`
+(`cargo run --bin spike-gui`), with the raw JSON in its `findings/`. It serves the shipped policies
+from `appScheme.ts` and `pluginScheme.ts` verbatim under the scheme names `acorn://` and
+`acorn-plugin://`, and every check is measured from inside the page.
+
+Verdict: go. Nothing in the design needs replacing. Three things changed, all recorded below: the
+tunnel cookie can be set from Rust rather than seeded through a page, a scheme handler never sees a
+request body, and reading cookies back out of an ephemeral webview returns nothing.
 
 ### Custom-scheme origins and CSP (spike 1)
 
-To verify in wry/WKWebView, with the designed fallback if it fails:
-
-- Per-response CSP headers from a `register_uri_scheme_protocol` handler are honored, including a
-  different policy per response.
-- Each `app-plugin://<hash>` is a real origin: storage separation, `'self'` resolves, and a
-  sandboxed `allow-scripts allow-same-origin` iframe from a different custom scheme behaves as it
-  does under Chromium. **Fallback:** the helper serves each active plugin frame from its own
-  ephemeral loopback port, so origin separation comes from the port; `connect-src 'none'` still
-  holds inside the frame, and the shell's `frame-src` names the loopback origins the helper
-  reports.
-- The worker CSP trick: a dedicated worker's policy comes from its own script response, and
-  `'wasm-unsafe-eval'` works. The failure mode already exists and is loud — pattern mismatch means
-  the document policy applies, Oniguruma fails, and highlighting falls back to the main thread.
-- Subframe navigation guarding: wry's `on_navigation` coverage of subframes. If absent, a
-  macOS-specific `decidePolicyForNavigationAction` extension is the compensating control; the
-  iframe `sandbox` attribute does not stop a frame navigating itself.
-- `codeCache` has no Tauri equivalent. Measure the startup cost; do not assume WKWebView's bytecode
-  cache covers custom schemes.
+- **Per-response CSP is honored, and the policy differs per response.** Frame hashes a and b were
+  served `connect-src 'none'` and hash c `connect-src 'self'` on the same scheme. In a and b `fetch`
+  threw `TypeError: Load failed`, XHR and `WebSocket` fired error events, and `sendBeacon` threw
+  `Beacons can only be sent over HTTP(S)`. In c the same fetch returned 200 and the XHR loaded. The
+  frame is network-dead when the header says so, and the header travels with the response.
+- **Each `app-plugin://<hash>` is a real origin.** `location.origin` is the full
+  `acorn-plugin://<hash>`, `isSecureContext` is true, and `localStorage`, `sessionStorage` and
+  `indexedDB` all work. `'self'` resolves: the generated document's `/ui.css` and `/client.js` both
+  loaded. Storage is separated by hash — each frame read `null` for the key the previous hash had
+  just written. The loopback-port fallback is not needed and is dropped from the design.
+- **The iframe sandbox behaves as it does under Chromium.** With `allow-scripts allow-same-origin`
+  the module script runs, `postMessage` reaches the parent, and a transferred `MessagePort`
+  round-trips, which is the real host↔frame bridge. Dropping `allow-same-origin` kills the frame
+  outright: the origin goes opaque, `'self'` stops matching, and no script runs at all. Both tokens
+  stay.
+- **The worker CSP trick works.** A worker built from a response carrying
+  `script-src 'self' 'wasm-unsafe-eval'` instantiated a wasm module, and `fetch` inside it failed
+  under the same response's `connect-src 'none'`. The identical instantiate in the parent document,
+  whose policy has no `wasm-unsafe-eval`, threw `CompileError: Refused to create a WebAssembly
+  object`. A worker's policy comes from its own script response, which is what Oniguruma depends on.
+- **Subframe navigation is guardable, twice over.** A frame setting `location.href` to
+  `https://example.com/` was refused by the shell's `frame-src acorn-plugin:` before wry was asked.
+  For a URL `frame-src` does allow — another plugin hash — `on_navigation` fired with the subframe
+  URL, and returning `false` blocked it: the frame stayed on its own document and kept answering on
+  its port. No `decidePolicyForNavigationAction` extension is needed.
+- **No code cache costs about 130 ms for 1.3 MB of module JavaScript**, and the number does not move
+  across runs (120, 123, 135, 137 ms over four launches), so WKWebView keeps no bytecode for a custom
+  scheme. `domContentLoaded` landed at 58-64 ms. Measure it against the real renderer bundle in phase
+  2; it is not a blocker.
+- **A scheme handler is given no request body.** A POST from the page reaches the handler and the
+  page sees the response, but `request.body()` is empty, which is long-standing WebKit behavior for
+  custom schemes. Nothing in the design posts to `app://` — the renderer talks to the helper over the
+  WebSocket — so this closes a shortcut rather than a path. The spike reports its own results through
+  `eval_with_callback` for the same reason.
 
 ### Multi-webview compositing (spike 2)
 
-A Tauri v2 child webview (unstable feature) positioned over the main webview: bounds tracking from
-the renderer's pane host, hide under overlays, an ephemeral data store per surface, per-webview
-navigation policy, `window.open` denial, and permission-request behavior (WKWebView defaults are
-deny-shaped; confirm media and geolocation).
+A child webview under the unstable feature, positioned over the main one, did everything the preview
+pane asks of it:
+
+- Created with `Window::add_child` while the shell webview was live, `incognito(true)`, at a
+  logical position and size.
+- `set_bounds` moved and resized it and `bounds()` read the new rect back unchanged, so renderer
+  pane geometry can drive it directly.
+- `hide()` and `show()` both succeeded, which is what hiding under an overlay needs.
+- The data store is per webview and ephemeral: a second `incognito` webview on the same origin saw
+  neither the `localStorage` key nor the cookie the first one held.
+- `on_navigation` fired for every navigation including the one driven from page script, and
+  returning `false` for `https://example.com/` kept the webview on the tunnel URL.
+- `window.open` reached `on_new_window`, and `NewWindowResponse::Deny` made the call return `null`
+  in the page. No window appeared.
+- Page-fill rules work through `eval`: setting an input's value from Rust and reading it back
+  reported the written value.
+- Permissions are deny-shaped. Geolocation was refused with `User denied Geolocation`, and
+  `Notification.permission` was `default`. `navigator.mediaDevices` is absent, but that is the http
+  origin being an insecure context rather than a WKWebView policy, so a https preview target has to
+  be re-checked in phase 3.
 
 ## Preview pane
 
@@ -64,6 +104,14 @@ authorization to a cookie: seed the pane's ephemeral cookie store for the tunnel
 the existing header scan, same `timingSafeEqual` on `latin1` bytes, still in the helper; the
 injected `headersFor` seam becomes `cookieFor` with the same refuse-unless-exactly-127.0.0.1 rule.
 This is a proposed change against [docs/electron.md](../../electron.md) § Host-owned webviews.
+
+Spike 2 settled the mechanism, and it is simpler than the seeding page this assumed:
+`Webview::set_cookie` from Rust, before the first real navigation, put `acorn_tunnel=<secret>` on
+every request the loopback server logged, starting with that navigation. Two constraints come with
+it. The webview has to exist before its cookie store can be written, so create it pointed at a blank
+page on the tunnel origin and navigate once the cookie is in. And `cookies_for_url` returns an empty
+list for an `incognito` webview, so from Rust the store is write-only; the check that the cookie
+arrived belongs on the helper's side of the tunnel, which is where the auth lives anyway.
 
 Rejected: a separate `WebviewWindow` (preview becomes a floating browser; acceptable only as an
 emergency fallback), an iframe in the shell (widens `frame-src` to http(s) and loses session

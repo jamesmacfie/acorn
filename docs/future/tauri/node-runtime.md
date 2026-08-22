@@ -64,6 +64,41 @@ Finder-launched apps (today's equivalent lives in `apps/node/src/service/runtime
 - **Emulate `NODE_CHANNEL_FD` from Rust.** Undocumented, fiddly, and unnecessary once the helper
   exists: Node-to-Node IPC stays Node-to-Node.
 
+## Spike findings
+
+Run 2026-08-23, Node 24.11.0 (module ABI 137) copied into `binaries/node-aarch64-apple-darwin`, Rust
+spawning it directly. The throwaway driver is at `~/Source/acorn-tauri-spike/spike-node` with its
+helper in `js/helper.js`; raw output in `findings/spike3.log`. It boots the real
+`apps/node/dist/service.js`, not a stub.
+
+Verdict: go. The design holds as written, and two operational requirements it did not name came out
+of the run.
+
+- **The node boots under a real Node with one line deleted.** The helper spawns the service with
+  `stdio: ['ignore', 'pipe', 'pipe', 'ipc']` and no `ELECTRON_RUN_AS_NODE`, and the
+  protocol-3 `service.start` handshake came back with the endpoint, node id, device token,
+  fingerprint and certificate. States ran `starting → migrating → listening → reconciling → ready`, and a request to
+  `/v2/node` verified against the reported certificate returned 200. Helper up in 45-58 ms, service
+  ready 533-597 ms after that.
+- **node-pty needs no rebuild.** The prebuild loaded under ABI 137 and a real PTY ran a command and
+  reported its output. The dual-ABI dance is deletable.
+- **No `SESSION_ENC_KEY` is needed.** The helper passed none and the service minted its own
+  `session.key` in the data root through `ensureSessionKey`, which is what deleting
+  `sessionKeyStore.ts` assumes.
+- **The helper must own the node's process group.** A `SIGKILL` on the helper alone orphans the
+  service, which keeps holding the data root's exclusive lock, and the restarted helper's node then
+  refuses to boot with `Another acorn node already holds <dataDir>`. Spawning the helper with its own
+  process group and killing the group fixed it: restart to `listening` again took 700-940 ms across
+  two generations on the same data root. Rust owns this, and it is not optional.
+- **The helper's command channel has to be live before the node is.** Rust can send `stop` while the
+  node is still booting. A helper that installs its stdin handler after `service.start` resolves
+  drops that line and gets killed for not quitting, so the handler is installed at boot and queues
+  anything that arrives early.
+- **The service bundle needs a staging directory.** `apps/node/dist/service.js` externalises its
+  dependencies and cannot resolve them from `apps/node`; under Electron it runs from
+  `apps/desktop/out/main`, whose `node_modules` has them. The Tauri bundle needs the same staging,
+  which is packaging work in phases 2 and 4, not a code change.
+
 ## Exit criteria
 
 - The node boots under the bundled runtime spawned from Rust via the helper; the versioned start

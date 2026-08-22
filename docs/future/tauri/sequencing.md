@@ -15,7 +15,7 @@ extracted once and imported by both build systems so it cannot drift.
 
 | Phase | Name | Size | Ships while Electron ships? |
 | --- | --- | --- | --- |
-| 0 | De-risk spikes | M | yes (throwaway) |
+| 0 | De-risk spikes ✅ | M | yes (throwaway) |
 | 1 | Groundwork that lands in Electron | M | yes (on trunk) |
 | 2 | Rust shell skeleton + helper | L | yes (parallel app) |
 | 3 | Feature parity | L | yes (parallel app) |
@@ -24,18 +24,19 @@ extracted once and imported by both build systems so it cannot drift.
 
 ### Phase 0 — de-risk spikes
 
-Run these first; each deliverable is a findings section in the owning topic doc, and the go/no-go
-lands in the README decisions.
+Done 2026-08-23, verdict go. Each deliverable was a findings section in the owning topic doc, with
+the go recorded in the README decisions. All three ran against one throwaway app, kept out of this
+repo.
 
-1. **Custom protocol, CSP, and iframe sandbox in WKWebView** — the spike that can invalidate the
-   plugin-frame design, detailed in [webviews-and-frames.md](./webviews-and-frames.md). It runs
-   before anything is built.
+1. **Custom protocol, CSP, and iframe sandbox in WKWebView** — the spike that could have invalidated
+   the plugin-frame design. Findings in [webviews-and-frames.md](./webviews-and-frames.md).
 2. **Multi-webview compositing** — the preview pane's mechanism: a child webview over the main one,
-   hidden under overlays, ephemeral session, navigation policy.
-3. **Node sidecar spawn** — spawn a pinned Node from Rust, boot a minimal helper, have it spawn
-   `service.js` over fd-3 IPC, receive the start handshake, kill it, observe the restart path.
+   hidden under overlays, ephemeral session, navigation policy. Same file.
+3. **Node sidecar spawn** — a pinned Node from Rust, a minimal helper, the real `service.js` over
+   fd-3 IPC, the start handshake, a kill, and the restart path. Findings in
+   [node-runtime.md](./node-runtime.md).
 
-Exit: findings written, go/no-go recorded.
+Exit met: findings written, go recorded in the [README](./README.md) decisions.
 
 ### Phase 1 — groundwork that lands in Electron
 
