@@ -110,7 +110,6 @@
 /* Glyph picker and close popover, anchored just right of its tab. Menu owns the surface (portal,
    position, elevation, dismissal) and the item vocabulary; all this keeps is the rail's own width cap
    on the two title rows. */
-   keeps is the rail's own width cap on the two title rows. */
 .tabrail-menu .ui-menu-label-row { max-width: 180px; }
 
 /* Workspace identity accent (docs/workspaces-and-tasks.md): task rows carry their workspace's colour as

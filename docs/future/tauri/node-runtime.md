@@ -1,6 +1,6 @@
 # Node runtime
 
-Status: proposal, 2026-08-22.
+Status: proposal, 2026-08-22; phase 2 built it, 2026-08-23.
 
 ## The problem
 
@@ -12,11 +12,17 @@ Node, and a Rust parent cannot speak Node's structured `process.send` channel na
 ## Design
 
 **Bundle a pinned real Node binary as a Tauri external binary** (`binaries/node-<target-triple>`),
-declared in `tauri.conf.json` `bundle.externalBin`. The version pin lives in one shared manifest
-that both the desktop build and `scripts/pack-node.mjs` read — one runtime pin, two consumers. Pin
-the Node 24 LTS line the node already requires (`node:sqlite` is what sets the floor,
-[docs/node-distribution.md](../../node-distribution.md)); assert the exact version at helper boot
-by having the helper report `process.version` in its ready line.
+declared in `tauri.conf.json` `bundle.externalBin`. The version pin is `node-runtime.json` at the
+repo root, read by `apps/desktop-tauri/scripts/stage.mjs` and by `scripts/pack-node.mjs` — one
+runtime pin, two consumers. It pins the Node 24 LTS line the node already requires (`node:sqlite` is
+what sets the floor, [docs/node-distribution.md](../../node-distribution.md)), and the helper reports
+`process.version` in its ready line so the boot test can assert the runtime that booted is the one
+the pin names.
+
+The staging script copies the running Node rather than downloading one, and refuses to run when that
+Node is not the pinned version. That is enough for a developer build and nothing else: a release has
+to fetch the pinned build for its target and verify it against nodejs.org's `SHASUMS`, which is phase
+4's work ([packaging-and-release.md](./packaging-and-release.md)).
 
 The helper from [architecture.md](./architecture.md) is launched as `node-<triple> helper.js`.
 Because the helper is a real Node process:
@@ -47,9 +53,11 @@ Finder-launched apps (today's equivalent lives in `apps/node/src/service/runtime
   The Linux source-build item from [bundle.md](../bundle.md) remains the one open CI task.
 - The `ELECTRON_RUN_AS_NODE` trick, including its appearance in
   `packages/node-core/src/main/mcpRegister.ts` and the agents driver.
-- The `process.resourcesPath` sniffs in `packages/node-core` still work — the helper receives the
-  resources directory over its stdin handshake and passes it down the same way Electron main does
-  today — but verify both call sites (`bindings.ts`, `pluginMigrations.ts`) during phase 2.
+- The `process.resourcesPath` sniffs in `packages/node-core` still work, and phase 2 checked both
+  call sites. `process.resourcesPath` is an Electron addition, so under the helper it is undefined and
+  both `bindings.ts` and `pluginMigrations.ts` fall through to their walk-up: they climb from the
+  service module looking for a `migrations` directory. The staging script puts one right beside
+  `service.js`, so the first place they look is the right one, and neither file needed a change.
 
 ## Why not the alternatives
 
@@ -102,6 +110,10 @@ of the run.
 ## Exit criteria
 
 - The node boots under the bundled runtime spawned from Rust via the helper; the versioned start
-  handshake is adopted; `apps/node/test/integration/standaloneParity.test.ts` stays green.
-- Killing the service honors the crash budget and reaches the recovery UI on the sixth crash.
-- The desktop build contains no `electron-rebuild` step and no Electron-ABI native module.
+  handshake is adopted; `apps/node/test/integration/standaloneParity.test.ts` stays green. **Met in
+  phase 2**, and `apps/desktop-tauri/test/boot.test.ts` is what holds it.
+- Killing the service honors the crash budget and reaches the recovery UI on the sixth crash. The
+  budget and the dialog are both wired; item 7 of the smoke checklist in [testing.md](./testing.md)
+  is what confirms it.
+- The desktop build contains no `electron-rebuild` step and no Electron-ABI native module. True of
+  `apps/desktop-tauri`; the Electron package keeps its rebuild step until cutover.

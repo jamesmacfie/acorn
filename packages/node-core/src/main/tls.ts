@@ -14,7 +14,7 @@ export type NodeCertificate = {
   keyPem: string
   certPem: string
   // sha256 of the DER, lowercase hex with no separators. The broker normalizes both sides of the
-  // comparison (main/helper/nodeBroker.ts), so the only requirement is that it's stable.
+  // comparison (@acorn/desktop-helper/main/nodeBroker.ts), so the only requirement is that it's stable.
   fingerprint: string
 }
 

@@ -46,7 +46,7 @@ contextBridge.exposeInMainWorld('acorn', {
   // app, and a remote node is restarted by whatever started it (nodeBrokerIpc.ts).
   nodeRestartLocal: (): Promise<void> => ipcRenderer.invoke('acorn:node-restart-local'),
   // The preview tunnel. In: a task and a port on the node. Out: a port on this machine. The renderer
-  // never sees the node's endpoint or its device token; main owns the pipe (main/helper/previewTunnel.ts).
+  // never sees the node's endpoint or its device token; main owns the pipe (@acorn/desktop-helper/main/previewTunnel.ts).
   nodeTunnelOpen: (request: { nodeId: string; taskId: string; port: number }): Promise<{ port: number }> =>
     ipcRenderer.invoke('acorn:node-tunnel-open', request),
   nodeTunnelClose: (match: { nodeId?: string; taskId?: string }): void =>
@@ -58,7 +58,7 @@ contextBridge.exposeInMainWorld('acorn', {
     state: () => ipcRenderer.invoke('acorn:plugins-state'),
     cachePut: (request: unknown) => ipcRenderer.invoke('acorn:plugins-cache-put', request),
     trustRecord: (request: unknown) => ipcRenderer.invoke('acorn:plugins-trust-record', request),
-    // Enter or leave development mode for one plugin on one node (main/helper/pluginTrustStore.ts). Grants
+    // Enter or leave development mode for one plugin on one node (@acorn/desktop-helper/main/pluginTrustStore.ts). Grants
     // nothing on its own: it records the owner's decision, and main applies it when a bundle arrives.
     devGrant: (request: unknown) => ipcRenderer.invoke('acorn:plugins-dev-grant', request),
   },

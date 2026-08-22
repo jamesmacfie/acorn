@@ -14,6 +14,7 @@
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
     "db:reset": "node scripts/db-reset.mjs",
     "dev": "turbo run dev",
+    "dev:tauri": "pnpm --filter @acorn/desktop-tauri dev",
     "dev:node": "pnpm --filter @acorn/node dev:node",
     "dev:plugin": "pnpm --filter @acorn/node dev:plugin",
     "dist": "pnpm --filter @acorn/desktop dist",

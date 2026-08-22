@@ -1,6 +1,6 @@
 # Sequencing
 
-Status: proposal, 2026-08-22; phases 0 and 1 executed 2026-08-23. Coexistence, the phases, the cutover trigger, and the deletion list.
+Status: proposal, 2026-08-22; phases 0, 1 and 2 executed 2026-08-23. Coexistence, the phases, the cutover trigger, and the deletion list.
 
 ## Coexistence: a second app package
 
@@ -17,7 +17,7 @@ extracted once and imported by both build systems so it cannot drift.
 | --- | --- | --- | --- |
 | 0 | De-risk spikes ✅ | M | yes (throwaway) |
 | 1 | Groundwork that lands in Electron ✅ | M | yes (on trunk) |
-| 2 | Rust shell skeleton + helper | L | yes (parallel app) |
+| 2 | Rust shell skeleton + helper ✅ | L | yes (parallel app) |
 | 3 | Feature parity | L | yes (parallel app) |
 | 4 | Packaging and CI | M | yes (parallel artifact) |
 | 5 | Cutover and deletion | M | — (the flip) |
@@ -72,12 +72,56 @@ instead of importing `desktopCapabilities.ts`, which reaches the window system.
 
 Exit met: all three on trunk, Electron `tsc`, the desktop suite, and the arch suite green.
 
-### Phase 2 — Rust shell skeleton + helper
+### Phase 2 — Rust shell skeleton + helper ✅
 
-`pnpm dev:tauri` boots: renderer served from the custom scheme with today's CSP, helper spawned
-with the stdin handshake, node under the bundled runtime, `/v2` traffic flowing through the helper
-broker, fleet visible. Preview and webview seam groups return null; browser tools report
-unavailable. Exit: the boot test green in CI.
+Done 2026-08-23. `pnpm dev:tauri` boots the shell, the helper, the node and an HMR renderer against
+the checkout data root. The renderer loads from `app://acorn` with the CSP below, `/v2` traffic runs
+through the helper broker, and the fleet lists the local node. The preview and webview seam groups
+resolve null and the bridge's contract test pins that, so a consumer hides those affordances rather
+than calling into half a group.
+
+What landed, and where it sits:
+
+- **`packages/desktop-helper`.** The custody stack moved out of `apps/desktop/src/app/main/helper/`
+  into its own workspace package, one phase earlier than the deletion list assumed. The arch rule
+  "apps never import each other" forced it: `apps/desktop-tauri` cannot reach into `apps/desktop`,
+  so the code both shells run has to live in a package. Electron's `bootstrap.ts` imports it exactly
+  as it imported the folder. The plugin request schemas came with it, as
+  `main/pluginRequests.ts`, because both shells parse them and a schema that drifted would mean one
+  host recording an acknowledgement the other cannot read.
+- **`apps/desktop-tauri`.** `src-tauri/` (six Rust modules), `src/main/` (the helper process),
+  `src/client/bridge.ts` (the renderer bridge), `src/shared/wire.ts` (the vocabulary between them),
+  and the Vite configs. It consumes `apps/desktop`'s renderer source through
+  `vite.renderer.config.ts`, the import direction phase 1 set up.
+- **`node-runtime.json`.** The runtime pin, read by `apps/desktop-tauri/scripts/stage.mjs` and by
+  `scripts/pack-node.mjs`. One pin, two consumers, as designed.
+- **The boot test.** `apps/desktop-tauri/test/boot.test.ts` runs the staged helper under the bundled
+  Node against a fresh data root, then asks it the first two questions the renderer asks. Eleven
+  Rust unit tests cover the parts a headless run cannot reach. See
+  [testing.md](./testing.md) § The boot test.
+
+Four things came out differently from the design:
+
+- **The helper wire is one WebSocket, not a socket plus loopback HTTP.** The design widened
+  `connect-src` for both `ws://` and `http://` on the helper's port. Only `ws://` is there, because
+  everything including `node-fetch` fits one request-reply channel. That removes the CORS
+  requirement phase 0 found, removes the preflight on every JSON write, and uses `abort(requestId)`
+  as the seam already defines it. The cost is base64 on request and response bodies, marked with its
+  ceiling in `src/shared/wire.ts`.
+- **`connect-src` also names `ipc:` and `http://ipc.localhost`.** Tauri's own IPC is a custom
+  protocol, and without it in the policy every `invoke` falls back silently to a slower postMessage
+  path. It reaches only the commands in `commands.rs`.
+- **Dev proxies the renderer through `app://` rather than loading `devUrl`.** The window always
+  loads the custom scheme, in dev and packaged alike, so developers exercise the origin the shipped
+  app uses. The dev-only widening for Vite's HMR socket and inline preamble is one branch in
+  `renderer_csp`. See [dev-workflow.md](./dev-workflow.md).
+- **A dev build skips the keychain.** An unsigned binary's keychain ACL does not survive a rebuild,
+  so `cargo build` put a modal password prompt in front of every launch, and answering it granted
+  nothing durable. Dev goes straight to the 0600 file that
+  [architecture.md](./architecture.md) § Keys and custody already names as the common path on macOS.
+
+Not in this phase, by design: preview panes, plugin webviews, plugin frames and the plugin scheme,
+the `safeStorage` token migration, and the Playwright browser plugin. Those are phase 3.
 
 ### Phase 3 — feature parity
 
@@ -111,9 +155,8 @@ parity.
 
 ## Deletion list
 
-- `apps/desktop/src/app/main/` (the 12 Electron files, `preload.ts`, and their tests). Not
-  `main/helper/`, which relocates into the desktop helper package instead — phase 1 separated the two
-  for exactly this line.
+- `apps/desktop/src/app/main/` (the 12 Electron files, `preload.ts`, and their tests). All of it:
+  the custody stack left for `packages/desktop-helper` in phase 2, and both shells import it there.
 - `apps/desktop/electron-builder.yml`, `electron.vite.config.ts`, the electron scripts, and the
   electron, electron-vite, electron-builder, and @electron/rebuild dependencies.
 - The Electron-ABI branch of `scripts/rebuild-node-abi.mjs`; the plain-Node path stays for the

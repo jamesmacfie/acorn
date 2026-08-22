@@ -1,0 +1,9 @@
+{
+  // Both halves in one program, like apps/desktop: `src/client` is the renderer bridge (DOM) and
+  // `src/main` is the desktop helper process (node).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src", "test", "vite.config.ts", "vite.helper.config.ts", "vitest.config.ts"]
+}

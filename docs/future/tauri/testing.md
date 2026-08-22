@@ -1,6 +1,6 @@
 # Testing
 
-Status: proposal, 2026-08-22; the seam contract suite landed 2026-08-23 (phase 1).
+Status: proposal, 2026-08-22; the seam contract suite landed in phase 1 and the boot test in phase 2, both 2026-08-23.
 
 ## The problem
 
@@ -24,22 +24,40 @@ implementation's units where they run headless. `packages/client-core/src/platfo
 the checker — a function returning a list of problems, not `expect` calls, so `src/` imports no test
 framework — plus the compile-time-exhaustive member list per capability group.
 `platform/contract.test.ts` drives it against a mock host; `apps/desktop/src/app/main/preload.test.ts`
-drives it against the real preload under a stub Electron. A shell that implements fewer groups (the
-phase-2 skeleton, with no preview and no plugin webviews) passes a shorter list, and a group that
-resolves anyway is a failure: half a group is worse than none, because consumers probe the group and
-then call its members. `tools/arch/boundaries.test.ts` gains the Tauri
-package rules — nothing outside the new shell package imports Tauri bindings — and the enumerated
-Electron-consumer baseline becomes a shrinking one that reaches zero at cutover. Its first step also
-landed in phase 1: nothing under `apps/desktop/src/app/main/helper/` may import Electron.
+drives it against the real preload under a stub Electron; and
+`apps/desktop-tauri/src/client/bridge.test.ts` drives it against the real bridge under stub Tauri
+bindings. The Tauri shell passes a shorter list — eight groups, without `preview` and `webviews` — and
+a group that resolves anyway is a failure: half a group is worse than none, because consumers probe
+the group and then call its members. The list is written out rather than derived, so adding a group to
+the bridge without adding it there fails instead of silently widening what the shell claims.
+
+`tools/arch/boundaries.test.ts` gained the mirror of the Electron rule in phase 2: nothing outside
+`apps/desktop-tauri` may name a Tauri binding. The enumerated Electron-consumer baseline becomes a
+shrinking one that reaches zero at cutover; its first step landed in phase 1 and now reads as
+"nothing in `packages/desktop-helper` may import Electron".
 
 ## The boot test
 
-The `mainBarrelLoad` analogue, and the single highest-value test in this series: a debug-build
-shell flag (or Rust integration test) boots the shell headless, spawns the helper and node, waits
-for the adopted handshake, asserts the renderer origin serves `index.html` with the expected CSP
-header, and exits 0. It catches "the shell cannot load its world" the way
-`apps/node/test/integration/mainBarrelLoad.test.ts` catches barrel poisoning. It runs in CI from
-phase 2 on.
+The `mainBarrelLoad` analogue, and the single highest-value test in this series. It catches "the shell
+cannot load its world" the way `apps/node/test/integration/mainBarrelLoad.test.ts` catches barrel
+poisoning, and it runs in CI from phase 2 on.
+
+It came out as two halves rather than one headless shell run, because a Tauri app needs a display
+server and a test that needs one does not run in CI.
+
+`apps/desktop-tauri/test/boot.test.ts` covers everything below the window. It runs the staged helper
+under the bundled Node against a fresh data root, which spawns the real `service.js` over the fd-3
+service protocol, and then asks the helper the first two questions the renderer asks: which nodes are
+there, and can a `/v2` request reach one. A 200 from `/v2/node` means the pinned TLS connection came
+up and the device token authenticated, so one assertion covers the custody stack end to end. Two more
+check the gate: a socket without the secret is refused, and a plain HTTP request gets 426. The whole
+thing takes about three seconds.
+
+The eleven Rust unit tests in `apps/desktop-tauri/src-tauri/src/` cover what is left: the CSP the
+scheme handler sends and the dev-only widening it must not send in a packaged build, the traversal
+guard, the highlighter worker's separate policy, the refusal to answer a node route with the shell's
+own HTML, the handshake's field names, the ready-line parser, and the data key's shape and file
+fallback. Between the two halves, nothing in the boot path is unexercised.
 
 ## Parity tests
 

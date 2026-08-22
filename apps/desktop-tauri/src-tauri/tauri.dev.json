@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
+  "//": "The dev overlay. A distinct identifier and product name so a dev build can never collide with an installed build's data directory or its keychain entry (docs/future/tauri/dev-workflow.md).",
+  "productName": "acorn dev",
+  "identifier": "com.acorn.desktop.dev",
+  "bundle": {
+    "createUpdaterArtifacts": false
+  }
+}

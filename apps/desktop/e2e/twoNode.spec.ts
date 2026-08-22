@@ -397,7 +397,7 @@ test('drives the bundled node and a second node concurrently, with per-node cach
   await dismissOnboarding(running.page)
 
   // Both connections up at the same time is the exit criterion. `online` is only reported once the
-  // authenticated WebSocket has opened (main/helper/nodeBroker.ts), so this covers TLS pinning, the device
+  // authenticated WebSocket has opened (@acorn/desktop-helper/main/nodeBroker.ts), so this covers TLS pinning, the device
   // bearer, and the upgrade for both nodes at once.
   await expect.poll(async () => {
     const { statuses } = await fleet(running.page)

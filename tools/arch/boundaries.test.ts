@@ -229,7 +229,7 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/main/tls.ts', // openssl, at first boot only
       // Composition roots: a login-shell PATH probe, and the supervised node's own child.
       'apps/node/src/service/runtime.ts',
-      'apps/desktop/src/app/main/helper/serviceHost.ts',
+      'packages/desktop-helper/src/main/serviceHost.ts',
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/main/terminal.ts', // PTYs
       'plugins/agents/src/main/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
@@ -417,7 +417,7 @@ describe('architecture boundaries', () => {
     // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
     // client-core/plugins/host.ts is the one door on the renderer side, speaking hashes and
     // decisions only.
-    const PLUGIN_STORE_OK = new Set(['apps/desktop'])
+    const PLUGIN_STORE_OK = new Set(['packages/desktop-helper', 'apps/desktop'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
         .filter((f) => /\b(?:PluginCache|PluginTrustStore)\b/.test(readFileSync(f, 'utf8')))
@@ -425,7 +425,7 @@ describe('architecture boundaries', () => {
     )
     expect([...new Set(offenders)].filter((p) => !PLUGIN_STORE_OK.has(p)).sort()).toEqual([])
     // Anti-vacuity: the regex must still find the classes and their tests.
-    expect([...new Set(offenders)]).toContain('apps/desktop')
+    expect([...new Set(offenders)]).toContain('packages/desktop-helper')
   })
 
   it('the Electron surface stays where it is declared', () => {
@@ -461,14 +461,26 @@ describe('architecture boundaries', () => {
     expect(offenders.map(rel).sort()).toEqual([])
   })
 
+  it('the Tauri surface stays inside the Tauri shell', () => {
+    // The mirror of the Electron rule above, written the day the second shell landed rather than the
+    // day someone reached for `invoke` from client-core (docs/future/tauri/testing.md § Seam contract
+    // tests). The renderer's one door to a host is the platform seam, and the bridge that fills it is
+    // the only file in the tree that may name a Tauri binding.
+    const SHELL = join(ROOT, 'apps', 'desktop-tauri') + '/'
+    const naming = [...new Set(EDGES.filter((e) => e.target.external === '@tauri-apps/api').map((e) => e.fromFile))]
+    expect(naming.filter((f) => !f.startsWith(SHELL)).map(rel).sort()).toEqual([])
+    // Anti-vacuity: the bridge must still be the file that carries it.
+    expect(naming.map(rel)).toContain('apps/desktop-tauri/src/client/bridge.ts')
+  })
+
   it('the desktop helper stays Electron-free', () => {
-    // apps/desktop/src/app/main/helper is the custody stack: the broker, the fleet, the device tokens,
-    // the plugin cache and trust store, the tunnels, and the supervised node service, composed by
-    // helper/index.ts. It moves into the Tauri desktop helper process wholesale
-    // (docs/future/tauri/architecture.md § Process model), so an Electron import anywhere in it turns
-    // that relocation back into a refactor. Encryption and the shell-only service capabilities are
+    // @acorn/desktop-helper is the custody stack: the broker, the fleet, the device tokens, the
+    // plugin cache and trust store, the tunnels, and the supervised node service, composed by its
+    // main/index.ts. Electron main and the Tauri desktop helper process both run it
+    // (docs/future/tauri/architecture.md § Process model), so a single Electron import in it would
+    // cost the Tauri shell its custody stack. Encryption and the shell-only service capabilities are
     // injected for exactly this reason.
-    const HELPER = join(ROOT, 'apps', 'desktop', 'src', 'app', 'main', 'helper') + '/'
+    const HELPER = join(ROOT, 'packages', 'desktop-helper') + '/'
     const offenders = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))].filter((f) => f.startsWith(HELPER))
     expect(offenders.map(rel).sort()).toEqual([])
     // Anti-vacuity: the folder exists and the scan reaches it.

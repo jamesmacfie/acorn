@@ -1,0 +1,33 @@
+[package]
+name = "acorn-desktop"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "The acorn desktop shell"
+publish = false
+
+[lib]
+# Tauri's own layout: the app is a library so the mobile targets and the integration tests can both
+# reach it, and main.rs is four lines that call into it.
+name = "acorn_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+getrandom = "0.2"
+hex = "0.4"
+# Dev only in practice: the app scheme proxies to the Vite dev server so the renderer keeps its own
+# origin while it keeps HMR (src/app_scheme.rs).
+ureq = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

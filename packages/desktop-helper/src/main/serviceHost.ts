@@ -53,7 +53,9 @@ export class ServiceHost {
     const child = spawn(process.execPath, [this.entry], {
       // ELECTRON_RUN_AS_NODE makes Electron's binary behave as `node`, so the child needs no system
       // Node install and keeps Electron's V8, the ABI the bundled node-pty is built against
-      // (docs/electron.md § Build and packaging).
+      // (docs/electron.md § Build and packaging). Under the Tauri helper `process.execPath` is
+      // already a real Node binary and the variable is inert, which is why the spawn is identical
+      // for both shells (docs/future/tauri/node-runtime.md).
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       // stdin closed (the service never reads it); stdout/stderr inherited so its logs land wherever
       // the app's do; fd 3 is the IPC channel that gives the child `process.send`.
