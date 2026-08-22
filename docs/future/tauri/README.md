@@ -1,0 +1,135 @@
+# Tauri migration
+
+Status: proposal, 2026-08-22. Nothing here is scheduled. This folder plans the replacement of the
+Electron host with a Tauri v2 shell, written for the agents and developers who will implement the
+phases. The reference implementation we steal mechanics from is `references/proliferate`, a shipped
+Tauri v2 app in this repo's references directory.
+
+## Why Tauri, and what does not change
+
+The migration is smaller than it sounds. The renderer (Solid), the node service, the protocol, and
+both plugin tiers are untouched. Product traffic already runs over HTTPS `/v2` plus one WebSocket
+per node; Electron IPC carries only platform glue and custody. Exactly 12 non-test files in
+`apps/desktop/src/app/main/` import Electron values, plus two lazy adapters in `plugins/preview`
+and `plugins/terminal`, and `tools/arch/boundaries.test.ts` enforces that boundary today. The
+renderer's one door to the host is `packages/client-core/src/platform/`, whose capability groups
+are all nullable. A Tauri host is a second implementation of that seam, not a rewrite.
+
+What the move buys, and only this:
+
+- The node runs under a real Node binary, so the node-pty dual-ABI rebuild dance
+  (`electron-rebuild` on one side, `scripts/rebuild-node-abi.mjs` on the other) is deleted.
+- A smaller binary and lower baseline memory than a bundled Chromium.
+- An update path. Electron acorn has no auto-updater; the Tauri pipeline generates updater
+  artifacts from the first release so turning updates on later is configuration, not a rebuild.
+- The platform seam gets its second consumer, which proves the seam. [remote.md](../remote.md)'s
+  web client becomes the third.
+
+What it costs is real and named in the topic files: WKWebView is not Chromium (the plugin-frame
+origin model and the worker CSP trick both need re-verification), `WebContentsView` has no direct
+equivalent, and CDP browser automation dies with `webContents.debugger`.
+
+## The decisions
+
+**Coexist, then cut over.** The Tauri shell is a new package (working name `apps/desktop-tauri`)
+consuming the same renderer source, node artifact, bundled-plugins build, and protocol. CI builds
+both from the same commit; Electron ships until the cutover checklist in
+[sequencing.md](./sequencing.md) is green. In-place conversion was rejected: no fallback artifact,
+and every failure is ambiguous between "Tauri cannot do it" and "the port broke it".
+
+**Custody stays TypeScript, in a Node "desktop helper" sidecar.** The broker, fleet store, token
+store, plugin cache and trust, preview tunnel, and service supervision move verbatim into a helper
+process that Rust supervises. Rust holds one secret: a data key in the OS keychain. Rewriting the
+broker in Rust was rejected; so was moving it into the renderer. [architecture.md](./architecture.md)
+carries the full argument.
+
+**Ship a real Node runtime.** A pinned Node binary rides in the bundle as an external binary, and
+the same version pin feeds `scripts/pack-node.mjs`. One runtime pin, two consumers.
+[node-runtime.md](./node-runtime.md).
+
+**Preview and plugin webviews arrive after the skeleton.** The seam groups are nullable, so a shell
+without them is a supported product state, not a hack. Agent browser automation leaves the shell
+entirely: a browser plugin ships `playwright-core`, contributes its tools through the agent-tool
+registry (so they project to MCP for free), and drives an installed or managed browser — rich
+results land as blobs so a future audit trail at the registry seam captures them.
+[webviews-and-frames.md](./webviews-and-frames.md).
+
+**No updater in v1.** It is hard-blocked on Apple Developer ID signing regardless of shell. The
+minisign keypair and updater artifacts exist from the first release.
+[packaging-and-release.md](./packaging-and-release.md).
+
+**The Electron e2e specs are not ported.** The harness is leaving core anyway; their coverage is
+decomposed in [testing.md](./testing.md).
+
+**Headless nodes stay `pack-node.mjs` tarballs.** Tauri does not become a second node-packaging
+path. [distribution.md](./distribution.md) records the convergence points with
+[bundle.md](../bundle.md).
+
+## The files
+
+| File | What it holds |
+| --- | --- |
+| [architecture.md](./architecture.md) | Process model, helper design, renderer contract, boot order, key custody, lifecycle. |
+| [node-runtime.md](./node-runtime.md) | The bundled Node binary, the surviving fd-3 service protocol, supervision parity. |
+| [webviews-and-frames.md](./webviews-and-frames.md) | Preview panes, plugin frame origins, plugin webviews, browser automation. Spike findings land here. |
+| [dev-workflow.md](./dev-workflow.md) | `tauri dev` wiring, config overlays, the node in dev. |
+| [packaging-and-release.md](./packaging-and-release.md) | Staging, bundling, CI, signing gates, the updater stance. |
+| [distribution.md](./distribution.md) | Desktop, headless nodes, and remote clients as one artifact story. |
+| [testing.md](./testing.md) | What replaces the e2e specs; the tests the migration itself needs. |
+| [sequencing.md](./sequencing.md) | Phases, exit criteria, the cutover trigger, the deletion list. |
+
+## Phases
+
+| Phase | Name | Status | Size |
+| --- | --- | --- | --- |
+| 0 | De-risk spikes | ⬜ Not started | M |
+| 1 | Groundwork that lands in Electron | ⬜ Not started | M |
+| 2 | Rust shell skeleton + helper | ⬜ Not started | L |
+| 3 | Feature parity | ⬜ Not started | L |
+| 4 | Packaging and CI | ⬜ Not started | M |
+| 5 | Cutover and deletion | ⬜ Not started | M |
+
+Ordering and exit criteria live in [sequencing.md](./sequencing.md). Phase 0's findings can change
+the designs here; do not start phase 2 until phase 0's go/no-go is recorded in this README.
+
+## Invariants
+
+Read these before building anything in this folder.
+
+- The renderer never learns which shell it is in. `packages/client-core/src/platform/` stays the
+  only module that touches the host global, and no `isTauri` branch appears above the seam. The
+  seam's types and the arch test need zero changes.
+- The node composition graph stays host-blind. Nothing reachable from
+  `apps/node/src/server/composition.ts` may import Tauri bindings, the same rule that keeps
+  Electron out of the standalone node today.
+- The protocol and `/v2` are unchanged. A Tauri client pairs with an Electron-era node and the
+  reverse, throughout the migration.
+- Security posture is a floor. Every property recorded in [docs/electron.md](../../electron.md)
+  is re-established or explicitly re-argued in these files, never silently dropped. The one
+  deliberate change is the renderer CSP's `connect-src`, argued in
+  [architecture.md](./architecture.md).
+- One artifact. The desktop-embedded node and the standalone tarball's node are the same
+  `apps/node/dist` build, differing in supervision only.
+
+## Drift warning — read this before building
+
+Every path and behavior claim in this folder was verified against the tree on 2026-08-22. Where
+this folder disagrees with [docs/electron.md](../../electron.md),
+[docs/architecture-overview.md](../../architecture-overview.md), or
+[docs/node-distribution.md](../../node-distribution.md), those win until cutover: they describe
+what ships, this folder describes a proposal. Where this folder deliberately proposes changing a
+shipped behavior, the owning file here says so explicitly.
+
+## What closes this folder
+
+The Tauri build is the released artifact, the deletion list in [sequencing.md](./sequencing.md) is
+executed, and [docs/electron.md](../../electron.md) is replaced by a shipped-behavior shell doc.
+At that point this folder's content is history, not plan.
+
+## Reference documents
+
+- [docs/electron.md](../../electron.md) — the behavior contract every parity item is written against
+- [docs/architecture-overview.md](../../architecture-overview.md) — runtime topology
+- [docs/node-distribution.md](../../node-distribution.md) — the standalone node that ships today
+- [bundle.md](../bundle.md) — node packaging; [remote.md](../remote.md) — non-desktop clients
+- `references/proliferate/apps/desktop/src-tauri/` and its release workflow — the working example
