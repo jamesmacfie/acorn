@@ -1,9 +1,9 @@
 # Tauri migration
 
-Status: proposal, 2026-08-22. Nothing here is scheduled. This folder plans the replacement of the
-Electron host with a Tauri v2 shell, written for the agents and developers who will implement the
-phases. The reference implementation we steal mechanics from is `references/proliferate`, a shipped
-Tauri v2 app in this repo's references directory.
+Status: proposal, 2026-08-22; phase 0 executed 2026-08-23. Phases 1 to 5 are not scheduled. This
+folder plans the replacement of the Electron host with a Tauri v2 shell, written for the agents and
+developers who will implement the phases. The reference implementation we steal mechanics from is
+`references/proliferate`, a shipped Tauri v2 app in this repo's references directory.
 
 ## Why Tauri, and what does not change
 
@@ -25,11 +25,28 @@ What the move buys, and only this:
 - The platform seam gets its second consumer, which proves the seam. [remote.md](../remote.md)'s
   web client becomes the third.
 
-What it costs is real and named in the topic files: WKWebView is not Chromium (the plugin-frame
-origin model and the worker CSP trick both need re-verification), `WebContentsView` has no direct
-equivalent, and CDP browser automation dies with `webContents.debugger`.
+What it costs is real and named in the topic files: `WebContentsView` has no direct equivalent, so
+the preview pane becomes a child webview under an unstable feature, and CDP browser automation dies
+with `webContents.debugger`. WKWebView is not Chromium either, but phase 0 checked the two places
+that mattered — the plugin-frame origin model and the worker CSP trick — and both behave as the
+design needs.
 
 ## The decisions
+
+**Phase 0 says go, recorded 2026-08-23.** All three spikes ran on macOS with Tauri 2.11.5 and wry
+0.55.1, and nothing came back that invalidates a design in this folder. Per-response CSP, real
+origins per plugin hash, storage separation, the sandboxed cross-scheme iframe, the `MessagePort`
+bridge, the worker's own `'wasm-unsafe-eval'` policy, subframe navigation guarding, child-webview
+compositing with an ephemeral store, `window.open` denial, and the node booting under a bundled Node
+with a real PTY all work. Four adjustments landed in the owning files: the tunnel cookie is written
+from Rust instead of seeded through a page and cannot be read back, a scheme handler never sees a
+request body, the widened `connect-src` also needs a CORS header from the helper, and Rust must own
+the helper's process group or a helper crash wedges the node on the data root's lock. The two design
+fallbacks phase 0 was insurance for — loopback-port plugin origins and a
+`decidePolicyForNavigationAction` extension — are dropped. Findings live in
+[webviews-and-frames.md](./webviews-and-frames.md) and [node-runtime.md](./node-runtime.md). The
+spike app is throwaway and deliberately not in this repo; it was run from `~/Source/acorn-tauri-spike`
+on the machine that produced these numbers, and its raw JSON is in that directory's `findings/`.
 
 **Coexist, then cut over.** The Tauri shell is a new package (working name `apps/desktop-tauri`)
 consuming the same renderer source, node artifact, bundled-plugins build, and protocol. CI builds
@@ -82,15 +99,15 @@ path. [distribution.md](./distribution.md) records the convergence points with
 
 | Phase | Name | Status | Size |
 | --- | --- | --- | --- |
-| 0 | De-risk spikes | ⬜ Not started | M |
+| 0 | De-risk spikes | ✅ Done, go (2026-08-23) | M |
 | 1 | Groundwork that lands in Electron | ⬜ Not started | M |
 | 2 | Rust shell skeleton + helper | ⬜ Not started | L |
 | 3 | Feature parity | ⬜ Not started | L |
 | 4 | Packaging and CI | ⬜ Not started | M |
 | 5 | Cutover and deletion | ⬜ Not started | M |
 
-Ordering and exit criteria live in [sequencing.md](./sequencing.md). Phase 0's findings can change
-the designs here; do not start phase 2 until phase 0's go/no-go is recorded in this README.
+Ordering and exit criteria live in [sequencing.md](./sequencing.md). Phase 0's go is recorded in the
+decisions above, so phase 1 is clear to start.
 
 ## Invariants
 
