@@ -101,6 +101,12 @@ and is the likelier form on a barrel.
 barrel in plain Node — and the arch rule is the fast first line that also catches an *unused* static
 import, which esbuild elides before Node ever sees it.
 
+**The custody stack stays shell-free.** Nothing under `apps/desktop/src/app/main/helper/` imports
+Electron either. That folder is the broker, the fleet, the device tokens, the plugin cache and trust
+store, the tunnels, and the supervised node service, composed by `helper/index.ts`; it is a whole
+process under a non-Electron shell (`docs/future/tauri/architecture.md`), so the encryption and the
+shell-only service capabilities are injected rather than imported.
+
 **The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/platform/`.
 The global is read rather than imported, so this is a source scan rather than a graph edge. Tests are
 permanently exempt: stubbing `globalThis.window` is how the platform implementation gets exercised.

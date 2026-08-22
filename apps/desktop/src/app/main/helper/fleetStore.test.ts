@@ -1,25 +1,25 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { deviceTokens, type TokenCipher } from './deviceTokenStore'
+import { FleetStore, toNodeRecord } from './fleetStore'
 
-// Fake safeStorage, same shape as sessionKeyStore.test.ts: a reversible tag wrap so a written token
-// round-trips, with availability switchable to exercise the keychain-less path.
+// A fake cipher, the shape a shell supplies (deviceTokenStore.ts): a reversible tag wrap so a written
+// token round-trips, with availability switchable to exercise the keychain-less path.
 const fake = { available: true }
-vi.mock('electron', () => ({
-  safeStorage: {
-    isEncryptionAvailable: () => fake.available,
-    encryptString: (s: string) => Buffer.from(`enc:${s}`),
-    decryptString: (b: Buffer) => {
-      const s = b.toString()
-      if (!s.startsWith('enc:')) throw new Error('bad ciphertext')
-      return s.slice(4)
-    },
+const cipher: TokenCipher = {
+  available: () => fake.available,
+  encrypt: (s) => Buffer.from(`enc:${s}`),
+  decrypt: (b) => {
+    const s = b.toString()
+    if (!s.startsWith('enc:')) throw new Error('bad ciphertext')
+    return s.slice(4)
   },
-}))
+}
 
-const { FleetStore, toNodeRecord } = await import('./fleetStore')
+const store = (): FleetStore => new FleetStore(dir, deviceTokens(dir, cipher))
 
 let dir: string
 beforeEach(() => {
@@ -40,15 +40,15 @@ const remote = {
 
 describe('FleetStore', () => {
   it('persists membership and the token across instances', () => {
-    new FleetStore(dir).remember({ ...remote }, 'tok-remote')
+    store().remember({ ...remote }, 'tok-remote')
 
-    const reloaded = new FleetStore(dir)
+    const reloaded = store()
     expect(reloaded.list()).toEqual([remote])
     expect(reloaded.tokenFor('node-remote')).toBe('tok-remote')
   })
 
   it('keeps the token out of fleet.json and both files owner-only', () => {
-    new FleetStore(dir).remember({ ...remote }, 'tok-remote')
+    store().remember({ ...remote }, 'tok-remote')
     const raw = readFileSync(join(dir, 'fleet.json'), 'utf8')
 
     expect(raw).not.toContain('tok-remote')
@@ -59,15 +59,15 @@ describe('FleetStore', () => {
   it('scopes the local node\'s token by the data dir, not its nodeId', () => {
     // The local token has to be readable before the service starts, and starting it is the only thing
     // that can report the nodeId (deviceTokenStore.ts).
-    new FleetStore(dir).remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
+    store().remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
 
     expect(existsSync(join(dir, 'device-token-local'))).toBe(true)
     expect(existsSync(join(dir, 'device-token-node-local'))).toBe(false)
-    expect(new FleetStore(dir).tokenFor('node-local')).toBe('tok-local')
+    expect(store().tokenFor('node-local')).toBe('tok-local')
   })
 
   it('replaces a node rather than duplicating it, so a re-pair cannot leave a stale endpoint', () => {
-    const fleet = new FleetStore(dir)
+    const fleet = store()
     fleet.remember({ ...remote }, 'tok-1')
     fleet.remember({ ...remote, endpoint: 'https://192.168.1.10:7443' }, 'tok-2')
 
@@ -82,7 +82,7 @@ describe('FleetStore', () => {
     // rows and `adoptLocalNode` only upserts the id it just started, so `homeNode()`, which takes the
     // first local row, would point the whole window at an address the broker answers `Unknown node`
     // for.
-    const fleet = new FleetStore(dir)
+    const fleet = store()
     fleet.remember({ ...remote }, 'tok-remote')
     fleet.remember({ nodeId: 'node-was', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-old')
     fleet.remember({ nodeId: 'node-now', label: 'This computer', endpoint: 'https://127.0.0.1:2', local: true }, 'tok-new')
@@ -92,12 +92,12 @@ describe('FleetStore', () => {
     // Pairings are untouched, and the shared local token scope now holds the live node's credential.
     expect(fleet.get('node-remote')?.endpoint).toBe(remote.endpoint)
     expect(fleet.tokenFor('node-now')).toBe('tok-new')
-    expect(new FleetStore(dir).list().filter((node) => node.local)).toHaveLength(1)
+    expect(store().list().filter((node) => node.local)).toHaveLength(1)
   })
 
   it('does not let a pairing displace the local node', () => {
     // The singleton rule is one-directional: remembering a remote node must leave the local row alone.
-    const fleet = new FleetStore(dir)
+    const fleet = store()
     fleet.remember({ nodeId: 'node-local', label: 'This computer', endpoint: 'https://127.0.0.1:1', local: true }, 'tok-local')
     fleet.remember({ ...remote }, 'tok-remote')
 
@@ -105,31 +105,31 @@ describe('FleetStore', () => {
   })
 
   it('renames without touching the token', () => {
-    const fleet = new FleetStore(dir)
+    const fleet = store()
     fleet.remember({ ...remote }, 'tok-remote')
 
     expect(fleet.rename('node-remote', 'Loft')?.label).toBe('Loft')
-    expect(new FleetStore(dir).get('node-remote')?.label).toBe('Loft')
+    expect(store().get('node-remote')?.label).toBe('Loft')
     expect(fleet.tokenFor('node-remote')).toBe('tok-remote')
     expect(fleet.rename('nope', 'x')).toBeUndefined()
   })
 
   it('forgets the row and the credential together', () => {
-    const fleet = new FleetStore(dir)
+    const fleet = store()
     fleet.remember({ ...remote }, 'tok-remote')
     fleet.forget('node-remote')
 
     expect(fleet.list()).toEqual([])
     expect(existsSync(join(dir, 'device-token-node-remote'))).toBe(false)
     // An orphaned credential would outlive the membership it belonged to.
-    expect(new FleetStore(dir).tokenFor('node-remote')).toBeUndefined()
+    expect(store().tokenFor('node-remote')).toBeUndefined()
   })
 
   it('keeps the node listed when there is no keychain to remember its token', () => {
     // deviceTokenStore's "no keychain ⇒ simply do not remember": the fleet still knows the node, so the
     // owner can see it and re-pair, rather than the row vanishing with the token.
     fake.available = false
-    const fleet = new FleetStore(dir)
+    const fleet = store()
     fleet.remember({ ...remote }, 'tok-remote')
 
     expect(fleet.list()).toEqual([remote])
@@ -138,7 +138,7 @@ describe('FleetStore', () => {
 
   it('starts from an empty fleet rather than guessing at an unparseable file', () => {
     writeFileSync(join(dir, 'fleet.json'), '{"version":1,"nodes":[{"nodeId":"x"}]}')
-    expect(new FleetStore(dir).list()).toEqual([])
+    expect(store().list()).toEqual([])
   })
 
   it('never projects the certificate or the device id to the renderer', () => {

@@ -1,6 +1,6 @@
 # Shell architecture
 
-Status: proposal, 2026-08-22. The organizing principle: the renderer seam
+Status: proposal, 2026-08-22; phase 1's regroup landed 2026-08-23. The organizing principle: the renderer seam
 (`packages/client-core/src/platform/index.ts`) and the service protocol
 (`packages/protocol/src/serviceProtocol.ts`) are the two contracts that must not change; everything
 between them is replaceable.
@@ -15,10 +15,12 @@ Tauri shell (Rust)
 
 The Rust shell owns the window, the two custom protocols, the menu and lifecycle, native dialogs,
 the OS keychain, and helper supervision. The helper owns everything Electron main owned that was
-already Electron-free TypeScript: `nodeBroker.ts`, `nodeRequest.ts`, `nodePairing.ts`,
+already Electron-free TypeScript. Phase 1 gathered those eleven files into
+`apps/desktop/src/app/main/helper/` behind `helper/index.ts`, with an arch rule holding Electron out,
+so the move is a directory relocation: `nodeBroker.ts`, `nodeRequest.ts`, `nodePairing.ts`,
 `fleetStore.ts`, `deviceTokenStore.ts`, `pluginCache.ts`, `pluginTrustStore.ts`,
-`bundledPluginTrust.ts`, `previewTunnel.ts`, `serviceHost.ts`, and `crashBudget.ts` move verbatim.
-The node service is untouched.
+`bundledPluginTrust.ts`, `previewTunnel.ts`, `serviceHost.ts`, and `crashBudget.ts`. The node service
+is untouched.
 
 ## Why a Node helper, not a Rust broker
 
@@ -118,7 +120,8 @@ app origin and the helper origin are different origins.
 ## Keys and custody
 
 One 32-byte data key lives in the OS keychain via the `keyring` crate, held by Rust and injected
-into the helper over the stdin handshake. Token blobs stay mode-0600 files on disk, AES-GCM
+into the helper over the stdin handshake. It arrives at the token store as the `TokenCipher` phase 1
+introduced, which is where Electron passes `safeStorage` today. Token blobs stay mode-0600 files on disk, AES-GCM
 encrypted by the helper. On a machine with no keychain the key falls back to a 0600 file — the same
 fail-quiet stance `deviceTokenStore.ts` has today, and the same blast radius as the node's own
 `session.key`, a precedent [docs/node-distribution.md](../../node-distribution.md) already accepts.
@@ -176,5 +179,6 @@ keychain items (a prompt per node and ACL churn), tokens inside `fleet.json` (re
 | `preview_webviews.rs` | Phase 3: child-webview lifecycle, bounds, nav guards, cookie seeding. |
 | `updater_owned.rs` | Post-signing: staged, verified updates. |
 
-Everything else stays TypeScript: the helper (moved files plus `helperServer.ts` and a
-`helperMain.ts` composition root distilled from `bootstrap.ts`), the renderer bridge, and the node.
+Everything else stays TypeScript: the helper (the moved `main/helper/`
+folder, whose `index.ts` is already the composition root, plus `helperServer.ts` and a `helperMain.ts`
+that adds the stdin handshake and the loopback listener), the renderer bridge, and the node.

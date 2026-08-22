@@ -3,8 +3,8 @@ import { z } from 'zod'
 import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
-import type { PluginCache, PutResult } from './pluginCache'
-import type { PluginAck, PluginDevGrant, PluginTrustStore } from './pluginTrustStore'
+import type { PluginCache, PutResult } from './helper/pluginCache'
+import type { PluginAck, PluginDevGrant, PluginTrustStore } from './helper/pluginTrustStore'
 
 // The renderer's projection of the bundle cache and the trust store. Thin like nodeBrokerIpc.ts:
 // every decision lives in pluginCache.ts / pluginTrustStore.ts, which are Electron-free and therefore
@@ -25,7 +25,7 @@ export const PLUGINS_CACHE_PUT = 'acorn:plugins-cache-put'
 export const PLUGINS_TRUST_RECORD = 'acorn:plugins-trust-record'
 export const PLUGINS_DEV_GRANT = 'acorn:plugins-dev-grant'
 
-// Enter or leave development mode for one plugin on one node (main/pluginTrustStore.ts). One channel for
+// Enter or leave development mode for one plugin on one node (main/helper/pluginTrustStore.ts). One channel for
 // both directions because they are one switch, and because the revoke half must never be harder to reach
 // than the grant half.
 const devGrantSchema = z.strictObject({
@@ -161,7 +161,7 @@ export function registerPluginIpc(cache: PluginCache, trust: PluginTrustStore): 
     }
     // The decision stands either way; what is lost is the snapshot behind it. Stored as `partial` so
     // it can never become the baseline of a later "what changed" diff, which would otherwise report
-    // grants as newly requested that the owner had already seen (main/pluginTrustStore.ts).
+    // grants as newly requested that the owner had already seen (main/helper/pluginTrustStore.ts).
     //
     // Recording rather than refusing, on both arms. A rejection needs no snapshot at all; nothing ever
     // diffs against one. An acceptance is still informed: the lines the owner read were rendered by

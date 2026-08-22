@@ -109,7 +109,7 @@ since been answered.
 - **The Monaco bundle has a hard ceiling.** ANSWERED — see the section above; it does not fit, and the
   workers cannot be served regardless. The question was: client bundles are capped at 8 MiB
   (`MAX_CLIENT_BUNDLE_BYTES` in `packages/node-core/src/main/pluginLoader.ts`, enforced again in
-  `apps/desktop/src/app/main/pluginCache.ts`), and `build-plugin.mjs` builds client bundles with
+  `apps/desktop/src/app/main/helper/pluginCache.ts`), and `build-plugin.mjs` builds client bundles with
   `minify: false`.
 - **`rollbar.md` no longer exists.** It was cleared along with these four when `docs/third-party/`
   became the review record. The reference is now [README.md](./README.md) plus `plugins/rollbar/`.

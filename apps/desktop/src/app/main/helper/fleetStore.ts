@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { nodeRecordSchema, type NodeRecord } from '@acorn/protocol/broker.ts'
-import { forgetDeviceToken, LOCAL_TOKEN_SCOPE, readDeviceToken, writeDeviceToken } from './deviceTokenStore'
+import { LOCAL_TOKEN_SCOPE, type DeviceTokens } from './deviceTokenStore'
 
 // Fleet membership, its storage split, and the local-node singleton invariant: docs/electron.md
 // § Fleet membership.
@@ -40,7 +40,10 @@ const scopeOf = (node: Pick<FleetNode, 'nodeId' | 'local'>): string => (node.loc
 export class FleetStore {
   #nodes: FleetNode[] | null = null
 
-  constructor(private readonly userDataDir: string) {}
+  constructor(
+    private readonly userDataDir: string,
+    private readonly tokens: DeviceTokens,
+  ) {}
 
   list(): FleetNode[] {
     if (!this.#nodes) this.#nodes = this.read()
@@ -53,7 +56,7 @@ export class FleetStore {
 
   tokenFor(nodeId: string): string | undefined {
     const node = this.get(nodeId)
-    return node ? readDeviceToken(this.userDataDir, scopeOf(node)) : undefined
+    return node ? this.tokens.read(scopeOf(node)) : undefined
   }
 
   // Add or replace a node and its token. Called on every local-node start (the endpoint changes
@@ -65,7 +68,7 @@ export class FleetStore {
     const nodes = this.list().filter((existing) => existing.nodeId !== node.nodeId && !(node.local && existing.local))
     nodes.push(node)
     this.write(nodes)
-    writeDeviceToken(this.userDataDir, scopeOf(node), token)
+    this.tokens.write(scopeOf(node), token)
     return node
   }
 
@@ -84,7 +87,7 @@ export class FleetStore {
     const node = this.get(nodeId)
     if (!node) return
     this.write(this.list().filter((candidate) => candidate.nodeId !== nodeId))
-    forgetDeviceToken(this.userDataDir, scopeOf(node))
+    this.tokens.forget(scopeOf(node))
   }
 
   private read(): FleetNode[] {

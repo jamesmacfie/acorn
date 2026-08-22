@@ -1,6 +1,6 @@
 # Testing
 
-Status: proposal, 2026-08-22.
+Status: proposal, 2026-08-22; the seam contract suite landed 2026-08-23 (phase 1).
 
 ## The problem
 
@@ -19,10 +19,18 @@ what it replaces, and the spend contradicts the extraction decision.
 
 ## Seam contract tests
 
-The platform seam gets a contract suite that runs against a mock and against each host
-implementation's units where they run headless. `tools/arch/boundaries.test.ts` gains the Tauri
+**Landed.** The platform seam has a contract suite that runs against a mock and against each host
+implementation's units where they run headless. `packages/client-core/src/platform/contract.ts` holds
+the checker — a function returning a list of problems, not `expect` calls, so `src/` imports no test
+framework — plus the compile-time-exhaustive member list per capability group.
+`platform/contract.test.ts` drives it against a mock host; `apps/desktop/src/app/main/preload.test.ts`
+drives it against the real preload under a stub Electron. A shell that implements fewer groups (the
+phase-2 skeleton, with no preview and no plugin webviews) passes a shorter list, and a group that
+resolves anyway is a failure: half a group is worse than none, because consumers probe the group and
+then call its members. `tools/arch/boundaries.test.ts` gains the Tauri
 package rules — nothing outside the new shell package imports Tauri bindings — and the enumerated
-Electron-consumer baseline becomes a shrinking one that reaches zero at cutover.
+Electron-consumer baseline becomes a shrinking one that reaches zero at cutover. Its first step also
+landed in phase 1: nothing under `apps/desktop/src/app/main/helper/` may import Electron.
 
 ## The boot test
 

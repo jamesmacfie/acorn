@@ -1,7 +1,7 @@
 import { cpSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
-import solid from 'vite-plugin-solid'
+import { rendererConfig } from './vite.renderer.config'
 
 // Bundle our own source (relative imports and @acorn/* workspace packages); keep every other
 // bare/node: specifier external so it is required from node_modules at runtime. This keeps the
@@ -92,31 +92,7 @@ export default defineConfig({
       },
     },
   },
-  renderer: {
-    root: __dirname,
-    plugins: [
-      solid(),
-      // Forces an absolute base. The renderer is served from Electron main's app:// protocol handler
-      // (main/appScheme.ts), not by any node, and it has client-side deep routes
-      // (/:owner/:repo/:number). electron-vite's default relative base ('./') makes ./assets/*
-      // resolve against the deep path on a hard reload, 404 to the app-scheme fallback HTML, and fail
-      // the module script's MIME check, which blanks the window. electron-vite's own preset
-      // (enforce: 'pre') force-sets './' in production, so this normal-phase hook re-sets it
-      // afterward. It stays '/' rather than becoming 'app://acorn/': the scheme is `standard`, so
-      // /assets/x.js in a document at app://acorn/owner/repo/1 already resolves to
-      // app://acorn/assets/x.js, and the emitted HTML keeps the /assets/... literals
-      // scripts/check-renderer-budget.mjs parses.
-      { name: 'acorn:absolute-base', config: () => ({ base: '/' }) },
-    ],
-    // Why format and entryFileNames matter for the highlighter worker's Content-Security-Policy:
-    // docs/electron.md § The syntax-highlighter worker's separate policy.
-    worker: {
-      format: 'es',
-      rollupOptions: { output: { entryFileNames: 'assets/worker-[name]-[hash].js' } },
-    },
-    build: {
-      outDir: 'dist/client',
-      rollupOptions: { input: resolve(__dirname, 'index.html') },
-    },
-  },
+  // The renderer target is shared with the Tauri shell rather than duplicated:
+  // vite.renderer.config.ts.
+  renderer: rendererConfig(__dirname),
 })

@@ -1,6 +1,6 @@
 # Dev workflow
 
-Status: proposal, 2026-08-22.
+Status: proposal, 2026-08-22; the renderer config extraction landed 2026-08-23 (phase 1).
 
 ## The problem
 
@@ -11,9 +11,11 @@ Vite app and the shell is a cargo build.
 
 ## Design
 
-**Extract the renderer Vite config.** The renderer target inside
-`apps/desktop/electron.vite.config.ts` moves to a standalone config the Tauri package owns and the
-Electron config imports, so the two shells cannot drift. The worker rules travel with it verbatim,
+**Extract the renderer Vite config. Landed.** The renderer target moved out of
+`apps/desktop/electron.vite.config.ts` into `apps/desktop/vite.renderer.config.ts`, which exports
+`rendererConfig(root)` — the app root is the only thing the two shells disagree about. The Electron
+config imports it, so the two shells cannot drift. It lives in `apps/desktop` until the Tauri package
+exists to own it; the import direction then reverses and nothing else changes. The worker rules travel with it verbatim,
 comments included: worker format `es`, the `worker-` prefix on the highlighter entry that the CSP
 filename match depends on, and Monaco's plain `[name]` pattern
 ([docs/electron.md](../../electron.md) § The syntax-highlighter worker's separate policy).

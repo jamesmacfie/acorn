@@ -6,7 +6,7 @@
 //
 // What this removes is the remembered sequence, not the restart: seeing a one-line change run used to
 // mean rebuilding the package by hand, restarting the node, reloading the renderer, and answering trust
-// dialogs. The dialogs are gone in a development build (main/bundledPluginTrust.ts) and the rebuild is
+// dialogs. The dialogs are gone in a development build (main/helper/bundledPluginTrust.ts) and the rebuild is
 // this; the node restart is the one step that is real, because a loaded plugin's routes, tables and jobs
 // wire at init (node-core/server/routes/plugins.ts).
 // Under `pnpm dev:node` even that is automatic, because node's own `--watch` sees the rewritten bundle.

@@ -1,55 +1,52 @@
-import { app, dialog, shell, type BrowserWindow } from 'electron'
+import { app, dialog, safeStorage, shell, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { registerPreviewIpc } from '@acorn/plugin-preview/main/index.ts'
 import { registerFolderPickerIpc } from '@acorn/plugin-terminal/main/index.ts'
-import type { ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
-import { LOCAL_TOKEN_SCOPE, readDeviceToken } from './deviceTokenStore'
-import { FleetStore, toNodeRecord } from './fleetStore'
-import { NodeBroker } from './nodeBroker'
+import type { ServiceStartResult } from '@acorn/protocol/serviceProtocol.ts'
+import { registerDesktopCapabilityHandlers } from './desktopCapabilities'
+import { createHelper } from './helper'
+import { MAX_CRASHES_PER_WINDOW } from './helper/crashBudget'
+import type { TokenCipher } from './helper/deviceTokenStore'
 import { brokerPushTargets, registerNodeBrokerIpc } from './nodeBrokerIpc'
-import { PluginCache } from './pluginCache'
 import { registerPluginIpc } from './pluginIpc'
 import { registerPluginScheme } from './pluginScheme'
-import { PluginTrustStore } from './pluginTrustStore'
 import { registerPluginWebviewIpc } from './pluginWebviewIpc'
-import { PreviewTunnels } from './previewTunnel'
-import { ServiceHost } from './serviceHost'
-import { MAX_CRASHES_PER_WINDOW, recordCrash } from './crashBudget'
 import { WebviewService } from './webviewService'
-import { trustBundledClientPlugins, trustsBundledClientPlugins } from './bundledPluginTrust'
 
 export type BootstrapOptions = {
   dataDir: string
   createWindow: (started: ServiceStartResult) => Promise<BrowserWindow>
 }
 
-const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+// Electron main's boot order and teardown (docs/electron.md § Main process). Everything that is not
+// Electron — the broker, the fleet, the tokens, the plugin stores, the tunnels, and the supervised
+// node — is composed by main/helper/, which knows nothing about windows or IPC. This file is the
+// Electron half of that seam: it supplies the encryption, the push target, the recovery dialog, and
+// the IPC projections the renderer talks to.
 
-// Crash budget and restart backoff: docs/electron.md § Node child.
+// safeStorage encrypts against the OS keychain and is built in, so docs/data-layer.md's "OS keychain"
+// needs no keytar dependency. Same mechanism as sessionKeyStore.ts, but a second independent secret.
+const safeStorageCipher: TokenCipher = {
+  available: () => safeStorage.isEncryptionAvailable(),
+  encrypt: (value) => safeStorage.encryptString(value),
+  decrypt: (blob) => safeStorage.decryptString(blob),
+}
 
 export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Promise<BrowserWindow> {
   let disposed = false
-  let bootComplete = false
-  let recovering = false
   let window: BrowserWindow | null = null
-  const crashTimes: number[] = []
-  const userDataDir = app.getPath('userData')
+  const reloadWindow = (): void => {
+    if (window && !window.isDestroyed()) window.webContents.reload()
+  }
   const bundledPluginsDir = app.isPackaged
     ? join(process.resourcesPath, 'plugins')
     : join(import.meta.dirname, '../bundled-plugins')
 
-  // Start the service and persist whatever token it ended up using. Reused on every start, including
-  // crash recovery: a restart must not mint a new device row, and the endpoint can change across
-  // restarts, so the caller always takes the fresh result rather than caching the first one.
-  const startService = async (): Promise<ServiceStartResult> => {
-    const started = await service.start(readDeviceToken(userDataDir, LOCAL_TOKEN_SCOPE))
-    adoptLocalNode(started)
-    return started
-  }
-
-  const service = new ServiceHost(
-    join(import.meta.dirname, 'service.js'),
-    {
+  // Push targets are held as a function of the window rather than a captured reference, so a window
+  // replaced by crash recovery gets the new one (nodeBrokerIpc.ts).
+  const helper = createHelper({
+    serviceEntry: join(import.meta.dirname, 'service.js'),
+    service: {
       dataDir,
       version: app.getVersion(),
       isPackaged: app.isPackaged,
@@ -57,147 +54,44 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
       mcpEntry: join(import.meta.dirname, 'mcp.js'),
       bundledPluginsDir,
     },
-    {
-      stateChanged: (state: ServiceState, detail?: string) => {
-        console.log(`[service-host] ${state}${detail ? `: ${detail}` : ''}`)
-      },
-      unexpectedExit: (code) => {
-        if (!bootComplete || disposed) return
-        console.error(`[service-host] service exited unexpectedly with code ${code}`)
-        void recover()
-      },
-    },
-  )
+    userDataDir: app.getPath('userData'),
+    tokenCipher: safeStorageCipher,
+    push: brokerPushTargets(() => window),
+    desktopCapabilities: registerDesktopCapabilityHandlers,
+    onNodeReplaced: reloadWindow,
+    onCrashBudgetExhausted: () => void showRecoveryScreen(),
+  })
 
   // Native IPC is installed before the renderer exists. Page rules cross the service boundary as
   // data; neither previewService nor the picker adapter can reach SQLite.
   const disposePicker = registerFolderPickerIpc()
-
-  // The connection broker, installed before the renderer: docs/electron.md § Node child.
-  const push = brokerPushTargets(() => window)
-  const broker = new NodeBroker({ frame: push.frame, status: push.status })
-  const fleet = new FleetStore(userDataDir)
-  // Preview tunnels re-resolve their node from the same fleet store the broker reads on every connection,
-  // so updated endpoint, token, and certificate records are applied to new connections. Established
-  // pipes are torn down explicitly by restart, adoption, and forget operations.
-  const tunnels = new PreviewTunnels((nodeId) => {
-    const node = fleet.get(nodeId)
-    const token = node && fleet.tokenFor(nodeId)
-    if (!node || !token) return null
-    return {
-      endpoint: node.endpoint,
-      token,
-      ...(node.certPem ? { certPem: node.certPem } : {}),
-      ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
-    }
+  const disposeBrokerIpc = registerNodeBrokerIpc(helper.broker, helper.fleet, {
+    restartLocalNode: () => helper.restartLocalNode(),
+    tunnels: helper.tunnels,
   })
-  const disposeBrokerIpc = registerNodeBrokerIpc(broker, fleet, { restartLocalNode: () => restartLocalNode(), tunnels })
+  const disposePluginIpc = registerPluginIpc(helper.pluginCache, helper.pluginTrust)
+  // The origin plugin UI renders on (docs/plugins.md). Registered here rather than beside
+  // registerAppScheme in electron.ts because it serves out of the plugin cache and nothing else: the
+  // handler has no path parameter to be pointed at, by design.
+  registerPluginScheme(helper.pluginCache)
 
-  // Third-party plugin bundles a node has served us, and this device's decisions about running them
-  // (docs/plugins.md). Both stores are main's: the bytes never pass through the renderer, and the
-  // acknowledgements sit beside the device tokens because they are the same kind of custody, something
-  // this machine agreed to, not something a node can assert.
-  //
-  // The sweep runs before the renderer can ask for state, so a bundle no node has offered in a month
-  // is gone rather than briefly listed and then dropped.
-  const pluginCache = new PluginCache(userDataDir, broker)
-  pluginCache.sweep()
-  const pluginTrust = new PluginTrustStore(userDataDir)
-  // These exact bytes are part of the application this process is: `resourcesPath` when packaged, the
-  // build's own `out/bundled-plugins` when not. Cache and acknowledge them locally before the renderer
-  // asks for plugin state, so a node cannot turn the "bundled" label into an auto-trust primitive for
-  // arbitrary remote bytes. `trustsBundledClientPlugins` owns the one condition, and says why it is not
-  // `app.isPackaged`.
-  if (trustsBundledClientPlugins()) trustBundledClientPlugins(bundledPluginsDir, app.getVersion(), pluginCache, pluginTrust)
-  const disposePluginIpc = registerPluginIpc(pluginCache, pluginTrust)
-  // The origin plugin UI renders on (docs/plugins.md). Registered here rather
-  // than beside registerAppScheme in electron.ts because it serves out of the cache above and nothing
-  // else: the handler has no path parameter to be pointed at, by design.
-  registerPluginScheme(pluginCache)
-
-  // Registered here rather than beside the picker above, because it needs `tunnels`: a preview pane
+  // Registered here rather than beside the picker above, because it needs the tunnels: a preview pane
   // pointed at a remote task loads a loopback URL, and the tunnel's listener refuses any connection
-  // that does not present that listener's secret (main/previewTunnel.ts). This is the injection that
+  // that does not present that listener's secret (helper/previewTunnel.ts). This is the injection that
   // carries it, since plugins/preview may not import an app, so the header record arrives as a
   // function. Still well before the window exists, the ordering the picker comment above is about.
   const webviews = new WebviewService()
   const disposePluginWebviews = registerPluginWebviewIpc(webviews)
   const disposePreview = registerPreviewIpc({
     viewService: webviews,
-    rulesForTask: (taskId) => service.previewRules(taskId),
-    tunnelHeadersFor: (url) => tunnels.headersFor(url),
+    rulesForTask: (taskId) => helper.previewRules(taskId),
+    tunnelHeadersFor: (url) => helper.tunnels.headersFor(url),
   })
-
-  // Record (or re-record, after a crash restart) the local node and bring its connection up. The
-  // endpoint, the certificate and even the token can change between starts now that the port is
-  // ephemeral, so this is driven by each start result rather than cached. The label stays the owner's
-  // though, so a rename survives.
-  const adoptLocalNode = (started: ServiceStartResult): void => {
-    // Every start (first boot, crash recovery, a deliberate restart) can change the endpoint, the
-    // certificate and the token, so any surviving pipe to this node is pointed at a process that is
-    // gone.
-    tunnels.closeFor({ nodeId: started.nodeId })
-    const node = fleet.remember(
-      {
-        nodeId: started.nodeId,
-        label: fleet.get(started.nodeId)?.label ?? 'This computer',
-        endpoint: started.endpoint.origin,
-        local: true,
-        ...(started.fingerprint ? { fingerprint: started.fingerprint } : {}),
-        ...(started.certPem ? { certPem: started.certPem } : {}),
-      },
-      started.deviceToken,
-    )
-    broker.upsert({
-      ...toNodeRecord(node),
-      token: started.deviceToken,
-      ...(node.certPem ? { certPem: node.certPem } : {}),
-    })
-  }
-
-  // Settings → Plugins' Restart button (nodeBrokerIpc.ts explains why only the local node has one).
-  //
-  // Goes through the same `startService` as boot and crash recovery, so the node re-reads its
-  // disabled-plugins file on the way up, and `adoptLocalNode` re-records the endpoint, certificate,
-  // and token, since all three can change across a restart now that the port is ephemeral. Not routed
-  // through `recover()`: this is a restart the owner asked for, and spending one of the five crashes
-  // in the ten-minute budget on it would mean a few plugin toggles could trip the recovery screen.
-  // Guarded against `recover()`, which is the case that made this dangerous rather than merely racy.
-  //
-  // `ServiceHost.start` throws "already started" while a child exists. Without the guard: the service
-  // crashes, `recover()` is inside its backoff wait, the owner clicks Restart, Restart succeeds, and
-  // then `recover()`'s own `startService()` throws. Its catch calls `service.stop()` and kills the
-  // working node, then re-enters `recover()` and spends another crash from the budget. Two clicks
-  // during recovery tripped the recovery dialog on a healthy node.
-  //
-  // A failure here also has to reach `recover()`, not just the renderer: if `startService()` rejects
-  // (a taken port, a corrupt plugin DB) no child was ever spawned, so `unexpectedExit` never fires and
-  // the app would sit with a dead node until relaunch. It still reports to the caller, so Settings →
-  // Plugins shows the reason.
-  const restartLocalNode = async (): Promise<void> => {
-    if (disposed) return
-    if (recovering) throw new Error('acorn is already restarting the background service.')
-    recovering = true
-    // A pipe to the process we are about to kill is dead either way, and its endpoint is about to change.
-    tunnels.closeFor({})
-    try {
-      await service.stop()
-      await startService()
-      if (window && !window.isDestroyed()) window.webContents.reload()
-    } catch (error) {
-      recovering = false
-      void recover()
-      throw error
-    }
-    recovering = false
-  }
 
   const dispose = async (): Promise<void> => {
     if (disposed) return
     disposed = true
-    await service.stop()
-    tunnels.dispose()
-    broker.dispose()
+    await helper.dispose()
     disposeBrokerIpc()
     disposePluginIpc()
     disposePluginWebviews()
@@ -222,36 +116,7 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
       return showRecoveryScreen()
     }
     if (response === 3) return void app.exit(1)
-    // Retry: clear the budget so the next failure gets the full backoff again. The owner asking for
-    // a retry is new information: they may have just freed the port or fixed permissions.
-    crashTimes.length = 0
-    recovering = false
-    await recover()
-  }
-
-  const recover = async (): Promise<void> => {
-    if (recovering || disposed) return
-    recovering = true
-    // The budget arithmetic is in crashBudget.ts, where it can be tested without booting Electron and
-    // crashing a real service five times.
-    const decision = recordCrash(crashTimes, Date.now())
-    if (!decision.retry) {
-      await showRecoveryScreen()
-      return
-    }
-    try {
-      await wait(decision.delayMs)
-      await startService()
-      if (window && !window.isDestroyed()) window.webContents.reload()
-      console.log('[service-host] background service recovered')
-    } catch (error) {
-      console.error('[service-host] recovery failed:', error)
-      await service.stop()
-      recovering = false
-      void recover()
-      return
-    }
-    recovering = false
+    await helper.retry()
   }
 
   app.on('will-quit', (event) => {
@@ -261,11 +126,9 @@ export async function bootstrap({ dataDir, createWindow }: BootstrapOptions): Pr
   })
 
   try {
-    // The service start request resolves when migrations, bridge installation, and the loopback
-    // listener are complete. Durable reconciliation continues there in the background.
-    const started = await startService()
+    const started = await helper.start()
     window = await createWindow(started)
-    bootComplete = true
+    helper.bootComplete()
     return window
   } catch (error) {
     await dispose()
