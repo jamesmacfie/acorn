@@ -15,7 +15,8 @@ After the handshake it prints a human pairing banner: the address to connect to,
 fingerprint as six words, and a live pairing code. Compare those words against the ones acorn shows
 on its pairing screen — that comparison is what makes pairing safe. A code is opened automatically
 only while no device is paired yet; `kill -USR1 <pid>` opens another without restarting the node and
-killing its live agent and terminal sessions.
+killing its live agent and terminal sessions. `SIGUSR1` does not exist on Windows, so pairing a
+second device there currently means a restart.
 
 ## Reaching a node from another machine
 
@@ -95,7 +96,8 @@ ACORN_DATA_DIR=/var/lib/acorn-node pnpm start
 
 The target machine needs Node 24.4+ (or 22.18+ on the 22 LTS line — the `node:sqlite` surface the
 shim uses is newer than the module itself, and the packed `package.json` pins this in `engines`) and
-OpenSSL for the Node certificate.
+OpenSSL for the Node certificate. OpenSSL is present on macOS and Linux and absent on stock Windows,
+where the node refuses to start at first boot without it.
 `node-pty` is the only native module left; it ships prebuilt binaries for macOS and Windows and
 compiles from source on Linux, so a Linux target also needs the usual build prerequisites. If package
 installation ignores lifecycle scripts, native bindings may remain unbuilt; run the package's rebuild
@@ -111,7 +113,9 @@ and does not need a client secret or callback URL.
 
 ## Operations
 
-Use a dedicated mode-`0700` data root. Only one process may hold it. Send SIGTERM for a graceful
+Use a dedicated mode-`0700` data root. Only one process may hold it. The `0700`/`0600` modes on the
+data root and key files are POSIX permissions; on Windows they are advisory, and restricting the
+data root is the operator's job (an NTFS ACL on the directory). Send SIGTERM for a graceful
 drain; the listener closes first, plugins dispose next, SQLite closes, and the root lock releases.
 The drain has a 30-second deadline.
 

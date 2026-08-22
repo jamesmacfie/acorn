@@ -59,7 +59,11 @@ it, and types do not need a compiler.
 **node-pty is the only native module left**, and it builds against node-addon-api (N-API), so its
 binaries are ABI-stable across Node versions *and* Electron. It ships prebuilds for `darwin-arm64`,
 `darwin-x64`, `win32-arm64` and `win32-x64` — **not Linux**, which compiles from source today. So
-Linux is the one platform needing a prebuild produced in CI, once.
+Linux is the one platform needing a prebuild produced in CI, once. That prebuild carries a libc
+decision: build against glibc and it loads on Debian, Ubuntu, Fedora and a `-slim` Docker base, but
+not Alpine (musl). Producing a second musl build doubles the Linux matrix for a distribution nobody
+has asked for — pick glibc, let the Docker image use a Debian base, and revisit only if an Alpine
+request actually arrives.
 
 `scripts/rebuild-node-abi.mjs` now probes node-pty rather than asserting anything: on a platform
 where the prebuilt binary loads, it exits immediately.
@@ -72,19 +76,52 @@ header says the reason it stops short of shipping binaries is that prebuilt bina
 triple are "a release pipeline rather than a script". That is a deliberate deferral.
 
 Shape: GitHub Actions across macOS arm64/x64, Linux x64/arm64 and Windows; five tarballs on a
-release. Linux and Windows first — see Gatekeeper below.
+release. Linux and Windows first — see Gatekeeper below. The eventual front door is a release page
+plus a `curl | sh` installer that picks the right tarball, and a container image on ghcr with a
+compose example; service-manager units stay documentation, not an installer product
+(docs/future/tauri/distribution.md already settled that).
 
-## Two snags
+## Docker (2026-08-22)
 
-**`openssl` on PATH.** `ensureCert` shells out to it to mint the node's certificate. Present on
-macOS and Linux, absent on stock Windows. Either bundle it or replace that call with a pure-JS
-certificate mint. Small either way, but it is a dependency on a machine we do not control, and it
-fails at first boot with the node refusing to start.
+A container image is the easiest of the four shapes and should ship first, because it needs none of
+the snags solved. A two-stage Dockerfile from `node:24-bookworm-slim` compiles node-pty at image
+build, so the Linux prebuild is not a prerequisite; there is no Gatekeeper; `openssl` is in the base
+image. Everything the no-TTY path needs already exists: `ACORN_ADVERTISE_HOST` and `ACORN_DATA_DIR`
+are env vars, the first-boot advertise prompt skips itself without a terminal, and the SIGTERM
+bounded drain is exactly what `docker stop` and `compose down` send.
+
+Three container-specific decisions, none of them code:
+
+- **The image is opinionated where the tarball is not.** Agents and PTY sessions run inside the
+  container, so every tool they need — git, the agent CLIs, ripgrep — must be baked into the image,
+  and the repos the node works on must be volume-mounted in. A tarball inherits the host's tools; an
+  image has to choose them.
+- **The node's own Docker features need the host socket mounted**, with the trust implications that
+  carries. Document it as opt-in; the features already report an explicit unavailable state without
+  it.
+- **Publish the same port the node listens on.** The Host guard compares the port, so a compose
+  remap (`8080:4317`) fails as a bare 403. Same rule as the SSH-tunnel note in
+  docs/node-distribution.md.
+
+## The snags
+
+**`openssl` on PATH.** `ensureCert` (`packages/node-core/src/main/tls.ts`) shells out to it to mint
+the node's certificate. Present on macOS and Linux, absent on stock Windows. Either bundle it or
+replace that call with a pure-JS certificate mint (`@peculiar/x509` is the obvious candidate — Node's
+own `crypto` cannot mint an X.509 certificate). Small either way, but it is a dependency on a machine
+we do not control, and it fails at first boot with the node refusing to start.
 
 **macOS Gatekeeper.** A downloaded tarball containing `.node` binaries is quarantined, and clearing
 that properly means Developer ID signing and notarization — the same purchase already blocking
 desktop auto-update (see the auto-update constraint notes). Linux and Windows have no equivalent.
 This is why macOS is last, not first.
+
+**Windows is POSIX-shaped in two places.** `SIGUSR1` is how a running node reopens its pairing
+window (`apps/node/src/server/standalone.ts`), and that signal does not exist on Windows — pairing a
+second device there means a restart until some other trigger exists (a stdin command, or a
+device-authenticated route). And the 0600/0700 file modes on the data root, `session.key` and the
+TLS key are advisory at best on NTFS; the guarantee those modes state needs restating as an ACL, or
+at least an honest doc note that Windows does not get it.
 
 ## Whether to bundle a Node runtime
 
@@ -117,11 +154,12 @@ same reason.
 ## Ordering
 
 1. `better-sqlite3` → `node:sqlite` — **done**, and it halves the problem.
-2. A Linux node-pty prebuild produced in CI.
-3. The CI matrix and release upload: Linux and Windows.
-4. Replace or bundle `openssl`.
-5. macOS, once there is a Developer ID.
-6. Bundle a Node runtime, if "install Node first" turns out to be the adoption blocker.
+2. The Docker image — no snags block it, and it exercises the no-TTY path end to end.
+3. A Linux node-pty prebuild produced in CI (glibc; see above).
+4. The CI matrix and release upload: Linux and Windows.
+5. Replace or bundle `openssl`, and decide the Windows answers for `SIGUSR1` and file modes.
+6. macOS, once there is a Developer ID.
+7. Bundle a Node runtime, if "install Node first" turns out to be the adoption blocker.
 
 ## Not in scope here
 
