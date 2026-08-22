@@ -1,6 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { z } from 'zod'
-import { registerDesktopCapabilityHandlers } from './desktopCapabilities'
 import {
   ServiceRpcPeer,
   previewBrowserRuleSchema,
@@ -18,6 +17,12 @@ import {
 export type ServiceHostEvents = {
   stateChanged?(state: ServiceState, detail?: string): void
   unexpectedExit?(code: number): void
+  // The handlers the service can call back into for things only a shell can do — preview panes,
+  // browser driving (main/desktopCapabilities.ts). Injected rather than imported, because those
+  // handlers reach the window system and this file must not: it is the piece that moves into the
+  // Tauri helper unchanged (docs/future/tauri/architecture.md § Process model). A shell without
+  // webviews simply leaves it out, and the service's own calls answer "unavailable".
+  desktopCapabilities?(peer: ServiceRpcPeer): () => void
 }
 
 // How long a well-behaved service gets to exit after SIGTERM before we stop being polite. Its own
@@ -75,7 +80,7 @@ export class ServiceHost {
     }
     const peer = new ServiceRpcPeer(transport)
     this.peer = peer
-    this.disposeDesktopHandlers = registerDesktopCapabilityHandlers(peer)
+    this.disposeDesktopHandlers = this.events.desktopCapabilities?.(peer) ?? null
     peer.onEvent('service.state', (payload) => {
       const parsed = serviceStateEventSchema.safeParse(payload)
       if (parsed.success) this.events.stateChanged?.(parsed.data.state, parsed.data.detail)

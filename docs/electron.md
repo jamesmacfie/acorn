@@ -19,14 +19,16 @@ cross-origin (Node traffic runs over IPC, not fetch), and it does not get `allow
 there is no offline story and no worker should be able to cache the shell. `app-plugin://<hash>`'s
 privileges are under [The plugin frame origin](#the-plugin-frame-origin) below.
 
-`bootstrap.ts` composes:
+Boot is split in two. `bootstrap.ts` is the Electron half: it supplies `safeStorage` as the cipher
+device tokens are encrypted with, the target broker pushes go to, the recovery dialog, and the IPC
+projections the renderer talks to, then wires window creation, native folder dialogs, preview and
+browser capabilities, and quit-time shutdown.
 
-- service supervision and restart policy;
-- the node connection broker;
-- `safeStorage` and device-token custody;
-- navigation, window creation, and external-URL policy;
-- native folder dialogs and preview/browser capabilities;
-- quit-time service shutdown and view cleanup.
+`main/helper/` is the other half, composed by `main/helper/index.ts`: service supervision and the
+restart policy, the connection broker and its fleet, device-token custody, the plugin cache and trust
+store, and the preview tunnels. Nothing in that folder imports Electron, and a rule in
+`tools/arch/boundaries.test.ts` keeps it that way, because that folder is what becomes a separate
+desktop helper process under a non-Electron shell (see `docs/future/tauri/architecture.md`).
 
 The main process must not import plugin engines, database handles, or Node source. Domain behavior
 belongs in the Electron-free service graph.
@@ -73,7 +75,7 @@ certificate fingerprint/PEM, and local device token. Electron adopts that record
 after the listener is ready. Startup failures fail closed; a crash after startup is retried with
 bounded exponential backoff and eventually shows the recovery UI without creating a new data root.
 
-The crash budget (`main/crashBudget.ts`) allows five restarts inside a ten-minute window, waiting
+The crash budget (`main/helper/crashBudget.ts`) allows five restarts inside a ten-minute window, waiting
 1, 2, 4, 8, then 16 seconds before each one; a sixth crash inside the window gives up and shows the
 recovery screen instead of restarting into the same fault. An earlier, tighter policy (roughly
 250ms doubling, capped at three crashes in sixty seconds) meant a service crashing on something
@@ -142,7 +144,8 @@ applying and Oniguruma would fail inside it.
 
 `main/appScheme.ts` identifies the one response that gets the relaxed policy by filename, matching
 `/^\/assets\/worker-highlighter\.worker-[\w-]+\.js$/`. The `worker-` prefix on the entry name
-(`electron.vite.config.ts`) is required, not cosmetic: Vite emits two files derived from
+(`apps/desktop/vite.renderer.config.ts`, which the electron-vite config imports so both shells build
+the renderer from one set of rules) is required, not cosmetic: Vite emits two files derived from
 `highlighter.worker.ts`, the worker entry itself and a roughly 270-byte main-thread wrapper that
 constructs it, and without a distinguishing prefix both would be named `highlighter.worker-<hash>.js`
 with no way to tell them apart. Monaco's five workers keep the plain `[name]` pattern, so they get their
@@ -158,7 +161,10 @@ handle, a process object, or a `webContents` ID.
 
 That surface is the *implementation* of the platform seam, and the renderer never reads it directly:
 `packages/client-core/src/platform/` is the only module allowed to touch the global, enforced by
-`boundaries.test.ts`. Presence of a preload key is therefore never a product capability. The folder
+`boundaries.test.ts`. The two are checked against each other rather than assumed to agree:
+`platform/contract.ts` states what a live capability group has to look like, and
+`main/preload.test.ts` runs it against the real preload loaded headless, so a renamed key fails a test
+instead of quietly nulling a group. Presence of a preload key is therefore never a product capability. The folder
 picker in particular is a folder picker — it used to sit under a `terminal` key whose presence gated
 the whole terminal/agents/run-targets/workflows block, which are ordinary `/v2` + WebSocket surfaces
 (`git history: docs/future/node-first/platform-seam.md`).
@@ -223,7 +229,7 @@ scheme with no CORS.
 
 ## Connection broker
 
-`main/nodeBroker.ts` is Electron-free apart from its use by the main composition root. For each Node
+`main/helper/nodeBroker.ts` is Electron-free apart from its use by the main composition root. For each Node
 it owns:
 
 - endpoint and certificate fingerprint;
@@ -246,7 +252,7 @@ would only add a certificate-override path for a trust decision this process doe
 
 ### Fleet membership
 
-`main/fleetStore.ts` holds which Nodes this client knows, where they are, and what certificate to pin,
+`main/helper/fleetStore.ts` holds which Nodes this client knows, where they are, and what certificate to pin,
 in `fleet.json`. It lives in main because main is what already holds the two things fleet membership
 is inseparable from: device tokens and pinned certificates. The renderer gets a token-free `NodeRecord`
 projection built by explicit field selection, not a spread with keys deleted, so a field added to the
@@ -283,7 +289,7 @@ A loaded plugin may also declare a `webview` pane. Its manifest hosts are checke
 broker and again in main, including `will-navigate` and `will-redirect`. Each surface gets an
 ephemeral isolated partition and no CDP attachment, devtools, tunnel header, preload, or page bridge.
 
-For a task whose dev server is served by another Node process, `main/previewTunnel.ts` opens an
+For a task whose dev server is served by another Node process, `main/helper/previewTunnel.ts` opens an
 authenticated loopback listener that forwards raw bytes to the Node's own tunnel endpoint over its
 pinned agent, so the preview pane can reach a dev server without the renderer ever touching the
 network directly. It binds `127.0.0.1` explicitly; binding `0.0.0.0` would publish another machine's

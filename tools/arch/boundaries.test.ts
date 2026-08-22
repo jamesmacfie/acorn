@@ -229,7 +229,7 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/main/tls.ts', // openssl, at first boot only
       // Composition roots: a login-shell PATH probe, and the supervised node's own child.
       'apps/node/src/service/runtime.ts',
-      'apps/desktop/src/app/main/serviceHost.ts',
+      'apps/desktop/src/app/main/helper/serviceHost.ts',
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/main/terminal.ts', // PTYs
       'plugins/agents/src/main/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
@@ -459,6 +459,20 @@ describe('architecture boundaries', () => {
     expect(importsElectronValues("import type { App } from 'electron'")).toBe(false)
     expect(importsElectronValues("import { type App, type Menu } from 'electron'")).toBe(false)
     expect(offenders.map(rel).sort()).toEqual([])
+  })
+
+  it('the desktop helper stays Electron-free', () => {
+    // apps/desktop/src/app/main/helper is the custody stack: the broker, the fleet, the device tokens,
+    // the plugin cache and trust store, the tunnels, and the supervised node service, composed by
+    // helper/index.ts. It moves into the Tauri desktop helper process wholesale
+    // (docs/future/tauri/architecture.md § Process model), so an Electron import anywhere in it turns
+    // that relocation back into a refactor. Encryption and the shell-only service capabilities are
+    // injected for exactly this reason.
+    const HELPER = join(ROOT, 'apps', 'desktop', 'src', 'app', 'main', 'helper') + '/'
+    const offenders = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))].filter((f) => f.startsWith(HELPER))
+    expect(offenders.map(rel).sort()).toEqual([])
+    // Anti-vacuity: the folder exists and the scan reaches it.
+    expect(EDGES.filter((e) => e.fromFile.startsWith(HELPER)).length).toBeGreaterThan(10)
   })
 
   it('the platform seam is the only door to the host (shrinking baseline)', () => {

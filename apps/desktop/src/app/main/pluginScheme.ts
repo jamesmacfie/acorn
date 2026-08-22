@@ -1,6 +1,6 @@
 import { net, protocol } from 'electron'
 import { pathToFileURL } from 'node:url'
-import type { PluginCache } from './pluginCache'
+import type { PluginCache } from './helper/pluginCache'
 import { pluginFrameStyles } from './pluginFrameStyles'
 
 // `app-plugin://<sha256>/...` is the origin a plugin's UI runs on. Why the hash is the host, what it

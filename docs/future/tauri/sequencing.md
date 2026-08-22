@@ -1,6 +1,6 @@
 # Sequencing
 
-Status: proposal, 2026-08-22. Coexistence, the phases, the cutover trigger, and the deletion list.
+Status: proposal, 2026-08-22; phases 0 and 1 executed 2026-08-23. Coexistence, the phases, the cutover trigger, and the deletion list.
 
 ## Coexistence: a second app package
 
@@ -16,7 +16,7 @@ extracted once and imported by both build systems so it cannot drift.
 | Phase | Name | Size | Ships while Electron ships? |
 | --- | --- | --- | --- |
 | 0 | De-risk spikes ✅ | M | yes (throwaway) |
-| 1 | Groundwork that lands in Electron | M | yes (on trunk) |
+| 1 | Groundwork that lands in Electron ✅ | M | yes (on trunk) |
 | 2 | Rust shell skeleton + helper | L | yes (parallel app) |
 | 3 | Feature parity | L | yes (parallel app) |
 | 4 | Packaging and CI | M | yes (parallel artifact) |
@@ -38,19 +38,39 @@ repo.
 
 Exit met: findings written, go recorded in the [README](./README.md) decisions.
 
-### Phase 1 — groundwork that lands in Electron
+### Phase 1 — groundwork that lands in Electron ✅
 
-Three changes the Tauri shell needs are improvements to the Electron build too, so they ship on
-trunk with production soak before any Rust exists. Nothing in this phase mentions Tauri in core.
+Done 2026-08-23. Three changes the Tauri shell needs were improvements to the Electron build too, so
+they shipped on trunk, ahead of any Rust, so they get real use before a second shell depends on them.
+Nothing in this phase mentions Tauri in core.
 
-- The platform-seam contract suite ([testing.md](./testing.md)); the Electron implementation
-  passes it.
-- The renderer Vite config extraction; Electron's config imports it
-  ([dev-workflow.md](./dev-workflow.md)).
-- Regroup `apps/desktop/src/app/main/` into helper-shaped modules: the Electron-free custody files
-  gathered behind one composition seam, so the phase-2 move is a relocation, not a refactor.
+- **The platform-seam contract suite** ([testing.md](./testing.md)).
+  `packages/client-core/src/platform/contract.ts` states what a live capability group looks like, as a
+  checker that returns problems rather than as `expect` calls, so both ends can run it without a test
+  framework reaching into `src/`. `platform/contract.test.ts` drives it against a mock host and pins
+  the discriminator rules; `apps/desktop/src/app/main/preload.test.ts` drives it against the real
+  preload, loaded headless against a stub Electron, and the Electron host passes with every group
+  implemented. The group member lists are compile-time exhaustive: a member added to a seam type and
+  not listed fails `tsc`.
+- **The renderer Vite config extraction** ([dev-workflow.md](./dev-workflow.md)).
+  `apps/desktop/vite.renderer.config.ts` exports `rendererConfig(root)` and
+  `electron.vite.config.ts` imports it. The worker rules travelled verbatim, and the extraction was
+  checked by building both ways: the emitted `index.html` and asset hashes are identical. It lives in
+  `apps/desktop` because that is the only shell there is; the Tauri package takes ownership when it
+  lands, and Electron keeps importing it.
+- **The custody regroup.** `apps/desktop/src/app/main/helper/` now holds the eleven Electron-free
+  custody files, composed by `helper/index.ts` — the broker and fleet, device tokens, the plugin cache
+  and trust store, the tunnels, and the supervised service, plus the restart and crash-recovery
+  policy. `bootstrap.ts` is the Electron half: it passes in the cipher, the push target, the recovery
+  dialog, and the IPC projections. A rule in `tools/arch/boundaries.test.ts` fails any Electron import
+  under `helper/`.
 
-Exit: all three on trunk, Electron build and tests green.
+Two seams had to be cut for the folder to be Electron-free, and both are the shape phase 2 wants:
+`deviceTokenStore.ts` takes a `TokenCipher` (Electron supplies `safeStorage`; the helper will supply
+the Rust-held data key), and `ServiceHost` takes the desktop-capability registrar as a callback
+instead of importing `desktopCapabilities.ts`, which reaches the window system.
+
+Exit met: all three on trunk, Electron `tsc`, the desktop suite, and the arch suite green.
 
 ### Phase 2 — Rust shell skeleton + helper
 
@@ -91,7 +111,9 @@ parity.
 
 ## Deletion list
 
-- `apps/desktop/src/app/main/` (the 12 Electron files, `preload.ts`, and their tests).
+- `apps/desktop/src/app/main/` (the 12 Electron files, `preload.ts`, and their tests). Not
+  `main/helper/`, which relocates into the desktop helper package instead — phase 1 separated the two
+  for exactly this line.
 - `apps/desktop/electron-builder.yml`, `electron.vite.config.ts`, the electron scripts, and the
   electron, electron-vite, electron-builder, and @electron/rebuild dependencies.
 - The Electron-ABI branch of `scripts/rebuild-node-abi.mjs`; the plain-Node path stays for the

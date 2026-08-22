@@ -36,6 +36,11 @@ running Playwright directly can exercise stale output.
   `apps/node/test/integration/mainBarrelLoad.test.ts` imports every plugin main barrel in a plain Node
   child. The arch suite's text checks stay as a fast, precise first line, but they are no longer the
   only line — and neither owns a file allowlist any more;
+- the platform-seam contract suite is one checker run from both ends: `client-core/platform/contract.ts`
+  states what a live capability group looks like, `platform/contract.test.ts` drives it against a mock
+  host, and each shell's own suite drives it against the real object that shell installs
+  (`apps/desktop/src/app/main/preload.test.ts`). The seam's groups are nullable, so this is what turns
+  "the host renamed a key" from a silently missing affordance into a failing test;
 - desktop integration tests cover broker, fleet, persistence, plugin activation, and native seams;
 - Playwright covers boot, onboarding, restore, task navigation, WebSocket terminal behavior, search,
   preview, restart, security settings, and the two-Node fleet path.

@@ -110,7 +110,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
 /**
  * Record an answer, accepted or rejected, and let the shell catch up.
  *
- * Both answers are remembered (main/pluginTrustStore.ts keeps a rejection so a turned-away plugin does
+ * Both answers are remembered (main/helper/pluginTrustStore.ts keeps a rejection so a turned-away plugin does
  * not ask every boot), which is exactly why dismissal must not come through here: Escape is "not now"
  * and records nothing. See the dialog's `dismiss`.
  */
