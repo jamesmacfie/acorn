@@ -38,7 +38,7 @@ Until recently each profile was its own workspace package, which read as an exte
 not one — everything that actually encodes provider knowledge (drivers, normalizers, usage probes,
 pricing) was already inside plugins/agents, so a new profiles package bought a menu entry whose agent
 could not run. Making the driver registry a real contribution point is the change that would open
-this up; the packages were not.
+this up; the packages were not. That design now lives in [docs/future/acp/](./future/acp/).
 
 The Node probes provider availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
