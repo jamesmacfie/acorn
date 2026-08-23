@@ -42,6 +42,7 @@ export type {
   PluginCommandDescriptor,
   PluginDocumentRegion,
   PluginFrameSurface,
+  PluginHarnessDescriptor,
   PluginKeybindingDescriptor,
   PluginPaneLayout,
   PluginRefResolverDescriptor,
@@ -58,7 +59,7 @@ export type {
 // its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read core routes, or another
 // plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
-  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks } = manifest.contributions
+  const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks, harnesses } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -284,6 +285,33 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: at, message: 'a task check calls a node route; declare `node` in the manifest' })
     }
   })
+  // Managed agent harnesses (docs/managed-agents.md § Harnesses). Four rules, and each one exists so a
+  // manifest that parses can actually run: a spawn that names neither a command nor an entry describes
+  // nothing, an entry that escapes the package directory is the confinement rule every other manifest
+  // path follows, `requires` says which CLI an adapter drives and means nothing without one, and a probe
+  // route with no node half would 404 on every read.
+  harnesses.forEach((entry, i) => {
+    const at = ['contributions', 'harnesses', i] as (string | number)[]
+    const spawn = entry.spawn
+    if ((spawn.command === undefined) === (spawn.entry === undefined)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'spawn'], message: 'a harness must declare exactly one of command or entry' })
+    }
+    if (spawn.requires !== undefined && spawn.entry === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'spawn', 'requires'],
+        message: 'requires names the CLI an adapter drives, so it is only valid with entry',
+      })
+    }
+    if (entry.probes?.usage !== undefined) route(entry.probes.usage, [...at, 'probes', 'usage'])
+    if (entry.probes?.auth !== undefined) route(entry.probes.auth, [...at, 'probes', 'auth'])
+    // Verbatim the schedule and task-check rule, and for the identical reason: only a node half serves
+    // `/v2/p/<id>/`, so a probe declared by a data-only package would be asked on every refresh and 404
+    // every time.
+    if (entry.probes && !manifest.node) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'probes'], message: 'a harness probe calls a node route; declare `node` in the manifest' })
+    }
+  })
   // ── Cooperative cross-plugin extension (@acorn/protocol/extensionPoints.ts) ──────────────────────
   //
   // A point is a promise that somebody else's rows will appear inside one of this manifest's surfaces, so
@@ -418,7 +446,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // Ids are per-registry on the client, but a plugin that reuses one across its own descriptors is
   // ambiguous about which contribution a query key or a disposal refers to. Cheap to forbid outright.
   const seen = new Set<string>()
-  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules, ...taskChecks]) {
+  for (const entry of [...frames, ...sources, ...slots, ...palette, ...commands, ...attention, ...nodeStats, ...contentLinks, ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints, ...extensions, ...collections, ...schedules, ...taskChecks, ...harnesses]) {
     if (seen.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }

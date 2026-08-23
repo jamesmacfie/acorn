@@ -42,7 +42,19 @@ export function createPluginReloader(options: {
       }
       const outcome = await options.host.reload(id, {
         plugin: entry.plugin,
-        binding: { permissions: entry.manifest.permissions.node, storage: entry.storage },
+        // The manifest contributions the host synthesises registrations from, not just permissions and
+        // storage: a reload that dropped them would silently take away the reloaded plugin's schedules,
+        // checks, collections and harnesses until the next boot.
+        binding: {
+          permissions: entry.manifest.permissions.node,
+          storage: entry.storage,
+          schedules: entry.manifest.contributions.schedules,
+          collections: entry.manifest.contributions.collections,
+          commands: entry.manifest.contributions.commands,
+          taskChecks: entry.manifest.contributions.taskChecks,
+          harnesses: entry.manifest.contributions.harnesses,
+          dir: entry.dir,
+        },
       })
       // Broadcast either way. A failed reload still changed the roster row the settings page renders, and
       // the client's reconcile is a re-read of state it can already fetch.

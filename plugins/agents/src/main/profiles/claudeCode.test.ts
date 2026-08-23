@@ -9,7 +9,7 @@ import { claudeCodeProfile } from './claudeCode'
 
 describe('the claude-code profile', () => {
   it('declares the identity terminal and workflows resolve it by', () => {
-    // `id` is persisted; see docs/managed-agents.md § Providers.
+    // `id` is persisted; see docs/managed-agents.md § Harnesses.
     expect(claudeCodeProfile).toMatchObject({ id: 'claude-code', label: 'Claude Code', kind: 'agent', command: 'claude', transport: 'pty' })
   })
 

@@ -105,7 +105,7 @@ is the widest one that owns tables; `plugins/model-providers/` is the narrowest 
 ### Contributions
 
 `contributions` is a loose object — a manifest written for a newer acorn contributes less on an older
-one rather than failing to parse — with nineteen named keys, each capped. The caps are not arbitrary:
+one rather than failing to parse — with twenty named keys, each capped. The caps are not arbitrary:
 each one is the point past which a contribution stops being an integration and starts being an app
 inside someone else's chrome.
 
@@ -135,6 +135,7 @@ because its data comes from a route on your always-running node half.
 | `extensionPoints` | 4 | A strip inside one of **your** panes that other plugins may fill: `{ id, label, location, surface }`. `location` is from a closed list (`pane.footer` today) and `surface` must be a `pane` this manifest declares. You write no code for it — the host draws the strip. |
 | `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
 | `extensions` | 8 | Rows **you** put inside another plugin's point: `{ id, point, label, order?, items, onSelect?, refresh? }`. `point` is `<ownerPluginId>:<pointId>`, `items` is a GET on your own namespace, `onSelect` takes the narrow verb set. |
+| `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](#harnesses). |
 
 A theme is the one contribution with no route and no bundle behind it, so it is the cheapest thing a
 plugin can be. `tokens` must carry **exactly** the palette token names and nothing else: a missing one,
@@ -215,8 +216,110 @@ whose `onSelect` navigates to it (its only mount site); an `overlay` needs an ac
 extension point must hang off a `pane` this manifest declares and only one may sit at each location on
 it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference and its `items` route
 must be your own; a `taskChecks` entry needs a `node` half, since only that serves the namespace its two
-routes live in; a `coreSlot` surface needs both a designated slot name and a client bundle; and no id
-may repeat across contributions.
+routes live in; a `harnesses` entry's `spawn` must name exactly one of `command` and `entry`, may only
+carry `requires` beside an `entry`, and needs a `node` half if it declares any `probes`; a `coreSlot`
+surface needs both a designated slot name and a client bundle; and no id may repeat across
+contributions.
+
+### Harnesses
+
+A harness is a managed agent: acorn starts it, drives the session, and draws the transcript, the
+permission prompts, the plans and the config options you see in the Agent pane. Every agent that
+speaks the [Agent Client Protocol](https://agentclientprotocol.com) is one manifest away, because
+acorn already owns everything downstream of the wire.
+
+This is the whole plugin that adds OpenCode:
+
+```json
+{
+  "id": "opencode",
+  "name": "OpenCode",
+  "version": "0.1.0",
+  "apiVersion": "2",
+  "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
+  "contributions": {
+    "harnesses": [
+      {
+        "id": "opencode",
+        "label": "OpenCode",
+        "spawn": { "command": "opencode", "args": ["acp"] },
+        "envPassthrough": ["OPENCODE_*"],
+        "quirks": { "manualCompaction": true },
+        "terminal": { "command": "opencode" }
+      }
+    ]
+  }
+}
+```
+
+One manifest and one icon path. No node bundle, no client bundle, no build step, and no `exec` grant —
+you describe a spawn, and the agents plugin owns the child process. Install it like any other package,
+approve the one line the trust prompt shows, and OpenCode appears beside Claude and Codex.
+
+The runtime id is `opencode:opencode`: the host prefixes your harness id with your plugin id, the same
+minting rule extension points follow, and for the same reason — a manifest may not claim a name in
+someone else's space. That id is persisted into session rows and workflow steps, so renaming it is a
+compatibility break for your users rather than a label edit.
+
+**What you declare, and what acorn does.**
+
+| You declare | acorn does |
+| --- | --- |
+| `spawn` | Starts the agent, owns the child, and restarts and shuts it down in the documented order |
+| `envPassthrough` | Builds the child environment through the broker contract; credentials never pass through |
+| `label`, `glyph` | Every surface: Agent Center rows, the pane header, usage sections, notifications |
+| `quirks` | Enables or hides the matching affordance, per harness |
+| `terminal` | Registers the terminal profile: task terminals, handoff, the input-controller lease |
+| `probes` | Fetches them and draws the answers |
+| nothing else | The ACP connection, the normalizer, the durable event ledger, transcript rendering, permission plumbing, attachments, session persistence, reconnect, replay |
+
+If you find yourself writing code to add a harness, either the agent does not speak ACP — in which
+case this contract does not cover it — or the seam has a gap, which is a bug report.
+
+**The two spawn forms.** `spawn` takes exactly one of:
+
+- **`command`** — an executable on `PATH`, with `args`. The common case: `opencode acp`,
+  `gemini --experimental-acp`. The user installs the CLI; your harness's diagnostics say so when it is
+  missing.
+- **`entry`** — a package-relative JavaScript file, run with the node service's own binary. This is
+  how you ship an adapter for an agent that does not speak ACP natively, the same way acorn's own
+  Claude harness runs a packaged adapter. Add `requires: { command, env }` and acorn resolves that CLI
+  on `PATH` and hands the child its absolute path under the variable you named — which is what an
+  adapter needs and the reason there is no template language here.
+
+An `entry` is your code running in a child process. Less privileged than a node bundle, since it is
+not inside the node, but still code, and the trust prompt says so.
+
+The ACP project publishes a registry of each agent's launch arguments at
+`cdn.agentclientprotocol.com/registry/v1/latest`. Copy yours from there. acorn never fetches it at
+runtime: your manifest is the pinned truth, so launch arguments change by plugin update and the trust
+record sees it.
+
+**Quirks.** ACP does not carry everything every vendor can do, and the gap is closed by declaration
+rather than by a list of ids inside acorn:
+
+- `manualCompaction` — the agent implements a compaction command, so the pane offers Compact.
+- `sessionPersistence` — sessions outlive the agent process and can be reloaded, so resume and the
+  terminal handoff exist.
+
+Do not restate anything the agent already says through ACP capability negotiation. The driver reads
+those off the wire, and a manifest repeating them would only drift.
+
+**Probes.** Two optional GETs on your own node half, which means adding a `node` entry:
+
+- `probes.usage` answers `{ plan?, quotas: [{ id, label, percentRemaining, resetsAt?, resetText? }], account? }`.
+  Use `session` as a quota id for the one the compact indicator shows. acorn derives the health and the
+  capture time, so one harness cannot call 5% remaining healthy while another calls it critical. Without
+  this route your harness simply shows no usage section, which is the right answer for most agent CLIs.
+- `probes.auth` answers `{ authenticated: boolean | null, diagnostic? }`, for the Agent Center's
+  provider-health row. `null` means "cannot tell", which is different from `false`; an answer acorn
+  cannot read is treated as `null` rather than as signed out.
+
+**What a data-only harness does not get.** Headless and workflow invocation. Turning conditional argv
+assembly into manifest data means inventing an argv template language, and that is the flexibility this
+contract refuses in favour of something a person can hold in their head. A data-only harness works in
+the Agent pane and the terminal; a workflow step cannot name it. A harness that needs headless support
+is asking for first-party investment, not a bigger manifest.
 
 ### The action verbs
 

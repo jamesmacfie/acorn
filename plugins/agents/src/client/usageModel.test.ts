@@ -5,6 +5,7 @@ import { formatReset, providerUsageRows, usageTooltipSummary } from './usageMode
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
   provider: id,
+  label: id === 'claude' ? 'Claude Code' : 'Codex',
   availability: 'available',
   health: usageHealth(percent),
   plan: null,
@@ -40,14 +41,17 @@ describe('agent usage health and tooltip', () => {
     expect(usageHealth(percent)).toBe(health)
   })
 
-  it('orders Claude before Codex regardless of response order', () => {
+  // The order is the node's, which is the collector registration order (main/usage/collectors.ts).
+  // Reordering here would have to know the whole harness set, which is the thing that is now open.
+  it('summarizes every harness the node reported, in the order it reported them', () => {
     const snapshot: AgentUsageSnapshot = { providers: [provider('codex', 34), provider('claude', 82)], refreshedAt: 1 }
-    expect(usageTooltipSummary(snapshot)).toBe('🟢 Claude 82% · 🟡 Codex 34%')
+    expect(usageTooltipSummary(snapshot)).toBe('🟡 Codex 34% · 🟢 Claude Code 82%')
   })
 
-  it('uses neutral placeholders for loading or unavailable providers', () => {
-    expect(usageTooltipSummary(null)).toBe('⚪ Claude — · ⚪ Codex —')
-    expect(usageTooltipSummary({ providers: [provider('codex', 0)], refreshedAt: 1 })).toBe('⚪ Claude — · ⚪ Codex 0%')
+  it('names no harness it was not told about', () => {
+    expect(usageTooltipSummary(null)).toBe('reading usage…')
+    expect(usageTooltipSummary({ providers: [], refreshedAt: 1 })).toBe('reading usage…')
+    expect(usageTooltipSummary({ providers: [provider('codex', 0)], refreshedAt: 1 })).toBe('⚪ Codex 0%')
   })
 })
 

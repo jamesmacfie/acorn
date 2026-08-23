@@ -8,7 +8,7 @@ import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
 import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { Alert, EmptyState, Input, Row, SegmentedControl, Select, StatusDot } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, Icon, Input, Row, SegmentedControl, Select, StatusDot } from '@acorn/plugin-api/ui'
 import { providerTone, runtimeTone } from './stateTone'
 import './agent-center.css'
 
@@ -39,6 +39,12 @@ export default function AgentCenter() {
     (tasks.data ?? []).filter((task) => workspaceProjectIds().has(task.projectId)))
   const workspaceTaskIds = createMemo(() => new Set(workspaceTasks().map((task) => task.id)))
   const [providers] = createResource(() => managedAgentApi.providers())
+  // The harness's own glyph, and the label's first letter when it declared none. The row used to draw
+  // `'C' : '⌘'` off the provider id, which drew Codex's mark for every third harness.
+  const providerGlyph = (providerId: string): string => {
+    const provider = providers()?.find((candidate) => candidate.id === providerId)
+    return provider?.glyph ?? (provider?.label ?? providerId).slice(0, 1).toUpperCase()
+  }
   const [query, setQuery] = createSignal('')
   const [scope, setScope] = createSignal<'workspace' | 'fleet'>('workspace')
   const fleetScope = () => scope() === 'fleet' && nodes().length > 1
@@ -239,7 +245,9 @@ export default function AgentCenter() {
             return (
               <Row class="agent-center-row" onActivate={() => open(row)}>
                 <span class="agent-center-session">
-                  <span class="agent-center-session-icon" data-provider={session.providerId}>{session.providerId === 'claude' ? 'C' : '⌘'}</span>
+                  <span class="agent-center-session-icon" data-provider={session.providerId}>
+                    <Icon name={providerGlyph(session.providerId)} />
+                  </span>
                   <span><strong>{session.title}</strong><small>{session.providerId} · {session.kind}</small></span>
                 </span>
                 <span>

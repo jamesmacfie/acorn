@@ -1702,6 +1702,52 @@ workspace being removed. No plugin should use it. It hands the caller an unregis
 was obliged to hold, and the one plugin that used it dropped the function, accumulated a handler on
 every re-activation — twice per boot and once per node switch — and drew its warning twice.
 
+## Harnesses
+
+A plugin adds a managed agent — an ACP-speaking CLI acorn drives, with a full transcript, permission
+prompts and plans — by declaring `contributions.harnesses`. It is the cheapest node-side contribution
+there is: no route, no bundle, no build step.
+
+The two-feeder pattern again, with one difference that matters. A compiled plugin registers a launch
+spec directly with the driver registry in plugins/agents; a loaded one declares the harness in its
+manifest and the host synthesises the registration through `ctx.harnesses`. The difference is where the
+registration lands: schedules, collections and task checks land in a node-core registry, and a harness
+lands in **another plugin's**, through the `agents.harnessRegistry` capability that plugins/agents
+publishes. The contract is `packages/node-core/src/server/plugin/harnesses.ts`, in node-core rather
+than in the agents plugin because the host is what delivers a harness and neither package may import
+the other.
+
+The host does three things a plugin cannot do for itself, and nothing else:
+
+- **Mints the id** as `<pluginId>:<harnessId>`, the same rule extension points follow. That value is
+  persisted onto every session row, so a manifest must not be able to choose it.
+- **Resolves an adapter entry** inside the contributing package, with the lexical and symlink
+  confinement every manifest path gets. A descriptor whose entry escapes its package is dropped with a
+  warning rather than failing the boot — it is one harness of a package that may contribute other
+  things.
+- **Turns a probe route into a call**, because a descriptor names a route and only the host can
+  dispatch one with no client in sight. The answer arrives at plugins/agents as `unknown` and is parsed
+  there: they are bytes a plugin wrote.
+
+Resolved at delivery time and never cached. With agents disabled, a contributed harness is the same
+silent nothing every unmatched contribution is, and re-enabling redelivers.
+
+**A harness package with no node half still gets a plugin row.** This is the one place the loader
+produces a plugin from a manifest alone (`main/pluginLoader.ts`): a no-op `init`, no storage, and
+everything else a plugin row carries — a line in Settings → Plugins, an owner who can disable it, and
+registrations that roll back with the rest. Delivering such a package beside the host instead would
+mean reimplementing all of that. A manifest-only package may not take a built-in's id, because there
+is nothing in it to run in that built-in's place.
+
+The trust line sits under `Enforced`, not `Declared`, and it is the only line in that group that names
+a program: the host spawns exactly the declared command with the declared arguments, and the plugin
+never gets a process of its own. The grant key is the whole spawn plus the environment passthrough, so
+swapping the binary, changing its arguments or widening a glob all read as newly requested.
+
+Four per plugin, the same ceiling as schedules and task checks.
+[managed-agents.md § Harnesses](./managed-agents.md) owns the behaviour and the two driver tiers;
+[plugin-authoring.md § Harnesses](./plugin-authoring.md) is the authoring contract.
+
 ## Collaboration rules
 
 Plugins collaborate through four mechanisms:

@@ -1,12 +1,28 @@
+import { AcpDriver } from './acpDriver'
+import type { HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverFactory } from './types'
 
+// The harness registry. Two doors, and the difference between them is the whole design
+// (docs/managed-agents.md § Harnesses):
+//
+//   register        a launch spec, run by the shared generic driver. The default for a new harness and
+//                   the only door a loaded plugin's manifest can reach.
+//   registerNative  a driver factory, for a vendor protocol that carries product value ACP cannot
+//                   express. First-party only, and the name is the point: writing one is a deliberate
+//                   act, not the path of least resistance.
 export class AgentDriverRegistry {
   readonly #factories = new Map<string, AgentDriverFactory>()
 
-  register(providerId: string, factory: AgentDriverFactory): () => void {
+  register(spec: HarnessLaunchSpec): () => void {
+    return this.registerNative(spec.id, () => new AcpDriver(spec))
+  }
+
+  registerNative(providerId: string, factory: AgentDriverFactory): () => void {
     if (this.#factories.has(providerId)) throw new Error(`Agent driver already registered: ${providerId}`)
     this.#factories.set(providerId, factory)
-    return () => this.#factories.delete(providerId)
+    return () => {
+      if (this.#factories.get(providerId) === factory) this.#factories.delete(providerId)
+    }
   }
 
   create(providerId: string): AgentDriver | null {

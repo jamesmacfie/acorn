@@ -62,15 +62,22 @@ export function formatUpdated(capturedAt: number | null, now = Date.now()): stri
   return `updated ${Math.floor(minutes / 60)}h ago`
 }
 
+// Whatever harnesses the snapshot came back with, in the node's order. It used to walk a two-id literal
+// and pick the label off a ternary, which meant a third harness could report usage the tooltip would
+// never mention. The label travels with the row now (shared/usage.ts).
 export function usageTooltipSummary(snapshot: AgentUsageSnapshot | null): string {
-  return (['claude', 'codex'] as const)
-    .map((id) => {
-      const provider = snapshot?.providers.find((item) => item.provider === id)
-      const quota = provider ? sessionQuota(provider) : undefined
-      const label = id === 'claude' ? 'Claude' : 'Codex'
-      return quota ? `${usageHealthIcon(quota.health)} ${label} ${formatPercent(quota.percentRemaining)}` : `⚪ ${label} —`
+  const summary = (snapshot?.providers ?? [])
+    .map((provider) => {
+      const quota = sessionQuota(provider)
+      return quota
+        ? `${usageHealthIcon(quota.health)} ${provider.label} ${formatPercent(quota.percentRemaining)}`
+        : `⚪ ${provider.label} —`
     })
     .join(' · ')
+  // This string is the indicator button's label, so an empty one collapses the button. It used to fill
+  // the gap with `⚪ Claude — · ⚪ Codex —`, which is a promise about which harnesses exist that only the
+  // node can keep. Naming nothing is the honest placeholder.
+  return summary || 'reading usage…'
 }
 
 export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()): UsageDetailRow[] {

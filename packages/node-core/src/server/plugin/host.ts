@@ -16,6 +16,9 @@ import type { CapabilityRegistry } from './capabilities'
 import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
 import { clearCollectionReads } from '../collections/registry'
 import { clearNodeActions } from '../nodeActions/registry'
+import { resolveInRoot } from '../../main/core/filesystem/confinement'
+import { dispatchPluginRoute } from './dispatch'
+import type { ManifestHarnessSpawn } from './harnesses'
 import { runPluginScheduleRoute } from './scheduleRun'
 import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
 import { clearTaskChecks } from './taskChecks'
@@ -121,7 +124,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // A missing env is a composition-root wiring bug, not a plugin's fault, so it's raised here, before
   // anything is started and there's a graph to unwind.
   const requireEnv = (name: string): Env => {
-    if (!options.env) throw new Error(`Plugin '${name}' declares schedules, but initPlugins was given no env to run them with.`)
+    if (!options.env) throw new Error(`Plugin '${name}' declares work the node runs on its own, but initPlugins was given no env to run it with.`)
     return options.env
   }
   for (const [name, binding] of loadedBindings) if (binding.schedules?.length) requireEnv(name)
@@ -217,6 +220,60 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
+  // What a loaded plugin's manifest declared as managed agent harnesses, handed on to whichever plugin
+  // owns agent sessions (./harnesses.ts). Two things happen here that cannot happen anywhere else:
+  //
+  //   an adapter entry is resolved against the plugin's installed package directory and re-confined,
+  //     so the consumer never touches the filesystem to find a path a manifest wrote;
+  //   a probe route becomes a call, because the descriptor names a route and the host is the only side
+  //     that can dispatch one with no client in sight (./dispatch.ts, shared with schedules and checks).
+  //
+  // A descriptor whose entry escapes its package is dropped with a warning rather than failing the boot:
+  // it is one harness of a package that may contribute other things, and the parse-time check already
+  // refused the obvious shapes.
+  const registerManifestHarnesses = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
+    const declared = binding?.harnesses ?? []
+    if (declared.length === 0) return
+    for (const descriptor of declared) {
+      let spawn: ManifestHarnessSpawn
+      if (descriptor.spawn.command !== undefined) {
+        spawn = { command: descriptor.spawn.command, args: descriptor.spawn.args }
+      } else {
+        const resolved = binding?.dir ? resolveInRoot(binding.dir, descriptor.spawn.entry!) : null
+        if (!resolved) {
+          console.warn(`[plugin:${name}] harness '${descriptor.id}' declares an entry outside its package; skipped`)
+          continue
+        }
+        spawn = {
+          entry: resolved,
+          args: descriptor.spawn.args,
+          ...(descriptor.spawn.requires ? { requires: descriptor.spawn.requires } : {}),
+        }
+      }
+      // Resolved lazily inside the probe, not here: a node with no bindings can still register a harness
+      // whose transcript works, and only the probe has nothing to answer with.
+      const probe = (path: string) => async (signal: AbortSignal): Promise<unknown> => {
+        const response = await dispatchPluginRoute(requireEnv(name), name, path, { method: 'GET' }, signal)
+        if (!response.ok) {
+          console.warn(`[harness] ${name}:${descriptor.id} answered ${response.status} from ${path}`)
+          return null
+        }
+        return await response.json().catch(() => null)
+      }
+      ctx.harnesses.register({
+        id: descriptor.id,
+        label: descriptor.label,
+        ...(descriptor.glyph ? { glyph: descriptor.glyph } : {}),
+        spawn,
+        envPassthrough: descriptor.envPassthrough,
+        quirks: descriptor.quirks,
+        ...(descriptor.terminal ? { terminal: descriptor.terminal } : {}),
+        ...(descriptor.probes?.usage ? { probeUsage: probe(descriptor.probes.usage) } : {}),
+        ...(descriptor.probes?.auth ? { probeAuth: probe(descriptor.probes.auth) } : {}),
+      })
+    }
+  }
+
   // A loaded plugin's schedulable actions, synthesised from the manifest's commands whose verb is
   // `runNodeAction`, the only verb that means anything with nobody watching.
   //
@@ -270,6 +327,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     })
     registerManifestSchedules(ctx, plugin.name, loaded)
     registerManifestTaskChecks(ctx, plugin.name, loaded)
+    registerManifestHarnesses(ctx, plugin.name, loaded)
     registerManifestCollections(ctx, loaded)
     registerManifestNodeActions(ctx, loaded)
     // A failing init still fails the boot: every plugin here is first-party code in the same binary. But
@@ -399,6 +457,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // under the same keys, and registering now would throw on the duplicate.
       registerManifestSchedules(candidateCtx, name, next.binding)
       registerManifestTaskChecks(candidateCtx, name, next.binding)
+      registerManifestHarnesses(candidateCtx, name, next.binding)
       registerManifestCollections(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)
       await next.plugin.init(candidateCtx)

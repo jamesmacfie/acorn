@@ -2,6 +2,8 @@ import { noteBundleAccepted, resolvePendingTrust, type PluginTrustRequest } from
 import {
   extensionGrants,
   extensionPermissionLines,
+  harnessGrants,
+  harnessPermissionLines,
   keyClaimGrants,
   keyClaimPermissionLines,
   nodePermissionLines,
@@ -62,12 +64,17 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // plugin id the host read the manifest under, the same value every other namespace is minted
         // from, so a point's public name here is the one the rest of the app will address it by.
         ...extensionPermissionLines(extensionGrants(request.row.name, installed.contributions)),
+        // The headline fact when a package contributes one: acorn will run this program as a managed
+        // agent. `Enforced`, because the host spawns exactly the declared command with the declared
+        // arguments and the plugin never gets a process of its own (docs/managed-agents.md § Harnesses).
+        ...harnessPermissionLines(harnessGrants(installed.contributions)),
       ],
       was: previous
         ? [
           ...uiPermissionLines(previous.permissions),
           ...keyClaimPermissionLines(previous.keyClaims ?? []),
           ...extensionPermissionLines(previous.extensions ?? []),
+          ...harnessPermissionLines(previous.harnesses ?? []),
         ]
         : null,
     },
@@ -137,6 +144,10 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     // Recorded for the same reason as the four above. "This package now stops my containers when I
     // archive" is exactly the change the update prompt has to be able to mark as new.
     taskChecks: taskCheckGrants(installed.contributions),
+    // Recorded for the same reason as the five above, and it is the sharpest case of it: "this package
+    // now asks acorn to run a different binary" is precisely the change that must not slide past the
+    // update prompt unremarked, and an unrecorded grant can never read as newly requested.
+    harnesses: harnessGrants(installed.contributions),
     decision,
   })
   resolvePendingTrust(request.row.name, request.hash)

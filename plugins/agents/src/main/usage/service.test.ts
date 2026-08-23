@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageProviderId } from '../../shared/usage'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
+import { AgentUsageCollectorRegistry, type AgentUsageCollector } from './collectors'
 import { createAgentUsageService } from './service'
 import { UsageProcessError } from './processRunner'
 
@@ -15,6 +16,7 @@ afterEach(async () => {
 
 const provider = (id: AgentUsageProviderId, percent = 80): AgentProviderUsage => ({
   provider: id,
+  label: id,
   availability: 'available',
   health: 'healthy',
   plan: null,
@@ -26,6 +28,15 @@ const provider = (id: AgentUsageProviderId, percent = 80): AgentProviderUsage =>
   stale: false,
   error: null,
 })
+
+// The service reads its collectors from a registry now, so each test builds its own rather than
+// passing two named collectors. The labels are what the service stamps onto every answer.
+const collectorsFor = (claude: AgentUsageCollector, codex: AgentUsageCollector): AgentUsageCollectorRegistry => {
+  const registry = new AgentUsageCollectorRegistry()
+  registry.register({ provider: 'claude', label: 'Claude Code', collect: claude })
+  registry.register({ provider: 'codex', label: 'Codex', collect: codex })
+  return registry
+}
 
 async function probeDir(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'acorn-usage-service-'))
@@ -48,16 +59,18 @@ describe('agent usage service', () => {
     }
     const service = createAgentUsageService({
       probeDir: await probeDir(),
-      claude: async () => {
-        markStarted()
-        await wait()
-        return provider('claude')
-      },
-      codex: async () => {
-        markStarted()
-        await wait()
-        return provider('codex')
-      },
+      collectors: collectorsFor(
+        async () => {
+          markStarted()
+          await wait()
+          return provider('claude')
+        },
+        async () => {
+          markStarted()
+          await wait()
+          return provider('codex')
+        },
+      ),
     })
     const result = service.read({ userId: 'james' })
     await allStarted
@@ -73,8 +86,7 @@ describe('agent usage service', () => {
       probeDir: await probeDir(),
       ttlMs: 100,
       now: () => clock,
-      claude: async () => provider('claude', ++calls),
-      codex: async () => provider('codex'),
+      collectors: collectorsFor(async () => provider('claude', ++calls), async () => provider('codex')),
     })
     const first = service.read({ userId: 'james' })
     const joined = service.read({ userId: 'james', force: true })
@@ -92,11 +104,13 @@ describe('agent usage service', () => {
     let failClaude = false
     const service = createAgentUsageService({
       probeDir: await probeDir(),
-      claude: async () => {
-        if (failClaude) throw new UsageProcessError('timeout', 'Claude timed out.')
-        return provider('claude', 72)
-      },
-      codex: async () => provider('codex', 44),
+      collectors: collectorsFor(
+        async () => {
+          if (failClaude) throw new UsageProcessError('timeout', 'Claude timed out.')
+          return provider('claude', 72)
+        },
+        async () => provider('codex', 44),
+      ),
     })
     await service.read({ userId: 'james' })
     failClaude = true
@@ -114,10 +128,12 @@ describe('agent usage service', () => {
   it('uses missing availability for an unavailable CLI without hiding the other provider', async () => {
     const service = createAgentUsageService({
       probeDir: await probeDir(),
-      claude: async () => {
-        throw new UsageProcessError('cli_missing', 'claude missing')
-      },
-      codex: async () => provider('codex'),
+      collectors: collectorsFor(
+        async () => {
+          throw new UsageProcessError('cli_missing', 'claude missing')
+        },
+        async () => provider('codex'),
+      ),
     })
     const snapshot = await service.read({ userId: 'james' })
     expect(snapshot.providers[0]).toMatchObject({ provider: 'claude', availability: 'missing', error: { code: 'cli_missing' } })
@@ -139,8 +155,7 @@ describe('agent usage service', () => {
           }],
         },
       }),
-      claude: async () => provider('claude', ++calls),
-      codex: async () => provider('codex'),
+      collectors: collectorsFor(async () => provider('claude', ++calls), async () => provider('codex')),
     })
 
     await service.read({ userId: 'james' })

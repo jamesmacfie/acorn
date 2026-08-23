@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
-import { keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
+import { harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
 
 // The permission diff the update prompt shows is a set-difference over the grant keys, so the wording
 // is free to change and the identifier is what has to stay stable. That makes this a contract test on
@@ -187,5 +187,55 @@ describe('frame key claims', () => {
     })
     expect(grants).toEqual([{ surface: 'editor', label: 'Editor', chords: ['meta+f'] }])
     expect(texts(keyClaimPermissionLines(grants))).toEqual(['Handle ⌘F in the "Editor" surface'])
+  })
+})
+
+describe('the harness grant', () => {
+  const contributions = (harnesses: unknown[]) => ({ frames: [], harnesses } as never)
+
+  it('names the program acorn will run and what it carries into it', () => {
+    const lines = harnessPermissionLines(harnessGrants(contributions([
+      {
+        id: 'opencode',
+        label: 'OpenCode',
+        spawn: { command: 'opencode', args: ['acp'] },
+        envPassthrough: ['OPENCODE_*'],
+      },
+      {
+        id: 'gemini',
+        label: 'Gemini',
+        spawn: { entry: 'dist/adapter.js', args: [] },
+        envPassthrough: [],
+      },
+    ])))
+
+    expect(texts(lines)).toEqual([
+      'Run JavaScript this package ships (dist/adapter.js) as the “Gemini” agent',
+      'Run “opencode acp” as the “OpenCode” agent and pass it OPENCODE_* from this node’s environment',
+    ])
+    // The strongest fact a package can state about itself, so it is the one an owner is nudged to read.
+    expect(lines.every((line) => line.high)).toBe(true)
+  })
+
+  it('reads a changed binary, changed arguments or a widened environment as newly requested', () => {
+    const before = harnessGrants(contributions([
+      { id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] },
+    ]))
+    const keys = new Set(harnessPermissionLines(before).map((line) => line.key))
+    const isNew = (harness: unknown) =>
+      harnessPermissionLines(harnessGrants(contributions([harness]))).every((line) => !keys.has(line.key))
+
+    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] })).toBe(false)
+    // A label edit is a copy edit, not a widening: the sentence changes and the key does not.
+    expect(isNew({ id: 'h', label: 'OpenCode', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: [] })).toBe(false)
+    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'curl', args: ['acp'] }, envPassthrough: [] })).toBe(true)
+    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp', '--yolo'] }, envPassthrough: [] })).toBe(true)
+    expect(isNew({ id: 'h', label: 'H', spawn: { command: 'opencode', args: ['acp'] }, envPassthrough: ['AWS_*'] })).toBe(true)
+  })
+
+  it('discloses nothing for a spawn the node already refused', () => {
+    // The node rejected this at parse, so it can never run, and a consent line about a grant that cannot
+    // exist is noise in the one list that must not have any.
+    expect(harnessGrants(contributions([{ id: 'h', label: 'H', spawn: { args: [] }, envPassthrough: [] }]))).toEqual([])
   })
 })

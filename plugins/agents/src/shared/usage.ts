@@ -1,7 +1,11 @@
 export const agentUsageRoute = '/v2/p/agents/usage'
 export const agentUsageRefreshRoute = '/v2/p/agents/usage/refresh'
 
-export type AgentUsageProviderId = 'claude' | 'codex'
+// A harness id, not a member of a closed set. It was `'claude' | 'codex'` until harnesses became a
+// contribution point (docs/managed-agents.md § Harnesses); the durable model in
+// @acorn/protocol/managedAgents.ts always kept `providerId` a plain string, and this is the edge
+// catching up with it.
+export type AgentUsageProviderId = string
 export type AgentUsageHealth = 'healthy' | 'warning' | 'critical' | 'depleted' | 'unknown'
 export type AgentUsageAvailability = 'available' | 'missing' | 'error'
 
@@ -63,6 +67,11 @@ export type AgentUsageError = {
 
 export type AgentProviderUsage = {
   provider: AgentUsageProviderId
+  // How the harness is named and drawn, stamped on by the usage service from the collector's
+  // registration. Here rather than looked up on the client, because a usage row has to be able to name
+  // itself without cross-referencing the provider descriptor list from a different store.
+  label: string
+  glyph?: string
   availability: AgentUsageAvailability
   health: AgentUsageHealth
   plan: string | null
@@ -74,6 +83,11 @@ export type AgentProviderUsage = {
   stale: boolean
   error: AgentUsageError | null
 }
+
+// What a collector answers, which is everything about the reading and nothing about the naming: the
+// harness's label and glyph come from its registration and are stamped on by the service
+// (main/usage/service.ts), so a probe never repeats its own id.
+export type AgentProviderUsageReading = Omit<AgentProviderUsage, 'label' | 'glyph'>
 
 export type AgentUsageSnapshot = {
   providers: AgentProviderUsage[]
@@ -116,11 +130,13 @@ export function sessionQuota(provider: AgentProviderUsage): AgentUsageQuota | un
 
 export function emptyProviderUsage(
   provider: AgentUsageProviderId,
+  label: string,
   availability: Exclude<AgentUsageAvailability, 'available'>,
   error: AgentUsageError,
 ): AgentProviderUsage {
   return {
     provider,
+    label,
     availability,
     health: 'unknown',
     plan: null,

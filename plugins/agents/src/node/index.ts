@@ -1,14 +1,18 @@
-import { agentProfileRegistry, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
-import { ClaudeAgentDriver } from '../main/drivers/claudeDriver'
+import { claudeHarness } from '../main/drivers/claudeHarness'
 import { CodexAgentDriver } from '../main/drivers/codexDriver'
 import { agentDriverRegistry } from '../main/drivers/registry'
+import { createHarnessRegistry } from '../main/harnessRegistry'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../main/pricingStore'
 import { ManagedAgentRuntime } from '../main/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { createSessionExecute } from '../main/sessionExecute'
+import { agentUsageCollectors } from '../main/usage/collectors'
+import { collectClaudeUsage } from '../main/usage/claudeUsage'
+import { collectCodexUsage } from '../main/usage/codexUsage'
 import { createAgentUsageService } from '../main/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
@@ -21,16 +25,44 @@ export function registerBuiltInProfiles(): void {
   builtInProfileDisposables = [claudeCodeProfile, codexProfile, aiderProfile].map((profile) => agentProfileRegistry.register(profile))
 }
 
-// Guards against a duplicate-registration error, not per-boot state: `apps/node/src/service/runtime.test.ts`
-// starts the runtime several times in one process (docs/plugins.md § Collaboration rules), and the driver
-// registry throws on a repeat id. A driver factory is stateless, so nothing else needs resetting between
-// boots.
-let driversRegistered = false
+// The two built-in harnesses, one per tier (docs/managed-agents.md § Harnesses). Claude is a launch
+// spec run by the shared generic driver; Codex keeps a native driver, because its app-server carries
+// fork, compaction, archive and delete, and ACP expresses none of them.
+//
+// Released in `dispose` like the profiles beside them. This used to be guarded by a module-level
+// boolean instead, which papered over a double boot — `apps/node/src/service/runtime.test.ts` starts
+// the runtime several times in one process — by keeping the first boot's factories forever.
+let builtInDriverDisposables: (() => void)[] | null = null
 function registerBuiltInDrivers(): void {
-  if (driversRegistered) return
-  driversRegistered = true
-  agentDriverRegistry.register('claude', () => new ClaudeAgentDriver())
-  agentDriverRegistry.register('codex', () => new CodexAgentDriver())
+  if (builtInDriverDisposables) return
+  builtInDriverDisposables = [
+    agentDriverRegistry.register(claudeHarness),
+    agentDriverRegistry.registerNative('codex', () => new CodexAgentDriver()),
+  ]
+}
+
+// The two built-in plan-usage probes, one per built-in harness. They register beside the drivers rather
+// than inside the usage service, because the service holds a registry now and a harness contributed by a
+// plugin feeds it through the same door (main/usage/collectors.ts).
+//
+// `probeDir` is bound at init, when the data root is known, so this takes it as a parameter.
+let builtInCollectorDisposables: (() => void)[] | null = null
+function registerBuiltInUsageCollectors(probeDir: string): void {
+  if (builtInCollectorDisposables) return
+  builtInCollectorDisposables = [
+    agentUsageCollectors.register({
+      provider: claudeHarness.id,
+      label: claudeHarness.label,
+      ...(claudeHarness.glyph ? { glyph: claudeHarness.glyph } : {}),
+      collect: (pricing) => collectClaudeUsage({ probeDir, pricing }),
+    }),
+    agentUsageCollectors.register({
+      provider: 'codex',
+      label: 'Codex',
+      glyph: '⌘',
+      collect: () => collectCodexUsage({ cwd: probeDir }),
+    }),
+  ]
 }
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
@@ -49,6 +81,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let runtime: ManagedAgentRuntime | null = null
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
+  let harnessRoute: { dispose(): void } | null = null
   return {
     name: 'agents',
     required: true,
@@ -107,14 +140,21 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // Local provider usage (the CLI plan probes) plus the pricing overrides it costs against. The
       // probe directory is under the data root, beside the plugin's SQLite file, and the pricing read
       // goes through `CoreServices.prefs` because `prefs` is core's table (main/pricingStore.ts).
+      const probeDir = join(dataDir, 'agent-usage-probe')
+      registerBuiltInUsageCollectors(probeDir)
       usageRoute = ctx.capabilities.provide(AGENT_USAGE, {
         ...createAgentUsageService({
-          probeDir: join(dataDir, 'agent-usage-probe'),
+          probeDir,
           pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
         }),
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),
         setPricing: (userId, preferences) => writeAgentPricingPreferences(core.prefs, userId, preferences),
       })
+
+      // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The delivery seam in the plugin host
+      // resolves this per contributed harness, so a node with agents disabled simply drops them and
+      // re-enabling redelivers.
+      harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing — account-scoped provider usage' })
@@ -153,8 +193,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       runtime = null
       managedRoute?.dispose()
       usageRoute?.dispose()
+      harnessRoute?.dispose()
       for (const dispose of builtInProfileDisposables ?? []) dispose()
       builtInProfileDisposables = null
+      for (const dispose of builtInDriverDisposables ?? []) dispose()
+      builtInDriverDisposables = null
+      for (const dispose of builtInCollectorDisposables ?? []) dispose()
+      builtInCollectorDisposables = null
     },
   }
 }

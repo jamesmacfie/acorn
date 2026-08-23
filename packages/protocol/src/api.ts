@@ -372,6 +372,24 @@ export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence 
 // now does something.
 export type PluginTaskCheckGrant = { id: string; cleansUp: boolean }
 
+// The sixth grant, and the only one under `Enforced` that names a program: a managed agent harness this
+// package asks acorn to run (docs/managed-agents.md § Harnesses). It belongs in the strong group because
+// the claim is exact — the host spawns the declared command with the declared args and nothing else —
+// which is also why the whole spawn is in the key. A version that starts running a different binary, or
+// carrying more of the node's environment into it, is the change an update prompt must never let past
+// unremarked.
+export type PluginHarnessGrant = {
+  id: string
+  label: string
+  // `command` is an executable off PATH; `entry` is JavaScript this package ships, run with the node
+  // service's own binary. Two different facts about a package, so the line says which.
+  kind: 'command' | 'entry'
+  // The command line, or the package-relative entry path, with its declared arguments.
+  run: string
+  // Config variables carried from the node's environment into the agent, by name or glob.
+  env: string[]
+}
+
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route serves,
 // because the host renders these (docs/architecture-overview.md § Who owns which contract).
 // Re-exported from @acorn/plugin-api so a plugin's node half types its handlers against the same

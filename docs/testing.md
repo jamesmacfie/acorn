@@ -92,6 +92,10 @@ build, and nothing ships to a person until it passes (docs/shell.md § Signing g
 6. Open a loaded plugin's webview surface; a link to a host its manifest does not name is refused.
 7. Trigger the quit flow with an active agent; the concern prompt appears; quit drains cleanly.
 8. Kill the node process five times; the recovery screen appears on the sixth.
+9. Install a data-only harness plugin against an agent CLI on the machine; the trust prompt names the
+   command under `Enforced`, and after approving it the agent appears in the Agent Center and completes
+   a turn. Nothing automated can cover this one: the suites can prove the descriptor reaches the driver
+   registry, and only a real CLI can prove the transcript.
 
 ## Composition-root tests
 

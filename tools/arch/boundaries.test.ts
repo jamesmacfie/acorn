@@ -233,7 +233,7 @@ describe('architecture boundaries', () => {
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/main/terminal.ts', // PTYs
       'plugins/agents/src/main/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
-      'plugins/agents/src/main/drivers/claudeDriver.ts',
+      'plugins/agents/src/main/drivers/acpDriver.ts', // the generic ACP driver, one process per session
       'plugins/agents/src/main/drivers/codexDriver.ts',
       'plugins/agents/src/main/drivers/authProbe.ts',
       'plugins/agents/src/main/usage/codexUsage.ts',

@@ -1,4 +1,4 @@
-import type { PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from './api'
+import type { PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from './api'
 import { isCoreExclusiveSlot, parseExtensionPointRef, qualifiedExtensionPointId } from './extensionPoints'
 import { isPluginKeyClaim } from './keybindings'
 import { normalizeWebviewHost } from './webview'
@@ -62,6 +62,29 @@ export const pluginScheduleGrants = (contributions: PluginContributions): Plugin
 export const pluginTaskCheckGrants = (contributions: PluginContributions): PluginTaskCheckGrant[] =>
   (contributions.taskChecks ?? [])
     .map((check) => ({ id: check.id, cleansUp: check.apply !== undefined }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+/** What this package asks acorn to run as a managed agent, and what it carries into it. See
+ *  docs/managed-agents.md § Harnesses. Unlike a schedule or a task check, the route is not the
+ *  interesting part and there is none: the whole grant is the program and its environment.
+ *
+ *  A descriptor declaring neither a command nor an entry is dropped rather than disclosed, exactly as an
+ *  unparseable extension reference is: the node refused it at parse, so it can never run, and a consent
+ *  line about a grant that cannot exist is noise in the one list that must not have any. */
+export const pluginHarnessGrants = (contributions: PluginContributions): PluginHarnessGrant[] =>
+  (contributions.harnesses ?? [])
+    .flatMap((harness): PluginHarnessGrant[] => {
+      const args = (harness.spawn.args ?? []).join(' ')
+      const target = harness.spawn.command ?? harness.spawn.entry
+      if (!target) return []
+      return [{
+        id: harness.id,
+        label: harness.label,
+        kind: harness.spawn.command ? 'command' : 'entry',
+        run: args ? `${target} ${args}` : target,
+        env: [...new Set(harness.envPassthrough ?? [])].sort(),
+      }]
+    })
     .sort((a, b) => a.id.localeCompare(b.id))
 
 export const pluginKeyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>

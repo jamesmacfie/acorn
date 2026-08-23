@@ -29,6 +29,12 @@ export type { TaskConcern } from '@acorn/node-core/server/plugin/taskChecks.ts'
 // passes `ctx.core` onward, so `NodePluginContext` never had to be named on this surface.
 export { PLUGIN_API_MAJOR } from '@acorn/node-core/main/pluginManifest.ts'
 export { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
+export type { Disposable } from '@acorn/node-core/server/plugin/capabilities.ts'
+// The managed agent harness seam (docs/managed-agents.md § Harnesses). The capability id and its shape
+// live in node-core rather than in the agents plugin, because the host is what delivers a
+// manifest-declared harness and neither package may import the other.
+export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/plugin/harnesses.ts'
+export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/plugin/harnesses.ts'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'

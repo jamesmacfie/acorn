@@ -98,6 +98,9 @@ export type AgentProviderDescriptor = {
   id: string
   profileId: string
   label: string
+  // A Lucide name or a `brand:` mark for the harness, drawn wherever a surface names it. Optional: the
+  // Icon resolver renders an unmatched name as text, which is what a one-character glyph relies on.
+  glyph?: string
   driverKind: 'acp' | 'codex-app-server' | 'terminal'
   driverVersion: string
   installed: boolean

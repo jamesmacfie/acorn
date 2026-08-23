@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import type { AgentProviderUsage, AgentUsageQuota } from '../../shared/usage'
+import type { AgentProviderUsageReading, AgentUsageQuota } from '../../shared/usage'
 import { clampRemaining, usageHealth, worstUsageHealth } from '../../shared/usage'
 import {
   capturePty,
@@ -175,7 +175,7 @@ function quota(
   }
 }
 
-export function parseCodexRpcResponse(message: unknown, capturedAt = Date.now()): AgentProviderUsage {
+export function parseCodexRpcResponse(message: unknown, capturedAt = Date.now()): AgentProviderUsageReading {
   const root = asObject(message)
   const result = asObject(root?.result)
   const rateLimits = asObject(result?.rateLimits)
@@ -236,7 +236,7 @@ function ttyPercent(label: RegExp, lines: readonly string[]): number | null {
   return null
 }
 
-export function parseCodexTtyOutput(text: string, capturedAt = Date.now()): AgentProviderUsage {
+export function parseCodexTtyOutput(text: string, capturedAt = Date.now()): AgentProviderUsageReading {
   const classified = classifyCodexOutput(text)
   if (classified) throw classified
   const lines = text.split(/\r?\n/)
@@ -266,7 +266,7 @@ export function parseCodexTtyOutput(text: string, capturedAt = Date.now()): Agen
   }
 }
 
-export async function collectCodexUsage(options: CodexUsageOptions): Promise<AgentProviderUsage> {
+export async function collectCodexUsage(options: CodexUsageOptions): Promise<AgentProviderUsageReading> {
   const now = options.now ?? Date.now
   try {
     return parseCodexRpcResponse(await readCodexRateLimitsViaRpc(options.startRpc), now())

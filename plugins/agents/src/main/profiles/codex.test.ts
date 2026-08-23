@@ -7,7 +7,7 @@ import { codexProfile } from './codex'
 
 describe('the codex profile', () => {
   it('declares the identity terminal and workflows resolve it by', () => {
-    // `id` is persisted; see docs/managed-agents.md § Providers.
+    // `id` is persisted; see docs/managed-agents.md § Harnesses.
     expect(codexProfile).toMatchObject({ id: 'codex', label: 'Codex', kind: 'agent', command: 'codex', transport: 'pty' })
   })
 

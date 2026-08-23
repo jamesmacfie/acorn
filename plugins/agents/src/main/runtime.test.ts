@@ -225,7 +225,7 @@ describe('managed agent runtime conformance', () => {
   it('persists a provider transcript before publishing ordered events', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
-    registry.register('fake', () => new FakeAgentDriver())
+    registry.registerNative('fake', () => new FakeAgentDriver())
     const published: number[] = []
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
@@ -269,7 +269,7 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
     const driver = new FailingStartDriver()
-    registry.register(driver.providerId, () => driver)
+    registry.registerNative(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
       dataDir,
@@ -356,7 +356,7 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
     const driver = new FailingStartDriver()
-    registry.register(driver.providerId, () => driver)
+    registry.registerNative(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
       dataDir,
@@ -464,7 +464,7 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
     const driver = new RequestDriver()
-    registry.register(driver.providerId, () => driver)
+    registry.registerNative(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
       dataDir,
@@ -503,7 +503,7 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
     const driver = new SafeRetryDriver()
-    registry.register(driver.providerId, () => driver)
+    registry.registerNative(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
       dataDir,
