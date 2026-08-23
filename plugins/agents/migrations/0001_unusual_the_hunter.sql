@@ -1,0 +1,1 @@
+ALTER TABLE `agent_sessions` ADD `subagents_json` text;

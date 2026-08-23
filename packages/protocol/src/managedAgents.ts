@@ -165,12 +165,49 @@ export type AgentToolCall = {
   parentId?: string
   title: string
   kind?: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  /** Absent means "unchanged": a provider update that only carries output must not drag a finished
+   *  call back to running. The transcript projection folds a call's updates and keeps the last
+   *  status that was actually reported. */
+  status?: 'pending' | 'running' | 'completed' | 'failed'
   input?: string
   output?: string
   outputAppend?: boolean
   paths?: string[]
+  /** The subagent that ran this call, when a harness attributes it (see AgentSubagent). */
+  subagentId?: string
 }
+
+export type AgentSubagentStatus = 'pending' | 'running' | 'idle' | 'completed' | 'failed'
+
+/**
+ * One subagent a session spawned, as a projection rather than a session row of its own: a subagent is
+ * not something you can address, resume, or send a turn to, so making it a session would be a lie in
+ * every table that reads one. docs/managed-agents.md, section Subagents, states the model.
+ *
+ * `id` is whatever the harness makes stable from the moment the subagent starts, which differs by
+ * harness: Claude's spawning tool call, Codex's child thread. `providerAgentRef` is the harness's own
+ * handle, which on both is a resumable one but arrives at different times.
+ */
+export type AgentSubagent = {
+  id: string
+  turnId: string | null
+  title: string
+  status: AgentSubagentStatus
+  /** What kind of subagent it is: Claude's `agentType`, Codex's agent path segment. */
+  role?: string
+  model?: string
+  providerAgentRef?: string
+  usage?: AgentUsage
+  toolUseCount?: number
+  durationMs?: number
+  startedAt: number
+  updatedAt: number
+}
+
+/** A subagent update. Absent means unchanged, the same convention AgentToolCall.status follows, so a
+ *  harness that only learns the model at completion does not wipe the title it reported at spawn. */
+export type AgentSubagentUpdate =
+  Partial<Omit<AgentSubagent, 'id' | 'startedAt' | 'updatedAt'>> & { id: string }
 
 export type AgentArtifact = {
   id: string
@@ -194,9 +231,10 @@ export type AgentNormalizedEvent =
   | { type: 'session_state'; state: AgentRuntimeState; detail?: string }
   | { type: 'session_metadata'; providerSessionRef?: string; configOptions?: AgentConfigOption[]; commands?: AgentCommandDescriptor[]; skills?: AgentSkillDescriptor[] }
   | { type: 'user_message'; text: string }
-  | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean }
-  | { type: 'reasoning'; text: string; messageId?: string; append?: boolean }
+  | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean; subagentId?: string }
+  | { type: 'reasoning'; text: string; messageId?: string; append?: boolean; subagentId?: string }
   | { type: 'tool'; tool: AgentToolCall }
+  | { type: 'subagent'; subagent: AgentSubagentUpdate }
   | { type: 'plan'; entries: AgentPlanEntry[] }
   | { type: 'usage'; usage: AgentUsage }
   | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[] }
@@ -226,6 +264,9 @@ export type AgentSession = {
   config: Record<string, unknown>
   parentSessionId: string | null
   parentTurnId: string | null
+  /** Projected from the session's own `subagent` events by the repository, so every surface that reads
+   *  a session row sees the live roster without loading its transcript. */
+  subagents: AgentSubagent[]
   lastEventSeq: number
   lastReadSeq: number
   archivedAt: number | null
@@ -314,6 +355,8 @@ export const agentEventSearchText = (event: AgentNormalizedEvent): string | null
       return event.text
     case 'tool':
       return [event.tool.title, event.tool.input, event.tool.output, ...(event.tool.paths ?? [])].filter(Boolean).join(' ')
+    case 'subagent':
+      return [event.subagent.title, event.subagent.role].filter(Boolean).join(' ') || null
     case 'file_change':
       return [event.path, event.summary].filter(Boolean).join(' ')
     case 'artifact':

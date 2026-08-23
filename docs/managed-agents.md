@@ -90,11 +90,74 @@ are not stored by the model-provider plugin. Plan usage is per harness: the buil
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
 
+## Subagents
+
+Both managed harnesses can delegate to a subagent, and a subagent is **not** a session. It cannot be
+addressed, sent a turn, forked, or handed to a terminal, so making it a session row would be a lie in
+every table that reads one. It is a projection instead: each session's row carries a `subagents`
+roster, folded from that session's own `subagent` events by `recordEvent`, in the same transaction as
+the event insert. The runtime already broadcasts a session row after every event it records, and agent
+frames are pushed to every client rather than subscribed to per id, so the task sidebar's indented
+sub-rows appear and settle live for every session in the task, not only the open one, and nothing extra
+is fetched. The roster keeps every in-flight entry plus the last 20 settled ones; the full history stays
+in the event ledger, which is what the transcript reads.
+
+A subagent's own progress never touches its session's runtime state. Turn boundaries own that, and a
+child that settles after its parent's turn completed — which Codex allows — would otherwise drag the
+session back out of ready.
+
+The two harnesses report a subagent very differently, and the roster shows what each actually sent
+rather than a fixed set of columns with gaps in it.
+
+| | Claude Code | Codex |
+| --- | --- | --- |
+| What a subagent is | a tool call, `Agent` (formerly `Task`) | a full app-server thread on the same connection |
+| Registration | `_meta.claudeCode.toolName` | a parent-side `subAgentActivity` item |
+| Roster key | the spawning tool call id | the child thread id |
+| Live inner tool calls | yes, tagged `_meta.claudeCode.parentToolUseId` | yes, on the child thread |
+| Live inner prose | no, the CLI does not forward it | yes |
+| Live usage | no | the child's own `thread/tokenUsage/updated` |
+| At completion | `_meta.claudeCode.toolResponse`: agent id, type, model, tokens, tool uses, duration | nothing extra |
+| Terminal state | completed | idle, and still resumable |
+
+Reading Claude's `_meta.claudeCode` namespace in the shared ACP normalizer is deliberate rather than a
+harness quirk: another harness's namespace is simply absent, so the branch costs nothing, and a quirk
+joins `HarnessQuirks` when a *second* harness needs one.
+
+Codex needs real routing, and it is the highest-blast-radius code in that driver, because a child's
+`turn/completed` on the parent path ends the parent's turn and a child's status flips the parent's
+runtime state mid-turn. `drivers/codexChildRouting.ts` owns it, keyed on the root thread id the driver
+learns from `thread/start`: anything naming another thread is that subagent's, registered on first
+sight. That is stricter than passing an unrecognised thread through, and it is what makes the observed
+ordering harmless — a child's traffic arrives *before* the item that names it. Routing asks which
+thread a notification arrived on; naming asks what the item's `agentThreadId` says. Conflating the two
+is how another implementation hung a session forever, because the wire reports `subAgentActivity` about
+the root itself, from a child thread. An unknown method from a child goes to the parent, so a Codex
+release that adds a notification degrades to "the parent sees it" rather than to silent loss.
+
+Both routing tables are pinned against real captures in
+`plugins/agents/src/main/drivers/testFixtures/`, not hand-written shapes: an extension field can only
+be tested against what the harness actually sent.
+
 ## Client surfaces
 
 - Agent Center aggregates sessions, search, provider health, attention, transcript import, and launch.
 - The Agent pane shows the current transcript, composer, queue, context, requests, artifacts, and a
   same-task roster.
+- A tool call is one card, no matter how many updates a provider sends for it. The event ledger still
+  stores a row per update, which is what replay and any later timing question read; the transcript
+  folds those rows by turn and tool id, so a command shows one panel whose status and output change in
+  place. Output sits behind a disclosure toggle that is open while the call is running, and a call with
+  neither output nor a path renders as a flat row instead, so no card opens onto nothing. A provider
+  reports a status only when it changes, so an update carrying nothing but output leaves the last
+  reported status alone.
+- Usage folds the same way, one line per turn. A turn's last usage update can arrive after the turn is
+  marked complete and so carries no turn id; it updates the line it belongs to rather than starting
+  another. That is how a cost joins a line that started with only a context count.
+- A subagent is one card in the transcript, holding everything that subagent did, and one indented row
+  under its session in the task Agent sidebar. The card starts expanded and then stays where the reader
+  puts it, rather than collapsing itself the moment the subagent finishes, which is when somebody is
+  most likely to be reading it. Activating a sub-row opens its session and scrolls to its card.
 - Changing a provider config option — the model, the reasoning level, the permission profile — writes
   a row into the transcript, so reading back a session shows where the switch happened rather than
   leaving every later turn to be read under whatever the setting is now.
@@ -123,6 +186,10 @@ are revalidated against the owning task.
 Only one turn dispatches per session. Workspace/provider ceilings bound concurrency. Cancellation,
 timeout, provider disconnect, and restart are explicit states. A live stream can be lost without
 killing the provider process; the client reattaches from the session sequence or terminal replay tail.
+
+A provider's stderr goes to the node's log as a byte count, not to the transcript. The content is
+withheld from both because it can carry credentials, and a count the reader cannot act on does not
+belong in their conversation.
 
 Shutdown runs in the order that cannot resurrect what it just stopped: cancel every pending
 provider-reconnect timer first, since a live one would call `ensureSession` and repopulate a session

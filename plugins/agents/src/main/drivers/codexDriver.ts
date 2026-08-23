@@ -8,6 +8,7 @@ import type {
   AgentProviderDescriptor,
 } from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
+import { CodexChildRouter } from './codexChildRouting'
 import { asObject, codexServerRequestResponse, normalizeCodexNotification, normalizeCodexServerRequest } from './codexNormalizer'
 import { JsonRpcProcess, type JsonRpcServerRequest } from './jsonRpcProcess'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
@@ -134,6 +135,7 @@ export class CodexAgentDriver implements AgentDriver {
     let currentTurnId: string | null = null
     let ready = false
     const pendingRequests = new Map<string, JsonRpcServerRequest>()
+    const childRouter = new CodexChildRouter()
     let rpc!: JsonRpcProcess
 
     const onServerRequest = (request: JsonRpcServerRequest): void => {
@@ -158,19 +160,27 @@ export class CodexAgentDriver implements AgentDriver {
       // canUseProviderCredential and SecretService entirely.
       env: brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
       onNotification: (notification) => {
-        const events = normalizeCodexNotification(notification)
-        for (const event of events) {
+        // Routed before it is normalized as the session's own. A Codex subagent is a full app-server
+        // thread on this same connection, so an unrouted child `turn/completed` would end the parent's
+        // turn and an unrouted child status would flip the parent's state (drivers/codexChildRouting.ts
+        // states the hazards and the capture they came from).
+        const routed = childRouter.route(notification)
+        if (routed.to === 'subagent') {
+          for (const event of routed.events) void options.onEvent(event)
+          return
+        }
+        for (const event of normalizeCodexNotification(notification)) {
           if (event.type === 'session_state') ready = event.state === 'ready'
           if (event.type === 'turn_completed' || event.type === 'error') currentTurnId = null
           void options.onEvent(event)
         }
       },
       onRequest: onServerRequest,
-      onStderr: (line) => void options.onEvent({
-        type: 'diagnostic',
-        level: 'warning',
-        message: providerStderrNotice('Codex app-server', Buffer.byteLength(line, 'utf8')),
-      }),
+      // The node's log rather than the transcript: a byte count the reader cannot act on is not part of
+      // the conversation.
+      onStderr: (line) => console.warn(
+        `[agents:provider] ${providerStderrNotice('Codex app-server', Buffer.byteLength(line, 'utf8'))}`,
+      ),
       onClosed: (error) => void options.onClosed(error),
     })
 
@@ -223,6 +233,9 @@ export class CodexAgentDriver implements AgentDriver {
       await rpc.stop()
       throw new Error('Codex did not return a thread id.')
     }
+    // The router answers "is this the parent's?" by comparing against this id, so nothing counts as a
+    // child until it is set. Whatever arrived during the handshake was the parent's by definition.
+    childRouter.setRootThread(threadId)
 
     const [models, permissionProfiles, skills] = await Promise.all([
       rpc.request('model/list', { limit: 100, includeHidden: false }).catch(() => null),

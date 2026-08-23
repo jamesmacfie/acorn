@@ -15,7 +15,7 @@ describe('provider diagnostics', () => {
     expect(message).toContain('<redacted>')
   })
 
-  it('does not persist raw provider stderr', () => {
+  it('reports a byte count instead of raw provider stderr', () => {
     expect(providerStderrNotice('Codex', 123)).toBe(
       'Codex wrote 123 bytes to its diagnostic stream; content was redacted.',
     )

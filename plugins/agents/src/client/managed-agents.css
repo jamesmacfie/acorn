@@ -192,7 +192,18 @@
 .agent-reasoning > summary,
 .agent-tool > summary { cursor: pointer; color: var(--text-muted); }
 .agent-reasoning > summary span { margin-left: var(--space-2); color: var(--text-faint); font-size: var(--fs-2xs); font-weight: 400; }
-.agent-tool > summary { display: flex; align-items: center; gap: var(--space-3); }
+/* The house disclosure classes (.ui-fold) carry the marker and the flex row. A hand-rolled
+   `display: flex` on the summary used to drop the marker entirely, so an expandable card looked
+   exactly like an inert one. A card with nothing to expand has no summary at all, and pads to the
+   marker's width so its dot still lines up with its neighbours. */
+.agent-tool-flat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: calc(var(--space-5) + var(--marker-w) + var(--space-3));
+  color: var(--text-muted);
+}
+.agent-tool-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-path-link.ui-btn {
   margin: var(--space-2) var(--space-2) 0 0;
   color: var(--accent);
@@ -201,6 +212,35 @@
   font: var(--fs-sm) var(--font-mono);
   cursor: pointer;
 }
+/* A subagent's card. Bordered rather than tinted like a tool call, because it contains cards of its
+   own and a nested tint on a tint stops reading as a boundary. The left stripe is what says "this
+   run belongs to somebody else". */
+.agent-subagent {
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--control-border);
+  /* The stripe border role: --stripe-w is the semantic width for a left marker, the same one diff rows
+     and .ui-card[data-stripe] use (docs/ui-design.md § Border roles). A hard 2px here would ignore the
+     style pack. */
+  border-left: var(--stripe-w) solid var(--border-strong);
+}
+.agent-subagent[data-status='running'],
+.agent-subagent[data-status='pending'] { border-left-color: var(--accent); }
+.agent-subagent[data-status='failed'] { border-left-color: var(--danger); }
+.agent-subagent > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.agent-subagent-title { color: var(--text); font-weight: 500; }
+.agent-subagent > summary .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xs); }
+/* Nothing inside gets its own outer margin: the card already spaces its contents, and a first child
+   with a top margin puts a visible gap between the summary and the run it describes. */
+.agent-subagent-stream > .agent-event:first-child > * { margin-top: 0; }
+
 .agent-card-title { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
 .agent-plan ol { margin: var(--space-3) 0 0; padding-left: var(--space-6); }
 .agent-plan li[data-state='completed'] { color: var(--text-muted); text-decoration: line-through; }

@@ -447,7 +447,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       lines.push('## User', '', agentTurnInputText(turn), '')
       for (const event of snapshot.events.filter((item) => item.turnId === turn.id)) {
         if (event.event.type === 'assistant_message') lines.push(event.event.text)
-        else if (event.event.type === 'tool') lines.push(`- Tool: ${event.event.tool.title} — ${event.event.tool.status}`)
+        else if (event.event.type === 'tool') lines.push(`- Tool: ${event.event.tool.title} — ${event.event.tool.status ?? 'running'}`)
         else if (event.event.type === 'error') lines.push(`- Error: ${event.event.message}`)
       }
       lines.push('')

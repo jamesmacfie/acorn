@@ -29,6 +29,11 @@ export const agentSessions = sqliteTable(
     configJson: text('config_json').notNull().default('{}'),
     parentSessionId: text('parent_session_id'),
     parentTurnId: text('parent_turn_id'),
+    // The subagent roster, projected from this session's own `subagent` events by
+    // main/sessionRepository.ts. On the row rather than in a table of its own because the row is
+    // already broadcast to every client after every event, which is what makes the task sidebar's
+    // sub-rows live for sessions nobody has opened.
+    subagentsJson: text('subagents_json'),
     lastEventSeq: integer('last_event_seq').notNull().default(0),
     lastReadSeq: integer('last_read_seq').notNull().default(0),
     archivedAt: integer('archived_at'),

@@ -4,10 +4,22 @@ import { AGENT_PANE_ID } from './paneContribution'
 
 const [selectedByTask, setSelectedByTask] = createSignal<Record<string, string | undefined>>({})
 const [focusedRequestBySession, setFocusedRequestBySession] = createSignal<Record<string, string | undefined>>({})
+// Keyed by session rather than by task, so switching sessions in the sidebar and back returns to the
+// subagent you were reading instead of the top of the transcript.
+const [selectedSubagentBySession, setSelectedSubagentBySession] = createSignal<Record<string, string | undefined>>({})
 
 export const selectedManagedSession = (taskId: string): string | undefined => selectedByTask()[taskId]
 export const focusedManagedRequest = (sessionId: string): string | undefined =>
   focusedRequestBySession()[sessionId]
+export const selectedManagedSubagent = (sessionId: string): string | undefined =>
+  selectedSubagentBySession()[sessionId]
+
+// ponytail: one signal doing two jobs, the sidebar row's highlight and the transcript's scroll target.
+// Clicking the row that is already selected therefore does not re-scroll, which is fine because the
+// card is on screen by then. Add a nonce if a repeat click ever needs to mean "take me back there".
+export function selectManagedSubagent(sessionId: string, subagentId: string): void {
+  setSelectedSubagentBySession((current) => ({ ...current, [sessionId]: subagentId }))
+}
 
 export function selectManagedSession(taskId: string, sessionId: string): void {
   setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
@@ -21,12 +33,14 @@ export function clearManagedSession(taskId: string, expectedSessionId?: string):
     return next
   })
   if (!expectedSessionId) return
-  setFocusedRequestBySession((current) => {
-    if (!(expectedSessionId in current)) return current
-    const next = { ...current }
-    delete next[expectedSessionId]
-    return next
-  })
+  for (const clear of [setFocusedRequestBySession, setSelectedSubagentBySession]) {
+    clear((current) => {
+      if (!(expectedSessionId in current)) return current
+      const next = { ...current }
+      delete next[expectedSessionId]
+      return next
+    })
+  }
 }
 
 export function openManagedSession(taskId: string, sessionId: string, requestId?: string): void {

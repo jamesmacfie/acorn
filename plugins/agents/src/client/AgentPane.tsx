@@ -8,7 +8,9 @@ import {
   focusedManagedRequest,
   openManagedSession,
   selectManagedSession,
+  selectManagedSubagent,
   selectedManagedSession,
+  selectedManagedSubagent,
 } from './managedSelection'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from './AgentComposer'
@@ -405,7 +407,14 @@ export default function AgentPane(props: { task: Task }) {
             task={props.task}
             managedSessions={taskSessions()}
             selectedSessionId={selectedSessionId()}
+            selectedSubagentId={selectedSessionId() ? selectedManagedSubagent(selectedSessionId()!) : undefined}
             onSelectSession={(sessionId, requestId) => openManagedSession(props.task.id, sessionId, requestId)}
+            onSelectSubagent={(sessionId, subagentId) => {
+              // The session first: a sub-row under a session that is not the open one has to bring its
+              // parent's transcript up before there is a card to scroll to.
+              if (sessionId !== selectedSessionId()) openManagedSession(props.task.id, sessionId)
+              selectManagedSubagent(sessionId, subagentId)
+            }}
             onError={setError}
           />
         }
@@ -446,6 +455,7 @@ export default function AgentPane(props: { task: Task }) {
                       taskId={props.task.id}
                       snapshot={value()}
                       focusRequestId={focusedManagedRequest(session().id)}
+                      focusSubagentId={selectedManagedSubagent(session().id)}
                       onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
                     />
                     <QueuedAgentTurns
