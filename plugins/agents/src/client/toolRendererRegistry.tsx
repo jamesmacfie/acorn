@@ -32,10 +32,11 @@ const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
 // A disclosure with nothing behind it is worse than no disclosure: the reader clicks a card that opens
 // onto nothing. Providers report plenty of calls with neither output nor a path, so those render flat.
 const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
-  // Seeded from the call's state when the card first has something to show, then the reader's own, the
-  // way the subagent card does it. A reactive `open` closed every card the reader had opened as soon as
-  // the next event arrived, because the transcript rebuilds its rows on each snapshot. Seeding here
-  // rather than in the parent is what still opens a call whose output streams while it runs.
+  // Seeded from the call's state, then the reader's own, the way the subagent card does it. A reactive
+  // `open` would shut a card the moment its call finished, which is when somebody is most likely to be
+  // reading it. Seeding here rather than in the parent is what still opens a call whose output streams
+  // while it runs, and the card only holds that state for as long as it stays mounted — see the note on
+  // Show's children in AgentEventCard for what used to remount it on every event.
   const [open, setOpen] = createSignal(props.tool.status === 'running')
   return (
     <details

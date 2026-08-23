@@ -183,10 +183,9 @@ export default function AgentPane(props: { task: Task }) {
       managedAgentStore.removeSession(session.id)
       if (next) selectManagedSession(props.task.id, next.id)
       else clearManagedSession(props.task.id, session.id)
-      if (result.provider !== 'deleted') {
-        setError(result.provider === 'unsupported'
-          ? 'Local history was deleted. This provider does not expose remote deletion.'
-          : `Local history was deleted, but provider deletion failed: ${result.detail ?? 'unknown error'}`)
+      // ponytail: 'unsupported' is normal for most providers, so it is not worth a banner.
+      if (result.provider === 'failed') {
+        setError(`Local history was deleted, but provider deletion failed: ${result.detail ?? 'unknown error'}`)
       }
     }, false)
   }
