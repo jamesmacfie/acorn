@@ -1,6 +1,6 @@
 // What a plugin has to say about a task the owner is about to archive, and the cleanup they may opt
-// into (docs/plugins.md § Task checks: why this lives node-side, and why a concern carries no
-// callback).
+// into. See docs/plugins.md § Task checks for why this lives node-side and why a concern carries no
+// callback.
 import type { TaskArchiveConcern } from '@acorn/protocol/terminal.ts'
 import type { TaskRef } from '../../main/core'
 
@@ -16,31 +16,31 @@ export const APPLY_TIMEOUT_MS = 60_000
 const MESSAGE_MAX = 200
 const DETAIL_MAX = 300
 const LABEL_MAX = 80
-/** The dialog draws a list, not a file tree. Five is what fits above the buttons without the concern
- *  rows pushing the confirm out of reach; the rest is a count. */
+/** The dialog draws a list, not a file tree. Five fits above the buttons without pushing the confirm
+ *  out of reach. The rest is a count. */
 export const DETAILS_MAX = 5
 
 export type TaskConcern = {
   /** Unique within the check. The host qualifies it with the plugin and check ids before it leaves. */
   id: string
   message: string
-  /** The plugin's to declare, unlike a context-menu `tone` (docs/plugins.md § Task checks: this is a
-   *  claim about the plugin's own data, not a core resource). */
+  /** The plugin's to declare, unlike a context-menu `tone`. This is a claim about the plugin's own
+   *  data, not a core resource (docs/plugins.md § Task checks). */
   severity: 'warn' | 'danger'
   /** Up to five lines under the message: changed paths, container names. */
   details?: string[]
   /** What the plugin knows it did not send, so the host draws "+7 more" and no plugin has to invent
    *  that string for itself. */
   detailsMore?: number
-  /** Absent = advisory. Present = a checkbox, and `apply` runs if it is still ticked on confirm. A
-   *  concern that offers one from a check with no `apply` is refused below rather than drawn: a
-   *  checkbox that does nothing is worse than no checkbox. */
+  /** Absent means advisory. Present means a checkbox, and `apply` runs if it is still ticked on
+   *  confirm. A concern that offers one from a check with no `apply` is refused below rather than
+   *  drawn, because a checkbox that does nothing is worse than no checkbox. */
   action?: { label: string; checked: boolean }
 }
 
 export type TaskCheck = {
-  /** Unique within the plugin, and stable: it is half of the id the client hands back to say which
-   *  cleanups the owner accepted. */
+  /** Unique within the plugin, and stable: half of the id the client hands back to say which cleanups
+   *  the owner accepted. */
   id: string
   /** Answers for one task, or `null` when it has nothing to say, which is the common case and must
    *  stay cheap. The signal fires at CHECK_TIMEOUT_MS. */
@@ -53,7 +53,7 @@ export type TaskCheck = {
 export type RegisteredTaskCheck = TaskCheck & { pluginId: string }
 
 /** One concern on its way to the client. The wire shape is the protocol's, because the dialog is the
- *  consumer; what this module adds is the guarantee that `id` and `pluginId` were minted here and not
+ *  consumer. This module adds the guarantee that `id` and `pluginId` were minted here rather than
  *  read off a plugin's answer. */
 export type WireTaskConcern = TaskArchiveConcern
 
@@ -66,7 +66,7 @@ export const qualifiedConcernId = (pluginId: string, checkId: string, concernId:
 
 // A module singleton, like the route, collection and node-action registries beside it, with the same
 // lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (./host.ts § clearRegistrations). That is the disposal the old client seam did not have.
+// (./host.ts § clearRegistrations).
 const checks = new Map<string, RegisteredTaskCheck>()
 
 export function registerTaskCheck(check: RegisteredTaskCheck): void {
@@ -90,8 +90,8 @@ const text = (value: unknown, max: number): string | null =>
  *
  * Per-field rather than all-or-nothing, matching how the client sanitises plugin chrome
  * (client-core/plugins/chrome/data.ts): a concern with one unusable detail loses the detail, not the
- * warning. `null` means there is nothing here worth a row: no message, or a check that answered with
- * something that is not a concern at all.
+ * warning. `null` means nothing here is worth a row, either no message or an answer that is not a
+ * concern at all.
  */
 export function sanitizeConcern(pluginId: string, checkId: string, value: unknown, canApply: boolean): WireTaskConcern | null {
   if (!value || typeof value !== 'object') return null
@@ -127,10 +127,10 @@ export function sanitizeConcern(pluginId: string, checkId: string, value: unknow
  * One check, bounded and contained. Resolves to `null` for a check that was slow, threw, or answered
  * with something unusable. A plugin cannot stop the owner archiving a task by being broken.
  *
- * The deadline races the check rather than merely signaling an abort. The signal is a courtesy: a
- * check that watches it can stop early, but most checks ignore it, and an ignored signal would leave
- * this promise pending forever and hold the dialog open with it. The abandoned work still runs to
- * completion in the background; the deadline only guarantees that nobody is waiting for it.
+ * The deadline races the check rather than only signaling an abort. The signal is a courtesy: a check
+ * that watches it can stop early, but most ignore it, and an ignored signal leaves this promise
+ * pending forever and holds the dialog open with it. The abandoned work still runs to completion in
+ * the background, and the deadline only guarantees that nobody is waiting for it.
  */
 function runOne(check: RegisteredTaskCheck, task: TaskRef): Promise<WireTaskConcern | null> {
   return new Promise<WireTaskConcern | null>((resolve) => {
@@ -169,11 +169,11 @@ export async function collectTaskConcerns(task: TaskRef): Promise<WireTaskConcer
 /**
  * Run the cleanups the owner accepted, by qualified concern id.
  *
- * Ids are matched against the registry, never trusted as a route: an id naming a check this node does
+ * Ids are matched against the registry, never trusted as a route. An id naming a check this node does
  * not have is dropped, which is also what happens when the owner archives from a stale dialog after
- * disabling the plugin. Each apply is bounded and contained for the same reason a check is: a
- * cleanup that hangs must not hold the archive open. The names that failed come back so the caller
- * can report them instead of reporting a clean archive.
+ * disabling the plugin. Each apply is bounded and contained for the same reason a check is: a cleanup
+ * that hangs must not hold the archive open. The names that failed come back so the caller can report
+ * them instead of reporting a clean archive.
  */
 export async function applyTaskChecks(task: TaskRef, ids: readonly string[]): Promise<string[]> {
   const wanted = new Set(ids)
@@ -181,8 +181,8 @@ export async function applyTaskChecks(task: TaskRef, ids: readonly string[]): Pr
   for (const check of taskChecks()) {
     const prefix = `${key(check.pluginId, check.id)}:`
     if (!check.apply || ![...wanted].some((id) => id.startsWith(prefix))) continue
-    // Raced, not merely aborted, for the reason runOne states: an ignored signal would hold the
-    // archive open indefinitely, and the archive is the thing the owner asked for.
+    // Raced, not only aborted, for the reason runOne states: an ignored signal holds the archive open
+    // indefinitely, and the archive is what the owner asked for.
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<'timeout'>((resolve) => {

@@ -15,10 +15,9 @@ import { syncState } from '../../node/schema'
 // parallel REST calls (REST can't be aliased). Per-PR TTL skip means already-fresh PRs cost no
 // GitHub calls. Reuses the same mirror tables/logic as the single-PR routes (prMirror.ts).
 //
-// Not on the serve-then-revalidate engine (docs/caching.md): this is a multi-item prefetch that
-// always blocks and never serves-then-revalidates, since there is no single response resource to
-// hand back stale. It shares the engine's TTL (PULLS_STALE_AFTER_MS) but owns its own per-item
-// freshness gate below.
+// Not on the serve-then-revalidate engine (docs/caching.md). A multi-item prefetch has no single
+// response resource to hand back stale, so this always blocks. It shares the engine's TTL
+// (PULLS_STALE_AFTER_MS) and owns the per-item freshness gate below.
 const MAX_BATCH = 10 // bounds the GraphQL query size; the client sends ~5
 const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
   value === 'full' || value === 'summary' || value === 'none'

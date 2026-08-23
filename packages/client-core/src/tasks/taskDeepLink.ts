@@ -6,18 +6,16 @@ import { taskPath } from '../registries/corePaths'
 
 // Deep-linking into a task's panes.
 //
-// A task's URL is `/t/:taskId` and stays that way. The panes are a left-to-right row with focus
-// and maximise state, persisted per task (tasks/tasks.ts): a URL that tried to own that would
-// either be enormous or wrong the moment the owner moved a pane. What is worth an address is the
-// thing `PaneIntent` already models: open this pane, select this item.
+// A task's URL stays `/t/:taskId`. The panes are a row with focus and maximise state persisted per
+// task (tasks/tasks.ts), and a URL that owned that would be enormous or wrong the moment the owner
+// moved a pane. What is worth an address is what `PaneIntent` already models: open this pane,
+// select this item.
 //
-// So the intent rides as query params, `/t/:taskId?pane=linear&item=ENG-404`, and is consumed
-// once, then stripped. Stripping matters: leaving them in the URL would leave it asserting a pane
-// the owner has since navigated away from, and the layout restores itself from its own persisted
-// state anyway.
+// So the intent rides as query params, `/t/:taskId?pane=linear&item=ENG-404`, is consumed once,
+// then stripped. Left in, the URL would keep asserting a pane the owner has navigated away from.
 //
-// This is what turns `openPluginContentTarget` (registries/contentLinks.ts) from a fire-and-forget
-// event into something with an address. Every pane plugin gets it without contributing a route.
+// This gives `openPluginContentTarget` (registries/contentLinks.ts) an address. Every pane plugin
+// gets it without contributing a route.
 
 export const TASK_PANE_PARAM = 'pane'
 export const TASK_ITEM_PARAM = 'item'
@@ -44,9 +42,9 @@ export function createTaskDeepLink(options: TaskDeepLinkOptions): void {
   createEffect(on(
     () => {
       const taskId = options.taskId()
-      // Gated on the task being active, not merely named in the URL: the intent opens a pane in the
-      // task view, and the shell activates the routed task through its own restore. Waiting costs
-      // nothing, since the params are still there when it lands.
+      // Gated on the task being active rather than merely named in the URL, because the intent
+      // opens a pane in the task view and the shell activates the routed task through its own
+      // restore. The params are still there when it lands.
       return taskId ? ({ taskId, link: parseTaskDeepLink(options.search()) }) : null
     },
     (current) => {

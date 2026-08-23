@@ -261,10 +261,10 @@ export const taskMcpStarterRoute = (id: string) => `/v2/core/tasks/${id}/mcp/sta
 
 
 export const prefsRoute = '/v2/core/prefs'
-// Settings → Plugins (docs/plugins.md § Activation): per node, since which plugins a node runs
-// decides which routes exist and which SQLite files open. `running` and `disabled` answer two
-// different questions: a toggle takes effect at the node's next start, so the page has to show the
-// gap between saving and restarting rather than hide it.
+// Settings → Plugins (docs/plugins.md § Activation). Per node, since which plugins a node runs
+// decides which routes exist and which SQLite files open. `running` and `disabled` answer different
+// questions: a toggle takes effect at the node's next start, so the page shows the gap between saving
+// and restarting.
 //
 // `state` is the third answer, the only one a restart cannot change: a plugin loaded from disk whose
 // init threw is `'failed'`. It stays out of `running` because `restartRequired` is computed from
@@ -372,17 +372,16 @@ export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence 
 // now does something.
 export type PluginTaskCheckGrant = { id: string; cleansUp: boolean }
 
-// The sixth grant, and the only one under `Enforced` that names a program: a managed agent harness this
-// package asks acorn to run (docs/managed-agents.md § Harnesses). It belongs in the strong group because
-// the claim is exact — the host spawns the declared command with the declared args and nothing else —
-// which is also why the whole spawn is in the key. A version that starts running a different binary, or
-// carrying more of the node's environment into it, is the change an update prompt must never let past
-// unremarked.
+// The sixth grant, and the only one under `Enforced` that names a program: a managed agent harness
+// this package asks acorn to run (docs/managed-agents.md § Harnesses). The claim is exact, since the
+// host spawns the declared command with the declared args and nothing else, so the whole spawn goes
+// in the key. A version that runs a different binary, or carries more of the node's environment into
+// it, has to reach the update prompt.
 export type PluginHarnessGrant = {
   id: string
   label: string
-  // `command` is an executable off PATH; `entry` is JavaScript this package ships, run with the node
-  // service's own binary. Two different facts about a package, so the line says which.
+  // `command` is an executable off PATH. `entry` is JavaScript this package ships, run with the node
+  // service's own binary.
   kind: 'command' | 'entry'
   // The command line, or the package-relative entry path, with its declared arguments.
   run: string
@@ -483,7 +482,7 @@ export type InstalledPluginRow = {
   // hand. A display string rather than the structured source, because only the node's lockfile has to
   // re-resolve it.
   source?: string
-  // The app seeded this package; it has no lockfile, so the node cannot update it and the settings row
+  // The app seeded this package. It has no lockfile, so the node cannot update it and the settings row
   // offers no update or uninstall. Structured rather than sniffed from `source`, which is display text.
   bundled?: true
   // Epoch millis.

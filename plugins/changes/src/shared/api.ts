@@ -1,9 +1,9 @@
 // The changes plugin's wire contract: the working-tree review pane and its inline notes.
 //
-// Types, route builders and the query key live together, following the docker and http
-// convention: the plugin that owns the namespace owns the shape of what crosses it. Moved verbatim
-// out of @acorn/protocol/api.ts with routes and the query key byte-identical; see docs/caching.md
-// for why a changed key would orphan a user's IndexedDB.
+// Types, route builders, and the query key live together, following the docker and http convention:
+// the plugin that owns the namespace owns the shape of what crosses it. The query key is
+// byte-identical to the one in @acorn/protocol/api.ts, because changing it orphans a user's
+// IndexedDB (docs/caching.md).
 
 // Inline annotations on uncommitted changes, owned by this plugin rather than mirrored from GitHub.
 export type ReviewNote = {
@@ -25,8 +25,8 @@ export const reviewNoteRoute = (taskId: string, noteId: string) => `/v2/p/change
 export const reviewNotesSentRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/review-notes/sent`
 export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as const
 
-// Local-changes review: working-tree status, diff and blob reads, plus stage, commit, discard and
-// push. Replaced the `local:*` IPC channels.
+// Local-changes review: working-tree status, diff and blob reads, plus stage, commit, discard, and
+// push.
 export const localChangesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/changes`
 export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
   `/v2/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`

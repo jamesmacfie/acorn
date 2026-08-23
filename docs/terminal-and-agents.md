@@ -23,11 +23,11 @@ roughly every 16 milliseconds (about one frame at 60 frames per second) instead 
 chunk, so a busy TUI does not send a frame for every keystroke echo.
 
 Every session, terminal or managed, reports its state from one shared vocabulary, `AgentState`
-(`packages/protocol/src/terminal.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. It is
-defined once and reused verbatim by every agent surface, so no other module redeclares it. A
-transport reports only the subset it can actually detect: a plain PTY session emits
-`working`/`idle`/`blocked`/`unknown`, since a shell has no notion of `starting` or `waiting`, while a
-managed or headless agent driver, which controls the process's own lifecycle, reports the full set.
+(`packages/protocol/src/terminal.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
+agent surface reuses it verbatim, so no other module redeclares it. A transport reports only the
+subset it can detect. A plain PTY session emits `working`, `idle`, `blocked`, or `unknown`, since a
+shell has no notion of `starting` or `waiting`. A managed or headless agent driver controls the
+process lifecycle, so it reports the full set.
 
 ## Activity and status
 
@@ -65,9 +65,8 @@ declared target/port configuration and the authenticated tunnel when necessary.
 ## Profiles
 
 Claude, Codex, and Aider launch specifications are registered by literal in
-`plugins/agents/src/node/index.ts`; the former profile packages were folded into the agents plugin.
-Claude and Codex support interactive and headless modes where the provider supports them; Aider is
-interactive. Argument grammars prevent callers from appending uncontrolled flags. Codex output
+`plugins/agents/src/node/index.ts`. Claude and Codex support interactive and headless modes where the
+provider supports them. Aider is interactive. Argument grammars prevent callers from appending uncontrolled flags. Codex output
 schemas are created and deleted by core on every execution path.
 
 Profiles are separate from the managed-agent drivers. A raw terminal can work without a managed
@@ -75,8 +74,8 @@ session, and a managed session can use a provider driver without owning a termin
 
 ## Handoff
 
-The agents plugin owns the managed session. Terminal publishes a narrow session-roster/handoff
-capability. Handoff transfers an exclusive controller lease; the managed composer is disabled while a
+The agents plugin owns the managed session. Terminal publishes a narrow session-roster and handoff
+capability. Handoff transfers an exclusive controller lease. The managed composer is disabled while a
 raw TUI owns input, and resume returns control only after the provider reference is verified.
 
 ## Sending text to an agent

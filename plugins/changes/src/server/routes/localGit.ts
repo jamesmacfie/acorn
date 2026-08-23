@@ -3,9 +3,9 @@ import { z } from 'zod'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
-// The ChangesPane's working-tree status, diff and blob reads, plus stage, commit, discard and push
-// actions. Was the `local:*` IPC channels; now task-scoped HTTP behind the LocalGitBridge
-// (main/localGit.ts). Pure Node, so it works in dev:node.
+// The ChangesPane's working-tree status, diff and blob reads, plus stage, commit, discard, and push
+// actions. Task-scoped HTTP behind the LocalGitBridge (main/localGit.ts). Pure Node, so it works in
+// dev:node.
 
 export type LocalScope = 'unstaged' | 'staged'
 export type GitActionResult = { ok: boolean; reason?: string }

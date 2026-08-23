@@ -1,9 +1,6 @@
-// Teaching the agent to write a plugin: the third piece of the dev loop, and the one the mechanics
-// are useless without. Full rationale (the two doors, why a context section and not an
-// `agentContexts` descriptor, why the vocabulary below is derived rather than written, what it
-// deliberately omits, and why neither door needed a frame-allowlist entry):
-// docs/agent-tools.md § plugin_authoring, docs/plugins.md § Teaching the agent,
-// docs/plugin-authoring.md.
+// Teaching the agent to write a plugin: the third piece of the dev loop. For the two doors, why the
+// vocabulary below is derived rather than written, and what it leaves out, see docs/agent-tools.md
+// § plugin_authoring, docs/plugins.md § Teaching the agent, and docs/plugin-authoring.md.
 import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 import { pluginManifestShape } from '@acorn/protocol/pluginContract.ts'
@@ -22,11 +19,10 @@ import type { AgentToolContribution } from './registry.ts'
 
 // ── Derived from the manifest schema ──────────────────────────────────────────────────────────────
 //
-// `z.toJSONSchema` rather than reaching into `_def`: it is the same projection the tool registry already
-// uses for MCP input schemas, so it is a supported door rather than an internals read that a zod bump
-// turns into a runtime throw. `unrepresentable: 'any'` because the manifest is full of refinements
-// (`entry`, the chord parser, the content-link matcher) that have no JSON Schema spelling. The fields
-// this module reads, keys, caps, enums, literal verbs, all do.
+// `z.toJSONSchema` rather than reaching into `_def`: the same projection the tool registry uses for
+// MCP input schemas, so a zod bump cannot turn it into a runtime throw. `unrepresentable: 'any'`
+// because the manifest is full of refinements with no JSON Schema spelling. The fields this module
+// reads, keys, caps, enums and literal verbs, all have one.
 type JsonSchema = {
   properties?: Record<string, JsonSchema>
   items?: JsonSchema
@@ -45,9 +41,9 @@ const manifestJsonSchema = (): JsonSchema =>
 const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | undefined =>
   path.reduce<JsonSchema | undefined>((node, key) => node?.properties?.[key], schema)
 
-// A discriminated union of `{ verb: '<literal>' }` objects, read back as the literal set. `oneOf` is what
-// zod emits for a discriminated union under draft-7; `anyOf` is the fallback if that ever changes, and the
-// test asserts the result is non-empty so a silent [] cannot ship.
+// A discriminated union of `{ verb: '<literal>' }` objects, read back as the literal set. zod emits
+// `oneOf` for a discriminated union under draft-7, and `anyOf` is the fallback if that changes. The
+// test asserts the result is non-empty, so a silent [] cannot ship.
 const verbs = (schema: JsonSchema | undefined): string[] =>
   (schema?.oneOf ?? schema?.anyOf ?? []).map((option) => option.properties?.verb?.const ?? '').filter(Boolean).sort()
 
@@ -55,8 +51,7 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 //
 // `satisfies Record<Union, string>` is the guard: add a message kind to
 // `@acorn/protocol/pluginBridge.ts` and this file stops compiling until it is described here. A type
-// has no runtime value to read, so this catches drift that no test could (docs/agent-tools.md §
-// plugin_authoring).
+// has no runtime value to read, so no test can catch this drift.
 const BRIDGE_KINDS = {
   api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v2/p/<id>/ namespace always passes",
   subscribe: 'subscribe to a shell channel the manifest declared in `permissions.events`',
@@ -127,32 +122,30 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       contributionCaps: Object.fromEntries(caps),
       frameTargets: at(contributions, 'frames')?.items?.properties?.target?.enum ?? [],
       slots: at(contributions, 'slots')?.items?.properties?.slot?.enum ?? [],
-      // Read off the schema, not hand-typed: this and the enums below are short lists that grow only
-      // when a host surface appears to draw them, so a guessed member is a contribution that parses
-      // on a newer node and never appears on this one.
+      // Read off the schema, not hand-typed. A guessed member is a contribution that parses on a newer
+      // node and never appears on this one.
       contextMenuLocations: at(contributions, 'contextMenus')?.items?.properties?.location?.enum ?? [],
       extensionPointLocations: at(contributions, 'extensionPoints')?.items?.properties?.location?.enum ?? [],
       coreSlots: at(contributions, 'frames')?.items?.properties?.coreSlot?.enum ?? [],
       commandCategories: at(contributions, 'commands')?.items?.properties?.category?.enum ?? [],
-      // A `themes` entry must carry exactly these token names, nothing else; a theme missing one is
-      // refused at parse. Read off the strict object the schema builds from the palette
-      // (@acorn/protocol/themeTokens.ts), so a token added to the appearance contract reaches the
-      // agent with no edit here.
+      // A `themes` entry must carry exactly these token names, and a theme missing one is refused at
+      // parse. Read off the strict object the schema builds from the palette
+      // (@acorn/protocol/themeTokens.ts), so a new token reaches the agent with no edit here.
       themeTokens: at(contributions, 'themes')?.items?.properties?.tokens?.required ?? [],
     },
     actions: {
-      // The two unions, read off the two descriptors that carry them rather than named directly: a rail
-      // source's `onSelect` is the only site with the full set in scope, and a command's `action` is the
-      // narrow one every context-free surface (commands, slot badges, a source's empty state) takes.
+      // The two unions, read off the descriptors that carry them. A rail source's `onSelect` is the only
+      // site with the full set in scope, and a command's `action` is the narrow one every context-free
+      // surface takes.
       railOnSelect: verbs(at(contributions, 'sources')?.items?.properties?.onSelect),
       commandsAndBadges: verbs(at(contributions, 'commands')?.items?.properties?.action),
     },
     permissions: {
       node: Object.keys(at(schema, 'permissions', 'node')?.properties ?? {}),
       core: [...NODE_CORE_FACETS],
-      // No list of grantable `permissions.api` scopes: that allowlist lives in the client and the
-      // node cannot import it (docs/agent-tools.md § plugin_authoring). What the `note` field states
-      // instead is what makes an unknown scope survivable, which is what an author actually needs.
+      // No list of grantable `permissions.api` scopes: that allowlist lives in the client and the node
+      // cannot import it (docs/agent-tools.md § plugin_authoring). The `note` below says what makes an
+      // unknown scope survivable instead.
       note: 'permissions.node is least privilege for cooperative code, not a sandbox: gating is by omission, so an undeclared facet is absent from ctx and the first call is a TypeError. permissions.api is different — it IS enforced, by an allowlist of (path, method) pairs at the frame bridge. Your own /v2/p/<id>/ namespace needs no scope and is always allowed; another plugin\'s namespace is always denied; a scope this acorn does not know is denied at the bridge rather than rejected at parse, so declare only scopes you have confirmed against this node.',
     },
     bridge: {
@@ -168,9 +161,8 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
 
 // ── The brief ─────────────────────────────────────────────────────────────────────────────────────
 //
-// Process, not vocabulary: the sequence of acts, which no schema states and nothing else in the
-// tree can be read off. Deliberately short; docs/plugin-authoring.md is the long form for a human
-// with the repository checked out.
+// Process, not vocabulary: the sequence of acts, which no schema states. Short on purpose.
+// docs/plugin-authoring.md is the long form for a human with the repository checked out.
 const BRIEF = `# Writing an acorn plugin, by hand
 
 A plugin is a DIRECTORY the node loads. There is no build step in this profile and no bundler on the
@@ -358,8 +350,8 @@ export const pluginAuthoringTool = (): AgentToolContribution => ({
   risk: 'read',
   handler: async () => {
     const vocabulary = pluginAuthoringVocabulary()
-    // Both shapes in one result: the markdown is what an agent reads, the structured half is what it can
-    // check a manifest against without parsing prose.
+    // Both shapes in one result: an agent reads the markdown, and checks a manifest against the
+    // structured half without parsing prose.
     return { guide: renderPluginAuthoring(vocabulary), vocabulary }
   },
 })
@@ -371,9 +363,9 @@ export const pluginAuthoringSection: ContextSectionContribution = {
   order: 50,
   label: 'Plugin authoring',
   defaultIncluded: false,
-  // One item, and a per-item ceiling well above the rendered guide so the budget is a backstop rather
+  // One item, and a per-item ceiling well above the rendered guide, so the budget is a backstop rather
   // than a silent truncation of the contract. `truncate-tail` because the brief leads and the derived
-  // vocabulary follows: if this ever did trip, losing the tail is the less wrong half to lose.
+  // vocabulary follows, so losing the tail is the less wrong half to lose.
   budget: { maxItems: 1, maxBytesPerItem: 32_000, overflow: 'truncate-tail' },
   assemble: async () => ({
     items: [{ id: PLUGIN_AUTHORING_SECTION, kind: 'guide', label: 'Writing an acorn plugin', body: renderPluginAuthoring() }],

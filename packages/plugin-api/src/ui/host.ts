@@ -3,13 +3,6 @@
 export { registerKeybindings } from '@acorn/client-core/registries/keybindings.ts'
 export { registerWillHandler } from '@acorn/client-core/registries/willPhase.tsx'
 export type { Concern } from '@acorn/client-core/registries/willPhase.tsx'
-// Four names came off this surface in the prune pass (docs/plugins.md § The plugin API), each
-// because its only consumer turned out to be core itself: PromoteToTaskModal (client-core's
-// ChromeSourcePanel), WorkspaceProjectAssignments (apps/desktop's own page contributions, by direct
-// import), and the ModelConnectionPicker/defaultModelIdFor pair, duplicated here for compiled panes
-// that were supposed to import it from there. No pane ever did; it lives on ./ui now, where a frame
-// can reach it too.
-//
 // prune candidate: GitHub still mounts the whole shell while its source migration is completed.
 export { default as Acorn } from '@acorn/client-core/Acorn.tsx'
 // The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a

@@ -1,14 +1,8 @@
 // Drivable browser, pure layer: CDP accessibility payloads become a compact AxNode tree with stable
-// per-snapshot refs (e1, e2, …), plus the ref bookkeeping clicks and fills resolve against. The
-// Playwright ARIA-snapshot model: agents reference refs, never CSS selectors.
-//
-// Moved here from `plugins/preview/src/main/browserAuto.ts` when browser automation left the shell for
-// this plugin (docs/agent-tools.md § Browser tools). Nothing in it
-// changed: it was already pure, already tested under plain Node, and the CDP payloads it reads are the
-// same whether the session is attached by Electron's debugger or by Playwright. What did change is the
-// process it runs in — the node's, on any machine, rather than a desktop shell's.
-//
-// The glue that opens a session and dispatches input lives in ./driver.ts.
+// per-snapshot refs (e1, e2, ...), plus the ref bookkeeping clicks and fills resolve against. Agents
+// reference refs, never CSS selectors, which is the Playwright ARIA-snapshot model.
+// See docs/agent-tools.md § Browser tools. The glue that opens a session and dispatches input lives
+// in ./driver.ts.
 export type AxNode = {
   ref?: string // present when the node is actionable (has a backend DOM node)
   role: string
@@ -74,11 +68,11 @@ export function buildAxTree(nodes: CdpAxNode[]): AxSnapshot {
 // Resolve a ref from the last snapshot; anything else is stale by definition.
 export function resolveRef(snapshot: AxSnapshot | null, ref: string): number {
   const backendNodeId = snapshot?.refs.get(ref)
-  if (backendNodeId == null) throw new Error(`Stale or unknown ref '${ref}' — take a new browser_snapshot first.`)
+  if (backendNodeId == null) throw new Error(`Stale or unknown ref '${ref}'. Take a new browser_snapshot first.`)
   return backendNodeId
 }
 
-// Render the tree as the compact indented text agents read best.
+// Render the tree as compact indented text.
 export function renderAxTree(tree: AxNode[], depth = 0): string {
   const lines: string[] = []
   for (const node of tree) {

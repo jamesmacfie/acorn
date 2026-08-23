@@ -2,20 +2,14 @@ import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore } fr
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { loadGrammar } from './langs'
 
-// The main-thread highlighter, no longer the one that does the bulk of the work: diffs tokenize
-// in highlighter.worker.ts, under the Oniguruma engine and off this thread (docs/diff-rendering.md
-// § Syntax highlighting). What is left here are the callers a worker would not pay for:
+// The main-thread highlighter, for the callers a worker would not pay for: the terminal's ANSI
+// palette, CI log output, and agent markdown code fences. Diffs tokenize in
+// highlighter.worker.ts under Oniguruma (docs/diff-rendering.md § Syntax highlighting), and
+// ./worker.ts falls back here when the worker cannot start.
 //
-//   the terminal's ANSI palette   needs `getTheme()`, no grammar and no tokenizing at all
-//   CI log output                 tokenizeAnsiLines, ANSI, also grammar-free
-//   agent markdown code fences    small, already async, and it wants HTML rather than tokens
-//
-// plus the fallback path in ./worker.ts, for a window where the worker could not start. This
-// engine (JavaScript regex, not Oniguruma) is the one the renderer's CSP allows, so it stays here
-// rather than moving into the worker too: these callers are small, and a second engine on the main
-// thread would be a second engine to keep working. `forgiving` covers the patterns a comparison
-// could not reach: an unsupported regex is skipped rather than thrown, because a highlighter that
-// degrades beats one that takes its surface down.
+// The engine is JavaScript regex rather than Oniguruma, which is what the renderer's CSP allows.
+// `forgiving` skips an unsupported regex rather than throwing, because a highlighter that degrades
+// beats one that takes its surface down.
 const loaded = new Map<string, Promise<void>>()
 
 let instance: Promise<HighlighterCore> | null = null
@@ -34,14 +28,14 @@ export async function getHighlighter(lang?: string): Promise<HighlighterCore> {
   return hl
 }
 
-// The vocabulary lives in langs.ts now (the worker needs it too, and must not import this module).
-// Re-exported because this is where every caller already looks for it.
+// The vocabulary lives in langs.ts, because the worker needs it too and must not import this
+// module. Re-exported because this is where callers look for it.
 export { langFor, LANGS } from './langs'
 
-// ANSI-colour log lines (CI output), tokenized the same dual-theme way as diff code: {content,
-// light, dark} per token, rendered with --l/--r CSS vars. ANSI token boundaries are
-// theme-independent, so the two passes zip 1:1. `ansi` isn't a TextMate grammar, so core won't
-// route to it via codeToTokens; we call tokenizeAnsiWithTheme directly, and no grammar has to load.
+// ANSI-colour log lines, tokenized the same dual-theme way as diff code: {content, light, dark} per
+// token, rendered with the --l and --r CSS vars. ANSI token boundaries are theme-independent, so
+// the two passes zip 1:1. `ansi` is not a TextMate grammar, so this calls tokenizeAnsiWithTheme
+// directly and no grammar loads.
 export type AnsiTok = { content: string; light: string; dark: string }
 export function tokenizeAnsiLines(hl: HighlighterCore, text: string): AnsiTok[][] {
   const light = tokenizeAnsiWithTheme(hl.getTheme('github-light'), text)

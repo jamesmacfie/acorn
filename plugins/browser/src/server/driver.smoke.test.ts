@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { BrowserPool } from './driver'
 
-// The snapshot-act-verify loop, against a real browser (docs/testing.md
-// § The browser smoke test). This is the check the Electron-era `scripts/smoke-browser.cjs` used to be, moved
-// here with its subject and turned from a script into a test, because the driver is plain TypeScript
-// now rather than something only an Electron main process could load.
+// The snapshot-act-verify loop against a real browser. See docs/testing.md § The browser smoke test.
 //
 // Opt-in, because it launches a real browser: `pnpm --filter @acorn/plugin-browser test:smoke`. The
-// default suite covers the pure layer (./axTree.test.ts) and the store (./captures.test.ts); this is
-// the only check that exercises the Playwright glue between them, and it is not something to make
-// every `pnpm test` pay for. It also tolerates a machine with no Chrome, asserting the tools said so
-// rather than failing the build, which is the other half of the exit criterion.
+// default suite covers the pure layer (./axTree.test.ts) and the store (./captures.test.ts), and this
+// is the only check that exercises the Playwright glue between them. On a machine with no Chrome it
+// asserts the tools said so rather than failing the build.
 
 const PAGE = `data:text/html,${encodeURIComponent(`
 <!doctype html><html><body>
@@ -18,8 +14,8 @@ const PAGE = `data:text/html,${encodeURIComponent(`
   <button id="go" onclick="console.log('clicked:' + document.getElementById('email').value)">Sign in</button>
 </body></html>`)}`
 
-// data: is not http(s), so the driver's own guard refuses it — correctly. The page is served over
-// loopback instead, which is also closer to what the tools actually meet.
+// The driver's guard refuses `data:` because it is not http(s), so serve the page over loopback. That
+// is closer to what the tools meet anyway.
 const serve = async (): Promise<{ url: string; close: () => Promise<void> }> => {
   const { createServer } = await import('node:http')
   const html = decodeURIComponent(PAGE.slice('data:text/html,'.length))
@@ -45,8 +41,7 @@ describe.skipIf(!process.env.ACORN_BROWSER_SMOKE)('the agent browser, end to end
     try {
       const opened = await pool.navigate('task-1', page.url)
       if (!opened.ok) {
-        // No browser on this machine. The tool reported why, which is the other half of the exit
-        // criterion, so assert that much and stop.
+        // No browser on this machine. Assert the tool reported why, then stop.
         expect(opened.reason).toMatch(/Chrome|Chromium|browser/i)
         return
       }
@@ -62,8 +57,8 @@ describe.skipIf(!process.env.ACORN_BROWSER_SMOKE)('the agent browser, end to end
       expect(await pool.fill('task-1', emailRef!, 'someone@example.test')).toEqual({ ok: true })
       expect(await pool.click('task-1', buttonRef!)).toEqual({ ok: true })
 
-      // The page logs what it read out of the input, so this asserts the fill landed as a real value
-      // the page's own script could see, not just as a DOM attribute.
+      // The page logs what it read out of the input, so this pins that the fill landed as a value the
+      // page's own script could see, rather than as a DOM attribute.
       await expect.poll(async () => (await pool.console('task-1')).lines.join('\n'), { timeout: 5_000 }).toContain(
         'clicked:someone@example.test',
       )

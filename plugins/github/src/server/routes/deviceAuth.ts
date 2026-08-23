@@ -31,9 +31,8 @@ const form = (body: Record<string, string>): RequestInit => ({
 
 export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
   // Open a device-flow window. Returns what the UI must display: the code, where to type it, and how
-  // often to poll. The device_code is a bearer for the pending grant, so it is returned to the
-  // client rather than held server-side, since it authorizes nothing on this node and keeping
-  // pending state would only add a lifecycle to get wrong.
+  // often to poll. The device_code goes back to the client rather than being held here. It authorizes
+  // nothing on this node, and pending state would add a lifecycle to get wrong.
   .post('/auth/device/start', async (c) => {
     ownerId(c) // owner-gated: only the owner may begin connecting an account
     const id = clientId()
@@ -80,23 +79,21 @@ export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
     if (!body.access_token) return respondError(c, 502, 'provider_unavailable', ['GitHub returned no access token.'])
 
     // Hand the token to the same path every other provider's connect uses: it validates against
-    // GET /user, records the granted scopes, encrypts at rest and enforces maxConnections. A token
-    // GitHub then rejects surfaces as 401, not as an uncaught 500, through the same mapping the core
-    // connection routes use.
+    // GET /user, records the granted scopes, encrypts at rest, and enforces maxConnections. A token
+    // GitHub rejects surfaces as 401 rather than an uncaught 500.
     try {
       const integration = await connectProvider(
-        // Core's handle: this writes core's `integrations` row through core's own connectProvider and
-        // touches none of this plugin's tables. `c.env.DB` rather than getDb() only because importing
-        // from server/db is what the schema ratchet measures, and there is nothing about github's
-        // schema in this call.
+        // Core's handle: this writes core's `integrations` row through core's connectProvider and
+        // touches none of this plugin's tables. `c.env.DB` rather than getDb(), because the schema
+        // ratchet measures imports from server/db and this call says nothing about github's schema.
         c.env.DB,
         userId,
         { providerId: GITHUB_PROVIDER, credentials: { accessToken: body.access_token } },
         c.env.SECRETS,
       )
-      // The token itself is never echoed back; the client only needs to know it worked. The machine
-      // identity is not touched here, only minted at boot (core's ensureBoundIdentity); the GitHub
-      // login is just this integration's account metadata.
+      // The token is never echoed back; the client only needs to know it worked. This touches no
+      // machine identity, which is minted at boot (core's ensureBoundIdentity). The GitHub login is
+      // this integration's account metadata.
       return c.json({ status: 'connected', integration } as const)
     } catch (error) {
       return providerError(c, error)

@@ -27,8 +27,7 @@ export const DERIVED_THEME_TOKENS = [
 export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const
 
 /** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`. See docs/ui-design.md
- * § Plugin themes for why the palette half also lives in `@acorn/protocol/themeTokens.ts`. Which
- * tokens belong to which axis is decided here, by this list. */
+ * § Plugin themes for why the palette half also lives in `@acorn/protocol/themeTokens.ts`. */
 export const THEME_TOKENS = [
   ...THEME_PALETTE_TOKENS,
   ...SELF_DESCRIPTION_TOKENS,
@@ -97,9 +96,8 @@ export const BRIDGE_TOKENS = [
   '--font-mono', '--is-dark', '--term-fs',
 ] as const
 
-/** Complete CSS-variable projection for isolated plugin documents. Unlike BRIDGE_TOKENS, which is
- * the small canvas/JavaScript contract, frames render the shared CSS itself and therefore need every
- * token from both appearance axes plus the invariant stacking/brand values. */
+/** Complete CSS-variable projection for isolated plugin documents. A frame renders the shared CSS
+ * itself, so it needs every token from both axes plus the invariant stacking and brand values. */
 export const FRAME_TOKENS = [
   ...THEME_TOKENS,
   ...STYLE_TOKENS,

@@ -2,17 +2,17 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-// The one secret Rust holds: a 32-byte data key that device tokens are encrypted under, in the OS
-// keychain via the `keyring` crate (docs/shell.md § Keys and custody). The helper
-// receives it over the stdin handshake and never writes it anywhere.
+// The one secret Rust holds: a 32-byte data key that device tokens are encrypted under, kept in the
+// OS keychain through the `keyring` crate. See docs/shell.md, "Keys and custody". The helper receives
+// it over the stdin handshake and never writes it anywhere.
 //
 // One key, not one per token. Per-token keychain items would mean a prompt per node and ACL churn on
-// every rebuild, and a stronghold database is a runtime for a problem one entry solves.
+// every rebuild.
 //
-// The file fallback is deliberate, and on macOS it is the common path rather than the exception:
-// keychain item ACLs bind to the code signature, so while acorn ships ad-hoc signed, every rebuild
-// re-prompts or loses access. Falling back to a 0600 file is the same fail-quiet stance
-// deviceTokenStore.ts already takes, and the same blast radius as the node's own session.key.
+// The file fallback is deliberate, and on macOS it is the common path. Keychain item ACLs bind to the
+// code signature, so while acorn ships ad-hoc signed, every rebuild re-prompts or loses access. A
+// 0600 file is the same fail-quiet stance deviceTokenStore.ts takes, with the same blast radius as
+// the node's own session.key.
 
 const SERVICE: &str = "acorn";
 const ACCOUNT: &str = "data-key";
@@ -47,12 +47,10 @@ fn to_file(path: &Path, key: &str) -> io::Result<()> {
 /// The data key for this installation, creating it on first run. `user_data_dir` is where the fallback
 /// file lives, beside the encrypted tokens it protects.
 ///
-/// `use_keychain` is false for a dev build, and that is not a shortcut. An unsigned binary's keychain
-/// ACL does not survive a rebuild, so every `cargo build` would put a modal password prompt in front of
-/// the app — and the answer to it grants nothing durable, because the next rebuild asks again. The
-/// 0600 file beside the tokens is what the caveat in docs/shell.md § Keys and
-/// custody says will be the common path on macOS until Developer ID signing exists; a dev build simply
-/// takes it directly.
+/// `use_keychain` is false for a dev build. An unsigned binary's keychain ACL does not survive a
+/// rebuild, so every `cargo build` would put a modal password prompt in front of the app, and
+/// answering it grants nothing durable. A dev build takes the 0600 file directly. See docs/shell.md,
+/// "Keys and custody".
 pub fn data_key(user_data_dir: &Path, use_keychain: bool) -> String {
     let entry = use_keychain.then(|| keyring::Entry::new(SERVICE, ACCOUNT).ok()).flatten();
     if let Some(existing) = entry.as_ref().and_then(|e| e.get_password().ok()) {
@@ -62,9 +60,9 @@ pub fn data_key(user_data_dir: &Path, use_keychain: bool) -> String {
     }
 
     let fallback = user_data_dir.join(FALLBACK);
-    // The keychain is asked first on every launch, but an existing fallback file wins over minting a
-    // new key: a machine that fell back once has tokens encrypted under that key, and quietly
-    // replacing it would forget every paired node without saying so.
+    // The keychain is asked first on every launch, but an existing fallback file beats minting a new
+    // key. A machine that fell back once has tokens encrypted under that key, and replacing it would
+    // forget every paired node without saying so.
     if let Some(existing) = from_file(&fallback) {
         return existing;
     }
@@ -82,16 +80,16 @@ pub fn data_key(user_data_dir: &Path, use_keychain: bool) -> String {
 }
 
 /// Electron's `safeStorage` key, for the one-time adoption of a custody root the Electron build left
-/// behind (docs/shell.md § Keys and custody).
+/// behind. See docs/shell.md, "Keys and custody".
 ///
-/// safeStorage is Chromium's os_crypt: on macOS the password lives in a keychain item named
-/// "<app> Safe Storage" and the AES key is derived from it. The derivation and the decryption are the
-/// helper's, in TypeScript beside the token store that has to re-encrypt the results; all Rust owns is
-/// the one thing only it can reach.
+/// safeStorage is Chromium's os_crypt. On macOS the password lives in a keychain item named
+/// "<app> Safe Storage" and the AES key is derived from it. The derivation and the decryption belong
+/// to the helper, beside the token store that re-encrypts the results. Rust owns only the part
+/// nothing else can reach.
 ///
-/// Returns None whenever there is nothing to adopt or nothing readable, and that is a supported
-/// outcome rather than an error: the local node mints a fresh device row, remote nodes need
-/// re-pairing, and the fleet UI says so.
+/// Returns None whenever there is nothing to adopt or nothing readable, which is supported rather
+/// than an error. The local node mints a fresh device row, remote nodes need re-pairing, and the
+/// fleet UI says so.
 pub fn legacy_safe_storage_key(app_name: &str) -> Option<String> {
     keyring::Entry::new(&format!("{app_name} Safe Storage"), app_name)
         .ok()?

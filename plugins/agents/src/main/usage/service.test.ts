@@ -29,8 +29,8 @@ const provider = (id: AgentUsageProviderId, percent = 80): AgentProviderUsage =>
   error: null,
 })
 
-// The service reads its collectors from a registry now, so each test builds its own rather than
-// passing two named collectors. The labels are what the service stamps onto every answer.
+// The service reads its collectors from a registry, so each test builds its own. The labels are what
+// the service stamps onto every answer.
 const collectorsFor = (claude: AgentUsageCollector, codex: AgentUsageCollector): AgentUsageCollectorRegistry => {
   const registry = new AgentUsageCollectorRegistry()
   registry.register({ provider: 'claude', label: 'Claude Code', collect: claude })

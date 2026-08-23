@@ -52,9 +52,8 @@ export default function TabRail() {
   const prefs = createQuery(() => prefsOptions(true))
   const [menuId, setMenuId] = createSignal<string | null>(null)
   const [dragId, setDragId] = createSignal<string | null>(null)
-  // The right-click door onto the same row actions. One menu for the whole list rather than one
-  // per row, and the row it belongs to travels in the signal, the same reason `menuId` is rail
-  // state.
+  // The right-click door onto the same row actions. One menu for the whole list, with the row it
+  // belongs to travelling in the signal.
   const [rowMenu, setRowMenu] = createSignal<ContextMenuOpening | null>(null)
   let rowMenuReturnFocus: HTMLElement | undefined
 
@@ -75,23 +74,21 @@ export default function TabRail() {
   // Chosen icon for the task being created/renamed. null = let the origin derive it.
   const [iconDraft, setIconDraft] = createSignal<string | null>(null)
   const [newProject, setNewProject] = createSignal('')
-  // Project options are snapshotted when the modal opens, not bound to the reactive
-  // activeWorkspace(). Otherwise a workspace switch mid-modal (App.tsx restore-nav / workspaces
-  // refetch) repopulates the <select> while newRepo() stays on the previously selected repo, and
-  // the task is created in the wrong workspace.
+  // Project options are snapshotted when the modal opens rather than bound to activeWorkspace().
+  // A workspace switch mid-modal would repopulate the <select> while newRepo() stays on the repo
+  // already selected, and the task lands in the wrong workspace.
   const [newProjectOptions, setNewProjectOptions] = createSignal<Project[]>([])
-  // Custom branch name (docs/workspaces-and-tasks.md § Task creation and navigation): defaults to
-  // a de-duped slug of the title until the user edits the branch field directly, then their value
-  // wins.
+  // Custom branch name (docs/workspaces-and-tasks.md § Task creation and navigation). Defaults to
+  // a de-duped slug of the title until the user edits the field, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
   // Opt out of the branch entirely: a task with no branch runs in the project folder on whatever is
   // already checked out, no worktree (docs/workspaces-and-tasks.md § Worktrees and setup). Non-git
   // projects are always like this, so the toggle only shows for git.
   const [noBranch, setNoBranch] = createSignal(false)
-  // The selected project's branch prefix. Desktop-only: project config is behind the main-process
-  // bridge, and on web there's no checkout to prefix branches for. Read through taskBridge, not
-  // the terminal plugin's client, because core must not import plugins (core/boundaries.test.ts).
+  // The selected project's branch prefix. Desktop only, because project config sits behind the
+  // main-process bridge and the web build has no checkout. Read through taskBridge rather than the
+  // terminal plugin's client, because core must not import plugins (core/boundaries.test.ts).
   const [prefixRow] = createResource(
     () => (draft()?.mode === 'new' ? newProject() : undefined),
     (id) => id ? taskBridge().project.get(id) : null,
@@ -116,8 +113,8 @@ export default function TabRail() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: tasksKey })
 
-  // Scope the rail to the active workspace through project IDs. Tasks whose project is not in the
-  // active workspace are hidden so switching workspaces swaps the roster.
+  // Scope the rail to the active workspace through project IDs, so switching workspaces swaps the
+  // roster.
   const activeProjectId = () => params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId
   const activeWorkspace = () => workspaceForProject(workspaces.data, activeProjectId())
   const visibleTasks = () => {
@@ -128,15 +125,13 @@ export default function TabRail() {
     return applyRailOrder(scoped, railOrder())
   }
 
-  // Sources are contributed by plugins and filtered by their own integration/capability gates.
-  // Selecting one fills the main area with that source's browse view.
   const sources = () => availableSources(integrations.data?.integrations)
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
-    // From a task view the URL is /t/:taskId, which carries no project, and every browse Source
-    // scopes itself to the routed project. Without this the rail swaps to a Source that then
-    // reports it has nothing to show. Selecting a Source keeps the project you were working in.
+    // A task URL is /t/:taskId, which carries no project, and every browse Source scopes itself to
+    // the routed project. Without this the rail swaps to a Source that reports it has nothing to
+    // show.
     if (params.projectId) return
     const projectId = query.data?.find((task) => task.id === activeTaskId())?.projectId
     if (projectId) navigate(projectPath(projectId))
@@ -152,9 +147,9 @@ export default function TabRail() {
     navigate(pathForTask(w))
   }
 
-  // What a right-click on a task row is about, in the host's own vocabulary (docs/plugins.md §
-  // Context menus): `origin`, `projectId` and `pinned` are the only facts a contribution may match
-  // on, and `id`/`title` are the payload the action receives rather than a predicate.
+  // What a right-click on a task row is about (docs/plugins.md § Context menus). `origin`,
+  // `projectId`, and `pinned` are the only facts a contribution may match on; `id` and `title` are
+  // payload for the action, not predicates.
   const rowTarget = (w: Task): TaskRowTarget => ({
     location: 'task.row',
     id: w.id,
@@ -168,7 +163,7 @@ export default function TabRail() {
 
   onMount(() => {
     // Core's own row actions, registered rather than written inline (docs/plugins.md § Context
-    // menus): this registry's first consumers.
+    // menus).
     const rowActions = registerContextMenuItems([
       {
         id: 'task.pin', location: 'task.row', label: 'Pin to top', icon: 'pin', order: 10,
@@ -182,8 +177,8 @@ export default function TabRail() {
       },
       {
         id: 'task.rename', location: 'task.row', label: 'Rename', icon: 'square-pen', order: 20,
-        // Re-read from the query rather than closed over: a contribution receives the flat target, and
-        // the modal wants the whole row. The task can have gone away between the click and the read.
+        // Re-read from the query rather than closed over: a contribution gets the flat target and
+        // the modal wants the whole row, which can have gone away in between.
         run: (target) => { const task = taskById(target.id); if (task) openRename(task) },
       },
       {
@@ -264,7 +259,7 @@ export default function TabRail() {
         activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
         navigate(pathForTask(w))
       } else {
-        // One PATCH for whichever of title/icon actually changed; nothing changed → no request.
+        // One PATCH for whichever of title or icon changed. Nothing changed means no request.
         const body: { title?: string; icon?: string | null } = {}
         if (value !== d.w.title) body.title = value
         if (iconDraft() !== d.w.icon) body.icon = iconDraft()
@@ -279,11 +274,10 @@ export default function TabRail() {
     }
   }
 
-  // Archive confirm/error use the same modal shell as create/rename (the webview has no
-  // window.prompt/confirm-styling; the rail's dialogs stay consistent). When the bridge is
-  // present, the archive always runs through the guarded teardown flow
-  // (docs/workspaces-and-tasks.md § Worktrees and setup); the plain HTTP flip exists only for the
-  // bridge-absent browser dev build (capabilities()).
+  // Archive confirm and error use the same modal shell as create and rename, because the webview
+  // has no window.prompt. With the bridge present the archive runs through the guarded teardown
+  // flow (docs/workspaces-and-tasks.md § Worktrees and setup); the plain HTTP flip is only for the
+  // browser dev build.
   const [archiveErr, setArchiveErr] = createSignal('')
   const [draftErr, setDraftErr] = createSignal('')
   let draftDialog!: HTMLDivElement
@@ -300,16 +294,16 @@ export default function TabRail() {
 
   async function archive(w: Task, applyChecks: string[] = []) {
     if (isArchiving(w.id)) return
-    // Wrapped so the row keeps a spinner for the whole teardown, the same one the task pane's close
-    // button shows (tasks/archiveLifecycle.ts).
+    // Wrapped so the row keeps a spinner for the whole teardown, the same one the task pane's
+    // close button shows (tasks/archiveLifecycle.ts).
     await withArchiving(w.id, () => archiveInner(w, applyChecks))
   }
 
   async function archiveInner(w: Task, applyChecks: string[]) {
     if (capabilities().terminal) {
-      // `force`, matching the task pane's own archive. This used to send no options at all, so a
-      // task with a dirty worktree came back "uncommitted changes, confirm to discard" after the
-      // owner had already confirmed exactly that on the danger row. Confirming means confirming.
+      // `force`, matching the task pane's own archive. With no options, a dirty worktree came back
+      // "uncommitted changes, confirm to discard" after the owner had already confirmed that on the
+      // danger row.
       const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
       if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
       if (res.cleanupFailed?.length) setArchiveErr(`Archived, but cleanup failed for: ${res.cleanupFailed.join(', ')}`)
@@ -346,10 +340,10 @@ export default function TabRail() {
         </For>
       </div>
       <div class="tabrail-sep" />
-      {/* The one designated core surface a plugin may offer to replace (registries/exclusiveSlots.ts).
-          Registering an offer seizes nothing: unless the owner picked a provider in Settings -> Plugins,
-          and that provider is installed, enabled here and has not thrown, the list below is what draws.
-          `core` is a getter so the subtree and its queries cost nothing while a replacement is up. */}
+      {/* The one core surface a plugin may offer to replace (registries/exclusiveSlots.ts).
+          Registering an offer seizes nothing: the list below draws unless the owner picked a working
+          provider in Settings > Plugins. `core` is a getter, so the subtree and its queries cost
+          nothing while a replacement is up. */}
       <ExclusiveSlotHost slot="rail.taskList" core={() => (
       <div class="tabrail-list">
         <For each={visibleTasks()}>
@@ -358,8 +352,8 @@ export default function TabRail() {
             // repository source seam; the GitHub PR pane remains the authoritative check surface.
             const checks = () => []
             const st = () => taskStatus(w.id)
-            // Active rail markers: one source of truth for the overlay icons below and the hover
-            // tooltip's legend, so the two never drift.
+            // One source of truth for the overlay icons below and the hover tooltip's legend, so
+            // the two cannot drift.
             const statusItems = () =>
               railStatusItems({
                 checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
@@ -368,8 +362,8 @@ export default function TabRail() {
                 status: st(),
                 archiving: isArchiving(w.id),
               })
-            // Workspace identity derived onto the row: a 3px accent in the workspace's colour,
-            // matching the active-row accent convention.
+            // Workspace identity on the row: a 3px accent in the workspace's colour, matching the
+            // active-row accent convention.
             const ws = () => workspaceForProject(workspaces.data, w.projectId)
             const accent = () => {
               const g = ws()
@@ -383,10 +377,8 @@ export default function TabRail() {
             <div
               class="tabrail-item"
               draggable={true}
-              // The second door onto the row's actions. `contextmenu` is also what the platform
-              // dispatches for Shift+F10 and the menu key, so this is the keyboard path too, and
-              // the button menu beside it still offers the identical list, from the identical
-              // registry.
+              // The second door onto the row's actions. The platform also dispatches `contextmenu`
+              // for Shift+F10 and the menu key, so this is the keyboard path too.
               onContextMenu={(e) => {
                 e.preventDefault()
                 setMenuId(null)
@@ -406,9 +398,8 @@ export default function TabRail() {
               <Show when={isPinned(railOrder(), w.id)}>
                 <span class="tabrail-pin" title="Pinned to top"><Icon name="pin" /></span>
               </Show>
-              {/* Gains Escape, outside-click and menu roles, none of which this had. The rail
-                  keeps owning which menu is open: Cmd+1-9 navigation closes it, and that decision
-                  cannot live inside one menu instance. */}
+              {/* The rail keeps owning which menu is open, because Cmd+1-9 navigation closes it and
+                  that decision cannot live inside one menu instance. */}
               <Menu
                 class="tabrail-menu"
                 ariaLabel={`Actions for ${w.title}`}
@@ -445,19 +436,16 @@ export default function TabRail() {
                     <Menu.Label>{w.title}</Menu.Label>
                     <Menu.Label>{w.branch ?? 'Project folder'}</Menu.Label>
                     <Menu.Separator />
-                    {/* Both doors onto a task row draw the same list from the same registry
-                        (docs/plugins.md § Context menus), so they cannot offer different things. */}
+                    {/* Both doors onto a task row draw from the same registry (docs/plugins.md
+                        § Context menus), so they cannot offer different things. */}
                     <ContextMenuItems context={menu} location="task.row" target={rowTarget(w)} />
                   </>
                 )}
               </Menu>
-              {/* Live status markers: CI dot, agent-working spinner, needs-you notice,
-                  dirty/repair, from railStatus.ts, mirrored in the hover tooltip. */}
+              {/* Live status markers from railStatus.ts, mirrored in the hover tooltip. */}
               <For each={statusItems()}>
                 {(s) => (
                   <span class={s.overlayCls} title={s.label}>
-                    {/* The CI marker has no glyph, it is a StatusDot, whose colour used to come
-                        from a class defined in the GitHub plugin's stylesheet. */}
                     <Show when={s.glyph} fallback={<Show when={s.dotTone}>{(tone) => <StatusDot tone={tone()} />}</Show>}>
                       {(g) => <Icon name={g()} />}
                     </Show>
@@ -471,8 +459,8 @@ export default function TabRail() {
         </For>
       </div>
       )} />
-      {/* One right-click menu for the whole list. Focus goes back to the row's own button on dismiss,
-          which is what keeps this usable from the keyboard rather than a mouse-only affordance. */}
+      {/* One right-click menu for the whole list. Focus returns to the row's own button on dismiss,
+          which is what keeps it usable from the keyboard. */}
       <ContextMenuHost
         location="task.row"
         ariaLabel={rowMenu() ? `Actions for ${rowMenu()!.target.title}` : 'Task actions'}
@@ -483,7 +471,6 @@ export default function TabRail() {
       <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
         +
       </button>
-      {/* `.tabrail-action-error` was never defined in any stylesheet, dropped with the migration. */}
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (

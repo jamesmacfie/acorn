@@ -20,48 +20,45 @@ use plugin_scheme::{Frames, PLUGIN_SCHEME};
 use webviews::Webviews;
 
 // The Rust shell: the window, the app scheme, the menu and lifecycle, native dialogs, the OS keychain,
-// and helper supervision. Everything else is TypeScript — the helper process, the renderer bridge, and
-// the node (docs/shell.md).
+// and helper supervision. The helper process, the renderer bridge, and the node are TypeScript. See
+// docs/shell.md.
 //
-// Boot order matters and is the reverse of what a Tauri app usually does. The helper is started and
-// waited for BEFORE the window exists, so the broker is warm by the time the renderer's first act — the
-// fleet list — arrives. That is the guarantee Electron gives today, and the recovery screen is the only
-// thing a renderer that booted first would have to show.
+// Boot order is the reverse of what a Tauri app usually does. The helper starts and is waited for
+// before the window exists, so the broker is warm by the time the renderer asks for the fleet list. A
+// renderer that booted first would have nothing to show but the recovery screen.
 
 /// The wire version both ends of the stdin handshake agree on.
 const HELPER_PROTOCOL: u32 = 1;
 
-/// A release build is a packaged one. It decides which roots the helper is pointed at — the
-/// application data directory, or the checkout — and nothing else.
+/// A release build is a packaged one. It decides which roots the helper is pointed at, the
+/// application data directory or the checkout, and nothing else.
 const PACKAGED: bool = !cfg!(debug_assertions);
 
-/// The Vite dev server to proxy the renderer from, when there is one (src/app_scheme.rs explains why
-/// dev is proxied rather than loaded directly).
+/// The Vite dev server to proxy the renderer from, when there is one. See src/app_scheme.rs for why
+/// dev is proxied rather than loaded directly.
 fn dev_server() -> Option<String> {
     std::env::var("ACORN_DEV_SERVER").ok().filter(|value| !value.is_empty())
 }
 
 pub fn run() {
-    // Read once, at the top, because the window and the scheme handler both need it and neither should
-    // be deciding what "dev" means. A runtime variable rather than a compile-time one: `pnpm dev`
-    // sets it, and a stale cargo cache must not be able to bake the wrong answer into a binary.
+    // Read once, at the top, because the window and the scheme handler both need it. A runtime
+    // variable rather than a compile-time one, so a stale cargo cache cannot bake the wrong answer
+    // into a binary.
     let dev_server = dev_server();
-    // The helper's port, shared with the scheme handler. The handler has to be registered before the
-    // app runs, and the port is not known until the helper is up, so it is read per response rather
-    // than baked in at registration. By the time index.html is asked for, the window exists, which
-    // means the helper is ready.
+    // The helper's port, shared with the scheme handler. The handler is registered before the app
+    // runs and the port is not known until the helper is up, so it is read per response. By the time
+    // index.html is asked for, the window exists, which means the helper is ready.
     let helper_port = Arc::new(RwLock::new(0u16));
 
     let scheme_port = helper_port.clone();
     let scheme_dev = dev_server.clone();
-    // Read once, before the app runs, because the scheme handler cannot ask for state it does not
-    // have and both of its inputs are fixed for the life of the process.
+    // Read before the app runs, because the scheme handler cannot ask for state it does not have.
     let frames: Arc<RwLock<Option<Frames>>> = Arc::new(RwLock::new(None));
     let scheme_frames = frames.clone();
 
     tauri::Builder::default()
-        // The data root's exclusive lock in the node is the real mutual exclusion; this is what makes a
-        // second launch focus the running window instead of failing on that lock.
+        // The data root's exclusive lock in the node is the real mutual exclusion. This makes a second
+        // launch focus the running window instead of failing on that lock.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.webview_windows().values().next() {
                 let _ = window.unminimize();
@@ -103,9 +100,9 @@ pub fn run() {
         .setup(move |app| {
             let handle = app.handle().clone();
             app.manage(Webviews::<tauri::Wry>::default());
-            // Deliberately blocking: there is nothing for the event loop to do until the node is up,
+            // Deliberately blocking. There is nothing for the event loop to do until the node is up,
             // and the alternative is a window that renders the recovery screen for a second every
-            // launch. Electron's `await bootstrap()` is the same shape.
+            // launch.
             match boot(&handle) {
                 Ok((helper, plugin_frames)) => {
                     *helper_port.write().unwrap() = helper.ready.port;
@@ -117,8 +114,8 @@ pub fn run() {
                     open_window(&handle)?;
                 }
                 Err(error) => {
-                    // Boot is all-or-nothing. A failure here means there is no node to talk to, so this
-                    // says why and quits rather than sitting headless in the dock.
+                    // Boot is all-or-nothing. A failure means there is no node to talk to, so say why
+                    // and quit rather than sit headless in the dock.
                     handle
                         .dialog()
                         .message(&error)
@@ -133,8 +130,8 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("the acorn shell failed to build")
         .run(|app, event| match event {
-            // The quit negotiation's other entry point: the dock's Quit, or a Cmd-Q the menu did not
-            // catch. `prevent_exit` holds the process while the renderer is asked.
+            // The quit negotiation's other entry point: the dock's Quit, or a Cmd-Q the menu missed.
+            // `prevent_exit` holds the process while the renderer is asked.
             RunEvent::ExitRequested { api, .. } => {
                 let approved = app.try_state::<Shell>().is_some_and(|s| s.quit_approved.load(Ordering::SeqCst));
                 if !approved {
@@ -143,8 +140,8 @@ pub fn run() {
                 }
             }
             RunEvent::Exit => {
-                // Before the helper, because a child webview composited over a window whose process is
-                // on its way out is the one thing this ordering can still get wrong.
+                // Before the helper, so no child webview is left composited over a window whose
+                // process is on its way out.
                 app.state::<Webviews<tauri::Wry>>().dispose();
                 commands::shutdown(app)
             }
@@ -152,14 +149,14 @@ pub fn run() {
         });
 }
 
-/// Where the built renderer lives in a packaged build. Beside the other bundled resources, because the
-/// scheme handler is the only thing that reads it and it is never a path anything else supplies.
+/// Where the built renderer lives in a packaged build, beside the other bundled resources. The scheme
+/// handler is the only thing that reads it.
 fn client_root(app: &tauri::AppHandle) -> PathBuf {
     app.path().resource_dir().map(|dir| dir.join("client")).unwrap_or_else(|_| PathBuf::from("client"))
 }
 
-/// Where the injected bridge and the plugin frames' stylesheet are staged. One directory, because both
-/// are renderer-facing assets this shell builds rather than the node's.
+/// Where the injected bridge and the plugin frames' stylesheet are staged. One directory, because
+/// both are renderer-facing assets this shell builds rather than the node's.
 fn bridge_dir(app: &tauri::AppHandle) -> PathBuf {
     if PACKAGED {
         app.path().resource_dir().map(|dir| dir.join("bridge")).unwrap_or_default()
@@ -169,14 +166,14 @@ fn bridge_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 /// Resolve the two roots, get or create the data key, then start and wait for the helper. The plugin
-/// frame handler's inputs come back with it because this is where both roots are known.
+/// frame handler's inputs come back with it, because this is where both roots are known.
 fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
     let packaged = PACKAGED;
     let path = app.path();
 
-    // The node's data root and the shell's custody root are two different directories on purpose:
-    // fleet.json and the encrypted device tokens are this app's, not the node's. A dev build points
-    // both at the checkout so a developer's fleet is not the installed app's.
+    // The node's data root and the shell's custody root are separate on purpose: fleet.json and the
+    // encrypted device tokens belong to this app, not the node. A dev build points both at the
+    // checkout so a developer's fleet is not the installed app's.
     let (data_dir, user_data_dir) = if packaged {
         let base = path.app_data_dir().map_err(|e| format!("no application data directory: {e}"))?;
         (base.join("node"), base)
@@ -226,8 +223,8 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
         },
         move |signal| match signal {
             Signal::CrashBudgetExhausted { reason } => show_recovery(&handle, reason.as_deref()),
-            // The credential for a preview tunnel, held by the shell so it can be seeded into the
-            // pane's cookie store. Never forwarded to the renderer (src/webviews.rs).
+            // The credential for a preview tunnel, seeded into the pane's cookie store by
+            // src/webviews.rs. Never forwarded to the renderer.
             Signal::TunnelOpened { port, secret } => handle.state::<Webviews<tauri::Wry>>().tunnel_opened(port, secret),
             Signal::TunnelClosed { port } => handle.state::<Webviews<tauri::Wry>>().tunnel_closed(port),
             Signal::Ready(_) => {}
@@ -244,18 +241,18 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
 }
 
 /// The Electron build's custody root and the key its device tokens are encrypted under, when both are
-/// there. The helper adopts them once, on a first launch that has nothing of its own; everything about
-/// what that means when it fails is in `packages/desktop-helper/src/main/legacyCustody.ts`.
+/// there. The helper adopts them once, on a first launch that has nothing of its own. See
+/// `packages/desktop-helper/src/main/legacyCustody.ts` for what happens when that fails.
 ///
-/// Only for a packaged build. A dev build does not ask the keychain at all (src/keychain.rs says why),
-/// and its custody root is the checkout, which no Electron build ever wrote to.
+/// Packaged builds only. A dev build never asks the keychain (see src/keychain.rs), and its custody
+/// root is the checkout, which no Electron build ever wrote to.
 fn legacy_custody(path: &tauri::path::PathResolver<tauri::Wry>, packaged: bool) -> Option<Legacy> {
     if !packaged {
         return None;
     }
     // Electron's userData is `<app data>/<app name>`, and safeStorage names its keychain item after
-    // the same app name. Tauri's own app data directory is keyed by bundle identifier instead, which
-    // is why these two builds do not share a root in the first place.
+    // the same app name. Tauri keys its app data directory by bundle identifier, which is why the two
+    // builds do not share a root.
     const ELECTRON_APP_NAME: &str = "acorn";
     let user_data_dir = path.data_dir().ok()?.join(ELECTRON_APP_NAME);
     if !user_data_dir.join("fleet.json").exists() {
@@ -268,8 +265,8 @@ fn legacy_custody(path: &tauri::path::PathResolver<tauri::Wry>, packaged: bool) 
 }
 
 /// Where the helper looks for secrets: the build's own file first, then the owner's file in the data
-/// directory, which wins (docs/shell.md § Startup: data directory, environment, and the singleton
-/// lock). A dev build reads the checkout's own `.env`, beside this crate.
+/// directory, which wins. See docs/shell.md, "Startup: data directory, environment, and the singleton
+/// lock". A dev build reads the checkout's own `.env`, beside this crate.
 fn env_files(app: &tauri::AppHandle, data_dir: &Path, packaged: bool) -> Result<Vec<String>, String> {
     let bundled = if packaged {
         app.path().resource_dir().map_err(|e| e.to_string())?.join(".env")
@@ -280,15 +277,15 @@ fn env_files(app: &tauri::AppHandle, data_dir: &Path, packaged: bool) -> Result<
 }
 
 /// The bundled runtime in a packaged build. `externalBin` strips the target triple and stages the
-/// binary beside this executable rather than under the other resources — on macOS that is
-/// `Contents/MacOS`, which `resource_dir()` (`Contents/Resources`) does not name. Getting this wrong
-/// is invisible until somebody installs the app, which is what `scripts/verify-bundle.mjs` is for.
+/// binary beside this executable rather than under the other resources. On macOS that is
+/// `Contents/MacOS`, which `resource_dir()` does not name. Getting it wrong is invisible until
+/// somebody installs the app, which is what `scripts/verify-bundle.mjs` catches.
 fn bundled_node() -> PathBuf {
     std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("node"))).unwrap_or_else(|| PathBuf::from("node"))
 }
 
-/// The bundled runtime in a dev build, named the way `bundle.externalBin` names it so dev and packaged
-/// disagree about the path and nothing else.
+/// The bundled runtime in a dev build, named the way `bundle.externalBin` names it, so dev and
+/// packaged disagree about the path and nothing else.
 fn bundled_node_for_host() -> PathBuf {
     let triple = std::env::var("ACORN_TARGET_TRIPLE").unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, host_suffix()));
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}"))
@@ -309,16 +306,13 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
         .inner_size(1440.0, 900.0)
         .background_color(tauri::webview::Color(0x12, 0x12, 0x12, 0xff))
         // This is the preload. It runs before any page script, so the host global is installed before
-        // the shell mounts and the platform string the seam reads synchronously is already there —
-        // both of which a `<script>` tag in the HTML could only approximate.
+        // the shell mounts and the platform string the seam reads synchronously is already there. A
+        // `<script>` tag in the HTML could only approximate both.
         .initialization_script(bridge_script(app))
-        // Main-frame navigation policy, and why there is no OAuth exception: docs/shell.md § The
-        // plugin frame origin. GitHub connects by device flow against the node, so nothing legitimate
-        // ever navigates this frame off its own origin.
-        // Main-frame navigation policy, plus the subframe guard: a plugin frame legitimately loads
-        // `app-plugin://<hash>`, and nothing else does. Phase 0 confirmed this fires for subframes and
-        // that returning false leaves the frame on its own document (docs/shell.md § The plugin
-        // frame origin, docs/shell.md § The plugin frame origin).
+        // Main-frame navigation policy, plus the subframe guard: a plugin frame loads
+        // `app-plugin://<hash>`, and nothing else does. GitHub connects by device flow against the
+        // node, so nothing legitimate navigates this frame off its own origin. See docs/shell.md,
+        // "The plugin frame origin".
         .on_navigation(|url| {
             if url.as_str().starts_with(APP_ORIGIN) || url.scheme() == PLUGIN_SCHEME {
                 return true;
@@ -331,8 +325,8 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
 }
 
 /// The renderer bridge, plus the one value it cannot ask for asynchronously. A missing bundle is not
-/// fatal here: the window still opens, the seam resolves no groups, and the renderer says it cannot
-/// reach a node — which is a far more legible failure than a black window.
+/// fatal. The window still opens, the seam resolves no groups, and the renderer says it cannot reach
+/// a node, which reads better than a black window.
 fn bridge_script(app: &tauri::AppHandle) -> String {
     let path = bridge_dir(app).join("bridge.js");
     let bridge = std::fs::read_to_string(&path).unwrap_or_else(|error| {
@@ -351,13 +345,13 @@ fn tauri_platform() -> &'static str {
 }
 
 /// The crash budget is spent and the helper has stopped trying. Native, because the shell that would
-/// render this is behind the very gate it is about to show.
+/// render this is behind the gate it is about to show.
 fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
     let Some(shell) = app.try_state::<Shell>() else { return };
     let data_dir = shell.data_dir.clone();
-    // Whatever the service said about the last attempt. Most of the causes name their own fix — another
-    // node already holds this data root, a taken port, a file the owner cannot read — and this dialog
-    // is the only place the owner sees them, because the messages themselves go to stderr.
+    // Whatever the service said about the last attempt. Most causes name their own fix, such as
+    // another node holding this data root, a taken port, or a file the owner cannot read. The
+    // messages go to stderr, so this dialog is the only place the owner sees them.
     let because = reason.map(|reason| format!("\n\nThe last attempt failed: {reason}")).unwrap_or_default();
     let answer = app
         .dialog()
@@ -370,8 +364,8 @@ fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
         .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom("Retry".into(), "Open data folder".into()))
         .blocking_show();
     if answer {
-        // The owner asking for a retry is new information: they may have just freed the port or fixed
-        // permissions, so the helper forgives the spent budget and tries once more.
+        // A retry is new information. The owner may have freed the port or fixed permissions, so the
+        // helper forgives the spent budget and tries once more.
         if let Ok(held) = shell.helper.lock() {
             if let Some(helper) = held.as_ref() {
                 helper.command("retry");
@@ -386,12 +380,12 @@ fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
     std::thread::spawn(move || show_recovery(&handle, reason.as_deref()));
 }
 
-/// Kept honest by the same rule Electron's is: the origin the window loads and the origin the helper
-/// checks on the WebSocket upgrade are one constant, not two spellings.
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// The origin the window loads and the origin the helper checks on the WebSocket upgrade are one
+    /// constant, not two spellings.
     #[test]
     fn the_window_url_is_the_origin_the_helper_checks() {
         assert!(format!("{APP_ORIGIN}/").starts_with(APP_ORIGIN));
@@ -399,8 +393,8 @@ mod tests {
     }
 
     /// The one thing a JSON file can get wrong that nothing else would catch. Naming a window in a
-    /// capability grants it to every webview in that window, and since phase 3 the main window hosts
-    /// the preview pane and plugin webview surfaces — pages this app does not write.
+    /// capability grants it to every webview in that window, and the main window hosts the preview
+    /// pane and plugin webview surfaces, which are pages this app does not write.
     #[test]
     fn no_capability_is_granted_by_window() {
         let capability: serde_json::Value = serde_json::from_str(include_str!("../capabilities/default.json")).expect("the capability file is JSON");
@@ -408,15 +402,14 @@ mod tests {
         assert_eq!(capability["webviews"], serde_json::json!(["main"]));
     }
 
-    /// The three packaging properties that only show up when somebody installs the artifact, so the
-    /// config file is where they have to be pinned (docs/shell.md § Build and packaging).
+    /// The three packaging properties that only show up when somebody installs the artifact. See
+    /// docs/shell.md, "Build and packaging".
     ///
-    /// Ad-hoc signing is gate 0: the same posture as the Electron build's `identity: null`. Leave
-    /// `signingIdentity` out and Tauri signs nothing, so the `.app` carries only the linker's own mark
-    /// on one binary and seals no resources — a bundle whose contents nothing vouches for, and
-    /// `codesign --verify` says so. A Developer ID replaces the string and notarization joins the same
-    /// pass. The updater key is the other half: artifacts are signed from the first release even with
-    /// no endpoint, so turning updates on later is configuration rather than a re-release.
+    /// Leave `signingIdentity` out and Tauri signs nothing: the `.app` carries only the linker's mark
+    /// on one binary and seals no resources, and `codesign --verify` says so. Ad-hoc signing is the
+    /// floor; a Developer ID replaces the string and notarization joins the same pass. Updater
+    /// artifacts are signed from the first release even with no endpoint, so turning updates on later
+    /// is configuration rather than a re-release.
     #[test]
     fn the_bundle_is_signed_and_its_updater_artifacts_are_too() {
         let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).expect("the bundle config is JSON");

@@ -56,10 +56,8 @@ async function inheritLoginShellPath(isPackaged: boolean): Promise<void> {
   }
 }
 
-// Shell-free composition root (docs/architecture-overview.md § Process ownership). Importing this
-// module in a plain Node test loads no shell, and there is nothing here that could: the runtime takes
-// no native surface at all. The shell drives its own windows and webviews; this process drives the
-// node.
+// Shell-free composition root (docs/architecture-overview.md § Process ownership). The runtime takes
+// no native surface, so importing this module in a plain Node test loads no shell.
 export async function startServiceRuntime({ config, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
   const mark = bootTimer()
   await inheritLoginShellPath(config.isPackaged)
@@ -117,14 +115,12 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     if (stopped) return
     stopped = true
     stateChanged('draining')
-    // Same bounded order as server/standalone.ts (docs/node-distribution.md § Operations): the
+    // Same bounded order as server/standalone.ts (docs/node-distribution.md § Operations). The
     // listener closes first, so nothing new arrives while the rest tears down.
     //
     // Each table-owning plugin's WAL-mode SQLite file closes inside that plugin's own dispose
-    // (server/plugin/host.ts). That is also where the terminal engine's idle watch and session
-    // displays, the docker streams, the database plugin's pg pools, and the agent runtime's live
-    // provider children, reconnect timers and webhook pump all close, so this list never has to grow
-    // when a new plugin needs its own teardown.
+    // (server/plugin/host.ts), along with everything else that plugin owns, so this list never has to
+    // grow when a new plugin needs teardown.
     //
     // The root lock releases last, once SQLite is closed, or a restart could open the database while
     // this process still holds its WAL. A drain that hits the deadline leaves the lock to dataRoot's
@@ -155,20 +151,20 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   }
 
   try {
-    // Audit retention and the idempotency sweep run as node-owned schedules now, not boot-time calls
+    // Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls
     // (docs/data-layer.md § Retention).
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
     setWorktreesRoot(worktreesDir)
-    // The four values a spawned child needs, and why each is a factory call rather than a record
-    // (docs/mcp.md § Launch environment; docs/authentication.md § Internal tokens): the signing key
+    // The four values a spawned child needs, and why each is a factory call rather than a record. See
+    // docs/mcp.md § Launch environment and docs/authentication.md § Internal tokens. The signing key
     // persists across restarts so a tmux-reattached agent session keeps authenticating, and the port
     // is ephemeral so a baked URL would point at nothing.
     //
     // Seeding the token here and assigning `apiUrl` right after `startListener` binds is enough,
     // because every consumer calls this factory at spawn time rather than at wire time. The ordering
-    // that actually matters is that these bridges are installed before any request can arrive.
+    // that matters is that these bridges are installed before any request can arrive.
     let apiUrl = ''
     const internalEnv: InternalEnvFactory = (claims) => ({
       ACORN_API_URL: apiUrl,

@@ -1,8 +1,8 @@
 // The exclusive-slot registry: a plugin offers to stand in for one of core's own surfaces, and the
 // user decides whether it does (docs/plugins.md § Replacing a core surface).
 //
-// This module holds no JSX import (docs/frontend.md § Registries and plugins): the arbitration rule
-// is here so it can be tested; the host that draws the resolved surface lives in a `.tsx`.
+// No JSX import here (docs/frontend.md § Registries and plugins), so the arbitration rule can be
+// tested. The host that draws the resolved surface lives in a `.tsx`.
 import type { Component } from 'solid-js'
 import { CORE_SLOT_PROVIDER, isCoreExclusiveSlot, type CoreExclusiveSlot } from '@acorn/protocol/extensionPoints.ts'
 import { Registry } from './registry'
@@ -28,14 +28,12 @@ export type ExclusiveSlotProvider = {
 export const exclusiveSlotRegistry = new Registry<ExclusiveSlotProvider>('exclusive-slot')
 
 // Providers whose surface threw while rendering, keyed `<slot>:<pluginId>`. A module-level set rather
-// than a signal, because the host that catches the throw and the resolver that stops choosing it are
-// in different modules, and the fall back to core must survive the remount that an error boundary's
-// reset would otherwise loop on.
+// than a signal, because the host that catches the throw and the resolver that stops choosing it sit
+// in different modules, and the fall back to core has to survive an error boundary's reset.
 const failed = new Set<string>()
 
-/** Called by the host's error boundary. Idempotent, and permanent for this session: a surface that
- *  threw once gets no second chance until the plugin set is re-synced, because retrying a broken
- *  replacement on every render is a flicker between two task lists. */
+/** Called by the host's error boundary. Idempotent, and permanent until the plugin set is re-synced,
+ *  because retrying a broken replacement on every render flickers between two task lists. */
 export const noteExclusiveSlotFailure = (slot: CoreExclusiveSlot, pluginId: string): void =>
   void failed.add(`${slot}:${pluginId}`)
 
@@ -46,8 +44,8 @@ export const exclusiveSlotFailed = (slot: CoreExclusiveSlot, pluginId: string): 
  *  changed. Also the test seam. */
 export const clearExclusiveSlotFailures = (): void => failed.clear()
 
-/** Every plugin currently offering to replace this surface, for the settings picker. Offers, not
- *  choices: nothing here is on screen unless the user said so. */
+/** Every plugin offering to replace this surface, for the settings picker. These are offers, so
+ *  nothing here is on screen unless the user said so. */
 export const exclusiveSlotOffers = (slot: CoreExclusiveSlot): ExclusiveSlotProvider[] =>
   exclusiveSlotRegistry.entries()
     .filter((entry) => entry.slot === slot && (entry.when?.() ?? true))
@@ -74,9 +72,9 @@ export function resolveExclusiveSlot(
 /**
  * The stored arbitration, read out of the one preference that holds all of it.
  *
- * One key holding a `{ slot: pluginId }` map rather than a key per slot, the same shape
- * `disk_warning_acked` takes and for the same reason: the designated list is short, and a key per
- * member would need a registration and an eviction rule for a value that is one string.
+ * One key holding a `{ slot: pluginId }` map rather than a key per slot, like `disk_warning_acked`.
+ * The designated list is short, and a key per member would need a registration and an eviction rule
+ * for a value that is one string.
  *
  * Anything unparseable reads as "nothing chosen", which is core. A malformed preference must not be
  * able to take someone's task list away.
@@ -88,8 +86,8 @@ export function exclusiveSlotChoices(raw: string | undefined): Partial<Record<Co
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
     const out: Partial<Record<CoreExclusiveSlot, string>> = {}
     for (const [slot, value] of Object.entries(parsed)) {
-      // A slot this shell does not have is dropped rather than kept: the list is version vocabulary,
-      // and a stored choice for a slot that no longer exists is nothing this device can honour.
+      // A slot this shell does not have is dropped. The list is version vocabulary, so a stored choice
+      // for a slot that no longer exists is not something this device can honour.
       if (isCoreExclusiveSlot(slot) && typeof value === 'string' && value) out[slot] = value
     }
     return out

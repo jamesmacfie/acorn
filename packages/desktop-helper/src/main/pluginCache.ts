@@ -5,27 +5,26 @@ import { z } from 'zod'
 import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 
-// The content-addressed store of plugin client bundles a node handed us. Why the hash is trusted and
-// not the claim, and what that closes: docs/security.md § Third-party plugin bundles ("Trust binds to
-// bytes, not to claims").
+// The content-addressed store of plugin client bundles a node handed over. See docs/security.md,
+// "Third-party plugin bundles", for why the hash is trusted and the claim is not.
 //
-// Only main writes here, and only main knows the paths: nothing on this class hands a filesystem path
-// across contextBridge. The renderer names bundles by hash and nothing else.
+// Only main writes here and only main knows the paths. Nothing on this class hands a filesystem path
+// to the renderer, which names bundles by hash and nothing else.
 //
-// Future-web note (docs/future/remote.md): this is the Electron-main implementation of what a browser
-// client does with IndexedDB. The renderer reaches it through one narrow module
-// (client-core/plugins/host.ts), so the interface is the portable part, not the storage.
+// See docs/future/remote.md: a browser client does the same job with IndexedDB. The renderer reaches
+// this through one narrow module, client-core/plugins/host.ts, so the interface is the portable part
+// rather than the storage.
 
 const CACHE_DIR = 'plugin-cache'
 const INDEX_FILE = 'index.json'
 const HASH_RE = /^[0-9a-f]{64}$/
 
-// Matches the node's own ceiling (node-core MAX_CLIENT_BUNDLE_BYTES). Enforced again here because the
+// Matches the node's own ceiling, node-core MAX_CLIENT_BUNDLE_BYTES. Enforced again here because the
 // node that answers is not necessarily one this device trusts yet, and a response arrives fully
 // buffered in main's heap.
 export const MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 
-// How long an unreferenced bundle survives. Generous on purpose: the cache is a few hundred kilobytes
+// How long an unreferenced bundle survives. Generous on purpose. The cache is a few hundred kilobytes
 // per plugin, and evicting a bundle the owner already acknowledged means a re-prompt for nothing.
 const EVICT_AFTER_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -33,8 +32,8 @@ const entrySchema = z.strictObject({
   pluginId: z.string().min(1),
   version: z.string().min(1),
   bytes: z.number().int().nonnegative(),
-  // Every node this exact bundle has been offered by. A plural: two nodes carrying the same plugin
-  // version serve byte-identical bundles and therefore share one cache entry.
+  // Every node that has offered this bundle. Two nodes carrying the same plugin version serve
+  // byte-identical bundles, so they share one cache entry.
   nodeIds: z.array(z.string().min(1)),
   firstSeen: z.number().int(),
   lastSeen: z.number().int(),
@@ -46,8 +45,8 @@ const indexSchema = z.strictObject({ version: z.literal(1), entries: z.record(z.
 export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch'
 export type PutResult = { hash: string } | { error: PutFailure }
 
-// Just enough of NodeBroker to fetch. Narrow so the tests do not need a TLS server to exercise the
-// hashing rules, which are the part worth testing.
+// Just enough of NodeBroker to fetch. Narrow so the tests can exercise the hashing rules without a
+// TLS server.
 export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> }
 
 export class PluginCache {
@@ -66,8 +65,8 @@ export class PluginCache {
     return { ...this.entries() }
   }
 
-  /** Cache client code read directly from this app's packaged resources. Unlike putFromNode there is
-   * no remote hash claim to verify; the content hash computed here is the identity trusted by main. */
+  /** Cache client code read from this app's packaged resources. Unlike putFromNode there is no remote
+   * hash claim to verify, so the content hash computed here is the identity main trusts. */
   putBundled(pluginId: string, version: string, bytes: Uint8Array): string {
     if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
     const hash = createHash('sha256').update(bytes).digest('hex')
@@ -88,14 +87,14 @@ export class PluginCache {
     return hash
   }
 
-  // Main-only. Phase 3's `app-plugin://` handler is the caller; this never crosses contextBridge.
+  // Main-only. The `app-plugin://` handler is the caller, and this never reaches the renderer.
   path(hash: string): string | null {
     return this.has(hash) ? join(this.dir, `${hash}.js`) : null
   }
 
   // Pull a plugin's client bundle from a node and store it under the hash of the bytes that arrived.
-  // `claim` is what the node's listing said; it is a fast "do we already have this?" check and an
-  // integrity assertion, never the storage key: docs/security.md § Third-party plugin bundles.
+  // `claim` is what the node's listing said. It is a fast "do we already have this?" check and an
+  // integrity assertion, never the storage key. See docs/security.md, "Third-party plugin bundles".
   async putFromNode(nodeId: string, pluginId: string, claim: { hash: string; version: string }): Promise<PutResult> {
     if (!HASH_RE.test(claim.hash)) return { error: 'hash-mismatch' }
     if (this.has(claim.hash)) {
@@ -120,8 +119,8 @@ export class PluginCache {
 
     const hash = createHash('sha256').update(response.body).digest('hex')
     if (hash !== claim.hash) {
-      // Loud, and refused. This is the one failure in this file that is a security event rather than
-      // an operational one, and the owner sees it as a blocked row rather than a silent absence.
+      // Loud, and refused. The one failure in this file that is a security event rather than an
+      // operational one, and the owner sees it as a blocked row rather than a silent absence.
       console.error(`[plugins] ${pluginId} from ${nodeId} does not match the hash it advertised; refusing the bundle`)
       return { error: 'hash-mismatch' }
     }
@@ -143,8 +142,8 @@ export class PluginCache {
     return { hash }
   }
 
-  // A node still offers this bundle. Keeps the eviction clock honest for a plugin that has been
-  // installed and untouched for a year.
+  // A node still offers this bundle. Keeps the eviction clock honest for a plugin installed and
+  // untouched for a year.
   noteSeen(nodeId: string, hash: string): void {
     const entry = this.entries()[hash]
     if (!entry) return
@@ -161,7 +160,7 @@ export class PluginCache {
   }
 
   // Boot sweep. Two independent jobs, because the file set and the index can disagree in both
-  // directions after a crash mid-write: drop bundles nothing indexes, and drop index rows for bundles
+  // directions after a crash mid-write. Drop bundles nothing indexes, and drop index rows for bundles
   // no known node has offered in a long time.
   sweep(): void {
     const entries = { ...this.entries() }
@@ -194,8 +193,8 @@ export class PluginCache {
     if (this.#entries) return this.#entries
     try {
       const parsed = indexSchema.safeParse(JSON.parse(readFileSync(join(this.dir, INDEX_FILE), 'utf8')))
-      // Same stance as fleet.json: an index we cannot parse is not one to guess at. Starting empty
-      // costs a re-download and a re-prompt, both of which are safe; half-reading it would not be.
+      // Same stance as fleet.json. An unparseable index is not one to guess at: starting empty costs
+      // a re-download and a re-prompt, both safe, where half-reading it would not be.
       if (!parsed.success) console.warn('[plugins] the bundle cache index is unreadable; starting from an empty cache')
       this.#entries = parsed.success ? parsed.data.entries : {}
     } catch {
@@ -204,8 +203,8 @@ export class PluginCache {
     return this.#entries
   }
 
-  // Temp + rename so a crash mid-write cannot leave a truncated file sitting under a hash that
-  // promises its contents. The temp name carries the hash for the same reason.
+  // Write to a temp file and rename, so a crash mid-write cannot leave a truncated file under a hash
+  // that promises its contents. The temp name carries the hash for the same reason.
   private writeBundle(hash: string, bytes: Uint8Array): void {
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
     const target = join(this.dir, `${hash}.js`)

@@ -9,11 +9,11 @@ import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
 import { Alert, Button, Checkbox, Select } from '../ui/primitives'
 
 // All project-level config for one folder project (docs/workspaces-and-tasks.md § Worktrees and
-// setup), collapsed behind a native <details> so a workspace with several projects isn't an
-// overwhelming wall of fields. Reads/writes the project row through the project bridge; local
-// signals override the fetched row while typing (null means use the row).
-// Gated on a mapped checkout, like run targets: the scripts run on the node, so the hosting client is
-// irrelevant. (Was labelled desktop-only, from when every route here was a preload bridge.)
+// setup), collapsed behind a native <details> so a workspace with several projects is not a wall of
+// fields. Reads and writes the project row through the project bridge; a local signal overrides the
+// fetched row while typing, and null means use the row.
+//
+// Gated on a mapped checkout, like run targets, because the scripts run on the node.
 export function ProjectConfig(props: { projectId: string; name: string }) {
   const api = taskBridge()
   const [row, { refetch }] = createResource(
@@ -31,8 +31,8 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   const [branchPrefix, setBranchPrefix] = createSignal<string | null>(null)
   const [err, setErr] = createSignal('')
 
-  // Gate the AI-SQL schema-source editor on a configured model provider connection, since the
-  // feature is useless without one, matching where SQL generation itself is available.
+  // The AI-SQL schema-source editor needs a configured model provider connection, matching where
+  // SQL generation itself is available.
   const integrations = createQuery(() => integrationsOptions(true))
   const hasModelConnection = () => {
     const data = integrations.data
@@ -58,8 +58,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   const debDbNotes = debounce(() => void save({ dbSchemaNotes: dbSchemaNotes() ?? '' }), 1500)
   const debPreview = debounce(() => void save({ previewValue: previewValue() ?? '' }), 1500)
   // The prefix is normalised server-side ('feature' becomes 'feature/'), so drop the local override
-  // once saved: the refetched row is the canonical value and the input should show it, not the raw
-  // typing.
+  // once saved and let the refetched row show.
   const debBranchPrefix = debounce(() => void save({ branchPrefix: branchPrefix() ?? '' }).then(() => setBranchPrefix(null)), 1500)
   onCleanup(() => { debSetup.flush(); debTeardown.flush(); debDbUrl.flush(); debDev.flush(); debDevRestart.flush(); debDbSchema.flush(); debDbNotes.flush(); debPreview.flush(); debBranchPrefix.flush() })
 
@@ -298,9 +297,9 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
   )
 }
 
-// Preview-browser page rules: row-per-rule editor over a repo's browserRules array. Whole-array save;
-// rows missing a pattern or selector are kept locally but not saved, so half-typed rules never 400
-// against the strict route validation.
+// Preview-browser page rules: a row-per-rule editor over a repo's browserRules array, saved as a
+// whole array. A row missing a pattern or selector is kept locally but not saved, so a half-typed
+// rule never 400s against the route's validation.
 function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: BrowserRule[]) => Promise<unknown> }) {
   const [rules, setRules] = createSignal<BrowserRule[]>(props.rules)
 
@@ -322,7 +321,7 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
 
   return (
     <>
-      {/* Index (not For): keys by position so editing a rule doesn't remount its row and defocus the input. */}
+      {/* Index, not For: keying by position stops an edit remounting the row and defocusing it. */}
       <Index each={rules()}>
         {(rule) => (
           <div class="integration-key-row">

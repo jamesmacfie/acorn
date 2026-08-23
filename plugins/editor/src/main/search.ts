@@ -1,6 +1,6 @@
 // Find-in-files: project-wide text search over the task's worktree, backed by ripgrep. Keyed by
-// taskId, not path: the renderer never hands us a path, so this resolves taskId to taskRoot and rg
-// runs with cwd:root, searching `.`. Exposed as the SearchBridge (server/routes/search.ts).
+// taskId, not path: the renderer never hands over a path, so this resolves taskId to taskRoot and
+// runs rg with cwd:root, searching `.`. Exposed as the SearchBridge (server/routes/search.ts).
 import { execFile } from 'node:child_process'
 import { sep } from 'node:path'
 import { promisify } from 'node:util'
@@ -35,10 +35,10 @@ type RgEvent = {
   }
 }
 
-// ripgrep's submatch offsets are UTF-8 bytes, while JavaScript strings and Monaco columns use
-// UTF-16 code units. Convert at the main-process boundary so every renderer consumer gets one
-// coherent column contract. rg only reports code-point boundaries, so a partial character cannot
-// occur; the defensive >= check still clamps malformed offsets to the next valid position.
+// ripgrep's submatch offsets are UTF-8 bytes, while JavaScript strings and Monaco columns use UTF-16
+// code units. Convert at the main-process boundary so every renderer consumer shares one column
+// contract. rg only reports code-point boundaries, so a partial character cannot occur, and the >=
+// check clamps a malformed offset to the next valid position.
 function utf16OffsetAtUtf8Byte(text: string, byteOffset: number): number {
   let bytes = 0
   let utf16 = 0
@@ -99,9 +99,8 @@ export function parseRgJson(stdout: string): SearchResult {
   return { files: files.filter((f) => f.hits.length), truncated }
 }
 
-// Run ripgrep over the task's worktree. An unknown task or unmapped repo returns an empty result,
-// never an error: the taskId is the capability, and a stale one is benign, so the pane just shows
-// no hits.
+// Run ripgrep over the task's worktree. An unknown task or unmapped repo returns an empty result
+// rather than an error: the taskId is the capability, and a stale one is benign.
 export async function searchInFiles(core: SearchCoreServices, taskId: string, query: string, opts: SearchOpts): Promise<SearchResult> {
   const root = await core.tasks.root(taskId)
   if (!root || !query) return { files: [], truncated: false }

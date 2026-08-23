@@ -10,9 +10,9 @@ import { langFor } from '../../highlight/shiki'
 // resolve.
 import type { TokenizeDocument } from '../../highlight/worker'
 
-// The renderer's own input contract, structural rather than named after one producer. A PR file
-// from github, an uncommitted hunk from changes, or a future producer all satisfy it without either
-// side importing the other.
+// The renderer's own input contract, structural rather than named after one producer, so a PR file
+// from github and an uncommitted hunk from changes both satisfy it without either side importing
+// the other.
 export type DiffFile = {
   path: string
   status: string | null
@@ -88,8 +88,8 @@ export type TokenizeLine = (path: string, content: string) => Tok[]
 export const isCodeRow = (r: Row): r is CodeRow => r.kind === 'normal' || r.kind === 'insert' || r.kind === 'delete'
 export const fileAnchor = (path: string) => `diff-file:${path}`
 
-// Virtualizer size estimates per row kind. This is the single source for these numbers; DiffView's
-// fallback estimate imports DIFF_LOAD_ROW_HEIGHT rather than redefining 36.
+// Virtualizer size estimates per row kind, and the single source for these numbers: DiffView's
+// fallback imports DIFF_LOAD_ROW_HEIGHT rather than redefining it.
 export const DIFF_LINE_HEIGHT = 20
 export const DIFF_FILE_HEADER_HEIGHT = 36
 export const DIFF_THREAD_HEIGHT = 140
@@ -224,18 +224,17 @@ function rawPatchRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[] {
 //
 // A hunk interleaves two documents. A deleted line belongs to the pre-image, an inserted line to
 // the post-image, an unchanged line to both. Tokenizing them in display order would feed the
-// grammar a text that never existed: a deleted `*/` would close a comment for the inserted lines
-// below it. So the two sides are gathered separately and each is tokenized as its own document.
+// grammar a text that never existed, where a deleted `*/` closes a comment for the inserted lines
+// below it. So each side is gathered and tokenized as its own document.
 //
-// Context lines are in both batches, because they carry grammar state to the deletions on one side
-// and the insertions on the other; leaving them out of either would put that side's changed lines
-// back on a cold start. Their row appears as a target twice, and the second assignment wins. The
-// two sides agree on the text by definition, so this is safe.
+// Context lines go in both batches, because they carry grammar state to the deletions on one side
+// and the insertions on the other. Their row appears as a target twice and the second assignment
+// wins, which is safe because the two sides agree on the text by definition.
 type TokenBatch = { code: string; targets: CodeRow[] }
 
 // The structure of a patch, with the tokens still missing. Split out because the two fill
 // strategies, per line on the main thread and per hunk-side in the worker, differ only in how
-// `batches` is consumed, and the hunk walk below is not worth having twice.
+// `batches` is consumed.
 function buildRowSkeleton(file: DiffFile): { rows: DiffRow[]; batches: TokenBatch[] } | null {
   let parsed: ReturnType<typeof gitdiffParser.parse>
   try {
@@ -304,13 +303,12 @@ export function buildDiffRows(file: DiffFile, tokenize: TokenizeLine): DiffRow[]
 /**
  * The same rows, tokenized a document at a time instead of a line at a time.
  *
- * This is the path the app uses. It is what makes the worker worth having, one message per
- * hunk-side rather than per line (see highlight/worker.ts), and it is what makes multi-line
- * constructs colour correctly, because shiki carries grammar state across the lines of a single
- * call.
+ * This is the path the app uses: one message per hunk-side rather than per line (see
+ * highlight/worker.ts). It is also what colours multi-line constructs correctly, because shiki
+ * carries grammar state across the lines of a single call.
  *
- * Never rejects: tokenizeDocument degrades to plain text rather than throwing, and a patch that
- * will not parse falls back to the untokenized raw rows exactly as the sync path does.
+ * Never rejects. tokenizeDocument degrades to plain text rather than throwing, and a patch that
+ * will not parse falls back to the untokenized raw rows as the sync path does.
  */
 export async function buildDiffRowsAsync(file: DiffFile, tokenizeDoc: TokenizeDocument): Promise<DiffRow[]> {
   if (!file.patch) return []
@@ -342,11 +340,9 @@ export function expandGap(gap: GapRow, body: string, tokenize: TokenizeLine): Co
 /**
  * As above, tokenized as one document so the revealed run colours consistently.
  *
- * The run still starts from a cold grammar state at its first line, because the lines above it were
- * never tokenized: this reveals a slice out of the middle of a file. Expanding into the top of a
- * block comment therefore still mis-colours until the expansion reaches line 1. Fixing it means
- * tokenizing the whole body and keeping the state, worth doing when someone complains about an
- * expanded gap specifically rather than on spec.
+ * The run starts from a cold grammar state at its first line, because this reveals a slice out of
+ * the middle of a file. Expanding into the top of a block comment mis-colours until the expansion
+ * reaches line 1. Fixing that means tokenizing the whole body and keeping the state.
  */
 export async function expandGapAsync(gap: GapRow, body: string, tokenizeDoc: TokenizeDocument): Promise<CodeRow[]> {
   const rows = gapRows(gap, body)

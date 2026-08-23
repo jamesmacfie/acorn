@@ -2,14 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { _resetPluginChannels, ensurePluginChannel, onPluginFrame, onPluginPush } from './pluginChannel'
 import { routeWsFrame, wsChannelPrefixes } from '../wsChannels'
 
-// The prefix core claims for every loaded plugin's own live channel (docs/plugins.md § The live
-// channel). Two consumers with deliberately different cadences, which is the whole reason this module
-// exists rather than the two call sites each listening to the socket:
+// The prefix core claims for every loaded plugin's live channel (docs/plugins.md § The live channel).
+// A subscribed frame gets every frame, chrome gets a coalesced nudge.
 //
-//   - a frame gets every frame, because it asked for the stream
-//   - chrome gets a coalesced nudge, because a rail row is a network read per node
-//
-// `wsClient` is stubbed because `wsConnect()` would otherwise open a socket from a unit test.
+// `wsClient` is stubbed because `wsConnect()` would open a socket from a unit test.
 vi.mock('../wsClient', () => ({ wsConnect: () => {} }))
 
 afterEach(() => {

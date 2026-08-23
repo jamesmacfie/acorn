@@ -2,44 +2,39 @@ import type { Browser, BrowserContext, CDPSession, Page } from 'playwright-core'
 import { buildAxTree, isAllowedBrowserUrl, renderAxTree, resolveRef, type AxSnapshot } from './axTree'
 
 // One Playwright browser for the node, one incognito context and page per task, and a CDP session on
-// each page for the accessibility tree (docs/agent-tools.md § Browser tools).
+// each page for the accessibility tree. See docs/agent-tools.md § Browser tools.
 //
-// Why CDP at all when Playwright has locators: refs. An agent needs stable per-snapshot handles it can
-// name back to us, which is what `Accessibility.getFullAXTree` plus ./axTree.ts already produce, tested,
-// from the shell version of this driver. Playwright buys the parts that were hand-rolled before —
-// launching, waiting, screenshots, console capture — and the tree stays as it was.
+// CDP rather than Playwright locators, because an agent needs stable per-snapshot refs it can name back
+// to us, and `Accessibility.getFullAXTree` plus ./axTree.ts produce those. Playwright covers launching,
+// waiting, screenshots, and console capture.
 //
-// The browser is not in this bundle and never will be: plugin bundles are hash-addressed and a Chromium
-// is 150 MB per platform. This drives an installed Chrome, and says so plainly when there is not one.
+// The bundle ships no browser: bundles are hash-addressed and a Chromium is 150 MB per platform. This
+// drives an installed Chrome, and says so when there is not one.
 
 const CONSOLE_CAP = 200
 
-// How many task browsing contexts stay alive. Each is a browsing profile with its own cookies and
-// storage, cheap but not free, and a long-running node works through a lot of tasks.
+// How many task browsing contexts stay alive. Each carries its own cookies and storage, and a
+// long-running node works through a lot of tasks.
 //
-// ponytail: the oldest is closed when a new one is needed, because nothing tells this plugin a task
-// was archived. If a task-lifecycle signal ever reaches a plugin, close on that instead and delete the
-// cap.
+// ponytail: the oldest closes when a new one is needed, because nothing tells this plugin a task was
+// archived. If a task-lifecycle signal ever reaches a plugin, close on that and delete the cap.
 const MAX_SESSIONS = 8
 
-// Chrome, then Chromium, then whatever `playwright-core` was pointed at by PLAYWRIGHT_BROWSERS_PATH.
-// Ordered by what a developer machine most likely already has.
+// Tried in order of what a developer machine most likely already has. The bare `launch()` fallback
+// picks up PLAYWRIGHT_BROWSERS_PATH.
 const CHANNELS = ['chrome', 'chromium'] as const
 
 export const NO_BROWSER =
   'No Chrome or Chromium on this machine. Install Google Chrome, or point PLAYWRIGHT_BROWSERS_PATH at a Playwright browser directory, and try again.'
 
-/// Everything a tool call needs back, in the shape the agent reads. `ok: false` is a domain answer, not
-/// a crash: an agent that asked a browser to do something impossible should be told what happened and
-/// get to try something else.
+/// `ok: false` is an answer, not a crash. An agent that asked for something impossible gets told what
+/// happened and can try something else.
 export type Outcome = { ok: true } | { ok: false; reason: string }
 
 export type Capture = { id: string; mime: string; bytes: Buffer; taskId: string }
 
-/// Where a screenshot goes. The plugin's own table implements it; a test passes something simpler. The
-/// point of the seam is that this file never learns what a database is
-/// (docs/agent-tools.md § Browser tools: rich results are blobs the node stores, not inline base64
-/// that evaporates with the transcript).
+/// Where a screenshot goes. The plugin's own table implements it, a test passes something simpler, and
+/// this file never learns what a database is. See docs/agent-tools.md § Browser tools.
 export type CaptureStore = { put(capture: Omit<Capture, 'id'>): Promise<{ id: string }> }
 
 type Session = { context: BrowserContext; page: Page; cdp: CDPSession; console: string[]; snapshot: AxSnapshot | null }
@@ -51,8 +46,8 @@ export class BrowserPool {
 
   constructor(private readonly captures: CaptureStore) {}
 
-  /// Launch once, lazily, and share. A browser process is expensive and a node with no agent driving
-  /// one should not be paying for it, which is why nothing here happens at plugin init.
+  /// Launch once, lazily, and share. Nothing happens at plugin init, because an idle node should not
+  /// pay for a browser process.
   async #launch(): Promise<Browser> {
     if (this.#browser?.isConnected()) return this.#browser
     this.#launching ??= (async () => {
@@ -73,8 +68,8 @@ export class BrowserPool {
     })()
       .then((browser) => {
         this.#browser = browser
-        // A browser the owner closed by hand, or one that crashed. The next call launches a new one
-        // rather than handing back a dead handle.
+        // The owner closed it by hand, or it crashed. The next call launches a new one rather than
+        // handing back a dead handle.
         browser.once('disconnected', () => {
           this.#browser = null
           this.#sessions.clear()
@@ -87,8 +82,7 @@ export class BrowserPool {
     return this.#launching
   }
 
-  /// One context per task, so cookies, storage and logins of one task's work never reach another's.
-  /// The same isolation the preview pane's ephemeral data store gives a person.
+  /// One context per task, so one task's cookies, storage, and logins never reach another's.
   async #session(taskId: string): Promise<Session> {
     const existing = this.#sessions.get(taskId)
     if (existing && !existing.page.isClosed()) return existing
@@ -145,9 +139,8 @@ export class BrowserPool {
     return this.#attempt(taskId, async (session) => {
       const backendNodeId = resolveRef(session.snapshot, ref)
       await session.cdp.send('DOM.getDocument')
-      // Cleared through the resolved node rather than a selector, so a page cannot substitute a
-      // different element between the snapshot and the write, then focused and typed so framework
-      // bindings see real input events.
+      // Clear through the resolved node, not a selector, so the page cannot substitute a different
+      // element between the snapshot and the write. Focus and type so frameworks see real input events.
       const { object } = (await session.cdp.send('DOM.resolveNode', { backendNodeId })) as { object: { objectId: string } }
       await session.cdp.send('Runtime.callFunctionOn', {
         objectId: object.objectId,
@@ -158,8 +151,7 @@ export class BrowserPool {
     })
   }
 
-  /// Persisted, not inlined. The tool answers with a handle the node can still resolve after the
-  /// transcript is gone, which is what makes a future audit trail at the tool-registry seam possible.
+  /// Persisted, not inlined, so the handle still resolves after the transcript is gone.
   async screenshot(taskId: string): Promise<{ captureId: string; url: string; bytes: number } | { error: string }> {
     try {
       const session = await this.#session(taskId)
@@ -176,8 +168,7 @@ export class BrowserPool {
     return { lines: session ? [...session.console] : [] }
   }
 
-  /// Drop one task's browsing. Called when a task is archived; the context takes its cookies and
-  /// storage with it.
+  /// Drop one task's browsing. The context takes its cookies and storage with it.
   async release(taskId: string): Promise<void> {
     const session = this.#sessions.get(taskId)
     if (!session) return

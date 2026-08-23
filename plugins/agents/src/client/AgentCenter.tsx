@@ -21,9 +21,8 @@ const elapsed = (timestamp: number): string => {
   return `${Math.round(minutes / 1_440)}d`
 }
 
-// One row, whichever scope produced it. `nodeId` is always present: in workspace scope it is the
-// active node, so `open` has one code path instead of branching on the scope that happened to be
-// selected.
+// One row, whichever scope produced it. `nodeId` is always present, the active node in workspace
+// scope, so `open` has one code path instead of branching on the scope.
 type AgentRow = { session: AgentSession; nodeId: string; nodeLabel: string; task: Task | undefined }
 
 export default function AgentCenter() {
@@ -39,8 +38,8 @@ export default function AgentCenter() {
     (tasks.data ?? []).filter((task) => workspaceProjectIds().has(task.projectId)))
   const workspaceTaskIds = createMemo(() => new Set(workspaceTasks().map((task) => task.id)))
   const [providers] = createResource(() => managedAgentApi.providers())
-  // The harness's own glyph, and the label's first letter when it declared none. The row used to draw
-  // `'C' : '⌘'` off the provider id, which drew Codex's mark for every third harness.
+  // The harness's own glyph, falling back to the label's first letter. Deriving it from the provider
+  // id draws Codex's mark for every harness that is not Claude.
   const providerGlyph = (providerId: string): string => {
     const provider = providers()?.find((candidate) => candidate.id === providerId)
     return provider?.glyph ?? (provider?.label ?? providerId).slice(0, 1).toUpperCase()
@@ -102,8 +101,8 @@ export default function AgentCenter() {
 
   const taskById = createMemo(() => new Map(workspaceTasks().map((task) => [task.id, task])))
 
-  // Rows, in whichever scope is selected. Both branches produce the same shape, so everything downstream
-  // (filters, counts, sort, open) is written once.
+  // Rows, in whichever scope is selected. Both branches produce the same shape, so the filters, counts,
+  // sort, and open below are written once.
   const rows = createMemo<AgentRow[]>(() => {
     if (fleetScope()) {
       // Per node, because a task id is only meaningful on its own node (docs/architecture-overview.md § Fleet semantics:
@@ -150,10 +149,10 @@ export default function AgentCenter() {
 
   function open(row: AgentRow) {
     if (!row.task) return setError('The session’s task is no longer available.')
-    // The node switches first. Everything below resolves against the active node: `activateTaskSignals`
-    // writes per-task client state, and `navigate` lands on a route the shell reads through the active
-    // node's query cache. Opening a remote row without switching first would address the wrong machine, or
-    // collide with a local task holding the same id.
+    // The node switches first, because everything below resolves against the active node.
+    // `activateTaskSignals` writes per-task client state and `navigate` lands on a route the shell
+    // reads through the active node's query cache. Opening a remote row without switching first
+    // addresses the wrong machine, or collides with a local task holding the same id.
     if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
     activateTaskSignals(row.task, { pane: 'agents' })
     openManagedSession(row.task.id, row.session.id)

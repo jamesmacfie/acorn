@@ -10,15 +10,14 @@ import { type Clock, Scheduler } from './scheduler'
 export { keyOwner, Scheduler } from './scheduler'
 export type { Clock, CreateScheduleInput, DeclaredSchedule, PatchScheduleInput, ScheduleRunner, ScheduleTarget } from './scheduler'
 
-/** The handle on the one scheduler this process owns. A capability rather than a binding on c.env for
- *  the same reason PLUGIN_STATE is one: the scheduler only exists once the composition root has built
- *  it, and its lifetime (start, drain, stop) belongs to whoever owns teardown, which makeBindings,
- *  having no stop(), does not.
+/** The handle on the one scheduler this process owns. A capability rather than a binding on c.env, for
+ *  the same reason PLUGIN_STATE is one: the scheduler exists only once the composition root has built
+ *  it, and its start, drain and stop belong to whoever owns teardown. makeBindings has no stop().
  *
  *  `register` is here for the plugin context, not for a route. `ctx.schedules.register` resolves the
  *  scheduler through this capability at call time rather than being threaded through initPlugins, the
- *  same late binding every other cross-plugin need uses (server/plugin/host.ts). Not `start`, `stop`
- *  or the constructor: the composition root owns the lifetime and nothing else may. */
+ *  late binding every other cross-plugin need uses (server/plugin/host.ts). Not `start`, `stop` or the
+ *  constructor: the composition root owns the lifetime and nothing else may. */
 export type SchedulerBridge = Pick<Scheduler, 'list' | 'runs' | 'create' | 'confirm' | 'patch' | 'remove' | 'runNow' | 'paused' | 'setPaused' | 'register'>
 export const SCHEDULER = routeCapability<SchedulerBridge>('core.scheduler')
 
@@ -27,9 +26,9 @@ export const SCHEDULER = routeCapability<SchedulerBridge>('core.scheduler')
 export type CreateSchedulerOptions = {
   clock?: Clock
   // The node's bindings. Optional because a test that only exercises the engine needs none, and
-  // because the two schedules and the one target below are exactly the work that reaches out of the
-  // scheduler, into plugin routes and the identity store. A scheduler built without env simply
-  // declares the audit prune, which is the only core job that is pure database work.
+  // because the two schedules and the one target below are the work that reaches out of the scheduler,
+  // into plugin routes and the identity store. A scheduler built without env declares only the audit
+  // prune, the one core job that is pure database work.
   env?: Env
 }
 
@@ -56,10 +55,9 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
       },
     })
 
-    // core:sample-measures (docs/schedules.md § What is registered today; § Policies for jitter and
-    // timeout). The timeout is generous because a pass dispatches one in-process read per source per
-    // panel; a pass that runs out of time simply records fewer panels and says so, the same shape as
-    // a skip.
+    // core:sample-measures (docs/schedules.md § What is registered today, § Policies). The timeout is
+    // generous because a pass dispatches one in-process read per source per panel. A pass that runs out
+    // of time records fewer panels and says so, the same shape as a skip.
     scheduler.register({
       key: 'core:sample-measures',
       name: 'Record dashboard measures',
@@ -75,7 +73,7 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
       cadence: { daily: '03:40' },
       run: async () => {
         // `null` when the blob could not be read, which skips the orphan sweep. Deleting every series
-        // because a preference read failed would be the worst available response to a transient error.
+        // over a failed preference read is the worst available response to a transient error.
         const prefs = await readDashboardPrefs(db, env)
         const live = prefs === null ? null : definedPanelIds(prefs)
         const { collapsed, dropped, orphaned } = await compactHistory(db, Date.now(), live)
@@ -85,8 +83,7 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
 
     // The one user-schedule target this build can run (docs/schedules.md § `node-action`). Registered
     // here rather than through the bridge because the target is core's: it dispatches a plugin's own
-    // route the same way a click does, and owning that dispatch is not something a plugin should be
-    // able to register on its own behalf.
+    // route the way a click does, and no plugin should register that dispatch on its own behalf.
     registerNodeActionTarget(scheduler, env)
   }
 

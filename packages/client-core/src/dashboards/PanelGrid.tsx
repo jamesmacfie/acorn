@@ -42,14 +42,14 @@ import {
 import './dashboards.css'
 
 // One placement: the grid of panels a person put somewhere, plus the chrome for putting one there,
-// arranging it and taking it away. `Panel` is placement-agnostic and owns a panel's frame, freshness
-// and body; this owns the arrangement. See docs/dashboards.md § Placements and § The grid.
+// arranging it, and taking it away. `Panel` owns a panel's frame, freshness, and body; this owns
+// the arrangement. See docs/dashboards.md § Placements and § The grid.
 //
-// It takes a scope rather than assuming home because `panelsAt` and `layoutAt` already do. A task pane
-// or a plugin-reserved region is this component with a different scope, not a second one.
+// It takes a scope rather than assuming home, because `panelsAt` and `layoutAt` already do. A task
+// pane or a plugin-reserved region is this component with a different scope.
 //
 // All layout arithmetic is in `layout.ts`. This file turns pixels into a candidate rect and renders
-// what the pure functions answer, and decides nothing about where a panel lands.
+// what the pure functions answer.
 
 /** Below this the cells are too small to mean anything, so the grid collapses to one column. */
 const MIN_CELL_PX = 44
@@ -78,20 +78,20 @@ const ARROWS: Record<string, readonly [number, number]> = {
 
 export default function PanelGrid(props: {
   scope: PlacementScope
-  /** Replaces the "Panels" heading in the same seat. Home's tab bar takes it when there is more than one
-   *  dashboard, because tabs are the heading then. Its presence is also what keeps the header row on an
-   *  empty placement, so a freshly created tab still has a bar. See docs/dashboards.md § Placements. */
+  /** Replaces the "Panels" heading in the same seat; Home's tab bar takes it when there is more than
+   *  one dashboard. Its presence also keeps the header row on an empty placement, so a freshly
+   *  created tab still has a bar. See docs/dashboards.md § Placements. */
   heading?: JSX.Element
   /** `role="tabpanel"` wiring for the grid, when something above it is a tablist. */
   panelAria?: { id: string; labelledBy: string }
   /** Present when this grid is a rectangle a plugin reserved, carrying what the owner allows there
-   *  (region.ts). Absent for Home and the task pane, which are the user's own surfaces and constrain
-   *  nothing. Every rule it carries is applied in exactly two places below, the offer and the render. */
+   *  (region.ts). Absent for Home and the task pane, which constrain nothing. Every rule it carries
+   *  is applied in two places below, the offer and the render. */
   region?: PanelRegion
 }) {
   // The sheet's session. The wrapper distinguishes "open" from "closed", which a bare
-  // `PanelDefinition | undefined` cannot. It is opened with no panel by nothing today, and otherwise
-  // with a draft the wizard handed over (`creating`) or a placed panel being edited.
+  // `PanelDefinition | undefined` cannot. It opens with a draft the wizard handed over (`creating`)
+  // or with a placed panel being edited.
   const [editing, setEditing] = createSignal<{ panel?: PanelDefinition; creating?: boolean } | undefined>()
   const [adding, setAdding] = createSignal(false)
   const [gesture, setGesture] = createSignal<Gesture | undefined>()
@@ -101,10 +101,10 @@ export default function PanelGrid(props: {
   const [announcement, setAnnouncement] = createSignal('')
   const confirmDelete = createArmedConfirm()
 
-  // The render-time half of a region's constraints. A panel the owner no longer allows here is dropped
-  // from this grid and from nowhere else: its definition, and every other placement of it, survive
-  // (region.ts, `regionAllows`). The hole it leaves in the geometry is cosmetic and only appears when a
-  // plugin narrows its own region after somebody composed against the wider one.
+  // The render-time half of a region's constraints. A panel the owner no longer allows here is
+  // dropped from this grid and nowhere else: its definition and every other placement survive
+  // (region.ts, `regionAllows`). The hole it leaves is cosmetic, and only appears when a plugin
+  // narrows its own region after somebody composed against the wider one.
   const panels = () => {
     const region = props.region
     const placed = panelsAt(props.scope)
@@ -117,8 +117,8 @@ export default function PanelGrid(props: {
     return region ? regionCollections(region, collectionContributions()) : collectionContributions()
   }
   const views = () => props.region && regionViews(props.region)
-  /** A region's cap is the owner's, and it takes the affordance away rather than failing on click, the
-   *  same rule the "no plugin provides a collection" gate below applies. */
+  /** A region's cap takes the affordance away rather than failing on click, the same rule the
+   *  "no plugin provides a collection" gate below applies. */
   const hasRoom = () => !props.region || regionHasRoom(props.region, panels().length)
   const committed = createMemo(() => layoutAt(props.scope))
   /** What the grid draws: the live candidate while a gesture is running, else what is stored. */
@@ -131,8 +131,7 @@ export default function PanelGrid(props: {
   // ── Measurement ─────────────────────────────────────────────────────────────────────────────
   //
   // The one pixel measurement in the whole feature (docs/dashboards.md § The grid): square cells,
-  // measured by a `ResizeObserver`, with the accepted consequence that panel heights breathe with
-  // window width.
+  // measured by a `ResizeObserver`, at the cost of panel heights breathing with window width.
   //
   // The gap is read off the resolved `column-gap` rather than by token name, so the grid and the
   // overlay agree to the pixel whatever a style pack sets, and nothing here joins the
@@ -159,10 +158,9 @@ export default function PanelGrid(props: {
 
   // ── Pointer gestures ────────────────────────────────────────────────────────────────────────
   //
-  // Pointer events with capture, not HTML5 drag-and-drop. The house mechanic (ui/split.ts) is already
-  // pointer-capture with rAF coalescing and user-select suppression, and HTML5 DnD brings a ghost image
-  // we would fight, no `pointercancel`, and worse coordinates. `createSplitDrag` itself is not extended:
-  // its own comment says its three call sites are delta-in-pixels, and this one is rect-in-cells.
+  // Pointer events with capture, not HTML5 drag-and-drop, which brings a ghost image to fight, no
+  // `pointercancel`, and worse coordinates. `createSplitDrag` is not extended, because its call
+  // sites are delta-in-pixels and this one is rect-in-cells.
 
   // A gesture that outlives its component would keep arranging panels that no longer exist.
   let release: (() => void) | undefined
@@ -317,9 +315,9 @@ export default function PanelGrid(props: {
 
   // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
   //
-  // Move up and move down survive, reinterpreted onto geometry as a swap toward the neighbour in
-  // reading order (docs/dashboards.md § The grid). On a one-column window they behave exactly as
-  // they did before geometry existed, which is the continuity that matters.
+  // Move up and move down are reinterpreted onto geometry as a swap toward the neighbour in reading
+  // order (docs/dashboards.md § The grid). On a one-column window they behave as they did before
+  // geometry existed.
 
   const moveTo = (id: PanelId, delta: -1 | 1) => {
     const current = committed()
@@ -339,13 +337,11 @@ export default function PanelGrid(props: {
 
   // ── Moving between placements ───────────────────────────────────────────────────────────────
   //
-  // The Home tabs other than this one (docs/dashboards.md § Placements). A flat labelled group rather
-  // than a submenu: `Menu` has no submenu and one is not worth inventing for a list of at most seven
-  // names that is already keyboard-operable as rows.
+  // The Home tabs other than this one (docs/dashboards.md § Placements). A flat labelled group
+  // rather than a submenu, because `Menu` has no submenu and a list of at most seven names is
+  // already keyboard-operable as rows.
   //
-  // Only tabs today. Moving to a task pane would be the same two calls and a different destination;
-  // nobody has asked for it yet, and aiming a pane's panel at Home would put it where nobody is
-  // looking, which is the argument the wizard's Where control already makes.
+  // Tabs only. Moving to a task pane would be the same two calls and a different destination.
 
   const moveTargets = () => props.scope.surface !== 'home'
     ? []
@@ -370,9 +366,9 @@ export default function PanelGrid(props: {
           variant="ghost"
           iconOnly
           aria-label={`${definition.title} panel actions`}
-          // Header actions fade out when the pointer leaves the panel, and opening this menu moves both
-          // pointer and focus into a portal, so without this the trigger vanishes under its own open
-          // menu.
+          // Header actions fade out when the pointer leaves the panel, and opening this menu moves
+          // pointer and focus into a portal, so without this the trigger vanishes under its own
+          // open menu.
           {...(open() ? { 'data-open': '' } : {})}
           onClick={toggle}
         >
@@ -412,15 +408,14 @@ export default function PanelGrid(props: {
             </For>
           </Show>
           <Menu.Separator />
-          {/* Remove and Delete are two different things now that a panel can be placed in more than
-              one surface (docs/dashboards.md § Placements). Taking a board off Home must not destroy
-              the definition the same board renders from in a task pane. */}
+          {/* Remove and Delete differ because a panel can be placed in more than one surface
+              (docs/dashboards.md § Placements). Taking a board off Home must not destroy the
+              definition a task pane renders the same board from. */}
           <Menu.Item context={menu} onSelect={() => unplacePanel(props.scope, definition.id)}>
             Remove from here
           </Menu.Item>
-          {/* Armed, because the editor has made a definition genuinely expensive to recompose:
-              filters, a sort, a projection, a whole mapping matrix. One misclick used to cost all of
-              it, the idiom every other destructive row in the app uses. */}
+          {/* Armed, because a definition is expensive to recompose: filters, a sort, a projection,
+              a whole mapping matrix. */}
           <Menu.Item
             context={menu}
             tone="danger"
@@ -445,19 +440,16 @@ export default function PanelGrid(props: {
   // ── Rendering ───────────────────────────────────────────────────────────────────────────────
   //
   // Panels are positioned absolutely from the measured cell rather than by `grid-area`
-  // (docs/dashboards.md § The grid): `grid-area` cannot be transitioned, so push-down and
-  // compaction jumped between frames and a drag read as a reshuffle rather than a chain reaction.
-  // FLIP transforms over CSS grid were the alternative and were refused: they are fragile under the
-  // re-layout this grid does every frame, and they fight the sub-cell translate the dragged panel
-  // already carries.
+  // (docs/dashboards.md § The grid), because `grid-area` cannot be transitioned: push-down and
+  // compaction jumped between frames and a drag read as a reshuffle. FLIP transforms over CSS grid
+  // fight the sub-cell translate the dragged panel already carries.
   //
-  // The container therefore has no in-flow children and must state its own height, which follows
-  // the live layout, so a mid-gesture preview resizes the container and the ResizeObserver above
-  // sees it. That is only safe because `measure` reads the width and writes nothing back into the
-  // layout. An observer that re-applied the committed model would stomp the preview every frame.
+  // The container therefore has no in-flow children and states its own height, which follows the
+  // live layout, so a mid-gesture preview resizes the container and the ResizeObserver sees it.
+  // That is only safe because `measure` reads the width and writes nothing back into the layout.
   //
-  // The collapsed state emits none of it and the slots fall back into ordinary block flow, stacked
-  // in document order, which `placements` is kept sorted to on every commit.
+  // The collapsed state emits none of it and the slots fall back into block flow, stacked in
+  // document order, which `placements` is kept sorted to on every commit.
 
   /** The gap, back out of the two measurements: pitch is a cell plus one gap. */
   const gap = () => pitch() - cell()
@@ -486,8 +478,8 @@ export default function PanelGrid(props: {
     const offset = active?.id === id ? active.offset : undefined
     return {
       ...boxOf(rect),
-      // A hair of lift composed with the tracking translate, so the payload and the cells it came from
-      // never look like the same object.
+      // A hair of lift composed with the tracking translate, so the payload and the cells it came
+      // from never look like the same object.
       ...(offset ? { transform: `translate(${offset.x}px, ${offset.y}px) scale(1.015)` } : {}),
     }
   }
@@ -515,9 +507,9 @@ export default function PanelGrid(props: {
   return (
     <Show when={panels().length || collections().length || props.heading}>
       <section class="dash-placement">
-        {/* The fallback needs no gate of its own: reaching it means no panels, and the Show above
-            already established that there is then at least one collection to offer — or a heading,
-            which is a tab bar that must survive its own tab being empty. */}
+        {/* The fallback needs no gate: reaching it means no panels, and the Show above already
+            established at least one collection to offer, or a heading, which is a tab bar that has
+            to survive its own tab being empty. */}
         <Show when={panels().length || props.heading} fallback={<div class="dash-placement-add">{addButton()}</div>}>
           <SectionHeader level="group" actions={<Show when={collections().length && hasRoom()}>{addButton()}</Show>}>
             {props.heading ?? 'Panels'}
@@ -535,9 +527,8 @@ export default function PanelGrid(props: {
             }}
             {...(collapsed() ? { 'data-collapsed': '' } : {})}
           >
-            {/* Visible only while a gesture is live: it appears on arm and vanishes on release,
-                iOS-widget style. Nothing about the layout is discoverable chrome until a gesture
-                makes it relevant. */}
+            {/* Visible only while a gesture is live. Nothing about the layout is discoverable
+                chrome until a gesture makes it relevant. */}
             <Show when={gesture()}>
               <div class="dash-grid-overlay" aria-hidden="true" />
             </Show>
@@ -573,17 +564,16 @@ export default function PanelGrid(props: {
                     {handle(definition.id, 's')}
                     {handle(definition.id, 'se')}
                   </Show>
-                  {/* Sighted keyboard users got strictly less than screen-reader users here: the live
-                      region below said where the panel was and nothing on screen did. This is the
-                      same computed string drawn a second time, so it carries no state of its own. */}
+                  {/* The live region below says where the panel is and nothing on screen did. This
+                      is the same computed string drawn again, so it carries no state of its own. */}
                   <Show when={keyboardGesture()?.id === definition.id}>
                     <div class="dash-caption" aria-hidden="true">{announcement()}</div>
                   </Show>
                 </div>
               )}
             </For>
-            {/* The candidate cells, under the panel that is floating above them: the shape of the
-                panel that will land there rather than a wireframe of it. */}
+            {/* The candidate cells, under the floating panel: the shape of the panel that lands
+                there rather than a wireframe of it. */}
             <Show when={gesture()?.kind === 'move'}>
               <div class="dash-placeholder" aria-hidden="true" style={placeholderStyle()} />
             </Show>
@@ -591,10 +581,9 @@ export default function PanelGrid(props: {
           <div class="dash-live" aria-live="polite">{announcement()}</div>
         </Show>
 
-        {/* Creation is staged, editing is not (docs/dashboards.md § The generated editor): a panel
-            that does not exist yet cannot be judged from a form, while an existing one is already on
-            screen, so its editor is the whole sheet at once. The sheet remains able to do everything
-            the wizard can; the wizard's footer hands the draft straight to it. */}
+        {/* Creation is staged, editing is not (docs/dashboards.md § The generated editor). A panel
+            that does not exist yet cannot be judged from a form; an existing one is already on
+            screen, so its editor is the whole sheet at once. */}
         <Show when={adding()}>
           <PanelWizard
             collections={collections()}
@@ -619,9 +608,9 @@ export default function PanelGrid(props: {
               onClose={() => setEditing(undefined)}
               onSave={(panel) => {
                 savePanel(panel)
-                // Placed only when it is not already here. An edit that re-placed the panel would move
-                // it to the end of the grid every time somebody changed its title, and would now also
-                // throw away its rect.
+                // Placed only when it is not already here. An edit that re-placed the panel would
+                // move it to the end of the grid and throw away its rect every time somebody
+                // changed its title.
                 if (!panels().some((entry) => entry.id === panel.id)) placePanel(props.scope, panel.id)
               }}
             />

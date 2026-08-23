@@ -5,8 +5,8 @@ WebSocket. It serves no HTML, JavaScript, or static assets.
 
 Route and response types live in `packages/protocol/src/api.ts`; the server composition is
 `packages/node-core/src/server/index.ts`; plugin route declarations are registered by each Node
-plugin. The table below is the current route map by responsibility. Use the route modules for fields
-and validation details when changing a contract.
+plugin. The table below maps routes by responsibility. Use the route modules for fields and
+validation details when changing a contract.
 
 ## Transport
 
@@ -39,75 +39,74 @@ branch; otherwise the transport codes are `bad_request`, `unauthorized`, `forbid
 
 ## Pairing
 
-A pairing code is a one-time, 128-bit credential with a 10-minute window and a 5-attempt budget,
-issued and displayed by the node (QR plus text) and typed into the new client. It lives in memory
-only and is never persisted: a code that survived a node restart would be a credential sitting on
-disk for a window the owner believes has closed, so a restart loses an in-flight code and the owner
-just reopens the window. Issuing a new code replaces any code already open; there is at most one open
-window at a time.
+A pairing code is a one-time 128-bit credential with a 10-minute window and a 5-attempt budget. The
+node issues and displays it as a QR code plus text, and the owner types it into the new client. It
+lives in memory only. A code that survived a node restart would be a credential on disk for a window
+the owner believes has closed, so a restart loses an in-flight code and the owner reopens the window.
+Issuing a new code replaces any open one, so at most one window is open at a time.
 
-Every failure mode, no open window, an expired window, an exhausted attempt budget, a wrong code, or
-a malformed request body, answers with the same 401 status and message. The response gives a caller
-no way to tell which of those it hit, so there is no oracle for "right code, wrong something". The
-attempt counter increments before the code comparison runs, so exhausting the budget cannot be
-avoided by racing concurrent guesses.
+Every failure mode answers with the same 401 status and message: no open window, an expired window,
+an exhausted attempt budget, a wrong code, or a malformed body. A caller cannot tell which one it
+hit, so there is no oracle for "right code, wrong something". The attempt counter increments before
+the code comparison runs, so racing concurrent guesses cannot dodge the budget.
 
-`POST /v2/pair` returns the device's bearer token exactly once, in that response; the node stores
-only its hash from then on. The node's unauthenticated probe response carries the TLS certificate
-fingerprint, for the new client to compare against what the node's own screen shows. Sending the
-fingerprint over the connection being authenticated proves nothing by itself; the comparison's value
-comes from the owner reading both screens.
+`POST /v2/pair` returns the device's bearer token once, in that response, and the node stores only
+its hash from then on. The node's unauthenticated probe response carries the TLS certificate
+fingerprint for the new client to compare against the node's own screen. Sending the fingerprint over
+the connection being authenticated proves nothing by itself. The comparison's value comes from the
+owner reading both screens.
 
-`DELETE /v2/core/devices/:id` closes that device's open WebSocket connections immediately, since a
-live socket holds no bearer to re-check against a revocation. A device may revoke itself; every
+`DELETE /v2/core/devices/:id` closes that device's open WebSocket connections immediately, because a
+live socket holds no bearer to re-check against a revocation. A device may revoke itself. Every
 paired device already has full owner authority, so there is no separate self-revocation guard.
 
 ## Versioning
 
 **One number, one meaning.** `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
-protocol major, and it is the entire compatibility contract — there is no minor, no capability
-negotiation and no feature handshake. Each side refuses a major it does not speak: the pairing probe
-refuses before pairing, and the broker re-probes `GET /v2/node` on every connect, producing the
+protocol major and the entire compatibility contract. There is no minor, no capability negotiation,
+and no feature handshake. Each side refuses a major it does not speak. The pairing probe refuses
+before pairing, and the broker re-probes `GET /v2/node` on every connect, producing the
 `incompatible` connection state and the `protocol_mismatch` error code. Checking only at pairing is
-not enough, because a paired node upgrades — usually by restarting, which drops the socket, so the
-reconnect is where a new major shows up.
+not enough, because a paired node upgrades by restarting, which drops the socket, so the reconnect is
+where a new major shows up.
 
-**Within a major, changes are additive only.** New routes, new optional response fields and new
+**Within a major, changes are additive only.** New routes, new optional response fields, and new
 WebSocket channels are all safe. Renaming a field, removing one, or changing what one means is the
-next major, not a patch. Reads are tolerant by rule and not by accident: `readJson` does not validate,
-so unknown fields pass and a missing field arrives as `undefined` — which is a licence to ADD, never a
-licence to remove, because the removal surfaces as a crash deep inside a component rather than at the
-boundary. Mutations keep their Zod validation exactly as they are; a request body is not a read.
+next major. Reads are tolerant by rule: `readJson` does not validate, so unknown fields pass and a
+missing field arrives as `undefined`. That is a licence to add, never to remove, because a removal
+surfaces as a crash deep inside a component rather than at the boundary. Mutations keep their Zod
+validation. A request body is not a read.
 
-**The handshake is the most tolerant surface, not the least.** `nodeInfoSchema` and `pairResultSchema`
-ignore unknown fields, in every major, forever. This is the response by which a client learns it
-*cannot* speak to a node, so every version of it must be readable by every client — a client that
-cannot parse it cannot even say why, and reports "this is not an acorn node" about something that
-plainly is. Both were `strictObject` until 2026-08-15, which meant the first field any future node
-added would have broken every older client in exactly that way.
+**The handshake is the most tolerant surface.** `nodeInfoSchema` and `pairResultSchema` ignore
+unknown fields, in every major, forever. This is the response by which a client learns it cannot
+speak to a node, so every version of it must be readable by every client. A client that cannot parse
+it cannot say why, and reports "this is not an acorn node" about something that plainly is. Both were
+`strictObject` until 2026-08-15, so the first field any future node added would have broken every
+older client in exactly that way.
 
-Why the rules are this blunt, and this early: today the client and node ship together, so any wire
-change is safe and none of this costs anything. Once a node is a download (`docs/future/bundle.md`),
-old nodes exist forever and that freedom is gone. There is deliberately no response-schema validation,
-no OpenAPI and no codegen (see `docs/architecture-overview.md § Wire validation`), and no protocol
-export snapshot — the plugin API has one because its authors are outside the repo, and the protocol's
-consumers are all inside it until standalone nodes ship.
+The rules are this blunt this early because the client and node ship together, so any wire change is
+safe and none of this costs anything. Once a node is a download (`docs/future/bundle.md`), old nodes
+exist forever and that freedom is gone. There is deliberately no response-schema validation, no
+OpenAPI, and no codegen. For more information, see wire validation in
+[the architecture overview](./architecture-overview.md). There is no protocol export snapshot either.
+The plugin API has one because its authors are outside the repo, and the protocol's consumers are all
+inside it until standalone nodes ship.
 
-The plugin bridge inherits the same posture for the same reason: frame-SDK verbs ship inside plugin
+The plugin bridge takes the same posture for the same reason. Frame-SDK verbs ship inside plugin
 bundles while the broker ships in the shell, so within a `PLUGIN_API_MAJOR` bridge verbs are additive
-only (`docs/plugins.md § The plugin API`).
+only. For more information, see the plugin API section in [the plugins doc](./plugins.md).
 
 ## Request processing
 
 `createApp()` applies the following order:
 
-1. request-id assignment;
-2. principal resolution from a device bearer or `x-acorn-internal`;
-3. the two pre-auth pairing routes;
-4. the `requireUser` auth gate;
-5. idempotency replay for device mutations;
-6. device-only, task-scope, provider-scope, and route-specific gates;
-7. core and plugin routers.
+1. Request-id assignment.
+2. Principal resolution from a device bearer or `x-acorn-internal`.
+3. The two pre-auth pairing routes.
+4. The `requireUser` auth gate.
+5. Idempotency replay for device mutations.
+6. Device-only, task-scope, provider-scope, and route-specific gates.
+7. Core and plugin routers.
 
 `Idempotency-Key` is optional for most mutations and required by agent session creation, agent-turn
 enqueue, and request resolution. A device-keyed replay stores the request hash and final response;
@@ -120,23 +119,23 @@ logical mutation, and a broker-minted key would defeat replay entirely.
 ## Errors
 
 Every route that fails returns the same envelope, `{ error: { code, message, requestId, retryable,
-details? } }` (`@acorn/protocol/errors.ts`). `ERROR_CODES` is a small set of transport-level codes,
-the floor every consumer can rely on for a failure with no domain meaning: things like `not_found`,
-`internal`, and `rate_limited`. Error bodies never carry secrets, tokens, file contents, or a
-provider's raw response body; an unknown internal failure returns `internal` plus a `requestId` and
+details? } }` (`@acorn/protocol/errors.ts`). `ERROR_CODES` is a small set of transport-level codes
+such as `not_found`, `internal`, and `rate_limited`, the floor every consumer can rely on for a
+failure with no domain meaning. Error bodies never carry secrets, tokens, file contents, or a
+provider's raw response body. An unknown internal failure returns `internal` plus a `requestId` and
 logs the rest server-side.
 
-That floor is closed but not exclusive. A route may return its own documented code instead of a
-floor code, and about three dozen of those domain codes are already load-bearing on the client:
-`needs-trust` opens the config-trust modal, `provider_needs_auth` rewrites the error message, and so
-on. Collapsing every route onto the ten floor codes would delete that behavior. A closed set exists
-to buy interop discipline across an API boundary, and there is no such boundary here: the client and
-the Node ship from the same repository and release together (§ Versioning above). So the floor is a
-fallback for the case a route did not think to name, not a whitelist a route must stay inside.
+That floor is closed but not exclusive. A route may return its own documented code instead, and about
+three dozen domain codes are load-bearing on the client. `needs-trust` opens the config-trust modal,
+`provider_needs_auth` rewrites the error message, and so on. Collapsing every route onto the ten
+floor codes would delete that behavior. A closed set buys interop discipline across an API boundary,
+and there is no such boundary here, because the client and the Node ship from the same repository and
+release together. The floor is a fallback for the case a route did not think to name, not an
+allowlist a route must stay inside.
 
-`retryable` is derived from the HTTP status, not set by hand, so callers never maintain a per-code
-table: `408`, `429`, `502`, `503`, and `504` are retryable, and no other 5xx is. A `500` usually means
-the request itself is broken, and marking it retryable would only invite a client to hammer it.
+`retryable` comes from the HTTP status rather than by hand, so callers keep no per-code table. `408`,
+`429`, `502`, `503`, and `504` are retryable, and no other 5xx is. A `500` usually means the request
+itself is broken, and marking it retryable would invite a client to hammer it.
 
 ## Core routes
 
@@ -160,18 +159,22 @@ the request itself is broken, and marking it retryable would only invite a clien
 | `PATCH` | `/v2/core/schedules` | Pause or resume the whole loop |
 | `POST` | `/v2/core/schedules` | Create a user schedule against a registered target kind |
 | `PATCH` | `/v2/core/schedules/:key` | Pause/resume, retune the cadence, rename (user rows only) |
-| `DELETE` | `/v2/core/schedules/:key` | Delete a user schedule — declared ones are paused, not deleted |
+| `DELETE` | `/v2/core/schedules/:key` | Delete a user schedule. Declared ones are paused, not deleted |
 | `POST` | `/v2/core/schedules/:key/run` | Run one now |
 | `GET` | `/v2/core/schedules/:key/runs` | The recent-run ring, newest first |
 
 These routes are device-only. Backup uses Node filesystem paths, so an internal task token must not
 reach it. Schedules are the same class for a different reason: a schedule is code the node runs
-unattended, so declaring one is a way to make code run later (docs/schedules.md). `GET /v2/core/plugins` also carries `requests` — the queue of installs an agent has asked for
-and the owner has not answered — and the decision route is what closes one. A task-scoped agent can raise a
-request through the `plugin_request` tool and can reach neither route, which is the whole point
-(docs/plugins.md § Approval-mediated install). What it *can* read is the authoring contract, through the
-`plugin_authoring` tool — a read of this node's own schemas, on the agent-tool surface rather than as a
-route, so it adds nothing here for a plugin frame to be denied (docs/plugins.md § Teaching the agent).
+unattended, so declaring one is a way to make code run later. For more information, see
+[the schedules doc](./schedules.md).
+
+`GET /v2/core/plugins` also carries `requests`, the queue of installs an agent has asked for and the
+owner has not answered, and the decision route closes one. A task-scoped agent can raise a request
+through the `plugin_request` tool and can reach neither route, which is the point. What it can read
+is the authoring contract, through the `plugin_authoring` tool. That is a read of this node's own
+schemas on the agent-tool surface rather than a route, so it adds nothing here for a plugin frame to
+be denied. For more information, see approval-mediated install and teaching the agent in
+[the plugins doc](./plugins.md).
 
 ### Preferences and integrations
 
@@ -294,13 +297,13 @@ execution. Workflows own durable definitions, runs, steps, gates, and reconcilia
 /v2/p/memory/memory[/*]
 ```
 
-The notes plugin owns the current notes namespace. The memory plugin's note paths under
+The notes plugin owns the notes namespace. The memory plugin's note paths under
 `/v2/p/memory/tasks/.../notes` and `/v2/p/memory/workspaces/.../notes` are deprecated compatibility
 aliases for one release and resolve through the same notes store.
 
 ### Other feature plugins
 
-| Plugin | Current route surface |
+| Plugin | Route surface |
 | --- | --- |
 | `changes` | task-local Git actions and review notes |
 | `database` | task-scoped PostgreSQL schema/query operations |
@@ -323,23 +326,24 @@ PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
 
 The preview tunnel (`/v2/tunnel`, `packages/node-core/src/main/tunnel.ts`) is a separate upgrade on
-the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device/internal-token
-authorization as `/v2/events`. It forwards raw bytes to `127.0.0.1` on the named port only, never to a
-resolved hostname: only declared ports are tunnellable, and there is no general SOCKS proxy to
-whatever else is listening on the node's loopback. A port counts as declared when the task's run
-bridge already names it as a run target's URL, or when the project's `previewMode` is `'port'`.
-`previewMode: 'script'` is not a source, because its value is a shell command whose output would have
-to run on every tunnel attempt to answer the question; a remote task configured that way gets no
-tunnel until the same port also appears as a run target's URL or a `'port'` value. `previewMode: 'url'`
-is also declared, the same way as `'port'`: without it, a remote task configured with
-`http://localhost:8025` would resolve the tunnel request, get refused, and fall back to loading the URL
-as given, which rendered whatever was on the owner's own port 8025 while claiming to show the remote
-preview. A URL naming a host other than loopback contributes nothing to the allowlist: it is already
-reachable from the client directly, so there is nothing to tunnel.
+the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device and
+internal-token authorization as `/v2/events`. It forwards raw bytes to `127.0.0.1` on the named port
+only, never to a resolved hostname. Only declared ports are tunnellable, and there is no general
+SOCKS proxy to whatever else listens on the node's loopback.
+
+A port counts as declared when the task's run bridge names it as a run target's URL, or when the
+project's `previewMode` is `'port'` or `'url'`. `previewMode: 'script'` is not a source, because its
+value is a shell command that would have to run on every tunnel attempt to answer the question. A
+remote task configured that way gets no tunnel until the same port also appears as a run target's URL
+or a `'port'` value. `'url'` counts because without it a remote task configured with
+`http://localhost:8025` would be refused and fall back to loading the URL as given, rendering
+whatever sits on the owner's own port 8025 while claiming to show the remote preview. A URL naming a
+host other than loopback adds nothing to the allowlist, because the client can already reach it
+directly.
 
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
-both ends. Core owns three of them: `term:` (transport on both ends), `workflow:` (the notification
-bell's notices and step events) and `plugins:` — whose one frame, `plugins:changed`, is the content-free
-ping the Node sends when it reloads a plugin's node half in place (docs/plugins.md § The dev loop). The
-client re-reads the roster route rather than trusting a payload. Every other prefix belongs to the plugin
-that registered it.
+both ends. Core owns three: `term:` (transport on both ends), `workflow:` (the notification bell's
+notices and step events), and `plugins:`. The one `plugins:` frame, `plugins:changed`, is the
+content-free ping the Node sends when it reloads a plugin's node half in place, covered by the dev
+loop in [the plugins doc](./plugins.md). The client re-reads the roster route rather than trusting a
+payload. Every other prefix belongs to the plugin that registered it.

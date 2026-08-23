@@ -82,8 +82,8 @@ export class ManagedAgentEngine {
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
   protected readonly live = new Map<string, LiveSession>()
-  // Every in-flight provider reconnect delay (onProviderClosed schedules up to three per session). Tracked
-  // so stop() can cancel them: an untracked timer that fires after teardown calls ensureSession, which
+  // Every in-flight provider reconnect delay (onProviderClosed schedules up to three per session).
+  // Tracked so stop() can cancel them: a timer that fires after teardown calls ensureSession, which
   // spawns a provider child against a closed SQLite handle.
   // `apps/node/src/service/runtime.test.ts` starts the runtime several times in one process, so a leaked
   // timer from an earlier boot lands inside a later one.
@@ -109,10 +109,9 @@ export class ManagedAgentEngine {
     this.store = new AgentStore(options.db, options.core)
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
-    // The redaction list is collected as sessions start, not computed once, because each session mints its
-    // own scoped internal token (docs/security.md § Credential handling) rather than sharing one env
-    // record. #mintedSecrets accumulates them and the materializer keeps a live reference to the same
-    // array.
+    // The redaction list grows as sessions start, rather than being computed once, because each session
+    // mints its own scoped internal token (docs/security.md § Credential handling). #mintedSecrets
+    // accumulates them and the materializer holds a live reference to the same array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
@@ -183,9 +182,9 @@ export class ManagedAgentEngine {
   }
 
   protected async ensureSession(session: AgentSession): Promise<LiveSession> {
-    // The only door into spawning or reconnecting a provider child. Checked here, not just at each call
-    // site, because after stop() the database handle is about to close; without it, a turn already in
-    // flight through pump() could start a provider mid-teardown.
+    // The only door into spawning or reconnecting a provider child. Checked here, not at each call
+    // site, because after stop() the database handle is about to close and a turn still in flight
+    // through pump() could otherwise start a provider mid-teardown.
     if (this.stopped) throw new Error('The managed agent runtime is shutting down.')
     const existing = this.live.get(session.id)
     if (existing?.handle) return existing

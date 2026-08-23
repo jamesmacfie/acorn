@@ -15,10 +15,9 @@ export const SQL_SYSTEM_PREAMBLE = [
   'Your entire reply must be executable as-is by PostgreSQL.',
 ].join(' ')
 
-// The schema is always sent. The repo's free-form notes, which are facts the schema can't express, and
-// any saved queries the user picked as worked examples, are appended when present. Notes and examples
-// share one char budget and are truncated as a block, because schema fidelity matters more than the last
-// example.
+// The schema is always sent. The repo's free-form notes and any saved queries picked as worked
+// examples are appended when present. Notes and examples share one character budget and are truncated
+// as a block, because schema fidelity matters more than the last example.
 export function buildSystemPrompt(schemaText: string, ctx?: { notes?: string; examples?: readonly DbSavedQuery[] }): string {
   const extras: string[] = []
   const notes = ctx?.notes?.trim()

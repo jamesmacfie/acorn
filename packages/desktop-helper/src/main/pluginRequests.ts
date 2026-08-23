@@ -4,19 +4,17 @@ import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
 
-// What the renderer may say about a third-party plugin bundle, and what it gets back. Two shells parse
-// these: the helper's `helperServer.ts` and, before it, Electron's `pluginIpc.ts`. They live beside the
-// stores they guard rather than in either shell, because a schema that drifted between the two would
-// mean one host recording an acknowledgement the other cannot read.
+// What the renderer may say about a third-party plugin bundle, and what it gets back. These schemas
+// live beside the stores they guard rather than in a shell, because a schema that drifted between two
+// hosts would mean one recording an acknowledgement the other cannot read.
 //
-// The renderer supplies `claim` (the hash and version a node advertised) and `display` (the version and
-// permissions to record with a decision). Both are untrusted and both are re-checked or display-only:
-// `claim.hash` is asserted against the bytes the host hashed, and `display` is only ever rendered back
-// to the owner in a later permission diff. Nothing here grants anything.
+// The renderer supplies `claim`, the hash and version a node advertised, and `display`, the version
+// and permissions to record with a decision. Both are untrusted. `claim.hash` is asserted against the
+// bytes the host hashed, and `display` is only rendered back to the owner in a later permission diff.
+// Nothing here grants anything.
 
-// Enter or leave development mode for one plugin on one node (./pluginTrustStore.ts). One channel for
-// both directions because they are one switch, and because the revoke half must never be harder to reach
-// than the grant half.
+// Enter or leave development mode for one plugin on one node. See ./pluginTrustStore.ts. One channel
+// for both directions, because they are one switch and revoking must never be harder than granting.
 export const devGrantSchema = z.strictObject({
   pluginId: z.string().min(1),
   nodeId: z.string().min(1),
@@ -32,13 +30,13 @@ export const putSchema = z.strictObject({
 })
 
 // The decision, split from the disclosure that came with it, because the two have different failure
-// budgets. This half identifies the bytes and says yes or no; it is entirely this app's own
-// vocabulary, so nothing a node does can make it unparseable, and it must always be recordable.
+// budgets. This half identifies the bytes and says yes or no. It is this app's own vocabulary, so
+// nothing a node does can make it unparseable, and it must always be recordable.
 //
 // A plain object rather than a strict one, because both halves are parsed out of the same payload and
-// each would otherwise reject the other's keys. Nothing is read from the raw payload after this: the
-// stored record is built from parsed fields only, so stripping an unknown key is exactly as safe as
-// refusing it, and it is what lets a newer renderer add a field without wedging an older main.
+// each would otherwise reject the other's keys. Nothing reads the raw payload after this, so
+// stripping an unknown key is as safe as refusing it and lets a newer renderer add a field without
+// wedging an older main.
 export const decisionSchema = z.object({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -47,12 +45,13 @@ export const decisionSchema = z.object({
   decision: z.enum(['accepted', 'rejected']),
 })
 
-// The snapshot, kept only so a later update can show what changed. Parsed, not cast: it is the
-// disclosure the owner consents to, so it has to be provably the shape the node parsed off disk
-// (@acorn/protocol/pluginContract.ts). But parsed separately, because a node running a newer manifest
-// schema than this shell can produce a grant this schema refuses. When that happened with one combined
-// schema the whole handler threw, so neither accept nor reject could be recorded, and the prompt
-// re-queued on every boot: a plugin the owner had explicitly turned away asked again forever.
+// The snapshot, kept only so a later update can show what changed. Parsed, not cast, because it is
+// the disclosure the owner consents to and has to be provably the shape the node parsed off disk. See
+// @acorn/protocol/pluginContract.ts.
+//
+// Parsed separately, because a node running a newer manifest schema than this shell can produce a
+// grant this schema refuses. With one combined schema the whole handler threw, so neither accept nor
+// reject could be recorded and the prompt re-queued on every boot.
 export const disclosureSchema = z.object({
   permissions: pluginPermissionsSchema,
   webviews: z.array(z.strictObject({
@@ -65,30 +64,26 @@ export const disclosureSchema = z.object({
     label: z.string().min(1).max(80),
     chords: z.array(z.string().min(1).max(64)).min(1).max(32),
   })).max(32) as z.ZodType<PluginKeyClaimGrant[]>,
-  // Defaulted, not required: a node running a manifest schema that predates the cooperative seam sends
-  // a disclosure with no such field, and refusing it would put us back in the loop this schema was
-  // split up to escape. A decision that cannot be recorded is a prompt that re-queues forever.
+  // Defaulted, not required. A node whose manifest schema predates the cooperative seam sends a
+  // disclosure with no such field, and refusing it would put a decision beyond recording, which is
+  // the re-queueing loop this schema was split up to escape.
   extensions: z.array(z.strictObject({
     kind: z.enum(['hosts', 'extends', 'replaces']),
     target: z.string().min(1).max(130),
     label: z.string().min(1).max(80),
   })).max(32).default([]) as z.ZodType<PluginExtensionGrant[]>,
-  // Defaulted for the same reason `extensions` is: a node whose manifest schema predates schedules sends
-  // a disclosure without the field, and refusing it would put a decision beyond recording.
+  // Defaulted for the same reason `extensions` is.
   schedules: z.array(z.strictObject({
     id: z.string().min(1).max(64),
     label: z.string().min(1).max(80),
     cadence: cadenceSchema,
   })).max(4).default([]) as z.ZodType<PluginScheduleGrant[]>,
-  // Defaulted for the same reason the two above are: a node whose manifest schema predates archive
-  // checks sends a disclosure without the field.
+  // Defaulted for the same reason the two above are.
   taskChecks: z.array(z.strictObject({
     id: z.string().min(1).max(64),
     cleansUp: z.boolean(),
   })).max(4).default([]) as z.ZodType<PluginTaskCheckGrant[]>,
-  // Defaulted for the same reason the three above are: a node whose manifest schema predates harnesses
-  // sends a disclosure without the field, and a decision that cannot be recorded is a prompt that
-  // re-queues forever.
+  // Defaulted for the same reason the three above are.
   harnesses: z.array(z.strictObject({
     id: z.string().min(1).max(64),
     label: z.string().min(1).max(80),
@@ -110,7 +105,8 @@ export const NO_DISCLOSURE = {
 } satisfies z.infer<typeof disclosureSchema>
 
 export type PluginsState = {
-  // hash → what we hold. The renderer diffs a node's listing against this to decide what to fetch.
+  // Hash to what this device holds. The renderer diffs a node's listing against it to decide what to
+  // fetch.
   cached: Record<string, { pluginId: string; version: string; bytes: number }>
   acks: PluginAck[]
   devGrants: PluginDevGrant[]

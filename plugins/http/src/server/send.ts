@@ -46,9 +46,9 @@ export class SendError extends Error {}
 const ANSI = /\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g
 const lastLine = (stdout: string): string | null => stdout.replace(ANSI, '').split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? null
 
-// Only resolves the names a request actually references (docs/http-client.md § Sending): a command
-// variable's value comes from running its shell command, and precedence must not mean running a
-// lower layer for its side effects, then discarding it.
+// Only resolves the names a request references (docs/http-client.md § Sending). A command variable's
+// value comes from running its shell command, so precedence must not mean running a lower layer for
+// its side effects, then discarding it.
 export function referencedVariableNames(input: HttpSendInput): Set<string> {
   const fields = [input.url]
   for (const header of input.headers) {
@@ -184,7 +184,6 @@ export async function resolveVars(
 
 // --- execution ----------------------------------------------------------------------------
 
-/**
 /**
  * Turns a draft plus resolved variables into the exact request to put on the wire.
  * Split out from send() so it is testable without a database or a network. This is where the

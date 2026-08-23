@@ -12,13 +12,12 @@ import { createMeasureHistory } from '../history'
 import { aggregateRows } from '../shaping'
 import type { PanelViewProps } from './props'
 
-// The stat view: one number over the shaped rows. Count by default, since "how many of these are
-// there" is the question a filter has already been written to answer. Unit comes from the
-// aggregated field, not the view (docs/dashboards.md § The two vocabularies, and the budget).
+// The stat view: one number over the shaped rows. Count by default, because "how many of these are
+// there" is what a filter has already been written to answer. Unit comes from the aggregated field,
+// not the view (docs/dashboards.md § The two vocabularies, and the budget).
 //
 // Trend tiers and their rules are docs/dashboards.md § Trends. This file turns `trend.ts`'s pure
-// output into SVG and picks a class name, exactly as ChartView does, because vitest here runs in
-// node with no Solid plugin.
+// output into SVG, as ChartView does.
 
 const AGGREGATE_LABELS: Record<string, string> = { sum: 'Total', avg: 'Average', min: 'Lowest', max: 'Highest' }
 
@@ -27,8 +26,8 @@ export default function StatView(props: PanelViewProps) {
   const field = () => props.schema.fields.find((candidate) => candidate.id === props.view.field)
   const value = () => aggregateRows(props.rows, props.schema, props.view)
 
-  /** The measure as a person reads it: rounded, and in the units the field declared. Shared by the
-   *  number and by the delta beside it, so "▲ 2 MB" cannot ever disagree with the total above it. */
+  /** The measure as a person reads it: rounded, in the units the field declared. Shared by the
+   *  number and the delta beside it, so "▲ 2 MB" cannot disagree with the total above it. */
   const measureText = (answer: number): string => {
     const rounded = Number.isInteger(answer) ? answer : Math.round(answer * 10) / 10
     const unitField = field()
@@ -72,10 +71,9 @@ export default function StatView(props: PanelViewProps) {
       <span class="dash-stat-value">{text()}</span>
       <span class="dash-stat-label">{label()}</span>
 
-      {/* No axes, no grid, no ticks: the number above is the axis.
-          `xMinYMid meet` scales uniformly and pins left: stretching would thin the line and turn the
-          end dot into an ellipse, and a mark whose ink weight varies with the panel's width reads as
-          data, something that is only geometry. */}
+      {/* No axes, no grid, no ticks: the number above is the axis. `xMinYMid meet` scales uniformly
+          and pins left, because stretching thins the line and turns the end dot into an ellipse, and
+          ink weight that varies with panel width reads as data. */}
       <Show when={mark()}>
         {(spark) => (
           <svg
@@ -109,9 +107,9 @@ export default function StatView(props: PanelViewProps) {
         <span class="dash-stat-delta" data-tone={delta()!.tone}>{deltaText()}</span>
       </Show>
 
-      {/* The honest cold state. A history trend accrues from when the panel first asked for it, so a
-          panel switched on this morning has an empty series and says so rather than drawing a flat
-          line through a fortnight it was not watching. */}
+      {/* A history trend accrues from when the panel first asked for it, so a panel switched on
+          today has an empty series and says so rather than drawing a flat line through a fortnight
+          it was not watching. */}
       <Show when={props.view.trend === 'history' && !mark()}>
         <span class="dash-stat-label">Collecting — hourly, from now on.</span>
       </Show>

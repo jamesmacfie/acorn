@@ -25,13 +25,12 @@ export function registerBuiltInProfiles(): void {
   builtInProfileDisposables = [claudeCodeProfile, codexProfile, aiderProfile].map((profile) => agentProfileRegistry.register(profile))
 }
 
-// The two built-in harnesses, one per tier (docs/managed-agents.md § Harnesses). Claude is a launch
-// spec run by the shared generic driver; Codex keeps a native driver, because its app-server carries
-// fork, compaction, archive and delete, and ACP expresses none of them.
+// The two built-in harnesses, one per tier. See docs/managed-agents.md § Harnesses. Claude is a launch
+// spec run by the shared generic driver. Codex keeps a native driver, because its app-server carries
+// fork, compaction, archive, and delete, and ACP expresses none of them.
 //
-// Released in `dispose` like the profiles beside them. This used to be guarded by a module-level
-// boolean instead, which papered over a double boot — `apps/node/src/service/runtime.test.ts` starts
-// the runtime several times in one process — by keeping the first boot's factories forever.
+// Released in `dispose` like the profiles beside them, because one process can boot the runtime several
+// times. `apps/node/src/service/runtime.test.ts` does.
 let builtInDriverDisposables: (() => void)[] | null = null
 function registerBuiltInDrivers(): void {
   if (builtInDriverDisposables) return
@@ -42,10 +41,8 @@ function registerBuiltInDrivers(): void {
 }
 
 // The two built-in plan-usage probes, one per built-in harness. They register beside the drivers rather
-// than inside the usage service, because the service holds a registry now and a harness contributed by a
-// plugin feeds it through the same door (main/usage/collectors.ts).
-//
-// `probeDir` is bound at init, when the data root is known, so this takes it as a parameter.
+// than inside the usage service, because a plugin-contributed harness feeds the same registry
+// (main/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
 let builtInCollectorDisposables: (() => void)[] | null = null
 function registerBuiltInUsageCollectors(probeDir: string): void {
   if (builtInCollectorDisposables) return
@@ -90,9 +87,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     init: (ctx) => {
       registerBuiltInProfiles()
       registerBuiltInDrivers()
-      // Migrated before init returns, so no request or provider spawn can reach an unmigrated
-      // database. See docs/data-layer.md § Migrations, which also covers the hand-written
-      // `agent_events_fts` triggers (node/schema.ts).
+      // Migrated before init returns, so no request or provider spawn reaches an unmigrated database.
+      // See docs/data-layer.md § Migrations.
       const store = ctx.storage.open()
       const core = ctx.core
 
@@ -102,7 +98,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         core,
         internalEnv: deps.internalEnv,
         secrets: core.secrets,
-        // Read per call, never captured: creating a task's worktree consults that owner's per-repo
+        // Read per call, never captured. Creating a task's worktree consults that owner's per-repo
         // `base_ref` preference, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
         publish: (frame) => ctx.events.send(frame),
@@ -124,9 +120,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           })
           return terminal.id
         },
-        // The return path of the same handoff. `false` when the terminal plugin is absent is the right
-        // answer, not a degradation: with no PTY engine there is no shell holding the session, so
-        // control can come back to Acorn.
+        // The return path of the same handoff. `false` with no terminal plugin is correct, not a
+        // degradation: with no PTY engine, no shell holds the session, so control can return to acorn.
         terminalHandoffRunning: async (sessionId) => {
           const sessions = ctx.capabilities.get(TERMINAL_SESSIONS)
           if (!sessions) return false
@@ -137,9 +132,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
 
       managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime))
-      // Local provider usage (the CLI plan probes) plus the pricing overrides it costs against. The
-      // probe directory is under the data root, beside the plugin's SQLite file, and the pricing read
-      // goes through `CoreServices.prefs` because `prefs` is core's table (main/pricingStore.ts).
+      // Local provider usage plus the pricing overrides it costs against. The probe directory sits
+      // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
+      // core's table (main/pricingStore.ts).
       const probeDir = join(dataDir, 'agent-usage-probe')
       registerBuiltInUsageCollectors(probeDir)
       usageRoute = ctx.capabilities.provide(AGENT_USAGE, {
@@ -151,9 +146,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         setPricing: (userId, preferences) => writeAgentPricingPreferences(core.prefs, userId, preferences),
       })
 
-      // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The delivery seam in the plugin host
-      // resolves this per contributed harness, so a node with agents disabled simply drops them and
-      // re-enabling redelivers.
+      // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The plugin host resolves this per
+      // contributed harness, so a node with agents disabled drops them and re-enabling redelivers.
       harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
@@ -169,8 +163,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         timeout: 120,
         run: async () => {
           const userId = ctx.core.identity.active()
-          // Nothing to collect against: a node with no bound owner has no pricing preferences to cost
-          // the usage with, and inventing an empty owner would cache a snapshot under the wrong key.
+          // A node with no bound owner has no pricing preferences to cost the usage with, and
+          // inventing an empty owner would cache the snapshot under the wrong key.
           if (!userId) return 'no owner is bound to this node yet'
           const snapshot = await ctx.capabilities.require(AGENT_USAGE).read({ userId, force: true })
           return `${snapshot.providers.filter((provider) => !provider.error).length} of ${snapshot.providers.length} providers answered`
@@ -178,12 +172,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
 
       // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call
-      // time and falls back to its own headless runner when it is absent, so a node with this plugin
-      // unavailable still runs non-managed workflow steps.
+      // time and falls back to its own headless runner, so a node without this plugin still runs
+      // non-managed workflow steps.
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, createSessionExecute(runtime))
-      // reconcile() runs from the composition root, not here, for the same reason workflows' does
-      // (contract/runtime.ts): it must run after the listener binds and it interrupts every unsettled
-      // session.
+      // reconcile() runs from the composition root, not here: it has to run after the listener binds,
+      // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
       ctx.capabilities.provide(AGENTS_RUNTIME, { reconcile: () => runtime!.reconcile() })
     },
     // Releases what init acquired, in the order docs/managed-agents.md § Operations and failure

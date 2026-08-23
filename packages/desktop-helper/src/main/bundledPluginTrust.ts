@@ -17,28 +17,27 @@ const packageDirectories = (root: string): string[] => {
   }
 }
 
-/** The env-var opt-out, for anyone whose subject is the trust flow itself: a QA pass over the dialog,
- * or a spec that wants a bundled package to prompt like a third-party one. Honoured in packaged
- * builds too, because the only thing it can do is ask more questions. */
+/** The environment-variable opt-out, for anyone testing the trust flow itself: a QA pass over the
+ * dialog, or a spec that wants a bundled package to prompt like a third-party one. Honoured in
+ * packaged builds too, because all it can do is ask more questions. */
 export const BUNDLED_TRUST_OPT_OUT = 'ACORN_PROMPT_BUNDLED_PLUGIN_TRUST'
 
 /** Whether to auto-accept the application's own bundled client bundles on this launch.
  *
- * Not `app.isPackaged`. The bytes this grant covers are the ones the build produced from the
- * first-party roster (`apps/desktop/scripts/build-bundled-plugins.mjs`) into this application's own
- * resource directory: the bundle's own resources when packaged, `dist/bundled-plugins` in a development
- * build, and in both cases a directory the build owns and nothing else writes to. Gating on packaging
- * meant every dev and e2e boot answered four dialogs about the developer's own build output, which
- * taught people to click Trust without reading, the opposite of what the prompt is for, and it wedged
- * a dozen e2e specs.
+ * Not `app.isPackaged`. This grant covers the bytes the build produced from the first-party roster,
+ * `apps/desktop/scripts/build-bundled-plugins.mjs`, into this application's own resource directory:
+ * bundle resources when packaged, `dist/bundled-plugins` in a development build, and in both cases a
+ * directory the build owns and nothing else writes to. Gating on packaging made every dev boot answer
+ * four dialogs about the developer's own build output, which taught people to click Trust without
+ * reading.
  *
- * This is parity, not a widening. It says nothing about packages in the data root: a hand-installed or
- * third-party package, and anything a node serves this device, still prompts. */
+ * It says nothing about packages in the data root. A hand-installed or third-party package, and
+ * anything a node serves this device, still prompts. */
 export const trustsBundledClientPlugins = (env: NodeJS.ProcessEnv = process.env): boolean =>
   env[BUNDLED_TRUST_OPT_OUT] !== '1'
 
 /** Trust only client bundles read from the application's own resource directory. The node roster is
- * deliberately not consulted: a remote node calling something "bundled" grants nothing. */
+ * not consulted, because a remote node calling something "bundled" grants nothing. */
 export function trustBundledClientPlugins(
   bundledRoot: string,
   appVersion: string,

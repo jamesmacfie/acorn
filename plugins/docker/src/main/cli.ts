@@ -7,19 +7,18 @@ import { brokerEnv } from '@acorn/plugin-api/node'
 
 const exec = promisify(execFile)
 
-// The env the docker CLI sees (docs/security.md § Process, path, and configuration controls, the
-// denylist-to-allowlist history). DOCKER_HOST and DOCKER_CONTEXT are how OrbStack, colima and
-// Docker Desktop differ, so they ride the DOCKER_*/COMPOSE_* passthrough below.
+// The env the docker CLI sees (docs/security.md § Process, path, and configuration controls).
+// DOCKER_HOST and DOCKER_CONTEXT are how OrbStack, colima, and Docker Desktop differ, so they ride
+// the DOCKER_* and COMPOSE_* passthrough below.
 export function dockerEnv(): NodeJS.ProcessEnv {
   return brokerEnv({
     passthrough: [
       'DOCKER_*',
       'COMPOSE_*',
       'XDG_CONFIG_HOME',
-      // A denylist kept these by accident; an allowlist has to name them. Without the proxy vars,
-      // `docker pull` fails behind a corporate proxy, and without the cloud ones, the ECR/GCR
-      // credential helpers cannot authenticate. Both are configuration the CLI needs, not acorn's
-      // secrets.
+      // An allowlist has to name these. Without the proxy vars, `docker pull` fails behind a
+      // corporate proxy; without the cloud ones, the ECR and GCR credential helpers cannot
+      // authenticate. Both are configuration the CLI needs, not acorn's secrets.
       'HTTP_PROXY',
       'HTTPS_PROXY',
       'NO_PROXY',

@@ -19,14 +19,12 @@ import {
   type RecoveryActions,
 } from './index'
 
-// The seam's contract, written as a checker rather than as tests, so both ends can run it: this
-// package's own suite drives it against a mock host object, and each shell's suite drives it against
-// the real object that shell installs (apps/desktop/src/shell/bridge.test.ts). Returning strings
-// instead of calling `expect` is what keeps a test framework out of src/.
+// The seam's contract as a checker rather than a test, so both ends can run it: this package against
+// a mock host, each shell against the object it installs (apps/desktop/src/shell/bridge.test.ts).
+// Returning strings instead of calling `expect` keeps a test framework out of src/.
 //
-// What it is for: every capability group is nullable, so a host that renames one member of one group
-// does not fail to compile — it silently returns null and the affordance quietly disappears. This
-// turns that into a failing test on whichever side is wrong. See docs/testing.md § Test layers.
+// Every group is nullable, so a host that renames a member returns null and the affordance vanishes
+// with no compile error. This turns that into a failing test. See docs/testing.md § Test layers.
 
 // A member added to a seam type and left out of the lists below fails `tsc` here rather than
 // silently dropping out of the contract.
@@ -80,10 +78,9 @@ const GROUPS = {
 export type SeamGroup = keyof typeof GROUPS
 export const SEAM_GROUPS = Object.keys(GROUPS) as SeamGroup[]
 
-// Every problem with the host currently installed on `window`, given the groups it claims to
-// implement. Empty means the host and the seam agree. Groups not named are required to be absent, so
-// a host cannot pass by implementing more than it declares — a half-built group is worse than none,
-// because consumers probe the group and then call its members.
+// Every problem with the host installed on `window`, given the groups it claims to implement. Empty
+// means the host and the seam agree. Groups not named must be absent: a half-built group is worse
+// than none, because consumers probe the group and then call its members.
 export function seamProblems(implemented: readonly SeamGroup[]): string[] {
   const problems: string[] = []
   for (const name of SEAM_GROUPS) {

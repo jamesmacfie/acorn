@@ -6,8 +6,8 @@ import { pinnedTlsOptions } from './nodeBroker'
 export type TunnelKey = { nodeId: string; taskId: string; port: number }
 
 export type TunnelNode = {
-  // Where the node is listening, as reported at start or pairing time. Never assumed; the port is
-  // ephemeral.
+  // Where the node is listening, as reported at start or pairing time. Never assumed, because the
+  // port is ephemeral.
   endpoint: string
   token: string
   // The pinned certificate and its fingerprint. pinnedTlsOptions falls back to no pinning unless
@@ -25,16 +25,14 @@ const MAX_TUNNELS = 16
 // Header name and case handling: docs/shell.md § Host-owned webviews.
 const TUNNEL_HEADER = 'x-acorn-tunnel'
 
-// The same credential as a cookie, for a shell that cannot inject a header. Electron adds
-// `x-acorn-tunnel` per request through `webRequest`; wry has no equivalent, so the Tauri shell seeds
-// this into the preview webview's ephemeral cookie store before its first navigation instead
-// (docs/shell.md § Host-owned webviews). Same secret, same constant-time compare,
-// same per-listener scope — only the envelope differs, so both shells are one code path from here on.
+// The same credential as a cookie, for a shell that cannot inject a header. wry has no `webRequest`,
+// so the Tauri shell seeds this into the preview webview's ephemeral cookie store before its first
+// navigation. Same secret, same constant-time compare, same per-listener scope, so only the envelope
+// differs. See docs/shell.md, "Host-owned webviews".
 const TUNNEL_COOKIE = 'acorn_tunnel'
 
-// Told the shell as each listener opens and closes, so it can seed that cookie. The secret goes to the
-// shell process and no further; nothing about this reaches the renderer, which is the whole reason
-// the secret exists (docs/shell.md § Host-owned webviews).
+// Told the shell as each listener opens and closes, so it can seed that cookie. The secret goes to
+// the shell process and no further, which is the reason it exists.
 export type TunnelEvents = {
   opened(port: number, secret: string): void
   closed(port: number): void
@@ -60,9 +58,8 @@ function matches(presented: string, secret: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
-// Secret check: docs/shell.md § Host-owned webviews. Either envelope satisfies it — the header
-// Electron injects, or the cookie the Tauri shell seeds — because they carry the same per-listener
-// secret and a dev server behind the tunnel sees both regardless.
+// Secret check. See docs/shell.md, "Host-owned webviews". Either envelope satisfies it, the injected
+// header or the seeded cookie, because both carry the same per-listener secret.
 export function headCarriesSecret(head: string, secret: string): boolean {
   for (const line of head.split('\r\n')) {
     const colon = line.indexOf(':')
@@ -111,9 +108,8 @@ export class PreviewTunnels {
 
   private async listen(id: string, target: TunnelKey): Promise<number> {
     if (this.entries.size >= MAX_TUNNELS) throw new Error('Too many preview tunnels are open.')
-    // Resolved here only to fail early with a clear message. Every connection re-resolves
-    // separately, since a restart or a re-pair can change the endpoint, the token, and the
-    // certificate.
+    // Resolved here only to fail early with a clear message. Every connection re-resolves, because a
+    // restart or a re-pair can change the endpoint, the token, and the certificate.
     if (!this.resolve(target.nodeId)) throw new Error('That node is not paired.')
 
     const sockets = new Set<Socket>()
@@ -130,8 +126,7 @@ export class PreviewTunnels {
         sockets.delete(socket)
         this.armIdle(id)
       })
-      // Re-resolved per connection, same reasoning as open() above: a restart or re-pair changes
-      // which endpoint, token, and certificate are current.
+      // Re-resolved per connection, for the reason open() gives above.
       const node = this.resolve(target.nodeId)
       if (!node?.certPem || !node.fingerprint) {
         // No pinned certificate, no tunnel. Every other path to a node goes through the pinned
@@ -141,7 +136,7 @@ export class PreviewTunnels {
         return
       }
       // The credential check runs before anything dials the node, so an unauthorized connection
-      // costs one destroyed socket rather than an upgrade attempt against the owner's device token.
+      // costs one destroyed socket rather than an upgrade against the owner's device token.
       this.authorize(socket, secret, id, (head) => this.pipe(socket, node, target, id, head))
     })
     // Loopback bind: docs/shell.md § Host-owned webviews.
@@ -150,8 +145,8 @@ export class PreviewTunnels {
       server.listen(0, '127.0.0.1', () => resolvePort((server.address() as { port: number }).port))
     })
     server.on('error', (error) => {
-      // A dead listener must not stay in the map, or a later open() would hand back a port nothing
-      // is listening on.
+      // A dead listener left in the map would make a later open() hand back a port nothing is
+      // listening on.
       console.warn(`[tunnel] listener for ${id} failed:`, error)
       this.closeEntry(id)
     })
@@ -161,8 +156,8 @@ export class PreviewTunnels {
     return port
   }
 
-  // How the secret reaches the WebContentsView without the preview plugin importing this file:
-  // docs/shell.md § Host-owned webviews.
+  // See docs/shell.md, "Host-owned webviews", for how the secret reaches the webview without the
+  // preview plugin importing this file.
   headersFor(url: string): Record<string, string> | null {
     let parsed: URL
     try {
@@ -181,7 +176,7 @@ export class PreviewTunnels {
 
   // Reads the request head, checks the secret, then hands the bytes on unchanged, secret header
   // included. A dev server ignores a header it does not recognize, and rewriting the request would
-  // mean reserializing it and owning every edge of HTTP framing for no benefit.
+  // mean reserializing it and owning every edge of HTTP framing.
   private authorize(socket: Socket, secret: string, id: string, onAuthorized: (head: Buffer) => void): void {
     let buffered = Buffer.alloc(0)
     const refuse = (reason: string): void => {
@@ -206,15 +201,15 @@ export class PreviewTunnels {
       }
       clearTimeout(timer)
       socket.off('data', onData)
-      // Passes everything read so far, not just the head: a POST's body can arrive in the same
+      // Passes everything read so far, not just the head. A POST's body can arrive in the same
       // packet, and dropping it would corrupt the request just authorized.
       onAuthorized(buffered)
     }
     socket.on('data', onData)
   }
 
-  // Closes every tunnel for a node (unpaired, revoked, restarted) or for a task (pane unmounted or
-  // archived).
+  // Closes every tunnel for a node, once it is unpaired, revoked, or restarted, or for a task whose
+  // pane was unmounted or archived.
   closeFor(match: { nodeId?: string; taskId?: string }): void {
     for (const id of [...this.entries.keys()]) {
       const { nodeId, taskId } = partsOf(id)
@@ -252,16 +247,17 @@ export class PreviewTunnels {
     url.searchParams.set('port', String(target.port))
     const ws = new WebSocket(url, {
       headers: { authorization: `Bearer ${node.token}` },
-      // The same pinning helper the broker's HTTPS agent uses: one definition of "is this the node
-      // we paired with".
+      // The same pinning helper the broker's HTTPS agent uses, so there is one definition of "is
+      // this the node we paired with".
       ...pinnedTlsOptions(node.fingerprint, node.certPem),
     })
     ws.binaryType = 'nodebuffer'
 
-    // Paused immediately: the socket is accepted before the WebSocket handshake finishes, so the
-    // first bytes of the request would otherwise be dropped. Pausing pushes backpressure onto the
-    // kernel instead of buffering without bound. `head`, bounded by MAX_HEAD_BYTES, is the one
-    // exception: the credential check already consumed those bytes, so something has to replay them.
+    // Paused immediately. The socket is accepted before the WebSocket handshake finishes, so the
+    // first bytes of the request would otherwise be dropped, and pausing pushes backpressure onto the
+    // kernel instead of buffering without bound. `head` is the one exception, bounded by
+    // MAX_HEAD_BYTES: the credential check already consumed those bytes, so something has to replay
+    // them.
     socket.pause()
 
     const closeBoth = (): void => {
@@ -279,16 +275,15 @@ export class PreviewTunnels {
     })
     socket.on('drain', () => ws.resume())
     socket.on('data', (chunk: Buffer) => {
-      // Backpressure by callback, matching the node side: stop reading from the browser until the
+      // Backpressure by callback, matching the node side. Stop reading from the browser until the
       // frame reaches the socket, so a slow link cannot grow an unbounded queue in main.
       socket.pause()
       ws.send(chunk, () => socket.resume())
     })
     ws.on('close', closeBoth)
     ws.on('error', (error) => {
-      // A refused upgrade is the normal failure here (an undeclared port, a dev server that is not
-      // running), and it must not be silent, or the preview pane shows a blank page with no
-      // explanation.
+      // A refused upgrade is the normal failure here, from an undeclared port or a dev server that
+      // is not running. Silence would leave the preview pane blank with no explanation.
       console.warn(`[tunnel] ${id}:`, error.message)
       closeBoth()
     })

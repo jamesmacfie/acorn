@@ -33,13 +33,12 @@ import {
 } from '../registries/exclusiveSlots'
 import './settings.css'
 
-// Settings → Plugins: per-node install, toggle, and the install lifecycle
-// (docs/plugins.md § Activation). Per node because a fleet is a set of independently administered
-// nodes; there is no install-everywhere or disable-everywhere here.
+// Settings > Plugins: per-node install, toggle, and the install lifecycle (docs/plugins.md
+// § Activation). Per node, because a fleet is a set of independently administered nodes.
 //
-// Two facts per row, not one: `disabled` (what will happen at the node's next start) and `running`
-// (what is happening now) can differ between saving and restarting, and this page is the only place
-// the owner can see the difference (docs/plugins.md § Activation).
+// Each row carries two facts: `disabled`, what happens at the node's next start, and `running`,
+// what is happening now. They diverge between saving and restarting, and this page is the only
+// place the owner sees the difference.
 
 type SourceKind = 'github' | 'npm' | 'url' | 'path'
 
@@ -50,9 +49,8 @@ const PLACEHOLDER: Record<SourceKind, string> = {
   path: '/absolute/path/to/the/plugin',
 }
 
-// `name@version` collapsed into one field rather than two, because that is how everyone already
-// writes it. The split is on the last `@` and only past position 0, so a scoped npm name
-// (`@scope/pkg`) keeps its own.
+// `name@version` is one field because that is how everyone writes it. The split is on the last `@`
+// past position 0, so a scoped npm name keeps its own.
 export function buildInstallSource(kind: SourceKind, raw: string): PluginInstallSource {
   const text = raw.trim()
   if (kind === 'url') return { url: text }
@@ -66,9 +64,8 @@ export function buildInstallSource(kind: SourceKind, raw: string): PluginInstall
 }
 
 // The seeded prompt behind "Create a plugin" (docs/plugins.md § Teaching the agent). The teaching
-// lives in the `plugin_authoring` tool this text tells the agent to call
-// (node-core/server/agentTools/pluginAuthoring.ts, whose test asserts this file still names it), not
-// in this text.
+// lives in the `plugin_authoring` tool this text names, not in the text; that tool's test asserts
+// this file still names it.
 export const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
 
 Call the \`plugin_authoring\` tool first. It returns the authoring contract and this node's own manifest
@@ -85,8 +82,8 @@ export default function PluginsSettings() {
   const [busy, setBusy] = createSignal(false)
   const [kind, setKind] = createSignal<SourceKind>('github')
   const [spec, setSpec] = createSignal('')
-  // Which row is mid-uninstall. Inline rather than a modal, because keeping or deleting the plugin's
-  // data is a third answer, not yes/no, and burying it in a checkbox inside a confirmation is how
+  // Which row is mid-uninstall. Inline rather than a modal, because keeping or deleting the
+  // plugin's data is a third answer, not yes or no, and a checkbox inside a confirmation is how
   // someone deletes a year of notes by reflex.
   const [removing, setRemoving] = createSignal<string | null>(null)
 
@@ -96,14 +93,13 @@ export default function PluginsSettings() {
   )
 
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
-  // A required plugin cannot be disabled, so it is not a checkbox — the route refuses one and the host
-  // ignores it — and the page does not list them at all: there is nothing an owner could do to the row.
+  // A required plugin cannot be disabled, so it gets no checkbox and the page does not list it.
+  // There is nothing an owner could do to the row.
   const optional = createMemo(() => rows().filter((row) => !row.required))
   const restartRequired = () => state()?.restartRequired === true
 
   // The device's own answers, which the node knows nothing about: it served the bundle, and this
-  // machine declined to run it, or put it into development mode (plugins/distribution.ts,
-  // docs/security.md § The dev grant). Refetched after the one control on this page that changes them.
+  // machine declined to run it, or put it into development mode (docs/security.md § The dev grant).
   const [custody, { refetch: refetchCustody }] = createResource(async () => await readPluginHostState())
   const blockedHere = (row: NodePluginRow): boolean => {
     const hash = row.installed?.client?.hash
@@ -111,13 +107,12 @@ export default function PluginsSettings() {
   }
   // A plugin in development on this device, against this node (docs/security.md § The dev grant).
   // Both halves matter: the same plugin may be a plain install on the owner's other laptop, and a
-  // bundle offered under this name by a different node is not covered by the grant.
+  // bundle offered under this name by a different node is not covered.
   const devGrant = (row: NodePluginRow) =>
     (custody()?.devGrants ?? []).find((grant) => grant.pluginId === row.name && grant.nodeId === nodeId())
 
-  // Ending development mode drops the grant and every acknowledgement it wrote (docs/security.md
-  // § The dev grant), so promoting a plugin to a normal install re-enters per-hash trust at the
-  // current bundle.
+  // Ending development mode drops the grant and every acknowledgement it wrote, so the plugin
+  // re-enters per-hash trust at the current bundle (docs/security.md § The dev grant).
   const endDevMode = (row: NodePluginRow) =>
     run(async () => {
       await setPluginDevGrant({ pluginId: row.name, nodeId: nodeId() ?? '', grant: false })
@@ -145,14 +140,14 @@ export default function PluginsSettings() {
   const restart = () =>
     run(async () => {
       await restartLocalNode()
-      // Main reloads the renderer after a successful restart, so this refetch only matters when that
-      // did not happen (a build with no supervision), in which case the list still needs a re-read.
+      // Main reloads the renderer after a successful restart, so this refetch only matters when
+      // that did not happen and the list still needs a re-read.
       await refetch()
     })
 
-  // The node has the package; this device has not seen its bytes yet (docs/security.md § Third-party
-  // plugin bundles). The boot pass fetches them, hashes them locally, and queues the trust prompt, so
-  // an install walks straight into consent rather than waiting for the next launch to ask.
+  // The node has the package; this device has not seen its bytes (docs/security.md § Third-party
+  // plugin bundles). Fetching and hashing them here queues the trust prompt, so an install walks
+  // straight into consent instead of waiting for the next launch to ask.
   const settle = async () => {
     await refetch()
     await syncPluginDistribution()
@@ -168,10 +163,9 @@ export default function PluginsSettings() {
       if (!result.ok) throw new Error(result.reason ?? 'That task has no agent session to send to.')
     })
 
-  // Offered only for a local node: the dialog browses this device's filesystem and the path is
-  // resolved by the node, so picking a folder for a remote node would hand it a path that means
-  // something else there, or nothing at all. Remote nodes keep the text field, where the owner types a
-  // path on the remote machine.
+  // Local nodes only: the dialog browses this device's filesystem but the node resolves the path,
+  // so picking a folder for a remote node hands it a path that means something else there. Remote
+  // nodes keep the text field.
   const canBrowse = () => kind() === 'path' && node()?.local === true && canPickFolder()
 
   const browse = () =>
@@ -188,10 +182,9 @@ export default function PluginsSettings() {
       await settle()
     })
 
-  // No background checking and no "an update is available" badge (docs/security.md § Supply chain):
-  // re-resolving every source on every roster read would phone the provider for each installed plugin,
-  // and an update is the one moment a compromised maintainer gets to run new code. The owner asks, and
-  // the node answers with whatever the source resolves to now.
+  // No background checking and no "an update is available" badge (docs/security.md § Supply chain).
+  // Re-resolving every source on every roster read would phone the provider for each installed
+  // plugin, and an update is the one moment a compromised maintainer gets to run new code.
   const update = (id: string) =>
     run(async () => {
       const result = await updateNodePlugin(id, {}, nodeId() ?? undefined)
@@ -233,9 +226,9 @@ export default function PluginsSettings() {
 
       <Show when={error()}><Alert>{error()}</Alert></Show>
 
-      {/* The other way a plugin gets here: the agent writes one. It lands as a DRAFT in the task's agent
-          composer — the owner reads it, finishes the sentence and sends — because a settings button that
-          silently starts an agent turn is a button nobody presses twice. */}
+      {/* The agent is the other way a plugin gets here. This lands a draft in the task's composer
+          rather than starting a turn, because a settings button that silently starts an agent turn
+          is one nobody presses twice. */}
       <div class="plugin-authoring">
         <p class="muted">
           Drafts a prompt in the current task's agent. It writes the package and asks you to install it;
@@ -246,10 +239,8 @@ export default function PluginsSettings() {
         </Button>
       </div>
 
-      {/* The install form. Deliberately plain: there is no browse-and-discover surface and there is not
-          going to be one soon, because any listing acorn could offer would be unreviewed
-          (docs/plugins.md § Non-goals). Someone who installs a plugin here already decided to
-          trust its author. */}
+      {/* No browse-and-discover surface, because any listing acorn could offer would be unreviewed
+          (docs/plugins.md § Non-goals). */}
       <form
         class="plugin-install"
         onSubmit={(event) => {
@@ -278,9 +269,8 @@ export default function PluginsSettings() {
         A plugin's server code runs with the same access as acorn itself. This device asks again, showing
         what the plugin declared, before any of its interface code runs here.
       </p>
-      {/* Said only for the source it is true of. A folder is symlinked, not copied, so it is the one
-          install whose bytes keep changing after the fact — the owner should know that before they point
-          acorn at a directory something else writes to (docs/security.md § Installing from a folder). */}
+      {/* A folder is symlinked, not copied, so it is the one install whose bytes keep changing after
+          the fact (docs/security.md § Installing from a folder). */}
       <Show when={kind() === 'path'}>
         <p class="muted plugin-install-hint">
           A folder is linked, not copied: whatever is in it when the node next starts is what runs, and
@@ -289,15 +279,14 @@ export default function PluginsSettings() {
       </Show>
 
       <Show when={state.loading && !state()}><p class="muted">Reading the plugin list…</p></Show>
-      {/* A node that cannot answer is not an empty list. Saying so beats rendering nothing, which reads as
-          "this node has no plugins". */}
+      {/* A node that cannot answer is not an empty list; rendering nothing would read as one. */}
       <Show when={!state.loading && !rows().length}>
         <p class="muted">This node did not report a plugin list. It may be offline.</p>
       </Show>
 
-      {/* A grid, not a flex line per row: checkboxes, names, versions and the action buttons each keep
-          a straight column edge however long a name or source string runs. Every row renders all four
-          cells — an absent version is an empty cell, not a shifted column. */}
+      {/* A grid, not a flex line per row, so checkboxes, names, versions, and actions keep a straight
+          column edge however long a name runs. An absent version is an empty cell, not a shifted
+          column. */}
       <ul class="plugin-list">
         <For each={optional()}>
           {(row) => (
@@ -308,19 +297,15 @@ export default function PluginsSettings() {
                 disabled={busy()}
                 onChange={(event) => void toggle(row.name, !event.currentTarget.checked)}
               />
-              {/* Only a plugin that came off this node's disk has a version worth showing; a built-in's
-                  is the app's. An empty cell is also how the owner tells the two apart. */}
+              {/* Only a plugin off this node's disk has a version worth showing; a built-in's is the
+                  app's, and the empty cell is how the owner tells the two apart. */}
               <span class="plugin-version muted">{row.installed?.version ?? ''}</span>
               <span class="plugin-meta">
-                {/* An absolute path or repo spec can outrun the column; it ellipsises and the full text
-                    lives in the title. */}
                 <Show when={row.installed?.source}>
                   {(source) => <span class="plugin-source muted" title={source()}>{source()}</span>}
                 </Show>
-                {/* Development mode, stated in full rather than as a decoration. The security story here
-                    rests entirely on the owner being able to SEE this and end it: the moment a dev-mode
-                    plugin looks like a normal install, the trust story has rotted (docs/security.md § The
-                    dev grant). */}
+                {/* Stated in full rather than as a decoration. The security story rests on the owner
+                    seeing this and being able to end it (docs/security.md § The dev grant). */}
                 <Show when={devGrant(row)}>
                   {(grant) => (
                     <>
@@ -333,29 +318,25 @@ export default function PluginsSettings() {
                     </>
                   )}
                 </Show>
-                {/* This device has seen these exact bytes and said no. Per-device by design, hence the
-                    wording: the same plugin may be running happily on the owner's other laptop. */}
+                {/* This device has seen these exact bytes and said no. The same plugin may be running
+                    happily on the owner's other laptop, hence the wording. */}
                 <Show when={blockedHere(row)}>
                   <span class="plugin-failed" role="status">blocked on this device</span>
                 </Show>
-                {/* The install directory and this process disagree — installed, updated or uninstalled
-                    since the node last started. Unlike a failed row, a restart is exactly the fix. */}
+                {/* The install directory and this process disagree: something was installed, updated,
+                    or uninstalled since the node last started. A restart is the fix. */}
                 <Show when={row.state === 'pending-restart'}>
                   <span class="plugin-pending muted">waiting for a restart</span>
                 </Show>
-                {/* Only when the two answers differ — otherwise every row would carry a redundant label. */}
                 <Show when={row.state !== 'pending-restart' && pluginPending(row)}>
                   <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>
                 </Show>
-                {/* A plugin installed on this node that threw, or that never loaded at all. Restarting will
-                    not fix either, so this deliberately does not raise the restart banner — the owner has to
-                    turn it off or fix the plugin.
+                {/* A restart fixes neither a throw nor a failed load, so this does not raise the
+                    restart banner. The owner has to turn the plugin off or fix it.
 
-                    `reason` is the node's verbatim account of what broke: a thrown message from a contained
-                    init, or the loader's own sentence for a manifest that does not parse or a bundle that
-                    will not import. It is a loaded plugin's text crossing into the owner's UI, so it is
-                    interpolated as TEXT and arrives already capped from the node. Absent from an older
-                    node, which is why the label stands alone. */}
+                    `reason` is the node's verbatim account of what broke, so it is loaded-plugin text
+                    crossing into the owner's UI: interpolated as text, and capped by the node. An
+                    older node does not send it, which is why the label stands alone. */}
                 <Show when={row.state === 'failed'}>
                   <span class="plugin-failed" role="status">
                     failed to {row.stage === 'load' ? 'load' : 'start'}
@@ -366,10 +347,9 @@ export default function PluginsSettings() {
                 </Show>
               </span>
 
-              {/* Only a package the owner installed can be updated or removed. A bundled package ships
-                  with the app and has no lockfile, so the node cannot re-resolve a source for it — the
-                  update route would only answer "acorn does not know where this came from" — and it comes
-                  back at the app's version on the next build either way. */}
+              {/* Only a package the owner installed can be updated or removed. A bundled package has
+                  no lockfile, so the node cannot re-resolve a source for it, and the next build brings
+                  it back at the app's version anyway. */}
               <span class="plugin-actions">
                 <Show when={row.installed && !row.installed.bundled}>
                   <Show
@@ -385,9 +365,8 @@ export default function PluginsSettings() {
                       </>
                     }
                   >
-                    {/* Keeping the data is the default everywhere else a plugin goes away — disabling one
-                        leaves its SQLite file alone (docs/plugins.md) — so it is the plain button here and
-                        deleting is the loud one. */}
+                    {/* Keeping the data is the default everywhere else a plugin goes away, so it is
+                        the plain button here and deleting is the loud one. */}
                     <span class="plugin-confirm">Remove {row.name}?</span>
                     <Button size="sm" disabled={busy()} onClick={() => void uninstall(row.name, false)}>
                       Keep its data
@@ -412,8 +391,7 @@ export default function PluginsSettings() {
 }
 
 // The exclusive-slot picker (registries/exclusiveSlots.ts, docs/plugins.md § Replacing a core
-// surface). Lives here rather than in Appearance, and hidden entirely when nobody has offered a
-// replacement, per that section.
+// surface). Lives here rather than in Appearance, and hides when nobody has offered a replacement.
 function ReplacedSurfaces() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
@@ -424,8 +402,7 @@ function ReplacedSurfaces() {
 
   return (
     <Show when={rows().length}>
-      {/* A plain div rather than a nested `.settings-section`: this page's root already is one, and the
-          rows below are fields, not a second page. */}
+      {/* A plain div rather than a nested `.settings-section`: this page's root already is one. */}
       <div>
         <p class="muted">
           Some plugins offer to draw one of acorn's own surfaces. Nothing is replaced until you pick it
@@ -444,9 +421,8 @@ function ReplacedSurfaces() {
                   {(offer) => <option value={offer.pluginId}>{offer.label} ({offer.pluginId})</option>}
                 </For>
               </Select>
-              {/* Stated rather than hidden. A replacement that fell back is the one situation where the
-                  setting and the screen disagree, and an owner staring at their old task list with this
-                  select still naming a plugin has no other way to find out why. */}
+              {/* A replacement that fell back is the one case where the setting and the screen
+                  disagree, and the owner has no other way to find out why. */}
               <Show when={choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))}>
                 <span class="plugin-failed" role="status">that surface failed — acorn's own is showing</span>
               </Show>
@@ -458,7 +434,6 @@ function ReplacedSurfaces() {
   )
 }
 
-// Core's own name for each designated surface. Core's, not the plugin's: the label beside the picker
-// says which of acorn's surfaces is being replaced, and a plugin's own label is already the option
-// text.
+// Core's own name for each designated surface, because the label says which of acorn's surfaces is
+// being replaced. The plugin's own label is already the option text.
 const CORE_SLOT_LABEL: Record<CoreExclusiveSlot, string> = { 'rail.taskList': 'Task list in the rail' }

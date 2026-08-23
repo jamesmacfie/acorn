@@ -19,9 +19,9 @@ export type ServiceHostEvents = {
   unexpectedExit?(code: number): void
 }
 
-// How long a well-behaved service gets to exit after SIGTERM before we stop being polite. Its own
-// handler drains the listener, the PTYs and SQLite, which is worth waiting for; a wedged one holding
-// the data root's lock is worse than a hard kill (main/dataRoot.ts).
+// How long a well-behaved service gets to exit after SIGTERM. Its own handler drains the listener,
+// the PTYs, and SQLite, which is worth waiting for, but a wedged one holding the data root's lock is
+// worse than a hard kill. See main/dataRoot.ts.
 const KILL_ESCALATION_MS = 5_000
 
 export class ServiceHost {
@@ -37,27 +37,27 @@ export class ServiceHost {
     serviceStartConfigSchema.parse(config)
   }
 
-  // Resolves with where the service bound, who it is, and the bearer to reach it with: everything the
-  // connection broker needs. The caller supplies the previously-remembered device token so the service
-  // can reuse it instead of creating a new device row on every launch.
+  // Resolves with where the service bound, who it is, and the bearer to reach it with, which is
+  // everything the connection broker needs. The caller supplies the remembered device token so the
+  // service reuses it instead of creating a device row on every launch.
   async start(rememberedDeviceToken?: string): Promise<ServiceStartResult> {
     if (this.child) throw new Error('Service host is already started')
     this.stopping = false
     const child = spawn(process.execPath, [this.entry], {
-      // `process.execPath` is the Node the bundle ships, which is how the child needs no system Node
-      // install and how the bundled node-pty finds the ABI it was built against
-      // (docs/shell.md § Build and packaging).
+      // `process.execPath` is the Node the bundle ships, so the child needs no system Node install
+      // and the bundled node-pty finds the ABI it was built against. See docs/shell.md, "Build and
+      // packaging".
       env: { ...process.env },
-      // stdin closed (the service never reads it); stdout/stderr inherited so its logs land wherever
-      // the app's do; fd 3 is the IPC channel that gives the child `process.send`.
+      // stdin closed, because the service never reads it. stdout and stderr inherited, so its logs
+      // land wherever the app's do. fd 3 is the IPC channel that gives the child `process.send`.
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     })
     this.child = child
 
     const transport: ServiceMessageTransport = {
-      // Send can throw once the channel is gone (a crashed child between our exit handler running and
-      // a caller's in-flight request). The peer's own timeout is the backstop, and a throw here would
-      // surface as an unhandled rejection in whatever unrelated code happened to be sending.
+      // Send can throw once the channel is gone, when a child crashes between the exit handler
+      // running and a caller's in-flight request. The peer's own timeout is the backstop, and a throw
+      // here would surface as an unhandled rejection in whatever happened to be sending.
       send: (message: ServiceMessage) => {
         try {
           child.send(message)
@@ -95,8 +95,8 @@ export class ServiceHost {
     child.on('exit', (code) => this.handleExit(child, code ?? 0))
     await spawned
     const result = await peer.request('service.start', { ...this.config, deviceToken: rememberedDeviceToken }, 60_000)
-    // Parsed, not cast: this is the one place a malformed handoff would otherwise surface much later
-    // as an unreachable node with no explanation.
+    // Parsed, not cast. A malformed handoff would otherwise surface much later as an unreachable node
+    // with no explanation.
     return serviceStartResultSchema.parse(result)
   }
 
@@ -122,10 +122,9 @@ export class ServiceHost {
   }
 
   // SIGTERM, then SIGKILL if it is ignored. The service installs its own SIGTERM handler to drain
-  // cleanly, so the polite signal is the one that matters. But a wedged child holding the data root's
-  // exclusive lock blocks the next launch, and commit 9dbb343 already taught this repo what happens
-  // when nothing follows up a signal a child can ignore: a probe found alive as an orphan four days
-  // later.
+  // cleanly, so the polite signal is the one that matters. A wedged child holding the data root's
+  // exclusive lock blocks the next launch, though, and a signal with no follow-up once left a probe
+  // alive as an orphan for four days.
   private terminate(child: ChildProcess): void {
     child.kill('SIGTERM')
     const escalate = setTimeout(() => child.kill('SIGKILL'), KILL_ESCALATION_MS)

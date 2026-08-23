@@ -2,12 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 
-// Moved here from @acorn/client-core/wsClient.test.ts with the channel it covers. Core's test
-// keeps the transport, the reconnect edge and the fleet filter. This one keeps what is docker's:
-// that a stream is routed by kind and id, and that a live subscription re-attaches after a drop.
+// Core's test covers the transport, the reconnect edge, and the fleet filter. This one covers
+// docker's part: a stream routes by kind and id, and a live subscription re-attaches after a drop.
 //
-// The bridge is faked, not a WebSocket: the renderer does not own a socket, the helper's
-// broker does, so the thing under test is subscription bookkeeping.
+// The bridge is faked rather than a WebSocket, because the renderer owns no socket. The helper's
+// broker does, so what is under test is subscription bookkeeping.
 
 type Bridge = {
   sent: { nodeId: string; frame: unknown }[]
@@ -75,8 +74,8 @@ describe('docker ws channel', () => {
     expect(events).toEqual([{ kind: 'log', data: 'line' }, { kind: 'end' }])
   })
 
-  // The reattach hook is this plugin's now: core's reconnect loop asks each channel owner for its
-  // frames rather than knowing how to spell `docker:${kind}:attach` itself.
+  // The reattach hook belongs to this plugin: core's reconnect loop asks each channel owner for its
+  // frames rather than spelling `docker:${kind}:attach` itself.
   it('re-attaches a live stream after a genuine reconnect', () => {
     channel.wsDockerAttach('logs', 'c1', () => {})
     bridge.emitStatus('online') // first connect

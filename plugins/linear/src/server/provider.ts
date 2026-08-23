@@ -214,8 +214,8 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
       const detail = linearNodeToDetail(node)
       const ref = refForIdentifier(context.connection.id, detail.identifier, detail.url)
       const data = encodeCached(linearCodec.withDetail(ref, linearSummaryOf(detail), detail, context.now), context.limits.maxCachedItemBytes)
-      // `write` is an upsert keyed on (owner, connection, identifier), the same conflict target the
-      // raw statement declared, kept in one place now that two providers share the table.
+      // `write` is an upsert keyed on (owner, connection, identifier), kept in one place because two
+      // providers share the table.
       await context.items.write({ connectionId: context.connection.id, identifier: detail.identifier, data, fetchedAt: context.now })
       return { ok: true }
     } catch {
@@ -224,14 +224,12 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
   },
 }
 
-// The projects a Linear workspace offers, for the host's workspace-mapping picker. This is the fetch
-// that used to sit behind `GET /v2/p/linear/projects`, moved onto the provider contribution so core
-// can ask it without knowing it is asking Linear. That route had no caller left, since the browse pane
-// that called it is a host-drawn rail now.
+// The projects a Linear workspace offers, for the host's workspace-mapping picker. It sits on the
+// provider contribution so core can ask without knowing it is asking Linear.
 //
-// No error handling beyond "no projects": the host runs this inside the secret scope and the request
+// No error handling beyond "no projects". The host runs this inside the secret scope and the request
 // budget and turns a throw into a per-connection failure the picker can retry, so swallowing a 401
-// here would only hide it. Same division as `linearIssuesResource.refresh` above.
+// here would hide it. Same division as `linearIssuesResource.refresh` above.
 const linearProjectSource: ProviderProjectSource = {
   async list({ secret }) {
     const response = await linearFetch(secret, PROJECTS_QUERY, {})

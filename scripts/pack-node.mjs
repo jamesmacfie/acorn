@@ -1,26 +1,24 @@
 #!/usr/bin/env node
-// Assemble a standalone Acorn Node tarball (docs/vNext/plan.md § Phase 5: "standalone node distribution
-// (`npx`/tarball + launchd/systemd notes) for remote machines"). See docs/node-distribution.md for what
-// an operator does with the result.
+// Assemble a standalone Acorn Node tarball. See docs/node-distribution.md for what an operator does
+// with the result.
 //
 // ## Why a tarball and not an npm package
 //
 // `apps/node` is `private`, every `@acorn/*` dependency is `workspace:*`, and the dependency that
-// matters most — node-pty — is NATIVE. An `npx`-able package would need prebuilt
-// binaries for every (platform, arch, Node ABI) triple we are willing to support, which is a release
-// pipeline rather than a script. A tarball the operator unpacks and runs `npm install --omit=dev` in
-// compiles it against THEIR Node, which is the same dance a developer already does here
-// (`pnpm rebuild:node`) and needs no infrastructure at all.
+// matters most, node-pty, is native. An `npx`-able package would need prebuilt binaries for every
+// (platform, arch, Node ABI) triple, which is a release pipeline rather than a script. A tarball the
+// operator unpacks and runs `npm install --omit=dev` in compiles node-pty against their own Node,
+// the same dance a developer already does here (`pnpm rebuild:node`).
 //
 // ## What goes in
 //
-//   dist/          the built artifact — standalone.js, mcp.js and the shared chunks
+//   dist/          the built artifact: standalone.js, mcp.js and the shared chunks
 //   migrations/    every Drizzle chain: core's at the root, each plugin's under its own name
-//   package.json   generated, listing ONLY the real runtime dependencies (see RUNTIME below)
+//   package.json   generated, listing only the real runtime dependencies (see RUNTIME below)
 //   README.md      pointing at docs/node-distribution.md
 //
-// The renderer, the Electron main process and every `@acorn/*` package are absent by construction: the
-// build bundles first-party source into the artifact, so a node needs none of them at runtime.
+// The renderer, the shell and every `@acorn/*` package are absent by construction: the build bundles
+// first-party source into the artifact, so a node needs none of them at runtime.
 
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -36,10 +34,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const NODE_APP = join(ROOT, 'apps/node')
 const OUT = join(ROOT, 'apps/node/release')
 
-// The runtime dependency set, and the one hand-maintained list in this script. Versions are read from
-// apps/desktop's manifest rather than repeated here — it is the package that already pins them for the
-// bundled node, so a divergence between the packaged app and the standalone one is impossible by
-// construction. `assertManifestCoversImports` below is what keeps the NAMES honest.
+// The runtime dependency set, and the one hand-maintained list in this script. Versions are read
+// from apps/desktop's manifest rather than repeated here, since that package already pins them for
+// the bundled node, so the packaged app and the standalone one cannot diverge.
+// `assertManifestCoversImports` below keeps the names honest.
 const RUNTIME = [
   '@agentclientprotocol/claude-agent-acp',
   '@agentclientprotocol/sdk',
@@ -61,8 +59,9 @@ const RUNTIME = [
 ]
 
 // Loaded through `createRequire(...)` rather than a static import. The scanner below matches both
-// spellings of that, so this list is a BELT-AND-BRACES check on the two that would break a boot — asserted by looking for the bare name as a quoted string,
-// which is weaker than the specifier scan and labelled as such rather than folded in silently.
+// spellings, so this list is a second check on the two that would break a boot. It looks for the bare
+// name as a quoted string, which is weaker than the specifier scan and labelled as such rather than
+// folded in silently.
 const DYNAMIC = ['@xterm/headless', '@xterm/addon-serialize']
 
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'))
@@ -75,17 +74,15 @@ function importedPackages(files) {
   const patterns = [
     /(?:^|[\s;}])(?:import|export)[^;'"]*?from\s*['"]([^'"]+)['"]/g,
     /(?:^|[\s;}])import\s*['"]([^'"]+)['"]/g,
-    // The negative lookbehind is load-bearing: `agentProfileRegistry.require("shell")` is a METHOD named
-    // require, and without it the scanner reported `shell` as a missing dependency. A checker that cries
-    // wolf on the first run is one whose next real finding gets waved through.
+    // The negative lookbehind is load-bearing: `agentProfileRegistry.require("shell")` is a method
+    // named require, and without it the scanner reported `shell` as a missing dependency. A checker
+    // that cries wolf on the first run is one whose next real finding gets waved through.
     /(?<![.\w$])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
     /(?<![.\w$])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    // The dynamic forms, and they are NOT an edge case here: @xterm/headless and
-    // @xterm/addon-serialize are both loaded this way, because a lazy load turns a load failure
-    // into an actionable error instead of a bare stack at import time. The first
-    // version of this scanner saw none of them — it declared the manifest complete, and the unpacked
-    // tarball then died on `Cannot find module '@xterm/headless'` at boot. That is precisely the silent
-    // failure this check exists for, so it now covers both spellings.
+    // The dynamic forms, which are not an edge case here: @xterm/headless and @xterm/addon-serialize
+    // are both loaded this way, because a lazy load turns a load failure into an actionable error
+    // instead of a bare stack at import time. A scanner blind to them declares the manifest complete
+    // and the unpacked tarball dies on `Cannot find module '@xterm/headless'` at boot.
     /(?<![.\w$])[A-Za-z_$][\w$]*Require\s*\(\s*['"]([^'"]+)['"]/g,
     /createRequire\([^)]*\)\s*\(\s*['"]([^'"]+)['"]/g,
   ]
@@ -156,7 +153,7 @@ cpSync(dist, join(staging, 'dist'), { recursive: true })
 const chains = stageMigrations(join(staging, 'migrations'))
 console.log(`[pack-node] staged ${chains} migration chains`)
 
-// Versions come from apps/desktop's manifest — the package that already pins them for the BUNDLED node,
+// Versions come from apps/desktop's manifest, the package that already pins them for the bundled node,
 // so the standalone one cannot drift from it. `catalog:` entries are resolved out of pnpm-workspace.yaml,
 // which is where the single-versioned packages live (a duplicate zod means schema instances that fail
 // each other's instanceof checks, which is why they are pinned there in the first place).

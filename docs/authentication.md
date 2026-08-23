@@ -26,10 +26,10 @@ type Principal = {
 | `internal` | `x-acorn-internal: <token>` | Node-spawned process or Node service call, constrained by token scope |
 
 `userId` is an opaque node-owner id used to scope identity-owned records. It is minted and bound at
-first boot (`ensureBoundIdentity`); installs that bound a GitHub login under the old scheme keep
-that login as the opaque id. Providers never bind identity — a GitHub login is metadata on its
-integration row. Internal authentication still fails closed on an unbound identity, which after
-first boot only a bare test environment can produce.
+first boot (`ensureBoundIdentity`). Installs that bound a GitHub login under the earlier scheme keep
+that login as the opaque id. Providers never bind identity: a GitHub login is metadata on its
+integration row. Internal authentication fails closed on an unbound identity, which after first boot
+only a bare test environment can produce.
 
 The bearer and internal paths are mutually exclusive during resolution. A malformed or rejected
 device bearer never falls through to internal authentication.
@@ -96,8 +96,8 @@ the revocation mechanism needed for tmux sessions that survive a Node restart.
 
 The GitHub credential is an integration secret, not part of `Principal`. GitHub routes read it
 through `plugins/github/src/server/githubToken.ts`, so an internal caller that can reach a GitHub
-route can spend the owner's GitHub credential. This is an important current boundary: task scope
-limits task access, but it is not a universal provider-credential firewall.
+route can spend the owner's GitHub credential. Know where that boundary sits: task scope limits task
+access, and it is not a universal provider-credential firewall.
 
 ## GitHub connection
 
@@ -124,5 +124,5 @@ client and Node use ping/pong watchdogs, and revocation closes device sockets.
 
 `SESSION_ENC_KEY` is the 32-byte AES-256-GCM/JWE key for integration credentials and HTTP-client
 fields. It must be exactly 64 hexadecimal characters. The Node generates and stores it beside its own
-data root; development may provide it through the environment. An existing database
-without usable key material fails closed.
+data root; development may provide it through the environment. A database without usable key
+material fails closed.

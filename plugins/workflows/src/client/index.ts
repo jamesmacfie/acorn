@@ -10,9 +10,9 @@ const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
   init: (ctx) => {
-    // The three reads plugins/agents' task sidebar needs (docs/plugins.md § Collaboration rules:
-    // this is the package-cycle example). Published under the id agents declares
-    // (contract/workflowControl.ts); a node with workflows disabled just never provides it.
+    // The three reads plugins/agents' task sidebar needs (docs/plugins.md § Collaboration rules).
+    // Published under the id agents declares (contract/workflowControl.ts). A node with workflows
+    // disabled never provides it.
     ctx.capability(WORKFLOW_CONTROL, {
       runs: workflowApi.runs,
       steps: workflowApi.steps,

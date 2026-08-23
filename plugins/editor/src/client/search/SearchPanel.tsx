@@ -5,10 +5,10 @@ import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import './search.css'
 
-// Find-in-files panel: substring search by default, with case, whole-word and regex toggles.
-// Double-clicking a hit opens the file in the editor beside it, centered on the match. Why this is
-// a sidebar panel rather than its own pane, and why it stays mounted when hidden, is in
-// docs/panes.md § Contributions (and the migration history in docs/third-party/editor.md).
+// Find-in-files panel: substring search by default, with case, whole-word, and regex toggles.
+// Double-clicking a hit opens the file in the editor beside it, centered on the match. For why this
+// is a sidebar panel rather than its own pane, and why it stays mounted when hidden, see
+// docs/panes.md § Contributions.
 export default function SearchPanel(props: { taskId: string; active: boolean }) {
   const [query, setQuery] = createSignal('')
   const [debounced, setDebounced] = createSignal('')
@@ -35,8 +35,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
 
   const totalHits = createMemo(() => (results()?.files ?? []).reduce((n, f) => n + f.hits.length, 0))
 
-  // Still the retained pane intent rather than a callback prop; see docs/third-party/editor.md §
-  // "What it cost, now that it is done".
+  // The retained pane intent rather than a callback prop. See docs/third-party/editor.md.
   function openHit(path: string, hit: SearchHit) {
     requestEditorReveal(props.taskId, path, hit.line, hit.col)
   }
@@ -105,8 +104,8 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
                     class="search-hit"
                     title={`Open ${file.path} at ${hit.line}:${hit.col}`}
                     onClick={(event) => {
-                      // Native keyboard/assistive button activation has detail 0. Mouse clicks wait
-                      // for the explicit double-click below so inspecting results does not navigate.
+                      // Keyboard and assistive activation has detail 0. A mouse click waits for the
+                      // double-click below, so inspecting results does not navigate.
                       if (event.detail === 0) openHit(file.path, hit)
                     }}
                     onDblClick={() => openHit(file.path, hit)}

@@ -17,21 +17,18 @@ import { repoMatches } from '../repoMatch'
 // The collection half of the PR mirror (@acorn/protocol/collections.ts). One route, one question:
 // the open pull requests this user has mirrored, across every repository, newest first.
 //
-// Reads the mirror and never drives it; freshness here stays owned by the repo-scoped list route a
-// person is actually waiting on (docs/dashboards.md § Freshness). No refresh of its own, so a panel
-// shows rows as old as the last time that repo's PR list was opened. The upgrade, when a dashboard is
-// somebody's home page rather than a second view of an open list, is a single cross-repo refresh
-// through the engine (`resource: 'pulls:mine'`, one GitHub search query, one TTL) rather than one
-// revalidate per repository.
+// Reads the mirror and never drives it. Freshness belongs to the repo-scoped list route a person is
+// waiting on (docs/dashboards.md § Freshness), so a panel shows rows as old as the last time that
+// repo's PR list was opened. The upgrade is one cross-repo refresh through the engine
+// (`resource: 'pulls:mine'`, one search query, one TTL) rather than one revalidate per repository.
 //
-// The GitHub side of the `involves` param spends a request the mirror read above does not, because
-// it is one search whatever the repository count rather than N repos times one poll, and a
-// mirror-side answer to "asked me to review" would be wrong rather than merely stale
-// (docs/github-integration.md § Reads and writes).
+// The `involves` param spends a GitHub request the mirror read does not, because a mirror-side answer
+// to "asked me to review" would be wrong rather than stale (docs/github-integration.md § Reads and
+// writes). It is one search whatever the repository count.
 //
 // The selection set is the mirror's list columns and no more. PR_FRAGMENT exists for a PR someone has
-// open in front of them, and pulling its reviews, threads and commits for fifty rows nobody has
-// clicked would cost a rate limit to render columns this collection does not declare.
+// open in front of them, and pulling reviews, threads, and commits for fifty unclicked rows would
+// spend rate limit on columns this collection does not declare.
 const SEARCH_QUERY = `
 query PullsInvolvingMe($q: String!, $first: Int!) {
   search(query: $q, type: ISSUE, first: $first) {
@@ -46,8 +43,7 @@ query PullsInvolvingMe($q: String!, $first: Int!) {
   }
 }`
 
-// GitHub caps a search page at 100 regardless of what we ask for, so this is GitHub's number, not ours
-// (MAX_COLLECTION_ROWS is five times higher and a panel is a glance either way).
+// GitHub caps a search page at 100 whatever we ask for. MAX_COLLECTION_ROWS is five times higher.
 const SEARCH_PAGE = 100
 
 type GqlSearchPull = {
@@ -91,29 +87,27 @@ export const collections = (db: PluginDatabase) => new Hono<AppEnv>().get(`/${PU
   const [owner, name] = repo.split('/')
   const involvements = parsePullInvolvement(c.req.query('involves') ?? '')
 
-  // "…involving me" leaves the mirror entirely (contract/collections.ts § involvement). No recognised
-  // value falls through to the mirror read rather than erroring: a param is opaque to the host, so a
-  // stale saved panel is a thing that can arrive here, and the widest honest answer beats a broken tile.
+  // "involving me" leaves the mirror entirely (contract/collections.ts § involvement). An
+  // unrecognised value falls through to the mirror read rather than erroring, because a param is
+  // opaque to the host and a stale saved panel can arrive here.
   if (involvements.length) {
     const token = await githubToken(c)
     // One search each, in parallel, unioned: GitHub's qualifiers only AND, so "assigned to me or
-    // waiting on my review" is two questions however it is asked. At most three, and a search is one
-    // call whatever the repository count, so the ceiling is three calls per poll.
+    // waiting on my review" is two questions. Three involvements, so three calls per poll at most.
     const results = await Promise.all(involvements.map((involvement) =>
       ghGraphQL(token, SEARCH_QUERY, { q: pullsSearchQuery(involvement, repo), first: SEARCH_PAGE })
         .then((res) => ghGraphQLResult<{ search?: { nodes?: GqlSearchPull[] } }>(res)),
     ))
-    // Any failure fails the panel. A partial union would be a tile that silently under-reports what is
-    // waiting on you, which is the one wrong answer this collection must not give.
+    // Any failure fails the panel. A partial union under-reports what is waiting on you, which is
+    // the one wrong answer this collection must not give.
     const failed = results.find((result) => !result.ok)
     if (failed && !failed.ok) {
       return failed.kind === 'http'
         ? respondError(c, failed.failure.status, failed.failure.error)
         : respondError(c, 502, 'github_unavailable', failed.messages)
     }
-    // A PR you were assigned and asked to review is one row. Deduped here rather than by the host: the
-    // host dedupes a mixed board by row id and would have got this right too, but a collection
-    // answering the same record twice is a wrong answer regardless of who is looking at it.
+    // A PR you were assigned and asked to review is one row. Deduped here rather than left to the
+    // host, because a collection answering the same record twice is wrong whoever reads it.
     const found = new Map<string, PullCollectionSource>()
     for (const result of results) {
       if (!result.ok) continue

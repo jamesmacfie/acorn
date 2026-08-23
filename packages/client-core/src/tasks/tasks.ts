@@ -11,10 +11,9 @@ import { onScopeEvicted } from '../registries/scopeEviction'
 export type { PaneId, TaskLayout } from './layout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 
-// Which browse Source is selected, or null when a task is the active view. Known core ids stay
-// typed for contributions and UI construction. The live selection accepts an unknown string so a
-// temporarily missing plugin source remains inert and round-trips through persistence until the
-// user explicitly selects another source.
+// Which browse Source is selected, or null when a task is the active view. The live selection
+// accepts an unknown string, so a missing plugin source stays inert and round-trips through
+// persistence until the user picks another one.
 export type SourceId = string
 export const isSourceId = (v: unknown): v is SourceId => typeof v === 'string' && !!sourceRegistry.get(v)
 
@@ -30,17 +29,15 @@ export function setSelectedSource(source: string | null): void {
   setSelectedSourceState(source)
 }
 
-// Per-workspace memory of the last view, a rail source (browse) or a task, so switching
-// workspaces returns you to exactly what you were looking at rather than always jumping back to
-// GitHub. Session-only (not persisted); first-load restore is handled by the last_source/last_task
-// prefs.
+// Per-workspace memory of the last view, a rail source or a task, so switching workspaces returns
+// you to what you were looking at. Session-only; first-load restore comes from the last_source and
+// last_task prefs.
 //
-// Keyed by node and cleared on a switch, which is belt and braces. The key stops two nodes'
-// workspace ids colliding (they are node-minted UUIDs, and two nodes may hold the same one,
-// docs/architecture-overview.md § Client state and fleet behavior); the clear stops the
-// persistence pass writing one node's scopes under the other's storage key, because
-// `storageKeyFor` reads the active node at write time and these stores survive the shell's
-// remount. See `clearNodeScopedTaskState` at the foot of this file.
+// Keyed by node and cleared on a switch. The key stops two nodes' workspace ids colliding, since
+// they are node-minted UUIDs (docs/architecture-overview.md § Client state and fleet behavior). The
+// clear stops the persistence pass writing one node's scopes under the other's storage key, because
+// `storageKeyFor` reads the active node at write time and these stores survive the shell's remount.
+// See `clearNodeScopedTaskState` at the foot of this file.
 const viewByWorkspace = new Map<string, WorkspaceView>()
 const viewKey = (workspaceId: string): string => `${activeNodeId() ?? ''}/${workspaceId}`
 export const rememberWorkspaceView = (workspaceId: string, view: WorkspaceView): void => {
@@ -72,9 +69,9 @@ export function dispatchLayout(taskId: string, action: LayoutAction): void {
   const nextLayout = layoutForTask(taskId) ?? defaultLayout()
   const focused = focusedPane(taskId)
   const maximized = maximizedPane(taskId)
-  // Focus/maximize are session state, but their ids must always belong to the durable layout.
-  // Keep that invariant here at the layout's single write boundary so close, show, and replace
-  // transitions cannot leave commands or rendering pointed at a pane that no longer exists.
+  // Focus and maximize are session state, but their ids must belong to the durable layout. Keeping
+  // that invariant at the single write boundary stops close, show, and replace pointing commands or
+  // rendering at a pane that no longer exists.
   if (focused && !nextLayout.panes.includes(focused)) clearFocusedPane(taskId, focused)
   if (action.type === 'show' || (maximized && !nextLayout.panes.includes(maximized))) setMaximizedPane(taskId, null)
 }
@@ -219,8 +216,8 @@ export function clearNodeScopedTaskState(): void {
   setMaximizedPanes({})
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered here rather than in the shell's evictor file, so this signal and the thing that clears
+// it are one edit apart (registries/scopeEviction.ts).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictTaskState(e.taskId)
   else if (e.scope === 'workspace') evictWorkspaceView(e.workspaceId)

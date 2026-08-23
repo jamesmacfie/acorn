@@ -157,9 +157,9 @@ export default function DockerBrowse() {
   }
 
   // TreeRow rather than Row: a compose project expands into its containers, so this list is a tree,
-  // and the same primitive the API panel's request tree uses gives it the twist, the depth indent and
-  // the compact density for free. A standalone container still renders through it, so its label lines
-  // up with a project header's rather than sitting a twist-width to the left.
+  // and the primitive the API panel's request tree uses brings the twist, the depth indent, and the
+  // compact density. A standalone container renders through it too, so its label lines up with a
+  // project header's rather than sitting a twist-width to the left.
   const row = (c: DockerContainerSummary, inGroup: boolean) => (
     <TreeRow
       class="docker-row"
@@ -217,8 +217,8 @@ export default function DockerBrowse() {
           reveal
           onActivate={() => toggleGroup(g.project!)}
           title={g.project!}
-          // The stale chip rides in `meta`, not the body: Row's body ellipsises, so a warning sat
-          // after a long project name would be the first thing clipped.
+          // The stale chip rides in `meta`, not the body: Row's body ellipsises, so a warning after a
+          // long project name is the first thing clipped.
           meta={
             <>
               <Show when={g.containers.some((c) => c.workingDirMissing)}>

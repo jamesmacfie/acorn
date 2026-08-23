@@ -1,8 +1,7 @@
 // Rollbar's wire contract (docs/integrations.md): deduped error items mirrored into `issues`. Types,
-// route builders, and query keys live here, not in `@acorn/protocol` (docs/architecture-overview.md:
-// a plugin owns the shape of its own wire surface). Route strings and query keys are unchanged from
-// the old @acorn/protocol/api.ts version, since a changed key orphans a user's persisted cache
-// (docs/caching.md).
+// route builders, and query keys live here, not in `@acorn/protocol`, because a plugin owns the shape
+// of its own wire surface (docs/architecture-overview.md). Do not change a query key: it orphans a
+// user's persisted cache (docs/caching.md).
 //
 // The list row (summary) and the detail differ: detail adds a normalized, privacy-safe view of the
 // latest occurrence. Raw upstream occurrence JSON never crosses this boundary (docs/security.md).
@@ -20,7 +19,7 @@ export type RollbarItemSummary = {
   firstOccurrenceAt: number | null
   lastOccurrenceAt: number | null
   framework?: string
-  // Optional (like framework) so cached pre-widening rows stay valid: absent until the next list refresh.
+  // Optional, like framework, so an older cached row stays valid until the next list refresh.
   lastActivatedAt?: number | null // later than firstOccurrenceAt ⇒ the item regressed after a resolve
   uniqueOccurrences?: number // distinct-IP count; plan-dependent upstream
 }
@@ -72,8 +71,8 @@ export type RollbarOccurrencesResponse = {
   capped: boolean
 }
 
-// Compatibility composite for the public automation API. The desktop pane uses the independently
-// cached metadata / occurrence-list / occurrence-detail routes below so inactive tabs do no work.
+// Compatibility composite for the public automation API. The desktop pane uses the separately cached
+// metadata, occurrence-list, and occurrence-detail routes below, so inactive tabs do no work.
 export type RollbarItemDetail = RollbarItemMetadata & {
   latestOccurrence: RollbarOccurrenceDetail | null
 }

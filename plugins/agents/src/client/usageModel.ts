@@ -62,9 +62,8 @@ export function formatUpdated(capturedAt: number | null, now = Date.now()): stri
   return `updated ${Math.floor(minutes / 60)}h ago`
 }
 
-// Whatever harnesses the snapshot came back with, in the node's order. It used to walk a two-id literal
-// and pick the label off a ternary, which meant a third harness could report usage the tooltip would
-// never mention. The label travels with the row now (shared/usage.ts).
+// Whatever harnesses the snapshot came back with, in the node's order. The label travels with the row
+// (shared/usage.ts), so a harness the client has never heard of still gets named.
 export function usageTooltipSummary(snapshot: AgentUsageSnapshot | null): string {
   const summary = (snapshot?.providers ?? [])
     .map((provider) => {
@@ -74,9 +73,8 @@ export function usageTooltipSummary(snapshot: AgentUsageSnapshot | null): string
         : `⚪ ${provider.label} —`
     })
     .join(' · ')
-  // This string is the indicator button's label, so an empty one collapses the button. It used to fill
-  // the gap with `⚪ Claude — · ⚪ Codex —`, which is a promise about which harnesses exist that only the
-  // node can keep. Naming nothing is the honest placeholder.
+  // This string is the indicator button's label, so an empty one collapses the button. The placeholder
+  // names no harness, because only the node knows which ones exist.
   return summary || 'reading usage…'
 }
 

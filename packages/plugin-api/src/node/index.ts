@@ -21,17 +21,16 @@ export type {
 // What `ctx.taskChecks.register` answers with. Here because a check worth writing is a function, not
 // an inline literal, and a function needs a return type to name (server/plugin/taskChecks.ts).
 export type { TaskConcern } from '@acorn/node-core/server/plugin/taskChecks.ts'
-// The major this build of the API speaks (docs/plugins.md § The plugin API covers what it guards
-// and why it is the one name kept without a consumer, since it is the contract's version rather
-// than an import target).
+// The major this build of the API speaks. docs/plugins.md § The plugin API covers what it guards, and
+// why it is the one name kept without a consumer.
 //
-// Context types were not re-added alongside it: a plugin keeps `ctx` inside `init`/`activate` and
-// passes `ctx.core` onward, so `NodePluginContext` never had to be named on this surface.
+// The context types are not here: a plugin keeps `ctx` inside `init`/`activate` and passes `ctx.core`
+// onward, so `NodePluginContext` never has to be named.
 export { PLUGIN_API_MAJOR } from '@acorn/node-core/main/pluginManifest.ts'
 export { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 export type { Disposable } from '@acorn/node-core/server/plugin/capabilities.ts'
-// The managed agent harness seam (docs/managed-agents.md § Harnesses). The capability id and its shape
-// live in node-core rather than in the agents plugin, because the host is what delivers a
+// The managed agent harness seam (docs/managed-agents.md § Harnesses). The capability id and its
+// shape live in node-core rather than in the agents plugin, because the host delivers a
 // manifest-declared harness and neither package may import the other.
 export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/plugin/harnesses.ts'
 export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/plugin/harnesses.ts'
@@ -45,17 +44,13 @@ export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 export { portableCarrier } from '@acorn/node-core/server/plugin/portable.ts'
 export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
-// `Env`, core's runtime bindings (SECRETS, ACTIVE_IDENTITY, INTERNAL_TOKEN and friends), used to be
-// here for one github route that wanted `Env['BLOBS']`. It named the whole binding set to reach two
-// methods. A plugin reads its env off `ctx`; where it genuinely needs a store, it states the two
-// methods it calls (plugins/github/src/server/routes/prMirror.ts § PatchBlobStore).
+// `Env`, core's runtime bindings, is not here. A plugin reads its env off `ctx`. Where it needs a
+// store, it states the methods it calls (plugins/github/src/server/routes/prMirror.ts §
+// PatchBlobStore).
 
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
-// The handle type only; see docs/data-layer.md and docs/plugins.md § Data ownership for
+// The handle type only. See docs/data-layer.md and docs/plugins.md § Data ownership for
 // `ctx.storage.open()` and how a plugin declares its migrations.
-//
-// `openPluginDb` and `pluginMigrationsFolder` were exported here until the eight built-ins that
-// hand-rolled that lifecycle adopted the seam.
 export type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 
 // ── Core services ─────────────────────────────────────────────────────────────────────────────

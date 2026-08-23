@@ -1,9 +1,8 @@
 // The cooperative cross-plugin seam: plugin A opens a point, plugin B fills it, and the host is the
 // only thing that carries anything between them (docs/plugins.md § Cooperative extension points).
 //
-// This module holds no JSX import (docs/frontend.md § Registries and plugins): the host that draws
-// these deliveries lives in `plugins/chrome/ExtensionPointHost.tsx`, a `<For>` over
-// `extensionDeliveries()`.
+// No JSX import here (docs/frontend.md § Registries and plugins). The host that draws these
+// deliveries is `plugins/chrome/ExtensionPointHost.tsx`.
 import {
   parseExtensionPointRef,
   takesPluginExtensions,
@@ -32,7 +31,7 @@ export type ExtensionPointContribution = {
 }
 
 /** One plugin's rows for one point. `fetch` and `run` are closures the chrome pass built over a route
- *  and a verb; nothing a plugin wrote reaches this registry as code. */
+ *  and a verb, so nothing a plugin wrote reaches this registry as code. */
 export type ExtensionContribution = {
   id: string
   /** The contributing plugin, stamped host-side and rendered beside the rows (docs/plugins.md §
@@ -67,12 +66,11 @@ export const extensionPointFor = (
  * (docs/plugins.md § Cooperative extension points, "an unmatched contribution is silent").
  *
  * `pane.aside` is the one location filled by the user rather than by a plugin's `extensions`
- * (dashboards/region.ts). Nothing renders an aside through this function today; "who may fill this
- * location" is a property of the location, and this is the one place it can be stated where a test
- * can reach it.
+ * (dashboards/region.ts). Nothing renders an aside through this function, but "who may fill this
+ * location" is a property of the location, and this is where a test can reach it.
  *
- * Ties break on id so two contributions at the same order are stable rather than dependent on plugin
- * registration sequence, the same rule the slot hosts and the context menu apply.
+ * Ties break on id, so two contributions at the same order are stable rather than dependent on plugin
+ * registration sequence. Same rule as the slot hosts and the context menu.
  */
 export function extensionDeliveries(pointId: string): ExtensionContribution[] {
   const point = extensionPointRegistry.get(pointId)
@@ -83,8 +81,8 @@ export function extensionDeliveries(pointId: string): ExtensionContribution[] {
 }
 
 /** Which packages a plugin's manifest says it reaches into, for the disclosure surfaces. `null` refs
- *  are dropped rather than reported: the node refused them at parse and the client re-checks, so
- *  anything unparseable here is already a contribution that will never deliver. */
+ *  are dropped rather than reported, because the node refused them at parse and anything unparseable
+ *  here will never deliver. */
 export const extensionPointOwners = (points: readonly { point: string }[]): string[] =>
   [...new Set(points.flatMap((entry) => {
     const ref = parseExtensionPointRef(entry.point)

@@ -36,10 +36,9 @@ const resourceKey = (
   identifier: string,
 ) => `provider:rollbar:${connectionId}:${resource}:${issueIdentifier}:${identifier}`
 
-// Both wrappers exist for one reason: the store types `resource` as a bare string, and
-// `ChildResource` stops an occurrence list and an occurrence detail from ever landing under each
-// other's key. They also hold the two constants, the connection scope and the 'rollbar' provider
-// tag, that every call site would otherwise repeat.
+// The store types `resource` as a bare string, so `ChildResource` stops an occurrence list and an
+// occurrence detail from landing under each other's key. The wrappers also hold the two constants
+// every call site would otherwise repeat: the connection scope and the 'rollbar' provider tag.
 const resourceRow = (
   context: Pick<ProviderResourceContext, 'items' | 'connection'>,
   issueIdentifier: string,
@@ -54,8 +53,8 @@ async function writeResource(
   identifier: string,
   value: unknown,
 ): Promise<boolean> {
-  // Version the storage envelope independently from the public contract (see
-  // CHILD_CACHE_SCHEMA_VERSION above for the current version's rationale).
+  // Version the storage envelope separately from the public contract. See
+  // CHILD_CACHE_SCHEMA_VERSION above.
   const data = JSON.stringify({ schemaVersion: CHILD_CACHE_SCHEMA_VERSION, value })
   // Checked here rather than in the store: refusing the write is a result this caller reports
   // upward as `provider_response_too_large`, not a storage-layer error.

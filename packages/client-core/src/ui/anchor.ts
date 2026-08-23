@@ -75,8 +75,8 @@ export function createAnchoredPopover(opts: {
       : placement === 'right-start' ? rect.right + gap
       : rect.left
     // Pull back inside the viewport rather than flipping. A flip needs to know which edge it came
-    // from and re-measure; a clamp needs the surface's own box, which is already measured above, and
-    // for a menu opened at the pointer it produces the same answer a flip would.
+    // from and re-measure; a clamp needs only the box measured above, and for a menu opened at the
+    // pointer it gives the same answer.
     const fit = (value: number, size: number, limit: number): number =>
       Math.max(gap, size && value + size + gap > limit ? limit - size - gap : value)
     setPos({

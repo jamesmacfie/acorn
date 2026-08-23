@@ -16,10 +16,10 @@ export type MemoryProposal = {
   type: MemoryType
   description: string
   body: string
-  // Verification flags from the auto-generation pass (memoryGen verifyCandidates), for example a
-  // contradiction with an existing memory. Carried structurally, never folded into the
-  // description (which would leak into the memory file on accept), so the gate UI can render them
-  // separately.
+  // Verification flags from the auto-generation pass (memoryGen verifyCandidates), such as a
+  // contradiction with a stored memory. Carried structurally so the gate UI can render them
+  // separately, and never folded into the description, which would leak into the memory file on
+  // accept.
   flags: string[]
   originSessionId: string | null
   status: 'pending' | 'accepted' | 'rejected'

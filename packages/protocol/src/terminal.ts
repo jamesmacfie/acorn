@@ -1,6 +1,6 @@
-// Shared terminal protocol (docs/terminal-and-agents.md). Imported by main, preload, and renderer, so
-// it holds the wire contract only, never node-pty types: main owns the PTY, this just describes what
-// crosses IPC. See docs/terminal-and-agents.md § Sessions for the `AgentState` vocabulary.
+// Shared terminal protocol (docs/terminal-and-agents.md). Both sides import it, so it holds the wire
+// contract only and never node-pty types: the node owns the PTY, and this describes what crosses the
+// wire. See docs/terminal-and-agents.md § Sessions for the `AgentState` vocabulary.
 export type AgentState = 'starting' | 'working' | 'waiting' | 'idle' | 'blocked' | 'permission' | 'done' | 'unknown'
 
 export type TerminalSession = {

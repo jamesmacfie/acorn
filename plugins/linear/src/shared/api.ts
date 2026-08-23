@@ -1,14 +1,11 @@
 // Linear's wire contract (docs/integrations.md): issues, projects and their comment threads.
 //
 // Types and route builders together, following the docker/http convention: the plugin that owns the
-// namespace owns the shape of what crosses it. Moved verbatim out of @acorn/protocol/api.ts, with
-// byte-identical route strings.
+// namespace owns the shape of what crosses it.
 //
-// No query keys left. The last one, `linearIssuesKey`, belonged to github's batch query through
-// `contract/issues.ts`; both are gone, replaced by the host's `refResolvers` carrier, which owns the
-// key for every provider (client-core/registries/refResolvers.ts). A frame calls these routes over the
-// bridge and keeps no query cache of its own, so a key with no client is a value nothing can compare
-// against.
+// No query keys here. The host's `refResolvers` carrier owns the key for every provider
+// (client-core/registries/refResolvers.ts), and a frame calls these routes over the bridge with no
+// query cache of its own.
 
 import type { PluginRailItem } from '@acorn/protocol/api.ts'
 
@@ -26,9 +23,8 @@ export type LinearRelatedIssue = { id: string; identifier: string; title: string
 // `label` is the ready-to-render string ("Blocked by", "Blocks", "Duplicate of", "Related").
 export type LinearRelationKind = 'blocks' | 'blocked-by' | 'duplicate' | 'duplicated-by' | 'related'
 export type LinearRelation = { id: string; kind: LinearRelationKind; label: string; issue: LinearRelatedIssue }
-// New detail fields are optional: fresh fetches always populate them, but short-TTL cached rows
-// written before this change stay valid and self-heal on next fetch, and the strict public schema
-// tolerates their absence. Summary fields (above) stay lean for PR-reference resolution.
+// Detail fields are optional so an older short-TTL cached row stays valid and self-heals on the next
+// fetch. Summary fields above stay lean for PR-reference resolution.
 export type LinearIssueDetail = LinearIssueSummary & {
   id: string
   description: string | null
@@ -59,12 +55,12 @@ export type LinearUploadResponse = { dataUrl: string }
 // (@acorn/protocol/refResolvers.ts), because it is declared as this plugin's ref resolver and the
 // vocabulary belongs to whoever renders it.
 export type LinearIssuesRequest = { identifiers: string[] }
-// A project list is no longer a Linear wire type. Core's workspace picker reads projects through the
-// provider's `projects` contribution and its own `IntegrationProject` shape (docs/workspaces-and-tasks.md
-// § Workspace and project).
+// A project list is not a Linear wire type. Core's workspace picker reads projects through the
+// provider's `projects` contribution and its own `IntegrationProject` shape
+// (docs/workspaces-and-tasks.md § Workspace and project).
 //
-// Browse-row triage fields ride the live /project-issues fetch (internal only, not the public
-// schema), so they are required here.
+// Browse-row triage fields ride the live /project-issues fetch, internal only, so they are required
+// here.
 export type LinearProjectIssue = LinearIssueSummary & {
   integrationId: string
   branchName: string | null
@@ -74,9 +70,9 @@ export type LinearProjectIssue = LinearIssueSummary & {
   labels: LinearLabel[]
 }
 export type LinearProjectIssuesResponse = { issues: LinearProjectIssue[] }
-// The declarative rail source's body. `PluginRailItems` is the host's own alias for the same shape; this
-// names it locally so the route can `satisfies` it without the plugin's wire contract importing the
-// host's descriptor vocabulary into every consumer of this file.
+// The declarative rail source's body. `PluginRailItems` is the host's alias for the same shape. Named
+// locally so the route can `satisfies` it without pulling the host's descriptor vocabulary into every
+// consumer of this file.
 export type LinearRailItemsResponse = { items: PluginRailItem[] }
 
 export const linearIssuesRoute = '/v2/p/linear/issues'
@@ -88,7 +84,7 @@ export const linearIssueRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>
   `/v2/p/linear/issues/${encodeURIComponent(identifier)}/comments${connectionId ? `?integration=${encodeURIComponent(connectionId)}` : ''}`
-// One private upload, inlined. The response is deliberately a data URL rather than the bytes: the frame
-// cannot do anything else with them, and the bridge carries JSON.
+// One private upload, inlined. A data URL rather than the bytes, because the frame can do nothing
+// else with them and the bridge carries JSON.
 export const linearUploadRoute = (url: string, connectionId?: string) =>
   `/v2/p/linear/uploads?url=${encodeURIComponent(url)}${connectionQuery(connectionId)}`

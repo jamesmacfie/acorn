@@ -19,8 +19,8 @@ export const editorClientPlugin: ClientPlugin = {
     ctx.slots.register({
       id: 'palette.files', slot: 'overlay', order: 20, requires: 'desktop', component: FilePalette,
     })
-    // The entry point that had to survive the fold, so searching does not start with "open the
-    // editor first" (docs/panes.md § Contributions).
+    // The entry point that keeps searching from starting with "open the editor first"
+    // (docs/panes.md § Contributions).
     ctx.commands.register({
       id: 'editor.search.open',
       title: 'Find in files…',

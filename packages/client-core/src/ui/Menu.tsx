@@ -17,8 +17,8 @@ const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
 
 
 /** The menu itself: portal, `role="menu"`, roving focus, and first-item focus on open. Mounted only
- *  while the popover is open, which also keeps the registered-item list honest. It used to live for
- *  the lifetime of the Menu and grew by one copy of every item on each re-open. */
+ *  while the popover is open, which keeps the registered-item list from growing a copy of every
+ *  item on each re-open. */
 function MenuSurface(props: {
   popover: AnchoredPopover
   ariaLabel: string
@@ -104,7 +104,6 @@ export function Menu(props: {
 }
 
 /**
-/**
  * The same menu, opened at a point instead of under a trigger. See docs/ui-design.md
  * § Menus and right-click for why visibility is the caller's state and why this is keyed on `at`.
  */
@@ -142,9 +141,8 @@ export function ContextMenu(props: {
   )
 }
 
-/** One action. `onSelect` fires and the menu closes; a menu item that leaves the menu open is
- *  almost always a checkbox in disguise. See docs/ui-design.md § Menus and right-click for the
- *  `closeOnSelect` exception. */
+/** One action. `onSelect` fires and the menu closes; an item that leaves it open is usually a
+ *  checkbox in disguise. See docs/ui-design.md § Menus and right-click for `closeOnSelect`. */
 Menu.Item = (props: {
   context: MenuContext
   onSelect: () => void
@@ -177,7 +175,7 @@ Menu.Item = (props: {
   </button>
 )
 
-/** A non-interactive heading row: TabRail's menu opened with two of these naming the task. */
+/** A non-interactive heading row. */
 Menu.Label = (props: { class?: string; children: JSX.Element }) => (
   <div class={cx('ui-menu-label-row', props.class)} role="presentation">{props.children}</div>
 )

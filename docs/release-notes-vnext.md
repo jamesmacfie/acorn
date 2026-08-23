@@ -35,5 +35,5 @@ manual release verification remain release-operator tasks that require Apple sig
 a fresh macOS environment.
 
 For implementation contracts, use the parent topic docs and the source. The project-model migration
-that produced this shape is finished; its phase record has been retired, and git history is where
-that reasoning now lives.
+that produced this shape is finished. Its phase record is retired, so the reasoning lives in git
+history.

@@ -2,7 +2,7 @@
 // agent). terminal.ts calls onIdle when a session flips idle, which flushes anything queued for
 // 'after-ready'.
 //
-// Deps-injected (a session is just write/running/idle) so this logic tests under plain Node.
+// A session is just write, running, and idle, injected as deps, so this tests under plain Node.
 import { wrapBracketedPaste } from './terminalUtils'
 import type { SendSubmit } from '../shared/send'
 

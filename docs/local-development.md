@@ -12,21 +12,22 @@ GITHUB_CLIENT_ID=...
 SESSION_ENC_KEY=<64 hexadecimal characters>
 ```
 
-`GITHUB_CLIENT_ID` is only needed when connecting GitHub; the GitHub plugin owns that configuration.
-There is no GitHub client secret. `SESSION_ENC_KEY` is optional — a node with none generates its own
-into the data root (see
-[node-distribution.md](./node-distribution.md)). Setting it in `.env` pins a stable key across
-throwaway data roots, which is why it is still listed here.
+`GITHUB_CLIENT_ID` is only needed when connecting GitHub, and the GitHub plugin owns that
+configuration. There is no GitHub client secret. `SESSION_ENC_KEY` is optional: a node without one
+generates its own into the data root. For more information, see
+[node-distribution.md](./node-distribution.md). Setting it in `.env` pins a stable key across
+throwaway data roots, which is why it is listed here.
 
 The data root defaults to `apps/node/.acorn/` and is gitignored. Set `ACORN_DATA_DIR` to isolate a
 run. Set `ACORN_PORT` to force a port for tests or a standalone process; otherwise the Node prefers
 the last port in `node.json` and falls back to an ephemeral port.
 
-Two variables exist for plugin work. `ACORN_BUNDLED_PLUGINS_DIR` gives a standalone Node a directory of
-app-owned plugin packages to reconcile from, which the desktop always has and `pnpm dev:node` otherwise
-has none of; unset, that step does not happen at all. `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` puts the
-per-bundle trust dialog back for the app's own bundled packages, which a development build otherwise
-acknowledges the same way a packaged build does — see [plugins.md](./plugins.md) § The dev loop.
+Two variables exist for plugin work. `ACORN_BUNDLED_PLUGINS_DIR` gives a standalone Node a directory
+of app-owned plugin packages to reconcile from. The desktop always has one and `pnpm dev:node` does
+not, and if the variable is unset the reconcile step does not run at all.
+`ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` puts the per-bundle trust dialog back for the app's own bundled
+packages, which a development build otherwise acknowledges the way a packaged build does. For more
+information, see [plugins.md](./plugins.md) § The dev loop.
 
 ## Start
 
@@ -41,23 +42,23 @@ stages them with the pinned Node runtime and the migration chains, then runs `ta
 Vite renderer on port 4319. `pnpm dev:node` runs the standalone Node and prints one JSON handshake
 line containing endpoint, fingerprint, certificate, Node ID, and device token.
 
-Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those — it rebuilds the plugin's
+Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those. It rebuilds the plugin's
 package on every save. [plugins.md](./plugins.md) § The dev loop has the whole loop, including which
-target to build into and why the node still restarts.
+target to build into and why the node restarts.
 
 ## Native ABI
 
 `node-pty` is the only native module. SQLite is the runtime's own `node:sqlite`
-(`packages/node-core/src/main/sqlite.ts`), so there is no ABI to match for it. Rebuild once at the
-workspace root for the process that will load node-pty — where its prebuilt binary applies, the
-rebuild script detects that and does nothing:
+(`packages/node-core/src/main/sqlite.ts`), so it has no ABI to match. Rebuild once at the workspace
+root for the process that loads node-pty. Where the prebuilt binary applies, the rebuild script
+detects that and does nothing:
 
 ```sh
 pnpm rebuild:node
 ```
 
 There is one ABI to match, because the desktop runs the node under the same pinned Node runtime the
-tests use. Do not rebuild per package; all packages resolve the same physical native copy.
+tests use. Do not rebuild per package. All packages resolve the same physical native copy.
 
 ## Database workflow
 
@@ -87,7 +88,7 @@ pnpm db:reset --yes    # non-interactive
 It removes `core.sqlite` and every `plugins/*.sqlite` (WAL and SHM sidecars included) from the dev
 data root, or from `ACORN_DATA_DIR` when that is set. Node identity, the listener key, and the
 internal token stay. The device row goes with the core database, so the desktop pairs again on the
-next launch — that is the intended fresh-install path, since there is no upgrade path from an older
+next launch. That is the intended fresh-install path, since there is no upgrade path from an older
 database.
 
 ## Build artifacts

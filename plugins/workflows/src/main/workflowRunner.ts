@@ -120,12 +120,12 @@ export class WorkflowRunner {
   readonly #activeHandlers = new Map<string, Map<string, AbortController>>()
 
   // Abort every in-flight step, for teardown. This is not cancel: cancelling a run is a user action
-  // that writes 'cancelled' and should stay visible on next launch, while this is the process going
+  // that writes 'cancelled' and stays visible on the next launch, while this is the process going
   // away mid-run. The rows stay 'running' and reconcile() sweeps them back to 'pending' on the next
-  // boot, which is exactly what that sweep is for.
+  // boot.
   //
-  // Without it, dispose() closed the plugin's SQLite handle while headless children kept running,
-  // and their persistOutcome/setStep writes landed on a closed database as unhandled rejections.
+  // Without it, dispose() closes the plugin's SQLite handle while headless children keep running, and
+  // their persistOutcome and setStep writes land on a closed database as unhandled rejections.
   stop(): void {
     for (const handlers of this.#activeHandlers.values()) {
       for (const controller of handlers.values()) controller.abort()

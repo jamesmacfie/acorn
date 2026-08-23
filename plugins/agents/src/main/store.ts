@@ -83,17 +83,17 @@ export class AgentStore extends AgentSessionRepository {
 
   async listSessions(filter: SessionListFilter = {}): Promise<AgentSessionList> {
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), 100)
-    // The fourth workspace-scoped read (sessionRepository.ts holds the other three). Resolved to
-    // task ids through core rather than joined, since `tasks` lives in core's database and this
-    // table lives in the plugin's; an empty result narrows to nothing, not to unfiltered
-    // (docs/managed-agents.md § Session model).
+    // The fourth workspace-scoped read (sessionRepository.ts holds the other three). Resolved to task
+    // ids through core rather than joined, because `tasks` lives in core's database and this table
+    // lives in the plugin's. An empty result narrows to nothing, not to unfiltered.
+    // See docs/managed-agents.md § Session model.
     const taskIds = await this.workspaceTaskIds(filter.workspaceId)
     if (taskIds?.length === 0) return { sessions: [], nextCursor: null }
-    // A session outlives its task's worktree but not its task; a caller already pinned to a task id
-    // is exempt (docs/managed-agents.md § Client surfaces).
+    // A session outlives its task's worktree but not its task. A caller already pinned to a task id is
+    // exempt (docs/managed-agents.md § Client surfaces).
     //
-    // One extra core read per list call. Fine while `active()` is a small table scan; if it stops
-    // being one, core grows an `activeIds()` and this asks for that instead.
+    // One extra core read per list call, fine while `active()` is a small table scan. If it stops being
+    // one, core grows an `activeIds()` and this asks for that instead.
     const activeIds = filter.taskId ? null : (await this.core.tasks.active()).map((task) => task.id)
     const liveTask = activeIds && (activeIds.length ? inArray(schema.agentSessions.taskId, activeIds) : sql`0`)
     const retiredTask = activeIds && (activeIds.length ? notInArray(schema.agentSessions.taskId, activeIds) : sql`1`)

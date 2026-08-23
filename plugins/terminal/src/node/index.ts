@@ -8,10 +8,9 @@ import { createRuntimeService } from '../main/runIpc'
 import { disposeTerminal, registerTerminalIpc, sendToAgent, sessionControl, terminalRunGlue, type TerminalIpcDeps } from '../main/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
 
-// The four hooks this plugin still cannot resolve for itself. Each one's blocker is stated on
-// TerminalIpcDeps in main/terminal.ts; in short, one closes over the listener origin and the
-// internal signing key (neither exists at init), and three belong to plugins/memory, whose
-// capability id is not in a contract/.
+// The four hooks this plugin cannot resolve for itself. TerminalIpcDeps in main/terminal.ts states each
+// one's blocker: one closes over the listener origin and the internal signing key, neither of which
+// exists at init, and three belong to plugins/memory, whose capability id is not in a contract/.
 export type TerminalPluginDeps = Omit<TerminalIpcDeps, 'seedTaskNotes'>
 
 export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
@@ -60,10 +59,9 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       ctx.routes.register(terminal, { prefix: '', note: '/sessions, /profiles — PTY control only' })
 
       // Run targets are terminal sessions in the task worktree, so the service can only be built where
-      // the session map is. Two projections consume it: the harness RunBridge (the renderer's run pane
-      // and preview home), filled here rather than from an app-layer wireRunBridge, and the capability,
-      // which is how the agent-tool and workflow projections in apps/node/src/wiring/ reach it without
-      // reading a mutable global out of this plugin.
+      // the session map is. Two projections consume it: the harness RunBridge, behind the renderer's
+      // run pane and preview home, and the capability, which is how the agent-tool and workflow
+      // projections in apps/node/src/wiring/ reach it without a mutable global.
       const runTargets = createRuntimeService(ctx.core, terminalRunGlue())
       routeDisposables.push(ctx.capabilities.provide(RUN_TARGETS, {
         targets: (taskId) => runTargets.targets(taskId),
@@ -81,20 +79,17 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // launch injector needs. Published rather than exported into a dep bag, so memory resolves it at
       // call time and degrades to a no-op when this plugin is absent.
       ctx.capabilities.provide(TERMINAL_SEND_TO_AGENT, sendToAgent)
-      // terminal.sessions (contract/sessions.ts): spawn + enumerate, for plugins/agents' terminal
-      // handoff. Published rather than left as an app-layer reach into `terminalBridgeSlot`, which is
-      // what apps/node/src/wiring/managedAgentsWiring.ts did before agents became a plugin able to
-      // resolve a capability of its own.
+      // terminal.sessions (contract/sessions.ts): spawn and enumerate, for plugins/agents' terminal
+      // handoff. Published as a capability so agents resolves it directly instead of reaching through
+      // an app-layer bridge slot.
       ctx.capabilities.provide(TERMINAL_SESSIONS, sessionControl)
     },
-    // Everything init reached out and touched, in reverse: the engine's idle-watch timer, its
-    // session displays and session map, and the four slots it filled. The SQLite handle is not in
-    // the list any more, since the host closes it right after this returns, at the same point in
-    // the drain.
+    // Everything init touched, in reverse: the engine's idle-watch timer, its session displays and
+    // session map, and the four slots it filled. Not the SQLite handle, which the host closes right
+    // after this returns.
     //
-    // The slots are cleared explicitly rather than trusting teardown order. disposeWsHub also clears
-    // the hub, and the process is usually about to exit, but "release what init opened" has to hold
-    // on its own or a second boot in one process serves through the first boot's closures.
+    // The slots clear explicitly rather than trusting teardown order, or a second boot in one process
+    // serves through the first boot's closures.
     dispose: () => {
       disposeTerminal()
       for (const disposable of routeDisposables) disposable.dispose()

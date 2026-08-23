@@ -86,9 +86,8 @@ export default function HttpPanel(props: {
     setError(null)
   }
 
-  // A rail selection names a request id; the row itself arrives with the list. Applied as an effect
-  // rather than at mount because the two races are real: the id can be there before the list, or
-  // arrive after it.
+  // A rail selection names a request id; the row itself arrives with the list. An effect rather than
+  // mount-time work, because the id can land before the list or after it.
   const [requested, setRequested] = createSignal<string | undefined>(props.initialRequestId)
   onCleanup(props.bridge.onSelect((item) => setRequested(item)))
   createEffect(() => {
@@ -171,8 +170,7 @@ export default function HttpPanel(props: {
     }
   }
 
-  // Pasting a curl command into the URL bar fills in the whole request. Bruno does the same, and it
-  // is by far the fastest way to get something from a terminal or a browser's devtools into here.
+  // Pasting a curl command into the URL bar fills in the whole request, as Bruno does.
   function onUrlPaste(event: ClipboardEvent) {
     const text = event.clipboardData?.getData('text') ?? ''
     if (!/^\s*curl\s/i.test(text)) return
@@ -314,8 +312,8 @@ export default function HttpPanel(props: {
   )
 }
 
-// Named RequestRow, not TreeRow: the shared TreeRow owns that name now, and this is the adapter that
-// gives it this plugin's leading method chip and its two row actions.
+// Named RequestRow because the shared component owns the name TreeRow. This adapter adds the leading
+// method chip and the two row actions.
 function RequestRow(props: { row: HttpRequest; active: boolean; armed: boolean; onOpen: (row: HttpRequest) => void; onCopy: (row: HttpRequest) => void; onDelete: (row: HttpRequest) => void }) {
   return (
     <TreeRow

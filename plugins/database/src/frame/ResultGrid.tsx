@@ -11,14 +11,13 @@ export default function ResultGrid(props: {
   activeRow?: number | null
   onRowClick?: (index: number) => void
   // The frame's appearance subscription, passed in rather than imported. `watchAppearance` reads the
-  // shell's own signal and there is no shell here; the same event reaches a frame as a bridge push, and
-  // the SDK has already written the tokens onto `:root` by the time it fires, so re-reading the token
-  // below is the correct thing to do.
+  // shell's signal and there is no shell here. The same event reaches a frame as a bridge push, and
+  // the SDK has written the tokens onto `:root` by the time it fires, so re-read the token below.
   onAppearance: (listener: () => void) => () => void
 }) {
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
-  // Row height comes from --row-h-sm so a style pack's density actually reaches the grid; the
-  // virtualizer writes it back as an inline height, which would beat any CSS rule.
+  // Row height comes from --row-h-sm so a style pack's density reaches the grid. The virtualizer
+  // writes it back as an inline height, which beats any CSS rule.
   const [rowH, setRowH] = createSignal(rowHeightSm())
   onCleanup(props.onAppearance(() => {
     setRowH(rowHeightSm())

@@ -35,9 +35,9 @@ import { ownsTaskOrigin } from './ownership'
 // re-checked here and a malformed body is dropped rather than thrown into the shell chrome
 // (docs/security.md § Third-party plugin bundles; docs/plugins.md § Cooperative extension points).
 
-// Re-spelled rather than imported, for the reason plugins/frames/scopes.ts gives at length: the
-// namespace is node-core's (server/routeRegistry.ts) and @acorn/protocol is forbidden from naming a
-// plugin route, so the client holds its own copy of the one string.
+// Re-spelled rather than imported: the namespace is node-core's (server/routeRegistry.ts) and
+// @acorn/protocol may not name a plugin route, so the client holds its own copy. See
+// plugins/frames/scopes.ts.
 const PLUGIN_NAMESPACE = '/v2/p/'
 
 /** The path a descriptor may address. Normalize dot segments before checking so an apparently owned
@@ -56,15 +56,12 @@ export const ownsRoute = (pluginId: string, path: string): boolean => {
 
 // Two revisions, and a descriptor read watches both.
 //
-// The shared one is bumped by the node's content-free status ping and by the polling fallback.
-// `ctx.events.status()` carries no payload by design (node-core/server/plugin/types.ts calls the
-// channel "an invalidation channel, not an event log"), so a global signal is all it can drive.
+// The shared one is bumped by the node's content-free status ping and by the polling fallback. That
+// ping carries no payload, so a global signal is all it can drive.
 //
-// The per-plugin one is for a plugin pushing on its own channel (plugins/pluginChannel.ts). That
-// refetch cost the `ponytail:` note here was waiting for did show up: a plugin sampling machine
-// statistics every two seconds would have re-read every *other* plugin's badges and rail rows at the
-// same cadence, which is the global ping's problem restated. So the split is per plugin, not per
-// contribution — a plugin's own descriptors are the ones its own data invalidates.
+// The per-plugin one is for a plugin pushing on its own channel (plugins/pluginChannel.ts). Without
+// it, a plugin sampling every two seconds re-reads every other plugin's badges and rail rows at the
+// same cadence. The split is per plugin rather than per contribution.
 const [chromeRevision, setChromeRevision] = createSignal(0)
 export { chromeRevision }
 
@@ -85,14 +82,13 @@ const revisionFor = (pluginId: string): { read: () => number; bump: () => void }
 /** One plugin's own freshness. */
 export const pluginRevision = (pluginId: string): number => revisionFor(pluginId).read()
 
-/** The freshness dependency a descriptor read watches: the shared revision plus this plugin's own, so a
- *  status ping invalidates everyone's and a push invalidates only its sender's. Summed because both
- *  counters only ever increase, which makes the total strictly increasing too and so incapable of
- *  landing back on a value a query has already seen. */
+/** The freshness dependency a descriptor read watches: the shared revision plus this plugin's own, so
+ *  a status ping invalidates everyone's and a push invalidates only its sender's. Both counters only
+ *  increase, so the sum never lands back on a value a query has already seen. */
 export const chromeDeps = (pluginId: string): number => chromeRevision() + pluginRevision(pluginId)
 
 /** Nudge chrome. With no argument every descriptor refetches, which is what a content-free status ping
- *  means; with a plugin id, only that plugin's. */
+ *  means. With a plugin id, only that plugin's. */
 export const bumpChrome = (pluginId?: string): void => {
   // Same rule the poller registry applies: a hidden window is not worth a fan-out.
   if (typeof document !== 'undefined' && document.hidden) return
@@ -127,12 +123,10 @@ export function unwatchChrome(): void {
 
 // ── Reads ─────────────────────────────────────────────────────────────────────────────────────────
 
-// Private to chrome. The fan-out writes through the node's QueryClient (node/fanout.ts states the
-// rule), so a key shared with a domain reader would have to share its value shape; nothing else in
-// the app has this shape. `nodeId` is absent on purpose: the cache is already partitioned per node.
-// `scope` is whatever else went into the path, today only the rail's project that
-// `scopedSourceItemsPath` appends. It has to be in the key because the cache is served on mount now: a
-// key that names only the source would hand the next project the previous project's rows.
+// Private to chrome. `nodeId` is absent on purpose: the cache is already partitioned per node.
+// `scope` is whatever else went into the path, so far only the rail's project that
+// `scopedSourceItemsPath` appends. It has to be in the key, because the cache is served on mount and a
+// key naming only the source would hand the next project the previous project's rows.
 export const chromeKey = (pluginId: string, contributionId: string, scope?: string): readonly unknown[] =>
   scope ? ['plugin-chrome', pluginId, contributionId, scope] : ['plugin-chrome', pluginId, contributionId]
 
@@ -246,10 +240,9 @@ export async function readAttention(pluginId: string, path: string, nodeId: stri
   return rows.filter((row) => isAttentionItem(row) || (drop(pluginId, 'attention item', row), false)) as PluginAttentionWireItem[]
 }
 
-// One row a cooperative extension point delivers. Display strings only: there is no `action` on the
-// wire, because the verb was declared once on the contribution and checked when the node parsed the
-// manifest. That is the difference between a descriptor crossing a plugin boundary and a plugin handing
-// another plugin's surface something to run.
+// One row a cooperative extension point delivers. Display strings only. There is no `action` on the
+// wire, because the verb was declared on the contribution and checked when the node parsed the
+// manifest.
 export const sanitizeExtensionItem = (row: unknown): PluginExtensionItem | null => {
   const item = row as PluginExtensionItem
   if (!item || typeof item !== 'object' || !str(item.id) || !str(item.title)
@@ -264,8 +257,8 @@ export const sanitizeExtensionItem = (row: unknown): PluginExtensionItem | null 
 }
 
 /** A contribution's rows, read from the contributor's own namespace. Per-row sanitising rather than
- *  all-or-nothing, exactly as the rail list is: these are drawn inside somebody else's surface, and one
- *  malformed row must not blank a section the owner reserved. */
+ *  all-or-nothing, like the rail list: these draw inside somebody else's surface, and one malformed
+ *  row must not blank a section the owner reserved. */
 export async function readExtensionItems(
   pluginId: string,
   path: string,
@@ -284,12 +277,12 @@ export async function readExtensionItems(
 
 // ── Agent context ─────────────────────────────────────────────────────────────────────────────────
 //
-// The one descriptor pair whose answer leaves the shell and enters a model's prompt, so it is held to
-// a stricter standard than the badges above: a real parser (@acorn/protocol/agentContext.ts) rather
-// than a field-by-field sniff, and a hard refusal instead of a truncation when it is too big.
+// The one descriptor pair whose answer enters a model's prompt, so it is held to a stricter standard
+// than the badges above: a real parser (@acorn/protocol/agentContext.ts) rather than a field-by-field
+// sniff, and a refusal instead of a truncation when it is too big.
 //
-// No `AbortSignal` here, unlike every reader above, because there is no query: the composer calls
-// these when a person clicks, and its own capture-version guard already discards a stale answer.
+// No `AbortSignal`, because there is no query. The composer calls these on a click and its own
+// capture-version guard discards a stale answer.
 
 /** Scope rides as query parameters, minted here so a plugin route cannot see a node or a task the
  * composer did not name. */
@@ -309,9 +302,8 @@ export async function readAgentContextOptions(
   const body = await read<unknown>(pluginId, scopedContextPath(path, scope), nodeId)
   const parsed = pluginAgentContextOptionsSchema.safeParse(body)
   if (!parsed.success) {
-    // Same answer as a malformed badge: the picker offers nothing rather than offering something the
-    // host cannot reason about. All-or-nothing rather than per-row, because an option list with holes
-    // in it silently hides things a person expected to be able to attach.
+    // All-or-nothing rather than per-row, because an option list with holes in it silently hides
+    // things a person expected to be able to attach.
     drop(pluginId, 'agent context option list', body)
     return []
   }
@@ -372,10 +364,9 @@ export async function captureAgentContext(
       capturedAt,
     }
   })
-  // Rejected outright, not trimmed to fit. Truncating someone's API schema or query text in the middle
-  // produces a snapshot that looks complete to an agent and is not, which is worse than no snapshot;
-  // and unlike a malformed row this is worth telling the person about, so it throws into the
-  // composer's error line rather than disappearing into a console warning.
+  // Rejected outright, not trimmed to fit. A truncated schema or query looks complete to an agent and
+  // is not. This one is worth telling the person about, so it throws into the composer's error line
+  // rather than a console warning.
   if (agentContextBudget(snapshots).overLimit) {
     throw new Error(`${pluginId} returned more than ${MAX_AGENT_CONTEXT_BYTES / 1024} KiB of context; nothing was attached.`)
   }
@@ -385,10 +376,9 @@ export async function captureAgentContext(
 // ── Ref resolution ────────────────────────────────────────────────────────────────────────────────
 //
 // The cross-plugin enrichment POST (@acorn/protocol/refResolvers.ts). Same posture as the capture
-// above: a real parser, host-bound provenance, with one extra reason for care. This route spends the
-// provider's credentials on a cache miss, so the identifier list is capped here as well as in the
-// schema. It is already behind `requireProviderAccess` through the provider mount on the node; that
-// gate is the authorisation and this cap is the budget, and neither replaces the other.
+// above: a real parser and host-bound provenance. This route spends the provider's credentials on a
+// cache miss, so the identifier list is capped here as well as in the schema. `requireProviderAccess`
+// on the node is the authorisation, this cap is the budget.
 export async function resolveRefs(
   pluginId: string,
   path: string,
@@ -406,8 +396,8 @@ export async function resolveRefs(
   })
   const parsed = pluginRefResolutionsSchema.safeParse(body)
   if (!parsed.success) {
-    // All-or-nothing, like the option list: a partially-parsed set would render some refs enriched and
-    // others bare, which reads as "that ticket does not exist" rather than "the plugin answered badly".
+    // All-or-nothing, like the option list. Some refs enriched and others bare reads as "that ticket
+    // does not exist" rather than "the plugin answered badly".
     drop(pluginId, 'ref resolutions', body)
     return []
   }
@@ -418,13 +408,11 @@ export async function resolveRefs(
 
 // ── Collections ───────────────────────────────────────────────────────────────────────────────────
 //
-// The third parsed descriptor response (@acorn/protocol/collections.ts), and the one with the most to
-// lose: these rows are drawn as the host's own table under the host's own chrome, beside another
-// plugin's rows, so the reader has no way to tell whose answer was malformed.
+// The third parsed descriptor response (@acorn/protocol/collections.ts). These rows draw as the host's
+// own table beside another plugin's rows, so the reader cannot tell whose answer was malformed.
 
 /** Declared params ride as query parameters, minted here rather than pasted onto the path by a caller,
- * so a collection route cannot be handed a second `nodeId` or a scope it was not given. A placement
- * that knows its project puts it through this same record, exactly as the rail does. */
+ * so a collection route cannot be handed a second `nodeId` or a scope it was not given. */
 const collectionItemsPath = (path: string, params: Record<string, string>): string => {
   const query = new URLSearchParams(params).toString()
   if (!query) return path
@@ -443,18 +431,16 @@ export async function readCollection(
   const body = await read<unknown>(pluginId, collectionItemsPath(path, params), nodeId, signal)
   const parsed = pluginCollectionResponseSchema.safeParse(body)
   if (!parsed.success) {
-    // All-or-nothing, like the ref resolutions above and unlike the per-row rail sanitiser. A
-    // half-parsed collection is the worst of the three outcomes: it renders some rows and silently
-    // drops the rest, so a person reads a complete-looking list that is missing the thing they were
-    // looking for. An empty panel at least says nothing rather than saying something false.
+    // All-or-nothing, unlike the per-row rail sanitiser. A half-parsed collection renders a
+    // complete-looking list missing the row someone was looking for. An empty panel says nothing
+    // instead of saying something false.
     drop(pluginId, `collection '${collectionId}'`, body)
     return emptyCollectionPage()
   }
   // Provenance is stamped from the contribution whose route answered, never read from the row, the
   // same rule `resolveRefs` applies to `providerId`. A mixed board renders source badges and row
-  // actions on this stamp, so a row that could name its own plugin could put its items behind a
-  // stranger's badge and its clicks into a stranger's pane. The schema does not carry the two fields at
-  // all, so a body that states them has them stripped before this line ever runs.
+  // actions on this stamp, so a row naming its own plugin could put its clicks into a stranger's pane.
+  // The schema omits both fields, so a body that states them is stripped before this line runs.
   return {
     schema: parsed.data.schema,
     rows: parsed.data.rows.map((row) => ({ ...row, pluginId, collectionId })),

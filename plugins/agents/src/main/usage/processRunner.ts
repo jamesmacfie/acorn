@@ -173,10 +173,9 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
       if (escalation) clearTimeout(escalation)
     }
 
-    // Two-stage teardown. node-pty's kill() sends SIGHUP, which a CLI sitting on a prompt can ignore. A
-    // `claude /usage` probe was found still alive as an orphan (ppid 1) four days after the run that
-    // spawned it, holding a deleted temp dir. Escalate to SIGKILL if the child has not reported exit
-    // shortly after the polite signal.
+    // Two-stage teardown. node-pty's kill() sends SIGHUP, which a CLI sitting on a prompt can ignore.
+    // One `claude /usage` probe survived as an orphan for four days, holding a deleted temp dir. So
+    // escalate to SIGKILL if the child has not reported exit shortly after the polite signal.
     let exited = false
     let escalation: ReturnType<typeof setTimeout> | undefined
 

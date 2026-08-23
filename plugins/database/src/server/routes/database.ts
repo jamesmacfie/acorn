@@ -2,15 +2,10 @@
 // per-task Postgres browse and edit, the project's saved queries, the task's scratch document, and
 // table/column completions.
 //
-// database ships loaded, so these routes run on the one tier a loaded plugin gets (docs/plugins.md §
-// Loaded plugins): the host gets `router.fetch` (createDatabaseFetch at the bottom), and identity rides
-// in through `c.env` rather than `ownerId(c)`/`c.get('principal')`, which a loaded bundle's Hono stack
-// never sets.
-//
-// The route capability this file used to declare (`routeCapability<DatabaseBridge>`, resolved through
-// `viaBridge`) is gone: it existed to cross the old main/renderer process boundary, and the pane has
-// been loopback HTTP for a while. The bridge is now a plain closure argument, which also makes a fake
-// injectable without a global registry.
+// database ships as a loaded plugin (docs/plugins.md § Loaded plugins). The host gets `router.fetch`
+// (createDatabaseFetch at the bottom), and identity rides in through `c.env` rather than `ownerId(c)`
+// or `c.get('principal')`, which a loaded bundle's Hono stack never sets. The bridge is a closure
+// argument, so a fake is injectable without a global registry.
 //
 // SQL-injection posture is main/database.ts's: docs/data-layer.md § Database plugin: the Postgres pane.
 import { randomUUID } from 'node:crypto'
@@ -42,9 +37,9 @@ const { requestContext, portableFetch } = portableCarrier('database')
 
 const owner = (c: Context<AppEnv>): string => requestContext(c).userId
 
-// AI generation spends the owner's provider key, billed to the owner, so a task-scoped agent credential
-// must not reach it. The host's `canUseProviderCredential` reads `c.get('principal')`, which a loaded
-// bundle does not have, so this is the same rule read off the request context instead.
+// AI generation spends the owner's provider key, so a task-scoped agent credential must not reach it.
+// The host's `canUseProviderCredential` reads `c.get('principal')`, which a loaded bundle does not
+// have, so this reads the same rule off the request context.
 const isInteractiveOwner = (c: Context<AppEnv>): boolean => {
   const { principal } = requestContext(c)
   return principal.kind === 'device' || principal.scope === 'service'
@@ -156,9 +151,6 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
 
     // The document surface: docs/third-party/monaco.md. This plugin owns a column of text; the host
     // owns the editor, its theme, workers, autosave, and the flush before unmount.
-    //
-    // It persists, unlike the compiled pane's unbacked Monaco, because a scratch buffer is task-scoped:
-    // what you meant to keep has a Save button (node/schema.ts § dbScratch).
     .get('/tasks/:taskId/scratch', async (c) => {
       const taskId = id(c)
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
@@ -169,9 +161,8 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       const p = scratchBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
       const taskId = id(c)
-      // The taskId is a plain ID into core's tables, so core validates it. Checked on the write as well
-      // as the read: an autosave for an archived task should not quietly create a row nothing will
-      // ever read again.
+      // The taskId is a plain ID into core's tables, so core validates it. Checked on the write as
+      // well as the read: an autosave for an archived task should not create a row nothing reads.
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
       const now = Date.now()
       await db
@@ -181,8 +172,8 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json({ ok: true })
     })
 
-    // Table/column completions, the first LSP-shaped capability. The host POSTs a position and maps
-    // what comes back onto its editor; every judgement about SQL is in ../completions.ts, on this side.
+    // Table and column completions. The host POSTs a position and maps what comes back onto its
+    // editor. Every judgement about SQL is in ../completions.ts, on this side.
     .post('/tasks/:taskId/completions', async (c) => {
       const p = completionsBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')
@@ -237,9 +228,9 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     })
 
     // Which model connections this owner could generate with. The frame cannot ask core directly:
-    // `/v2/core/integrations` has no bridge scope, and minting one would hand every installed plugin the
-    // whole connection roster to serve one dropdown. This answers ids and labels; the key stays on the
-    // node and is resolved inside `models.generateText`.
+    // `/v2/core/integrations` has no bridge scope, and minting one would hand every installed plugin
+    // the whole connection roster to serve one dropdown. This answers ids and labels. The key stays
+    // on the node and is resolved inside `models.generateText`.
     .get('/tasks/:taskId/model-connections', async (c) => {
       if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
       const connections = await core.models.available(owner(c))
@@ -247,8 +238,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     })
 
     // Generate a PostgreSQL query from a natural-language description through a connected model
-    // provider. The plugin owns the route and the prompt; core owns provider access. The prompt carries
-    // the schema, the repo's schema notes, and any saved queries picked as examples.
+    // provider. The plugin owns the route and the prompt; core owns provider access.
     .post('/tasks/:taskId/generate', async (c) => {
       const p = generateBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request')

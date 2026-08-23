@@ -2,13 +2,8 @@ import { z } from 'zod'
 import type { AgentToolContribution } from '@acorn/plugin-api/node'
 import type { BrowserPool } from './driver'
 
-// The six browser tools, contributed through the agent-tool registry like any other plugin's, which is
-// what projects them to MCP, the harness route and the renderer for free (docs/agent-tools.md).
-//
-// They kept their names and their descriptions from the version that lived in `plugins/preview`, so an
-// agent's habits and a stored permission decision both survive the move. What changed underneath is
-// everything: the browser is the node's now, not a desktop shell's, so a headless remote node has one
-// too (docs/agent-tools.md § Browser tools).
+// The six browser tools, contributed through the agent-tool registry like any other plugin's, which
+// projects them to MCP, the harness route, and the renderer. See docs/agent-tools.md § Browser tools.
 
 const empty = z.object({})
 
@@ -47,8 +42,8 @@ export function browserAgentTools(pool: BrowserPool): AgentToolContribution[] {
     ),
     tool(
       'browser_screenshot',
-      // The answer is a handle, not an image, and the description says so: an agent that expected
-      // pixels would otherwise report the tool broken.
+      // The answer is a handle, not an image, and the description says so. An agent expecting pixels
+      // would report the tool broken.
       'Screenshot the current page. Returns a capture id and the node URL that serves the PNG; the bytes are stored on the node, not inlined here.',
       empty,
       async (_args, ctx) => pool.screenshot(ctx.taskId),

@@ -10,44 +10,40 @@ import { PreviewTunnels, type TunnelEvents } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 
 // The custody stack, composed in one place: the broker and its fleet, the device tokens, the plugin
-// cache and trust store, the preview tunnels, and the supervised node service. Nothing in this
-// package imports a shell binding, which is what lets it run in a process of its own: the desktop
-// helper composes it under the bundled Node, and Rust supervises that (docs/shell.md § The shell
-// process).
+// cache and trust store, the preview tunnels, and the supervised node service. Nothing here imports a
+// shell binding, which is what lets it run in a process of its own. See docs/shell.md, "The shell
+// process".
 //
-// What stays outside: the window, the dialogs, the renderer projection, and the encryption. Those
-// reach this seam through the options below, so a shell supplies four small things and gets a warm
-// broker.
+// The window, the dialogs, the renderer projection, and the encryption stay outside and reach this
+// seam through the options below.
 //
-// Boot order is the shell's to drive and matters: build the helper, register whatever the renderer
-// talks to, then `start()`, then `bootComplete()`. Between start and bootComplete an unexpected exit
-// is a failed boot, not a crash to recover from.
+// The shell drives boot order: build the helper, register whatever the renderer talks to, then
+// `start()`, then `bootComplete()`. Between the two an unexpected exit is a failed boot, not a crash
+// to recover from.
 
 export type HelperOptions = {
-  // The staged service.js, and the config it starts with. @acorn/protocol is the spec for the second
-  // one, so this file does not restate its fields.
+  // The staged service.js, and the config it starts with. @acorn/protocol specs the config.
   serviceEntry: string
   service: Omit<ServiceStartConfig, 'deviceToken'>
-  // Custody root: fleet.json, the encrypted device tokens, the plugin cache and the trust store. Not
-  // the node's data root — that one is in `service.dataDir` and belongs to the node.
+  // Custody root: fleet.json, the encrypted device tokens, the plugin cache and the trust store. The
+  // node's own data root is `service.dataDir`.
   userDataDir: string
   // How this host encrypts a device token (helper/deviceTokenStore.ts).
   tokenCipher: TokenCipher
   // Where broker pushes go. The shell owns the target, because only it knows whether a renderer is
   // currently attached.
   push: { frame(nodeId: string, frame: unknown): void; status(status: unknown): void }
-  // A preview tunnel opened or closed. Only a shell that cannot inject a request header needs these:
-  // the Tauri shell seeds the listener's secret into the preview webview's cookie store instead
-  // (previewTunnel.ts). Electron leaves it out and keeps using `headersFor`.
+  // A preview tunnel opened or closed. Only a shell that cannot inject a request header needs these.
+  // The Tauri shell seeds the listener's secret into the preview webview's cookie store instead. See
+  // previewTunnel.ts.
   tunnelEvents?: TunnelEvents
-  // The node the renderer was talking to has been replaced, by a restart or by crash recovery. Its
-  // endpoint, certificate and token are all new, so whatever is rendering has to start over.
+  // A restart or crash recovery replaced the node the renderer was talking to. Its endpoint,
+  // certificate, and token are all new, so whatever is rendering has to start over.
   onNodeReplaced?(): void
-  // The crash budget is spent and this helper has stopped trying. The shell shows the recovery screen;
-  // `retry()` is how the owner's answer comes back. Nothing else clears the block. `reason` is why the
-  // last attempt failed, when the service said anything: the recovery screen is the only place an owner sees
-  // this, and "another node already holds this data root" is the difference between a five-minute fix
-  // and a mystery.
+  // The crash budget is spent and this helper has stopped trying. The shell shows the recovery
+  // screen, and `retry()` carries the owner's answer back. Nothing else clears the block. `reason` is
+  // why the last attempt failed, when the service said anything, and the recovery screen is the only
+  // place an owner sees it.
   onCrashBudgetExhausted(reason?: string): void
 }
 
@@ -57,8 +53,8 @@ export type Helper = {
   tunnels: PreviewTunnels
   pluginCache: PluginCache
   pluginTrust: PluginTrustStore
-  // Start the node and adopt it into the fleet. Resolves when its migrations, bridge installation and
-  // loopback listener are done; durable reconciliation continues in the background over there.
+  // Start the node and adopt it into the fleet. Resolves when its migrations, bridge installation,
+  // and loopback listener are done. Durable reconciliation continues in the background over there.
   start(): Promise<ServiceStartResult>
   // Boot succeeded. Until this is called an unexpected exit is left to the caller's error path.
   bootComplete(): void
@@ -82,8 +78,8 @@ export function createHelper(options: HelperOptions): Helper {
   const crashTimes: number[] = []
   const tokens = deviceTokens(userDataDir, options.tokenCipher)
 
-  // Why the last start attempt failed, for the recovery screen. Reset by `start()` so a fixed problem
-  // cannot be reported as the cause of a later, different one.
+  // Why the last start attempt failed, for the recovery screen. `start()` resets it so a fixed
+  // problem is not reported as the cause of a later one.
   let lastFailure: string | undefined
 
   const service = new ServiceHost(options.serviceEntry, options.service, {
@@ -94,7 +90,7 @@ export function createHelper(options: HelperOptions): Helper {
     unexpectedExit: (code) => {
       if (!booted || disposed) return
       console.error(`[service-host] service exited unexpectedly with code ${code}`)
-      // Only if the service did not already say why: its own message beats an exit code every time.
+      // Only if the service did not already say why. Its own message beats an exit code.
       lastFailure ??= `the background service exited with code ${code}`
       void recover()
     },
@@ -102,9 +98,9 @@ export function createHelper(options: HelperOptions): Helper {
 
   const broker = new NodeBroker({ frame: options.push.frame, status: options.push.status })
   const fleet = new FleetStore(userDataDir, tokens)
-  // Preview tunnels re-resolve their node from the same fleet store the broker reads on every connection,
-  // so updated endpoint, token, and certificate records are applied to new connections. Established
-  // pipes are torn down explicitly by restart, adoption, and forget operations.
+  // Preview tunnels re-resolve their node from the fleet store on every connection, so a new
+  // endpoint, token, or certificate applies to new connections. Restart, adoption, and forget tear
+  // down established pipes explicitly.
   const tunnels = new PreviewTunnels(
     (nodeId) => {
       const node = fleet.get(nodeId)
@@ -120,31 +116,27 @@ export function createHelper(options: HelperOptions): Helper {
     options.tunnelEvents,
   )
 
-  // Third-party plugin bundles a node has served us, and this device's decisions about running them
-  // (docs/plugins.md). Both stores are the host's: the bytes never pass through the renderer, and the
-  // acknowledgements sit beside the device tokens because they are the same kind of custody, something
-  // this machine agreed to, not something a node can assert.
+  // Third-party plugin bundles a node has served, and this device's decisions about running them. See
+  // docs/plugins.md. Both stores belong to the host: the bytes never pass through the renderer, and
+  // the acknowledgements sit beside the device tokens because they are the same kind of custody,
+  // something this machine agreed to rather than something a node can assert.
   //
   // The sweep runs before the renderer can ask for state, so a bundle no node has offered in a month
   // is gone rather than briefly listed and then dropped.
   const pluginCache = new PluginCache(userDataDir, broker)
   pluginCache.sweep()
   const pluginTrust = new PluginTrustStore(userDataDir)
-  // These exact bytes are part of the application this process is. Cache and acknowledge them locally
-  // before the renderer asks for plugin state, so a node cannot turn the "bundled" label into an
-  // auto-trust primitive for arbitrary remote bytes. `trustsBundledClientPlugins` owns the one
-  // condition, and says why it is not "is this a packaged build".
+  // These bytes ship with this process. Cache and acknowledge them locally before the renderer asks
+  // for plugin state, so a node cannot turn the "bundled" label into auto-trust for arbitrary remote
+  // bytes. `trustsBundledClientPlugins` owns the one condition.
   const { bundledPluginsDir } = options.service
   if (bundledPluginsDir && trustsBundledClientPlugins()) trustBundledClientPlugins(bundledPluginsDir, version, pluginCache, pluginTrust)
 
-  // Record (or re-record, after a crash restart) the local node and bring its connection up. The
-  // endpoint, the certificate and even the token can change between starts now that the port is
-  // ephemeral, so this is driven by each start result rather than cached. The label stays the owner's
-  // though, so a rename survives.
+  // Record, or re-record after a crash restart, the local node and bring its connection up. The port
+  // is ephemeral, so the endpoint, the certificate, and the token can all change between starts. Each
+  // start result drives this rather than a cache. The label stays the owner's, so a rename survives.
   const adoptLocalNode = (started: ServiceStartResult): void => {
-    // Every start (first boot, crash recovery, a deliberate restart) can change the endpoint, the
-    // certificate and the token, so any surviving pipe to this node is pointed at a process that is
-    // gone.
+    // Any surviving pipe to this node points at a process that is gone.
     tunnels.closeFor({ nodeId: started.nodeId })
     const node = fleet.remember(
       {
@@ -165,8 +157,8 @@ export function createHelper(options: HelperOptions): Helper {
   }
 
   // Start the service and persist whatever token it ended up using. Reused on every start, including
-  // crash recovery: a restart must not mint a new device row, and the endpoint can change across
-  // restarts, so the caller always takes the fresh result rather than caching the first one.
+  // crash recovery, because a restart must not mint a new device row. The caller always takes the
+  // fresh result, since the endpoint can change across restarts.
   const start = async (): Promise<ServiceStartResult> => {
     lastFailure = undefined
     const started = await service.start(tokens.read(LOCAL_TOKEN_SCOPE))
@@ -174,31 +166,29 @@ export function createHelper(options: HelperOptions): Helper {
     return started
   }
 
-  // Settings → Plugins' Restart button. Only the local node has one: a remote node is somebody else's
-  // process and this client has no business restarting it.
+  // Settings > Plugins' Restart button. Only the local node has one, because a remote node is
+  // somebody else's process.
   //
   // Goes through the same `start` as boot and crash recovery, so the node re-reads its
-  // disabled-plugins file on the way up, and `adoptLocalNode` re-records the endpoint, certificate,
-  // and token, since all three can change across a restart now that the port is ephemeral. Not routed
-  // through `recover()`: this is a restart the owner asked for, and spending one of the five crashes
-  // in the ten-minute budget on it would mean a few plugin toggles could trip the recovery screen.
-  // Guarded against `recover()`, which is the case that made this dangerous rather than merely racy.
+  // disabled-plugins file on the way up and `adoptLocalNode` re-records the endpoint, certificate,
+  // and token. It skips `recover()`, because the owner asked for this restart and spending one of the
+  // five crashes in the ten-minute budget would let a few plugin toggles trip the recovery screen.
   //
-  // `ServiceHost.start` throws "already started" while a child exists. Without the guard: the service
-  // crashes, `recover()` is inside its backoff wait, the owner clicks Restart, Restart succeeds, and
-  // then `recover()`'s own `start()` throws. Its catch calls `service.stop()` and kills the working
-  // node, then re-enters `recover()` and spends another crash from the budget. Two clicks during
-  // recovery tripped the recovery dialog on a healthy node.
+  // The `recovering` guard matters. `ServiceHost.start` throws "already started" while a child
+  // exists, so without it: the service crashes, `recover()` waits out its backoff, the owner clicks
+  // Restart, Restart succeeds, and `recover()`'s own `start()` throws. Its catch calls
+  // `service.stop()`, kills the working node, re-enters `recover()`, and spends another crash. Two
+  // clicks during recovery tripped the recovery dialog on a healthy node.
   //
-  // A failure here also has to reach `recover()`, not just the caller: if `start()` rejects (a taken
-  // port, a corrupt plugin DB) no child was ever spawned, so `unexpectedExit` never fires and the app
-  // would sit with a dead node until relaunch. It still reports to the caller, so Settings → Plugins
-  // shows the reason.
+  // A failure here also has to reach `recover()`. If `start()` rejects on a taken port or a corrupt
+  // plugin DB, no child was ever spawned, so `unexpectedExit` never fires and the app sits with a
+  // dead node until relaunch. It still reports to the caller, so Settings > Plugins shows the
+  // reason.
   const restartLocalNode = async (): Promise<void> => {
     if (disposed) return
     if (recovering) throw new Error('acorn is already restarting the background service.')
     recovering = true
-    // A pipe to the process we are about to kill is dead either way, and its endpoint is about to change.
+    // A pipe to the process about to be killed is dead either way.
     tunnels.closeFor({})
     try {
       await service.stop()
@@ -212,14 +202,14 @@ export function createHelper(options: HelperOptions): Helper {
     recovering = false
   }
 
-  // Crash budget and restart backoff: docs/shell.md § Node child.
+  // Crash budget and restart backoff. See docs/shell.md, "Node child".
   const recover = async (): Promise<void> => {
     if (recovering || disposed) return
     recovering = true
-    // The budget arithmetic is in crashBudget.ts, where it can be tested without booting a shell and
-    // crashing a real service five times.
+    // The budget arithmetic is in crashBudget.ts, where it can be tested without crashing a real
+    // service five times.
     const decision = recordCrash(crashTimes, Date.now())
-    // Left blocked on purpose: `recovering` stays true until `retry()` clears it, so nothing restarts
+    // Left blocked on purpose. `recovering` stays true until `retry()` clears it, so nothing restarts
     // behind the recovery screen.
     if (!decision.retry) return void options.onCrashBudgetExhausted(lastFailure)
     try {
@@ -230,7 +220,7 @@ export function createHelper(options: HelperOptions): Helper {
     } catch (error) {
       console.error('[service-host] recovery failed:', error)
       // A rejected `start()` never spawned a child, so no state event carried a reason. This is the
-      // taken-port and locked-data-root case, which is exactly the one worth naming on the screen.
+      // taken-port and locked-data-root case, the one worth naming on the screen.
       lastFailure ??= error instanceof Error ? error.message : String(error)
       await service.stop()
       recovering = false
@@ -251,8 +241,8 @@ export function createHelper(options: HelperOptions): Helper {
       booted = true
     },
     restartLocalNode,
-    // Clear the budget so the next failure gets the full backoff again. The owner asking for a retry is
-    // new information: they may have just freed the port or fixed permissions.
+    // Clear the budget so the next failure gets the full backoff again. A retry is new information:
+    // the owner may have freed the port or fixed permissions.
     retry: async () => {
       crashTimes.length = 0
       recovering = false

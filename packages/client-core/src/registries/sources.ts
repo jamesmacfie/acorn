@@ -19,9 +19,8 @@ export type SourcePromotion<Item> = {
 }
 
 // A URL pattern a source wants registered on the Router. `order` decides registration order, so a
-// static path can be declared ahead of a parameter path that would otherwise swallow it. This
-// replaced a single-first-match `kind` lookup on the route registry (docs/frontend.md § Registries
-// and plugins).
+// static path can be declared ahead of a parameter path that would swallow it (docs/frontend.md §
+// Registries and plugins).
 export type SourceRouteContribution = {
   id: string
   path: string
@@ -30,9 +29,8 @@ export type SourceRouteContribution = {
 
 export type SourceContribution<Item = unknown> = {
   id: string
-  // The rail's position. Required rather than optional, and not derived from plugin activation order:
-  // docs/frontend.md § Registries and plugins has the reason every client registry sorts on an
-  // explicit order field instead.
+  // The rail's position. Required rather than derived from plugin activation order. See
+  // docs/frontend.md § Registries and plugins.
   order: number
   // Absent for local sources with no integration row behind them (docker); always shown.
   providerId?: string
@@ -48,16 +46,15 @@ export type SourceContribution<Item = unknown> = {
   // plugins), so the shell does not need to know which provider is bundled first.
   isDefault?: boolean
   routes?: readonly SourceRouteContribution[]
-  // Where a task belongs in the router, when this source owns it. docs/plugins.md § Loaded plugins:
-  // the client half and docs/frontend.md § Registries and plugins cover why this replaced a `kind`
-  // lookup on the route registry.
+  // Where a task belongs in the router, when this source owns it. See docs/plugins.md § Loaded
+  // plugins: the client half.
   taskPath?: (task: Task) => string | undefined
   // The inverse of `taskPath`: does this task already track the thing a reference panel is showing?
   // docs/plugins.md § Loaded plugins: the client half explains why `task.links` alone is not enough.
   tracksRef?: (task: Task, ref: { providerId?: string; displayId: string }) => boolean
   promotion?: SourcePromotion<Item>
-  // No `emptyState` here, unlike the descriptor twin (docs/plugins.md § Loaded plugins: the client
-  // half): a first-party source is a component and already renders its own empty case.
+  // No `emptyState` here, unlike the descriptor twin, because a first-party source is a component and
+  // renders its own empty case (docs/plugins.md § Loaded plugins: the client half).
 }
 
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')
@@ -80,14 +77,12 @@ export const sourceRouteContributions = (): SourceRouteContribution[] => sourceR
 
 // Which rail source owns a path, by the routes it declared.
 //
-// The shell draws from `selectedSource()`, not the location: every contributed route mounts as a
-// `noop` component and App picks the surface off the rail. Navigating to a source's route while a
-// different source is selected changes the address bar and nothing else, so a caller minting a path
-// must already be inside the owning source.
+// The shell draws from `selectedSource()`, not the location. Every contributed route mounts as a
+// `noop` component and App picks the surface off the rail, so navigating to a source's route while
+// another source is selected changes the address bar and nothing else.
 //
-// Segment-count and `:param` matching, not the router's grammar. Contributed patterns are plain
-// `/p/:projectId/…` forms today; if one ever needs optional or splat segments, ask the router to match
-// instead of growing this.
+// Segment-count and `:param` matching, not the router's grammar. Every contributed pattern is a plain
+// `/p/:projectId/…` form. If one needs optional or splat segments, ask the router to match instead.
 const matchesRoute = (pattern: string, path: string): boolean => {
   const expected = pattern.split('/').filter(Boolean)
   const actual = path.split('/').filter(Boolean)
@@ -113,9 +108,8 @@ export function taskPathFromSources(task: Task): string | undefined {
 /** Does this task already track this external reference? Host link matching first, then each
  *  source's own second spelling (docs/plugins.md § Loaded plugins: the client half). */
 export function taskTracksRef(task: Task, ref: { providerId?: string; displayId: string; connectionId?: string }): boolean {
-  // A link names a connection and a panel target usually does not: a PR body says `ENG-42`, not which
-  // connected Linear owns it. The connection is compared only when both sides have one, the same
-  // looseness every identifier match here accepts.
+  // A link names a connection and a panel target usually does not. A PR body says `ENG-42`, not which
+  // connected Linear owns it, so the connection is compared only when both sides have one.
   const linked = task.links.some((link) =>
     link.providerId === ref.providerId
     && link.identifier === ref.displayId

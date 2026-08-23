@@ -47,9 +47,7 @@ describe('literal ratchets (these may only go down)', () => {
   // backtracks to zero width and the lookahead then succeeds against the space itself.
   const count = (re: RegExp) => (withoutComments(corpus).match(re) ?? []).length
 
-  // Zero today. The last literal was `.linear-priority i`, a 1px radius on a 3px-wide bar with no
-  // rung on the scale, and it left when that plugin moved to the loaded tier. A ratchet that
-  // reaches zero should say zero.
+  // Zero. A ratchet that reaches zero should say zero.
   it('border-radius literals', () => {
     expect(count(/border-radius:(?!\s*var\()[^;]+;/g)).toBe(0)
   })
@@ -77,8 +75,8 @@ describe('literal ratchets (these may only go down)', () => {
     expect(count(/font-size:\s*\d/g)).toBeLessThanOrEqual(4)
   })
 
-  // Third-party brand marks live in tokens-invariant.css, so nothing outside the axis files needs
-  // to spell a colour at all.
+  // Third-party brand marks live in tokens-invariant.css, so nothing outside the axis files spells
+  // a colour.
   it('colour literals outside the axis sheets', () => {
     const leaked = sheets
       .filter((f) => !f.name.startsWith('tokens-'))
@@ -97,11 +95,9 @@ describe('literal ratchets (these may only go down)', () => {
     expect(bare).toEqual([])
   })
 
-  // Individual pixel values left inside spacing declarations. Everything on the --space-* scale is
-  // already a token, so whatever remains is off-scale (3px, 5px, 7px, 9px, and so on). These are not
-  // snapped retroactively: that would shift about 85 paddings by 1px and the hygiene pass promised
-  // no visual change. Snap them while authoring a pack that moves the density anyway, where 1px is
-  // invisible.
+  // Pixel values left inside spacing declarations. Everything on the --space-* scale is a token,
+  // so whatever remains is off-scale. Snapping them retroactively would shift about 85 paddings by
+  // 1px; do it while authoring a pack that moves the density anyway.
   it('off-scale spacing values', () => {
     const decls = withoutComments(corpus)
       .match(/(?:padding|margin|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left))?:[^;]+;/g) ?? []
@@ -113,15 +109,13 @@ describe('literal ratchets (these may only go down)', () => {
 // A plugin frame is served exactly the sheets scripts/stage.mjs lists, primitives.css among them
 // (docs/ui-design.md § How the primitives are built).
 //
-// A font shorthand needs at minimum a size and a family. `font: var(--font-ui)` parses, since any
-// var() might expand to anything, but is invalid once substituted with a family alone: an
-// invalid-at-computed-value-time declaration takes the property's unset value rather than falling
-// back to the previous declaration in the cascade, and every `font` longhand is inherited, so the
-// element inherits nothing from its parent and lands on the browser's default serif. This rendered
-// the whole Database pane in Times New Roman, and it is invisible in review and invisible to tsc.
-// The signature to ban is narrow: a `font` shorthand whose entire value is one var(). Use
-// `font-family` when the value should be a family; the legitimate uses all carry a size
-// (`font: var(--fs-sm) var(--font-mono)`).
+// A font shorthand needs a size and a family. `font: var(--font-ui)` parses, because any var()
+// might expand to anything, but it is invalid once substituted with a family alone. An
+// invalid-at-computed-value-time declaration takes the property's unset value instead of the
+// previous declaration, and every `font` longhand inherits, so the element lands on the browser's
+// default serif. That rendered the whole Database pane in Times New Roman, invisible in review and
+// to tsc. Use `font-family` when the value is a family; legitimate uses carry a size, as in
+// `font: var(--fs-sm) var(--font-mono)`.
 it('never puts a bare token in the font shorthand', () => {
   // One var() and then the semicolon. A legitimate `font: var(--fs-sm) var(--font-mono)` has a
   // second token after the first var() closes, so it does not match; the inner value bans

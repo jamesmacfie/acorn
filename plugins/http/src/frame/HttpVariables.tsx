@@ -1,13 +1,12 @@
 // Repo-level variables for the API panel. Mounted twice: as the Variables view inside the panel,
-// and as the "API requests" settings page. One component, two entry points.
+// and as the "API requests" settings page.
 //
 // Three kinds:
 //   value   - stored and shown as typed
-//   secret  - encrypted at rest with the Node's secret key; the
-//             plaintext never comes back to the renderer, so the field shows a placeholder
-//   command - a stored shell command run in the task worktree (or the project checkout) when a
-//             request references it. Its output is never stored. The same mechanism the Database
-//             pane uses for its connection URL.
+//   secret  - encrypted at rest with the node's secret key. The plaintext never comes back to the
+//             renderer, so the field shows a placeholder
+//   command - a stored shell command run in the task worktree, or the project checkout, when a
+//             request references it. Its output is never stored.
 import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
 import { Button, Checkbox, createArmedConfirm, Icon, Input, Select } from '@acorn/plugin-api/ui'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
@@ -35,10 +34,10 @@ export default function HttpVariables(props: { projectId: string; projectName: s
   const [busy, setBusy] = createSignal<string | null>(null)
   const [stored] = createResource(() => props.projectId, listVariables)
 
-  // One local list, seeded from the server load and thereafter edited in place: each save patches
-  // its row from the response, so nothing refetches under a cursor. The earlier stored-plus-drafts
-  // merge rebuilt every row object on each keystroke and moved an edited row to the end of the list,
-  // which tore the input out from under the caret; rows are addressed by position now.
+  // One local list, seeded from the server load and then edited in place: each save patches its row
+  // from the response, so nothing refetches under a cursor. Rows are addressed by position. A
+  // stored-plus-drafts merge rebuilds every row object per keystroke and moves an edited row to the
+  // end of the list, which tears the input out from under the caret.
   const [rows, setRows] = createSignal<Row[]>([])
   createEffect(() => {
     const saved = stored()

@@ -5,8 +5,8 @@ integration credential and its repositories/PRs are a disposable local mirror.
 
 ## Connecting
 
-Settings → Integrations and the first-run wizard both run the OAuth device authorization flow, through
-the same `createDeviceFlow` helper in `packages/client-core/src/integrations/deviceFlow.ts` — the
+Settings → Integrations and the first-run wizard both run the OAuth device authorization flow through
+the same `createDeviceFlow` helper in `packages/client-core/src/integrations/deviceFlow.ts`, so the
 polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated once:
 
 1. `POST /v2/p/github/auth/device/start` asks GitHub for a device code.
@@ -20,13 +20,12 @@ The optional GitHub plugin reads `GITHUB_CLIENT_ID`, uses no client secret, and 
 `githubToken(c)` is the single credential read site for GitHub routes.
 
 Device flow wins over the redirect web flow for three reasons. The web flow needs a client secret to
-exchange the code, and a secret shipped inside a distributed binary is recoverable, a problem an
-earlier version hit and could not fix; device flow exchanges on `client_id` alone. The web flow also
-needs a redirect URI, and the renderer has no server-served origin to redirect back to, while a remote
-node would need its own registered callback URL; device flow has neither problem, so a local node and
-a remote node run the same code path. And the web flow needs a shell-owned auth window to intercept
-the redirect, which device flow avoids. The cost is one extra step for the person
-connecting: they read a code and type it at `github.com/login/device`.
+exchange the code, and a secret shipped inside a distributed binary is recoverable; device flow
+exchanges on `client_id` alone. The web flow needs a redirect URI, and the renderer has no
+server-served origin to redirect back to, while a remote node would need its own registered callback
+URL; device flow has neither problem, so a local node and a remote node run the same code path. The
+web flow also needs a shell-owned auth window to intercept the redirect. The cost is one extra step
+for the person connecting: they read a code and type it at `github.com/login/device`.
 
 ## Mirror
 
@@ -47,14 +46,11 @@ value.
 
 The "my pull requests" collection filters by involvement (review-requested, assigned, authored) as a
 live GitHub search rather than a mirror query. Assignees are never mirrored, and review requests only
-mirror through the PR-detail sync, which only runs for PRs already in the mirror because this account
-opened them, so a mirror-side filter would parse and render but answer nothing for exactly what the
-person is asking. Each involvement value runs as its own search and the results are unioned, since
-GitHub's search qualifiers only AND and "assigned to me or waiting on my review" is two questions
+mirror through the PR-detail sync, which runs only for PRs already in the mirror because this account
+opened them. A mirror-side filter would parse and render, then answer nothing for the question the
+person is asking. Each involvement value runs as its own search and the results are unioned, because
+GitHub's search qualifiers only AND, and "assigned to me or waiting on my review" is two questions
 however it is asked.
-
-The three-pane browse layout (PR list, PR detail, diff) is pinned by the desktop e2e suite. Changing
-its panes, headers, or affordances needs a matching e2e update.
 
 ## Content links
 
@@ -74,15 +70,15 @@ failed silently, because an unresolved repo simply opens the real `github.com` U
 
 ## Importing projects
 
-Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. A repository
-is either mapped to an existing folder or cloned with non-interactive Git; both ask for the folder
-before anything is written, so cancelling the dialog cancels the import. There is no third "defer"
-action — not importing a repository is what deferring meant, and the path-null placeholder project it
-created became a duplicate as soon as the same repository was mapped later.
+Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. A
+repository is either mapped to an existing folder or cloned with non-interactive Git. Both ask for
+the folder before anything is written, so cancelling the dialog cancels the import. There is no third
+"defer" action: skipping the repository is what deferring meant, and the path-null placeholder
+project it created turned into a duplicate as soon as the same repository was mapped.
 
-For that reason an import that finds an existing **path-null** project for the repository fills that
-one in rather than adding a second. A project that already has a path is a real checkout, and two
-clones of one repository stay legal (`projects_github_idx` is deliberately non-unique).
+So an import that finds a path-null project for the repository fills that one in rather than adding a
+second. A project that already has a path is a real checkout, and two clones of one repository stay
+legal (`projects_github_idx` is deliberately non-unique).
 
 The importer returns an individual result for every repository, so a failed clone does not hide
 successful imports. The mirror remains disposable candidate data; project identity, checkout paths, and
@@ -97,11 +93,11 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 A PR can promote to a task. The task stores the core project ID and pull number; the project's GitHub
 facet supplies provider owner/name metadata. Subsequent task context and changes use the owning Node.
 Linear reference panels are contributed through a provider contract, so the GitHub plugin does not
-import Linear's implementation — and since Linear became a loaded plugin, the panel it renders there is
-a sandboxed frame whose overlay chrome the host draws. GitHub does still depend on
-`@acorn/plugin-linear` for two things in `contract/`: the ticket-reference text scanner and the
-query-options factory over `/v2/p/linear/issues`. Both are the sanctioned cross-plugin surface and
-neither reaches Linear's UI.
+import Linear's implementation. Linear is a loaded plugin, so the panel it renders there is a
+sandboxed frame whose overlay chrome the host draws. GitHub does depend on `@acorn/plugin-linear` for
+two things in `contract/`: the ticket-reference text scanner and the query-options factory over
+`/v2/p/linear/issues`. Both are the sanctioned cross-plugin surface, and neither reaches Linear's
+UI.
 
 ## Actions and logs
 

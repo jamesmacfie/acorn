@@ -45,23 +45,19 @@ export type DashboardState = {
   placements: Record<string, PanelId[]>
   /** Placement scope key to panel id to its rect on that surface (layout.ts).
    *
-   *  A sibling key rather than turning `placements` entries into `{ id, x, y, w, h }` objects. These
-   *  blobs are node-owned and shared by every client paired with the node, and the shipped parser keeps
-   *  only string entries from a placement array, so object entries would parse to an empty placement
-   *  and the board would vanish on an old client. A sibling key is invisible to an old parser.
+   *  A sibling key rather than `{ id, x, y, w, h }` entries inside `placements`. These blobs are
+   *  node-owned and shared by every paired client, and the shipped parser keeps only string entries
+   *  from a placement array, so object entries would parse to an empty placement and the board would
+   *  vanish on an old client. A sibling key is invisible to that parser, which instead resets
+   *  geometry to auto-placement while panels, definitions, and order survive.
    *
-   *  The ceiling: an old client that writes the slice serialises only what it parsed, so geometry
-   *  resets to auto-placement while the panels, their definitions and their order survive.
-   *
-   *  Geometry is per (scope, panel), never on the definition: the same panel placed on Home and in a
-   *  task pane has two rects. */
+   *  Geometry is per (scope, panel), never on the definition, so the same panel placed on Home and
+   *  in a task pane has two rects. */
   layouts: Record<string, Record<PanelId, Rect>>
-  /** The named Home tabs, in display order. Additive and optional: absent, or one entry, means no tab
-   *  bar and Home renders as it did before tabs existed.
+  /** The named Home tabs, in display order. Absent, or one entry, means no tab bar.
    *
-   *  Only names and order live here. A tab's content is ordinary `placements` and `layouts` under the
-   *  `home/<tabId>` key, which is why an old client that drops this key loses the names and keeps every
-   *  panel. */
+   *  Only names and order live here. A tab's content is ordinary `placements` and `layouts` under
+   *  the `home/<tabId>` key, so a client that drops this key loses the names and keeps the panels. */
   tabs?: DashboardTab[]
 }
 
@@ -121,15 +117,12 @@ export const homeTabIdOf = (key: string): string | undefined => {
   return decodeURIComponent(segments[1] ?? '')
 }
 
-/** The tabs to render: the named ones in order, then any `home/*` scope with placements but no name,
- *  appended as "Untitled".
+/** The tabs to render: the named ones in order, then any `home/*` scope with placements but no
+ *  name, appended as "Untitled". That recovers from a client that dropped `tabs`, survives a
+ *  partially-written blob, and keeps deleting a name from deleting a composition.
  *
- *  One rule doing three jobs. It's the recovery from an old client that wrote the slice and dropped
- *  `tabs`, the defence against a partially-written blob, and why deleting a name can never delete a
- *  composition. The bare `home` scope is always a candidate whether or not it holds panels, because
- *  it's the default tab and has no delete.
- *
- *  Empty when the blob names no tabs: one dashboard draws no bar. */
+ *  The bare `home` scope is always a candidate, panels or not, because it is the default tab and
+ *  has no delete. Empty when the blob names no tabs, since one dashboard draws no bar. */
 export function homeTabs(state: DashboardState): DashboardTab[] {
   const named = state.tabs ?? []
   if (!named.length) return []
@@ -147,9 +140,9 @@ export function homeTabs(state: DashboardState): DashboardTab[] {
 export function parseDashboards(raw: unknown): DashboardState {
   const value = parseJson(raw)
   if (!isRecord(value)) return emptyDashboards()
-  // Definitions and placements come from the shared codec, which the node's measure sampler also calls
-  // (@acorn/dashboards-core/definition.ts). Two parsers over one blob is how a client and a node come
-  // to disagree about what a panel is. Geometry stays here, because a rect is a rendering concern.
+  // Definitions and placements come from the shared codec, which the node's measure sampler also
+  // calls (@acorn/dashboards-core/definition.ts). Two parsers over one blob is how a client and a
+  // node come to disagree about what a panel is. Geometry stays here; a rect is a rendering concern.
   const { panels, placements } = parsePanels(value)
   const layouts: Record<string, Record<PanelId, Rect>> = {}
   if (isRecord(value.layouts)) {
@@ -251,10 +244,9 @@ export const placePanel = (scope: PlacementScope, id: PanelId, index?: number): 
 
 /** Place a panel at a starting size, which is the wizard's commit.
  *
- *  The size is a preset the person picked (layout.ts § sizePresets): it's first-fitted against what's
- *  already there and then run through the ordinary `normalize` path, so what lands is a rect like any
- *  other. Nothing persisted learns that a preset existed, so the table can be retuned without a
- *  migration.
+ *  The size is a preset the person picked (layout.ts § sizePresets), first-fitted against what is
+ *  already there and then run through the ordinary `normalize` path, so what lands is a rect like
+ *  any other and nothing persisted records that a preset existed.
  *
  *  Call `savePanel` first: the normalise pass asks each placed panel for its view kind's minimums. */
 export function placePanelAt(scope: PlacementScope, id: PanelId, size: { w: number; h: number }): void {
@@ -303,9 +295,8 @@ export const removeHomeTab = (tabId: string): void =>
 export const dashboardsSlice: PersistedStateSlice<DashboardState> = {
   id: 'core.dashboards',
   key: PrefKeys.dashboards,
-  // `app`, and one blob rather than a key per panel: the whole model is read together on every surface
-  // that draws one, and a key per panel would need a scope registration and an eviction rule for a
-  // short list. The precedent is `agentTools.perms`.
+  // `app`, and one blob rather than a key per panel, because the whole model is read together on
+  // every surface that draws one. The precedent is `agentTools.perms`.
   scope: 'app',
   restore: 'view',
   version: 1,

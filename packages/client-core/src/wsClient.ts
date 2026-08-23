@@ -1,17 +1,14 @@
-// The renderer end of the one authenticated stream socket. It no longer owns a socket: the desktop
-// main's connection broker holds it, because the device token rides the upgrade request's headers
+// The renderer end of the one authenticated stream socket. This file does not own the socket: the
+// desktop main's connection broker does, because the device token rides the upgrade request's headers
 // and a browser cannot set those (docs/architecture-overview.md § Node API and client flow).
 //
-// What stayed here: the subscription registries, the first-attach/last-detach contract, and the
-// re-attach-on-reconnect behaviour. What moved to the broker: the URL, the socket lifecycle, the
-// local outbox (main queues frames until its socket is open), and the fixed 1s reconnect timer,
-// replaced by the broker's own backoff.
+// What stays here is the subscription registries, the first-attach/last-detach contract, and the
+// re-attach-on-reconnect behaviour. The broker owns the URL, the socket lifecycle, the outbox, and the
+// reconnect backoff.
 //
-// Dispatch is a prefix registry now (wsChannels.ts), not a flat if/else over every channel name.
-// This file still owns the `term:` and `workflow:` prefixes: `term:` is core transport on both
-// ends, the node's hub handles it inline before prefix dispatch so it can apply the task-scope
-// check, and `workflow:notice` feeds core's own notification pipeline. `docker:` and `agent:` are
-// registered by the plugins that own them.
+// Dispatch is a prefix registry (wsChannels.ts). This file owns `term:` and `workflow:`, because
+// `term:` is core transport on both ends and `workflow:notice` feeds core's notification pipeline.
+// `docker:` and `agent:` are registered by the plugins that own them.
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from './platform'
@@ -19,8 +16,8 @@ import { activeNodeId } from './node/activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
 
 type OutputCb = (m: ServerMsg) => void
-// Exported because subscribers outside this package (the terminal plugin's client) used to keep a
-// hand-written twin of it, which drifted the moment a fourth kind was added. One declaration, imported.
+// Exported so subscribers outside this package import it rather than keeping a hand-written twin that
+// drifts when a kind is added.
 export type WorkflowNotice = {
   taskId: string
   kind: 'gate' | 'run-done' | 'repo-config-trust' | 'plugin-request'
@@ -38,16 +35,15 @@ const stepEventSubs = new Set<StepEventCb>()
 const reconnectSubs = new Set<() => void>()
 
 let bridged = false
-// Which nodes' sockets have been up at least once. A transition to online after that point is a
-// reconnect, and reconnect means both re-attach and refetch; the first connect means neither.
+// Which nodes' sockets have been up at least once. A later transition to online is a reconnect, which
+// means re-attach and refetch. The first connect means neither.
 //
-// Per node, not one flag. A single boolean was set by whichever node connected first, so a second
-// node's very first connect read as a reconnect: it re-attached every PTY subscription and told
-// the shell to refetch, both against the active node, for an event that had nothing to do with it.
+// Per node, not one flag. A single boolean read a second node's first connect as a reconnect, and
+// re-attached every PTY subscription against the active node.
 const everOnline = new Set<string>()
 
-// The one send door. Exported because a channel owner needs it to attach and detach its own streams,
-// and it is the only thing about the socket a plugin should be able to reach.
+// The one send door. A channel owner needs it to attach and detach its own streams, and it is the only
+// part of the socket a plugin can reach.
 export function wsSend(frame: WsClientFrame): void {
   rawSend(frame)
 }
@@ -60,25 +56,21 @@ function rawSend(frame: WsClientFrame): void {
   nodeTransport()?.send(nodeId, frame)
 }
 
-// Subscribe to the broker's push channels. Idempotent and never torn down: this module is a singleton
-// whose lifetime is the renderer's.
+// Subscribe to the broker's push channels. Idempotent and never torn down, because this module is a
+// singleton whose lifetime is the renderer's.
 function connect(): void {
   if (bridged) return
   const transport = nodeTransport()
   if (!transport) return
   bridged = true
 
-  // The nodeId is a filter, not decoration. Main opens a socket to every paired node and pushes
-  // every frame here, and this module's subscriber maps are keyed on session/container/exec ids
-  // alone. Before this filter, node B's `term:out` for a session id that happened to collide fed
-  // node A's xterm, and its `agent:*` frames mutated the managed-session store the Agent Center
-  // renders for A. Two nodes must never collide in the client
-  // (docs/architecture-overview.md § Client state and fleet behavior); the QueryClient partition
-  // made that true for cached data, and this makes it true for the live stream.
+  // The nodeId is a filter, not decoration. Main opens a socket to every paired node and pushes every
+  // frame here, while the subscriber maps below are keyed on session and exec ids alone. Without the
+  // filter, node B's `term:out` for a colliding session id feeds node A's xterm
+  // (docs/architecture-overview.md § Client state and fleet behavior).
   //
-  // Dropping rather than routing is right for now: only the active node's surfaces are subscribed,
-  // so a frame from any other node has no consumer. A fleet-wide live surface would need a nodeId
-  // in the subscription key, not a wider filter here.
+  // Dropping rather than routing works because only the active node's surfaces are subscribed. A
+  // fleet-wide live surface would need a nodeId in the subscription key, not a wider filter here.
   transport.onFrame((nodeId, raw) => {
     if (nodeId !== activeNodeId()) return
     dispatch(raw)
@@ -89,31 +81,29 @@ function connect(): void {
       everOnline.add(status.nodeId)
       return
     }
-    // A reconnect of some other node must not re-attach this node's PTYs or refetch its queries:
-    // every `rawSend` below addresses the active node, and `reconnectSubs` invalidates the active
-    // node's cache.
+    // Every `rawSend` below addresses the active node, and `reconnectSubs` invalidates the active
+    // node's cache, so another node's reconnect must not reach either.
     if (status.nodeId !== activeNodeId()) return
-    // Re-attach every live subscription: the node treats attach as idempotent per connection, so
-    // this re-subscribes each PTY and restores its display snapshot. Each channel owner supplies
-    // its own frames (wsChannels.ts); this loop no longer knows how to spell another prefix's
-    // attach.
+    // Re-attach every live subscription. The node treats attach as idempotent per connection, so this
+    // re-subscribes each PTY and restores its display snapshot. Each channel owner supplies its own
+    // frames (wsChannels.ts).
     for (const frame of wsReattachFrames()) rawSend(frame)
-    // Reconnect means refetch (docs/api-reference.md § WebSocket): there is no cursor into
-    // history, so the client marks the node's cache stale instead of replaying. The QueryClient
-    // lives in the app shell, so this is announced rather than performed here.
+    // Reconnect means refetch (docs/api-reference.md § WebSocket). There is no cursor into history, so
+    // the client marks the node's cache stale instead of replaying. The QueryClient lives in the app
+    // shell, so this announces rather than performs it.
     reconnectSubs.forEach((cb) => cb())
   })
 }
 
 function dispatch(raw: unknown): void {
   if (!raw || typeof raw !== 'object' || typeof (raw as { channel?: unknown }).channel !== 'string') return
-  // `seq` is stripped by the broker's gap detection before we see it; the remaining value is the
-  // channel-tagged event frame. Core reads only `channel`; the owner narrows the rest.
+  // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
+  // narrows the rest.
   routeWsFrame(raw as WsServerFrame)
 }
 
-// This file's own two prefixes (docs/api-reference.md § WebSocket). `term:` frames carry a
-// per-session ServerMsg; `workflow:` carries the notification bell's notices and step events.
+// This file's own two prefixes (docs/api-reference.md § WebSocket). `term:` frames carry a per-session
+// ServerMsg, `workflow:` carries the notification bell's notices and step events.
 registerWsChannel(
   'term',
   (frame) => {
@@ -131,7 +121,7 @@ registerWsChannel('workflow', (frame) => {
   if (frame.channel === 'workflow:step:event') stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
 })
 
-// Core's third prefix (docs/api-reference.md § WebSocket). Content-free like `term:status`; the
+// Core's third prefix (docs/api-reference.md § WebSocket). Content-free like `term:status`, so the
 // subscriber re-reads the roster route (plugins/reload.ts).
 registerWsChannel('plugins', (frame) => {
   if (frame.channel === 'plugins:changed') pluginsSubs.forEach((cb) => cb())
@@ -153,9 +143,8 @@ export const wsConnect = (): void => connect()
 // Test seam: this module's singletons outlive a single test otherwise.
 export function _resetWsClient(): void {
   bridged = false
-  // NOT _resetWsChannels(): this module registers its prefixes at import time, and clearing the map
-  // would leave the whole socket mute for every later test in the file. A plugin's registration is
-  // taken back by its own reset.
+  // Not _resetWsChannels(). This module registers its prefixes at import time, so clearing the map
+  // leaves the socket mute for every later test in the file.
   everOnline.clear()
   outputSubs.clear()
   statusSubs.clear()
@@ -165,9 +154,9 @@ export function _resetWsClient(): void {
   reconnectSubs.clear()
 }
 
-// Subscribe to one session's output; returns an unsubscribe. Detaching keeps the PTY running.
-// Only the first local subscriber per session sends the attach frame (the server restores one
-// display snapshot per connection); the last unsubscribe detaches.
+// Subscribe to one session's output. Detaching keeps the PTY running. Only the first local subscriber
+// per session sends the attach frame, because the server restores one display snapshot per connection,
+// and the last unsubscribe detaches.
 export function wsAttach(id: string, on: OutputCb): () => void {
   let set = outputSubs.get(id)
   const first = !set
@@ -199,9 +188,8 @@ export function wsOnStatus(cb: () => void): () => void {
   return () => void statusSubs.delete(cb)
 }
 
-// A reload swapped a plugin's node half (docs/plugins.md § The dev loop). A subscriber, not a
-// direct call into the plugin layer, because plugins/chrome already imports this module and the
-// reverse edge would be a cycle.
+// A reload swapped a plugin's node half (docs/plugins.md § The dev loop). A subscriber rather than a
+// direct call, because plugins/chrome imports this module and the reverse edge would be a cycle.
 export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)
   connect()

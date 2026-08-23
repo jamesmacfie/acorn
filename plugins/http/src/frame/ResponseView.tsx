@@ -19,8 +19,7 @@ const statusTone = (status: number): 'accent' | 'warn' | 'del' | 'neutral' => {
 }
 
 // Pretty-print JSON when it is JSON; otherwise show it as it came. No syntax highlighting: Monaco is
-// off-limits here (its only cross-plugin import is baselined and the baseline is shrink-only), and a
-// highlighter for the sake of colour isn't worth a new dependency.
+// off-limits here, its one cross-plugin import is baselined, and the baseline is shrink-only.
 function formatBody(text: string, contentType: string): string {
   if (!contentType.includes('json')) return text
   try {

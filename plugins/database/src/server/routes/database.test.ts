@@ -12,10 +12,9 @@ import type { DbSavedQuery } from '../../shared/database'
 import type { DatabaseBridge } from '../../main/database'
 import { createDatabaseFetch } from './database'
 
-// These routes run over the portable carrier now: no host Hono stack, no middleware-set principal,
-// and the identity arrives as the request context the host binds. So does the bridge: it is a closure
-// argument rather than a capability resolved out of `c.env`, which is what lets a fake be handed in
-// without a global registry to reset afterwards.
+// These routes run over the portable carrier: no host Hono stack, no middleware-set principal, and the
+// identity arrives as the request context the host binds. The bridge is a closure argument rather than
+// a capability resolved out of `c.env`, so a fake goes in without a global registry to reset.
 const principal = (userId: string, kind: Principal['kind'] = 'device'): Principal => ({ kind, userId })
 
 const fake = (over: Partial<DatabaseBridge> = {}): DatabaseBridge => ({
@@ -173,10 +172,9 @@ describe('database routes', () => {
     expect((await f.call('/tasks/task1/generate', json({ connectionId: '', prompt: 'x' }))).status).toBe(400)
   })
 
-  // Generation and the picker behind it spend the owner's provider key, billed to the owner. A
-  // task-scoped agent token must not reach either. The compiled route enforced this through the host's
-  // `canUseProviderCredential`, which reads a middleware-set principal a loaded bundle does not have, so
-  // this is the same rule read off the request context instead.
+  // Generation and the picker behind it spend the owner's provider key, so a task-scoped agent token
+  // must not reach either. The host's `canUseProviderCredential` reads a middleware-set principal a
+  // loaded bundle does not have, so the rule is read off the request context instead.
   it('refuses generation and the connection list to a task-scoped agent token', async () => {
     const agent = principal('james', 'internal')
     expect((await f.call('/tasks/task1/generate', json({ connectionId: 'c', prompt: 'x' }), fake(), agent)).status).toBe(403)
@@ -185,8 +183,8 @@ describe('database routes', () => {
   })
 })
 
-// The document surface's two routes. What the host does with them is its business; what this plugin owes
-// is `{ text }` back, `{ text }` in, and a task that exists.
+// The document surface's two routes. This plugin owes `{ text }` back, `{ text }` in, and a task that
+// exists.
 describe('the scratch document', () => {
   let f: Fixture
   beforeEach(async () => {
@@ -206,8 +204,8 @@ describe('the scratch document', () => {
     await f.call('/tasks/task1/scratch', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'SELECT 1;' }) })
     expect(await (await f.call('/tasks/other/scratch')).json()).toEqual({ text: '' })
     expect((await f.call('/tasks/ghost/scratch')).status).toBe(404)
-    // The write is checked too: an autosave for a task that has gone should not quietly create a row
-    // nothing will ever read again.
+    // The write is checked too: an autosave for a task that has gone should not create a row nothing
+    // reads.
     const orphan = await f.call('/tasks/ghost/scratch', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'x' }) })
     expect(orphan.status).toBe(404)
   })
@@ -306,8 +304,8 @@ describe('saved queries', () => {
     expect(system).not.toContain('SELECT 99;')
   })
 
-  // The agent composer's entry, moved off the client with the rest of the plugin. The interesting half
-  // is the scoping: the options a task offers are its project's, not every project's.
+  // The agent composer's entry. The scoping is the interesting half: the options a task offers are its
+  // project's, not every project's.
   it('serves the composer its options and captures the picked ones', async () => {
     const mine: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
     await save({ name: 'foreign', notes: '', sql: 'SELECT 99;' }, 'other')
@@ -319,8 +317,8 @@ describe('saved queries', () => {
     expect(captured).toHaveLength(1)
     expect(captured[0]).toMatchObject({ contextId: mine.id, label: 'Database · paid orders', deepLink: { pane: 'database' } })
     expect(captured[0].content).toContain('SELECT 1;')
-    // The connection URL is resolved per connect and never persisted, so there is nothing here to leak;
-    // this asserts that the snapshot really is only the query and its notes.
+    // The connection URL is resolved per connect and never persisted, so this asserts the snapshot is
+    // only the query and its notes.
     expect(captured[0].content).not.toContain('postgres://')
   })
 })

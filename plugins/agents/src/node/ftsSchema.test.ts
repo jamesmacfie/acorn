@@ -3,12 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { agentEvents } from './schema'
 
-// FTS5 schema drift guard: see docs/data-layer.md § Migrations for why this table and its triggers
-// are hand-written into the migration instead of the Drizzle schema, and why this file is the
-// pattern to copy for another plugin's virtual table.
+// FTS5 schema drift guard. See docs/data-layer.md § Migrations for why this table and its triggers are
+// hand-written into the migration instead of the Drizzle schema.
 //
-// Uses a per-plugin database rather than a core one, since the migration chain that creates these
-// four objects (migrations/0000_*.sql) is this plugin's own.
+// Uses a per-plugin database, because the migration chain that creates these four objects
+// (migrations/0000_*.sql) is this plugin's own.
 describe('agent_events_fts schema drift guard', () => {
   let t: TestPluginDb
 
@@ -45,10 +44,9 @@ describe('agent_events_fts schema drift guard', () => {
     for (const column of ['id', 'session_id', 'search_text']) expect(eventColumns).toContain(column)
   })
 
-  // The projection is only useful if the triggers actually fire, and a virtual table with no rows answers
-  // every MATCH with an empty set, which looks exactly like "nothing matched". So this asserts the whole
-  // path: insert an event row through Drizzle, find it through FTS5, then delete it and confirm the
-  // projection was swept.
+  // A virtual table with no rows answers every MATCH with an empty set, which looks the same as
+  // "nothing matched". So assert the whole path: insert an event row through Drizzle, find it through
+  // FTS5, then delete it and confirm the projection was swept.
   it('projects and unprojects an event row through the triggers', async () => {
     await t.db.insert(agentEvents).values({
       id: 'event-1',

@@ -25,8 +25,8 @@ export const changesPlugin = (): NodePlugin => {
     // (docs/plugins.md § Task checks; details in main/archiveCheck.ts).
     ctx.taskChecks.register({ id: 'uncommitted', check: (task) => changesArchiveConcern(bridge, task) })
     ctx.routes.register(localGit, { prefix: '/tasks', note: '/:id/local/*' })
-    // local_changes / local_diff / git_log. Same module as the bridge above, so the agent and the review
-    // pane cannot disagree about the working tree.
+    // local_changes, local_diff, and git_log. Same module as the bridge above, so the agent and the
+    // review pane cannot disagree about the working tree.
     for (const tool of localGitAgentTools(ctx.core)) ctx.tools.register(tool)
   },
   // The capability slot only; the host drains the SQLite handle right after this returns

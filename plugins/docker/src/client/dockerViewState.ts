@@ -35,9 +35,8 @@ clientEvents.on('runtime:task-archived', ({ taskId }) => {
   for (const key of detailStates.keys()) if (key.startsWith(prefix)) detailStates.delete(key)
 })
 
-// A container state's StatusDot tone. One mapping for the browse list, the task pane and the
-// detail header: they each rendered `.docker-dot[data-state]` and relied on one stylesheet
-// agreeing.
+// A container state's StatusDot tone. One mapping for the browse list, the task pane, and the detail
+// header, which otherwise each render `.docker-dot[data-state]` and rely on one stylesheet agreeing.
 export const containerTone = (state: string): 'ok' | 'warn' | 'bad' | 'muted' =>
   state === 'running' ? 'ok'
   : state === 'paused' || state === 'restarting' ? 'warn'

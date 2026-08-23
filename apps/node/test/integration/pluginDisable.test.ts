@@ -16,9 +16,8 @@ import { SecretService } from '@acorn/node-core/main/core/index.ts'
 import { nodePlugins } from '../../src/server/plugins'
 import { readGolden, writeGolden } from './golden'
 
-// The deps the composition root supplies. These are stubs, not fakes, because nothing here runs
-// during init. The test is which contributions land, and each plugin's init that does I/O does it
-// against its own database.
+// Stubs, not fakes, because nothing here runs during init. The test is which contributions land, and
+// a plugin's init that does I/O does it against its own database.
 const buildPlugins = (dataDir: string) =>
   nodePlugins(dataDir, {
     agents: {
@@ -40,11 +39,10 @@ const buildPlugins = (dataDir: string) =>
     },
   } as never)
 
-// Every registry a node plugin can write to, including the three provider registries (why connection
-// and integration are separate lists: docs/integrations.md § Connection and integration
-// contributions). linear has since moved to the loaded tier, so github is the only provider-owning
-// plugin left in this graph. The provider keys stay snapshotted for its sake; `providerRoutes` and
-// `modelProviders` are asserted empty in the baseline case.
+// Every registry a node plugin can write to. For why connection and integration are separate lists,
+// see docs/integrations.md § Connection and integration contributions. github is the only
+// provider-owning plugin left in this graph, so `providerRoutes` and `modelProviders` are asserted
+// empty in the baseline case.
 type Snapshot = {
   routes: string[]
   tools: string[]
@@ -59,22 +57,20 @@ type Snapshot = {
 const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'integrationProviders', 'providerRoutes', 'modelProviders', 'capabilities', 'databases'] as const
 
 // The full boot's contribution set, and what each optional plugin owns within it: every entry that
-// must vanish when it's disabled, and by omission every entry that must not. Recorded as a golden
-// snapshot in pluginDisable.snapshot.json; docs/plugins.md § The golden lists covers the mechanism,
-// why the comparison is exact equality in both directions, and what a regeneration can and can't
-// catch.
+// must vanish when it's disabled, and by omission every entry that must not. Recorded in
+// pluginDisable.snapshot.json. See docs/plugins.md § The golden lists.
 //
-// No optional plugin owns a context section here: all four belong to required plugins (`pr` →
-// github, `notes` → notes, `memory` → memory) or to core itself (`issues`), so `sections` comes out
-// of every case below byte-identical.
+// No optional plugin owns a context section. All four belong to required plugins (`pr` → github,
+// `notes` → notes, `memory` → memory) or to core itself (`issues`), so `sections` is identical in
+// every case below.
 type Golden = { full: Snapshot; owned: Record<string, Partial<Snapshot>> }
 const GOLDEN = 'pluginDisable.snapshot.json'
-// Read per assertion rather than once at module scope, so a regenerating run writes the file before the
-// cases below read it back.
+// Read per assertion rather than once at module scope, so a regenerating run writes the file before
+// the cases below read it back.
 const golden = (): Golden => readGolden<Golden>(GOLDEN)
 
 // Multiset subtraction: remove each expected entry once, leave the rest in order, report what didn't
-// match. docs/plugins.md § The golden lists covers why a plain filter is wrong here.
+// match. For why a plain filter is wrong here, see docs/plugins.md § The golden lists.
 const minus = (from: readonly string[], take: readonly string[]): { rest: string[]; unmatched: string[] } => {
   const remaining = [...take]
   const rest: string[] = []
@@ -88,7 +84,8 @@ const minus = (from: readonly string[], take: readonly string[]): { rest: string
 
 const without = (from: readonly string[], expected: readonly string[] = []): string[] => {
   const { rest, unmatched } = minus(from, expected)
-  // An expectation that matched nothing means the ledger and the code disagree about what this plugin owns.
+  // An expectation that matched nothing means the ledger and the code disagree about what this plugin
+  // owns.
   if (unmatched.length) throw new Error(`ledger names entries that the full boot never produced: ${unmatched.join(', ')}`)
   return rest
 }
@@ -102,8 +99,7 @@ describe('disabling a node plugin', () => {
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
     dataRoots = []
     // A real migrated core database, not a stub. At least one plugin's init queries core during this
-    // boot, so a stubbed CoreServices would fail the boot instead of testing it, which looks exactly
-    // like the coupling this suite exists to catch.
+    // boot, so a stub would fail the boot instead of testing it.
     coreDb = makeTestDb()
   })
 
@@ -123,17 +119,15 @@ describe('disabling a node plugin', () => {
     const { CapabilityRegistry } = await import('@acorn/node-core/server/plugin/capabilities.ts')
     const { Scheduler, SCHEDULER } = await import('@acorn/node-core/server/schedules/index.ts')
     const capabilities = new CapabilityRegistry()
-    // Provided before the plugins, matching both composition roots (docs/schedules.md § Why the
-    // node, and only the node). Never started: this suite asserts on what a boot registers, and a
-    // running scheduler would mean a fixture firing jobs at a temp data root while the assertions
-    // run.
+    // Provided before the plugins, matching both composition roots (docs/schedules.md § Why the node,
+    // and only the node). Never started, or a fixture would fire jobs at a temp data root while the
+    // assertions run.
     capabilities.provide(SCHEDULER, new Scheduler(coreDb.db))
     const result = await initPlugins(buildPlugins(dataDir), {
       capabilities,
       core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db, activeIdentity: memoryIdentityStore() }),
-        // The host opens every plugin database under this root now, which is what the `databases`
-        // snapshot below reads back, so passing it is no longer a courtesy to the plugins, it is
-        // the boot.
+        // The host opens every plugin database under this root, which is what the `databases`
+        // snapshot below reads back.
       dataDir,
       disabled,
     })
@@ -146,21 +140,19 @@ describe('disabling a node plugin', () => {
         routes: pluginRouteContributions().map((c) => `${c.plugin}${c.prefix}`).sort(),
         tools: agentToolContributions().map((t) => t.name).sort(),
         sections: getContextSections().map((s) => s.id),
-        // The three provider registries (why connection and integration are separate:
-        // docs/integrations.md § Connection and integration contributions). `modelProviders` comes
-        // out empty here and stays snapshotted anyway: model-providers is a loaded package now, so
-        // this compiled-only boot never registers an adapter, and an entry appearing here would mean
-        // one had started registering again. `providerRoutes` is the entry that would strand first
-        // if host.ts ever cleared the registries in the wrong order, since it's the last of the four
-        // things `ctx.providers.integration(p, router)` registers.
+        // The three provider registries. For why connection and integration are separate, see
+        // docs/integrations.md § Connection and integration contributions. `modelProviders` comes out
+        // empty because model-providers is a loaded package, so an entry here would mean the compiled
+        // boot had started registering an adapter again. `providerRoutes` strands first if host.ts
+        // clears the registries in the wrong order, being the last thing
+        // `ctx.providers.integration(p, router)` registers.
         connectionProviders: connectionProviderRegistry.list().map((p) => p.id).sort(),
         integrationProviders: integrationProviderRegistry.list().map((p) => p.id).sort(),
         providerRoutes: integrationProviderRegistry.routes().map((r) => `${r.providerId}${r.prefix}`).sort(),
         modelProviders: modelProviderRegistry.list().map((a) => a.providerId).sort(),
-        // The typed capability registry, which for some plugins is the whole contribution: `preview`
-        // provides its page rules here and registers nothing else at all now that the browser tools
-        // have left for `plugins/browser`. Without this key, disabling it would lose nothing this
-        // snapshot could see, and the anti-vacuity check below would rightly call that meaningless.
+        // The typed capability registry, which for some plugins is the whole contribution. `preview`
+        // provides its page rules here and registers nothing else, so without this key the
+        // anti-vacuity check below would call disabling it meaningless.
         capabilities: [...capabilities.ids()].sort(),
         // Proof the plugin actually opened its own file, which a stubbed init could not fake.
         databases: readdirSync(join(dataDir, 'plugins'), { withFileTypes: true })
@@ -175,10 +167,9 @@ describe('disabling a node plugin', () => {
   const optional = all.filter((p) => !p.required).map((p) => p.name)
   const required = all.filter((p) => p.required).map((p) => p.name)
 
-  // Regeneration, and nothing else: one full boot plus one per optional plugin, recording what each
-  // disable lost. Declared before the cases below because those read the file back, and declared
-  // only when the flag is set so a normal run neither pays for the extra boots nor reports a
-  // permanently skipped test.
+  // Regeneration only: one full boot plus one per optional plugin, recording what each disable lost.
+  // Declared before the cases below because those read the file back, and only under the flag so a
+  // normal run neither pays for the extra boots nor reports a permanently skipped test.
   if (process.env.UPDATE_PLUGIN_GOLDENS) {
     it(
       'records the full boot and the ownership ledger',
@@ -199,26 +190,24 @@ describe('disabling a node plugin', () => {
         }
         writeGolden(GOLDEN, { full: full.snapshot, owned })
       },
-      // Seven real boots, each opening its own WAL-mode plugin databases. Not a 5s job.
+      // Seven real boots, each opening its own WAL-mode plugin databases.
       180_000,
     )
   }
 
   it('has a plugin list worth cycling (anti-vacuity)', () => {
     // Every case below asserts "the others are still there", which an empty list satisfies trivially.
-    // These floors track the compiled list, so they drop by one each time a plugin ships loaded
-    // instead: rollbar, then linear, then model-providers, then http, now database.
+    // These floors track the compiled list, so drop them by one each time a plugin ships loaded
+    // instead.
     expect(all.length).toBeGreaterThanOrEqual(10)
     expect(optional.length).toBeGreaterThanOrEqual(6)
-    // Hand-written, and the only list in this file that is: docs/plugins.md § The golden lists
-    // covers why.
+    // Hand-written, and the only list in this file that is. See docs/plugins.md § The golden lists.
     expect(required.sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     // The ledger covers exactly the plugins that get cycled. A plugin added to the list without an
     // entry fails here rather than quietly getting a case that asserts nothing.
     expect(Object.keys(golden().owned).sort()).toEqual([...optional].sort())
     // And every one of them owns something. Without this check, a refactor that stopped ten plugins
-    // from registering anything would leave all ten cases green, since "the others are still there"
-    // is trivially true when there was nothing to be there in the first place.
+    // registering anything would leave all ten cases green.
     for (const [name, owned] of Object.entries(golden().owned)) {
       const total = SNAPSHOT_KEYS.reduce((n, key) => n + (owned[key]?.length ?? 0), 0)
       expect(total, `'${name}' contributes nothing, so disabling it proves nothing`).toBeGreaterThan(0)
@@ -229,19 +218,17 @@ describe('disabling a node plugin', () => {
     const { enabled, skipped, snapshot } = await start()
     expect(skipped).toEqual([])
     expect(enabled).toEqual(all.map((p) => p.name))
-    // Floors first: the anti-vacuity half. The equality below is against a file, so a boot that
-    // registered nothing would match an empty golden without anyone noticing. Six databases, not
-    // eight: http.sqlite and database.sqlite are opened by their own loaded packages through
-    // ctx.storage now (docs/data-layer.md § Plugin databases), so this boot never sees either. The
-    // connection and integration registries need real content too, github's, or the ledger's
-    // provider expectations would be satisfiable by an empty registry.
+    // Floors first, the anti-vacuity half. The equality below is against a file, so a boot that
+    // registered nothing would match an empty golden. Six databases, not eight: http.sqlite and
+    // database.sqlite belong to loaded packages that open them through ctx.storage
+    // (docs/data-layer.md § Plugin databases), so this boot never sees either. The provider
+    // registries need real content too, or the ledger's expectations pass against an empty registry.
     expect(snapshot.databases.length).toBeGreaterThanOrEqual(6)
     expect(snapshot.routes.length).toBeGreaterThanOrEqual(15)
     expect(snapshot.connectionProviders.length).toBeGreaterThan(0)
     expect(snapshot.integrationProviders.length).toBeGreaterThan(0)
-    // The exact record: two of the golden's keys come out empty by design. openai, anthropic and
-    // linear's provider route belong to loaded packages this boot never assembles, so either key
-    // gaining an entry would mean the binary had started registering them again.
+    // Two of the golden's keys come out empty by design. openai, anthropic, and linear's provider
+    // route belong to loaded packages this boot never assembles.
     expect(snapshot).toEqual(golden().full)
   })
 
@@ -255,28 +242,26 @@ describe('disabling a node plugin', () => {
       expect(reduced.skipped).toEqual([name])
       expect(reduced.enabled).toEqual(full.enabled.filter((n) => n !== name))
 
-      // One exact equality per registry, checked in both directions at once: docs/plugins.md § The
-      // golden lists covers why. A plugin filling in for a disabled sibling would break the equality
-      // just as losing an entry would, so that's caught here too, not just outright removal.
+      // One exact equality per registry, checked in both directions at once. See docs/plugins.md §
+      // The golden lists. A plugin filling in for a disabled sibling breaks the equality too.
       const owned = golden().owned[name]
       for (const key of SNAPSHOT_KEYS) {
         expect(reduced.snapshot[key], `${key} after disabling '${name}'`).toEqual(without(full.snapshot[key], owned?.[key]))
       }
-      // Routes carry their owner in the key: docs/plugins.md § The golden lists covers why this
-      // attribution check exists.
+      // Routes carry their owner in the key. See docs/plugins.md § The golden lists.
       const lostRoutes = owned?.routes ?? []
       expect(lostRoutes.filter((id) => !id.startsWith(name))).toEqual([])
     })
   }
 
-  // The standalone shape, called out on its own: docs/agent-tools.md § Context sections covers why
-  // core's `issues` section survives a boot that never calls `wireAgentTools`.
+  // For why core's `issues` section survives a boot that never calls `wireAgentTools`, see
+  // docs/agent-tools.md § Context sections.
   it("registers core's own 'issues' section without wireAgentTools (the standalone shape)", async () => {
     const { snapshot } = await start()
     const issues = getContextSections().find((s) => s.id === 'issues')
     expect(snapshot.sections).toContain('issues')
     expect(issues?.label).toBe('Linked issues')
-    // It's core's own section, which is why it's the one that still receives the database handle:
+    // Core's own section, so it's the one that still receives the database handle. See
     // docs/agent-tools.md § Context sections.
     expect(issues?.defaultIncluded).toBe(true)
   })
@@ -285,18 +270,16 @@ describe('disabling a node plugin', () => {
     const { enabled, skipped, roster } = await start(required)
     expect(skipped).toEqual([])
     expect(enabled).toEqual(all.map((p) => p.name))
-    // And the roster says so too, which is what Settings → Plugins renders: a required plugin named in
-    // the disabled list is still `disabled: false`, so the page cannot offer a checkbox that would not
+    // The roster says so too, which is what Settings → Plugins renders. A required plugin named in the
+    // disabled list is still `disabled: false`, so the page cannot offer a checkbox that would not
     // stick.
     expect(roster.filter((entry) => entry.disabled)).toEqual([])
   })
 
   it('reports a roster covering every offered plugin, including the skipped ones', async () => {
-    // `enabled` plus `skipped` isn't the list Settings → Plugins needs: it says nothing about which
-    // names are `required` and therefore not togglable, and a disabled plugin still has to appear as
-    // a row. Two optional plugins, in roster order. It was `['docker', 'http']` until http moved out
-    // of the compiled graph, and `['database', 'docker']` until database followed it, the same
-    // substitution linear's migration forced for the same reason, three times now.
+    // `enabled` plus `skipped` isn't the list Settings → Plugins needs. It says nothing about which
+    // names are `required` and therefore not togglable, and a disabled plugin still has to appear as a
+    // row. Pick any two optional plugins, in roster order.
     const { roster } = await start(['changes', 'docker'])
     expect(roster.map((entry) => entry.name)).toEqual(all.map((p) => p.name))
     expect(roster.filter((entry) => entry.required).map((entry) => entry.name).sort()).toEqual(required.sort())

@@ -1,7 +1,7 @@
 // The colour half of the theme axis, as a contract both sides read. See docs/ui-design.md § Plugin
 // themes for the three-group split and why only the palette is declarable.
 
-/** The palette a theme block must state in full. Colour values only; see the group note above. */
+/** The palette a theme block must state in full. Colour values only. */
 export const THEME_PALETTE_TOKENS = [
   '--bg', '--bg-subtle', '--bg-hover', '--bg-selected',
   '--border', '--border-strong',

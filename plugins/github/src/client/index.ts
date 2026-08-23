@@ -13,8 +13,7 @@ import { githubBrowsePath, githubRouteContributions } from './routes'
 import GithubImporter from './GithubImporter'
 
 const GithubBrowse = lazy(() => import('./GithubBrowse'))
-// Lazy for the same reason every other surface here is: a panel nobody has opened should not be in the
-// first paint's bundle.
+// Lazy: a panel nobody has opened should not be in the first paint's bundle.
 const PullRefPanel = lazy(() => import('./PullRefPanel'))
 
 export const githubClientPlugin: ClientPlugin = {
@@ -23,25 +22,24 @@ export const githubClientPlugin: ClientPlugin = {
   init: (ctx) => {
     // github.com PR and repo URLs, resolved in-app instead of opening a browser.
     for (const contribution of githubContentLinkContributions) ctx.contribute(contentLinkRegistry, contribution)
-    // The glance-sized half of a pull request, for a reader who is in the middle of something else. The
-    // `providerId` is what a recognised PR URL resolves through, and the host binds it to this plugin.
+    // The glance-sized half of a pull request, for a reader in the middle of something else. A
+    // recognised PR URL resolves through `providerId`, which the host binds to this plugin.
     ctx.refPanels.register({ id: 'github-pull', providerId: 'github', component: PullRefPanel })
-    // The PR rail is provider-owned and only appears once GitHub is connected. Core home remains the
-    // default landing source, so a disabled/disconnected provider never becomes the startup view.
+    // The PR rail is provider-owned and appears only once GitHub is connected. Core home stays the
+    // default landing source, so a disconnected provider never becomes the startup view.
     //
-    // No `promotion` either: github's browse creates a task inline from its PR list (seeding provider links
-    // as it goes) rather than through PromoteToTaskModal, so there is nothing for the registry to hold.
-    // `providerId` is enforced by the client host and gates the source on the GitHub integration.
+    // No `promotion`: github's browse creates a task inline from its PR list, seeding provider links
+    // as it goes, rather than through PromoteToTaskModal. The client host enforces `providerId` and
+    // gates the source on the GitHub integration.
     ctx.sources.register({
       id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
       routes: githubRouteContributions,
       // A PR-backed task lives at its PR URL. The claim belongs here, where the shape of a PR URL is
-      // already known, rather than in core's route registry.
+      // known, rather than in core's route registry.
       taskPath: (task) => (task.pullNumber != null && task.github ? `${githubBrowsePath(task.projectId)}/${task.pullNumber}` : undefined),
       // The same knowledge read backwards, for "is there already a task for this PR"
       // (docs/plugins.md § Frame authoring and the UI kit, `tracksRef`). A github-pr task records its
-      // pull request as `pullNumber` on the task row; `links` holds the Linear tickets found in the
-      // PR body.
+      // pull request as `pullNumber` on the task row; `links` holds the Linear tickets from the body.
       tracksRef: (task, ref) => ref.providerId === 'github' && task.pullNumber != null && !!task.github
         && pullRefMatchesTask(ref.displayId, task.github, task.pullNumber),
     })
@@ -65,11 +63,10 @@ export const githubClientPlugin: ClientPlugin = {
     // declares this in its manifest and the host synthesises the same contribution over its own
     // reader; github ships no manifest, so it supplies the fetch itself.
     //
-    // No schema parse on the way in: this response is this repo's own TypeScript answering this
-    // repo's own route (docs/architecture-overview.md § wire validation). The parse exists for a
-    // loaded plugin's answer, which is untrusted wire. Provenance is still stamped rather than read,
-    // for the same reason as on that path: a row never names its own source, even when the source is
-    // us.
+    // No schema parse on the way in: this repo's own TypeScript answers this repo's own route
+    // (docs/architecture-overview.md § wire validation). The parse exists for a loaded plugin's
+    // answer, which is untrusted wire. Provenance is stamped rather than read, because a row never
+    // names its own source.
     ctx.collections.register({
       collectionId: PULLS_COLLECTION_ID,
       name: 'My pull requests',
@@ -78,15 +75,15 @@ export const githubClientPlugin: ClientPlugin = {
         // `enum` with no declared values: the values are this user's repositories, and no static
         // declaration can name them. `paramOptions` below fills them on the device.
         { id: 'repo', name: 'Repository', type: 'enum' },
-        // Unset is "every open PR in every mirrored repo", the collection's original answer and
-        // still the default. Setting it hands the same columns from a GitHub search instead, which
-        // is the only place two of the three answers exist (contract/collections.ts § involvement).
-        // `multiple`, because "assigned to me or waiting on my review" is one question a person asks.
+        // Unset means every open PR in every mirrored repo. Setting it hands the same columns from
+        // a GitHub search, which is the only place two of the three answers exist
+        // (contract/collections.ts § involvement). `multiple`, because "assigned to me or waiting on
+        // my review" is one question.
         { id: 'involves', name: 'Involving me', type: 'enum', multiple: true, values: [...PULL_INVOLVEMENT] },
       ],
-      // The repositories this user has mirrored, which is also exactly the set the mirror path can
-      // match. The repo picker's own route and cache; no new endpoint, and no refresh of its own. A
-      // panel editor open long enough for the list to go stale is not a case worth a poll.
+      // The repositories this user has mirrored, which is the set the mirror path can match. Reuses
+      // the repo picker's route and cache, with no refresh of its own. A panel editor open long
+      // enough for the list to go stale is not worth a poll.
       paramOptions: async (paramId, nodeId) => {
         if (paramId !== 'repo') return []
         const repos = await readJson<{ owner: string; name: string }[]>(reposRoute, { nodeId })

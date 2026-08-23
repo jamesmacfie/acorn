@@ -1,17 +1,15 @@
 // The http plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
 // <data-root>/plugins/http.sqlite with its own Drizzle chain, migrated at plugin init.
 //
-// Moved out of @acorn/node-core's schema.ts: saved requests and project variables are the API panel's
-// data, and core has no reason to know their shape. `task_id` is a plain ID into core's `tasks`,
-// dereferenced through CoreServices.tasks, never joined.
+// `task_id` is a plain ID into core's `tasks`, dereferenced through CoreServices.tasks, never joined.
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-// Saved HTTP requests for the API panel (docs/http-client.md § Data model). Project-scoped like the
-// database plugin's saved queries: a request written against a project's API outlives any one task
-// worktree, and credentials make this identity-scoped even on a single-user machine. Sensitive
-// fields are JWE ciphertext whenever `encrypted` is true.
-// The `http_` prefix, not `api_`: `api_tokens`/`api_idempotency` belonged to V1's public automation
-// API, and so does the settings page id `api`.
+// Saved HTTP requests for the API panel (docs/http-client.md § Data model). Project-scoped: a
+// request written against a project's API outlives any one task worktree, and credentials make this
+// identity-scoped even on a single-user machine. Sensitive fields are JWE ciphertext whenever
+// `encrypted` is true.
+// The `http_` prefix, not `api_`: `api_tokens` and `api_idempotency` belong to the public automation
+// API, as does the settings page id `api`.
 export const httpRequests = sqliteTable(
   'http_requests',
   {
@@ -20,8 +18,8 @@ export const httpRequests = sqliteTable(
     projectId: text('project_id'), // → CoreServices.projects.byId (plain ID, not a foreign key)
     folder: text('folder').notNull().default(''),
     // Set = an ad-hoc request living with a task (shown in that task's API pane). Null = saved in
-    // the repo tree. "Save this ad-hoc request" clears taskId and sets folder + name. No FK, and now
-    // not even the same database file: an orphan row after a hard task delete is inert.
+    // the repo tree. "Save this ad-hoc request" clears taskId and sets folder and name. No FK, and
+    // not even the same database file, so an orphan row after a hard task delete is inert.
     taskId: text('task_id'), // → core tasks.id
     name: text('name').notNull(),
     method: text('method').notNull(),

@@ -4,12 +4,12 @@ import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.t
 // The slice of workflow control the agent task sidebar needs, declared by the consumer.
 //
 // The sidebar's roster merges agent sessions with workflow steps, so it needs three reads from
-// plugins/workflows. Importing them directly would close a package cycle, since workflows' node half
+// plugins/workflows. Importing them directly closes a package cycle, because workflows' node half
 // already imports this plugin's AGENTS_SESSION_EXECUTE to run a step. Declaring the interface here and
-// having workflows provide it (client/index.ts) keeps the only package edge the one that already existed.
+// letting workflows provide it (client/index.ts) keeps the one package edge that already existed.
 //
-// The row types come from @acorn/protocol/workflow.ts, which both sides already share, so nothing about
-// workflows' HTTP surface leaks in here.
+// The row types come from @acorn/protocol/workflow.ts, which both sides share, so none of workflows'
+// HTTP surface leaks in.
 export type WorkflowControl = {
   runs(taskId: string): Promise<WorkflowRunRow[]>
   steps(runId: string): Promise<WorkflowStepRow[]>

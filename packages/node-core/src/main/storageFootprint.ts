@@ -28,20 +28,16 @@ async function directoryBytes(path: string, keep: (name: string) => boolean = ()
   }
 }
 
-// `<dataRoot>/plugins` holds two unrelated things: one SQLite file per plugin (plus its -wal/-shm
-// siblings), and, since the loader landed, the unpacked package of every installed plugin in a
-// subdirectory named for its id. Only the first counts as "plugin databases"; counting the second
-// would silently report bundle bytes as stored rows.
+// `<dataRoot>/plugins` holds two unrelated things: one SQLite file per plugin, with its -wal and
+// -shm siblings, and the unpacked package of every installed plugin in a subdirectory named for its
+// id. Only the first counts as a plugin database. Counting the second reports bundle bytes as rows.
 const isPluginDatabase = (name: string): boolean => name.includes('.sqlite')
 
 /**
- * Row counts a plugin can report about its own database. Resolved by the composition root from the
- * capability registry (plugins/github/src/contract/mirror.ts § footprint), so a disabled plugin
- * contributes nothing and is absent from the log line rather than reported as empty.
- *
- * A failing contributor must not take the boot log with it: this whole function is already fired
- * best-effort by the caller, but one plugin's broken query should not hide the others' numbers either,
- * so each is caught individually below.
+ * Row counts a plugin reports about its own database. The composition root resolves these from the
+ * capability registry, so a disabled plugin contributes nothing and is absent from the log line
+ * rather than reported as empty. Each contributor is caught separately below, so one broken query
+ * does not hide the other numbers.
  */
 export type FootprintContributor = { plugin: string; counts: () => Promise<Record<string, number>> }
 
@@ -69,7 +65,7 @@ export async function logStorageFootprint(
       console.warn(`[storage] ${contributor.plugin} footprint failed:`, error)
       return null
     })
-    // `null` is the failure above and is deliberately NOT rendered as zeros.
+    // `null` is the failure above, and is not rendered as zeros.
     if (counts) parts.push(`${contributor.plugin} ${Object.entries(counts).map(([key, value]) => `${key}=${value}`).join(' ')}`)
   }
   console.log(`[storage] ${parts.join(' ')}`)

@@ -8,25 +8,22 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 // Supervision of the desktop helper: spawn it under the bundled Node, hand it the handshake on stdin,
-// read its ready line off stdout, and kill its whole process group on the way out
-// (docs/shell.md § The shell process).
+// read its ready line off stdout, and kill its whole process group on the way out. See docs/shell.md,
+// "The shell process".
 //
-// Two things here are not optional, both from the phase-0 spike
-// (docs/shell.md § Node child):
+// Two rules here are not optional. The helper gets its own process group and the kill targets the
+// group. Killing the helper alone orphans the node service, which keeps holding the data root's
+// exclusive lock, and the replacement helper's node then refuses to boot with "Another acorn node
+// already holds <dataDir>".
 //
-// The helper gets its own process group and we kill the GROUP. Killing the helper alone orphans the
-// node service, which keeps holding the data root's exclusive lock, and the replacement helper's node
-// then refuses to boot with "Another acorn node already holds <dataDir>".
-//
-// The handshake goes in the moment the process exists, before we wait for anything, because the helper
+// The handshake goes in the moment the process exists, before anything is awaited, because the helper
 // installs its command reader before it starts the node and a quit can reach it mid-boot.
 
-/// How long the helper gets to print its ready line before we call the boot failed. The spike saw
-/// helper up in under 60ms and the service ready around 600ms after that; migrations on a cold data
-/// root are the case this has to be generous for.
+/// How long the helper gets to print its ready line before the boot counts as failed. Normal boot is
+/// under a second. Migrations on a cold data root are the case this has to be generous for.
 const READY_TIMEOUT: Duration = Duration::from_secs(90);
 /// SIGTERM, then SIGKILL if the group ignores it. The helper drains the node, which is worth waiting
-/// for; a wedged one holding the data root's lock is worse than a hard kill.
+/// for, but a wedged one holding the data root's lock is worse than a hard kill.
 const KILL_ESCALATION: Duration = Duration::from_secs(8);
 
 #[derive(Serialize)]
@@ -41,8 +38,8 @@ pub struct Handshake {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bundled_plugins_dir: Option<String>,
     /// The Electron build's custody root and the safeStorage key its device tokens are encrypted
-    /// under, when both were found. Absent means there is nothing to adopt, or nothing readable —
-    /// either way the helper starts from an empty fleet (src/keychain.rs).
+    /// under, when both were found. Absent means there is nothing to adopt or nothing readable, and
+    /// the helper starts from an empty fleet. See src/keychain.rs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub legacy: Option<Legacy>,
     pub env_files: Vec<String>,
@@ -67,19 +64,17 @@ pub struct Ready {
     pub node_version: String,
 }
 
-/// A line the helper meant for us, as opposed to one of its logs. Everything it says to the shell
-/// carries the `acorn-helper` key; everything else on stdout is passed through to ours.
+/// A line the helper meant for the shell, as opposed to one of its logs. Everything it says to the
+/// shell carries the `acorn-helper` key. Everything else on stdout is passed through.
 #[derive(Debug)]
 pub enum Signal {
     Ready(Ready),
     /// `reason` is what the service said about the last attempt, when it said anything. The recovery
-    /// dialog is the only place an owner reads it, and a locked data root or a taken port is worth
-    /// naming there.
+    /// dialog is the only place an owner reads it.
     CrashBudgetExhausted { reason: Option<String> },
-    /// A preview tunnel is listening on this loopback port under this secret. The shell needs it
-    /// because wry cannot inject a per-request header, so the credential is seeded into the preview
-    /// webview's cookie store instead (src/webviews.rs). It travels on this pipe rather than through
-    /// the renderer for the reason the secret exists at all.
+    /// A preview tunnel is listening on this loopback port under this secret. wry cannot inject a
+    /// per-request header, so src/webviews.rs seeds the credential into the preview webview's cookie
+    /// store. It travels on this pipe so the renderer never sees it.
     TunnelOpened { port: u16, secret: String },
     TunnelClosed { port: u16 },
 }
@@ -120,8 +115,8 @@ fn spawn(launch: &Launch) -> std::io::Result<Child> {
         .stderr(Stdio::inherit());
 
     // Its own process group, so the kill below reaches the node service too. `setsid` would also
-    // detach it from the controlling terminal, which is exactly wrong for `pnpm dev`: the
-    // helper's logs are meant to land in the developer's terminal.
+    // detach it from the controlling terminal, which is wrong for `pnpm dev`, where the helper's logs
+    // are meant to land in the developer's terminal.
     #[cfg(unix)]
     unsafe {
         use std::os::unix::process::CommandExt;
@@ -151,8 +146,8 @@ impl Helper {
         let mut stdin = child.stdin.take().ok_or("the desktop helper has no stdin")?;
         let stdout = child.stdout.take().ok_or("the desktop helper has no stdout")?;
 
-        // Written before anything is awaited: the helper's command reader is live from its first tick,
-        // and a handshake it never receives is a helper that hangs rather than one that fails.
+        // Written before anything is awaited. The helper's command reader is live from its first
+        // tick, and a handshake it never receives leaves it hanging rather than failing.
         let line = serde_json::to_string(&launch.handshake).map_err(|e| e.to_string())?;
         stdin
             .write_all(format!("{line}\n").as_bytes())
@@ -190,10 +185,9 @@ impl Helper {
             stdin: Arc::new(Mutex::new(Some(stdin))),
             ready,
         };
-        // A helper from a different build than this shell. It cannot happen in a bundle, where the two
-        // ship together, but it happens constantly in a checkout where one side was rebuilt and the
-        // other was not — and the failure it would otherwise cause is a renderer that connects and then
-        // gets nonsense back.
+        // A helper from a different build than this shell. A bundle ships both together, but in a
+        // checkout one side often gets rebuilt and the other does not, and the failure that causes is
+        // a renderer that connects and then gets nonsense back.
         if helper.ready.protocol != expected {
             let found = helper.ready.protocol;
             helper.stop();
@@ -211,7 +205,7 @@ impl Helper {
         }
     }
 
-    /// Ask politely, then stop being polite. Group-wide both times: see the note at the top of this
+    /// Ask politely, then stop being polite. Group-wide both times. See the note at the top of this
     /// file for what a single-process kill costs.
     pub fn stop(&self) {
         self.command("stop");

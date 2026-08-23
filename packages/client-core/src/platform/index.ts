@@ -9,19 +9,17 @@ import type {
 import type { NodePluginPermissions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
-// The platform seam: the renderer's one door to whatever is hosting it (git history:
-// docs/future/node-first/platform-seam.md). See docs/architecture-overview.md § Node API and
-// client flow for the seam's shape, its four nullable capability groups, and the arch rule that
-// keeps `window.acorn` from spreading past this file.
+// The platform seam: the renderer's one door to whatever is hosting it. See
+// docs/architecture-overview.md § Node API and client flow for the seam's shape, its nullable
+// capability groups, and the arch rule that keeps `window.acorn` inside this file.
 
 // ── The capability groups ─────────────────────────────────────────────────────────────────────
 
-// Reaching a node. On the desktop these go to the helper's broker, which holds the device
-// token and the socket; the renderer never sees either.
+// Reaching a node. On the desktop these go to the helper's broker, which holds the device token and
+// the socket. The renderer never sees either.
 //
-// fetch buffers whole responses because that's what can cross IPC (apiClient.ts explains why). A
-// web implementation can return a streaming response instead: the type is per-implementation, so
-// recording this limitation here doesn't impose it on the next host.
+// `fetch` buffers whole responses because that is what crosses IPC (apiClient.ts explains why). A web
+// implementation can stream instead, since the type is per-implementation.
 export type NodeTransport = {
   fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse>
   abort(requestId: string): void
@@ -30,9 +28,9 @@ export type NodeTransport = {
   onStatus(cb: (status: NodeStatus) => void): () => void
 }
 
-// Fleet membership, as the renderer performs it: every call is a request to whoever owns
-// fleet.json and the encrypted device tokens. `probe` must precede `pair`, since the host pairs
-// only against the endpoint whose fingerprint the owner was just shown.
+// Fleet membership, as the renderer performs it: every call is a request to whoever owns fleet.json
+// and the encrypted device tokens. `probe` must precede `pair`, because the host pairs only against
+// the endpoint whose fingerprint the owner was just shown.
 export type FleetBridge = {
   list(): Promise<{ nodes: NodeRecord[]; statuses: NodeStatus[] }>
   probe(endpoint: string): Promise<NodeProbeResult>
@@ -69,12 +67,12 @@ export type DesktopExtras = {
   onWillQuit(cb: () => boolean | Promise<boolean>): () => void
 }
 
-// The native folder dialog. Its own group, and not part of `DesktopExtras`, because it is the
-// probe the rest of the product used to be gated on by mistake, see `capabilities.ts`.
+// The native folder dialog. Its own group rather than part of `DesktopExtras`, because gating the
+// rest of the product on this probe was the original mistake (`capabilities.ts`).
 export type FolderPicker = { pick(): Promise<string | null> }
 
-// The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals a
-// path in the file manager, the other has to bypass the will-quit prompt, whose handler lives in a shell
+// The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals
+// a path in the file manager, the other bypasses the will-quit prompt, whose handler lives in a shell
 // that is not mounted behind the gate.
 export type RecoveryActions = { openDataFolder(): void; quit(): void }
 
@@ -107,9 +105,9 @@ export type PluginWebviews = {
   onBlocked(cb: (state: PluginWebviewBlocked) => void): () => void
 }
 
-// What the host holds for third-party plugins: the bundles it has cached, and this device's
-// decisions about running them. The storage is the desktop's today and a browser's later
-// (docs/future/remote.md), so the renderer only ever sees this shape and never a path.
+// What the host holds for third-party plugins: the bundles it cached, and this device's decisions
+// about running them. The renderer sees this shape and never a path, so the storage can move from the
+// desktop to a browser (docs/future/remote.md).
 export type PluginTrustDecision = {
   pluginId: string
   hash: string
@@ -118,19 +116,17 @@ export type PluginTrustDecision = {
   permissions: NodePluginPermissions
   webviews: PluginWebviewGrant[]
   keyClaims: PluginKeyClaimGrant[]
+  // Each of the five below is required here and defaulted in the store's schema, so an acknowledgement
+  // written before the field existed reads back as the empty list, which is what was true of it.
+
   // What this manifest says about surfaces that are not its own, in both directions
-  // (@acorn/protocol/extensionPoints.ts). Required here and defaulted in the store's schema, exactly as
-  // `webviews` and `keyClaims` are: an acknowledgement written before the cooperative seam existed reads
-  // back as the empty list, which is what was true of it.
+  // (@acorn/protocol/extensionPoints.ts).
   extensions: PluginExtensionGrant[]
-  // What this package will run on its own, and how often (docs/schedules.md). Required here and
-  // defaulted in the store's schema, exactly as the three above are.
+  // What this package will run on its own, and how often (docs/schedules.md).
   schedules: PluginScheduleGrant[]
-  // What this package will say, and possibly do, when a task is archived. Required here and
-  // defaulted in the store's schema, exactly as the four above are.
+  // What this package will say, and possibly do, when a task is archived.
   taskChecks: PluginTaskCheckGrant[]
   // What this package asks acorn to run as a managed agent (docs/managed-agents.md § Harnesses).
-  // Required here and defaulted in the store's schema, exactly as the five above are.
   harnesses: PluginHarnessGrant[]
   decision: 'accepted' | 'rejected'
 }
@@ -140,8 +136,8 @@ export type PluginAckRecord = PluginTrustDecision & {
   // The dev grant for why such a row never becomes the baseline of a later "what changed" diff.
   partial?: true
 }
-// Which plugins this device is currently developing, and against which node. See
-// docs/security.md § The dev grant for why the key is the pair rather than the plugin id alone.
+// Which plugins this device is developing, and against which node. See docs/security.md § The dev
+// grant for why the key is the pair rather than the plugin id alone.
 export type PluginDevGrant = { pluginId: string; nodeId: string; path?: string; grantedAt: number }
 export type PluginDevGrantRequest = { pluginId: string; nodeId: string; path?: string; grant: boolean }
 export type PluginHostState = {
@@ -187,30 +183,28 @@ declare global {
   }
 }
 
-// Guards `window` because there isn't always one: the whole suite runs in a node environment (no
-// DOM, no Solid plugin, docs/testing.md), and apiClient consults this on every request rather
-// than only inside desktop-only branches. A bare `window.acorn` threw ReferenceError in six tests.
+// Guards `window` because there is not always one. The suite runs in a node environment
+// (docs/testing.md) and apiClient consults this on every request, so a bare `window.acorn` throws
+// ReferenceError.
 //
-// Module-private, so it cannot become the contract by accident the way `window.acorn` almost did
-// for `plugins/host.ts`: `tools/arch/boundaries.test.ts` fails any file outside this folder that
-// names `window.acorn`.
+// Module-private, so it cannot become the contract by accident. `tools/arch/boundaries.test.ts` fails
+// any file outside this folder that names `window.acorn`.
 const acornGlobal = (): AcornPreload | undefined => (typeof window === 'undefined' ? undefined : window.acorn)
 
 // ── The accessors ─────────────────────────────────────────────────────────────────────────────
 
-// "Is a desktop shell hosting this renderer." A marker, nothing more: it must not be used to
-// decide whether a feature is available, because almost every feature is HTTP+WS and portable.
+// Whether a desktop shell hosts this renderer. A marker only. Do not gate a feature on it, because
+// almost every feature is HTTP plus WS and portable.
 export const isDesktopHost = (): boolean => !!acornGlobal()?.desktop
 
 // 'darwin' | 'win32' | 'linux' when a desktop shell is hosting; undefined otherwise.
 export const hostPlatform = (): string | undefined => acornGlobal()?.platform
 
-// Null in a plain browser served directly by a node (`dev:node`), where the origin is the node
-// and apiClient's same-origin fallback covers it.
+// Null in a plain browser served by a node (`dev:node`), where apiClient's same-origin fallback
+// covers it.
 //
-// One member, `nodeFetch`, is the discriminator for "there is a broker"; the rest degrade
-// individually rather than nulling the whole group. That's the same additive-forever tolerance
-// docs/api-reference.md § Versioning describes for the wire contract generally.
+// `nodeFetch` alone discriminates "there is a broker". The rest degrade individually rather than
+// nulling the whole group, the same tolerance docs/api-reference.md § Versioning describes.
 export const nodeTransport = (): NodeTransport | null => {
   const acorn = acornGlobal()
   if (!acorn?.nodeFetch) return null
@@ -226,9 +220,9 @@ export const nodeTransport = (): NodeTransport | null => {
 
 // Null where there is no broker: the origin is the node and there is no membership to read.
 //
-// Reading the fleet and changing it are different capabilities, `canPairNodes()` below answers the
-// second, so the discriminator here is `fleetList` alone. A client that can see the fleet but not
-// pair is a coherent host; requiring the pairing machinery in order to read the list is not.
+// Reading the fleet and changing it are different capabilities, and `canPairNodes()` answers the
+// second, so `fleetList` alone discriminates here. A host that reads the fleet without pairing is
+// coherent.
 export const fleetBridge = (): FleetBridge | null => {
   const acorn = acornGlobal()
   if (!acorn?.fleetList) return null
@@ -273,13 +267,12 @@ export const recoveryActions = (): RecoveryActions | null => acornGlobal()?.reco
 export const previewViews = (): PreviewViews | null => acornGlobal()?.preview ?? null
 export const pluginWebviews = (): PluginWebviews | null => acornGlobal()?.webview ?? null
 
-// The native folder dialog, as two calls rather than a nullable object, because both halves are
-// used on their own: the probe decides whether to render "Add folder..." at all, and the action is
-// fire-and-await. Resolves null when there is no picker or the owner cancelled, so a caller that
-// cannot open the dialog and a caller whose dialog was dismissed take the same path.
+// The native folder dialog, as two calls rather than a nullable object, because the probe decides
+// whether to render "Add folder..." at all. Resolves null when there is no picker and when the owner
+// cancelled, so both take the same path.
 export const canPickFolder = (): boolean => !!acornGlobal()?.folderPath
 export const pickFolder = async (): Promise<string | null> => (await acornGlobal()?.folderPath?.pick()) ?? null
 
-// Whether this host can change fleet membership, as opposed to merely read it (`fleetBridge`).
-// Settings → Nodes hides itself rather than offering buttons that cannot work.
+// Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
+// Nodes hides itself rather than offering buttons that cannot work.
 export const canPairNodes = (): boolean => !!acornGlobal()?.nodeProbe

@@ -13,8 +13,7 @@ const deps: RunnerDeps = {
 
 describe('workflow registry conformance', () => {
   it('every registered step kind has a handler and its descriptor validation is projected', () => {
-    // This plugin's own migrated SQLite file, not core's: the runner cannot see core's tables any
-    // more.
+    // This plugin's own migrated SQLite file, not core's: the runner cannot see core's tables.
     const testDb = makeTestPluginDb('workflows')
     try {
       const runner = new WorkflowRunner(testDb.db, deps)

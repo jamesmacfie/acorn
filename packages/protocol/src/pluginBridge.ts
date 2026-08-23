@@ -4,12 +4,11 @@
 // MessagePort, and these are the messages that go through it. Everything here is
 // structured-clone-safe by rule: no functions, no class instances, no streams.
 //
-// Two rules this file holds. First, nothing here names `app-plugin://`: the frame sees a port and
-// the host alone knows how frames are served, so the same protocol can run unchanged in a browser
-// iframe with an opaque origin later. Second, the frame supplies no identity: there is no `pluginId`,
-// `nodeId` or token on any request, because the host bound all three when it created the frame, and
-// a message that tried to carry them would be ignored. That is why `path` is the only addressing a
-// request has.
+// Two rules this file holds. Nothing here names `app-plugin://`: the frame sees a port and the host
+// alone knows how frames are served, so the same protocol runs unchanged in a browser iframe with an
+// opaque origin. And the frame supplies no identity: no `pluginId`, `nodeId` or token on any request,
+// because the host bound all three when it created the frame. That is why `path` is the only
+// addressing a request has.
 //
 // Types rather than Zod schemas, unlike the HTTP wire: the parsing here is hand-rolled in the broker
 // (client-core/plugins/frames/broker.ts) because the trust boundary is inverted. An HTTP route
@@ -85,10 +84,9 @@ export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'openPane'; paneId: string }
   // Hand an `https` URL to the host, which runs the same content-link ladder every shell surface
   // runs: in-app when a recogniser claims it, the owner's browser otherwise. The frame passes a URL
-  // and learns nothing back. Where it lands, and which presentation it lands in, are the host's,
-  // because it is the side that knows which surface this port belongs to. A frame's anchor cannot
-  // navigate itself (the sandbox has no `allow-popups` and `will-frame-navigate` pins every subframe
-  // to its own origin), so before this verb every link inside a frame's rendered content was inert.
+  // and learns nothing back, because the host is the side that knows which surface this port belongs
+  // to. A frame's anchor cannot navigate itself: the sandbox has no `allow-popups`, and
+  // `will-frame-navigate` pins every subframe to its own origin.
   | { id: number; kind: 'ui'; op: 'openUrl'; url: string }
   // Importer lifecycle, valid only from a frame whose surface is an importer. `done` closes the modal
   // and triggers the host's post-import refresh; `close` is plain dismissal.

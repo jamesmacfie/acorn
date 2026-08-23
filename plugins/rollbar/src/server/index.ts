@@ -21,11 +21,10 @@ export async function rollbarData<T>(res: Response): Promise<T> {
 
 export type RollbarProject = { id: number; name: string }
 
-// Upstream shapes stay loose: Rollbar's reference documents endpoints more reliably than response
-// schemas, and fields vary by plan. Everything beyond the identifiers is optional and is checked
-// during normalization in server/normalize.ts. This type is written from Rollbar's public API docs,
-// not from a live contract spike, so the normalizer treats every field as possibly absent or
-// mistyped.
+// Upstream shapes stay loose. Rollbar's reference documents endpoints more reliably than response
+// schemas, and fields vary by plan. This type comes from those docs, not from a live contract spike,
+// so everything beyond the identifiers is optional and server/normalize.ts treats every field as
+// possibly absent or mistyped.
 export type RollbarApiItem = {
   id: number
   counter: number
@@ -44,9 +43,9 @@ export type RollbarApiItem = {
   assigned_user_id?: number | string | null
 }
 
-// GET /instance/:id and /item/:id/instances expose the notifier payload as `data`. `occurrence` is
-// retained as a compatibility alias for older fixtures/variants. Only allowlisted fields are read;
-// neither upstream object is ever persisted wholesale.
+// GET /instance/:id and /item/:id/instances expose the notifier payload as `data`. `occurrence` is a
+// compatibility alias for older fixtures. Only allowlisted fields are read, and neither upstream
+// object is persisted whole.
 export type RollbarApiInstance = {
   id?: number | string
   timestamp?: number | null

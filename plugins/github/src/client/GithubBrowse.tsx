@@ -2,13 +2,12 @@
 // (docs/github-integration.md § Reads and writes covers why its layout is pinned by e2e).
 //
 // Params-driven, like the components it hosts: PullList reads `useParams()` itself, and the routes
-// exist only to populate params. That is why this component takes no props even though it renders
-// three panes.
+// exist only to populate params. That is why this component takes no props for three panes.
 //
-// The routed project is the only thing this surface needs to render, the same gate every other
-// Source applies (plugins/http HttpBrowse). It does not require one of this plugin's own routes to
-// match (docs/plugins.md § Frame authoring and the UI kit): the routes address a PR, they do not
-// decide whether the surface renders.
+// The routed project is all this surface needs to render, the same gate every other Source applies
+// (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins.md § Frame
+// authoring and the UI kit): the routes address a PR, they do not decide whether the surface
+// renders.
 import { createSignal, lazy, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -20,9 +19,9 @@ import PullList from './PullList'
 import { githubCreateRoute } from './routes'
 import { Button, EmptyState, SectionHeader } from '@acorn/plugin-api/ui'
 
-// Heavy/conditional surfaces stay behind their actual navigation intent so Shiki/diff rendering and
-// the create-PR form do not compete with the first interactive paint. PullList is the startup path
-// and loads eagerly.
+// Heavy surfaces stay behind their navigation intent so Shiki, diff rendering, and the create-PR
+// form do not compete with the first interactive paint. PullList is the startup path, so it loads
+// eagerly.
 const PullDetail = lazy(() => import('./PullDetail'))
 const CreatePullForm = lazy(() => import('./CreatePullForm'))
 const ComparePreview = lazy(() => import('./ComparePreview'))
@@ -36,15 +35,16 @@ export default function GithubBrowse() {
   const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
   const owner = () => project()?.github?.owner ?? ''
   const repo = () => project()?.github?.name ?? ''
-  // Pull requests need the GitHub facet, not just a project: a project with no github.com remote has no
-  // PRs to list, and without this gate PullList sits on "Loading…" forever (its queries never enable).
+  // Pull requests need the GitHub facet, not only a project. A project with no github.com remote has
+  // no PRs to list, and without this gate PullList sits on "Loading…" forever, because its queries
+  // never enable.
   const linked = () => !!project()?.github
   // Create-PR mode: the static route is contributed ahead of the parameter route.
   const newMatch = useMatch(() => githubCreateRoute)
   const isNew = () => !!newMatch()
 
-  // Why the routed project is missing, said plainly. `undefined` while the projects query is in flight,
-  // so the first paint shows the mark rather than flashing "select a project".
+  // Why the routed project is missing. `undefined` while the projects query is in flight, so the
+  // first paint shows the mark rather than flashing "select a project".
   const emptyMessage = () => {
     if (!projects.data) return undefined
     const selected = project()
@@ -75,12 +75,10 @@ export default function GithubBrowse() {
       queryClient.setQueryData(filesKey(owner(), repo(), params.number), files)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner(), repo()) }),
-        // Linked tickets (list enrichment and any open detail), refetched too. Keyed by string
+        // Linked tickets, both list enrichment and any open detail, refetch too. Keyed by string
         // rather than by importing the plugin that supplies them, so a force-refresh of a PR does
-        // not make this plugin depend on whichever providers enrich it.
-        //
-        // One prefix, the host's, covers every provider at once
-        // (client-core/registries/refResolvers.ts).
+        // not make this plugin depend on whichever providers enrich it. The host's one prefix covers
+        // every provider (client-core/registries/refResolvers.ts).
         queryClient.invalidateQueries({ queryKey: ['plugin-ref-resolutions'] }),
       ])
     } finally {
@@ -107,7 +105,6 @@ export default function GithubBrowse() {
                 <Button class="new-pr-btn" data-tip="New pull request" onClick={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}>
                   + New PR
                 </Button>
-                {/* Was a literal '...' with no accessible name for the busy state. */}
                 <Button variant="bare" iconOnly data-tip="Refresh reviews" aria-label="Refresh reviews" busy={refreshingPulls()} onClick={refreshAllPulls}>↻</Button>
               </>
             }

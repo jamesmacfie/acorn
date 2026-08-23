@@ -1,6 +1,6 @@
-// Where a request gets its name, its folder and (in a task) its home. This is a modal rather than
-// two always-visible fields in the panel's metabar, because naming is a save-time decision: inputs
-// sat above the request tabs read as part of the request itself.
+// Where a request gets its name, its folder, and in a task its home. A modal rather than two fields
+// in the panel's metabar, because naming is a save-time decision. Inputs above the request tabs read
+// as part of the request itself.
 import { createSignal, For, Show } from 'solid-js'
 import { Button, Field, Input, Modal, Select } from '@acorn/plugin-api/ui'
 

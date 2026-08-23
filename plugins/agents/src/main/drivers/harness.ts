@@ -1,15 +1,14 @@
 // A harness as data: everything the generic ACP driver needs to start an agent and describe it.
 // See docs/managed-agents.md § Harnesses for the two driver tiers and which one a new agent belongs in.
 //
-// This is the internal shape. Its data-only twin is the `harnesses` manifest contribution
-// (@acorn/protocol/pluginContract.ts), which the delivery seam converts into one of these. The two
-// differ in exactly the places a manifest cannot carry a function: `entry` resolves a path here and is
-// a package-relative string there, and `probeAuth` is a call here and a route there.
+// The internal shape. Its data-only twin is the `harnesses` manifest contribution
+// (@acorn/protocol/pluginContract.ts), which the delivery seam converts into one of these. They differ
+// only where a manifest cannot carry a function: `entry` resolves a path here and is a package-relative
+// string there, and `probeAuth` is a call here and a route there.
 import type { AgentCapability } from '@acorn/protocol/managedAgents.ts'
 
-/** What the protocol cannot ask the agent, so the harness declares it. See the growth rule in
- *  docs/plugin-authoring.md § Harnesses: a quirk joins this list when a second harness needs it, and
- *  each one names the affordance it gates. */
+/** What the protocol cannot ask the agent, so the harness declares it. A quirk joins this list when a
+ *  second harness needs it. See docs/plugin-authoring.md § Harnesses. */
 export type HarnessQuirks = {
   /** The agent accepts an explicit compaction request. Gates the pane's Compact action. */
   manualCompaction?: boolean
@@ -22,25 +21,23 @@ export type HarnessSpawn =
   // An executable on PATH. The user installs the CLI; the descriptor's diagnostics say so when it is
   // missing.
   | { command: string; args?: readonly string[] }
-  // A JS file run with the node service's own binary, for an agent that does not speak ACP natively and
-  // needs an adapter in front of it. A function rather than a path because the two feeders resolve it
-  // differently: a built-in harness resolves a desktop dependency through `createRequire`, a contributed
-  // one joins its installed package directory. Either way the resolution happens at probe time, so a
-  // missing adapter is a diagnostic rather than a boot failure.
+  // A JS file run with the node service's own binary, for an agent that needs an adapter in front of it.
+  // A function, not a path, because the two feeders resolve it differently: a built-in harness goes
+  // through `createRequire`, a contributed one joins its installed package directory. Both resolve at
+  // probe time, so a missing adapter is a diagnostic rather than a boot failure.
   | {
     entry: () => string
     args?: readonly string[]
-    // The CLI the adapter drives, whose resolved absolute path is passed to the child as `env`. Named
-    // rather than templated: the manifest carries data a person can read, not a program.
+    // The CLI the adapter drives. Its resolved absolute path reaches the child as `env`. Named rather
+    // than templated, so the manifest carries data a person can read.
     requires?: { command: string; env: string }
   }
 
 export type HarnessLaunchSpec = {
-  /** Persisted as a session row's `providerId`. Renaming one is a compatibility break across every
-   *  stored row (docs/managed-agents.md § Harnesses: the id constraint). */
+  /** Persisted as a session row's `providerId`. Renaming one breaks every stored row. */
   id: string
-  /** Persisted as a session row's `profileId` and a workflow step's `profile`. Usually the same as `id`;
-   *  `claude`/`claude-code` differ only because both were minted before this seam existed. */
+  /** Persisted as a session row's `profileId` and a workflow step's `profile`. Usually the same as
+   *  `id`. `claude`/`claude-code` differ because both names predate this seam. */
   profileId: string
   label: string
   /** A Lucide name or a `brand:` mark, drawn wherever a surface names the harness. Absent means the
@@ -59,14 +56,11 @@ export type HarnessLaunchSpec = {
 }
 
 // What any ACP harness can carry, because the protocol defines these update kinds and the shared
-// normalizer maps every one of them (main/drivers/acpNormalizer.ts). This replaces the twelve-entry
-// array the Claude driver used to hardcode, which on a generic driver would be a lie about every
-// harness at once: the list has to be either derived from the wire or true of the protocol, and only
-// the second is knowable before the child is spawned.
+// normalizer maps all of them (main/drivers/acpNormalizer.ts). A descriptor is built before the child
+// is spawned, so this is what the protocol guarantees, not what one agent negotiated.
 //
-// The negotiated set is narrower and arrives at `initialize`. What the client actually branches on
-// from it — the model and mode pickers — reads `configOptions`, which the live session emits from that
-// same response, so nothing downstream needs the descriptor to guess.
+// The negotiated set is narrower and arrives at `initialize`. The model and mode pickers read
+// `configOptions` from that same response, so nothing downstream has to guess from the descriptor.
 const ACP_BASELINE: readonly AgentCapability[] = [
   'streaming_messages',
   'reasoning',

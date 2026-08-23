@@ -15,13 +15,12 @@ import { workflowRuns } from './schema'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory
-  // Resolves when the composition root's post-window reconcile pass finishes, always, even on
-  // failure. workflow:start/gate/cancel/kill all await it: reconcile() sweeps every 'running' step
-  // to 'pending', so a run started before the sweep would have its live step re-queued underneath
-  // it.
+  // Resolves when the composition root's post-window reconcile pass finishes, even on failure.
+  // workflow:start, gate, cancel, and kill all await it: reconcile() sweeps every 'running' step to
+  // 'pending', so a run started before the sweep has its live step re-queued underneath it.
   reconciled: Promise<void>
-  // plugins/memory's auto-generation trigger, as a thunk (see the header). Optional so a node with
-  // memory disabled still runs workflows; the run simply produces no memory proposals.
+  // plugins/memory's auto-generation trigger, as a thunk. Optional, so a node with memory disabled
+  // still runs workflows and the run produces no memory proposals.
   memoryReviewTrigger?: (taskId: string, transcriptTail: string) => Promise<void>
   // '' when every check passed, a rendered list when some failed, null when there is nothing to check
   // (no PR, no identity, no mirrored repo). The three-valued answer is load-bearing: the ci-loop step
@@ -35,12 +34,12 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let routeCapability: { dispose(): void } | null = null
   return {
     name: 'workflows',
-    // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host owns
-    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
+    // owns open, migrate, and close from there (@acorn/node-core/main/pluginStorage.ts).
     migrationsModule: import.meta.url,
     init: (ctx) => {
-      // Opened and migrated by the host before init returns: the runner and the bridge below both close
-      // over the handle, so no request can reach an unmigrated database.
+      // Opened and migrated by the host before init returns. The runner and the bridge below both
+      // close over the handle, so no request can reach an unmigrated database.
       const store = ctx.storage.open()
       const core = ctx.core
 
@@ -86,22 +85,23 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             task: task && project
               ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
               : null,
-            // 'task'-scoped, bound to the step's own task: a workflow step is a child process, so it is
-            // denied the owner's provider credentials and confined to this task's tool surface.
+            // 'task'-scoped, bound to the step's own task: a workflow step is a child process, so it
+            // is denied the owner's provider credentials and confined to this task's tool surface.
             env: { ...deps.internalEnv({ scope: 'task', taskId }), ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}) },
           })
           return runHeadless(argv, { cwd, env, timeoutMs: opts.timeoutMs, signal: opts.signal, onEvent: opts.onEvent, adapter: profile.streamJson })
         },
-        // Handoffs are notes, in plugins/notes' store, resolved at call time (its capability id is in a
-        // contract/, so this is a sanctioned edge rather than a coupling).
+        // Handoffs are notes, in plugins/notes' store, resolved at call time. Its capability id lives
+        // in a contract/, so this is a sanctioned edge rather than a coupling.
         writeHandoff: async (taskId, runId, stepName, body) => {
           await ctx.capabilities
             .require(NOTES_STORE)
             .append({ scope: 'task', taskId }, `workflow-handoffs-${runId}`, `## ${stepName}\n${body}\n`, { author: 'workflow', originTaskId: taskId })
         },
-        // De-included rather than deleted when the run ends: the handoff trail stays readable in
-        // the pane, it just stops being injected into every later agent session for this task.
-        // This is `async`, not a bare arrow returning the promise, because the runner calls it as
+        // De-included rather than deleted when the run ends, so the handoff trail stays readable in
+        // the pane but stops being injected into later agent sessions for this task.
+        //
+        // `async`, not a bare arrow returning the promise: the runner calls it as
         // `finishHandoffs?.(…).catch(…)`, and a synchronous throw from `require` would escape that
         // catch and propagate out of finishRun, leaving a terminal run unfinished.
         finishHandoffs: async (taskId, runId) => {
@@ -109,9 +109,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
         assembleContext: async (taskId, runId) => {
           try {
-            // 'service' scope: this is the node calling its own HTTP surface to reuse core's context
-            // assembler, not a child process. It keeps full reach precisely so context assembly survives
-            // the task-scope restriction that applies to agents.
+            // 'service' scope: the node calling its own HTTP surface to reuse core's context
+            // assembler, not a child process. It keeps full reach so context assembly survives the
+            // task-scope restriction that applies to agents.
             const loopback = deps.internalEnv({ scope: 'service' })
             const res = await fetch(`${loopback.ACORN_API_URL}/v2/core/tasks/${taskId}/context?workflowRunId=${encodeURIComponent(runId)}`, {
               headers: { 'x-acorn-internal': loopback.ACORN_API_TOKEN ?? '' },
@@ -144,8 +144,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await deps.memoryReviewTrigger(taskId, handoff?.body ?? `Workflow ${runId} reached a terminal state.`)
         },
         startRunTarget: async (taskId, targetId) => {
-          // terminal.runTargets, resolved at call time. A node with terminal disabled cannot start a run
-          // target at all, and the runner turns the falsy answer into a clean step failure.
+          // terminal.runTargets, resolved at call time. A node with terminal disabled cannot start a
+          // run target, and the runner turns the falsy answer into a clean step failure.
           const runTargets = ctx.capabilities.get(TERMINAL_RUN_TARGETS)
           if (!runTargets) return { ok: false }
           const started = await runTargets.start(taskId, targetId)
@@ -153,9 +153,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const status = await runTargets.status(taskId, targetId)
           return { ok: true, url: status.url }
         },
-        // Materialises a child task (docs/workflows.md covers fan-out, branch dedup, and lazy
-        // worktree creation). Core owns `tasks`, so the insert is core's; this plugin has no handle
-        // to that table.
+        // Materialises a child task (docs/workflows.md covers fan-out, branch dedup, and lazy worktree
+        // creation). Core owns `tasks`, so the insert is core's.
         createChildTask: (parentTaskId, seed) => core.tasks.createChild(parentTaskId, seed),
         cancelChildTask: (taskId) => core.tasks.cancel(taskId),
         authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
@@ -221,8 +220,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       })
 
       // Namespace-root router: it owns both task-scoped (/tasks/:id/workflows) and run-scoped
-      // (/workflows/runs/:runId/...) paths. The internal paths are registered as declared so the client
-      // route builders and server surface share one contract.
+      // (/workflows/runs/:runId/...) paths. The internal paths are registered as declared, so the
+      // client route builders and the server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
 
       // reconcile() is not called here. It has to run after the listener binds and before the
@@ -234,10 +233,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     // startServiceRuntime in one process would otherwise serve workflow requests through the first
     // boot's closed database handle.
     //
-    // In-flight steps are aborted here, still before the handle closes; the host drains it after
-    // this returns. A headless child that outlives its database would write its outcome onto a
-    // closed connection, so the run rows stay 'running' and reconcile() sweeps them to 'pending' on
-    // the next boot. That is what the sweep is for.
+    // In-flight steps are aborted here, before the handle closes, because a headless child that
+    // outlives its database writes its outcome onto a closed connection. Run rows stay 'running' and
+    // reconcile() sweeps them to 'pending' on the next boot.
     dispose: () => {
       live?.stop()
       live = null

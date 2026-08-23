@@ -7,18 +7,17 @@ import type { PluginLoadFailure } from '@acorn/node-core/main/pluginLoader.ts'
 import { nodePluginNames } from './composition'
 
 // The PLUGIN_STATE bridge, built once for both composition roots (docs/node-distribution.md §
-// Plugins). It used to be written out twice, in service/runtime.ts and server/standalone.ts, and the
-// two copies drifted on which build allowed `{ path }` installs and on whether the disabled set was
-// the file alone or the file plus the start config. Building it once here removes that risk.
+// Plugins). Building it once here is what stops the two roots drifting on which build allows
+// `{ path }` installs, and on whether the disabled set is the file alone or the file plus the start
+// config.
 export type DisabledPluginsStore = {
   get(): readonly string[]
   set(names: readonly string[]): void
 }
 
-// The file is the owner's setting; the start config is a test/`dev:node` override
-// (docs/node-distribution.md § Plugins). Both have to stay visible to the route: a plugin disabled
-// only in the start config used to show as enabled but not running, with a Restart banner nothing
-// could clear.
+// The file is the owner's setting, and the start config is a test/`dev:node` override
+// (docs/node-distribution.md § Plugins). Both have to stay visible to the route, or a plugin disabled
+// only in the start config shows as enabled but not running, with a Restart banner nothing can clear.
 export const effectiveDisabled =
   (store: DisabledPluginsStore, extra: readonly string[] = []): (() => string[]) =>
   () => [...new Set([...store.get(), ...extra])]

@@ -8,7 +8,8 @@ WebSocket streams.
 
 A session belongs to one task and provider profile. It contains turns, normalized events, permission
 and question requests, attachments, artifacts, usage snapshots, and lifecycle state. Each session
-event has a durable sequence. HTTP pagination is the replay authority; the WebSocket is the live tail.
+event has a durable sequence. HTTP pagination is the replay authority, and the WebSocket is the live
+tail.
 
 Session state changes and their event records are committed together. Once a turn has committed any
 events, a restart never silently resubmits it. Reconciliation marks interrupted work and leaves an
@@ -16,73 +17,73 @@ explicit state for the owner to inspect.
 
 A workspace-scoped list or search resolves the task ids first, through
 `CoreServices.tasks.idsForWorkspace()`, then narrows this plugin's own tables to those ids. An empty
-result narrows the answer to nothing rather than falling back to unfiltered: unfiltered is how a
-workspace-scoped read would leak another workspace's sessions into the caller's view.
+result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
+how a workspace-scoped read leaks another workspace's sessions into the caller's view.
 
 ## Harnesses
 
-A harness is one agent acorn can manage. A driver adapts its protocol into the common session/event
-model; a PROFILE — how to launch the CLI, resume it, run it headless — is registered into a core
-registry and used by terminal, agents, and workflows. A profile may be available for interactive
-terminal use without a managed driver behind it; `aider` is exactly that case.
+A harness is one agent acorn can manage. A driver adapts its protocol into the common session and
+event model. A profile, meaning how to launch the CLI, resume it, and run it headless, is registered
+into a core registry and used by terminal, agents, and workflows. A profile may be available for
+interactive terminal use without a managed driver behind it, and `aider` is that case.
 
-**There are two driver tiers, permanently.**
+There are two driver tiers, permanently.
 
 **Tier 1 is the generic ACP driver, and a harness is data.** One driver
 (`plugins/agents/src/main/drivers/acpDriver.ts`), built from a launch spec: a command or a
 package-relative adapter entry, arguments, an environment passthrough list, and a small block of
-declared quirks. Everything downstream is shared — the normalizer, the durable event ledger, the
-transcript, permission plumbing. This is the default path for a new agent and the only path a loaded
-plugin can reach.
+declared quirks. Everything downstream is shared, including the normalizer, the durable event ledger,
+the transcript, and permission plumbing. This is the default path for a new agent and the only path a
+loaded plugin can reach.
 
 **Tier 2 is a native driver, first-party only, for what ACP cannot say.** Codex is the reason it
-exists: its app-server gives acorn `thread/fork`, `thread/compact/start`, `thread/archive`,
-`thread/delete` and per-turn model, effort and permission settings, and ACP expresses none of them.
-A native driver is written when a vendor protocol carries product value the generic driver cannot, and
-it lives in plugins/agents with the rest of the first-party code. The registry has two doors and the
-names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.
+exists. Its app-server gives acorn `thread/fork`, `thread/compact/start`, `thread/archive`,
+`thread/delete`, and per-turn model, effort, and permission settings, and ACP expresses none of them.
+A native driver is written when a vendor protocol carries product value the generic driver cannot,
+and it lives in plugins/agents with the rest of the first-party code. The registry has two doors and
+the names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.
 
 Claude runs on tier 1 and Codex on tier 2, which makes the two of them the worked example of each.
 
 **plugins/agents stays first-party.** It owns the stream and the surfaces, and a harness contribution
-is a descriptor delivered *to* it rather than a fork of it: the contributing plugin describes the
-spawn, plugins/agents owns the child process, the session and every byte of the transcript. That is
-also why a data-only harness plugin needs no `exec` grant — it never spawns anything.
+is a descriptor delivered to it rather than a fork of it. The contributing plugin describes the
+spawn, and plugins/agents owns the child process, the session, and every byte of the transcript. That
+is also why a data-only harness plugin needs no `exec` grant: it never spawns anything.
 
 **The delivery seam.** A manifest's `harnesses` entries reach the node host like schedules and task
-checks do: the composition root carries them on the loaded-plugin binding, and
+checks do. The composition root carries them on the loaded-plugin binding, and
 `node-core/server/plugin/host.ts` resolves each adapter entry inside the contributing package, turns
 each probe route into a call, and hands the result to `ctx.harnesses`. That facet forwards to the
 `agents.harnessRegistry` capability plugins/agents publishes, resolved at delivery time and never
-cached: agents disabled means the same silent nothing every unmatched contribution gets, and
+cached, so agents disabled means the same silent nothing every unmatched contribution gets, and
 re-enabling redelivers. A harness package with no node bundle still gets a real plugin row, so it is
 listed in Settings → Plugins and the owner can turn it off.
 
 A harness names a program acorn will run, so it is disclosed under **Enforced** in the trust prompt,
-honestly: the host spawns exactly the declared command with the declared arguments and nothing else.
-The whole spawn plus the environment passthrough is the grant key, so a version that swaps the binary,
+honestly: the host spawns the declared command with the declared arguments and nothing else. The
+whole spawn plus the environment passthrough is the grant key, so a version that swaps the binary,
 changes its arguments, or widens the globs reads as newly requested.
 
-**Ids are persisted, not displayed.** A harness id is stored as a session row's `providerId` and a
-profile id as its `profileId` and a workflow step's `profile`. Renaming one is a compatibility break
+**Ids are persisted, not displayed.** A harness id is stored as a session row's `providerId`, a
+profile id as its `profileId`, and a workflow step's `profile`. Renaming one is a compatibility break
 across every stored row. Built-in ids (`claude`, `codex`, `claude-code`) are grandfathered as bare
-names; a loaded plugin's harness id is namespaced by the host into `<pluginId>:<harnessId>`.
+names, and a loaded plugin's harness id is namespaced by the host into `<pluginId>:<harnessId>`.
 
-[docs/plugin-authoring.md § Harnesses](./plugin-authoring.md) is the authoring contract.
+For the authoring contract, see harnesses in [plugin authoring](./plugin-authoring.md).
 
-Until recently each profile was its own workspace package, which read as an extension seam and was
-not one — everything that actually encodes provider knowledge (drivers, normalizers, usage probes,
-pricing) was already inside plugins/agents, so a new profiles package bought a menu entry whose agent
-could not run. The driver registry was the seam that had never been opened; the packages were not, and
-they were folded back in.
+Each profile used to be its own workspace package, which read as an extension seam and was not one.
+Everything that encodes provider knowledge, meaning drivers, normalizers, usage probes, and pricing,
+was already inside plugins/agents, so a new profiles package bought a menu entry whose agent could
+not run. The driver registry was the seam that had never been opened. The packages were not, and they
+were folded back in.
 
-**What ACP offers the client side is declined, for now.** The driver answers no to `fs`, `terminal` and
+**What ACP offers the client side is declined.** The driver answers no to `fs`, `terminal`, and
 `mcpServers` at `initialize`. Each is worth adopting on its own merits and none of them blocks, or is
-blocked by, harness contributions: `fs` would make the agent ask acorn to read and write files, which
-is one audit point and the precondition for the agent and the worktree living on different machines;
-`terminal` would put agent-run commands through acorn's process lifecycle and into the task's terminal
-surfaces; `mcpServers` would replace per-CLI config-file registration with per-session MCP carrying
-the task-scoped internal token.
+blocked by, harness contributions. `fs` would make the agent ask acorn to read and write files, which
+is one audit point and the precondition for the agent and the worktree living on different machines.
+`terminal` would put agent-run commands through acorn's process lifecycle and into the task's
+terminal surfaces. `mcpServers` would replace per-CLI config-file registration with per-session MCP
+carrying the task-scoped internal token.
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
@@ -97,16 +98,16 @@ usage section.
   same-task roster.
 - Terminal handoff transfers an exclusive input-controller lease to a raw provider TUI. A managed
   session and a raw terminal cannot write the same provider session simultaneously.
-- Notifications and the attention inbox represent requests that need the owner; dismissal of purely
+- Notifications and the attention inbox represent requests that need the owner. Dismissing purely
   informational UI is client-local.
 
-A session's lifetime is bounded by its task's. Sessions belonging to a task that is no longer active
-— archived, cancelled, or hard-deleted with its project — are retired: they leave the live list every
-glance surface reads (Agent Center, the Fleet stat, the attention inbox, the `sessions` dashboard
-collection) and appear in the archived list instead. This is resolved when the list is read rather
-than cascaded onto the session's own `archivedAt`, because removing a project deletes its tasks
-outright and no cascade would visit those rows. A read that names a task id is exempt — the task pane
-is looking at that task.
+A session's lifetime is bounded by its task's. Sessions belonging to a task that is no longer active,
+whether archived, cancelled, or hard-deleted with its project, are retired. They leave the live list
+every glance surface reads (Agent Center, the Fleet stat, the attention inbox, the `sessions`
+dashboard collection) and appear in the archived list instead. This is resolved when the list is read
+rather than cascaded onto the session's own `archivedAt`, because removing a project deletes its
+tasks outright and no cascade would visit those rows. A read that names a task id is exempt, because
+the task pane is looking at that task.
 
 ## Context, files, and attachments
 
@@ -117,9 +118,10 @@ are revalidated against the owning task.
 
 ## Operations and failure
 
-Only one turn dispatches per session. Workspace/provider ceilings bound concurrency. Cancellation,
-timeout, provider disconnect, and restart are explicit states. A live stream can be lost without
-killing the provider process; the client reattaches from the session sequence or terminal replay tail.
+Only one turn dispatches per session. Workspace and provider ceilings bound concurrency.
+Cancellation, timeout, provider disconnect, and restart are explicit states. A live stream can be
+lost without killing the provider process, and the client reattaches from the session sequence or
+terminal replay tail.
 
 Shutdown runs in the order that cannot resurrect what it just stopped: cancel every pending
 provider-reconnect timer first, since a live one would call `ensureSession` and repopulate a session
@@ -131,12 +133,12 @@ explicitly, rather than relying on teardown order, so a second boot in the same 
 `apps/node/src/service/runtime.test.ts` exercises) never serves a request through the first boot's
 closed database handle.
 
-Each session mints its own scoped internal token rather than sharing one environment record
-(`docs/security.md` § Credential handling), so the list of secrets to redact out of provider messages
-and transcripts is collected as sessions start rather than computed once.
+Each session mints its own scoped internal token rather than sharing one environment record. See
+credential handling in [the security doc](./security.md). The list of secrets to redact out of
+provider messages and transcripts is therefore collected as sessions start rather than computed once.
 
 ## Source map
 
 The main implementation is in `plugins/agents/src/node`, `src/main`, `src/server/routes`, and
-`src/client`; process/profile boundaries are supplied by `plugins/agents/src/main/index.ts` and the
-terminal plugin.
+`src/client`. `plugins/agents/src/main/index.ts` and the terminal plugin supply the process and
+profile boundaries.

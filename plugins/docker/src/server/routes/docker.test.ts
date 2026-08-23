@@ -7,9 +7,9 @@ import { docker, setDockerBridge } from './docker'
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Transport contract for the docker routes: auth + ref validation (nothing dash-leading reaches
-// argv) + body validation + BridgeError passthrough + bridge-unavailable. The CLI/daemon behaviors
-// live in main/ and are covered by parse.test.ts + the live pass.
+// Transport contract for the docker routes: auth, ref validation so nothing dash-leading reaches
+// argv, body validation, BridgeError passthrough, and bridge-unavailable. The CLI and daemon
+// behaviours live in main/ and are covered by parse.test.ts and the live pass.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -134,9 +134,7 @@ describe('the docker daemon surface is device-only', () => {
   afterEach(() => setDockerBridge(null))
 
   // Walks the router's own route table rather than a hand-written list of paths, so a daemon-wide
-  // route added later without a `use(..., requireDevice)` line fails here instead of shipping
-  // ungated. This is the counterweight to gating per subtree: the enumeration is checked, not
-  // trusted.
+  // route added without a `use(..., requireDevice)` line fails here instead of shipping ungated.
   const daemonRoutes = docker.routes
     .filter((r) => r.method !== 'ALL' && !r.path.startsWith('/tasks/'))
     .map((r) => ({ method: r.method, path: r.path }))
@@ -160,9 +158,8 @@ describe('the docker daemon surface is device-only', () => {
     setDockerBridge(spy)
     const app = asTask1()
     for (const { method, path } of daemonRoutes) {
-      // A concrete ref, and a body that would validate, so a 400 cannot be mistaken for the gate.
-      // The gate runs before body parsing, which is the ordering that matters: it must not have to
-      // read the request to refuse it.
+      // A concrete ref, and a body that would validate, so a 400 cannot be mistaken for the gate. The
+      // gate runs before body parsing: it must not have to read the request to refuse it.
       const url = `/api/docker${path.replace(':ref', 'web-1')}`
       const body = method === 'POST' ? { action: 'stop', kind: 'images', force: true, project: 'runn_x' } : undefined
       expect((await app.fetch(req(url, method, body), {} as Env)).status, `${method} ${path}`).toBe(403)

@@ -19,9 +19,8 @@ import { inlineUploadImages, uploadImageUrls } from './uploads'
 //   refPanel   `context.refId`, unscoped: resolved across every connected workspace.
 //   pane       `context.item` from a rail row, or `context.taskId` for whatever the task links.
 //
-// Both pane surfaces, the task one and the project-scoped one, come through the same branch: the
-// project surface arrives with an `item` and no `taskId`, the same shape a rail selection into a task
-// pane takes, so they need no further telling apart here.
+// Both pane surfaces come through the same branch: the project surface arrives with an `item` and no
+// `taskId`, the same shape a rail selection into a task pane takes.
 //
 // A selection into an already-mounted pane arrives as `onSelect` rather than a new context, because
 // remounting per click would throw away everything drawn so far.
@@ -41,15 +40,15 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
   const [issue, setIssue] = createSignal<LinearIssueDetail | null>(null)
   const [page, setPage] = createSignal<Page>({ kind: 'loading' })
   const [activeTab, setActiveTab] = createSignal('overview')
-  // A relation row re-points the detail request without disturbing which ticket the host opened, so the
-  // back affordance has somewhere to return to and a later `onSelect` still lands on the host's choice.
+  // A relation row re-points the detail request without disturbing which ticket the host opened, so
+  // the back affordance has somewhere to return to and a later `onSelect` lands on the host's choice.
   const [override, setOverride] = createSignal<string | null>(null)
   const [refreshing, setRefreshing] = createSignal(false)
   const [posting, setPosting] = createSignal(false)
   const [postError, setPostError] = createSignal('')
-  // Private Linear uploads, keyed by their https URL, resolved to `data:` URLs the frame's CSP allows.
-  // Cumulative across tickets: it is a pure URL to bytes map, the URLs are content-addressed by Linear,
-  // and re-pointing the view at a related ticket and back should not refetch the screenshots.
+  // Private Linear uploads, keyed by their https URL, resolved to `data:` URLs the frame's CSP
+  // allows. Cumulative across tickets, because Linear content-addresses the URLs and re-pointing the
+  // view at a related ticket and back should not refetch the screenshots.
   const [images, setImages] = createSignal<Record<string, string>>({})
   let load = 0
 
@@ -58,11 +57,11 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
   /**
    * Resolve every upload this ticket draws, in one state write.
    *
-   * The batch matters more than it looks. Each resolution changes `renderBody`, which changes an
-   * `innerHTML`, and an innerHTML rewrite drops whatever the reader had selected in that block. Writing
-   * the map once per ticket means one rewrite; writing it per image means one per screenshot.
+   * Batch it. Each resolution changes `renderBody`, which changes an `innerHTML`, and an innerHTML
+   * rewrite drops whatever the reader had selected in that block. One write per ticket means one
+   * rewrite; one write per image means one rewrite per screenshot.
    *
-   * Fire-and-forget beside the detail render rather than in front of it: the text is the thing someone
+   * Fire-and-forget beside the detail render rather than in front of it. The text is what someone
    * opened the ticket for, and it should not wait on a picture.
    */
   const resolveImages = async (detail: LinearIssueDetail, connectionId?: string): Promise<void> => {
@@ -75,7 +74,7 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
         const body = await props.bridge.api.get<LinearUploadResponse>(linearUploadRoute(url, connectionId))
         return [url, body.dataUrl] as const
       } catch {
-        // A single unreachable upload is not worth an error banner over a ticket that otherwise read
+        // One unreachable upload is not worth an error banner over a ticket that otherwise read
         // fine. It stays an unresolved https URL, which the CSP shows as a broken image.
         return null
       }
@@ -117,12 +116,10 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
     void fetchIssue(canonicalIdentifier(identifier), target()?.connectionId)
   }
 
-  // A linear.app ticket link stays local rather than going through the host: docs/integrations.md §
-  // Linear. From the project surface specifically there is no task, so the pane rung could not fire
-  // even if it went through the host; re-pointing in place is what makes the back affordance work.
-  //
-  // Everything else goes over the port to the host's usual in-app-or-browser resolution. Which one
-  // happened is not reported back.
+  // A linear.app ticket link stays local rather than going through the host (docs/integrations.md §
+  // Linear). The project surface has no task, so the pane rung could not fire through the host
+  // anyway, and re-pointing in place is what makes the back affordance work. Everything else goes
+  // over the port to the host's in-app-or-browser resolution.
   const onContentClick = (event: MouseEvent): void => {
     const identifier = linearIdentifierFromHref((event.target as HTMLElement | null)?.closest('a')?.getAttribute('href'))
     if (identifier) {
@@ -163,24 +160,24 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
   onMount(() => {
     const off = props.bridge.onSelect((item) => {
       const selected = parseLinearRailItemId(item)
-      // A rail row is `<connection>:<identifier>`; a content link delivers a bare path segment, which is
-      // not that shape. Both arrive on this one channel, so both have to be accepted here.
+      // A rail row is `<connection>:<identifier>`; a content link delivers a bare path segment. Both
+      // arrive on this one channel, so both have to be accepted here.
       open(selected ?? { identifier: item })
     })
     onCleanup(off)
 
     void (async () => {
       const context = props.bridge.context
-      // A ref panel is told exactly one thing and needs nothing else, in particular no task, which is
-      // why the host's binding does not give a refPanel frame one.
+      // A ref panel is told one thing and needs no task, which is why the host's binding does not
+      // give a refPanel frame one.
       if (context.refId) return open({ identifier: context.refId })
       if (context.item) {
         const selected = parseLinearRailItemId(context.item)
         return open(selected ?? { identifier: context.item })
       }
       // No task and no item: the project-scoped surface, sitting beside the rail list with nothing
-      // addressed yet. `taskId` is what tells the two pane surfaces apart. The host gives one to a task
-      // pane and never to a project-scoped one, and the frame does not get to ask which it is.
+      // addressed. `taskId` is what tells the two pane surfaces apart, because the host gives one to
+      // a task pane and never to a project-scoped one.
       if (!context.taskId) {
         return setPage({ kind: 'empty', message: 'Pick an issue from the list.' })
       }
@@ -204,8 +201,8 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
     <div class="ln-app">
       <header class="ln-brandbar">
       {/* The mark inlined, not an <Icon name="brand:linear" />: this frame is a separate origin and a
-          separate JS realm, so the host's brand-mark registry is not reachable from here. Same path
-          data as the manifest's `icon`, and `currentColor` still lets .ln-brand-mark colour it. */}
+          separate JS realm, so the host's brand-mark registry is out of reach. Same path data as the
+          manifest's `icon`, and `currentColor` lets .ln-brand-mark colour it. */}
         <span class="ln-brand-mark">
           <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M2.886 4.18A11.982 11.982 0 0 1 11.99 0C18.624 0 24 5.376 24 12.009c0 3.64-1.62 6.903-4.18 9.105L2.887 4.18ZM1.817 5.626l16.556 16.556c-.524.33-1.075.62-1.65.866L.951 7.277c.247-.575.537-1.126.866-1.65ZM.322 9.163l14.515 14.515c-.71.172-1.443.282-2.195.322L0 11.358a12 12 0 0 1 .322-2.195Zm-.17 4.862 9.823 9.824a12.02 12.02 0 0 1-9.824-9.824Z" />
@@ -213,10 +210,9 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
         </span>
         <strong class="ln-brand">Linear</strong>
       </header>
-      {/* The ticket switcher for a task linking several is ListDetail's list column. It is the app
-          shell's concern rather than the view's, and the ref-panel contract's own multi-ref chip strip
-          does not cross the port — no single-ref host needs it, and this is where a multi-ticket TASK
-          gets one anyway. */}
+      {/* The ticket switcher for a task linking several is ListDetail's list column, an app shell
+          concern rather than the view's. The ref-panel contract's multi-ref chip strip does not cross
+          the port, so a multi-ticket task gets its switcher here. */}
       <ListDetail
         class="ln-layout"
         listWidth="narrow"

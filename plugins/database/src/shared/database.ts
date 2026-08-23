@@ -41,13 +41,10 @@ export const GENERATE_MAX_PROMPT_CHARS = 4000
 // pane): loaded back into the editor, and optionally fed to AI generation as a worked example.
 export type DbSavedQuery = { id: string; name: string; notes: string | null; sql: string; updatedAt: number }
 
-// Database pane: per-task Postgres browse/edit over this plugin's own route namespace. Built here
-// rather than spelled at each call site so the frame, the manifest's document region and the route
+// Database pane: per-task Postgres browse and edit over this plugin's own route namespace. Built here
+// rather than spelled at each call site so the frame, the manifest's document region, and the route
 // table cannot drift apart. The manifest declares the scratch and completions paths as literals with
-// `:taskId` in them, which is the one form these helpers cannot produce.
-//
-// The redundant `/database/` segment these carried before the move is gone. Nothing outside this plugin
-// ever held one: the namespace prefix already says which plugin is answering.
+// `:taskId` in them, the one form these helpers cannot produce.
 export const DATABASE_ROUTE_PREFIX = '/v2/p/database'
 const taskRoute = (taskId: string, rest: string) => `${DATABASE_ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}${rest}`
 

@@ -4,8 +4,8 @@ import { clientFor, refreshFleet, _resetFleet } from './fleet'
 import { cachedFleet, fetchFleet, onFleetInvalidation } from './fanout'
 
 // The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed
-// page" (docs/architecture-overview.md § Client state and fleet behavior) true once instead of four
-// times. These cases are the three properties it exists to provide.
+// page" (docs/architecture-overview.md § Client state and fleet behavior) true in one place. These
+// cases are the three properties it provides.
 
 const record = (nodeId: string, label: string, local = false): NodeRecord => ({
   nodeId,
@@ -50,8 +50,7 @@ afterEach(() => {
 
 describe('fetchFleet', () => {
   it('merges every node in fleet order, not completion order', async () => {
-    // Node B answers first. Rows must still come back A then B: a list that reshuffles because one node
-    // was quicker is unusable.
+    // Node B answers first. Rows must still come back A then B, or the list reshuffles on every read.
     const result = await fetchFleet(KEY, async (nodeId) => {
       if (nodeId === 'a') await new Promise((resolve) => setTimeout(resolve, 20))
       return `from-${nodeId}`
@@ -84,8 +83,8 @@ describe('fetchFleet', () => {
       await vi.advanceTimersByTimeAsync(60)
       const result = await pending
       expect(result.rows.map((row) => row.nodeId)).toEqual(['a'])
-      // Milliseconds below a second. `Math.round(ms/1000)` rendered every sub-second deadline as "no
-      // answer within 0s", a string the partial-result banner shows the owner verbatim.
+      // Milliseconds below a second. `Math.round(ms/1000)` renders a sub-second deadline as "no answer
+      // within 0s", and the banner shows this string verbatim.
       expect(result.unavailable[0]).toMatchObject({ nodeId: 'b', reason: 'no answer within 50ms' })
     } finally {
       vi.useRealTimers()
@@ -93,8 +92,8 @@ describe('fetchFleet', () => {
   })
 
   it('renders a failed node from ITS OWN cache, marked stale', async () => {
-    // The payoff of the per-node QueryClient partition: exactly one place node B's last answer lives, so
-    // a row can be served from it instead of disappearing.
+    // The payoff of the per-node QueryClient partition: one place node B's last answer lives, so a row
+    // is served from it instead of disappearing.
     clientFor('b').client.setQueryData(KEY, 'remembered')
     const result = await fetchFleet(KEY, (nodeId) =>
       nodeId === 'b' ? Promise.reject(new Error('offline')) : Promise.resolve('fresh'),
@@ -178,13 +177,11 @@ describe('cachedFleet', () => {
   })
 })
 
-// The link between a mutation and the fan-out. `createFleetQuery` is a resource, so this suite cannot
-// mount it (Solid resolves to its server build here); the subscription it depends on is covered
-// directly instead, the same way `cachedFleet` is.
+// The link between a mutation and the fan-out. `createFleetQuery` is a resource and Solid resolves to
+// its server build here, so this covers the subscription directly instead.
 describe('onFleetInvalidation', () => {
   it('fires when any node invalidates the key, and stops on unsubscribe', async () => {
-    // The fan-out's own fetch is what puts the entry in each node's cache; nothing can be invalidated
-    // before that happens.
+    // The fan-out's own fetch puts the entry in each node's cache, so nothing is invalidated first.
     clientFor('b').client.setQueryData(KEY, 'fetched-by-the-fan-out')
     let fired = 0
     const stop = onFleetInvalidation(KEY, () => { fired += 1 })

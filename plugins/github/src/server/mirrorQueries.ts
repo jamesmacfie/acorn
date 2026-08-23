@@ -6,8 +6,8 @@ import { repoMatches } from './repoMatch'
 
 // A mirrored repo row's GitHub id, for a (userId, owner, name). The mirror is keyed by the numeric
 // GitHub repo id everywhere below, and nothing outside this plugin can resolve owner/name to that
-// id, which is why the GitHub plugin owns mirror-related repository state, including pinned
-// repositories and viewed files.
+// id. That is why the GitHub plugin owns mirror-related repository state, pinned repositories and
+// viewed files included.
 async function mirroredRepoId(db: PluginDatabase, userId: string, repoOwner: string, repoName: string): Promise<number | null> {
   const [row] = await db
     .select({ id: repos.id })
@@ -42,14 +42,13 @@ export async function mirroredPullRequest(
 }
 
 /**
- * The three-valued contract is unchanged and is load-bearing: '' means every check passed, text is
- * the rendered failure list that becomes the fix prompt, and null means there is nothing to check,
- * which the ci-loop step treats as a hard failure rather than as success. The `!userId` and no-rows
- * cases both fall into null for exactly that reason: an unmirrored repo must not be mistaken for a
- * green one.
+ * Three values, all load-bearing. '' means every check passed. Text is the rendered failure list that
+ * becomes the fix prompt. Null means there is nothing to check, which the ci-loop step treats as a
+ * hard failure rather than success, so `!userId` and no rows both return null: an unmirrored repo
+ * must not be mistaken for a green one.
  *
  * The task lookup goes through CoreServices because tasks are core-owned. Cross-plugin references
- * remain plain IDs and are validated by the owning service when dereferenced.
+ * stay plain ids, validated by the owning service when dereferenced.
  */
 export async function failingChecksFor(
   db: PluginDatabase,
@@ -73,9 +72,9 @@ export async function failingChecksFor(
 }
 
 /**
- * Row counts for core's boot-time storage log (main/storageFootprint.ts), which can no longer see
- * these tables. The three counted here are the three it counted before, the two mirror parents plus
- * this plugin's freshness table, so the log line keeps reporting the same facts about the same data.
+ * Row counts for core's boot-time storage log (main/storageFootprint.ts), which cannot see these
+ * tables. The two mirror parents plus this plugin's freshness table, so the log line reports the same
+ * facts it always did.
  */
 export async function mirrorFootprint(db: PluginDatabase): Promise<Record<string, number>> {
   const [repoRows, pullRows, syncRows] = await Promise.all([

@@ -7,8 +7,8 @@ import { freshnessOf, type Freshness } from '../node/freshness'
 import NodeChip from '../node/NodeChip'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
 // Imported for `use:paneFocus` below. Solid compiles a directive to a bare reference to this
-// identifier, so without the import the first pane that renders dies on "paneFocus is not defined".
-// The linter cannot see that use, hence the suppression rather than a deletion.
+// identifier, so without the import the first pane to render dies on "paneFocus is not defined".
+// The linter cannot see that use, hence the suppression.
 // eslint-disable-next-line no-unused-vars -- used by the `use:paneFocus` directive on the pane element.
 import { paneFocus } from './paneFocus'
 import Icon from '../ui/Icon'
@@ -34,9 +34,8 @@ export default function TaskPaneHost(props: {
       return pane && paneAvailable(pane, props.task) ? [pane] : []
     })
     // A layout can name a pane this task cannot show: DEFAULT_PANE is the PR pane, and a task on a
-    // plain or GitHub-less project has no PR, which is now the ordinary case rather than the
-    // exception. Fall back to the first pane the task does offer; the empty state below is then
-    // what it says it is, an environment with no panes at all.
+    // project with no GitHub remote has no PR. Fall back to the first pane the task does offer, so
+    // the empty state below means what it says.
     return chosen.length ? chosen : switcherPanes().slice(0, 1)
   }
   const visiblePanes = () => {
@@ -49,10 +48,9 @@ export default function TaskPaneHost(props: {
   const onSwitch = (pane: PaneId, event: MouseEvent) =>
     dispatch(event.metaKey || event.ctrlKey ? { type: 'add', pane } : { type: 'show', pane })
 
-  // The badge is hidden while everything is fine, which is the common case and the reason this is
-  // not visual noise in every pane header. One value for the whole task view, because that is what
-  // it reports: the node's state, not a per-pane query (registries/panes.ts explains why there is
-  // no per-pane hook).
+  // Hidden while everything is fine, so a healthy node adds no noise to a pane header. One value
+  // for the whole task view, because it reports the node's state rather than a per-pane query
+  // (registries/panes.ts).
   const nodeFreshness = (): Freshness => freshnessOf(nodeState(activeNodeId() ?? ''))
 
   const weightFor = (pane: PaneId) => layout().weights?.[pane] ?? 1
@@ -60,10 +58,9 @@ export default function TaskPaneHost(props: {
 
   const slotRefs = new Map<PaneId, HTMLDivElement>()
 
-  // Pointer capture, rAF coalescing, selection suppression and the arrow/Home/End keys come from
-  // createSplitDrag; the weight model stays here. Widths are snapshotted at pointer-down because
-  // the reducer works from the sizes the drag started at; re-measuring mid-drag compounds the
-  // delta.
+  // Pointer capture, rAF coalescing, selection suppression, and the arrow/Home/End keys come from
+  // createSplitDrag; the weight model stays here. Widths are snapshotted at pointer-down, because
+  // the reducer works from the sizes the drag started at and re-measuring compounds the delta.
   const paneDrag = (pane: PaneContribution, adjacent: () => PaneContribution | undefined) => {
     let paneWidth = 0
     let adjacentWidth = 0
@@ -118,12 +115,11 @@ export default function TaskPaneHost(props: {
                 data-pane-id={pane.id}
               >
                 <div class="pane-slot-actions">
-                  {/* docs/ui-design.md § Connection and staleness vocabulary asks for offline/stale rendering on every
-                      node-backed surface. `.pane-slot-actions` is the ONE piece of chrome every pane has,
-                      so this is one edit rather than thirteen — and it is rendered only when there is
-                      something to say, so a healthy node changes nothing on screen.
-                      It reports the NODE's state, which is the reactive half of docs/ui-design.md's vocabulary; see
-                      registries/panes.ts for why there is no per-pane query hook. */}
+                  {/* docs/ui-design.md § Connection and staleness vocabulary asks for offline and
+                      stale rendering on every node-backed surface. `.pane-slot-actions` is the one
+                      piece of chrome every pane has, so this is one edit rather than thirteen. It
+                      reports the node's state; see registries/panes.ts for why there is no per-pane
+                      query hook. */}
                   <Show when={nodeFreshness() !== 'live'}>
                     <NodeChip nodeId={activeNodeId() ?? ''} compact />
                   </Show>
@@ -182,7 +178,7 @@ export default function TaskPaneHost(props: {
           )}
         </For>
         {props.extraButtons}
-        {/* Not `disabled` while closing — disabled buttons swallow the mouseover the tooltip needs. */}
+        {/* Not `disabled` while closing: a disabled button swallows the mouseover the tooltip needs. */}
         <Button
           variant="bare" class="pane-switch-btn pane-switch-close"
           data-tip={props.closing ? 'Removing…' : 'Close task'}

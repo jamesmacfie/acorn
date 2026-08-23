@@ -15,19 +15,18 @@ import { respondError } from '../respond'
 // Pairing and device management (docs/api-reference.md § Pairing, docs/security.md
 // § Transport and auth).
 //
-// Two routers, because they sit on opposite sides of the auth gate. `open` is how a client that
-// holds no credential yet gets one at all, so it must mount above requireUser; `core` is owner-only
-// device administration and must mount below it. createApp() does both. A pairing route below the
-// gate is unreachable, and a device route above it is an unauthenticated hole.
+// Two routers, because they sit on opposite sides of the auth gate. `open` is how a client holding no
+// credential gets one, so it mounts above requireUser. `core` is owner-only device administration and
+// mounts below it. A pairing route below the gate is unreachable, and a device route above it is an
+// unauthenticated hole.
 
-// What this ceiling adds, given the pairing window already allows only 5 attempts: the window can be
-// reopened, and each reopen refreshes that budget. This bounds the churn: a caller that can reach
-// the port cannot spend the day guessing across reopened windows, and each attempt costs a decode
-// plus a constant-time compare. Guessing a single code is still bounded by the per-window budget.
+// The pairing window already allows only five attempts, but it can be reopened and each reopen
+// refreshes that budget. This ceiling bounds the churn, so a caller that reaches the port cannot spend
+// the day guessing across reopened windows.
 //
-// Not a general rate limiter and not keyed by caller: one counter on one route. A
-// loopback/LAN peer's address is not an identity that can be trusted, and keying a map on hostile input
-// is an unbounded allocation.
+// Not a general rate limiter and not keyed by caller: one counter on one route. A loopback or LAN
+// peer's address is not a trustworthy identity, and keying a map on hostile input allocates without
+// bound.
 const PAIR_ATTEMPT_WINDOW_MS = 60_000
 const PAIR_ATTEMPTS_PER_WINDOW = 20
 
@@ -54,20 +53,18 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
 
   const open = new Hono<AppEnv>()
     .get('/node', (c) => {
-      // authMiddleware has already run (it resolves the principal without enforcing it), so this can
+      // authMiddleware has already run and resolved the principal without enforcing it, so this can
       // widen the payload for an authenticated caller without a second credential check.
       const authenticated = c.get('principal') !== null
       const info: NodeInfo = {
         protocolVersion: NODE_PROTOCOL_VERSION,
-        // The certificate a client pins against (docs/api-reference.md § Pairing). Advertising it here
-        // is not what makes the pin trustworthy: reading it over the very connection being
-        // authenticated proves nothing. It is the value the owner compares against the code shown on
-        // the node.
+        // The certificate a client pins against (docs/api-reference.md § Pairing). Reading it over the
+        // connection being authenticated proves nothing. It is the value the owner compares against
+        // the code shown on the node.
         fingerprint: c.env.NODE_FINGERPRINT,
-        // `appVersion` used to ride along here and no client ever read it. Dropped rather than kept
-        // against a future reader: this is the one response that must stay readable by every client
-        // forever, so the bar for a field on it is a consumer, not a plausible use. Adding it back is
-        // one line and always safe (the schema is additive-forever, protocol/node.ts).
+        // This is the one response that must stay readable by every client forever, so the bar for a
+        // field on it is a real consumer, not a plausible use. Adding one back is one line and always
+        // safe, because the schema is additive forever (protocol/node.ts).
         ...(authenticated ? { nodeId: c.env.NODE_ID } : {}),
       }
       return c.json(info)
@@ -85,27 +82,27 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
 
   const core = new Hono<AppEnv>()
     .post('/pair/start', (c) => {
-      // The plaintext code goes back to the caller because the caller is the node's own UI, which has
-      // to show it as QR + text. Issuing again replaces any live code (pairingCodes.ts).
+      // The plaintext code goes back to the caller because the caller is the node's own UI, which shows
+      // it as a QR code and text. Issuing again replaces any live code (pairingCodes.ts).
       //
-      // Audited, and it is the single most important row in the table: a pairing window is the one
-      // moment this node will hand full owner authority to whoever knows a five-minute code. The code
-      // itself is not recorded: an audit trail that quotes the credential is a second copy of it.
+      // The most important row in the audit table: a pairing window is the one moment this node hands
+      // full owner authority to whoever knows a five-minute code. The code itself is not recorded,
+      // because an audit trail that quotes a credential is a second copy of it.
       auditRequest(c, { action: 'pairing.window.opened' })
       return c.json({ code: c.env.PAIRING_CODES.issue(), expiresInMs: PAIRING_WINDOW_MS } satisfies PairingWindow)
     })
     .delete('/pair', (c) => {
       // Idempotent: "no window is open" is the state the caller asked for, so closing a closed window
-      // is a 204 rather than a 404 the settings UI would have to special-case.
+      // answers 204 rather than a 404 the settings UI would have to special-case.
       c.env.PAIRING_CODES.close()
       auditRequest(c, { action: 'pairing.window.closed' })
       return c.body(null, 204)
     })
     .get('/devices', async (c) => c.json({ devices: await c.env.DEVICES.list() } satisfies DevicesResponse))
     .delete('/devices/:id', async (c) => {
-      // A device may revoke itself, that is "unpair this machine", and every paired device has full
-      // owner authority anyway, so there is no self-revocation guard. 404 only when the
-      // device never existed; revoking an already-revoked one is a 204.
+      // A device may revoke itself, which is "unpair this machine", and every paired device has full
+      // owner authority anyway, so there is no self-revocation guard. 404 only when the device never
+      // existed. Revoking an already-revoked one is a 204.
       const existed = await c.env.DEVICES.revoke(c.req.param('id'), auditActor(c))
       return existed ? c.body(null, 204) : respondError(c, 404, 'not_found', ['No such device.'])
     })

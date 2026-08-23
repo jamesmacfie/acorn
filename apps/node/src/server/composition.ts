@@ -14,8 +14,8 @@ import { reconcileTmux } from '@acorn/plugin-terminal/main/index.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { nodePlugins, type NodePluginDeps } from './plugins'
 
-// Both Node hosts assemble the same graph here (docs/node-distribution.md § Runtime); the Electron
-// app supervises it rather than owning a second implementation. Keeping this in apps/node keeps the
+// Both Node hosts assemble the same graph here (docs/node-distribution.md § Runtime). The desktop
+// app supervises it rather than owning a second implementation. This lives in apps/node to keep the
 // dependency direction right: the graph names plugins, and node-core stays independent of them
 // (docs/architecture-overview.md § Package boundaries).
 export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'schedules', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
@@ -88,9 +88,8 @@ export type BundledReconcileOptions = {
 }
 
 /** Reconcile app-owned plugin packages into the data root, then report every outcome
- * (docs/node-distribution.md § Plugins). Shared by both Node hosts rather than copied into each: this
- * used to be inline in the supervised root only, so `pnpm dev:node` ran whatever `build:plugin` last
- * left behind and printed none of these lines. */
+ * (docs/node-distribution.md § Plugins). Shared by both Node hosts, so `pnpm dev:node` reconciles on
+ * the same terms the supervised root does. */
 export function reconcileBundledPackages({ dataDir, bundledRoot, development }: BundledReconcileOptions): void {
   const preserved: string[] = []
   if (bundledRoot) {
@@ -130,8 +129,7 @@ export type ReconcileOptions = {
 }
 
 // The post-listener sequence shared by both hosts (docs/node-distribution.md § Runtime).
-// Host-specific work, Electron MCP registration, state transitions, the final ready signal, stays at
-// the call site.
+// Host-specific work stays at the call site: MCP registration, state transitions, the ready signal.
 export async function reconcileNode({ db, dataDir, capabilities, mark = () => {} }: ReconcileOptions): Promise<void> {
   const githubMirror = capabilities.get(GITHUB_MIRROR)
   void logStorageFootprint(

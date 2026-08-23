@@ -35,7 +35,7 @@ const disabledPlugins = disabledPluginsStore(root.dir)
 // The disabled-plugin list a standalone node reads (docs/node-distribution.md § Plugins). There is
 // no start-config override here: only the supervised host passes one.
 const disabled = effectiveDisabled(disabledPlugins)
-// Audit retention and the idempotency sweep run as node-owned schedules now, not boot-time calls
+// Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls
 // (docs/data-layer.md § Retention).
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
@@ -44,18 +44,18 @@ setWorktreesRoot(join(root.dir, 'worktrees'))
 const bundledRoot = process.env.ACORN_BUNDLED_PLUGINS_DIR
 const development = process.env.NODE_ENV !== 'production'
 // Looks like a bug and is not one: `dev:node` with no bundled root reconciles nothing, so a
-// `build:plugin` copy in the data root keeps running and a newer bundled package never arrives.
-// That is the correct, permanent answer for a service-managed node; only a developer needs
+// `build:plugin` copy in the data root keeps running and a newer bundled package never arrives. That
+// is the right answer for a service-managed node. Only a developer needs
 // `ACORN_BUNDLED_PLUGINS_DIR` set.
 if (development && !bundledRoot) {
-  console.log('[plugins] ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled — whatever is in the data root keeps running')
+  console.log('[plugins] ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.')
 }
 reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 
 // The same deps the supervised composition root supplies (service/runtime.ts explains each one). A
 // standalone node runs a real terminal engine, not a stub, because terminal is a required plugin
-// (docs/plugins.md § Activation) and this node has to answer /v2/core/tasks/:id/archive for a task's
-// live sessions.
+// (docs/plugins.md § Activation) and this node answers /v2/core/tasks/:id/archive for a task's live
+// sessions.
 let apiUrl = ''
 const internalEnv: InternalEnvFactory = (claims) => ({
   ACORN_API_URL: apiUrl,
@@ -68,9 +68,7 @@ const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
 
 // Same plugin list, through the same builder, as the desktop-supervised root
-// (docs/node-distribution.md § Runtime). Nothing in the bag differs between them any more: the preview
-// browser was the last entry that did, and agent browser automation is a plugin now, with a browser of
-// its own on whichever node runs it.
+// (docs/node-distribution.md § Runtime). Nothing in the bag differs between the two.
 const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))
 // The node's one scheduler (docs/schedules.md § Why the node, and only the node).
 const scheduler = createScheduler(runtime.DB, { env: runtime })

@@ -1,10 +1,9 @@
 export const agentUsageRoute = '/v2/p/agents/usage'
 export const agentUsageRefreshRoute = '/v2/p/agents/usage/refresh'
 
-// A harness id, not a member of a closed set. It was `'claude' | 'codex'` until harnesses became a
-// contribution point (docs/managed-agents.md § Harnesses); the durable model in
-// @acorn/protocol/managedAgents.ts always kept `providerId` a plain string, and this is the edge
-// catching up with it.
+// A harness id, not a member of a closed set, because harnesses are a contribution point
+// (docs/managed-agents.md § Harnesses). The durable model in @acorn/protocol/managedAgents.ts already
+// keeps `providerId` a plain string.
 export type AgentUsageProviderId = string
 export type AgentUsageHealth = 'healthy' | 'warning' | 'critical' | 'depleted' | 'unknown'
 export type AgentUsageAvailability = 'available' | 'missing' | 'error'
@@ -68,8 +67,8 @@ export type AgentUsageError = {
 export type AgentProviderUsage = {
   provider: AgentUsageProviderId
   // How the harness is named and drawn, stamped on by the usage service from the collector's
-  // registration. Here rather than looked up on the client, because a usage row has to be able to name
-  // itself without cross-referencing the provider descriptor list from a different store.
+  // registration. Here rather than looked up on the client, so a usage row can name itself without
+  // cross-referencing the provider descriptor list in another store.
   label: string
   glyph?: string
   availability: AgentUsageAvailability
@@ -84,9 +83,8 @@ export type AgentProviderUsage = {
   error: AgentUsageError | null
 }
 
-// What a collector answers, which is everything about the reading and nothing about the naming: the
-// harness's label and glyph come from its registration and are stamped on by the service
-// (main/usage/service.ts), so a probe never repeats its own id.
+// What a collector answers: the reading, never the naming. The service stamps on the label and glyph
+// from the registration (main/usage/service.ts), so a probe never repeats its own id.
 export type AgentProviderUsageReading = Omit<AgentProviderUsage, 'label' | 'glyph'>
 
 export type AgentUsageSnapshot = {

@@ -1,16 +1,13 @@
 // Routes for the API panel, mounted at /v2/p/http by this plugin's init (node/index.ts). Every route
-// here requires a device principal (docs/http-client.md § Sending), on top of the core stack's
-// authMiddleware and requireUser, because outbound requests and secret resolution must not be
-// reachable through an internal token.
+// here requires a device principal (docs/http-client.md § Sending), because outbound requests and
+// secret resolution must not be reachable through an internal token.
 //
 // A factory over the plugin's own database, not a module-scope router reading a handle off `c.env`
-// (docs/data-layer.md § Plugin databases). The SecretService comes from CoreServices for the same
-// reason: this router no longer needs `c.env` at all.
+// (docs/data-layer.md § Plugin databases).
 //
-// http ships as a loaded plugin, so these routes run behind `portableCarrier`, the same carrier
-// rollbar and linear use (docs/http-client.md). The identity below comes off the request context
-// rather than `owner(c)`/`c.get('principal')`, because a loaded bundle is not inside the host's Hono
-// stack, so those middleware-set values are not there.
+// http ships as a loaded plugin, so these routes run behind `portableCarrier`. A loaded bundle sits
+// outside the host's Hono stack, so the identity comes off the request context rather than
+// `owner(c)` or `c.get('principal')`.
 import { Hono, type Context } from 'hono'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
@@ -198,19 +195,15 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
 
     // ── Host-drawn chrome (the manifest's `sources` and `agentContexts` descriptors) ──
     //
-    // These three answer to the host rather than to this plugin's own frame: the rail draws the
-    // rows, and the agent composer draws the picker. A descriptor's data has to come from a route,
-    // because the node is always running and a frame is not.
+    // The host draws these three, not this plugin's frame. A descriptor's data has to come from a
+    // route, because the node is always running and a frame is not.
 
     // The rail's list of this project's saved requests (docs/http-client.md § Client, "the rail
     // source"). `?project=` is minted by the host from the shell's routed project
-    // (client-core/plugins/chrome/data.ts § scopedSourceItemsPath); with no project routed there is
-    // nothing to list.
+    // (client-core/plugins/chrome/data.ts § scopedSourceItemsPath).
     //
     // No `task` block on a row, and that absence is the contribution: it tells the host there is
-    // nothing to promote here, so no task-creation affordance is drawn. A saved request is not an
-    // external item; the compiled source carried a permanent promotion stub to say the same thing in
-    // more code.
+    // nothing to promote, so no task-creation affordance is drawn.
     .get('/rail-items', async (c) => {
       const projectId = c.req.query('project')
       if (!projectId) return c.json({ items: [] } satisfies PluginRailItems)
@@ -230,13 +223,10 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
 
     // The agent composer's option list and capture, for the task the composer named
     // (docs/http-client.md § Client). Both resolve the project from the task rather than taking one
-    // from the caller: the composer's scope is a task, and a project parameter here would be a second
-    // thing to check ownership of.
+    // from the caller: a project parameter here would be a second thing to check ownership of.
     //
-    // The set is this task's ad-hoc requests, unchanged from the renderer contribution this replaced,
-    // so a difference in what an agent receives cannot be blamed on the tier move. It is also
-    // thinner than it looks: a task with no ad-hoc requests offers nothing, and widening it to the
-    // project tree is a product decision, not a port.
+    // The set is this task's ad-hoc requests, so a task with no ad-hoc requests offers nothing.
+    // Widening it to the project tree is a product decision.
     .get('/context-options', async (c) => {
       const scoped = await taskRequests(c, db, core)
       if (!scoped) return respondError(c, 404, 'not_found')
@@ -456,9 +446,8 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
     })
 }
 
-// The Hono routes over the portable carrier, the only way in. Its request context supplies the
-// caller's identity without this bundle reaching for the host's middleware state. The bundle keeps
-// its own Hono (build-plugin.mjs inlines every non-builtin dependency), so a router instance can
-// never cross the contract; only `router.fetch` does.
+// The Hono routes over the portable carrier, the only way in. The bundle keeps its own Hono
+// (build-plugin.mjs inlines every non-builtin dependency), so a router instance can never cross the
+// contract. Only `router.fetch` does.
 export const createHttpFetch = (db: PluginDatabase, core: SendCoreServices): PluginFetchHandler =>
   portableFetch(httpRoutes(db, core))

@@ -53,8 +53,8 @@ export function evictSyncState(taskId: string): void {
   for (const [sessionId, record] of lastSync) if (record.taskId === taskId) lastSync.delete(sessionId)
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered here rather than in the shell's evictor file, so this signal and the thing that clears
+// it are one edit apart (registries/scopeEviction.ts).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictSyncState(e.taskId)
 })

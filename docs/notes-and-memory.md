@@ -12,7 +12,7 @@ reserved workspace key), so an owner can read or edit one by hand. Writes are at
 rename, so a crash never leaves a partial note. Notes has no SQLite file; autosave sends an expected
 revision and surfaces a conflict rather than overwriting a newer edit.
 
-The current HTTP surface is `/v2/p/notes/tasks/:id/notes` and
+The HTTP surface is `/v2/p/notes/tasks/:id/notes` and
 `/v2/p/notes/workspaces/:wsId/notes` (including their read/write, title, inclusion, and delete
 subroutes). `/v2/p/memory/.../notes` remains as a one-release compatibility alias for saved agent
 prompts and older clients; it uses the notes capability and does not own a second store.
@@ -31,12 +31,12 @@ membership rather than a caller-supplied id, so an agent cannot address a worksp
 own task's. None of the four tools can set a note's `included` flag: an included global note is
 injected into every task's assembled context, and that is a decision the tools leave to the pane.
 
-When a task is created from a GitHub PR, its PR description, its comment/review thread, and any
-linked Linear ticket are seeded into notes tagged with that task's id, one note per source. These
-seeded notes are stamped `author: 'workflow'` with kind `'scratch'`, which keeps them out of the
-Notes pane's editing library since they are external snapshots that belong to context, not something
-the owner authored. A workflow run's handoff notes are also `author: 'workflow'` but kind `'finding'`,
-so they stay visible in the library; only the workflow-plus-scratch combination is treated as a seed.
+When a task is created from a GitHub PR, its description, its comment and review thread, and any
+linked Linear ticket are seeded into notes tagged with that task's id, one note per source. Seeded
+notes are stamped `author: 'workflow'` with kind `'scratch'`, which keeps them out of the Notes
+pane's editing library: they are external snapshots that belong to context, not something the owner
+authored. A workflow run's handoff notes are also `author: 'workflow'`, but kind `'finding'`, so they
+stay in the library. Only the workflow-plus-scratch combination counts as a seed.
 
 ## Memory
 
@@ -61,16 +61,16 @@ and Rollbar contributions under a deterministic byte/token budget. Section failu
 reported independently. The context pane previews the exact snapshot and can send it to a selected
 managed agent session.
 
-A fresh agent session can receive that snapshot two ways. The **push** queues the assembled block for
-the session's first idle edge — but it is delivered `'after-ready'`, so whenever the CLI is still busy
-when the user types, it lands *after* the first ask, arriving as reference material for work already
-underway. A profile that can carry a standing instruction avoids the race by **pulling** instead: it
-sets `launchArgs` on its `AgentProfileContribution` (Claude Code: `--append-system-prompt`, telling it
-to call `task_context` / `notes_read` / `memory_search` before starting), and `spawnOne` then skips the
-push for that session. A system prompt cannot lose a race, and a pull sees notes edited mid-session.
-The push still governs profiles with no such flag. `launchArgs` reach node-pty as argv and the tmux /
-`-lc` paths as a quoted line (`launchCommandLine`); a command override (dev-server pane) is a
-different binary and gets none.
+A fresh agent session can receive that snapshot two ways. The _push_ queues the assembled block for
+the session's first idle edge. It is delivered `'after-ready'`, so if the CLI is still busy when the
+user types, the block lands after the first ask, as reference material for work already underway. A
+profile that can carry a standing instruction avoids the race by _pulling_ instead. It sets
+`launchArgs` on its `AgentProfileContribution` (Claude Code uses `--append-system-prompt`, telling it
+to call `task_context`, `notes_read`, or `memory_search` before starting), and `spawnOne` skips the
+push for that session. A system prompt cannot lose the race, and a pull sees notes edited
+mid-session. The push still governs profiles with no such flag. `launchArgs` reach node-pty as argv,
+and the tmux and `-lc` paths as a quoted line (`launchCommandLine`). A command override, such as the
+dev-server pane, is a different binary and gets none.
 
 ## Lifecycle hooks
 

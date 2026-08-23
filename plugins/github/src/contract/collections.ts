@@ -9,7 +9,7 @@ import { formatPullRef } from './pullRef'
 //
 // Declared in contract/, not server/, because the node route and the client's
 // `ctx.collections.register` both need this schema. One declaration, two readers, so a column
-// can't render under a different name than it sorts by.
+// cannot render under a different name than it sorts by.
 export const PULLS_COLLECTION_ID = 'pulls-mine'
 export const pullsCollectionRoute = `/v2/p/github/collections/${PULLS_COLLECTION_ID}`
 
@@ -57,16 +57,15 @@ export const pullStatus = (row: {
   if (row.mergeStateStatus === 'BEHIND') return 'behind'
   if (row.mergeStateStatus === 'UNSTABLE') return 'unstable'
   if (row.mergeStateStatus === 'CLEAN' || row.mergeStateStatus === 'HAS_HOOKS') return 'ready'
-  // Unknown, or a repo whose detail has never been fetched. "Open" is the honest answer: the mirror
-  // holds no merge state for a PR nobody has opened, and inventing `ready` from silence would tell
-  // someone a branch is mergeable when nothing has checked.
+  // Unknown, or a repo whose detail was never fetched. The mirror holds no merge state for a PR
+  // nobody has opened, and inventing `ready` from silence would say a branch is mergeable when
+  // nothing has checked.
   return 'open'
 }
 
-// The three questions a person actually asks a PR dashboard, as one enum param rather than three
-// booleans: the param vocabulary has no boolean, and a single answer reads better in a dropdown than
-// three checkboxes that can contradict each other. Unset keeps the collection's original behaviour,
-// every open PR in every mirrored repo.
+// The three questions a person asks a PR dashboard, as one enum param rather than three booleans:
+// the param vocabulary has no boolean, and a single answer reads better in a dropdown than three
+// checkboxes that can contradict each other. Unset means every open PR in every mirrored repo.
 //
 // None of the three can be answered from the mirror, which is why this runs as a GitHub search
 // instead of a `where` clause (docs/github-integration.md § Reads and writes).
@@ -79,10 +78,9 @@ const INVOLVEMENT_QUALIFIER: Record<PullInvolvement, string> = {
   authored: 'author:@me',
 }
 
-/** `owner/name`, and nothing that could carry a second search qualifier in on a space. The mirror path
- *  gets the same shape for free by splitting on `/`; here it is a guard, because this string is
- *  interpolated into a query GitHub parses. Anything else is dropped, which searches wider rather than
- *  somewhere unintended. */
+/** `owner/name`, and nothing that could carry a second search qualifier in on a space. This string is
+ *  interpolated into a query GitHub parses, so anything else is dropped, which searches wider rather
+ *  than somewhere unintended. */
 const REPO_QUALIFIER = /^[\w.-]+\/[\w.-]+$/
 
 /** The GitHub search that answers one involvement. `@me` is the load-bearing part: GitHub resolves it
@@ -93,9 +91,9 @@ export const pullsSearchQuery = (involvement: PullInvolvement, repo = ''): strin
     .join(' ')
 
 /** The param's value is a comma-joined set, because "assigned to me or waiting on my review" is one
- *  question a person asks and GitHub's qualifiers only AND. So the route runs one search per
- *  involvement and unions the results, which is why this parses to a set rather than a value, and why
- *  an unrecognised entry is dropped instead of failing: a saved panel outlives the vocabulary. */
+ *  question and GitHub's qualifiers only AND. The route runs one search per involvement and unions
+ *  the results. An unrecognised entry is dropped rather than failing, because a saved panel outlives
+ *  the vocabulary. */
 export const parsePullInvolvement = (value: string): PullInvolvement[] =>
   PULL_INVOLVEMENT.filter((entry) => value.split(',').includes(entry))
 
@@ -116,15 +114,15 @@ export type PullCollectionSource = {
 }
 
 export const pullsCollectionPage = (rows: readonly PullCollectionSource[]): PluginCollectionResponse => ({
-  // The response repeats the object the client declares as its static schema; contract/ is where
-  // both sides read it from, so there is no third place for the two to disagree.
+  // The response repeats the object the client declares as its static schema. Both sides read it
+  // from contract/, so there is no third place for them to disagree.
   schema: pullsCollectionSchema,
   rows: rows.map((row): PluginCollectionRowBody => {
     const url = `https://github.com/${row.owner}/${row.repo}/pull/${row.number}`
     return {
-      // Stable across refreshes and unique across repositories, which a bare PR number is not. Spelled
-      // by ./pullRef.ts, which is the one owner of this identity. A recognised URL and the reference
-      // panel resolve to the same string through the same helper.
+      // Stable across refreshes and unique across repositories, which a bare PR number is not.
+      // ./pullRef.ts owns this identity, so a recognised URL and the reference panel resolve to the
+      // same string.
       id: formatPullRef(row.owner, row.repo, row.number),
       values: {
         title: row.title,

@@ -1,6 +1,5 @@
-// The redaction test lives here rather than beside the route: this is the assertion that a
-// captured snapshot can't carry a credential, and it has to hold over rows whose ciphertext has
-// already been opened, which is the state the capture route reads them in.
+// Asserts that a captured snapshot cannot carry a credential. It has to hold over rows whose
+// ciphertext is already open, which is the state the capture route reads them in.
 import { describe, expect, it } from 'vitest'
 import { redactUrl, requestOption, requestSnapshot } from './agentContext'
 import type { HttpRequest } from '../shared/model'

@@ -1,20 +1,19 @@
-// Use-scoped secret access (docs/security.md § Credential handling). `use()` scrubs the plaintext
-// out of anything thrown from its own scope; it does not stop a caller from returning the plaintext
-// out of `use()`, which internal-token scoping closes instead.
+// Use-scoped secret access (docs/security.md § Credential handling). `use()` scrubs the plaintext out
+// of anything thrown from its own scope. It does not stop a caller returning the plaintext out of
+// `use()`, which internal-token scoping closes instead.
 import { decryptSecret, encryptSecret } from '../../../server/secretBox'
 
 export class SecretUnavailableError extends Error {
   constructor(readonly purpose: string) {
-    // Never includes the ref: a JWE is not plaintext, but it is the ciphertext, and error bodies are
+    // Never include the ref. A JWE is not plaintext, but it is the ciphertext, and an error body is
     // the wrong place for it.
     super(`No usable credential for ${purpose}.`)
     this.name = 'SecretUnavailableError'
   }
 }
 
-// Replace every occurrence of each plaintext with a marker. Short strings are skipped: redacting a
-// 3-character secret out of prose would mangle unrelated text, and a credential that short is not
-// one worth protecting by substring replacement.
+// Replace every occurrence of each plaintext with a marker. Short strings are skipped, because
+// redacting a 3-character secret out of prose mangles unrelated text.
 const MIN_REDACTABLE = 8
 
 export function redact(text: string, secrets: readonly string[]): string {
@@ -26,18 +25,16 @@ export function redact(text: string, secrets: readonly string[]): string {
   return out
 }
 
-// Mutate rather than re-wrap: callers branch on the error's class (DockerCliError, BridgeError,
-// ApiError), and replacing the instance with a generic Error would change control flow to fix a
-// string.
+// Mutate rather than re-wrap. Callers branch on the error's class, such as DockerCliError or
+// ApiError, so replacing the instance with a generic Error would change control flow to fix a string.
 //
-// Every write is guarded, because the one function whose job is non-disclosure must not become a
-// leak amplifier. A frozen or sealed Error, or one whose `message` is a getter-only accessor, makes
-// the assignment throw a TypeError, and that TypeError's own message embeds the original error's
-// stringification, secret included, thrown from inside this catch where no caller can recover it.
-// Confirmed against `Object.freeze(new Error(...))`. When a field cannot be rewritten, the error is
-// replaced by a redacted plain Error: losing the class is bad, and leaking the credential is worse.
+// Every write is guarded. A frozen or sealed Error, or one whose `message` is a getter-only
+// accessor, makes the assignment throw a TypeError whose own message embeds the original error's
+// stringification, secret included, from inside this catch where no caller can recover it. Confirmed
+// against `Object.freeze(new Error(...))`. When a field cannot be rewritten, a redacted plain Error
+// replaces it: losing the class is bad, leaking the credential is worse.
 //
-// `seen` breaks a circular cause chain, which otherwise recursed until RangeError (also confirmed).
+// `seen` breaks a circular cause chain, which otherwise recursed until RangeError.
 function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = new Set()): unknown {
   if (!(error instanceof Error)) {
     return typeof error === 'string' ? redact(error, secrets) : error
@@ -50,8 +47,8 @@ function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = 
     error.message = message
     if (stack !== undefined) error.stack = stack
   } catch {
-    // Unwritable (frozen/sealed/getter-only). Fall back to a redacted copy rather than let the
-    // assignment's own TypeError carry the plaintext out of this scope.
+    // Frozen, sealed, or getter-only. Fall back to a redacted copy rather than let the assignment's
+    // own TypeError carry the plaintext out of this scope.
     const replacement = new Error(message)
     if (stack !== undefined) replacement.stack = stack
     return replacement
@@ -62,7 +59,7 @@ function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = 
     try {
       ;(error as { cause?: unknown }).cause = scrubbed
     } catch {
-      // A frozen cause chain is already scrubbed in place where it could be; nothing further to do.
+      // A frozen cause chain is already scrubbed wherever it could be.
     }
   }
   return error
@@ -71,9 +68,9 @@ function scrub(error: unknown, secrets: readonly string[], seen: Set<unknown> = 
 export class SecretService {
   constructor(private readonly hexKey: string) {}
 
-  // `purpose` is what the owner would see in an audit row and what an error names. It is required
-  // so a read has a stated reason at the call site: the difference between `getSecret(ref)` and
-  // "read the github credential to list pull requests".
+  // `purpose` is what an audit row shows and what an error names. Required, so every read states a
+  // reason at the call site: `getSecret(ref)` against "read the github credential to list pull
+  // requests".
   async use<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T> {
     const plaintext = ref ? await decryptSecret(ref, this.hexKey) : null
     if (!plaintext) throw new SecretUnavailableError(purpose)
@@ -84,8 +81,8 @@ export class SecretService {
     }
   }
 
-  // For callers that must distinguish "not connected" from "failed", which is the shape githubToken()
-  // already relies on to converge never-connected and revoked onto one user-visible outcome.
+  // For callers that have to tell "not connected" from "failed". githubToken() relies on this to
+  // converge never-connected and revoked onto one user-visible outcome.
   async useOptional<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T | null> {
     try {
       return await this.use(ref, purpose, fn)
@@ -100,9 +97,9 @@ export class SecretService {
     return encryptSecret(plaintext, this.hexKey)
   }
 
-  // Escape hatch for the call sites that hand a credential to a long-lived consumer whose lifetime
-  // this scope cannot bracket (a pg pool, a driver's child-process env). Named to be greppable, and
-  // every use of it is a place the scrub-on-throw guarantee does not apply.
+  // Escape hatch for call sites that hand a credential to a long-lived consumer this scope cannot
+  // bracket, such as a pg pool or a driver's child-process env. Named to be greppable: every use is
+  // a place scrub-on-throw does not apply.
   reveal(ref: string, purpose: string): Promise<string> {
     return this.use(ref, purpose, (plaintext) => plaintext)
   }

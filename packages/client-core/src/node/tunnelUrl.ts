@@ -5,10 +5,9 @@ import { nodes } from './fleet'
 // Rewrite a loopback URL resolved by a node so it is reachable from this machine
 // (docs/shell.md § Host-owned webviews).
 //
-// The preview pane's URL comes from the node: a run target's `url`, a repo's `previewMode: 'port'`,
-// or a URL script's stdout, then loaded by the client's own shell. For the bundled local node
-// those are the same machine and nothing needs doing. For a remote node `http://localhost:5173`
-// points at the owner's laptop, where nothing is listening, and the pane shows a blank page.
+// The preview pane's URL comes from the node and is loaded by the client's shell. For the bundled
+// local node those are the same machine. For a remote node `http://localhost:5173` points at the
+// owner's laptop, where nothing is listening, and the pane shows a blank page.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0'])
 
 // Exported for the test: the two facts that decide whether a URL needs a tunnel at all.
@@ -26,30 +25,27 @@ export function loopbackTarget(url: string): { port: number; rest: string } | nu
   return { port, rest: `${parsed.pathname}${parsed.search}${parsed.hash}` }
 }
 
-// Returns the URL to load, which is the input unchanged whenever no tunnel is needed or possible:
+// Returns the URL to load, unchanged whenever no tunnel is needed or possible:
 //
-//   - the active node is the local one (same machine, a tunnel would be a pointless hop);
-//   - the URL names a real host, already reachable from here, and tunnelling it would be the general
-//     proxy docs/api-reference.md rules out;
-//   - there is no broker (a plain browser served by a node, where the origin is the node).
+//   - the active node is the local one, so a tunnel is a pointless hop
+//   - the URL names a real host, already reachable, and tunnelling it would be the general proxy
+//     docs/api-reference.md rules out
+//   - there is no broker, so the origin is the node
 //
-// A failure to open the tunnel returns null, not the original URL, and that is the security-relevant
-// half: a remote loopback URL is only usable when the build can open the node-owned tunnel, since
-// localhost is local to the node, not the client. Returning null prevents the preview from showing an
-// unrelated local service.
+// A failed tunnel returns null rather than the original URL. localhost is local to the node, so
+// returning the input would point the preview at an unrelated local service.
 export async function tunnelUrl(taskId: string, url: string | null): Promise<string | null> {
   if (!url) return url
   const nodeId = activeNodeId()
-  // No broker, or no node: the origin is the node (`dev:node` in a browser), so nothing needs
+  // No broker or no node, so the origin is the node (`dev:node` in a browser) and nothing needs
   // rewriting.
   if (!nodeId) return url
-  // The bundled local node: same machine, so a tunnel would be a pointless extra hop. `!== false`
-  // rather than `=== true`, so an unknown node is treated as local and left alone rather than
-  // tunnelled blindly.
+  // The bundled local node is the same machine, so a tunnel is a pointless hop. `!== false` rather
+  // than `=== true`, so an unknown node is left alone rather than tunnelled blindly.
   if (nodes().find((node) => node.nodeId === nodeId)?.local !== false) return url
   const target = loopbackTarget(url)
-  // A real host is already reachable from here, and tunnelling it would be the general proxy docs/api-reference.md
-  // rules out.
+  // A real host is already reachable, and tunnelling it would be the general proxy
+  // docs/api-reference.md rules out.
   if (!target) return url
   const bridge = fleetBridge()
   if (!bridge) {
@@ -65,12 +61,12 @@ export async function tunnelUrl(taskId: string, url: string | null): Promise<str
   }
 }
 
-// Called when a preview pane goes away (and so on task archive, which unmounts it), so the loopback
-// listener does not outlive what it was for.
+// Called when a preview pane goes away, including on task archive, so the loopback listener does not
+// outlive what it was for.
 //
-// Scoped to the node as well as the task. Without the nodeId this matched every node's tunnels for
-// that task id, and two nodes may hold the same task UUID by construction, so unmounting one pane
-// could close a live pipe belonging to a different machine.
+// Scoped to the node as well as the task. Without the nodeId this matches every node's tunnels for
+// that task id, and two nodes may hold the same task UUID, so unmounting one pane closes a live pipe
+// on another machine.
 export const closeTunnelsForTask = (taskId: string): void => {
   const nodeId = activeNodeId()
   fleetBridge()?.tunnelClose(nodeId ? { nodeId, taskId } : { taskId })

@@ -193,8 +193,8 @@ class FailingStartDriver implements AgentDriver {
 }
 
 describe('managed agent runtime conformance', () => {
-  // Two real databases, matching the shape of the thing under test. `testDb` is core's: it holds the
-  // workspace/project/task rows seedTask writes, which is what the runtime reaches through CoreServices.
+  // Two real databases, matching the shape of the thing under test. `testDb` is core's, holding the
+  // workspace, project, and task rows seedTask writes, which the runtime reaches through CoreServices.
   // `pluginDb` is this plugin's own migrated file, holding every `agent_*` table and the
   // `agent_events_fts` virtual table the workspace search case exercises.
   //

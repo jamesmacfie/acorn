@@ -3,9 +3,9 @@ import { claudeCodeProfile } from './claudeCode'
 
 // The argv this profile hands the process broker.
 //
-// Worth pinning because these arrays are the actual command line acorn spawns: a renamed or dropped flag
-// produces a silently different invocation, not a boot-check failure. The rest of the descriptor is data,
-// and `streamJson` is core's shared adapter with its own test suite, so neither needs a test here.
+// These arrays are the command line acorn spawns, so a renamed or dropped flag changes the invocation
+// silently instead of failing a boot check. The rest of the descriptor is data, and `streamJson` is
+// core's shared adapter with its own suite.
 
 describe('the claude-code profile', () => {
   it('declares the identity terminal and workflows resolve it by', () => {
@@ -13,14 +13,13 @@ describe('the claude-code profile', () => {
     expect(claudeCodeProfile).toMatchObject({ id: 'claude-code', label: 'Claude Code', kind: 'agent', command: 'claude', transport: 'pty' })
   })
 
-  // Asserts the whole array, not `toContain` per flag. A per-flag check missed dropping `-p` (the headless
-  // runner then waits forever on a prompt) or `--verbose` (required by `-p --output-format stream-json`, so
-  // claude exits with a usage error), and it missed an inserted `--dangerously-skip-permissions --add-dir /`
-  // surviving untouched, which silently widens what a headless agent may do.
+  // Asserts the whole array, not `toContain` per flag. A per-flag check missed a dropped `-p`, which
+  // leaves the headless runner waiting forever on a prompt, and a dropped `--verbose`, which
+  // `-p --output-format stream-json` requires. It also let an inserted
+  // `--dangerously-skip-permissions --add-dir /` through, widening what a headless agent may do.
   //
-  // Only the no-options invocation gets full equality, since it is the one case with a fixed answer; the
-  // option-threading cases below stay as membership checks because they test presence or absence, not
-  // order.
+  // Only the no-options invocation gets full equality, because it is the one case with a fixed answer.
+  // The option-threading cases below test presence or absence, not order.
   it('builds a headless turn that streams JSON and never prompts for permission', () => {
     const { file, args } = claudeCodeProfile.headlessArgv!('claude', { prompt: 'do the thing' })
     expect(file).toBe('claude')
@@ -55,10 +54,10 @@ describe('the claude-code profile', () => {
   })
 
   it('disables tools for a one-shot decision, so an AI call cannot act', () => {
-    // `aiArgv` is the structured-decision path (a workflow gate policy, an AI SQL draft). An empty
-    // `--tools` is the whole difference from a headless turn: a decision reads, it does not edit. Pinned as
-    // a whole array for the same reason as above: a check for `args[indexOf('--tools') + 1] === ''` would
-    // still pass if a second, non-empty `--tools` or an inserted `--add-dir` were appended later.
+    // `aiArgv` is the structured-decision path: a workflow gate policy, an AI SQL draft. An empty
+    // `--tools` is the whole difference from a headless turn, because a decision reads and does not
+    // edit. Pinned as a whole array, since `args[indexOf('--tools') + 1] === ''` would still pass with
+    // a second non-empty `--tools` or an inserted `--add-dir` appended later.
     const { args } = claudeCodeProfile.aiArgv!('claude', { prompt: 'decide' })
     expect(args).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk', '--tools', '', 'decide'])
   })

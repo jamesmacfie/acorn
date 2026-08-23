@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process'
 import type { TerminalProfile } from '@acorn/protocol/terminal.ts'
 import { agentProfileRegistry, type AgentProfileContribution } from './agentProfiles'
 
-// Built-in agent profiles (docs/terminal-and-agents.md). The user-editable `agent_profiles` table
-// is a later enhancement; these cover shell plus the common coding agents. `command` is the binary
-// we look for on PATH (or $SHELL for the shell profile); we never install it.
+// Built-in agent profiles (docs/terminal-and-agents.md), covering shell plus the common coding
+// agents. `command` is the binary we look for on PATH, or $SHELL for the shell profile. We never
+// install it.
 export type ProfileDef = AgentProfileContribution
 export const listProfileDefs = (): ProfileDef[] => agentProfileRegistry.list()
 
@@ -27,9 +27,9 @@ export const tmuxAvailable = (): boolean => onPath('tmux')
 // The shell profile is always available; agents only if their command is on PATH (docs/terminal-and-agents.md).
 export const profileAvailable = (p: ProfileDef): boolean => (p.kind === 'shell' ? true : onPath(p.command))
 
-  // `tmuxMissing`: the profile prefers the durable tmux backend but tmux isn't on PATH, so
-  // sessions silently degrade to node-pty (resolveBackend) and won't survive an app restart.
-  // Surfaced as a hint in the drawer's profile menu rather than hidden.
+// `tmuxMissing` means the profile prefers the durable tmux backend but tmux is not on PATH, so
+// sessions degrade to node-pty and do not survive an app restart. The profile menu shows it as a
+// hint.
 export const listProfiles = (): TerminalProfile[] => {
   const tmux = tmuxAvailable()
   return listProfileDefs().map((p) => ({

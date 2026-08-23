@@ -4,13 +4,12 @@ import { buildChart, CHART_FRAME, TICK_GAP } from '../chart'
 import type { PanelViewProps } from './props'
 
 // The chart view. Every number on screen comes out of `chart.ts`, which is pure and tested; this
-// file turns that into SVG and picks a class name, because vitest here runs in node with no Solid
-// plugin and nothing written here is checked.
+// file turns that into SVG and picks a class name, because vitest runs in node with no Solid plugin
+// and nothing written here is checked.
 //
-// Colour is an attribute, never a literal, here: `data-tone` or `data-series`, never both, with
-// `dashboards.css` owning the actual colour. No `fill="#…"` in this file, so a swatch and its mark
-// can never drift apart. The design behind the two attributes and the legend's accessibility role
-// is docs/dashboards.md § Views are derived, not chosen from a menu.
+// Colour is an attribute, never a literal: `data-tone` or `data-series`, never both, with
+// `dashboards.css` owning the colour. No `fill="#…"` here, so a swatch and its mark cannot drift
+// apart. See docs/dashboards.md § Views are derived, not chosen from a menu.
 
 const LABEL_DROP = 10
 
@@ -18,9 +17,9 @@ export default function ChartView(props: PanelViewProps) {
   const plot = createMemo(() =>
     buildChart(props.rows, props.schema, props.view, props.groupBy ? { groupBy: props.groupBy } : {}))
 
-  // Every coordinate comes off the plot's own frame, never a module constant: the left gutter is as wide
-  // as this chart's y axis labels need, so a chart counting to 200,000 sits further right than one
-  // counting to 9. `CHART_FRAME` is only the stand-in for the un-drawable case below.
+  // Every coordinate comes off the plot's own frame, never a module constant, because the left
+  // gutter is as wide as this chart's y axis labels need. `CHART_FRAME` is only the stand-in for
+  // the un-drawable case below.
   const frame = () => plot()?.frame ?? CHART_FRAME
   const yTicks = () => plot()?.yTicks ?? []
   const bars = () => {
@@ -50,9 +49,9 @@ export default function ChartView(props: PanelViewProps) {
     >
       <Show when={props.rows.length} fallback={<EmptyState align="start" size="sm">No rows.</EmptyState>}>
         <div class="dash-chart-wrap">
-          {/* One row above the plot, wrapping rather than truncating (docs/dashboards.md § Views are
-              derived, not chosen from a menu): identity lives in the swatch, never in coloured text,
-              so the legend reads the same whether or not the reader can tell the swatches apart. */}
+          {/* One row above the plot, wrapping rather than truncating. Identity lives in the swatch,
+              never in coloured text, so the legend reads the same to someone who cannot tell the
+              swatches apart. */}
           <Show when={legend()}>
             {(keys) => (
               <ul class="dash-chart-legend">
@@ -93,10 +92,10 @@ export default function ChartView(props: PanelViewProps) {
               </ul>
             )}
           </Show>
-          {/* `font-size` in user units, from the frame: inside a scaled viewBox a CSS px is a user
+          {/* `font-size` in user units, from the frame. Inside a scaled viewBox a CSS px is a user
               unit, so type set in the stylesheet scales with the drawing and `--fs-2xs` came out
-              enormous on a large panel. It is geometry here, like the point radius (chart.ts
-              § TICK_FONT), and the stylesheet keeps the colour. */}
+              enormous on a large panel. Here it is geometry (chart.ts § TICK_FONT); the stylesheet
+              keeps the colour. */}
           <svg
             class="dash-chart"
             viewBox={`0 0 ${frame().width} ${frame().height}`}

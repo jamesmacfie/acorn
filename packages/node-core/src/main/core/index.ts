@@ -30,12 +30,12 @@ export type CoreServices = {
   // Text generation through a stored model-provider connection. The plugin owns the prompt; core owns
   // credential resolution and the provider adapters.
   models: ModelService
-  // One (userId, key) row of core's `prefs` table. The server-side half of a preference whose value
-  // the node itself has to read: today only plugins/agents' model-pricing overrides, which the usage
-  // service needs before it can price a token count.
+  // One (userId, key) row of core's `prefs` table. The server-side half of a preference the node
+  // itself has to read, such as plugins/agents' model-pricing overrides, which the usage service
+  // needs before it can price a token count.
   prefs: PrefService
-  // The machine identity: which owner this node is bound to. Read-only for consumers, the binding
-  // is minted at boot (ensureBoundIdentity in main/bindings.ts), never by a plugin.
+  // The machine identity: which owner this node is bound to. Read-only for consumers. The binding is
+  // minted at boot by ensureBoundIdentity in main/bindings.ts, never by a plugin.
   identity: IdentityService
   // Narrow project identity for plugins: scope resolution, importer writes, and all mapped project
   // folders. The returned ProjectRef never exposes core config or the core SQLite handle.
@@ -45,8 +45,8 @@ export type CoreServices = {
 export function createCoreServices(options: {
   secrets: SecretService
   db: AppDatabase
-  // The persisted binding. Required rather than defaulted, so a composition root cannot end up with a
-  // process-local identity by omission; tests pass memoryIdentityStore() (main/activeIdentity.ts).
+  // The persisted binding. Required rather than defaulted, so a composition root cannot end up with
+  // a process-local identity by omission. Tests pass memoryIdentityStore() from main/activeIdentity.ts.
   activeIdentity: ActiveIdentityStore
   capabilities?: Pick<CapabilityRegistry, 'get'>
 }): CoreServices {
@@ -68,11 +68,11 @@ export { SecretService }
 export type { ChildTaskSeed, TaskLinkRef, TaskRunConfig, TaskService } from './tasks/service'
 export type { IdentityService } from './identity/identity'
 export type { ProjectService } from './projects'
-// The shapes ProjectService hands back and takes in. A plugin that calls the seam has to be able to
-// name them; they carry no core config columns and no database handle.
+// The shapes ProjectService hands back and takes in. A plugin that calls the seam has to name them,
+// and they carry no core config columns and no database handle.
 export type { ProjectCreateRefInput, ProjectRef, ProjectUpdateRefInput } from '../projects'
 // The same arrangement one entity over: what TaskService hands back and takes in. Six fields off the
-// `tasks` row, no core columns a plugin has no business reading, and no database handle.
+// `tasks` row, and no database handle.
 export type { TaskRef } from '../taskWorktree'
 export type { ContextService } from './context/launch'
 export type { PrefService } from './identity/preferences'

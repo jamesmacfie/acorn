@@ -1,8 +1,7 @@
 // The plugin's domain-to-StatusDot tone mapping, declared once.
 //
-// StatusDot takes a semantic tone, not a domain state: the shared component has no business
-// knowing what "reconnecting" means, so the plugin decides once, here. See docs/ui-design.md §
-// Primitive adoption ratchet for why StatusDot replaced each plugin's own colour vocabulary.
+// StatusDot takes a semantic tone, not a domain state, because the shared component has no business
+// knowing what "reconnecting" means. See docs/ui-design.md § Primitive adoption ratchet.
 
 type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
 
@@ -21,8 +20,8 @@ export const runtimeTone = (state: string): Tone => {
 /** A provider's install/auth health in the Agent Center header. */
 export const providerTone = (health: 'ok' | 'error' | 'missing'): Tone => {
   if (health === 'ok') return 'ok'
-  // Authentication required is recoverable, so it is a warning rather than a failure. The old CSS said
-  // the same thing (--warn), despite the state being named 'error'.
+  // Authentication required is recoverable, so it warns rather than reading as a failure, despite the
+  // state being named 'error'.
   if (health === 'error') return 'warn'
   return 'muted'
 }
