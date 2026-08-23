@@ -525,6 +525,89 @@ const taskCheckDescriptor = z.object({
   timeout: z.number().int().min(1).max(10).optional(),
 })
 
+// ── Managed agent harnesses (docs/managed-agents.md § Harnesses) ──────────────────────────────────
+//
+// An ACP-speaking agent acorn starts, drives, and draws a transcript for. The pair to
+// `agents.harnessRegistry`, which plugins/agents publishes and the delivery seam in
+// node-core/server/plugin/host.ts feeds; docs/plugin-authoring.md § Harnesses is the authoring
+// contract and owns what a harness author may declare.
+//
+// The whole point of the shape is that a harness is data: the contributing plugin describes the spawn,
+// and plugins/agents owns the child process, the session and every byte of the transcript. A data-only
+// harness plugin therefore needs no `exec` grant, because it never spawns anything.
+
+// A variable name, or a `PREFIX_*` glob. A bare `*` is refused here as well as in `brokerEnv`, because
+// it would copy the node's whole environment into the agent and defeat the allowlist outright.
+const envName = z.string().min(1).max(64).regex(
+  /^[A-Za-z_][A-Za-z0-9_]*\*?$/,
+  'env passthrough must be a variable name or a PREFIX_* glob',
+)
+
+// Exactly one of `command` and `entry`, checked in node-core/main/pluginManifest.ts because a
+// refinement here could not name the field path inside the containing descriptor. The webview
+// url/urlSource pair sets that precedent.
+const harnessSpawn = z.object({
+  // An executable resolved on PATH. The user installs the CLI themselves; the harness's diagnostics say
+  // so when it is missing.
+  command: z.string().min(1).max(128).optional(),
+  // A package-relative JS file, run with the node service's own binary, for shipping an adapter in front
+  // of an agent that does not speak ACP natively. Confined to the installed package directory at parse
+  // time like every other manifest path.
+  entry: entry.optional(),
+  args: z.array(z.string().min(1).max(256)).max(16).default([]),
+  // `entry` only: the CLI the adapter drives, whose resolved absolute path is handed to the child as the
+  // named variable. A named pair rather than a template, because the manifest carries data a person can
+  // read and not a program in JSON.
+  requires: z.object({
+    command: z.string().min(1).max(128),
+    env: z.string().min(1).max(64).regex(/^[A-Z][A-Z0-9_]*$/, 'env must be an upper-case variable name'),
+  }).optional(),
+})
+
+// What ACP deliberately does not carry, closed per harness by declaration and never by an id list
+// inside acorn. Each entry names the affordance it gates; the vocabulary grows when a second harness
+// needs one.
+const harnessQuirks = z.object({
+  // The agent implements a compaction command, so the pane may offer Compact.
+  manualCompaction: z.boolean().default(false),
+  // Sessions outlive the agent process and can be reloaded, so resume and the terminal handoff exist.
+  sessionPersistence: z.boolean().default(false),
+})
+
+// The interactive TUI beside the managed session: the data half of an agent profile. The code-carrying
+// half — `headlessArgv`, `resumeArgv`, `aiArgv` and the stream-JSON parser — has no manifest form, so a
+// data-only harness works in the Agent pane and the terminal and a workflow step cannot name it. See
+// docs/plugin-authoring.md § Harnesses for why that line is drawn there.
+const harnessTerminal = z.object({
+  command: z.string().min(1).max(128),
+  backendPreference: z.enum(['node-pty', 'tmux']).default('tmux'),
+  launchArgs: z.array(z.string().min(1).max(4_096)).max(16).default([]),
+})
+
+const harnessDescriptor = z.object({
+  // Namespaced by the host into `<pluginId>:<id>`, and then persisted as a session row's `providerId`
+  // and `profileId`. Renaming one is a compatibility break for the plugin's users, not a label edit.
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  // A Lucide name or a `brand:` mark; `brand:<pluginId>` is this manifest's own `icon`.
+  glyph: z.string().min(1).max(64).optional(),
+  spawn: harnessSpawn,
+  // Config variables carried through from the node's environment. Configuration only: the broker's base
+  // allowlist omits `ANTHROPIC_*` and `OPENAI_*` for exactly this reason, and an agent CLI authenticates
+  // through its own stored login. Disclosed in the trust prompt, because a package that starts carrying
+  // more of the node's environment has grown its reach.
+  envPassthrough: z.array(envName).max(32).default([]),
+  quirks: harnessQuirks.prefault({}),
+  // Routes on this plugin's own node half, confined to its own namespace at parse time. `usage` answers the
+  // plan-usage snapshot for the Agent pane; `auth` answers whether the harness's account is signed in.
+  // Absent means the matching surface simply shows less, which is the right answer for most agent CLIs.
+  probes: z.object({
+    usage: pluginRoute.optional(),
+    auth: pluginRoute.optional(),
+  }).optional(),
+  terminal: harnessTerminal.optional(),
+})
+
 // `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` stays
 // loose: a manifest written for a newer acorn should contribute less on an older one rather than fail
 // to parse.
@@ -551,6 +634,9 @@ const contributions = z.looseObject({
   collections: z.array(collectionDescriptor).max(8).default([]),
   schedules: z.array(scheduleDescriptor).max(4).default([]),
   taskChecks: z.array(taskCheckDescriptor).max(4).default([]),
+  // Managed agent harnesses. The ctx twin is the `agents.harnessRegistry` capability; docs/managed-agents.md
+  // § Harnesses owns the behaviour and docs/plugin-authoring.md § Harnesses the authoring contract.
+  harnesses: z.array(harnessDescriptor).max(4).default([]),
 }).prefault({})
 
 
@@ -700,6 +786,7 @@ export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
 export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>
 export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
 export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
+export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
 
 // Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
 // contribute less rather than fail to parse. Every list but `frames` is optional because an older node's
@@ -724,4 +811,5 @@ export type PluginContributions = {
   collections?: PluginCollectionDescriptor[]
   schedules?: PluginScheduleDescriptor[]
   taskChecks?: PluginTaskCheckDescriptor[]
+  harnesses?: PluginHarnessDescriptor[]
 } & Record<string, unknown>

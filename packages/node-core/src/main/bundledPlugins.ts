@@ -51,7 +51,15 @@ const packageManifest = (dir: string, expectedId: string): PluginManifest => {
   if (manifest.apiVersion !== PLUGIN_API_MAJOR) {
     throw new Error(`built for plugin API ${manifest.apiVersion}; this app speaks ${PLUGIN_API_MAJOR}`)
   }
-  for (const declared of [manifest.node, manifest.client, manifest.migrations]) {
+  // Including a harness's adapter entry, which is a package-relative path acorn will run
+  // (docs/managed-agents.md § Harnesses) and so belongs under the same check as the code entrypoints.
+  const declaredPaths = [
+    manifest.node,
+    manifest.client,
+    manifest.migrations,
+    ...manifest.contributions.harnesses.map((harness) => harness.spawn.entry),
+  ]
+  for (const declared of declaredPaths) {
     if (!declared) continue
     const path = resolveInRoot(dir, declared)
     if (!path || !existsSync(path)) throw new Error(`declared path '${declared}' is missing or escapes the package`)

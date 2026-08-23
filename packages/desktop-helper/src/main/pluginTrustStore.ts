@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 
@@ -50,6 +50,17 @@ const taskCheckGrantSchema = z.strictObject({
   cleansUp: z.boolean(),
 }) as z.ZodType<PluginTaskCheckGrant>
 
+// The whole spawn is the grant, so all of it is parsed: an acknowledgement that could not be compared
+// field for field is one the update prompt cannot diff, and "this package now runs a different binary"
+// is the diff that matters most.
+const harnessGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  kind: z.enum(['command', 'entry']),
+  run: z.string().min(1).max(512),
+  env: z.array(z.string().min(1).max(64)).max(32),
+}) as z.ZodType<PluginHarnessGrant>
+
 const ackSchema = z.strictObject({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -75,6 +86,9 @@ const ackSchema = z.strictObject({
   // Default keeps acknowledgements written before archive checks existed readable. An old
   // acknowledgement says the previously accepted bundle had nothing to say on archive.
   taskChecks: z.array(taskCheckGrantSchema).max(4).default([]),
+  // Default keeps acknowledgements written before harnesses existed readable. An old acknowledgement
+  // says the previously accepted bundle asked acorn to run nothing, which is what was true of it.
+  harnesses: z.array(harnessGrantSchema).max(4).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure that came with the decision could not be fully parsed, because a node ran
@@ -193,6 +207,7 @@ export class PluginTrustStore {
       extensions: [],
       schedules: [],
       taskChecks: [],
+      harnesses: [],
       decision: 'accepted',
       decidedAt: Date.now(),
       partial: true,

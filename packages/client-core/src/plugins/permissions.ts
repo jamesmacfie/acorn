@@ -1,5 +1,5 @@
-import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { pluginExtensionGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../tasks/paneShortcuts'
 import { describeChannel, isFrameChannel } from './frames/channels'
@@ -150,6 +150,34 @@ export const taskCheckPermissionLines = (grants: readonly PluginTaskCheckGrant[]
         icon: 'archive',
       }),
     )
+
+export const harnessGrants = (contributions: PluginContributions): PluginHarnessGrant[] =>
+  pluginHarnessGrants(contributions)
+
+// `Enforced`, and the only line in that group that names a program. It earns the strong group because
+// the claim is exact and does not depend on the plugin behaving: the host spawns this command with these
+// arguments and nothing else, and the plugin never gets a process of its own
+// (docs/managed-agents.md § Harnesses).
+//
+// `high`, because "acorn will run this binary" is the fact an owner most needs to actually read.
+//
+// The environment is a second sentence rather than a clause, for the reason the task-check line gives:
+// they are two different facts about the package and the second one is worth reading twice. Both are in
+// the key, so a version that swaps the binary or widens the globs reads as newly requested.
+export const harnessPermissionLines = (grants: readonly PluginHarnessGrant[]): PermissionLine[] =>
+  [...grants]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((grant) => {
+      const run = grant.kind === 'command'
+        ? `Run “${grant.run}” as the “${grant.label}” agent`
+        : `Run JavaScript this package ships (${grant.run}) as the “${grant.label}” agent`
+      const env = grant.env.length ? ` and pass it ${grant.env.join(', ')} from this node’s environment` : ''
+      return line(`harness:${grant.id}:${grant.kind}:${grant.run}:${grant.env.join(' ')}`, {
+        text: `${run}${env}`,
+        icon: 'bot',
+        high: true,
+      })
+    })
 
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   pluginKeyClaimGrants(contributions)

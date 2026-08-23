@@ -92,6 +92,7 @@ describe('agent usage routes', () => {
         providers: [
           {
             provider: 'claude',
+            label: 'Claude Code',
             availability: 'error',
             health: 'unknown',
             plan: null,

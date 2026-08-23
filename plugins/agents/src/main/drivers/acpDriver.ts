@@ -1,3 +1,10 @@
+// The generic ACP driver: one driver for every harness that speaks the Agent Client Protocol, built
+// from a launch spec instead of subclassed per provider. See docs/managed-agents.md § Harnesses.
+//
+// This is tier 1, and it is the only tier a loaded plugin can reach. Everything downstream of the
+// events it emits — the normalizer, the durable ledger, the transcript, permission plumbing — is
+// shared, which is what lets a harness be data. Tier 2 is a native driver for a vendor protocol that
+// carries product value ACP cannot express (main/drivers/codexDriver.ts is the worked example).
 import {
   ClientSideConnection,
   ndJsonStream,
@@ -8,28 +15,35 @@ import {
   type SessionConfigOption,
 } from '@agentclientprotocol/sdk'
 import { randomUUID } from 'node:crypto'
-import { createRequire } from 'node:module'
 import { Readable, Writable } from 'node:stream'
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { brokerEnv } from '@acorn/plugin-api/node'
 import { AGENT_TOOL_PASSTHROUGH } from './toolEnv'
 import type { AgentInputPart, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { normalizeAcpConfig, normalizeAcpPermission, normalizeAcpUpdate } from './acpNormalizer'
+import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
-import { probeClaudeAuthentication } from './authProbe'
 import { providerStderrNotice } from './diagnostics'
 
-const nodeRequire = createRequire(import.meta.url)
-const DRIVER_VERSION = 'claude-acp-1'
+const DRIVER_VERSION = 'acp-1'
 
 type PendingPermission = {
   resolve(response: RequestPermissionResponse): void
 }
 
-const adapterEntry = (): string =>
-  nodeRequire.resolve('@agentclientprotocol/claude-agent-acp/dist/index.js')
+// What `probe()` learned about the child before it is spawned, kept so `start()` does not re-derive it.
+type Launch = {
+  // The argv the child runs. For the `entry` form this is the node binary plus the resolved adapter.
+  file: string
+  args: string[]
+  // The harness's own CLI, when there is one: the `command` itself, or the CLI an adapter drives. This
+  // is what the auth probe is asked about and what the descriptor reports as its executable.
+  executable: string | null
+  env: Record<string, string>
+  diagnostics: string[]
+}
 
 function acpPrompt(
   parts: AgentInputPart[],
@@ -67,6 +81,7 @@ function acpPrompt(
 
 function clientFor(
   options: AgentDriverStartOptions,
+  label: string,
   pending: Map<string, PendingPermission>,
   replaying: () => boolean,
 ): Client {
@@ -79,79 +94,108 @@ function clientFor(
     },
     async sessionUpdate(params) {
       if (replaying()) return
-      for (const event of normalizeAcpUpdate(params.update)) await options.onEvent(event)
+      for (const event of normalizeAcpUpdate(params.update, label)) await options.onEvent(event)
     },
   }
 }
 
-export class ClaudeAgentDriver implements AgentDriver {
-  readonly providerId = 'claude'
-  readonly profileId = 'claude-code'
+export class AcpDriver implements AgentDriver {
+  constructor(private readonly spec: HarnessLaunchSpec) {}
+
+  get providerId(): string {
+    return this.spec.id
+  }
+
+  get profileId(): string {
+    return this.spec.profileId
+  }
+
+  // Resolves the child's argv and env, and collects the reasons it could not be resolved rather than
+  // throwing: an unavailable harness has to show up in the Agent Center as a row with a diagnostic, not
+  // as a failed discovery.
+  private launch(): Launch {
+    const processEnv = usageProcessEnv()
+    const diagnostics: string[] = []
+    let file: string
+    let args: string[]
+    let executable: string | null
+    const env: Record<string, string> = { ...this.spec.env }
+
+    if ('command' in this.spec.spawn) {
+      executable = resolveUsageCommand(this.spec.spawn.command, processEnv)
+      if (!executable) diagnostics.push(`${this.spec.spawn.command} is not available on PATH.`)
+      file = executable ?? this.spec.spawn.command
+      args = [...(this.spec.spawn.args ?? [])]
+    } else {
+      let adapter: string | null = null
+      try {
+        adapter = this.spec.spawn.entry()
+      } catch {
+        diagnostics.push(`The ${this.spec.label} ACP adapter is unavailable.`)
+      }
+      file = process.execPath
+      args = [...(adapter ? [adapter] : []), ...(this.spec.spawn.args ?? [])]
+      const requires = this.spec.spawn.requires
+      executable = requires ? resolveUsageCommand(requires.command, processEnv) : null
+      if (requires && !executable) diagnostics.push(`${requires.command} is not available on PATH.`)
+      if (requires && executable) env[requires.env] = executable
+      if (!adapter) file = ''
+    }
+
+    return { file, args, executable, env, diagnostics }
+  }
 
   async probe(): Promise<AgentProviderDescriptor> {
-    const executable = resolveUsageCommand('claude', usageProcessEnv())
-    let adapterAvailable = true
-    try {
-      adapterEntry()
-    } catch {
-      adapterAvailable = false
-    }
+    const launch = this.launch()
     return {
-      id: this.providerId,
-      profileId: this.profileId,
-      label: 'Claude Code',
+      id: this.spec.id,
+      profileId: this.spec.profileId,
+      label: this.spec.label,
+      ...(this.spec.glyph ? { glyph: this.spec.glyph } : {}),
       driverKind: 'acp',
       driverVersion: DRIVER_VERSION,
-      installed: executable != null && adapterAvailable,
-      authenticated: executable ? await probeClaudeAuthentication(executable) : null,
-      executable: executable ?? undefined,
+      installed: launch.diagnostics.length === 0,
+      authenticated: launch.executable && this.spec.probeAuth
+        ? await this.spec.probeAuth(launch.executable)
+        : null,
+      ...(launch.executable ? { executable: launch.executable } : {}),
       statusAuthority: 'protocol',
-      capabilities: [
-        'streaming_messages',
-        'reasoning',
-        'tool_calls',
-        'plans',
-        'permissions',
-        'models',
-        'modes',
-        'permission_policies',
-        'commands',
-        'usage',
-        'resume',
-        'file_changes',
-        'attachments',
-      ],
+      capabilities: harnessCapabilities(this.spec.quirks),
       configOptions: [],
       commands: [],
       skills: [],
-      diagnostics: [
-        ...(executable ? [] : ['claude is not available on PATH.']),
-        ...(adapterAvailable ? [] : ['The packaged Claude ACP adapter is unavailable.']),
-      ],
+      diagnostics: launch.diagnostics,
     }
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
-    const descriptor = await this.probe()
-    if (!descriptor.executable) throw new Error('Claude Code is not available on PATH.')
+    // Read off the spec here rather than through `this` inside the session object below: the returned
+    // literal's methods rebind `this` to the literal.
+    const { id, label, quirks } = this.spec
+    const launch = this.launch()
+    if (launch.diagnostics.length > 0) throw new Error(launch.diagnostics[0])
     await options.onEvent({
       type: 'session_state',
       state: options.session.providerSessionRef ? 'replaying' : 'connecting',
     })
 
-    const child: ChildProcessWithoutNullStreams = spawn(process.execPath, [adapterEntry()], {
+    const child: ChildProcessWithoutNullStreams = spawnChild(launch.file, launch.args, {
       cwd: options.cwd,
       // brokerEnv, not `{ ...process.env }`. Spreading the parent environment would hand the session
       // the node's own bindings too, SESSION_ENC_KEY, INTERNAL_TOKEN, GITHUB_CLIENT_*, on top of the
       // task env it already has (docs/security.md § Credential handling). Config directories pass
       // through by name instead.
       //
-      // Not 'ANTHROPIC_*': that glob would carry ANTHROPIC_API_KEY. proc.ts's passthrough contract
-      // is for tool configuration, never credentials; the CLI authenticates through its own stored
-      // login under XDG_CONFIG_HOME.
+      // That is the rule for every harness, not a Claude detail: a passthrough glob is for tool
+      // configuration and never for credentials. `ANTHROPIC_*` and `OPENAI_*` are absent from the base
+      // allowlist for exactly this reason (main/drivers/toolEnv.ts) — those globs would carry API keys,
+      // and an agent CLI authenticates through its own stored login under XDG_CONFIG_HOME.
       env: {
-        ...brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CLAUDE_CODE_*'] }),
-        CLAUDE_CODE_EXECUTABLE: descriptor.executable,
+        ...brokerEnv({
+          env: options.env,
+          passthrough: [...AGENT_TOOL_PASSTHROUGH, ...(this.spec.envPassthrough ?? [])],
+        }),
+        ...launch.env,
       },
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -161,13 +205,13 @@ export class ClaudeAgentDriver implements AgentDriver {
         void options.onEvent({
           type: 'diagnostic',
           level: 'warning',
-          message: providerStderrNotice('Claude ACP adapter', chunk.byteLength),
+          message: providerStderrNotice(label, chunk.byteLength),
         })
       }
     })
     child.on('error', (error) => void options.onClosed(error))
     child.on('exit', (code) => void options.onClosed(
-      code === 0 ? undefined : new Error(`Claude ACP adapter exited with code ${code ?? 'unknown'}.`),
+      code === 0 ? undefined : new Error(`${label} exited with code ${code ?? 'unknown'}.`),
     ))
 
     const pending = new Map<string, PendingPermission>()
@@ -179,12 +223,15 @@ export class ClaudeAgentDriver implements AgentDriver {
     )
     const connection = new ClientSideConnection((remote) => {
       agent = remote
-      return clientFor(options, pending, () => replaying)
+      return clientFor(options, label, pending, () => replaying)
     }, stream)
 
     const initialized = await agent.initialize({
       protocolVersion: 1,
       clientInfo: { name: 'acorn', version: '0.1.0' },
+      // Everything ACP offers the client side is declined for now. Each of the three is worth adopting
+      // on its own merits and none blocks a harness contribution: docs/managed-agents.md § Harnesses
+      // records why they are parked and what each buys.
       clientCapabilities: {
         fs: { readTextFile: false, writeTextFile: false },
         terminal: false,
@@ -223,6 +270,19 @@ export class ClaudeAgentDriver implements AgentDriver {
     let active = false
     let stopped = false
     let currentConfig = normalizeAcpConfig(configOptions)
+    // ACP has one door for everything the client sends the agent, so both a turn and a compaction request
+    // go through here. What differs is what the caller does with the answer, which is why this does not
+    // emit anything itself: only one of the two is a turn.
+    const prompt = async (blocks: ContentBlock[]): Promise<string | undefined> => {
+      if (!providerSessionRef) throw new Error(`${label} has no initialized ACP session.`)
+      if (active) throw new Error(`${label} already has an active turn.`)
+      active = true
+      try {
+        return (await agent.prompt({ sessionId: providerSessionRef, prompt: blocks })).stopReason
+      } finally {
+        active = false
+      }
+    }
     return {
       get providerSessionRef() {
         return providerSessionRef
@@ -231,28 +291,35 @@ export class ClaudeAgentDriver implements AgentDriver {
         return !active && !stopped
       },
       async sendTurn(turnOptions: AgentDriverTurnOptions) {
-        if (!providerSessionRef) throw new Error('Claude ACP session is not initialized.')
-        if (active) throw new Error('Claude session already has an active turn.')
-        active = true
         try {
-          const response = await agent.prompt({
-            sessionId: providerSessionRef,
-            prompt: acpPrompt(turnOptions.input, turnOptions.attachments),
-          })
-          await options.onEvent({ type: 'turn_completed', stopReason: response.stopReason })
+          const stopReason = await prompt(acpPrompt(turnOptions.input, turnOptions.attachments))
+          await options.onEvent({ type: 'turn_completed', ...(stopReason ? { stopReason } : {}) })
           return {}
         } catch (error) {
           await options.onEvent({
             type: 'error',
-            code: 'claude_turn_failed',
-            message: error instanceof Error ? error.message : 'Claude turn failed.',
+            code: `${id}_turn_failed`,
+            message: error instanceof Error ? error.message : `${label} turn failed.`,
             retryable: false,
           })
           throw error
-        } finally {
-          active = false
         }
       },
+      // Only when the harness declared `manualCompaction`, because ACP has no compaction call: what the
+      // quirk says is that this agent implements a `/compact` command, so compaction is that command sent
+      // down the same door a turn uses. A harness that has not declared it leaves this undefined and the
+      // runtime refuses the request rather than sending a prompt the agent would answer as prose.
+      //
+      // No `turn_completed`: this is not a turn, and one here would end whatever the transcript thinks is
+      // in flight. The agent's own output still streams in through `sessionUpdate` either way.
+      ...(quirks?.manualCompaction
+        ? {
+          compact: async () => {
+            await prompt([{ type: 'text', text: '/compact' }])
+            await options.onEvent({ type: 'diagnostic', level: 'info', message: `${label} compacted the conversation.` })
+          },
+        }
+        : {}),
       async cancel() {
         if (!providerSessionRef || !active) return
         await agent.cancel({ sessionId: providerSessionRef })
@@ -261,7 +328,7 @@ export class ClaudeAgentDriver implements AgentDriver {
       },
       async resolveRequest(providerRequestId, resolution) {
         const request = pending.get(providerRequestId)
-        if (!request) throw new Error('Claude permission request is no longer pending.')
+        if (!request) throw new Error(`The ${label} permission request is no longer pending.`)
         pending.delete(providerRequestId)
         const row = typeof resolution === 'object' && resolution != null ? resolution as Record<string, unknown> : {}
         const optionId = typeof row.optionId === 'string' ? row.optionId : null

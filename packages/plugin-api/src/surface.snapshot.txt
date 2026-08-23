@@ -158,6 +158,7 @@ client: wsOnStatus
 client: wsOnWorkflowStepEvent
 client: wsSend
 client: wsWrite
+node: AGENTS_HARNESS_REGISTRY
 node: AgentProfileContribution
 node: AgentToolContribution
 node: AppEnv
@@ -168,13 +169,18 @@ node: CachedItemCodec
 node: CodecResult
 node: CoreServices
 node: DEFAULT_PROFILE_ID
+node: Disposable
 node: GenerateTextRequest
 node: HEADLESS_TIMEOUT_MS
+node: HarnessProbe
+node: HarnessRegistry
 node: HeadlessOpts
 node: HeadlessResult
 node: InternalEnvFactory
 node: Launcher
 node: LayoutRecipe
+node: ManifestHarness
+node: ManifestHarnessSpawn
 node: MirroredResourceContribution
 node: ModelProviderAdapter
 node: ModelService

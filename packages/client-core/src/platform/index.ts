@@ -6,7 +6,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it (git history:
@@ -129,6 +129,9 @@ export type PluginTrustDecision = {
   // What this package will say, and possibly do, when a task is archived. Required here and
   // defaulted in the store's schema, exactly as the four above are.
   taskChecks: PluginTaskCheckGrant[]
+  // What this package asks acorn to run as a managed agent (docs/managed-agents.md § Harnesses).
+  // Required here and defaulted in the store's schema, exactly as the five above are.
+  harnesses: PluginHarnessGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = PluginTrustDecision & {

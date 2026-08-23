@@ -578,6 +578,87 @@ describe('chrome descriptors', () => {
     }))).toEqual([`duplicate contribution id 'board'`])
   })
 
+  it('accepts a data-only harness and insists a spawn names exactly one thing to run', () => {
+    // The whole opencode plugin from docs/plugin-authoring.md § Harnesses, minus the icon: no node half,
+    // no client half, no build step. If this stops parsing, that document is wrong.
+    const opencode = manifest({
+      harnesses: [{
+        id: 'opencode',
+        label: 'OpenCode',
+        spawn: { command: 'opencode', args: ['acp'] },
+        envPassthrough: ['OPENCODE_*'],
+        quirks: { manualCompaction: true },
+        terminal: { command: 'opencode' },
+      }],
+    })
+    expect(opencode.success).toBe(true)
+    expect(opencode.success && opencode.data.contributions.harnesses[0]).toMatchObject({
+      spawn: { command: 'opencode', args: ['acp'] },
+      quirks: { manualCompaction: true, sessionPersistence: false },
+      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
+    })
+
+    // Neither, or both, describes nothing acorn can start.
+    expect(messages(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { args: ['acp'] } }] })))
+      .toEqual(['a harness must declare exactly one of command or entry'])
+    expect(messages(manifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h', entry: './dist/adapter.js' } }],
+    }))).toEqual(['a harness must declare exactly one of command or entry'])
+  })
+
+  it('confines an adapter entry to the package and ties `requires` to it', () => {
+    expect(manifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { entry: './dist/adapter.js', requires: { command: 'h', env: 'H_BIN' } } }],
+    }).success).toBe(true)
+
+    // The same confinement every code entrypoint gets: a harness entry is a path acorn will run.
+    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { entry: '../../../etc/passwd' } }] }).success).toBe(false)
+    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { entry: '/usr/bin/node' } }] }).success).toBe(false)
+
+    // `requires` says which CLI an adapter drives, so it means nothing beside a bare command.
+    expect(messages(manifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h', requires: { command: 'x', env: 'X_BIN' } } }],
+    }))).toEqual(['requires names the CLI an adapter drives, so it is only valid with entry'])
+  })
+
+  it('refuses an env passthrough that would copy the whole node environment', () => {
+    expect(manifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['H_TOKEN_DIR', 'H_*'] }],
+    }).success).toBe(true)
+    // A bare `*` is the one glob that defeats the allowlist outright, refused here as well as in brokerEnv.
+    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['*'] }] }).success).toBe(false)
+    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, envPassthrough: ['H-DASH'] }] }).success).toBe(false)
+  })
+
+  it('confines harness probe routes and insists there is a node half to serve them', () => {
+    expect(nodeManifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v2/p/board/h/usage', auth: '/v2/p/board/h/auth' } }],
+    }).success).toBe(true)
+
+    expect(messages(nodeManifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v2/p/linear/usage' } }],
+    }))).toEqual(['route must be inside /v2/p/board/'])
+
+    // Verbatim the schedule and task-check rule: only a node half serves that namespace.
+    expect(messages(manifest({
+      harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' }, probes: { usage: '/v2/p/board/h/usage' } }],
+    }))).toEqual(['a harness probe calls a node route; declare `node` in the manifest'])
+
+    // And a harness with no probes needs no node half at all, which is the whole point of the tier.
+    expect(manifest({ harnesses: [{ id: 'h', label: 'H', spawn: { command: 'h' } }] }).success).toBe(true)
+  })
+
+  it('caps harnesses at four and refuses an id another contribution kind already took', () => {
+    const five = Array.from({ length: 5 }, (_, i) => ({ id: `h${i}`, label: 'H', spawn: { command: 'h' } }))
+    expect(manifest({ harnesses: five }).success).toBe(false)
+    expect(manifest({ harnesses: five.slice(0, 4) }).success).toBe(true)
+
+    expect(messages(manifest({
+      frames: [PANE],
+      harnesses: [{ id: 'board', label: 'H', spawn: { command: 'h' } }],
+    }))).toEqual([`duplicate contribution id 'board'`])
+  })
+
   it('floors the polling fallback so a descriptor cannot busy-loop a remote node', () => {
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 30 }] }).success).toBe(true)
     expect(manifest({ slots: [{ id: 'x', slot: 'footer', data: '/v2/p/board/badge', refresh: 5 }] }).success).toBe(false)

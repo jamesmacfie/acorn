@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { PluginExtensionGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
@@ -86,6 +86,16 @@ export const disclosureSchema = z.object({
     id: z.string().min(1).max(64),
     cleansUp: z.boolean(),
   })).max(4).default([]) as z.ZodType<PluginTaskCheckGrant[]>,
+  // Defaulted for the same reason the three above are: a node whose manifest schema predates harnesses
+  // sends a disclosure without the field, and a decision that cannot be recorded is a prompt that
+  // re-queues forever.
+  harnesses: z.array(z.strictObject({
+    id: z.string().min(1).max(64),
+    label: z.string().min(1).max(80),
+    kind: z.enum(['command', 'entry']),
+    run: z.string().min(1).max(512),
+    env: z.array(z.string().min(1).max(64)).max(32),
+  })).max(4).default([]) as z.ZodType<PluginHarnessGrant[]>,
 })
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
@@ -96,6 +106,7 @@ export const NO_DISCLOSURE = {
   extensions: [],
   schedules: [],
   taskChecks: [],
+  harnesses: [],
 } satisfies z.infer<typeof disclosureSchema>
 
 export type PluginsState = {

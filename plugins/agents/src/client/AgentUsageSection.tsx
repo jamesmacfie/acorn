@@ -1,12 +1,9 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
-import type { AgentProviderUsage } from '../shared/usage'
 import { agentUsageStore } from './usageStore'
 import { formatUpdated, providerUsageRows } from './usageModel'
 import { Button, DescriptionList, Icon, StatusDot } from '@acorn/plugin-api/ui'
 import { usageTone } from './stateTone'
 import './agent-usage.css'
-
-const providerLabel = (provider: AgentProviderUsage): string => (provider.provider === 'claude' ? 'Claude' : 'Codex')
 
 export default function AgentUsageSection(props: { showHeader?: boolean }) {
   onMount(() => onCleanup(agentUsageStore.init()))
@@ -42,7 +39,7 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
           <div class="agent-usage-provider" data-provider={provider.provider}>
             <div class="agent-usage-provider-head">
               <StatusDot tone={usageTone(provider.health)} />
-              <strong>{providerLabel(provider)}</strong>
+              <strong>{provider.label}</strong>
               <Show when={provider.plan}><span class="agent-usage-plan">{provider.plan}</span></Show>
               <span class="agent-usage-updated muted">
                 {provider.stale ? 'stale · ' : ''}{formatUpdated(provider.capturedAt)}

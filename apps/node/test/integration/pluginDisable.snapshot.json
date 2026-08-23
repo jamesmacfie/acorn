@@ -69,6 +69,7 @@
     "providerRoutes": [],
     "modelProviders": [],
     "capabilities": [
+      "agents.harnessRegistry",
       "agents.managedRoute",
       "agents.runtime",
       "agents.sessionExecute",

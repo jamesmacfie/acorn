@@ -10,11 +10,12 @@
 // and the rollback of everything registered here all stay in host.ts, because they are decisions about a
 // set of plugins and this is one plugin's surface.
 import type { CoreServices } from '../../main/core'
-import type { NodePermissions, PluginCollectionDescriptor, PluginCommandDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
+import type { NodePermissions, PluginCollectionDescriptor, PluginCommandDescriptor, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
 import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerCollectionRead } from '../collections/registry'
 import { registerNodeAction } from '../nodeActions/registry'
+import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
 import { registerTaskCheck } from './taskChecks'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute } from '../routeRegistry'
@@ -52,6 +53,13 @@ export type LoadedPluginBinding = {
   // And what it declared as archive checks, by the same route as schedules: the registration is
   // synthesised from these two paths so both feeders land through `ctx.taskChecks` (./taskChecks.ts).
   taskChecks?: readonly PluginTaskCheckDescriptor[]
+  // And its managed agent harnesses, by the same route. The delivery seam also needs `dir` below, since
+  // an adapter entry is a path inside the installed package.
+  harnesses?: readonly PluginHarnessDescriptor[]
+  // The plugin's installed package directory, for resolving a manifest path the host has to hand to
+  // something else as an absolute one. Host-side only: this is a path on the node's filesystem and must
+  // never reach a route (main/pluginLoader.ts § InstalledPluginInfo says the same).
+  dir?: string
 }
 
 export type PluginContextOptions = {
@@ -171,6 +179,24 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
     taskChecks: {
       register: (check) => registerTaskCheck({ ...check, pluginId: plugin }),
     },
+    // Owner-bound like the four above, and here the binding is the id itself: a harness id is persisted
+    // into session rows and workflow steps, so minting it from `plugin` is what keeps one package's
+    // sessions out of another package's namespace for good.
+    //
+    // The consumer is resolved at registration rather than held: agents absent means the harness quietly
+    // does not exist, which is what an unmatched contribution always means, and re-enabling redelivers.
+    harnesses: {
+      register: (harness) => {
+        const registry = options.capabilities.get(AGENTS_HARNESS_REGISTRY)
+        if (!registry) return
+        const handle = registry.register({
+          ...harness,
+          id: qualifiedHarnessId(plugin, harness.id),
+          pluginId: plugin,
+        })
+        recordUndo(() => handle.dispose())
+      },
+    },
     // asContextSection is where core's database handle is dropped rather than merely left unused: core's
     // own `issues` section keeps it, a plugin-registered one can never see it, and neither side has to be
     // trusted to remember.
@@ -274,7 +300,7 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
       return undefined as R
     }
 
-  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'taskChecks', 'contextSections', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'taskChecks', 'harnesses', 'contextSections', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined

@@ -234,6 +234,14 @@ The threats this closes, and the ones it does not:
   which is the same argument brand marks make for shipping path data instead of an SVG document, and
   the reason the host generates the theme block rather than accepting a stylesheet
   (`docs/ui-design.md § Plugin themes`).
+- **A contributed harness spawning something else.** A `harnesses` entry names a program acorn will
+  run, so it is disclosed under `Enforced` rather than `Declared`: the host spawns exactly the declared
+  command with the declared arguments and nothing else, and the plugin gets no process of its own — a
+  data-only harness package needs no `exec` grant because it never spawns anything. The whole spawn plus
+  the environment passthrough is the grant key, so swapping the binary, changing its arguments or
+  widening a glob all read as newly requested. What this does not bound is the agent itself: an agent
+  CLI a person installed and acorn started is code that person is running, which is the same trust class
+  as running it in their own terminal (`docs/managed-agents.md § Harnesses`).
 - **Not closed: the Node half.** A loaded plugin's node code runs in the Node's process, disclosed and
   acknowledged — the same trust class as an editor extension. Its declared `node` permissions shape
   the context it is handed; they are not enforced against a bundle that imports `node:fs` directly.

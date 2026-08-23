@@ -95,7 +95,11 @@ function toolStatus(status: string | null | undefined): 'pending' | 'running' | 
   return 'running'
 }
 
-export function normalizeAcpUpdate(update: SessionUpdate): AgentNormalizedEvent[] {
+// `harness` is the label of the agent whose events these are, and it is a parameter rather than a
+// constant because this file is the shared half of the generic driver (main/drivers/acpDriver.ts). It
+// used to write "Claude" into three user-visible strings, which would have named the wrong agent for
+// every harness the moment a second one arrived.
+export function normalizeAcpUpdate(update: SessionUpdate, harness: string): AgentNormalizedEvent[] {
   switch (update.sessionUpdate) {
     case 'user_message_chunk':
       return []
@@ -111,7 +115,7 @@ export function normalizeAcpUpdate(update: SessionUpdate): AgentNormalizedEvent[
     case 'tool_call_update': {
       const diffs = (update.content ?? []).flatMap((content) =>
         content.type === 'diff'
-          ? [{ type: 'file_change' as const, path: content.path, summary: 'Claude updated a file.' }]
+          ? [{ type: 'file_change' as const, path: content.path, summary: `${harness} updated a file.` }]
           : [])
       return [{
         type: 'tool',
@@ -149,11 +153,11 @@ export function normalizeAcpUpdate(update: SessionUpdate): AgentNormalizedEvent[
       return [{
         type: 'diagnostic',
         level: 'info',
-        message: `Claude switched to mode ${update.currentModeId}.`,
+        message: `${harness} switched to mode ${update.currentModeId}.`,
       }]
     case 'session_info_update':
       return update.title
-        ? [{ type: 'diagnostic', level: 'info', message: `Claude session title: ${update.title}` }]
+        ? [{ type: 'diagnostic', level: 'info', message: `${harness} session title: ${update.title}` }]
         : []
     case 'plan_update':
     case 'plan_removed':

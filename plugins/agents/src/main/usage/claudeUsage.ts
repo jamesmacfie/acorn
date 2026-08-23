@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type {
-  AgentProviderUsage,
+  AgentProviderUsageReading,
   AgentUsageCost,
   AgentUsageQuota,
 } from '../../shared/usage'
@@ -203,7 +203,7 @@ function extraUsage(text: string, now: number): AgentUsageCost | null {
   }
 }
 
-export function parseClaudeCostOutput(text: string, capturedAt = Date.now()): AgentProviderUsage {
+export function parseClaudeCostOutput(text: string, capturedAt = Date.now()): AgentProviderUsageReading {
   const costMatch = text.match(/total\s+cost:\s*\$?([\d,]+(?:\.\d+)?)/i)
   if (!costMatch) throw new UsageProcessError('parse_failure', 'Claude `/cost` output did not contain total cost.')
   const duration = text.match(/total\s+duration\s*\(api\):\s*([^\n\r]+)/i)?.[1] ?? ''
@@ -238,7 +238,7 @@ export function parseClaudeUsageOutput(
   text: string,
   capturedAt = Date.now(),
   account: ClaudeAccount = null,
-): AgentProviderUsage {
+): AgentProviderUsageReading {
   const classified = classifyClaudeOutput(text)
   if (classified === 'trust') throw new UsageProcessError('trust_failure', 'Claude requires trust for the usage probe directory.')
   if (classified === 'cost') throw new UsageProcessError('parse_failure', 'Claude account requires the `/cost` fallback.')
@@ -276,7 +276,7 @@ export function parseClaudeUsageOutput(
   }
 }
 
-export async function collectClaudeUsage(options: ClaudeUsageOptions): Promise<AgentProviderUsage> {
+export async function collectClaudeUsage(options: ClaudeUsageOptions): Promise<AgentProviderUsageReading> {
   const paths = claudePaths()
   const configFile = options.configFile ?? paths.configFile
   const claudeDir = options.claudeDir ?? paths.claudeDir

@@ -19,30 +19,76 @@ A workspace-scoped list or search resolves the task ids first, through
 result narrows the answer to nothing rather than falling back to unfiltered: unfiltered is how a
 workspace-scoped read would leak another workspace's sessions into the caller's view.
 
-## Providers
+## Harnesses
 
-Claude and Codex drivers adapt provider protocols into the common session/event model. A provider
-PROFILE — how to launch the CLI, resume it, run it headless — is registered into a core registry and
-used by terminal, agents, and workflows. A profile may be available for interactive terminal use
-without the managed driver being enabled; `aider` is exactly that case.
+A harness is one agent acorn can manage. A driver adapts its protocol into the common session/event
+model; a PROFILE — how to launch the CLI, resume it, run it headless — is registered into a core
+registry and used by terminal, agents, and workflows. A profile may be available for interactive
+terminal use without a managed driver behind it; `aider` is exactly that case.
 
-**Both are first-party.** The profiles live in `plugins/agents/src/main/profiles/`, and the driver
-registry is not a contribution point: `plugins/agents/src/node/index.ts` registers `claude` and
-`codex` by literal. Adding an agent CLI means a change to plugins/agents.
+**There are two driver tiers, permanently.**
 
-A profile's `id` is persisted, not just displayed: it is stored as a session row's `profileId` and
-as a workflow step's `profile`. Renaming one is a compatibility break across every stored row, not a
-label edit.
+**Tier 1 is the generic ACP driver, and a harness is data.** One driver
+(`plugins/agents/src/main/drivers/acpDriver.ts`), built from a launch spec: a command or a
+package-relative adapter entry, arguments, an environment passthrough list, and a small block of
+declared quirks. Everything downstream is shared — the normalizer, the durable event ledger, the
+transcript, permission plumbing. This is the default path for a new agent and the only path a loaded
+plugin can reach.
+
+**Tier 2 is a native driver, first-party only, for what ACP cannot say.** Codex is the reason it
+exists: its app-server gives acorn `thread/fork`, `thread/compact/start`, `thread/archive`,
+`thread/delete` and per-turn model, effort and permission settings, and ACP expresses none of them.
+A native driver is written when a vendor protocol carries product value the generic driver cannot, and
+it lives in plugins/agents with the rest of the first-party code. The registry has two doors and the
+names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.
+
+Claude runs on tier 1 and Codex on tier 2, which makes the two of them the worked example of each.
+
+**plugins/agents stays first-party.** It owns the stream and the surfaces, and a harness contribution
+is a descriptor delivered *to* it rather than a fork of it: the contributing plugin describes the
+spawn, plugins/agents owns the child process, the session and every byte of the transcript. That is
+also why a data-only harness plugin needs no `exec` grant — it never spawns anything.
+
+**The delivery seam.** A manifest's `harnesses` entries reach the node host like schedules and task
+checks do: the composition root carries them on the loaded-plugin binding, and
+`node-core/server/plugin/host.ts` resolves each adapter entry inside the contributing package, turns
+each probe route into a call, and hands the result to `ctx.harnesses`. That facet forwards to the
+`agents.harnessRegistry` capability plugins/agents publishes, resolved at delivery time and never
+cached: agents disabled means the same silent nothing every unmatched contribution gets, and
+re-enabling redelivers. A harness package with no node bundle still gets a real plugin row, so it is
+listed in Settings → Plugins and the owner can turn it off.
+
+A harness names a program acorn will run, so it is disclosed under **Enforced** in the trust prompt,
+honestly: the host spawns exactly the declared command with the declared arguments and nothing else.
+The whole spawn plus the environment passthrough is the grant key, so a version that swaps the binary,
+changes its arguments, or widens the globs reads as newly requested.
+
+**Ids are persisted, not displayed.** A harness id is stored as a session row's `providerId` and a
+profile id as its `profileId` and a workflow step's `profile`. Renaming one is a compatibility break
+across every stored row. Built-in ids (`claude`, `codex`, `claude-code`) are grandfathered as bare
+names; a loaded plugin's harness id is namespaced by the host into `<pluginId>:<harnessId>`.
+
+[docs/plugin-authoring.md § Harnesses](./plugin-authoring.md) is the authoring contract.
 
 Until recently each profile was its own workspace package, which read as an extension seam and was
 not one — everything that actually encodes provider knowledge (drivers, normalizers, usage probes,
 pricing) was already inside plugins/agents, so a new profiles package bought a menu entry whose agent
-could not run. Making the driver registry a real contribution point is the change that would open
-this up; the packages were not. That design now lives in [docs/future/acp/](./future/acp/).
+could not run. The driver registry was the seam that had never been opened; the packages were not, and
+they were folded back in.
 
-The Node probes provider availability and usage on bounded intervals. Usage and pricing details are
+**What ACP offers the client side is declined, for now.** The driver answers no to `fs`, `terminal` and
+`mcpServers` at `initialize`. Each is worth adopting on its own merits and none of them blocks, or is
+blocked by, harness contributions: `fs` would make the agent ask acorn to read and write files, which
+is one audit point and the precondition for the agent and the worktree living on different machines;
+`terminal` would put agent-run commands through acorn's process lifecycle and into the task's terminal
+surfaces; `mcpServers` would replace per-CLI config-file registration with per-session MCP carrying
+the task-scoped internal token.
+
+The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
-are not stored by the model-provider plugin.
+are not stored by the model-provider plugin. Plan usage is per harness: the built-in CLI probes and a
+contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
+usage section.
 
 ## Client surfaces
 

@@ -13,7 +13,8 @@ import { z } from 'zod'
 import { agentToolContributions } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import { pluginRouteContributions } from '../routeRegistry'
-import { initPlugins } from './host'
+import { AGENTS_HARNESS_REGISTRY, type ManifestHarness } from './harnesses'
+import { clearRegistrations, initPlugins } from './host'
 import type { NodePermissions } from '../../main/pluginManifest'
 import type { NodePlugin, NodePluginContext } from './types'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providers/shared'
@@ -552,5 +553,135 @@ describe('loaded plugins', () => {
     const route = integrationProviderRegistry.routes().find((entry) => entry.providerId === 'tracker-fetch-provider')
     expect(route?.router).toBeUndefined()
     expect(route?.fetch).toBeTypeOf('function')
+  })
+})
+
+describe('delivering a manifest-declared harness', () => {
+  let shared: ReturnType<typeof makeTestDb> | null = null
+  const coreDb = () => (shared ??= makeTestDb()).db
+  afterAll(() => shared?.cleanup())
+
+  const plugin = (name: string, opts: Partial<NodePlugin> = {}): NodePlugin => ({ name, init: () => {}, ...opts })
+
+  // Two plugins per boot, in the order the composition root uses them: the consumer publishes the
+  // capability from its own init, and the contributor's harnesses are delivered when its turn comes.
+  const boot = async (
+    harnesses: readonly unknown[],
+    dir: string,
+  ): Promise<{ registered: ManifestHarness[]; dispose: () => Promise<void> }> => {
+    const registered: ManifestHarness[] = []
+    const result = await initPlugins([
+      plugin('agents', {
+        init: (ctx) => void ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, {
+          register: (harness) => {
+            registered.push(harness)
+            return { dispose: () => void registered.splice(registered.indexOf(harness), 1) }
+          },
+        }),
+      }),
+      plugin('opencode'),
+    ], {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      dataDir: '',
+      loaded: new Map([['opencode', {
+        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+        storage: { open: () => { throw new Error('test storage is not configured') } },
+        harnesses: harnesses as never,
+        dir,
+      }]]),
+    })
+    return { registered, dispose: () => result.dispose() }
+  }
+
+  it('mints the id from the contributing plugin and hands the descriptor over verbatim', async () => {
+    const { registered, dispose } = await boot([{
+      id: 'opencode',
+      label: 'OpenCode',
+      spawn: { command: 'opencode', args: ['acp'] },
+      envPassthrough: ['OPENCODE_*'],
+      quirks: { manualCompaction: true, sessionPersistence: false },
+      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: [] },
+    }], '')
+
+    expect(registered).toHaveLength(1)
+    // `<pluginId>:<harnessId>`, minted here and nowhere else: this value is persisted onto every session
+    // row, so a manifest must not be able to choose it.
+    expect(registered[0]).toMatchObject({
+      id: 'opencode:opencode',
+      pluginId: 'opencode',
+      label: 'OpenCode',
+      spawn: { command: 'opencode', args: ['acp'] },
+    })
+    // No probes declared, so no probes handed over: absent, not a stub that answers nothing.
+    expect(registered[0].probeUsage).toBeUndefined()
+    expect(registered[0].probeAuth).toBeUndefined()
+
+    // Released when the plugin's registrations are rolled back, which is what a re-init and a contained
+    // failure both do. The plugin's own dispose does not: a harness lives in the consumer's registry, and
+    // the consumer's dispose takes the whole capability with it.
+    clearRegistrations('opencode')
+    expect(registered).toEqual([])
+    await dispose()
+  })
+
+  it('resolves an adapter entry inside the package and drops one that escapes it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acorn-harness-'))
+    try {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(noop)
+      const { registered, dispose } = await boot([
+        {
+          id: 'inside',
+          label: 'Inside',
+          spawn: { entry: 'dist/adapter.js', args: [], requires: { command: 'node', env: 'NODE_BIN' } },
+          envPassthrough: [],
+          quirks: { manualCompaction: false, sessionPersistence: false },
+        },
+        // The schema already refuses `..` and a leading slash, so this is the belt to that brace: a path
+        // that only escapes once it is resolved must not reach the consumer either.
+        {
+          id: 'outside',
+          label: 'Outside',
+          spawn: { entry: 'dist/../../escape.js', args: [] },
+          envPassthrough: [],
+          quirks: { manualCompaction: false, sessionPersistence: false },
+        },
+      ], dir)
+
+      expect(registered.map((harness) => harness.id)).toEqual(['opencode:inside'])
+      expect(registered[0].spawn).toEqual({
+        entry: join(dir, 'dist/adapter.js'),
+        args: [],
+        requires: { command: 'node', env: 'NODE_BIN' },
+      })
+      expect(warn).toHaveBeenCalled()
+      warn.mockRestore()
+      await dispose()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('delivers nothing when no plugin owns agent sessions', async () => {
+    // The same silent nothing every unmatched contribution gets. A throw here would make "agents
+    // disabled" into "this node does not boot".
+    const result = await initPlugins([plugin('opencode')], {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      dataDir: '',
+      loaded: new Map([['opencode', {
+        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+        storage: { open: () => { throw new Error('test storage is not configured') } },
+        harnesses: [{
+          id: 'opencode',
+          label: 'OpenCode',
+          spawn: { command: 'opencode', args: [] },
+          envPassthrough: [],
+          quirks: { manualCompaction: false, sessionPersistence: false },
+        }] as never,
+      }]]),
+    })
+    expect(result.enabled).toEqual(['opencode'])
+    await result.dispose()
   })
 })

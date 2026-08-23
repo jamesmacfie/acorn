@@ -11,6 +11,7 @@ import type { AgentToolContribution } from '../agentTools/registry'
 import type { CollectionReadRegistration } from '../collections/registry'
 import type { NodeActionRegistration } from '../nodeActions/registry'
 import type { PluginContextSection } from '../agentTools/contextSections'
+import type { PluginHarnessRegistry } from './harnesses'
 import type { TaskCheck } from './taskChecks'
 import type { AppEnv, Principal } from '../middleware/auth'
 import type { CapabilityRegistry } from './capabilities'
@@ -224,6 +225,11 @@ export type NodePluginContext = {
   // Both tiers. A loaded plugin declares `taskChecks` in its manifest and the host synthesises the
   // registration through this seam.
   taskChecks: PluginTaskCheckRegistry
+  // Both tiers, same as taskChecks: a loaded plugin declares `harnesses` in its manifest and the host
+  // synthesises the registration through this seam. Delivered on to whichever plugin owns agent
+  // sessions, which is the one difference from its siblings — there is no registry here, only a
+  // capability handover (./harnesses.ts).
+  harnesses: PluginHarnessRegistry
   contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities

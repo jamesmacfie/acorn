@@ -42,8 +42,14 @@ until it can do everything the first can.
 
 If yes, it can be sandboxed. Panes, reference panels, settings pages, importers, overlay pickers, rail
 sources, badges, palette rows, attention items, node stats, content links, commands, keybindings,
-typed record sets, webviews — all of these turned out to be expressible that way, several of them only
-after someone looked properly.
+typed record sets, webviews, managed agent harnesses — all of these turned out to be expressible that
+way, several of them only after someone looked properly.
+
+Harnesses are the sharpest case, because the same line runs *inside* one feature: an ACP-speaking agent
+is a launch spec and a stream of asynchronous messages, so it is data and it sandboxes; Codex's
+app-server carries fork, compaction, archive and delete, which ACP cannot express, so it stays a native
+driver. Same question, two answers, in one place. See
+[managed-agents.md § Harnesses](./managed-agents.md).
 
 If no, it needs the shared realm and stays first-party. That is a short list: owning a WebSocket
 stream or channel (the transport itself, not a consumer of it), components the shell renders
