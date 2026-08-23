@@ -34,6 +34,10 @@ const VISIBLE_EVENT_TYPES = new Set([
 // A plain Map, in memory for the life of the window. Scroll position is worth remembering across a pane
 // unmount, not worth a store or a round trip to disk. Cleared with the roster it keys off, so a node
 // switch can't leave positions behind for sessions that are gone.
+//
+// Only positions the reader chose are held. A session left at the bottom has no entry, because a pixel
+// offset is the wrong thing to save for it: the bottom moves as the session runs, so replaying the offset
+// lands short of it and the reader comes back a screenful up from where they left.
 const scrollTopBySession = new Map<string, number>()
 onScopeEvicted((e) => {
   if (e.scope === 'node-switched') scrollTopBySession.clear()
@@ -67,7 +71,7 @@ export default function AgentTranscript(props: {
     if (!element) return
     element.scrollTop = element.scrollHeight
     applied = element.scrollTop
-    scrollTopBySession.set(sessionId(), applied)
+    scrollTopBySession.delete(sessionId())
   }
   const noteScroll = () => {
     const element = scrollElement()
@@ -78,7 +82,8 @@ export default function AgentTranscript(props: {
     if (element.scrollTop === applied) return
     target = null
     following = nearBottom(element)
-    scrollTopBySession.set(sessionId(), element.scrollTop)
+    if (following) scrollTopBySession.delete(sessionId())
+    else scrollTopBySession.set(sessionId(), element.scrollTop)
   }
   // Leaving the task unmounts this pane, so the reader must land back where they were. Code highlighting
   // resolves after mount and keeps growing the list, so the browser clamps an early write. Re-apply the
