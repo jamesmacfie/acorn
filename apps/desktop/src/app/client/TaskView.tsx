@@ -24,6 +24,7 @@ import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-c
 import { defaultSourceId } from '@acorn/client-core/registries/sources.ts'
 import CopyButton from '@acorn/client-core/ui/CopyButton.tsx'
 import '@acorn/client-core/tasks/task-view.css'
+import { RailTab } from '@acorn/client-core/tabs/RailTab.tsx'
 
 export default function TaskView(props: {
   task: Task
@@ -219,8 +220,8 @@ export default function TaskView(props: {
       <Show when={(runTargets() ?? []).length}>
         <For each={runTargets() ?? []}>
           {(target) => (
-            <Button
-              variant="bare" class="pane-switch-btn pane-switch-run"
+            <RailTab
+              class="pane-switch-run"
               classList={{ active: target.running }}
               data-tip={`${target.running ? 'Stop' : 'Run'} ${target.id}`}
               data-tip-sub={target.command}
@@ -228,11 +229,11 @@ export default function TaskView(props: {
               onClick={() => void toggleTarget(target.id, target.running)}
             >
               {target.running ? '■' : '▶'}<span class="pane-switch-run-id">{target.id}</span>
-            </Button>
+            </RailTab>
           )}
         </For>
       </Show>
-      <Button variant="bare" class="pane-switch-btn" classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</Button>
+      <RailTab classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</RailTab>
     </>
   )
 
