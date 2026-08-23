@@ -6,6 +6,7 @@ import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
+import { sessionModelLabel } from './agentConfigOptions'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 import './agent-task-sidebar.css'
 
@@ -172,7 +173,7 @@ export default function AgentTaskSidebar(props: {
                 onActivate={() => props.onSelectSession(session.id)}
               >
                 <strong>{session.title}</strong>
-                <small>{[session.providerId, session.model, session.runtimeState].filter(Boolean).join(' · ')}</small>
+                <small>{[session.providerId, sessionModelLabel(session), session.runtimeState].filter(Boolean).join(' · ')}</small>
               </Row>
             )}
           </For>
