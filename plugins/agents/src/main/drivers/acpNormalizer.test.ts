@@ -3,6 +3,8 @@ import type { SessionUpdate } from '@agentclientprotocol/sdk'
 import { normalizeAcpUpdate } from './acpNormalizer'
 import type { AgentNormalizedEvent } from '@acorn/protocol/managedAgents.ts'
 import capture from './testFixtures/claudeSubagentWire.json' with { type: 'json' }
+import { buildConversationItems } from '../../client/conversationItems'
+import type { AgentEventRecord } from '@acorn/protocol/managedAgents.ts'
 
 const toolEvent = (update: SessionUpdate) => {
   const [event] = normalizeAcpUpdate(update, 'Claude Code')
@@ -164,5 +166,42 @@ describe('Claude subagent attribution, unit cases', () => {
       _meta: { claudeCode: { toolResponse: { agentId: 'a1', status: 'error' } } },
     } as SessionUpdate, 'Claude Code')
     expect(event).toMatchObject({ type: 'subagent', subagent: { status: 'failed', providerAgentRef: 'a1' } })
+  })
+})
+
+describe('the captured fan-out as a transcript', () => {
+  // End to end over the real capture: normalize every update, then project it the way the transcript
+  // does. This is what catches an attribution the projection cannot act on, which unit cases on either
+  // side of the seam both pass.
+  const projected = () => {
+    let seq = 0
+    const records: AgentEventRecord[] = normalizedCapture.map((event) => ({
+      id: String(++seq),
+      sessionId: 'session',
+      turnId: 'turn-1',
+      seq,
+      schemaVersion: 1,
+      event,
+      searchText: null,
+      createdAt: seq,
+    }))
+    return buildConversationItems(records)
+  }
+
+  it('leaves no orphan tool card at the top level', () => {
+    // The bug: the adapter leaves a subagent's mid-call update untagged, and a per-stream fold could not
+    // place it, so seven cards appeared at the top titled with a raw tool id.
+    const orphans = projected().filter((item) =>
+      item.event.type === 'tool' && item.event.tool.title.startsWith('toolu_'))
+    expect(orphans).toEqual([])
+  })
+
+  it('puts one card per subagent at the top and the rest inside them', () => {
+    const items = projected()
+    const cards = items.filter((item) => item.event.type === 'subagent')
+    expect(cards).toHaveLength(2)
+    // Every tool the two subagents ran, nested: three for one, four for the other, plus each spawn call.
+    expect(cards.map((card) => card.children?.length)).toEqual([4, 5])
+    expect(items.some((item) => item.event.type === 'tool')).toBe(false)
   })
 })

@@ -8,6 +8,8 @@ import { AgentToolCallCard } from './toolRendererRegistry'
 import { Button, StatusDot } from '@acorn/plugin-api/ui'
 import { subagentTone } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
+import { selectManagedSubagent } from './managedSelection'
+import { visibleConversationItems } from './conversationItems'
 
 const copy = (text: string): void => {
   void navigator.clipboard.writeText(text)
@@ -24,7 +26,12 @@ async function downloadArtifact(artifactId: string, title: string): Promise<void
 }
 
 
-export default function AgentEventCard(props: { item: AgentConversationItem; taskId: string; turn?: AgentTurn }) {
+export default function AgentEventCard(props: {
+  item: AgentConversationItem
+  taskId: string
+  sessionId: string
+  turn?: AgentTurn
+}) {
   const event = () => props.item.event
   const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
 
@@ -97,13 +104,17 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
       <Show when={event().type === 'subagent'}>
         {(() => {
           const subagent = () => (event() as Extract<ReturnType<typeof event>, { type: 'subagent' }>).subagent
-          // Seeded open, then the reader's own. A reactive `open` would slam the card shut the moment
-          // the subagent finished, which is the one moment somebody is most likely to be reading it.
-          const [open, setOpen] = createSignal(true)
+          const children = () => visibleConversationItems(props.item.children ?? [])
+          // Seeded once, then the reader's own. Expanded while the subagent is working, because watching
+          // it is the point; collapsed if it had already settled when this card was first rendered,
+          // because a long finished run buries the parent's stream and there is a dedicated view for it.
+          // A reactive `open` would instead slam the card shut the moment the subagent finished, which
+          // is exactly when somebody is most likely to be reading it.
+          const [open, setOpen] = createSignal(
+            subagent().status === undefined || subagent().status === 'running' || subagent().status === 'pending')
           return (
             <details
               class="agent-subagent"
-              data-subagent={subagent().id}
               data-status={subagent().status ?? 'running'}
               open={open()}
               onToggle={(toggle) => setOpen(toggle.currentTarget.open)}
@@ -112,13 +123,33 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
                 <StatusDot tone={subagentTone(subagent().status)} />
                 <span class="agent-subagent-title">{subagent().title ?? 'Subagent'}</span>
                 <span class="muted">{subagentSummary(subagent())}</span>
+                {/* Straight to the dedicated view, for a run too long to read in a box. `onClick` stops
+                    the event rather than the default, so the button does not also toggle the summary. */}
+                <Button
+                  variant="bare"
+                  size="sm"
+                  class="agent-subagent-open"
+                  onClick={(click) => {
+                    click.stopPropagation()
+                    selectManagedSubagent(props.sessionId, subagent().id)
+                  }}
+                >
+                  Open
+                </Button>
               </summary>
               {/* `Index`, not `For`, for the reason AgentTranscript states: buildConversationItems
                   rebuilds every item object on every snapshot, so reference keying would replace this
                   DOM, and any selection in it, on each streamed event. */}
               <div class="agent-subagent-stream">
-                <Index each={props.item.children ?? []}>
-                  {(child) => <AgentEventCard item={child()} taskId={props.taskId} turn={props.turn} />}
+                <Index each={children()}>
+                  {(child) => (
+                    <AgentEventCard
+                      item={child()}
+                      taskId={props.taskId}
+                      sessionId={props.sessionId}
+                      turn={props.turn}
+                    />
+                  )}
                 </Index>
               </div>
             </details>

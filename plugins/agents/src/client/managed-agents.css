@@ -240,6 +240,25 @@
 /* Nothing inside gets its own outer margin: the card already spaces its contents, and a first child
    with a top margin puts a visible gap between the summary and the run it describes. */
 .agent-subagent-stream > .agent-event:first-child > * { margin-top: 0; }
+/* Pushed to the end of the summary row, and only drawn once there is something to open. */
+.agent-subagent-open.ui-btn { margin-left: auto; flex: none; color: var(--accent); }
+.agent-subagent-stream:empty { display: none; }
+
+/* The header for a subagent's own run, when it owns the window rather than sitting in a box. Above the
+   scroll container, so it stays put while the run scrolls under it. */
+.agent-subagent-crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-2) var(--space-5);
+  border-bottom: var(--chrome-divider);
+}
+.agent-subagent-crumb > span { min-width: 0; display: grid; gap: 1px; }
+.agent-subagent-crumb strong { font-size: var(--fs-sm); }
+.agent-subagent-crumb small,
+.agent-subagent-crumb strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-subagent-crumb small { color: var(--text-faint); font-size: var(--fs-2xs); }
 
 .agent-card-title { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
 .agent-plan ol { margin: var(--space-3) 0 0; padding-left: var(--space-6); }

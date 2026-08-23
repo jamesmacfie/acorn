@@ -123,6 +123,7 @@ export function boundProviderEvent(
         ...event,
         path: sliceText(event.path, 4_096),
         summary: sliceText(event.summary, 16_384),
+        subagentId: sliceText(event.subagentId, 2_000),
       }
     case 'terminal':
       return {

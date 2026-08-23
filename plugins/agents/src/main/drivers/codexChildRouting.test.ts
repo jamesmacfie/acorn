@@ -245,6 +245,22 @@ describe('CodexChildRouter guards', () => {
     ]))
   })
 
+  it('attributes a child’s file change to that child', () => {
+    // A subagent's run has to show what it changed, not only which tool it ran.
+    const router = new CodexChildRouter()
+    router.setRootThread('root-1')
+    router.route(activity('root-1', 'child-1', '/root/alpha'))
+    const routed = router.route({
+      method: 'item/fileChange/patchUpdated',
+      params: { threadId: 'child-1', path: 'src/a.ts', patch: '@@ -1 +1 @@' },
+    })
+    expect(routed.to === 'subagent' && routed.events[0]).toMatchObject({
+      type: 'file_change',
+      path: 'src/a.ts',
+      subagentId: 'child-1',
+    })
+  })
+
   it('attributes a child’s items and prose to that child', () => {
     const router = new CodexChildRouter()
     router.setRootThread('root-1')

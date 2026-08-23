@@ -7,6 +7,7 @@ import {
   clearManagedSession,
   focusedManagedRequest,
   openManagedSession,
+  clearManagedSubagent,
   selectManagedSession,
   selectManagedSubagent,
   selectedManagedSession,
@@ -408,7 +409,11 @@ export default function AgentPane(props: { task: Task }) {
             managedSessions={taskSessions()}
             selectedSessionId={selectedSessionId()}
             selectedSubagentId={selectedSessionId() ? selectedManagedSubagent(selectedSessionId()!) : undefined}
-            onSelectSession={(sessionId, requestId) => openManagedSession(props.task.id, sessionId, requestId)}
+            onSelectSession={(sessionId, requestId) => {
+              // Picking the session row is how you come back out of a subagent's run.
+              clearManagedSubagent(sessionId)
+              openManagedSession(props.task.id, sessionId, requestId)
+            }}
             onSelectSubagent={(sessionId, subagentId) => {
               // The session first: a sub-row under a session that is not the open one has to bring its
               // parent's transcript up before there is a card to scroll to.
@@ -456,6 +461,7 @@ export default function AgentPane(props: { task: Task }) {
                       snapshot={value()}
                       focusRequestId={focusedManagedRequest(session().id)}
                       focusSubagentId={selectedManagedSubagent(session().id)}
+                      onExitSubagent={() => clearManagedSubagent(session().id)}
                       onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
                     />
                     <QueuedAgentTurns
@@ -467,13 +473,20 @@ export default function AgentPane(props: { task: Task }) {
                   </>
                 )}
               </Show>
-              <AgentComposer
-                session={session()}
-                disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
-                previousAutomaticContext={previousAutomaticContext()}
-                onSessionUpdated={managedAgentStore.upsertSession}
-                onSent={() => void managedAgentStore.loadSnapshot(session().id)}
-              />
+              {/* Gone while a subagent's run owns the window. The composer only ever addresses the
+                  session, so leaving it under a subagent's transcript would read as "reply to this
+                  subagent", which is not a thing either harness offers. The draft survives: it lives in
+                  a module signal keyed by session (managedDrafts.ts) plus localStorage, not in the
+                  component, so stepping into a subagent and back leaves half-typed text alone. */}
+              <Show when={!selectedManagedSubagent(session().id)}>
+                <AgentComposer
+                  session={session()}
+                  disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
+                  previousAutomaticContext={previousAutomaticContext()}
+                  onSessionUpdated={managedAgentStore.upsertSession}
+                  onSent={() => void managedAgentStore.loadSnapshot(session().id)}
+                />
+              </Show>
             </>
           )}
         </Show>
