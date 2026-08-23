@@ -95,6 +95,7 @@ Start with [architecture-overview.md](./docs/architecture-overview.md), then use
 - [features.md](./docs/features.md) — shipped product surfaces.
 - [frontend.md](./docs/frontend.md) and [state.md](./docs/state.md) — renderer composition and state ownership.
 - [authentication.md](./docs/authentication.md) and [security.md](./docs/security.md) — device auth and boundaries.
+- [shell.md](./docs/shell.md) — the Tauri shell: schemes, custody, webviews, and packaging.
 - [api-reference.md](./docs/api-reference.md) and [data-layer.md](./docs/data-layer.md) — Node API and storage.
 - [plugins.md](./docs/plugins.md), [first-party-plugins.md](./docs/first-party-plugins.md), and
   [extensibility.md](./docs/extensibility.md) — the two plugin tiers, and why they're shaped that way.

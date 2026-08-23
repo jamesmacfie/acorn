@@ -386,10 +386,8 @@ parts that are easy to get subtly wrong — abort signals, key-claim narrowing, 
 
 **If you do not**, which is the profile this document is about: **inline the handshake yourself.** It is
 about thirty lines, the protocol is versioned, and `npm create acorn-plugin` writes a working copy of it
-for you. There is also a worked precedent in the tree —
-`apps/desktop/e2e/pluginFrame.spec.ts`'s fixture bundle is hand-written ESM with the handshake inlined
-precisely so the fixture does not depend on a bundler run. Read `sdk.ts` for the semantics; it stays
-the reference implementation even when you are not importing it.
+for you. Read `sdk.ts` for the semantics; it stays the reference implementation even when you are
+not importing it.
 
 The sequence (`packages/protocol/src/pluginBridge.ts`):
 

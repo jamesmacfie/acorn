@@ -156,3 +156,21 @@ evidence for it. Full flow in [plugins.md § Approval-mediated install](./plugin
 
 Add the contribution to the owning plugin, register it in the Node plugin host, add the protocol/client
 rendering metadata if needed, and test it through the real `createApp()` route and MCP projection.
+
+## Browser tools
+
+`plugins/browser` contributes the `browser_*` tools (navigate, snapshot, act, screenshot) through the
+same registry, so they project to the renderer and to MCP like every other contribution, and an agent
+on any node — a headless remote one included — gets a browser. The plugin ships `playwright-core` and
+drives an installed Chrome; the browser itself is in no bundle, and the tools report why they are
+unavailable on a machine without one. The plugin is compiled rather than loaded because
+`playwright-core` carries native bits a hash-addressed loaded bundle cannot.
+
+Rich results are audit-ready by construction: a screenshot is a row in the plugin's own table, keyed
+to the task and capped per task, and the tool result is a URL handle rather than inline base64, so it
+outlives the transcript. A future audit trail of tool usage belongs at the registry dispatch seam,
+where every call already passes, not inside this plugin.
+
+The user's preview pane and the agent's browser are two surfaces on purpose: the shell's child
+webview is view-only for the person (docs/shell.md § Host-owned webviews), and when the agent needs
+to see what the user sees, it points its own browser at the same tunnel URL.

@@ -10,7 +10,7 @@ use crate::helper::Helper;
 
 // The commands the renderer may call, and the shell state they read. This is the whole Tauri-side
 // surface: everything else the renderer needs goes over the helper socket
-// (docs/future/tauri/architecture.md § The resulting Rust surface).
+// (docs/shell.md § The shell process).
 
 pub struct Shell {
     pub helper: Mutex<Option<Helper>>,

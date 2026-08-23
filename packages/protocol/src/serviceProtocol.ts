@@ -80,7 +80,7 @@ export type PreviewBrowserRule = z.infer<typeof previewBrowserRuleSchema>
 // The peer is symmetric, but every method here is one the shell calls on the service. The
 // service->shell direction had one user, the Electron preview pane's `desktop.preview-*` handlers,
 // and it went with the Electron shell: the pane is a child webview the shell drives directly now,
-// and no node-side caller ever asked for it (docs/future/tauri/sequencing.md § Phase 5).
+// and no node-side caller ever asked for it (docs/shell.md § Service protocol).
 export const serviceRpcMethods = [
   'service.start',
   'service.stop',

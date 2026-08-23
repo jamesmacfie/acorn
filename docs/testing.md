@@ -9,13 +9,13 @@ listeners, and real child processes where those seams are part of the behavior.
 pnpm lint
 pnpm test
 pnpm --filter @acorn/arch-tests test
-pnpm --filter @acorn/desktop test:e2e
+pnpm --filter @acorn/desktop test
 pnpm db:check
 ```
 
 `pnpm test` rebuilds native modules for plain Node and runs Vitest through Turborepo with bounded
-concurrency. The desktop e2e package builds the service artifact and desktop output before Playwright;
-running Playwright directly can exercise stale output.
+concurrency. The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites
+and the Rust unit tests, so the boot test always exercises fresh artifacts.
 
 ## Test layers
 
@@ -38,12 +38,60 @@ running Playwright directly can exercise stale output.
   only line — and neither owns a file allowlist any more;
 - the platform-seam contract suite is one checker run from both ends: `client-core/platform/contract.ts`
   states what a live capability group looks like, `platform/contract.test.ts` drives it against a mock
-  host, and each shell's own suite drives it against the real object that shell installs
-  (`apps/desktop/src/app/main/preload.test.ts`). The seam's groups are nullable, so this is what turns
-  "the host renamed a key" from a silently missing affordance into a failing test;
+  host, and the shell's own suite drives it against the real object the shell installs
+  (`apps/desktop/src/shell/bridge.test.ts`, under stub Tauri bindings). The seam's groups are
+  nullable, so this is what turns "the host renamed a key" from a silently missing affordance into a
+  failing test;
 - desktop integration tests cover broker, fleet, persistence, plugin activation, and native seams;
-- Playwright covers boot, onboarding, restore, task navigation, WebSocket terminal behavior, search,
-  preview, restart, security settings, and the two-Node fleet path.
+- the desktop boot test and the Rust unit suite cover the shell (below); what needs a real window is
+  on the smoke checklist.
+
+## The desktop boot test
+
+`apps/desktop/test/boot.test.ts` is the shell's `mainBarrelLoad` analogue: it catches "the shell
+cannot load its world". It runs the staged helper under the bundled Node against a fresh data root,
+which spawns the real `service.js` over the service protocol, then asks the helper the first two
+questions the renderer asks: which nodes are there, and can a `/v2` request reach one. A 200 from
+`/v2/node` means the pinned TLS connection came up and the device token authenticated, so one
+assertion covers the custody stack end to end. Two more check the gate: a socket without the secret
+is refused, and a plain HTTP request gets 426.
+
+The Rust unit tests in `apps/desktop/src-tauri/src/` cover what a headless run cannot reach through
+the helper: the renderer CSP and the dev-only widening a packaged build must not carry, the traversal
+guard, the highlighter worker's separate policy, the refusal to answer a node route with the shell's
+own HTML, the handshake and ready-line parsing, the data key's shape and file fallback, the plugin
+scheme's hash grammar and frame CSP, the webview URL policies and the key grammar that picks between
+them, the navigation-history bookkeeping, the capability file's webview scoping, and the three
+packaging properties in `tauri.conf.json`. `.github/workflows/build-desktop.yml` runs both halves
+before the bundler pass, so a broken boot path fails in seconds rather than minutes.
+
+What no headless run reaches is compositing: a child webview positioned over a window needs a window.
+That is what items 4 and 5 of the smoke checklist are for.
+
+## The browser smoke test
+
+`plugins/browser/src/server/driver.smoke.test.ts` runs an agent's loop against a real Chrome — load a
+loopback page, snapshot it, fill a field by its ref, click a button by its ref, and read back the
+console line the page logged with the value it saw. Opt-in through
+`pnpm --filter @acorn/plugin-browser test:smoke`, because launching a browser is not something every
+`pnpm test` should pay for. On a machine with no Chrome it takes the other branch and asserts the
+tools reported why.
+
+## The smoke checklist
+
+Deliberately manual — it replaced the Playwright specs, whose harness left the repo with the Electron
+shell. Run it per release. Its first pass is still owed, on a machine that never had the Electron
+build, and nothing ships to a person until it passes (docs/shell.md § Signing gates and the updater).
+
+1. Install and launch; the window appears and the local node reaches online.
+2. Pair a second node by code; fingerprint words match.
+3. Open a terminal; a TUI renders and survives resize.
+4. Open a preview pane against a task dev server through the tunnel. Navigate, go back, and cover it
+   with an overlay; the child webview hides rather than floating above it.
+5. Open a loaded plugin pane; it renders, and a network call from its frame fails.
+6. Open a loaded plugin's webview surface; a link to a host its manifest does not name is refused.
+7. Trigger the quit flow with an active agent; the concern prompt appears; quit drains cleanly.
+8. Kill the node process five times; the recovery screen appears on the sixth.
 
 ## Composition-root tests
 

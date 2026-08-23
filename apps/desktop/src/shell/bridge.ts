@@ -146,7 +146,7 @@ const acorn = {
 
   // Cmd/Ctrl+W closes the focused pane, never the window. `before-input-event` has no Tauri
   // equivalent, so the accelerator is a menu item and the shell emits this
-  // (docs/future/tauri/architecture.md § Window, lifecycle, and platform bits).
+  // (docs/shell.md § Startup: data directory, environment, and the singleton lock).
   onClosePane: (cb: () => void) => onEvent('acorn:close-pane', cb),
   onWillQuit: (cb: () => boolean | Promise<boolean>) =>
     onEvent('acorn:will-quit', () => {

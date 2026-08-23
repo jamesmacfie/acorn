@@ -4,7 +4,7 @@ import { browserAgentTools } from '../server/agentTools'
 import { BrowserPool } from '../server/driver'
 
 // The browser plugin's node part: an agent's browser, driven by Playwright against an installed
-// Chrome (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
+// Chrome (docs/agent-tools.md § Browser tools).
 //
 // It replaces the six `browser_*` tools that used to live in `plugins/preview` and terminate in
 // Electron main's `webContents.debugger`. That arrangement could only ever give a browser to an agent

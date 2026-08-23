@@ -21,7 +21,7 @@ use webviews::Webviews;
 
 // The Rust shell: the window, the app scheme, the menu and lifecycle, native dialogs, the OS keychain,
 // and helper supervision. Everything else is TypeScript — the helper process, the renderer bridge, and
-// the node (docs/future/tauri/architecture.md).
+// the node (docs/shell.md).
 //
 // Boot order matters and is the reverse of what a Tauri app usually does. The helper is started and
 // waited for BEFORE the window exists, so the broker is warm by the time the renderer's first act — the
@@ -318,7 +318,7 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
         // Main-frame navigation policy, plus the subframe guard: a plugin frame legitimately loads
         // `app-plugin://<hash>`, and nothing else does. Phase 0 confirmed this fires for subframes and
         // that returning false leaves the frame on its own document (docs/shell.md § The plugin
-        // frame origin, docs/future/tauri/webviews-and-frames.md § Custom-scheme origins and CSP).
+        // frame origin, docs/shell.md § The plugin frame origin).
         .on_navigation(|url| {
             if url.as_str().starts_with(APP_ORIGIN) || url.scheme() == PLUGIN_SCHEME {
                 return true;
@@ -409,7 +409,7 @@ mod tests {
     }
 
     /// The three packaging properties that only show up when somebody installs the artifact, so the
-    /// config file is where they have to be pinned (docs/future/tauri/packaging-and-release.md).
+    /// config file is where they have to be pinned (docs/shell.md § Build and packaging).
     ///
     /// Ad-hoc signing is gate 0: the same posture as the Electron build's `identity: null`. Leave
     /// `signingIdentity` out and Tauri signs nothing, so the `.app` carries only the linker's own mark

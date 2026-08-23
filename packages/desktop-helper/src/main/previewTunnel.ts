@@ -28,7 +28,7 @@ const TUNNEL_HEADER = 'x-acorn-tunnel'
 // The same credential as a cookie, for a shell that cannot inject a header. Electron adds
 // `x-acorn-tunnel` per request through `webRequest`; wry has no equivalent, so the Tauri shell seeds
 // this into the preview webview's ephemeral cookie store before its first navigation instead
-// (docs/future/tauri/webviews-and-frames.md § Preview pane). Same secret, same constant-time compare,
+// (docs/shell.md § Host-owned webviews). Same secret, same constant-time compare,
 // same per-listener scope — only the envelope differs, so both shells are one code path from here on.
 const TUNNEL_COOKIE = 'acorn_tunnel'
 

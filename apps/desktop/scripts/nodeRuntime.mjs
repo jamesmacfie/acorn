@@ -5,7 +5,7 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 
 // The pinned Node runtime that rides in the bundle, fetched from nodejs.org and verified against that
-// release's SHASUMS256.txt (docs/future/tauri/packaging-and-release.md).
+// release's SHASUMS256.txt (docs/shell.md § Build and packaging).
 //
 // Phase 2 copied whichever Node was running the staging script, which was enough for a developer build
 // and refused to run when the developer's runtime was not the pinned one. There is one path now, and it

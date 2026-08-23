@@ -8,7 +8,7 @@ use tauri::http::{Request, Response};
 //
 // Phase 0 measured this exact arrangement in WKWebView: each hash is a real origin with its own
 // storage, `'self'` resolves against it, and the per-response CSP below is honoured
-// (docs/future/tauri/webviews-and-frames.md § Custom-scheme origins and CSP).
+// (docs/shell.md § The plugin frame origin).
 //
 // Two things are shaped by Rust serving this rather than a Node process:
 //

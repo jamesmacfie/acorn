@@ -6,8 +6,7 @@ import { blob, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core
 // What a screenshot is for: an agent takes one, describes it, and moves on — but the bytes are the
 // evidence for whatever it concluded, and inline base64 in a transcript is evidence that evaporates.
 // A row keyed to the task is the smallest thing that survives, and a future audit trail at the
-// tool-registry seam reads it by id (docs/future/tauri/webviews-and-frames.md § Agent browser
-// automation).
+// tool-registry seam reads it by id (docs/agent-tools.md § Browser tools).
 //
 // `task_id` is a plain id into core's `tasks`, dereferenced through CoreServices.tasks, never joined.
 export const browserCaptures = sqliteTable(

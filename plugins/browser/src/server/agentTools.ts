@@ -8,7 +8,7 @@ import type { BrowserPool } from './driver'
 // They kept their names and their descriptions from the version that lived in `plugins/preview`, so an
 // agent's habits and a stored permission decision both survive the move. What changed underneath is
 // everything: the browser is the node's now, not a desktop shell's, so a headless remote node has one
-// too (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
+// too (docs/agent-tools.md § Browser tools).
 
 const empty = z.object({})
 

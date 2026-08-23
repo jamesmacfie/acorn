@@ -11,7 +11,7 @@
 // database handle the composition root used to pass to a loose previewRulesForTask function in
 // service/runtime.ts. It briefly owned the six browser_* agent tools too; those left for
 // `plugins/browser`, whose driver is Playwright on the node rather than CDP in a desktop shell
-// (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
+// (docs/agent-tools.md § Browser tools).
 //
 // No database, no routes, no dispose: there is nothing to release. It is not `required`: a node with
 // preview disabled reports no page rules, which the pane already treats as an empty rule set.

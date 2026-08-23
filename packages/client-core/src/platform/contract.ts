@@ -26,7 +26,7 @@ import {
 //
 // What it is for: every capability group is nullable, so a host that renames one member of one group
 // does not fail to compile — it silently returns null and the affordance quietly disappears. This
-// turns that into a failing test on whichever side is wrong. See docs/future/tauri/testing.md.
+// turns that into a failing test on whichever side is wrong. See docs/testing.md § Test layers.
 
 // A member added to a seam type and left out of the lists below fails `tsc` here rather than
 // silently dropping out of the contract.
@@ -36,7 +36,7 @@ const members =
     keys as readonly string[]
 
 // Groups a host either implements or does not. Absent is a supported product state for all but the
-// first two: docs/future/tauri/README.md § Preview and plugin webviews arrive after the skeleton.
+// first two: docs/shell.md § The renderer bridge.
 const GROUPS = {
   desktop: {
     // Not an object, so it is checked rather than enumerated: the marker plus the platform string.

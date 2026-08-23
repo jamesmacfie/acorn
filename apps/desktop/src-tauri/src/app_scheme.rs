@@ -25,7 +25,7 @@ fn is_highlight_worker(path: &str) -> bool {
 const WORKER_CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'none'";
 
 /// The one CSP change against Electron: `connect-src` names the helper's exact loopback WebSocket
-/// origin as well as `'self'` (docs/future/tauri/architecture.md § The one CSP change). No wildcard
+/// origin as well as `'self'` (docs/shell.md § Renderer origin and protocol handler). No wildcard
 /// port — the handler knows the port because the helper reported it, so no other local service becomes
 /// reachable. Everything that directive protected still holds: the renderer still cannot reach a node
 /// directly, because a node needs the pinned agent and bearer only the helper has.

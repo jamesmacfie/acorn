@@ -2,8 +2,7 @@ import type { Browser, BrowserContext, CDPSession, Page } from 'playwright-core'
 import { buildAxTree, isAllowedBrowserUrl, renderAxTree, resolveRef, type AxSnapshot } from './axTree'
 
 // One Playwright browser for the node, one incognito context and page per task, and a CDP session on
-// each page for the accessibility tree (docs/future/tauri/webviews-and-frames.md § Agent browser
-// automation).
+// each page for the accessibility tree (docs/agent-tools.md § Browser tools).
 //
 // Why CDP at all when Playwright has locators: refs. An agent needs stable per-snapshot handles it can
 // name back to us, which is what `Accessibility.getFullAXTree` plus ./axTree.ts already produce, tested,
@@ -39,7 +38,7 @@ export type Capture = { id: string; mime: string; bytes: Buffer; taskId: string 
 
 /// Where a screenshot goes. The plugin's own table implements it; a test passes something simpler. The
 /// point of the seam is that this file never learns what a database is
-/// (docs/future/tauri/webviews-and-frames.md: rich results are blobs the node stores, not inline base64
+/// (docs/agent-tools.md § Browser tools: rich results are blobs the node stores, not inline base64
 /// that evaporates with the transcript).
 export type CaptureStore = { put(capture: Omit<Capture, 'id'>): Promise<{ id: string }> }
 

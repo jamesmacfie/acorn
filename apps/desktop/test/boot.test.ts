@@ -9,7 +9,7 @@ import { WebSocket } from 'ws'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { HELPER_PROTOCOL, type HelperMethod } from '../src/shell/wire'
 
-// The boot test (docs/future/tauri/testing.md § The boot test): does the shell's world come up.
+// The boot test (docs/testing.md § The desktop boot test): does the shell's world come up.
 //
 // It runs the real thing — the staged helper bundle under the bundled Node runtime, spawning the real
 // `service.js` over the fd-3 service protocol against a fresh data root — and then asks it the first

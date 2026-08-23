@@ -6,7 +6,8 @@ it supervises. It owns no product data and no feature engines. The node service 
 and staged into the bundle; the shell starts it and brokers access to it.
 
 Everything here is shipped behaviour. The migration that produced it, including the arguments for
-each decision and what the Electron host did instead, is in [docs/future/tauri/](./future/tauri/).
+each decision and what the Electron host did instead, was planned in `docs/future/tauri/`, which was
+deleted once every phase landed; git history holds that record.
 
 ## The shell process
 
@@ -439,3 +440,37 @@ standalone node is distributed separately as a tarball; it is not an npm package
 plus the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
 rather than minutes. A tag builds and keeps its artifacts; publishing them is refused while the build
 is ad-hoc signed.
+
+### Signing gates and the updater
+
+Release maturity is three gates, and only the first is met.
+
+- **Gate 0 — ad-hoc.** Where the app ships today. `codesign --verify` passes on the `.app` and the
+  DMG-mounted copy, and `spctl` rejects both, so installing means the right-click-open Gatekeeper
+  dance.
+- **Gate 1 — Developer ID.** One purchase unblocks three things at once: notarized desktop builds,
+  the macOS half of the node tarball matrix (`docs/future/bundle.md`), and any updater. Sign and
+  notarize in the same `tauri build` pass so the `.app`, DMG, and updater payload are one notarized
+  bundle. It also ends the keychain re-prompting: an ad-hoc signature changes on every rebuild, so
+  the data key's ACL never sticks (§ Keys and custody).
+- **Gate 2 — updater on.** Needs gate 1 plus the hosting decision (R2 versus GitHub Releases); the
+  updater manifest URL is the only thing that differs between the two.
+
+When gate 2 arrives, use `tauri-plugin-updater` for the manifest check only and own the download and
+install path: the plugin buffers whole downloads in memory, cannot abort or resume, and
+`Update::install` performs no signature verification.
+`references/proliferate/apps/desktop/src-tauri/src/updater_owned.rs` is the shape to port — a
+streamed download with resume, one live download enforced, and sha256 plus minisign verified against
+the baked public key before install.
+
+The updater private key was generated on 2026-08-23 with `tauri signer generate`, has no passphrase,
+and was written to `~/.acorn/tauri-updater/acorn-updater.key` on the machine that made it. That is
+not durable storage: it belongs in a password manager and in the `TAURI_SIGNING_PRIVATE_KEY` repo
+secret. Losing it means every install carrying the baked public key can never be updated; the only
+fix is a new keypair and a manual reinstall. The workflow refuses to start without the secret,
+because `createUpdaterArtifacts` with no key produces nothing signed, and an unsigned updater payload
+is worse than none.
+
+Two release gates are owed to a person, and no script closes them: the smoke checklist
+([docs/testing.md](./testing.md) § The smoke checklist), run against the DMG on a machine that never
+had the Electron build, and a developer soak window. Nothing ships to a person until both pass.
