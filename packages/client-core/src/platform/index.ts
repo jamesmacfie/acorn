@@ -16,7 +16,7 @@ import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 
 // ── The capability groups ─────────────────────────────────────────────────────────────────────
 
-// Reaching a node. In Electron, these are IPC calls into main's broker, which holds the device
+// Reaching a node. On the desktop these go to the helper's broker, which holds the device
 // token and the socket; the renderer never sees either.
 //
 // fetch buffers whole responses because that's what can cross IPC (apiClient.ts explains why). A
@@ -108,7 +108,7 @@ export type PluginWebviews = {
 }
 
 // What the host holds for third-party plugins: the bundles it has cached, and this device's
-// decisions about running them. The storage is Electron's today and a browser's later
+// decisions about running them. The storage is the desktop's today and a browser's later
 // (docs/future/remote.md), so the renderer only ever sees this shape and never a path.
 export type PluginTrustDecision = {
   pluginId: string
@@ -148,7 +148,7 @@ export type PluginHostState = {
 }
 export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' }
 
-// ── The Electron implementation ───────────────────────────────────────────────────────────────
+// ── The desktop implementation ────────────────────────────────────────────────────────────────
 
 // The preload object, shaped as the groups above rather than as a flat bag, so the adapters below are
 // projections instead of translations. Everything is optional: an older preload, or none at all.

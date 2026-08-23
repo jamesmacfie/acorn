@@ -19,7 +19,7 @@ import { Alert, Badge, Button, Kbd } from '../ui/primitives'
 // Three groups, and the split between them is the whole point (docs/security.md § Design rules,
 // rule 6). `Enforced` is a fence: the UI bridge refuses anything undeclared. `Declared` is a
 // disclosure and nothing more: that code shares the node's process and can ignore its manifest
-// entirely. `Web pages` is enforced by Electron but reaches the live internet, so it is neither of
+// entirely. `Web pages` is enforced by the shell but reaches the live internet, so it is neither of
 // the other two. The vocabulary is defined once in the legend rather than being spelled out on every
 // heading, and the groups may never be rendered as one list: a strong claim must not lend
 // credibility to a weaker one sitting next to it.

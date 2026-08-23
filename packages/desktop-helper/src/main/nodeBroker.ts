@@ -12,9 +12,9 @@ import {
   type NodeStatus,
 } from '@acorn/protocol/broker.ts'
 
-// The connection broker: docs/electron.md § Connection broker for what it owns per node. Electron-free
-// so it can be unit-tested against a real TLS server; the IPC wiring that exposes it lives in
-// nodeBrokerIpc.ts.
+// The connection broker: docs/shell.md § Connection broker for what it owns per node. Free of any
+// shell binding, so it can be unit-tested against a real TLS server; the wiring that exposes it to
+// the renderer is `apps/desktop/src/shell/helperServer.ts`.
 //
 // It must not live in @acorn/client-core: the boundary test classifies that package as client-side,
 // so a node:https import there would both fail the client/node split rule and drag Node builtins into
@@ -233,9 +233,9 @@ export class NodeBroker {
       // node is offline" until the next successful read happens to clear it.
       if (isAbort(error) && !timedOut) throw error
       this.noteHttpFailure(connection, error)
-      // Renamed so the two aborts stay distinguishable one layer up (nodeBrokerIpc.ts swallows the
-      // renderer's cancellation and must not swallow this), and because "the operation was aborted" is a
-      // useless thing to show someone whose node stopped answering.
+      // Renamed so the two aborts stay distinguishable one layer up: `helperServer.ts` answers the
+      // renderer's own cancellation with a 499 and must not swallow this one. "The operation was
+      // aborted" is also a useless thing to show someone whose node stopped answering.
       if (isAbort(error)) {
         throw Object.assign(new Error(`The node did not answer within ${request.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`), { name: 'TimeoutError' })
       }

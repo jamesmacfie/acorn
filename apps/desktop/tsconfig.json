@@ -1,12 +1,9 @@
 {
-  // The only package-level overrides: this is the Electron app, so it needs both DOM (renderer)
-  // and node (main/service) types in one program.
+  // Both halves in one program: `src/app/client` is the renderer (DOM) and `src/shell` is the Tauri
+  // shell's TypeScript — the injected bridge and the desktop helper process (node).
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["vite/client", "node"]
   },
-  // `e2e` is included so the Playwright specs are typechecked by `pnpm lint` like everything else.
-  // They were outside the program, which is how a spec could reference a `window.acorn` member that no
-  // longer exists and only fail at runtime, minutes into a suite.
-  "include": ["src", "test", "e2e", "electron.vite.config.ts", "playwright.e2e.config.ts"]
+  "include": ["src", "test", "vite.config.ts", "vite.bridge.config.ts", "vite.helper.config.ts", "vitest.config.ts"]
 }

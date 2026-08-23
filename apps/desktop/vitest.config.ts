@@ -11,10 +11,13 @@ export default defineConfig({
     projects: [
       {
         test: {
-          name: 'main',
+          name: 'shell',
           environment: 'node',
-          include: ['src/**/*.test.ts', 'test/integration/**/*.test.ts'],
+          include: ['src/shell/**/*.test.ts', 'test/boot.test.ts', 'test/integration/**/*.test.ts'],
           env: gitEnv,
+          // The boot test stages nothing itself: it runs the staged helper under the bundled Node
+          // against a fresh data root, and that whole chain has to come up inside one test.
+          testTimeout: 60_000,
         },
       },
       {

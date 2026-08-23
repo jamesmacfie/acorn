@@ -5,7 +5,7 @@ import { pluginCustody, type PluginDevGrantRequest, type PluginHostState, type P
 //
 // Every other module in the client reaches the bundle cache and the trust store through this one
 // file, never through the platform seam's `pluginCustody()` directly. That is the whole design: today it fronts
-// Electron main's content-addressed store, and a future web client (docs/future/remote.md) fronts
+// the desktop helper's content-addressed store, and a future web client (docs/future/remote.md) fronts
 // IndexedDB plus server-side per-user acknowledgements. The interface is the part that has to stay
 // portable; the storage behind it is not, and letting the host object leak through client code would
 // make the storage the contract by accident. `src/platform/` generalised this rule to the whole seam.

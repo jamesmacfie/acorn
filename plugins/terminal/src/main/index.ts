@@ -5,7 +5,3 @@ export {
   reconcileTmux,
   refreshAcornMcpRegistrations,
 } from './terminal'
-// Safe on this barrel only because folderPickerIpc resolves electron at call time, not at import
-// (docs/plugins.md § Package shape). apps/node's composition root imports reconcileTmux from here,
-// and a barrel evaluates every module on it.
-export { registerFolderPickerIpc } from './folderPickerIpc'

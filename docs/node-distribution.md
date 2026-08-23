@@ -1,6 +1,6 @@
 # Standalone Node distribution
 
-`pnpm pack:node` builds a self-contained tarball for running an acorn Node without the Electron
+`pnpm pack:node` builds a self-contained tarball for running an acorn Node without the desktop
 desktop. The artifact contains the Node service/standalone entrypoints, shared chunks, migrations,
 workspace production dependencies, and native modules.
 
@@ -54,12 +54,12 @@ token plus a rate-limited pairing code. Advertise on a network you trust. An SSH
 as the local and remote ports match — the Host guard compares the port too.
 
 It supports pure-Node features such as workspaces, tasks, providers, Git, files, database, Docker,
-HTTP, and core routes. Electron-only operations such as native dialogs, browser views, and window
+HTTP, and core routes. Shell-only operations such as native dialogs, child webviews, and window
 management are unavailable. The terminal, managed-agent, and workflow engines are wired by the
 standalone composition when their dependencies are present; unsupported native adapters report an
 explicit unavailable state.
 
-Standalone and Electron-supervised Node hosts use the same `apps/node/src/server/composition.ts` graph,
+Standalone and desktop-supervised Node hosts use the same `apps/node/src/server/composition.ts` graph,
 post-listener reconciliation sequence, and bounded drain order. The host difference is supervision and
 native capability injection, not a second plugin assembly.
 

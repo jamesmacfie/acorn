@@ -29,7 +29,7 @@ last consumer leaves.
 | notes | `protocol/notes.ts` location type is core addressing; node half writes `.md` files in the data root. | — | Movable when a seam wants it. |
 | changes | Renders inside the agents transcript via `agentToolRenderers` — an in-realm component on a core surface. | `agentToolRenderers` (sole consumer) | **Stays first-party** per the tier line (inline renderers). Named, not pending. |
 | context | Hosts the tray that memory renders into (receiving half of the same coupling). | — | Movable only together with memory, and coupling 1 below says why that is now a redesign, not a seam swap. |
-| preview | Electron main `WebContentsView` code. | — | **Stays first-party** (desktop extra behind the platform seam). |
+| preview | Drives a shell-owned child webview. | — | **Stays first-party** (desktop extra behind the platform seam). |
 | editor | Monaco in-realm; the host document surface already exists and `docs/third-party/editor.md` owns the remaining move. | — | **In flight** — the last planned migration of the original program. |
 | docker | Owns the `docker` WS channel + exec streams; `tabrail.task-row` slot has no manifest form. | `tabrail.task-row` | Closest to movable of the stream owners; its footer badge already has a descriptor twin. |
 | memory | Renders inside context's tray — editable inputs and accept/reject gates, a component in another plugin's surface; `MEMORY_KNOWLEDGE` capability named by the composition root. | client `contextSections` | **Stays first-party while the tray is a component** — the cooperative-seam conversion was attempted and correctly refused (coupling 1 below). |

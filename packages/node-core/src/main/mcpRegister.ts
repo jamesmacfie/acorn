@@ -11,18 +11,18 @@ export type AgentFlavour = 'claude' | 'codex'
 
 export const serverName = (isPackaged: boolean): string => (isPackaged ? 'acorn' : 'acorn-dev')
 
-// The Electron-as-node launcher (verne's trick: the user needs no system node): run the bundled
-// server entry under the app's own binary with ELECTRON_RUN_AS_NODE=1.
+// The user needs no system node: the MCP server runs under the runtime the app already ships, which
+// is the bundled Node the shell launched everything else with.
 export type Launcher = { command: string; args: string[]; env: Record<string, string> }
 
-export const resolveMcpEntry = (mainOutDir: string): string => join(mainOutDir, 'mcp.js')
+export const resolveMcpEntry = (stagingDir: string): string => join(stagingDir, 'mcp.js')
 
 // `name` is the build-flavoured server name (serverName above): the MCP server self-reports it
 // via ACORN_MCP_NAME, so an `acorn-dev` registration identifies as acorn-dev, not `acorn`.
-export const launcherSpec = (electronPath: string, mcpEntry: string, name: string): Launcher => ({
-  command: electronPath,
+export const launcherSpec = (hostRuntimePath: string, mcpEntry: string, name: string): Launcher => ({
+  command: hostRuntimePath,
   args: [mcpEntry],
-  env: { ELECTRON_RUN_AS_NODE: '1', ACORN_MCP_NAME: name },
+  env: { ACORN_MCP_NAME: name },
 })
 
 export type Argv = { file: string; args: string[] }

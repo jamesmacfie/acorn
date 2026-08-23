@@ -1,5 +1,5 @@
 {
-  "//": "The Node runtime pin, in one place because two artifacts ship one runtime: the Tauri bundle's external binary (apps/desktop-tauri/scripts/stage.mjs) and the standalone node tarball (scripts/pack-node.mjs). See docs/future/tauri/node-runtime.md.",
+  "//": "The Node runtime pin, in one place because two artifacts ship one runtime: the desktop bundle's external binary (apps/desktop/scripts/stage.mjs) and the standalone node tarball (scripts/pack-node.mjs). See docs/future/tauri/node-runtime.md.",
   "version": "24.11.0",
   "//engines": "The floor the packed artifact declares. node:sqlite is what sets it (docs/node-distribution.md); apps/node/scripts/build-plugin.mjs importing a .ts file directly is the other reason.",
   "engines": ">=22.18 <23 || >=24.4"

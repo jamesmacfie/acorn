@@ -2,7 +2,7 @@ import { shellProfile } from './shell'
 import type { AgentProfileContribution } from './types'
 
 // The agent-profile registry, in core. The claude/codex/aider profile plugins register through the
-// composition root (app/main/agentProfiles.ts); core owns the registry and the default-profile
+// composition root (plugins/agents/src/node/index.ts); core owns the registry and the default-profile
 // policy, not the set of profile plugins, so adding a fourth profile touches no core files.
 class AgentProfileRegistry {
   readonly #profiles = new Map<string, AgentProfileContribution>()
@@ -31,7 +31,7 @@ class AgentProfileRegistry {
 export const agentProfileRegistry = new AgentProfileRegistry()
 
 // shellProfile is core (the plain-shell fallback), so it registers at the registry's own definition;
-// the claude/codex/aider plugins register through the composition root (app/main/agentProfiles.ts).
+// the claude/codex/aider plugins register through the agents plugin's node entry.
 agentProfileRegistry.register(shellProfile)
 
 // The engine's fallback when a step names no profile. A core policy value (the string id), not an

@@ -1,6 +1,7 @@
 # Webviews and frames
 
-Status: proposal, 2026-08-22; built in phase 3, 2026-08-23. Three embedded-content surfaces and one
+Status: historical. Proposed 2026-08-22, built in phase 3, 2026-08-23.
+[docs/shell.md](../../shell.md) § Host-owned webviews owns shipped behaviour. Three embedded-content surfaces and one
 automation surface. All three renderer-side capability groups (`PreviewViews`, `PluginWebviews`, and
 the plugin frame machinery) were shaped so absence is a supported product state, which is what let
 phase 2 ship without them.
@@ -26,7 +27,7 @@ rest:
 ## The problem
 
 WKWebView is not Chromium, and the differences land exactly where
-[docs/electron.md](../../electron.md) argues from:
+[docs/shell.md](../../shell.md) argues from:
 
 - The **preview pane** is a main-owned `WebContentsView` composited over the renderer's pane rect,
   with an ephemeral session, denied permissions, HTTP(S)-only navigation, and a tunnel-auth header
@@ -121,7 +122,7 @@ authorization to a cookie: seed the pane's ephemeral cookie store for the tunnel
 `http://127.0.0.1:<port>` before first load. `previewTunnel.ts` grows a Cookie-header scan beside
 the existing header scan, same `timingSafeEqual` on `latin1` bytes, still in the helper; the
 injected `headersFor` seam becomes `cookieFor` with the same refuse-unless-exactly-127.0.0.1 rule.
-This is a proposed change against [docs/electron.md](../../electron.md) § Host-owned webviews.
+This is a proposed change against [docs/shell.md](../../shell.md) § Host-owned webviews.
 
 Spike 2 settled the mechanism, and it is simpler than the seeding page this assumed:
 `Webview::set_cookie` from Rust, before the first real navigation, put `acorn_tunnel=<secret>` on

@@ -27,7 +27,7 @@ export const serviceStartConfigSchema = z.strictObject({
   // service needs to be told.
   version: z.string().min(1),
   isPackaged: z.boolean(),
-  electronPath: z.string().min(1),
+  hostRuntimePath: z.string().min(1),
   mcpEntry: z.string().min(1),
   // Trusted application resources, never a renderer- or node-supplied path. The service copies these
   // into its writable data root before discovery; package ownership policy lives with that copy.
@@ -77,23 +77,14 @@ export const previewBrowserRuleSchema = z.strictObject({
 })
 export type PreviewBrowserRule = z.infer<typeof previewBrowserRuleSchema>
 
-export const previewNavStateSchema = z.strictObject({
-  url: z.string(),
-  canGoBack: z.boolean(),
-  canGoForward: z.boolean(),
-  loading: z.boolean(),
-})
-export type PreviewNavState = z.infer<typeof previewNavStateSchema>
-
+// The peer is symmetric, but every method here is one the shell calls on the service. The
+// service->shell direction had one user, the Electron preview pane's `desktop.preview-*` handlers,
+// and it went with the Electron shell: the pane is a child webview the shell drives directly now,
+// and no node-side caller ever asked for it (docs/future/tauri/sequencing.md § Phase 5).
 export const serviceRpcMethods = [
   'service.start',
   'service.stop',
   'service.preview-rules',
-  'desktop.preview-current-url',
-  'desktop.preview-load-url',
-  'desktop.preview-nav-state',
-  'desktop.preview-navigate',
-  'desktop.preview-evict',
 ] as const
 export const serviceRpcMethodSchema = z.enum(serviceRpcMethods)
 export type ServiceRpcMethod = z.infer<typeof serviceRpcMethodSchema>

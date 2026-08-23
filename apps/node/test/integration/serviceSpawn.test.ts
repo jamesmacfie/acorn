@@ -143,7 +143,7 @@ describe('the service as a spawned child process', () => {
       dataDir,
       version: 'spawn-test',
       isPackaged: false,
-      electronPath: process.execPath,
+      hostRuntimePath: process.execPath,
       mcpEntry: join(dataDir, 'unused-mcp.js'),
     })
     return { started: serviceStartResultSchema.parse(result), service }

@@ -191,8 +191,8 @@ export type BindingsOptions = {
   capabilities: Pick<CapabilityRegistry, 'get' | 'require'>
 }
 
-// Build the bindings object once at startup. Electron resolves the data root in electron.ts
-// (app.getPath('userData') when packaged, the repo-local apps/node/.acorn in dev) and passes
+// Build the bindings object once at startup. The desktop shell resolves the data root, the OS
+// application-data path when packaged and the repo-local apps/node/.acorn in a checkout, and passes
 // the paths in; the standalone entry takes ACORN_DATA_DIR or that same dev root.
 export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilities }: BindingsOptions): RuntimeBindings {
   const databasePath = resolve(dbPath)

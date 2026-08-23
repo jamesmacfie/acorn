@@ -3,14 +3,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import type { ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 
 // A fully validated request against the node's reported pin. `ca` is the node's own self-signed
 // certificate; `rejectUnauthorized` stays true, so the IP:127.0.0.1 SAN has to match too.
 //
 // `expectedFingerprint` replaces hostname verification with the fingerprint comparison, the same
-// check the client's connection broker does (docs/electron.md § Connection broker). The shape is
+// check the client's connection broker does (docs/shell.md § Connection broker). The shape is
 // restated here rather than imported, because a package or app may never import an app, so the pin
 // is proved in two halves: this file asserts the node really answers under the identity it reported,
 // and nodeBroker.test.ts asserts the broker accepts exactly that identity and no other. Neither half
@@ -49,16 +48,6 @@ function get(started: ServiceStartResult, path: string, expectedFingerprint?: st
   })
 }
 
-const desktop: DesktopCapabilities = {
-  preview: {
-    currentUrl: async () => null,
-    loadUrl: async () => false,
-    navState: async () => null,
-    navigate: async () => false,
-    evict: async () => false,
-  },
-}
-
 describe('Electron-free service runtime', () => {
   const original = {
     port: process.env.ACORN_PORT,
@@ -85,11 +74,10 @@ describe('Electron-free service runtime', () => {
         dataDir: opts.dataDir,
         version: 'test',
         isPackaged: false,
-        electronPath: process.execPath,
+        hostRuntimePath: process.execPath,
         mcpEntry: '/unused/mcp.js',
         deviceToken: opts.deviceToken,
       },
-      desktop,
       stateChanged: (state) => opts.onState?.(state),
     })
   }

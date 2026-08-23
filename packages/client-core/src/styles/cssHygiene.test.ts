@@ -110,7 +110,7 @@ describe('literal ratchets (these may only go down)', () => {
   })
 })
 
-// A plugin frame is served exactly the sheets pluginFrameStyles.ts lists, primitives.css among them
+// A plugin frame is served exactly the sheets scripts/stage.mjs lists, primitives.css among them
 // (docs/ui-design.md § How the primitives are built).
 //
 // A font shorthand needs at minimum a size and a family. `font: var(--font-ui)` parses, since any
@@ -131,9 +131,9 @@ it('never puts a bare token in the font shorthand', () => {
 })
 
 describe('the plugin-frame stylesheet is self-contained', () => {
-  const listPath = join(workspaceRoot(), 'apps/desktop/src/app/main/pluginFrameStyles.ts')
-  const served = [...readFileSync(listPath, 'utf8').matchAll(/from '@acorn\/client-core\/([^']+)\?raw'/g)]
-    .map((m) => m[1])
+  const listPath = join(workspaceRoot(), 'apps/desktop/scripts/stage.mjs')
+  const list = /const FRAME_STYLES = \[([\s\S]*?)\]/.exec(readFileSync(listPath, 'utf8'))?.[1] ?? ''
+  const served = [...list.matchAll(/'([^']+\.css)'/g)].map((m) => m[1])
 
   it('names sheets that exist', () => {
     expect(served.length).toBeGreaterThan(5)

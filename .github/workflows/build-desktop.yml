@@ -1,0 +1,90 @@
+name: Build the desktop app
+
+# The desktop artifact. There are no GitHub OAuth secrets here on purpose: the client id is a
+# node-side plugin read now, from the environment or the data root's .env file.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    # arm64 only. A second architecture is a matrix entry plus an ACORN_TARGET_TRIPLE, which the
+    # staging and verification scripts already read.
+    runs-on: macos-latest
+    env:
+      # Signs the updater payload so enabling updates later needs an endpoint and nothing else. The
+      # public half is baked into tauri.conf.json; without the private half `tauri build` refuses to
+      # produce the artifact at all, which is why this is not optional.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Require the updater signing key
+        run: test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo "::error::Set the TAURI_SIGNING_PRIVATE_KEY repo secret. Generate a keypair with \`pnpm --filter @acorn/desktop exec tauri signer generate\` and put its public half in apps/desktop/src-tauri/tauri.conf.json."; exit 1; }
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          # Whatever runs the build, not what gets bundled: the staging script downloads the pinned
+          # runtime from nodejs.org and verifies it against that release's SHASUMS256.txt.
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      # One download per pin per runner image, which is worth a cache entry of its own because the
+      # rust-cache key has nothing to do with it.
+      - name: Cache the pinned Node runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/acorn/node-runtime
+          key: node-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node-runtime.json') }}
+
+      # The node service, the bundled plugins, the helper, the bridge, the migration chains and the
+      # pinned runtime. Everything the bundler is about to copy has to exist before it runs.
+      - name: Stage the bundle inputs
+        run: pnpm --filter @acorn/desktop run stage
+
+      # The shell's own boot test plus the Rust unit tests. This is the gate that catches "the shell
+      # cannot load its world" (docs/future/tauri/testing.md § The boot test), and it runs before the
+      # slow bundler pass so a broken boot path fails in seconds rather than minutes.
+      - name: Test the shell and the helper
+        run: pnpm --filter @acorn/desktop test
+
+      - name: Build and verify the bundle
+        run: pnpm --filter @acorn/desktop run dist
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: acorn-dmg
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz
+            apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+          if-no-files-found: error
+
+  # Gate 1 of docs/future/tauri/packaging-and-release.md § Signing gates. A tag builds and keeps its
+  # artifacts through the job above; publishing them as a release is refused while the build is
+  # ad-hoc signed, because a public download that Gatekeeper blocks and an updater payload nobody can
+  # install are worse than no release at all. Turning this on is: buy a Developer ID, add the
+  # certificate and notarization secrets, sign and notarize inside the same `tauri build` pass, then
+  # replace this step with the publish.
+  publish:
+    needs: bundle
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to publish an ad-hoc signed build
+        # Through the environment, never interpolated into the script: a tag name is attacker-supplied
+        # text as far as this shell is concerned.
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          echo "::error::$TAG built successfully and its artifacts are attached to this run, but publishing is gated on Apple Developer ID signing and notarization (docs/future/tauri/packaging-and-release.md)."
+          exit 1

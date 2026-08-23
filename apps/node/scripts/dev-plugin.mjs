@@ -2,7 +2,7 @@
 // Watch one plugin's package and re-run `build-plugin.mjs` on every save.
 //
 //   pnpm dev:plugin rollbar                                              # into the dev data root
-//   pnpm dev:plugin rollbar -- --package-root ../desktop/out/bundled-plugins   # into desktop staging
+//   pnpm dev:plugin rollbar -- --package-root ../desktop/dist/bundled-plugins  # into desktop staging
 //
 // What this removes is the remembered sequence, not the restart: seeing a one-line change run used to
 // mean rebuilding the package by hand, restarting the node, reloading the renderer, and answering trust

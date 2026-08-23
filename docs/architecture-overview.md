@@ -7,12 +7,12 @@ it. There is no shared database or cross-Node transaction.
 ## Runtime topology
 
 ```text
-Electron desktop
+Desktop app (Tauri)
   renderer: SolidJS shell, panes, query cache, layouts, drafts
-  main: app:// scheme, native views/dialogs, safeStorage, broker, supervision
-       │ preload IPC
+  Rust shell: app:// scheme, window, child webviews, dialogs, the data key
+       │ one loopback WebSocket
        ▼
-connection broker in Electron main
+desktop helper (Node): connection broker, fleet, tokens, plugin custody, supervision
        │ pinned HTTPS + device bearer, one WebSocket per Node
        ├──────────────► bundled local Node
        └──────────────► paired Node
@@ -23,19 +23,19 @@ Node
   Git, worktrees, PTYs, agents, workflows, Docker, provider clients
 ```
 
-Electron main starts the built `apps/node` artifact with `process.execPath` and
-`ELECTRON_RUN_AS_NODE=1`. The Node reports its bound endpoint and certificate fingerprint through
-the service protocol. The local Node is supervised and restarted with bounded backoff; a standalone
-Node uses the same service graph without Electron-native capabilities.
+The desktop helper starts the built `apps/node` artifact with `process.execPath`, which is the Node
+runtime the bundle ships. The Node reports its bound endpoint and certificate fingerprint through the
+service protocol. The local Node is supervised and restarted with bounded backoff; a standalone Node
+uses the same service graph.
 
 The Node binds `127.0.0.1` over HTTPS with TLS 1.3, and only loopback unless an operator has recorded
 an `advertiseHost` for it (`node.json`, or `ACORN_ADVERTISE_HOST`) — see
 [node-distribution.md](./node-distribution.md). A Host header outside that allowlist is refused with
 403 regardless. The endpoint the Node *reports* is always loopback, because the child processes it
 spawns validate its certificate against an `IP:127.0.0.1` SAN. The port is ephemeral unless
-`ACORN_PORT` is set or a remembered port in `node.json` is available. The Node serves no web assets. Electron's
-`app://acorn` protocol serves the renderer and falls back to its bundled `index.html` for client-side
-routes.
+`ACORN_PORT` is set or a remembered port in `node.json` is available. The Node serves no web assets. The
+shell's `app://acorn` scheme serves the renderer and falls back to its bundled `index.html` for
+client-side routes.
 
 ## Process ownership
 
@@ -51,16 +51,15 @@ The Node owns:
   not anyone is";
 - the HTTPS listener, authenticated WebSocket, stream/tunnel sockets, and shutdown drain.
 
-Electron main owns:
+The desktop shell owns:
 
-- `BrowserWindow`, `WebContentsView`, dialogs, menus, navigation policy, and `safeStorage`;
-- the renderer preload bridge and node connection broker;
+- the window, child webviews, dialogs, menus, navigation policy, and the data key in the OS keychain;
+- the injected renderer bridge, and the helper process behind it;
 - Node endpoint records, certificate pins, device-token custody, fleet membership, and service
   supervision.
 
 Only serializable values cross a boundary. Product requests and streams use the broker and `/v2`;
-the service protocol is reserved for lifecycle messages and narrow, task-addressed native
-capabilities such as preview/browser operations.
+the service protocol is reserved for lifecycle messages.
 
 ## Package boundaries
 
@@ -93,19 +92,16 @@ which is how a temp-directory SQLite factory ends up shipped. Deep imports past
 `@acorn/plugin-api/testkit` are a shrinking baseline; migrate a test as you touch it, and widen the
 testkit rather than adding a root.
 
-**The node stays bootable.** Nothing outside `apps/desktop` statically imports Electron *values*. A
-type-only import is erased and a lazy `createRequire(import.meta.url)('electron')` only resolves when
-called; a static value import fails Node's linker before a line runs. `export … from 'electron'` counts,
-and is the likelier form on a barrel.
-`apps/node/test/integration/mainBarrelLoad.test.ts` is the durable check — it loads every plugin's main
-barrel in plain Node — and the arch rule is the fast first line that also catches an *unused* static
-import, which esbuild elides before Node ever sees it.
+**The node stays bootable.** Nothing in the tree imports a shell binding it should not. Tauri's `invoke`
+and its event API are confined to `apps/desktop/src/shell/`, the bridge the window injects, and
+nothing imports `electron` at all any more — that rule reads as a flat ban now, manifests included.
+`apps/node/test/integration/mainBarrelLoad.test.ts` is the durable check: it loads every plugin's main
+barrel in a plain Node process, which is the runtime that has to boot.
 
-**The custody stack stays shell-free.** Nothing in `@acorn/desktop-helper` imports Electron either.
-That package is the broker, the fleet, the device tokens, the plugin cache and trust store, the
-tunnels, and the supervised node service, composed by its `main/index.ts`. Electron main and the
-Tauri desktop helper are both consumers of it (`docs/future/tauri/architecture.md`), so the
-encryption and the shell-only service capabilities are injected rather than imported.
+**The custody stack stays shell-free.** `@acorn/desktop-helper` is the broker, the fleet, the device
+tokens, the plugin cache and trust store, the tunnels, and the supervised node service, composed by
+its `main/index.ts`. It runs as its own process under the bundled Node, so it names no shell binding
+and the encryption is injected rather than imported (`docs/shell.md` § The shell process).
 
 **The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/platform/`.
 The global is read rather than imported, so this is a source scan rather than a graph edge. Tests are
@@ -179,9 +175,9 @@ The renderer reaches the host through one seam, `packages/client-core/src/platfo
 what a host provides — node transport, fleet membership, plugin custody, and the native extras — into
 separate nullable capabilities. The thin client in `packages/client-core` calls the transport group;
 nothing else in the client may read the injected `window.acorn` global, and `boundaries.test.ts` fails
-any file outside the seam that does. The Electron preload is the only implementation today; a web
+any file outside the seam that does. The desktop bridge is the only implementation today; a web
 client implements the transport group and omits the desktop extras.
-Electron main supplies the Node endpoint, pinned HTTPS agent, and bearer token. The renderer never
+The helper supplies the Node endpoint, pinned HTTPS agent, and bearer token. The renderer never
 holds a token or certificate and cannot open a direct network connection under the app CSP.
 
 Every response has an `X-Request-Id`. Errors use the single envelope
@@ -339,4 +335,4 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
   first-party because they must be rather than because they were written first.
 - [third-party/](./third-party/) — review findings from moving Rollbar out of the binary and onto
   the loaded-plugin path.
-- [electron.md](./electron.md), [local-development.md](./local-development.md) — runtime and development.
+- [shell.md](./shell.md), [local-development.md](./local-development.md) — runtime and development.

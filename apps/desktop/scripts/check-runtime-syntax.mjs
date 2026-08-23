@@ -2,11 +2,9 @@ import { readdir } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { extname, join, resolve } from 'node:path'
 
-// The generated host-side bundles, parsed by the runtime that will load them. Electron's main and
-// preload by default; the Tauri package passes its helper and bridge output instead.
-const roots = process.argv.length > 2
-  ? process.argv.slice(2).map((root) => resolve(process.cwd(), root))
-  : [resolve(import.meta.dirname, '../out/main'), resolve(import.meta.dirname, '../out/preload')]
+// The generated host-side bundles, parsed by the runtime that will load them: the desktop helper,
+// which runs under the bundled Node, and the bridge the shell injects into the webview.
+const roots = ['dist/helper', 'dist/bridge'].map((dir) => resolve(import.meta.dirname, '..', dir))
 
 async function javascriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })

@@ -19,7 +19,7 @@ plugins/<name>/
   src/
     node/       NodePlugin entry, schema, and Node-owned behavior
     server/     Hono route handlers and provider logic
-    main/       Electron-free runtime engines and adapters
+    main/       shell-free runtime engines and adapters
     client/     SolidJS panes, sources, settings, and contributions (compiled-in plugins)
     frame/      the sandboxed-frame bundle a LOADED plugin's UI is instead
     contract/   narrow cross-plugin types, capability IDs, and provider contracts
@@ -39,14 +39,13 @@ because TypeScript resolves a relative path against the file that declares it, s
 seventeen packages typechecking nothing. `package.json` is not hoistable — npm has no `extends` — and
 its identical `exports`/`scripts` blocks stay copied rather than generated.
 
-"Electron-free" in `main/` means loadable, not Electron-ignorant: a plugin's main barrel is imported
-by `apps/node`, which has no Electron, and a barrel evaluates every module on it. So the one or two
-files that genuinely need a desktop resolve it lazily — `createRequire(import.meta.url)('electron')`
-inside the function, with the types imported statically because types are erased
-(`plugins/terminal/src/main/folderPickerIpc.ts`, `plugins/preview/src/main/previewService.ts`). A
-static value import there kills the standalone node at link time, before a line of it runs, and
+"Shell-free" in `main/` is about what loads, not about taste: a plugin's main barrel is imported by
+`apps/node`, and a barrel evaluates every module on it, so one module that reaches for something only
+the desktop bundle has kills the standalone node at link time, before a line of it runs.
 `apps/node/test/integration/mainBarrelLoad.test.ts` loads every `plugins/*/src/main/index.ts` in a
-plain Node child to catch it at the commit that causes it.
+plain Node child to catch that at the commit that causes it. Nothing in `main/` reaches for a shell
+any more: the folder picker the terminal plugin used to own is a Tauri command, and the preview pane
+is a child webview the shell drives (`docs/shell.md` § Host-owned webviews).
 
 Not every plugin has every directory. The built-in Claude, Codex, and Aider profiles are registered
 by `plugins/agents`; there are no separate profile packages. Onboarding is a client overlay with
@@ -367,7 +366,7 @@ so it prints the row, the file and the fix instead. Both Node hosts also report 
 boot (`reconcileBundledPackages` in `apps/node/src/server/composition.ts`), because reconciliation's
 "declined to update" list can only name a package it had a newer copy of, and the whole failure mode is a
 frozen package on a node that has no newer copy to decline.
-Bundled client bytes are trusted only after Electron main reads and hashes its own application
+Bundled client bytes are trusted only after the desktop helper reads and hashes its own application
 resource directory; a node cannot acquire that trust by labelling a roster row as bundled.
 
 A bundled package has no lockfile, so the node has no source to re-resolve and its update route can
@@ -394,7 +393,7 @@ pnpm dev:node               # and this restarts itself when the bundle changes
 `pnpm dev:plugin <id>` (`apps/node/scripts/dev-plugin.mjs`) watches the plugin's `src/`, its
 `acorn-plugin.config.mjs` and its migration chain, and re-runs `build-plugin.mjs` — a fresh process per
 rebuild, so there is no module cache to invalidate. It builds wherever `build-plugin.mjs` would: the dev
-data root by default, or `-- --package-root ../desktop/out/bundled-plugins` to write into the desktop's
+data root by default, or `-- --package-root ../desktop/dist/bundled-plugins` to write into the desktop's
 staging directory instead, which is the one to use when iterating on a **bundled** plugin's frame under
 `pnpm dev` (that directory is the copy the app trusts and reconciles from).
 
@@ -454,19 +453,19 @@ its bundle hash, so a new hash is a new origin and a new document with nothing c
 
 **Boot** trust prompts are gone from development, because a development build acknowledges the bundled
 first-party roster on exactly the terms a packaged build does — the same directory, read and hashed by
-Electron main (`packages/desktop-helper/src/main/bundledPluginTrust.ts`). This is parity, not a widening: a
+the helper (`packages/desktop-helper/src/main/bundledPluginTrust.ts`). This is parity, not a widening: a
 hand-installed package, a third-party one, and anything a node serves this device still prompt. Set
 `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` to get the prompts back when the trust flow itself is what you are
 working on.
 
-Mid-session rebuilds are not covered, and the reason is structural: the grant is made once, at Electron
+Mid-session rebuilds are not covered, and the reason is structural: the grant is made once, at helper
 boot, over the bytes in the staging directory, and trust is keyed by `(pluginId, hash)`. Rebuild a client
 bundle while the app is running and its new hash has never been granted, so the next registration pass
 prompts — once, and not again after a relaunch. Rebuilding into the data root instead (a plain
 `build:plugin`, or a package served by a paired `dev:node`) is outside the grant entirely and prompts per
 rebuild by design; the marker that would let the host recognise a dev build cannot be a security signal
 (`packages/node-core/src/main/bundledPlugins.ts` says why). So: iterate on a client bundle with
-`--package-root` into `apps/desktop/out/bundled-plugins` and relaunch, and a node-only change needs no
+`--package-root` into `apps/desktop/dist/bundled-plugins` and relaunch, and a node-only change needs no
 prompt at all.
 
 Four first-party packages ship this way and none is also present in the compiled composition.
@@ -555,7 +554,7 @@ The design note says "per (pluginId, device)" and the device half is the file it
 addition, because fleet resolution picks the highest version across every paired node and a grant keyed on
 the name alone would auto-trust a bundle a *different* node started serving under it.
 
-What it does: when Electron main caches a bundle for a plugin under grant, it records an ordinary accepted
+What it does: when the helper caches a bundle for a plugin under grant, it records an ordinary accepted
 acknowledgement for those bytes right there — beside the hash it computed itself, in the process that
 holds the grant. The renderer therefore never queues a prompt, and nothing about eligibility changes:
 `bundleAccepted` and `eligiblePlugins().trusted` see an acceptance and behave exactly as they would for
@@ -625,7 +624,7 @@ kinds of contribution come out of one manifest:
   list at `/p/:projectId` with no task involved. A project-scoped pane must declare a `routes` entry
   addressing it and a source whose `onSelect` navigates to it — those are its address and its only
   mount site, and a manifest missing either is rejected rather than shipping a surface that can never
-  appear. Each renders in an iframe on `app-plugin://<bundle-hash>`, a scheme Electron main serves
+  appear. Each renders in an iframe on `app-plugin://<bundle-hash>`, a scheme the shell serves
   from its content-addressed cache with `connect-src 'none'`: the frame has no network, no
   `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
   is checked against the manifest's declared scopes by an allowlist naming each path and method
@@ -680,7 +679,7 @@ kinds of contribution come out of one manifest:
   draw (two clicks, an inline undo, whatever fits) rather than a host verb.
 
   A link inside a frame's own rendered content reaches the shell through `bridge.ui.openUrl(url)`,
-  because the anchor itself cannot go anywhere: the iframe has no `allow-popups` and Electron pins every
+  because the anchor itself cannot go anywhere: the iframe has no `allow-popups` and the shell pins every
   subframe to its own origin. The frame passes a URL and learns nothing back. The host validates the
   scheme at the boundary — `https` only, the same policy a manifest's `openUrl` descriptor verb is held
   to (`@acorn/protocol/externalUrl.ts`), so `file:`, `javascript:`, `data:` and the frame's own
@@ -825,10 +824,10 @@ kinds of contribution come out of one manifest:
   and inline UI cannot, and the test for any proposed addition is "is this an LSP method". The wire
   shapes are `@acorn/protocol/documentSurface.ts`; the kinds are LSP's names rather than its magic
   numbers, because this wire is read by plugin authors and not by an LSP client.
-- **Webviews** — a host-drawn pane backed by an Electron-main `WebContentsView`. A surface declares
+- **Webviews** — a host-drawn pane backed by a shell-owned child webview. A surface declares
   exactly one literal `url` or plugin-owned `urlSource` plus a non-empty `hosts` allowlist. HTTPS is
   required except for `localhost`, `127.0.0.1`, and `::1`; the renderer broker validates requested
-  navigation and Electron enforces the same list on direct navigation and redirects. The page has an
+  navigation and the shell enforces the same list on direct navigation and redirects. The page has an
   isolated ephemeral partition, no preload, no CDP, no devtools, no tunnel credentials, and no script
   or message bridge. The plugin's sandboxed client frame remains the controller for only
   `navigate`, `back`, `forward`, and `reload`; it cannot read the page or type into it.
@@ -1433,7 +1432,7 @@ Linear do. This workspace dependency is the accepted intermediate package locati
 published separately for external plugins later, and only that import name is expected to change.
 Do not copy the primitives or hand-roll replacements while packaging catches up.
 
-Electron main owns the frame document and links `/ui.css`, a stylesheet assembled at build time from
+The shell owns the frame document and links `/ui.css`, a stylesheet assembled at build time from
 the same presentation-only primitive, tabs, picker, modal, copy, diff, and style-pack CSS the shell
 uses. The appearance bridge applies the complete theme/style/invariant token projection to the frame
 root. Plugins may add feature-owned CSS for their layout, but they neither bundle nor version a copy
@@ -1740,7 +1739,7 @@ boot twice in one process, this one is a module singleton: a renderer has exactl
 and `_resetClientCapabilities` exists only for tests.
 
 The architecture test enforces zero non-contract plugin-to-plugin edges, no app imports from packages
-or plugins, no Electron imports outside the allowed desktop surface, protocol purity, declared
+or plugins, no shell bindings outside `apps/desktop/src/shell`, protocol purity, declared
 dependencies, an acyclic package graph, and the client/Node split.
 
 ## Data ownership

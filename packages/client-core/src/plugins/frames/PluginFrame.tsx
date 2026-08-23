@@ -17,11 +17,11 @@ const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${
 
 // The host component for one sandboxed plugin surface (docs/plugins.md).
 //
-// Everything security-relevant is either in the frame's origin (main/pluginScheme.ts serves the CSP) or
+// Everything security-relevant is either in the frame's origin (the shell's plugin scheme serves the CSP) or
 // in the broker (scopes.ts decides every call). What is left here is wiring, and one rule: the frame is
 // created from values the host holds, and the only thing that crosses into it is a MessagePort.
 //
-// docs/electron.md describes why the `sandbox` attribute carries `allow-same-origin` alongside
+// docs/shell.md describes why the `sandbox` attribute carries `allow-same-origin` alongside
 // `allow-scripts`: the pair is only dangerous when the framed document shares the embedder's origin,
 // which is `app://acorn` here, not the frame's own `app-plugin://<hash>`.
 
@@ -34,7 +34,7 @@ const currentAxes = (): { theme: string; style: string } => ({
 
 // The token values a frame gets. A frame can render the shared primitive stylesheet, so it needs the
 // complete theme + style + invariant projection rather than BRIDGE_TOKENS' deliberately small canvas
-// contract. The stylesheet itself is served by Electron main at the frame's hash origin.
+// contract. The stylesheet itself is served by the shell at the frame's hash origin.
 const currentTokens = (): Record<string, string> => {
   const computed = getComputedStyle(document.documentElement)
   const tokens: Record<string, string> = {}

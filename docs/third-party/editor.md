@@ -188,7 +188,7 @@ relocation of a results list plus a query box, against an unchanged route.
 | --- | --- | --- |
 | Worktree read/write/list routes | `server/routes/` | `ctx.routes.fetch` |
 | Find-in-files route | `server/routes/search.ts` | Unchanged, same fetch handler |
-| ripgrep runner | `main/search.ts` | Stays node-side; it is not Electron code despite the directory name |
+| ripgrep runner | `main/search.ts` | Stays node-side; it is not shell code despite the directory name |
 | Editor pane (Monaco, tree, tabs) | `client/` | `frame` pane |
 | Search panel | `client/search/` | Already a panel in the pane; it travels with the frame |
 | Component slot | `client/index.ts` | A `target: "overlay"` frame surface — see "The slot" below |
@@ -221,7 +221,7 @@ The frame bundles its own Monaco. That is fine — it is self-contained by desig
 iframe better than most libraries — but know the costs before committing:
 
 - **Bundle size.** Monaco is large, and there is a hard cap: 8 MiB per client bundle
-  (`MAX_CLIENT_BUNDLE_BYTES`), enforced by the node and again by Electron main, with
+  (`MAX_CLIENT_BUNDLE_BYTES`), enforced by the node and again by the desktop helper, with
   `build-plugin.mjs` producing unminified client bundles. Monaco's ESM tree is 30 MB on disk. The
   bundle is content-addressed and cached per hash, so *if* it fits the cost is one-time per version —
   but whether it fits at all is the first thing to measure.

@@ -430,76 +430,62 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)]).toContain('packages/desktop-helper')
   })
 
-  it('the Electron surface stays where it is declared', () => {
-    // apps/desktop is the Electron app, so anything in it may name electron.
+  it('nothing in the tree imports electron', () => {
+    // The end state of the migration: there is one shell, it is Tauri, and the Electron dependency is
+    // gone from every manifest (docs/future/tauri/sequencing.md § Phase 5). This used to be an
+    // enumerated baseline of the files allowed to name electron; it shrank to zero at cutover and the
+    // rule flipped to a flat ban, which is why there is nothing to exempt and nothing to shrink.
     //
-    // Comments are stripped here, unlike the graph scan at the top of this file: both files that got the
-    // lazy treatment describe the import they used to have, in the form they used to have it, and a rule
-    // that fails the fix it documents is a rule people delete.
-    const ELECTRON_VALUE_IMPORT = /\b(?:import|export)\s+(?!type\b)([^'"]*?)\s+from\s*['"]electron['"]/g
-    const importsElectronValues = (source: string): boolean => {
-      const text = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-      ELECTRON_VALUE_IMPORT.lastIndex = 0
-      let m: RegExpExecArray | null
-      while ((m = ELECTRON_VALUE_IMPORT.exec(text))) {
-        // A named clause of only `type X` entries is type-only in substance.
-        const named = m[1].trim().match(/^\{([\s\S]*)\}$/)
-        if (named && named[1].split(',').every((part) => !part.trim() || /^type\s/.test(part.trim()))) continue
-        return true
-      }
-      return false
-    }
-    // The edge scan already found every file that names electron; this only decides how.
+    // A source scan as well as an edge scan, because both lazy adapters that survived to the end
+    // reached for it through `createRequire` rather than an import, and an edge scan alone would not
+    // have seen either.
     const naming = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))]
-    const offenders = naming.filter((f) => !rel(f).startsWith('apps/desktop/')).filter((f) => importsElectronValues(readFileSync(f, 'utf8')))
-    // Anti-vacuity: the regex must still recognise the real form, which apps/desktop is full of.
-    expect(naming.filter((f) => importsElectronValues(readFileSync(f, 'utf8'))).length).toBeGreaterThan(5)
-    // And the forms no file in the tree happens to use, so the predicate is pinned rather than trusted.
-    expect(importsElectronValues("export { app } from 'electron'")).toBe(true)
-    expect(importsElectronValues("export * from 'electron'")).toBe(true)
-    expect(importsElectronValues("export type { BrowserWindow } from 'electron'")).toBe(false)
-    expect(importsElectronValues("import type { App } from 'electron'")).toBe(false)
-    expect(importsElectronValues("import { type App, type Menu } from 'electron'")).toBe(false)
-    expect(offenders.map(rel).sort()).toEqual([])
+    expect(naming.map(rel).sort()).toEqual([])
+    // Any call whose sole argument is the string, which is the `createRequire(import.meta.url)('electron')`
+    // form both surviving adapters used. Comments are stripped so prose about the deleted shell is not
+    // a failure.
+    const LAZY_REQUIRE = /\(\s*['"]electron['"]\s*\)/
+    const withoutComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const files = PACKAGES.flatMap((p) => walk(p.src))
+    expect(files.filter((f) => LAZY_REQUIRE.test(withoutComments(readFileSync(f, 'utf8')))).map(rel).sort()).toEqual([])
+    // And out of the manifests, so nobody reinstalls it by accident.
+    const manifestOf = (p: Pkg) => JSON.parse(readFileSync(join(p.dir, 'package.json'), 'utf8')) as Record<string, Record<string, string> | undefined>
+    const declares = (p: Pkg, name: string) => ['dependencies', 'devDependencies'].some((field) => manifestOf(p)[field]?.[name])
+    expect(PACKAGES.filter((p) => declares(p, 'electron')).map((p) => p.name).sort()).toEqual([])
+
+    // Anti-vacuity: an empty result has to mean "nothing matched", not "nothing was scanned". Each of
+    // the three scans is shown finding something it should.
+    expect(files.length).toBeGreaterThan(500)
+    expect(LAZY_REQUIRE.test(`const e = createRequire(import.meta.url)('electron')`)).toBe(true)
+    expect(LAZY_REQUIRE.test(`// createRequire(import.meta.url)('electron') is what this replaced`)).toBe(true)
+    expect(withoutComments(`// createRequire(import.meta.url)('electron')`)).toBe('')
+    expect(EDGES.some((e) => e.target.external === '@tauri-apps/api')).toBe(true)
+    expect(PACKAGES.filter((p) => declares(p, 'typescript')).length).toBeGreaterThan(5)
   })
 
-  it('the Tauri surface stays inside the Tauri shell', () => {
-    // The mirror of the Electron rule above, written the day the second shell landed rather than the
-    // day someone reached for `invoke` from client-core (docs/future/tauri/testing.md § Seam contract
-    // tests). The renderer's one door to a host is the platform seam, and the bridge that fills it is
-    // the only file in the tree that may name a Tauri binding.
-    const SHELL = join(ROOT, 'apps', 'desktop-tauri') + '/'
+  it('the Tauri surface stays inside the shell', () => {
+    // The renderer's one door to a host is the platform seam, and the bridge that fills it is the only
+    // file in the tree that may name a Tauri binding (docs/future/tauri/testing.md § Seam contract
+    // tests). `src/app/client` is the renderer and shares this package with the shell, so the rule is
+    // written against the shell folder rather than the package.
+    const SHELL = join(ROOT, 'apps', 'desktop', 'src', 'shell') + '/'
     const naming = [...new Set(EDGES.filter((e) => e.target.external === '@tauri-apps/api').map((e) => e.fromFile))]
     expect(naming.filter((f) => !f.startsWith(SHELL)).map(rel).sort()).toEqual([])
     // Anti-vacuity: the bridge must still be the file that carries it.
-    expect(naming.map(rel)).toContain('apps/desktop-tauri/src/client/bridge.ts')
-  })
-
-  it('the desktop helper stays Electron-free', () => {
-    // @acorn/desktop-helper is the custody stack: the broker, the fleet, the device tokens, the
-    // plugin cache and trust store, the tunnels, and the supervised node service, composed by its
-    // main/index.ts. Electron main and the Tauri desktop helper process both run it
-    // (docs/future/tauri/architecture.md § Process model), so a single Electron import in it would
-    // cost the Tauri shell its custody stack. Encryption and the shell-only service capabilities are
-    // injected for exactly this reason.
-    const HELPER = join(ROOT, 'packages', 'desktop-helper') + '/'
-    const offenders = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))].filter((f) => f.startsWith(HELPER))
-    expect(offenders.map(rel).sort()).toEqual([])
-    // Anti-vacuity: the folder exists and the scan reaches it.
-    expect(EDGES.filter((e) => e.fromFile.startsWith(HELPER)).length).toBeGreaterThan(10)
+    expect(naming.map(rel)).toContain('apps/desktop/src/shell/bridge.ts')
   })
 
   it('the platform seam is the only door to the host (shrinking baseline)', () => {
     // A source scan rather than a graph edge, because the global is read rather than imported:
     // `acornGlobal` is module-private inside platform/index.ts, so `window.acorn` is the only spelling
-    // left to police. Comments are stripped, same reasoning as the electron rule. Tests are exempt
-    // permanently: stubbing `globalThis.window` is how the platform implementation gets exercised.
+    // left to police. Comments are stripped. Tests are exempt permanently: stubbing
+    // `globalThis.window` is how the platform implementation gets exercised.
     const READS_GLOBAL = /\bwindow\s*(?:\.\s*acorn\b|\?\.\s*acorn\b|\[\s*['"]acorn['"]\s*\])/
     const readsHostGlobal = (source: string): boolean =>
       READS_GLOBAL.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
     const SEAM = join(ROOT, 'packages', 'client-core', 'src', 'platform') + '/'
-    // The preload writes the global (exposeInMainWorld) rather than reading it, so it doesn't match.
-    // Named here so the next implementation knows where the other end of this contract lives.
+    // The bridge writes the global rather than reading it, so it doesn't match. Named here so the
+    // next implementation knows where the other end of this contract lives.
     const files = PACKAGES.flatMap((p) => walk(p.src))
       .filter((f) => !isTestCode(f) && !f.startsWith(SEAM))
       .filter((f) => readsHostGlobal(readFileSync(f, 'utf8')))

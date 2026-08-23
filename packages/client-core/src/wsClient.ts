@@ -1,4 +1,4 @@
-// The renderer end of the one authenticated stream socket. It no longer owns a socket: Electron
+// The renderer end of the one authenticated stream socket. It no longer owns a socket: the desktop
 // main's connection broker holds it, because the device token rides the upgrade request's headers
 // and a browser cannot set those (docs/architecture-overview.md § Node API and client flow).
 //

@@ -1,6 +1,6 @@
 # Distribution
 
-Status: proposal, 2026-08-22. This file is subordinate to [bundle.md](../bundle.md), which owns
+Status: historical, 2026-08-22. This file is subordinate to [bundle.md](../bundle.md), which owns
 node packaging; it records only what the Tauri work changes or converges. The end state has three
 consumption shapes and one node artifact.
 

@@ -17,21 +17,20 @@ actually do on phones.
 
 ## Web client: what changes and what doesn't
 
-A web client is a browser talking to a Node directly. The Node already runs Electron-free
-(docs/architecture-overview.md: a standalone Node uses the same service graph without
-Electron-native capabilities). Three assumptions break:
+A web client is a browser talking to a Node directly. The Node already runs shell-free
+(docs/architecture-overview.md: a standalone Node uses the same service graph). Three assumptions
+break:
 
 ### 1. Auth inverts (the big one)
 
-On desktop the renderer never holds a token; Electron main brokers every request with pinned
+On desktop the renderer never holds a token; the desktop helper brokers every request with pinned
 HTTPS and a device bearer. A browser IS the client — it must hold a session. The Node needs real
 web auth: httpOnly-cookie or bearer sessions, CSRF protection, rate limiting, lockout, session
 revocation. A web session should be modeled as a **device row** — the existing device-token
 model extends naturally, giving revocation UI ("this browser session") for free. The public
 automation API work (docs/api-reference.md: bearer tokens, registry, rate limits) is the down payment.
 
-Token custody on web is strictly worse than Electron main custody, and no design fixes that
-fully:
+Token custody on web is strictly worse than desktop custody, and no design fixes that fully:
 
 - Tokens for every connected node live in JS-reachable storage; one XSS in the shell is
   fleet-wide credential theft.
@@ -127,7 +126,7 @@ that day (`git history: docs/future/node-first/platform-seam.md`). Everything el
 
 1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/platform/`.)
    Everything that touches `window.acorn` (apiClient's nodeFetch, stream attach, plugin cache access,
-   trust prompts) is behind capability-grouped interfaces with the Electron preload as their only
+   trust prompts) is behind capability-grouped interfaces with the desktop bridge as their only
    implementation, and `boundaries.test.ts` fails any file outside the seam that reads the global.
    Two facts pinned for the eventual web implementation: the device bearer rides the WS *upgrade
    header* today, which a browser cannot set, so the node needs a second auth carrier; and `nodeFetch`

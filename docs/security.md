@@ -6,9 +6,9 @@ and untrusted provider/preview content rather than implementing multi-user roles
 
 ## Trust boundaries
 
-- Electron renderer: UI code and third-party preview content; no device token, certificate, database
+- Renderer: UI code and third-party preview content; no device token, certificate, database
   handle, process object, or direct network access.
-- Electron main: native host, broker, certificate pins, device-token custody, window policy, and
+- Desktop shell and its helper: native host, broker, certificate pins, device-token custody, window policy, and
   preview `WebContentsView` host.
 - Node: authoritative data and execution environment. It is intentionally able to run developer
   tools, so a compromised Node account is outside the application threat model.
@@ -22,7 +22,7 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 
 - Nodes bind to `127.0.0.1` over TLS 1.3 and reject unexpected `Host` values.
 - The certificate is self-signed, persisted in the Node data root, and pinned by fingerprint in the
-  Electron broker. A changed fingerprint is a hard stop.
+  helper's broker. A changed fingerprint is a hard stop.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
 - `/v2/node` and `/v2/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
@@ -193,7 +193,7 @@ broker pipe to every paired device. That makes a Node a source of executable cod
 gated twice — once on content, once on consent.
 
 **Trust binds to bytes, not to claims.** The hash a Node advertises in `/v2/core/plugins` is
-untrusted input. Electron main fetches the bundle itself (the bytes never pass through the renderer),
+untrusted input. The helper fetches the bundle itself (the bytes never pass through the renderer),
 hashes what arrived, and stores it content-addressed under that hash. A mismatch against the
 advertised value is refused and reported, never re-keyed. Every acknowledgement therefore binds a
 plugin id to a hash no one but this device computed.
@@ -320,7 +320,7 @@ of the key is not in the design note and is deliberate — fleet resolution pick
 paired node, so a grant keyed on the plugin name alone would auto-trust a bundle a *different* node started
 serving under it.
 
-The grant writes ordinary accepted acknowledgements, in Electron main, beside the hash main computed
+The grant writes ordinary accepted acknowledgements, in the helper, beside the hash it computed
 itself; nothing in the renderer can turn a bundle into an accepted one with or without a grant. Each such
 row is marked `dev` so revocation can find it, and `partial` because nobody read a disclosure — so it can
 never become the baseline of a later "what changed" diff.
@@ -357,7 +357,7 @@ and the palette, settings, task-switching, and Escape chords are unclaimable.
 
 A loaded plugin may declare a host-owned webview. Unlike its sandboxed interface frame, the remote
 page has live network access and its own cookies/login state for the life of the process. The trust
-prompt names the declared hosts as a separate grant. Electron enforces that allowlist across requested
+prompt names the declared hosts as a separate grant. The shell enforces that allowlist across requested
 navigations and redirects, and gives each surface an isolated ephemeral partition. The plugin gets no
 page preload, CDP driver, devtools, tunnel headers, script injection, or `postMessage` path, so it can
 choose the URL but cannot inspect or operate the page.

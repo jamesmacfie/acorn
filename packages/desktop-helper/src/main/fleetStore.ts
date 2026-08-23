@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { nodeRecordSchema, type NodeRecord } from '@acorn/protocol/broker.ts'
 import { LOCAL_TOKEN_SCOPE, type DeviceTokens } from './deviceTokenStore'
 
-// Fleet membership, its storage split, and the local-node singleton invariant: docs/electron.md
+// Fleet membership, its storage split, and the local-node singleton invariant: docs/shell.md
 // § Fleet membership.
 //
 // Follows sessionKeyStore.ts's file discipline: 0700 dir, 0600 files, chmod after write so a looser
@@ -25,7 +25,7 @@ export type FleetNode = z.infer<typeof fleetNodeSchema>
 
 const fleetFileSchema = z.strictObject({ version: z.literal(1), nodes: z.array(fleetNodeSchema) })
 
-// The renderer's projection: docs/electron.md § Fleet membership.
+// The renderer's projection: docs/shell.md § Fleet membership.
 export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   nodeId: node.nodeId,
   label: node.label,
@@ -34,7 +34,7 @@ export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
 })
 
-// The bundled local node's token predates its nodeId: docs/electron.md § Fleet membership.
+// The bundled local node's token predates its nodeId: docs/shell.md § Fleet membership.
 const scopeOf = (node: Pick<FleetNode, 'nodeId' | 'local'>): string => (node.local ? LOCAL_TOKEN_SCOPE : node.nodeId)
 
 export class FleetStore {
@@ -63,7 +63,7 @@ export class FleetStore {
   // across restarts now that the port is ephemeral) and once per successful pairing.
   //
   // Why a local node replaces any other local row as well as its own, and the bug this fixed:
-  // docs/electron.md § Fleet membership.
+  // docs/shell.md § Fleet membership.
   remember(node: FleetNode, token: string): FleetNode {
     const nodes = this.list().filter((existing) => existing.nodeId !== node.nodeId && !(node.local && existing.local))
     nodes.push(node)

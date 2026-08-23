@@ -21,7 +21,7 @@ import {
 
 // The seam's contract, written as a checker rather than as tests, so both ends can run it: this
 // package's own suite drives it against a mock host object, and each shell's suite drives it against
-// the real object that shell installs (apps/desktop/src/app/main/preload.test.ts). Returning strings
+// the real object that shell installs (apps/desktop/src/shell/bridge.test.ts). Returning strings
 // instead of calling `expect` is what keeps a test framework out of src/.
 //
 // What it is for: every capability group is nullable, so a host that renames one member of one group

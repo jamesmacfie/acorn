@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { desktopCapabilitiesOverRpc } from '@acorn/protocol/desktopCapabilities.ts'
 import {
   ServiceRpcError,
   ServiceRpcPeer,
@@ -35,7 +34,6 @@ peer.register('service.start', async (payload) => {
   stateChanged('starting')
   runtime = await startServiceRuntime({
     config,
-    desktop: desktopCapabilitiesOverRpc(peer),
     stateChanged,
   })
   // The endpoint, certificate identity, and device bearer the parent needs to adopt the local Node.

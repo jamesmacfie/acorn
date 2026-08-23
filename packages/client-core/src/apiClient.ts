@@ -4,7 +4,7 @@ import { nodeTransport } from './platform'
 import { activeNodeId } from './node/activeNode'
 import { nodeState } from './node/fleet'
 
-// The renderer's only HTTP surface. Every request goes through Electron main's connection broker
+// The renderer's only HTTP surface. Every request goes through the desktop helper's connection broker
 // (docs/architecture-overview.md § Node API and client flow), which owns the endpoint, the pinned
 // certificate, and the device token, so nothing here knows an origin and nothing here holds a
 // credential.

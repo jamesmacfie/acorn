@@ -43,7 +43,7 @@ function internalPrincipal(c: { env: Env; req: { header(name: string): string | 
   return userId ? { kind: 'internal', userId, scope: claims.scope, taskId: claims.taskId, sessionId: claims.sessionId } : null
 }
 
-// Device bearer: the client's connection broker in Electron main authenticates with a paired device
+// Device bearer: the client's connection broker authenticates with a paired device
 // token.
 //
   // A comma in the merged Authorization value means the request carried more than one such header

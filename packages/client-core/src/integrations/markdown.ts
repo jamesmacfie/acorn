@@ -6,7 +6,7 @@ const safeHref = (u: string): string | null => (/^(https?:\/\/|mailto:)/i.test(u
 // Images are fetched by the renderer, so mailto is not meaningful here.
 //
 // `data:image/` is allowed alongside http(s) because of the sandboxed plugin frames, whose CSP is
-// `img-src 'self' data:` with `connect-src 'none'` (desktop/src/app/main/pluginScheme.ts). A frame
+// `img-src 'self' data:` with `connect-src 'none'` (docs/shell.md § The plugin frame origin). A frame
 // cannot load a remote image at all, and a provider's uploads are usually behind the same credential
 // its API is, so the only way one draws a picture is for its node half to fetch the bytes and hand
 // them back inline. Inert either way: an `<img>` never executes what it points at, SVG included.

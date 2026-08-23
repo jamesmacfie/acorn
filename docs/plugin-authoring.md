@@ -340,7 +340,7 @@ manifest.
 
 ## The client half
 
-A frame is a **host-generated iframe document**, not a component in the shell's tree. Electron main
+A frame is a **host-generated iframe document**, not a component in the shell's tree. The shell
 serves it from a content-addressed cache on `app-plugin://<bundle-hash>/`, and the handler answers
 exactly four paths (`apps/desktop/src/app/main/pluginScheme.ts`):
 

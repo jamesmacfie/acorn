@@ -79,8 +79,8 @@ export type NodeRecord = z.infer<typeof nodeRecordSchema>
 
 // --- Owner-initiated fleet mutations ---
 //
-// Membership is main's to change, so the renderer asks. Each of these is Zod-parsed in
-// nodeBrokerIpc.ts exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
+// Membership is the helper's to change, so the renderer asks. Each of these is Zod-parsed in
+// `helperServer.ts` exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
 // compromised renderer asked for…" reasoning about the files that hold device tokens.
 //
 // There is no "add this node with this token" shape. The only route into the fleet is probe-then-pair,

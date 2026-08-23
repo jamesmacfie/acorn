@@ -156,7 +156,7 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       // Repeated on this side for the same reason `runNodeAction` re-checks its path: the URL came off a
       // roster row, and a roster row is wire input from a node. `window.open` is denied by main's
       // setWindowOpenHandler, which hands the URL to `openExternal`, so this opens in the owner's browser
-      // and never in-app (apps/desktop/src/app/main/electron.ts).
+      // and never in-app (docs/shell.md § Navigation policy).
       if (!isPluginOpenableUrl(action.url)) return toast(context.pluginId, 'refused a non-https URL')
       // A URL acorn has its own surface for stays inside acorn. A dashboard row for one of my pull requests
       // names github.com because that is the durable identity of the thing, not because the browser is

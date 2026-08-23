@@ -1,6 +1,7 @@
 # Packaging and release
 
-Status: proposal, 2026-08-22; phase 4 built it, 2026-08-23.
+Status: historical. Proposed 2026-08-22, built in phase 4, 2026-08-23.
+[docs/shell.md](../../shell.md) § Build and packaging owns shipped behaviour.
 
 ## The problem
 
@@ -31,7 +32,7 @@ GitHub Release creation and updater-manifest generation, gated off until signing
 
 ## What landed
 
-Built 2026-08-23. `pnpm --filter @acorn/desktop-tauri run build` stages, builds the renderer, runs both
+Built 2026-08-23. `pnpm --filter @acorn/desktop run build` stages, builds the renderer, runs both
 budget checks, bundles, and then verifies the bundle it produced. `.github/workflows/build-tauri.yml`
 runs the same thing on a push to main, alongside `build-dmg.yml` rather than instead of it.
 

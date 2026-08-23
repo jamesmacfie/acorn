@@ -35,10 +35,11 @@ describe('pluginMigrationsFolder', () => {
 
   it('prefers the plugin-scoped chain over core’s in the built layout', () => {
     const dir = root()
-    const core = chain(join(dir, 'out/migrations'))
-    const expected = chain(join(dir, 'out/migrations/http'))
-    const module = join(dir, 'out/main/service.js')
-    mkdirSync(join(dir, 'out/main'), { recursive: true })
+    // The staged layout: scripts/stage.mjs puts service.js and the chains in one directory, core's at
+    // `migrations` and each plugin's at `migrations/<id>`.
+    const core = chain(join(dir, 'dist/helper/migrations'))
+    const expected = chain(join(dir, 'dist/helper/migrations/http'))
+    const module = join(dir, 'dist/helper/service.js')
 
     const resolved = pluginMigrationsFolder('http', pathToFileURL(module).href)
     expect(resolved).toBe(expected)
@@ -47,10 +48,10 @@ describe('pluginMigrationsFolder', () => {
 
   it('throws rather than silently applying nothing when no chain exists', () => {
     const dir = root()
-    const module = join(dir, 'out/main/service.js')
-    mkdirSync(join(dir, 'out/main'), { recursive: true })
+    const module = join(dir, 'dist/helper/service.js')
+    mkdirSync(join(dir, 'dist/helper'), { recursive: true })
     // A `migrations` directory with no journal must not end the search either.
-    mkdirSync(join(dir, 'out/migrations'), { recursive: true })
+    mkdirSync(join(dir, 'dist/helper/migrations'), { recursive: true })
     expect(() => pluginMigrationsFolder('nosuch', pathToFileURL(module).href)).toThrow("No migrations chain found for plugin 'nosuch'")
   })
 

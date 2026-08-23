@@ -1,23 +1,20 @@
 node_modules/
 .turbo/
 dist/
-out/
-release/
 .env
 .env*.local
 *.log
 
-# Electron: local SQLite + on-disk blob cache
+# Local SQLite + on-disk blob cache
 .acorn/
 
-# Tauri: the Rust build tree, and the Node runtime the staging script copies in
-apps/desktop-tauri/src-tauri/target/
-apps/desktop-tauri/src-tauri/binaries/
-apps/desktop-tauri/src-tauri/gen/
+# The Rust build tree, and the Node runtime the staging script copies in
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/gen/
 
 .playwright-mcp/*
-
 references/
-# Playwright failure artifacts (screenshots, error-context.md)
+
+# Local scratch: test runner artifacts
 test-results/
-playwright-report/

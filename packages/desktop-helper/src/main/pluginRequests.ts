@@ -5,7 +5,7 @@ import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
 
 // What the renderer may say about a third-party plugin bundle, and what it gets back. Two shells parse
-// these: Electron's `pluginIpc.ts` and the Tauri helper's `helperServer.ts`. They live beside the
+// these: the helper's `helperServer.ts` and, before it, Electron's `pluginIpc.ts`. They live beside the
 // stores they guard rather than in either shell, because a schema that drifted between the two would
 // mean one host recording an acknowledgement the other cannot read.
 //

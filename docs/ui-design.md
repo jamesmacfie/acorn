@@ -15,7 +15,7 @@ Overlays: palette, settings, onboarding, notices, confirmations
 ```
 
 The shell owns navigation chrome and modal prompts. Plugins supply feature content through registries
-and slots. A native preview view is positioned over a pane host by Electron main; page content never
+and slots. A child webview is positioned over a pane host by the shell; page content never
 owns the surrounding chrome.
 
 ## Appearance
