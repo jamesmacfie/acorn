@@ -12,6 +12,7 @@ import type {
   PluginCollectionRow,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
+import { sessionModelLabel } from './agentConfigOptions'
 import { managedAgentApi } from './managedClient'
 import { AGENT_PANE_ID } from './paneContribution'
 import { runtimeTone } from './stateTone'
@@ -88,7 +89,7 @@ export const sessionRow = (session: AgentSession): PluginCollectionRow => ({
     state: session.runtimeState,
     attention: session.attention,
     provider: session.providerId,
-    model: session.model,
+    model: sessionModelLabel(session) ?? null,
     updated: session.updatedAt,
   },
 })

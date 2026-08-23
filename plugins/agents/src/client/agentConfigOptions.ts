@@ -1,4 +1,4 @@
-import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption, AgentSession } from '@acorn/protocol/managedAgents.ts'
 
 const sameValue = (
   left: AgentConfigOption['values'][number],
@@ -30,3 +30,18 @@ export const sameAgentConfigOptions = (
         return nextValue != null && sameValue(value, nextValue)
       })
   })
+
+/**
+ * The model a session is running. The `model` column on the session row is never written: the live
+ * provider reports its choice as a `session_metadata` config option, and that is what a model switch
+ * updates, so `config.configOptions` is the only place the current answer lives. Returns the option's
+ * value label where the provider gave one, since a raw id like `claude-opus-4-1-20250805` is not what
+ * anyone calls it.
+ */
+export const sessionModelLabel = (session: AgentSession): string | undefined => {
+  const options = session.config.configOptions
+  if (!Array.isArray(options)) return session.model ?? undefined
+  const model = (options as AgentConfigOption[]).find((option) => option.category === 'model')
+  if (!model?.currentValue) return session.model ?? undefined
+  return model.values.find((value) => value.value === model.currentValue)?.label ?? model.currentValue
+}
