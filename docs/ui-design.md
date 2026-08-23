@@ -18,6 +18,13 @@ The shell owns navigation chrome and modal prompts. Plugins supply feature conte
 and slots. A child webview is positioned over a pane host by the shell; page content never
 owns the surrounding chrome.
 
+Both vertical rails, the TabRail on the left and the task pane switcher on the right, are built from
+one component: `tabs/RailTab.tsx`, a square icon tab styled by `.tabrail-tab`. It is not a Button.
+A rail tab hovers by changing its icon and background only, and `.ui-btn:hover` also moves
+`border-color`, which lit the right rail's own dividers on hover and made the two sides look
+unrelated. `.pane-switcher` restates only what genuinely differs on the right: the glyph font and an
+active accent on the right edge instead of the left.
+
 ## Appearance
 
 Themes provide semantic colors for backgrounds, text, borders, accents, diff states, notices, and

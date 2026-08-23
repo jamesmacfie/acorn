@@ -16,6 +16,7 @@ import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'
 import { formatChord } from './paneShortcuts'
 import { Button, EmptyState } from '../ui/primitives'
+import { RailTab } from '../tabs/RailTab'
 import { createSplitDrag } from '../ui/split'
 
 export default function TaskPaneHost(props: {
@@ -170,28 +171,27 @@ export default function TaskPaneHost(props: {
       <nav class="pane-switcher" aria-label="Task panes">
         <For each={switcherPanes()}>
           {(pane) => (
-            <Button
-              variant="bare" class="pane-switch-btn"
+            <RailTab
               classList={{ active: showsPane(pane.id) }}
               data-tip={pane.label}
               data-tip-key={props.shortcutFor?.(`pane.show.${pane.id}`) ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!) : pane.defaultChord ? formatChord(pane.defaultChord) : undefined}
               data-tip-sub={`${pane.description ?? pane.label} · ⌘-click to open beside`}
               aria-label={pane.label}
               onClick={(event) => onSwitch(pane.id, event)}
-            ><Icon name={pane.glyph} /></Button>
+            ><Icon name={pane.glyph} /></RailTab>
           )}
         </For>
         {props.extraButtons}
         {/* Not `disabled` while closing — disabled buttons swallow the mouseover the tooltip needs. */}
-        <Button
-          variant="bare" class="pane-switch-btn pane-switch-close"
+        <RailTab
+          class="pane-switch-close"
           data-tip={props.closing ? 'Removing…' : 'Close task'}
           aria-label={props.closing ? 'Removing task' : 'Close task'}
           aria-busy={props.closing || undefined}
           onClick={() => { if (!props.closing) props.onCloseTask() }}
         >
           {props.closing ? <span class="spin">⠿</span> : '✕'}
-        </Button>
+        </RailTab>
       </nav>
     </>
   )
