@@ -420,7 +420,7 @@ export default function AgentComposer(props: {
             }}
             buttonClass="repo-picker-button agent-composer-picker-button"
             disabled={props.disabled}
-            placement="top"
+            placement="top-start"
           />
           <Picker<InsertChoice>
             label="＋"
@@ -435,7 +435,7 @@ export default function AgentComposer(props: {
             onSelect={(choice) => insert(choice.value)}
             buttonClass="repo-picker-button agent-composer-picker-button agent-insert-picker-button"
             disabled={props.disabled}
-            placement="top"
+            placement="top-start"
           />
           <Show when={contexts().length}>
             {/* Was a <details> with an absolutely-positioned <pre>, which the composer's own
