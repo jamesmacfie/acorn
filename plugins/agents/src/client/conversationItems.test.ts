@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord } from '@acorn/protocol/managedAgents.ts'
-import { buildConversationItems } from './conversationItems'
+import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
   id: String(seq),
@@ -94,18 +94,37 @@ describe('conversation projection', () => {
     expect(card.lastSeq).toBe(6)
   })
 
-  it('folds a subagent\u2019s own tool call without touching the parent\u2019s call of the same id', () => {
-    // Per-stream fold keys. One shared map would have let a subagent's update land on the parent's card.
+  it('folds an untagged mid-call update into the subagent that opened the call', () => {
+    // Claude's adapter tags a subagent's `tool_call` and its final `tool_call_update` with the owning
+    // agent and leaves the one in between untagged. This used to be looked up per stream, so that
+    // middle update could not find its card and opened a second one at the top level, titled with the
+    // raw tool id because a mid-call update carries no title either. Seven of them in a two-subagent
+    // capture.
     const items = buildConversationItems([
-      event(1, { type: 'tool', tool: { id: 'shared', title: 'Parent bash', status: 'pending' } }),
+      event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Worker' } }),
+      event(2, { type: 'tool', tool: { id: 'read-1', title: 'Read alpha.txt', status: 'pending', subagentId: 'sub-1' } }),
+      event(3, { type: 'tool', tool: { id: 'read-1', title: '', output: 'alpha' } }),
+      event(4, { type: 'tool', tool: { id: 'read-1', title: '', status: 'completed', subagentId: 'sub-1' } }),
+    ])
+    expect(items.map((item) => item.event.type)).toEqual(['subagent'])
+    expect(items[0].children).toHaveLength(1)
+    expect(items[0].children?.[0].event.type === 'tool' && items[0].children?.[0].event.tool)
+      .toMatchObject({ id: 'read-1', title: 'Read alpha.txt', status: 'completed', output: 'alpha' })
+  })
+
+  it('keeps a tool card in the stream that opened it, whichever way the attribution drifts', () => {
+    // The mirror case: an update that gains an attribution the opening call did not have must not open a
+    // phantom card inside the subagent. A tool call id is provider-minted and unique, so the same id is
+    // always the same call, and whoever opened it owns it.
+    const items = buildConversationItems([
+      event(1, { type: 'tool', tool: { id: 'bash-1', title: 'Parent bash', status: 'pending' } }),
       event(2, { type: 'subagent', subagent: { id: 'sub-1', title: 'Worker' } }),
-      event(3, { type: 'tool', tool: { id: 'shared', title: 'Child bash', status: 'completed', subagentId: 'sub-1' } }),
+      event(3, { type: 'tool', tool: { id: 'bash-1', title: '', status: 'completed', subagentId: 'sub-1' } }),
     ])
     expect(items.map((item) => item.event.type)).toEqual(['tool', 'subagent'])
     expect(items[0].event.type === 'tool' && items[0].event.tool)
-      .toMatchObject({ title: 'Parent bash', status: 'pending' })
-    expect(items[1].children?.[0].event.type === 'tool' && items[1].children?.[0].event)
-      .toMatchObject({ tool: { title: 'Child bash', status: 'completed' } })
+      .toMatchObject({ title: 'Parent bash', status: 'completed' })
+    expect(items[1].children).toHaveLength(0)
   })
 
   it('appends a subagent\u2019s prose inside its card, not after the parent\u2019s', () => {
@@ -118,6 +137,20 @@ describe('conversation projection', () => {
     expect(items[0].event.type === 'assistant_message' && items[0].event.text).toBe('parent says')
     expect(items[1].children?.length).toBe(1)
     expect(items[1].children?.[0].event.type === 'assistant_message' && items[1].children?.[0].event.text).toBe('Teal')
+  })
+
+  it('puts a subagent\u2019s file change in the subagent\u2019s run', () => {
+    // A subagent's run has to show what it changed, not only which tool it ran. The diff used to render
+    // in the parent's stream while the Edit call that produced it sat inside the subagent's card.
+    const items = buildConversationItems([
+      event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Worker' } }),
+      event(2, { type: 'tool', tool: { id: 'edit-1', title: 'Edit src/a.ts', subagentId: 'sub-1' } }),
+      event(3, { type: 'file_change', path: 'src/a.ts', summary: 'Claude Code updated a file.', subagentId: 'sub-1' }),
+      event(4, { type: 'file_change', path: 'src/b.ts', summary: 'the parent updated a file.' }),
+    ])
+    expect(items.map((item) => item.event.type)).toEqual(['subagent', 'file_change'])
+    expect(items[0].children?.map((child) => child.event.type)).toEqual(['tool', 'file_change'])
+    expect(items[1].event.type === 'file_change' && items[1].event.path).toBe('src/b.ts')
   })
 
   it('keeps an orphan visible at the top level', () => {
@@ -136,5 +169,39 @@ describe('conversation projection', () => {
     ])
     const [card] = items
     expect(card.event.type === 'tool' && card.event.tool.output).toBe('one-two')
+  })
+})
+
+describe('a subagent\u2019s run on its own', () => {
+  // What the main window renders when a sub-row is selected: the card's children as the top level, so a
+  // long child run is read at full width instead of inside a box in its parent's stream.
+  const built = () => buildConversationItems([
+    event(1, { type: 'assistant_message', text: 'delegating', messageId: 'a' }),
+    event(2, { type: 'subagent', subagent: { id: 'sub-1', title: 'Read alpha', status: 'running' } }),
+    event(3, { type: 'tool', tool: { id: 'sub-1', title: 'Read alpha', input: 'go', subagentId: 'sub-1' } }),
+    event(4, { type: 'assistant_message', text: 'Teal', messageId: 'c', subagentId: 'sub-1' }),
+    event(5, { type: 'session_state', state: 'ready' }),
+  ])
+
+  it('finds the card a selection names', () => {
+    const card = findSubagentItem(built(), 'sub-1')
+    expect(card?.event.type === 'subagent' && card.event.subagent.title).toBe('Read alpha')
+    expect(card?.children?.map((child) => child.event.type)).toEqual(['tool', 'assistant_message'])
+  })
+
+  it('has nothing to show for a subagent that is not there', () => {
+    // Selecting a sub-row under another session loads that snapshot afterwards, so the transcript must
+    // fall back to the session's own stream rather than render blank.
+    expect(findSubagentItem(built(), 'missing')).toBeUndefined()
+  })
+
+  it('hides the same events at both levels', () => {
+    // One shared predicate. Two lists disagreeing would show a session_state row inside a subagent card
+    // and not outside it.
+    expect(visibleConversationItems(built()).map((item) => item.event.type))
+      .toEqual(['assistant_message', 'subagent'])
+    const card = findSubagentItem(built(), 'sub-1')
+    expect(visibleConversationItems(card?.children ?? []).map((item) => item.event.type))
+      .toEqual(['tool', 'assistant_message'])
   })
 })

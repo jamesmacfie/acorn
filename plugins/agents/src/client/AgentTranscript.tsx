@@ -3,24 +3,9 @@ import { onScopeEvicted } from '@acorn/plugin-api/client'
 import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
-import { buildConversationItems } from './conversationItems'
-import { EmptyState } from '@acorn/plugin-api/ui'
-
-const VISIBLE_EVENT_TYPES = new Set([
-  'user_message',
-  'assistant_message',
-  'reasoning',
-  'tool',
-  'subagent',
-  'plan',
-  'usage',
-  'file_change',
-  'terminal',
-  'artifact',
-  'turn_completed',
-  'error',
-  'diagnostic',
-])
+import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
+import { Button, EmptyState } from '@acorn/plugin-api/ui'
+import { subagentSummary } from './subagentDisplay'
 
 // Deliberately not virtualized. The virtualizer this used to run called `measure()` on every new event,
 // which clears the item size cache, so every row fell back to the size estimate, the canvas height
@@ -48,14 +33,31 @@ export default function AgentTranscript(props: {
   snapshot: AgentSessionSnapshot
   focusRequestId?: string
   focusSubagentId?: string
+  onExitSubagent: () => void
   onRequestResolved: () => void
 }) {
   const [scrollElement, setScrollElement] = createSignal<HTMLDivElement>()
-  const items = createMemo(() =>
-    buildConversationItems(props.snapshot.events).filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type)))
+  const conversation = createMemo(() => buildConversationItems(props.snapshot.events))
+  // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
+  // its parent's stream, so selecting it moves the whole window onto that run: the transcript renders
+  // the card's own children as its top level, which the projection already built as a tree.
+  const focused = createMemo(() => {
+    const id = props.focusSubagentId
+    return id ? findSubagentItem(conversation(), id) : undefined
+  })
+  const focusedSubagent = createMemo(() => {
+    const event = focused()?.event
+    return event?.type === 'subagent' ? event.subagent : undefined
+  })
+  // Falls back to the session's own stream when the card is not there: selecting a subagent under
+  // another session loads that snapshot afterwards, and a truncated replay may never have carried it.
+  const items = createMemo(() => visibleConversationItems(focused()?.children ?? conversation()))
   const pending = createMemo(() => props.snapshot.requests.filter((request) =>
     request.status === 'pending' || request.status === 'resolving'))
   const sessionId = createMemo(() => props.snapshot.session.id)
+  // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
+  // different lists, so one key would restore the wrong offset every time the reader stepped in or out.
+  const viewId = createMemo(() => focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId())
 
   // Follow the bottom until the reader scrolls away from it, and pick it up again when they scroll back.
   // Everything below is driven by the list resizing rather than by the snapshot changing: a streamed
@@ -71,7 +73,7 @@ export default function AgentTranscript(props: {
     if (!element) return
     element.scrollTop = element.scrollHeight
     applied = element.scrollTop
-    scrollTopBySession.delete(sessionId())
+    scrollTopBySession.delete(viewId())
   }
   const noteScroll = () => {
     const element = scrollElement()
@@ -82,8 +84,8 @@ export default function AgentTranscript(props: {
     if (element.scrollTop === applied) return
     target = null
     following = nearBottom(element)
-    if (following) scrollTopBySession.delete(sessionId())
-    else scrollTopBySession.set(sessionId(), element.scrollTop)
+    if (following) scrollTopBySession.delete(viewId())
+    else scrollTopBySession.set(viewId(), element.scrollTop)
   }
   // Leaving the task unmounts this pane, so the reader must land back where they were. Code highlighting
   // resolves after mount and keeps growing the list, so the browser clamps an early write. Re-apply the
@@ -100,40 +102,16 @@ export default function AgentTranscript(props: {
   // The list grows for two reasons and the response differs: while restoring we chase the saved offset,
   // otherwise we sit on the bottom. The scroll element is observed too, because the pending-request strip
   // above it appearing shortens the viewport without touching the list.
-  // Where a sidebar sub-row sends the reader. The card may not be in the DOM on the first attempt,
-  // because selecting a sub-row under another session loads that session's snapshot first, so the id is
-  // held and retried on the list's own resizes alongside the restore.
-  let pendingSubagentId: string | null = null
-  const focusPendingSubagent = () => {
-    const element = scrollElement()
-    if (!element || !pendingSubagentId) return
-    const card = element.querySelector(`[data-subagent="${CSS.escape(pendingSubagentId)}"]`)
-    if (!card) return
-    pendingSubagentId = null
-    // Jumping to a card is a decision to stop following the tail, the same as scrolling up by hand.
-    target = null
-    following = false
-    card.scrollIntoView({ block: 'start' })
-    scrollTopBySession.set(sessionId(), element.scrollTop)
-  }
   const growth = new ResizeObserver(() => {
-    if (pendingSubagentId) focusPendingSubagent()
-    else if (target !== null) applyTarget()
+    if (target !== null) applyTarget()
     else if (following) pin()
   })
   onCleanup(() => growth.disconnect())
-  // A memo, not an inline getter: `on()` runs its callback on every notification without comparing the
-  // input, and the signal behind this prop is one record covering every session's subagent selection,
-  // so an inline getter would jump the transcript when a different session's row was clicked.
-  const focusSubagentId = createMemo(() => props.focusSubagentId)
-  createEffect(on(focusSubagentId, (id) => {
-    if (!id) return
-    pendingSubagentId = id
-    focusPendingSubagent()
-  }, { defer: true }))
-  // Switching sessions in the sidebar swaps the snapshot without remounting, so this covers both mount
-  // and session change.
-  createEffect(on(sessionId, (id) => {
+  // Switching sessions or stepping into a subagent swaps the list without remounting, so this covers
+  // mount and every change of view. A memo as the dep, not an inline getter: `on()` runs its callback on
+  // every notification without comparing the input, and the signal behind the focus prop is one record
+  // covering every session, so an inline getter would reset the scroll when another session's row moved.
+  createEffect(on(viewId, (id) => {
     target = scrollTopBySession.get(id) ?? null
     following = target === null
     if (target === null) pin()
@@ -155,6 +133,14 @@ export default function AgentTranscript(props: {
           </For>
         </div>
       </Show>
+      <Show when={focusedSubagent()}>
+        {(subagent) => (
+          <div class="agent-subagent-crumb">
+            <Button variant="bare" size="sm" onClick={props.onExitSubagent}>← {props.snapshot.session.title}</Button>
+            <span><strong>{subagent().title ?? 'Subagent'}</strong><small>{subagentSummary(subagent())}</small></span>
+          </div>
+        )}
+      </Show>
       <div
         class="agent-transcript"
         ref={(element) => {
@@ -167,7 +153,7 @@ export default function AgentTranscript(props: {
           when={items().length}
           fallback={
             <EmptyState icon={<span class="agent-empty-mark">✦</span>}>
-              This session is ready for its first turn.
+              {focusedSubagent() ? 'This subagent has not reported anything yet.' : 'This session is ready for its first turn.'}
             </EmptyState>
           }
         >
@@ -182,6 +168,7 @@ export default function AgentTranscript(props: {
                 <AgentEventCard
                   item={item()}
                   taskId={props.taskId}
+                  sessionId={sessionId()}
                   turn={props.snapshot.turns.find((turn) => turn.id === item().turnId)}
                 />
               )}

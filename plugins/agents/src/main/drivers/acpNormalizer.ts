@@ -206,10 +206,6 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
     case 'tool_call':
     case 'tool_call_update': {
       const blocks = update.content ?? []
-      const diffs = blocks.flatMap((content) =>
-        content.type === 'diff'
-          ? [{ type: 'file_change' as const, path: content.path, summary: `${harness} updated a file.` }]
-          : [])
       // A command's stdout arrives as inline text blocks, because Acorn declines ACP's terminal
       // capability, so this is the only place it can be picked up. The card renders it behind a
       // disclosure toggle. `content` replaces rather than appends in ACP, hence no outputAppend.
@@ -229,6 +225,18 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       const roster: AgentNormalizedEvent[] = spawn
         ? [{ type: 'subagent', subagent: subagentFromToolCall(update.toolCallId, update.title, status, meta) }]
         : []
+      // A diff belongs to whoever made the edit, the same as the call it arrived on. Left unattributed
+      // it rendered in the parent's stream while the Edit call that produced it sat inside the
+      // subagent's, so a subagent's run showed the tool and not what it changed.
+      const diffs = blocks.flatMap((content) =>
+        content.type === 'diff'
+          ? [{
+            type: 'file_change' as const,
+            path: content.path,
+            summary: `${harness} updated a file.`,
+            subagentId,
+          }]
+          : [])
       return [...roster, {
         type: 'tool',
         tool: {

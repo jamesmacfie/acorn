@@ -14,11 +14,21 @@ export const focusedManagedRequest = (sessionId: string): string | undefined =>
 export const selectedManagedSubagent = (sessionId: string): string | undefined =>
   selectedSubagentBySession()[sessionId]
 
-// ponytail: one signal doing two jobs, the sidebar row's highlight and the transcript's scroll target.
-// Clicking the row that is already selected therefore does not re-scroll, which is fine because the
-// card is on screen by then. Add a nonce if a repeat click ever needs to mean "take me back there".
+// One signal, two readers that agree by construction: it is which subagent's run the main window is
+// showing, and the sidebar row for that subagent is the one drawn as selected. Absent means the
+// session's own stream.
 export function selectManagedSubagent(sessionId: string, subagentId: string): void {
   setSelectedSubagentBySession((current) => ({ ...current, [sessionId]: subagentId }))
+}
+
+/** Back out of a subagent's run to the session's own stream. */
+export function clearManagedSubagent(sessionId: string): void {
+  setSelectedSubagentBySession((current) => {
+    if (current[sessionId] === undefined) return current
+    const next = { ...current }
+    delete next[sessionId]
+    return next
+  })
 }
 
 export function selectManagedSession(taskId: string, sessionId: string): void {

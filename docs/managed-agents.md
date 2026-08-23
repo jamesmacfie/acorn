@@ -116,6 +116,7 @@ rather than a fixed set of columns with gaps in it.
 | Roster key | the spawning tool call id | the child thread id |
 | Live inner tool calls | yes, tagged `_meta.claudeCode.parentToolUseId` | yes, on the child thread |
 | Live inner prose | no, the CLI does not forward it | yes |
+| Live file changes | yes, the diff on the tool call | yes, the child's own patch updates |
 | Live usage | no | the child's own `thread/tokenUsage/updated` |
 | At completion | `_meta.claudeCode.toolResponse`: agent id, type, model, tokens, tool uses, duration | nothing extra |
 | Terminal state | completed | idle, and still resumable |
@@ -154,10 +155,31 @@ be tested against what the harness actually sent.
 - Usage folds the same way, one line per turn. A turn's last usage update can arrive after the turn is
   marked complete and so carries no turn id; it updates the line it belongs to rather than starting
   another. That is how a cost joins a line that started with only a context count.
-- A subagent is one card in the transcript, holding everything that subagent did, and one indented row
-  under its session in the task Agent sidebar. The card starts expanded and then stays where the reader
-  puts it, rather than collapsing itself the moment the subagent finishes, which is when somebody is
-  most likely to be reading it. Activating a sub-row opens its session and scrolls to its card.
+- A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent
+  did, and as one indented row under its session in the task Agent sidebar. The card is seeded expanded
+  while the subagent is working and collapsed if it had already settled when the card was first drawn,
+  then stays where the reader puts it. Reactive expansion would instead slam the card shut the moment
+  the subagent finished, which is when somebody is most likely to be reading it.
+- A subagent's run renders through exactly the same cards as its parent's: tool calls, prose, reasoning
+  and file changes all go through one `AgentEventCard`, so a contributed tool renderer works inside a
+  subagent's run without knowing it is in one. A tool call belongs to whichever stream opened it, and
+  every later update folds there wherever it arrives from, because a provider need not repeat the
+  attribution on each one. Claude's adapter in particular tags a subagent's `tool_call` and its final
+  `tool_call_update` and leaves the one in between untagged.
+- What reaches a subagent's stream is narrower than its parent's, and it differs by harness rather than
+  by choice: a Codex child sends prose, reasoning, tool calls and diffs, and its own status and token
+  usage become the row rather than cards; a Claude subagent sends tool calls and diffs only, since the
+  CLI does not forward a subagent's prose. A Codex child's plan is dropped, because `plan` carries no
+  attribution and a child's plan is not the session's.
+- Selecting a sub-row, or the card's own **Open**, moves the whole message window onto that subagent's
+  run: the transcript renders the card's children as its top level and a header names the subagent, with
+  the way back to the session's own stream. A complex child run does not fit in a box inside its
+  parent's stream. The projection already builds the tree, so this is a choice of root rather than a
+  second transcript, and the scroll memory keys on the view rather than the session so stepping in and
+  out does not restore one list's offset onto another. Picking the session row in the sidebar comes back
+  out. The composer is hidden while a subagent's run is showing: it only ever addresses the session, so
+  leaving it there would read as a way to reply to the subagent, which neither harness offers. The draft
+  is held per session outside the component, so stepping in and back does not lose typed text.
 - Changing a provider config option — the model, the reasoning level, the permission profile — writes
   a row into the transcript, so reading back a session shows where the switch happened rather than
   leaving every later turn to be read under whatever the setting is now.

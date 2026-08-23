@@ -240,7 +240,7 @@ export type AgentNormalizedEvent =
   | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[] }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
   | { type: 'artifact'; artifactId: string; kind: AgentArtifactKind; title: string; mediaType?: string; byteSize?: number }
-  | { type: 'file_change'; path?: string; patch?: string; summary?: string }
+  | { type: 'file_change'; path?: string; patch?: string; summary?: string; subagentId?: string }
   | { type: 'terminal'; terminalSessionId: string; title: string }
   | { type: 'turn_completed'; stopReason?: string }
   | { type: 'error'; code: string; message: string; retryable: boolean }

@@ -16,6 +16,35 @@ export type AgentConversationItem = {
   children?: AgentConversationItem[]
 }
 
+// Which events are worth a card. `session_state`, `session_metadata`, `request` and `request_resolved`
+// are all projected elsewhere: state into the pane header, requests into the strip above the list.
+// Exported because the transcript and a subagent card render from the same tree and have to agree.
+const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
+  'user_message',
+  'assistant_message',
+  'reasoning',
+  'tool',
+  'subagent',
+  'plan',
+  'usage',
+  'file_change',
+  'terminal',
+  'artifact',
+  'turn_completed',
+  'error',
+  'diagnostic',
+])
+
+export const visibleConversationItems = (items: AgentConversationItem[]): AgentConversationItem[] =>
+  items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type))
+
+/** The card for one subagent, so a caller can render that subagent's run on its own. */
+export const findSubagentItem = (
+  items: AgentConversationItem[],
+  subagentId: string,
+): AgentConversationItem | undefined =>
+  items.find((item) => item.event.type === 'subagent' && item.event.subagent.id === subagentId)
+
 type AppendableEvent = Extract<AgentNormalizedEvent, { type: 'assistant_message' | 'reasoning' }>
 const isAppendable = (event: AgentNormalizedEvent): event is AppendableEvent =>
   event.type === 'assistant_message' || event.type === 'reasoning'
@@ -64,20 +93,21 @@ const mergeSubagent = (previous: AgentSubagentUpdate, next: AgentSubagentUpdate)
 // Whose stream an event belongs to. Absent means the session's own.
 const subagentIdOf = (event: AgentNormalizedEvent): string | undefined => {
   if (event.type === 'tool') return event.tool.subagentId
-  if (event.type === 'assistant_message' || event.type === 'reasoning') return event.subagentId
+  if (event.type === 'assistant_message' || event.type === 'reasoning' || event.type === 'file_change') {
+    return event.subagentId
+  }
   return undefined
 }
 
-// One agent's run of cards, plus where each foldable row landed in it. Per stream rather than per
-// transcript, so a subagent's tool call cannot fold into a parent call that happens to share an id,
-// and a subagent's token count cannot update the parent's usage line.
+// One agent's run of cards. A usage line is per stream, so a subagent's token count cannot update the
+// parent's; tool cards are tracked across the whole transcript instead, for the reason on `toolCards`
+// below.
 type Stream = {
   items: AgentConversationItem[]
-  toolCardAt: Map<string, number>
   usageCardAt: number | undefined
 }
 
-const newStream = (): Stream => ({ items: [], toolCardAt: new Map(), usageCardAt: undefined })
+const newStream = (): Stream => ({ items: [], usageCardAt: undefined })
 
 export function buildConversationItems(events: AgentEventRecord[]): AgentConversationItem[] {
   const top = newStream()
@@ -86,6 +116,13 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
   // here if a deep fan-out ever reads as flat.
   const streams = new Map<string, Stream>()
   const subagentCardAt = new Map<string, number>()
+  // Tool cards are found across streams, not within one, because a provider need not repeat the
+  // attribution on every update. Claude's adapter tags a subagent's `tool_call` and its final
+  // `tool_call_update` with the owning agent and leaves the one in between untagged; a per-stream
+  // lookup could not find the card that update belonged to, so it opened a second one at the top level,
+  // titled with the raw tool id because a mid-call update carries no title either. A tool call belongs
+  // to whoever opened it, and every later update folds there wherever it arrives from.
+  const toolCards = new Map<string, { stream: Stream; at: number }>()
 
   // Two kinds of row report a running total rather than a moment, so each is folded into the card it
   // started rather than appended. The event ledger still stores a row per provider update, which is
@@ -99,12 +136,19 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
   // by id, so a completion summary lands on the card the spawn opened.
   const toolKey = (record: AgentEventRecord, tool: AgentToolCall) =>
     `${record.turnId ?? 'session'}:${tool.id}`
-  const foldTarget = (record: AgentEventRecord, stream: Stream): number | undefined => {
-    if (record.event.type === 'tool') return stream.toolCardAt.get(toolKey(record, record.event.tool))
-    if (record.event.type === 'subagent') return subagentCardAt.get(record.event.subagent.id)
+  // Which existing card this record updates, and in which stream. `undefined` means it opens a new one.
+  const foldTarget = (
+    record: AgentEventRecord,
+    stream: Stream,
+  ): { stream: Stream; at: number } | undefined => {
+    if (record.event.type === 'tool') return toolCards.get(toolKey(record, record.event.tool))
+    if (record.event.type === 'subagent') {
+      const at = subagentCardAt.get(record.event.subagent.id)
+      return at === undefined ? undefined : { stream: top, at }
+    }
     if (record.event.type !== 'usage' || stream.usageCardAt === undefined) return undefined
     return record.turnId === null || record.turnId === stream.items[stream.usageCardAt].turnId
-      ? stream.usageCardAt
+      ? { stream, at: stream.usageCardAt }
       : undefined
   }
   const folded = (card: AgentNormalizedEvent, update: AgentNormalizedEvent): AgentNormalizedEvent => {
@@ -125,14 +169,16 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     // An orphan stays visible at the top rather than being dropped: the subagent card is normally the
     // event before its first child, but a truncated replay can start mid-stream.
     const stream = (owner ? streams.get(owner) : undefined) ?? top
-    const at = foldTarget(record, stream)
-    if (at !== undefined) {
-      const card = stream.items[at]
+    const fold = foldTarget(record, stream)
+    if (fold) {
+      const card = fold.stream.items[fold.at]
       // Spread, so a subagent card keeps the `children` array its stream is still pushing into.
-      stream.items[at] = { ...card, lastSeq: record.seq, event: folded(card.event, record.event) }
+      fold.stream.items[fold.at] = { ...card, lastSeq: record.seq, event: folded(card.event, record.event) }
       continue
     }
-    if (record.event.type === 'tool') stream.toolCardAt.set(toolKey(record, record.event.tool), stream.items.length)
+    if (record.event.type === 'tool') {
+      toolCards.set(toolKey(record, record.event.tool), { stream, at: stream.items.length })
+    }
     if (record.event.type === 'usage') stream.usageCardAt = stream.items.length
 
     const previous = stream.items[stream.items.length - 1]

@@ -1,4 +1,4 @@
-import { For, Show, type Component } from 'solid-js'
+import { createSignal, For, Show, type Component } from 'solid-js'
 import { agentToolTone, type AgentToolRendererProps, agentToolRendererRegistry } from '@acorn/plugin-api/client'
 import { StatusDot } from '@acorn/plugin-api/ui'
 
@@ -31,12 +31,18 @@ const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
 
 // A disclosure with nothing behind it is worse than no disclosure: the reader clicks a card that opens
 // onto nothing. Providers report plenty of calls with neither output nor a path, so those render flat.
-const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
-  <Show
-    when={props.tool.input || props.tool.output || props.tool.paths?.length}
-    fallback={<div class="agent-tool agent-tool-flat"><AgentToolHead {...props} /></div>}
-  >
-    <details class="agent-tool ui-fold" open={props.tool.status === 'running'}>
+const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
+  // Seeded from the call's state when the card first has something to show, then the reader's own, the
+  // way the subagent card does it. A reactive `open` closed every card the reader had opened as soon as
+  // the next event arrived, because the transcript rebuilds its rows on each snapshot. Seeding here
+  // rather than in the parent is what still opens a call whose output streams while it runs.
+  const [open, setOpen] = createSignal(props.tool.status === 'running')
+  return (
+    <details
+      class="agent-tool ui-fold"
+      open={open()}
+      onToggle={(toggle) => setOpen(toggle.currentTarget.open)}
+    >
       <summary class="ui-fold-summary">
         <span class="ui-fold-marker" aria-hidden="true" />
         <AgentToolHead {...props} />
@@ -47,6 +53,15 @@ const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
         {(path) => <span class="agent-path-link">{path}</span>}
       </For>
     </details>
+  )
+}
+
+const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
+  <Show
+    when={props.tool.input || props.tool.output || props.tool.paths?.length}
+    fallback={<div class="agent-tool agent-tool-flat"><AgentToolHead {...props} /></div>}
+  >
+    <AgentToolFold {...props} />
   </Show>
 )
 

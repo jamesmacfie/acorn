@@ -220,9 +220,14 @@ export class CodexChildRouter {
           return [{ ...event, subagentId }]
         case 'tool':
           return [{ ...event, tool: { ...event.tool, subagentId } }]
-        // A child editing the worktree changed the same files the parent's Changes pane reads, so this
-        // one belongs to the session rather than to the subagent, and stays unattributed.
+        // Attributed like a tool call: a subagent's run has to show what it changed, not just which
+        // tool it ran. The Changes pane is unaffected either way, since it reads the worktree rather
+        // than these events.
         case 'file_change':
+          return [{ ...event, subagentId }]
+        // ponytail: a child's diagnostic stays the session's. There is nowhere on the event to say whose
+        // it is, and one line about a subagent reads fine in the parent's stream. Give it a subagentId
+        // if a chatty harness ever makes that noisy.
         case 'diagnostic':
           return [event]
         // A child's plan is not the session's plan, and there is nowhere to say whose it is.
