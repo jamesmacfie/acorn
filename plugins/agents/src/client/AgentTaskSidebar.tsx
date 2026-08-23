@@ -172,7 +172,7 @@ export default function AgentTaskSidebar(props: {
                 onActivate={() => props.onSelectSession(session.id)}
               >
                 <strong>{session.title}</strong>
-                <small>{session.providerId} · {session.runtimeState}</small>
+                <small>{[session.providerId, session.model, session.runtimeState].filter(Boolean).join(' · ')}</small>
               </Row>
             )}
           </For>
