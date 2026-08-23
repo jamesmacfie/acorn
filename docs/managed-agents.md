@@ -95,6 +95,9 @@ usage section.
 - Agent Center aggregates sessions, search, provider health, attention, transcript import, and launch.
 - The Agent pane shows the current transcript, composer, queue, context, requests, artifacts, and a
   same-task roster.
+- Changing a provider config option — the model, the reasoning level, the permission profile — writes
+  a row into the transcript, so reading back a session shows where the switch happened rather than
+  leaving every later turn to be read under whatever the setting is now.
 - Terminal handoff transfers an exclusive input-controller lease to a raw provider TUI. A managed
   session and a raw terminal cannot write the same provider session simultaneously.
 - Notifications and the attention inbox represent requests that need the owner; dismissal of purely

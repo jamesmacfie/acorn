@@ -533,4 +533,69 @@ describe('managed agent runtime conformance', () => {
     expect(snapshot.events.some((record) =>
       record.event.type === 'diagnostic' && record.event.message.includes('retrying'))).toBe(true)
   })
+
+  it('writes a transcript row when the model or reasoning level changes', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    const configOptions = [
+      {
+        id: 'model',
+        label: 'Model',
+        category: 'model',
+        currentValue: 'sonnet',
+        values: [{ value: 'sonnet', label: 'Sonnet 5' }, { value: 'opus', label: 'Opus 5' }],
+      },
+      {
+        id: 'reasoning',
+        label: 'Reasoning effort',
+        category: 'reasoning',
+        currentValue: 'medium',
+        values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }],
+      },
+    ]
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { configOptions },
+    })
+    await runtime.patchSession(session.id, {
+      config: {
+        configOptions: [
+          { ...configOptions[0], currentValue: 'opus' },
+          { ...configOptions[1], currentValue: 'high' },
+        ],
+      },
+    })
+
+    const snapshot = await runtime.store.snapshot(session.id, 0)
+    const messages = snapshot.events.flatMap((record) =>
+      record.event.type === 'diagnostic' ? [record.event.message] : [])
+    expect(messages).toContain('Model changed to Opus 5')
+    expect(messages).toContain('Reasoning effort changed to High')
+
+    // Re-patching the same values is not a change, so it must not add another row.
+    await runtime.patchSession(session.id, {
+      config: {
+        configOptions: [
+          { ...configOptions[0], currentValue: 'opus' },
+          { ...configOptions[1], currentValue: 'high' },
+        ],
+      },
+    })
+    const after = await runtime.store.snapshot(session.id, 0)
+    expect(after.events.filter((record) => record.event.type === 'diagnostic')).toHaveLength(2)
+  })
 })
