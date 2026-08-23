@@ -48,7 +48,7 @@ after someone looked properly.
 If no, it needs the shared realm and stays first-party. That is a short list: owning a WebSocket
 stream or channel (the transport itself, not a consumer of it), components the shell renders
 *inside its own tree* (an agent-tool renderer drawn inline in a transcript list, an overlay),
-Electron main-process code, and publishing something core cannot start without.
+code that runs in the desktop shell itself, and publishing something core cannot start without.
 
 The test is easy to get wrong in one specific way, and we got it wrong: **"another plugin renders
 it" is not the same as "embedded in a render tree."** A reference panel looks like the first and is

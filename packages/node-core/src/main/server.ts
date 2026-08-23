@@ -18,8 +18,8 @@ import type { Env } from './bindings'
 
 // Dev data root: the repo-local apps/node/.acorn (gitignored). It belongs to apps/node because the node
 // owns SQLite, blobs and the node identity (./serverPaths.ts). Only valid while running from a checkout:
-// a packaged app's module dir is the read-only asar, so electron.ts passes an app.getPath('userData')
-// root into bootstrap() instead when app.isPackaged.
+// a packaged app's module dir is inside the read-only bundle, so the desktop shell passes an
+// application-data root into bootstrap() instead.
 export { devDataDir }
 
 // What the listener bound, plus the certificate identity it bound it with. The endpoint is reported after
@@ -35,7 +35,7 @@ export type Listener = { server: ServerType; endpoint: ServiceEndpoint; fingerpr
 // so a restart usually lands back on the same one.
 export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise<Listener> {
   // Every bridge, pure-Node domain bridges and the stateful harness and context bridges, is installed by
-  // the composition root (apps/node's service/runtime.ts under Electron, server/standalone.ts otherwise)
+  // the composition root (apps/node's service/runtime.ts under the desktop shell, server/standalone.ts otherwise)
   // before this is called. Core no longer imports plugin bridge wiring (docs/plugins.md).
   const app = createApp()
 

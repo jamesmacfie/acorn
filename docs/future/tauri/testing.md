@@ -1,6 +1,9 @@
 # Testing
 
-Status: proposal, 2026-08-22; the seam contract suite landed in phase 1, the boot test in phase 2, the phase-3 unit tests below, and CI to run them in phase 4, all 2026-08-23.
+Status: historical. Proposed 2026-08-22; the seam contract suite landed in phase 1, the boot test in
+phase 2, the phase-3 unit tests below, and CI to run them in phase 4, all 2026-08-23. The smoke
+checklist below is live: run it per release.
+[docs/testing.md](../../testing.md) owns the test layers.
 
 ## The problem
 
@@ -25,14 +28,14 @@ the checker — a function returning a list of problems, not `expect` calls, so 
 framework — plus the compile-time-exhaustive member list per capability group.
 `platform/contract.test.ts` drives it against a mock host; `apps/desktop/src/app/main/preload.test.ts`
 drives it against the real preload under a stub Electron; and
-`apps/desktop-tauri/src/client/bridge.test.ts` drives it against the real bridge under stub Tauri
+`apps/desktop/src/shell/bridge.test.ts` drives it against the real bridge under stub Tauri
 bindings. The Tauri shell passes a shorter list — eight groups, without `preview` and `webviews` — and
 a group that resolves anyway is a failure: half a group is worse than none, because consumers probe
 the group and then call its members. The list is written out rather than derived, so adding a group to
 the bridge without adding it there fails instead of silently widening what the shell claims.
 
 `tools/arch/boundaries.test.ts` gained the mirror of the Electron rule in phase 2: nothing outside
-`apps/desktop-tauri` may name a Tauri binding. The enumerated Electron-consumer baseline becomes a
+`apps/desktop` may name a Tauri binding. The enumerated Electron-consumer baseline becomes a
 shrinking one that reaches zero at cutover; its first step landed in phase 1 and now reads as
 "nothing in `packages/desktop-helper` may import Electron".
 
@@ -47,7 +50,7 @@ that workflow.
 It came out as two halves rather than one headless shell run, because a Tauri app needs a display
 server and a test that needs one does not run in CI.
 
-`apps/desktop-tauri/test/boot.test.ts` covers everything below the window. It runs the staged helper
+`apps/desktop/test/boot.test.ts` covers everything below the window. It runs the staged helper
 under the bundled Node against a fresh data root, which spawns the real `service.js` over the fd-3
 service protocol, and then asks the helper the first two questions the renderer asks: which nodes are
 there, and can a `/v2` request reach one. A 200 from `/v2/node` means the pinned TLS connection came
@@ -55,7 +58,7 @@ up and the device token authenticated, so one assertion covers the custody stack
 check the gate: a socket without the secret is refused, and a plain HTTP request gets 426. The whole
 thing takes about three seconds.
 
-The Rust unit tests in `apps/desktop-tauri/src-tauri/src/` cover what is left, twenty-four of them
+The Rust unit tests in `apps/desktop/src-tauri/src/` cover what is left, twenty-four of them
 after phase 4: the CSP the scheme handler sends and the dev-only widening it must not send in a
 packaged build, the traversal guard, the highlighter worker's separate policy, the refusal to answer a
 node route with the shell's own HTML, the handshake's field names, the ready-line parser including the
@@ -101,7 +104,7 @@ release during coexistence and at cutover, on a machine that never had the Elect
 
 ## The bundle inventory check
 
-`apps/desktop-tauri/scripts/verify-bundle.mjs`, the last step of the build. It is the packaging
+`apps/desktop/scripts/verify-bundle.mjs`, the last step of the build. It is the packaging
 analogue of the boot test: the boot test proves the shell can load its world in a checkout, and this
 proves the world is actually inside the artifact. It compares every file staging produced against the
 same path in the `.app`, by digest, and checks the code signature, the bundled runtime, the updater
@@ -111,6 +114,7 @@ a path that exists only in a packaged build.
 
 ## Exit criteria
 
-The boot test is green in CI for the Tauri shell, and the checklist has passed once against a
-packaged build. The first is met by `.github/workflows/build-tauri.yml`. The second is open, and it is
-the last thing between here and the cutover trigger.
+The boot test is green in CI for the shell, and the checklist has passed once against a packaged
+build. The first is met by `.github/workflows/build-desktop.yml`. The second is open. Phase 5 cut
+over without it, so it is a release gate rather than a cutover gate: nothing ships to a person until
+somebody runs it.

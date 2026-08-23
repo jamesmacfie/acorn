@@ -1,9 +1,9 @@
 # Tauri migration
 
-Status: proposal, 2026-08-22; phases 0 to 4 executed 2026-08-23. Phase 5 is not scheduled. This
-folder plans the replacement of the Electron host with a Tauri v2 shell, written for the agents and
-developers who will implement the phases. The reference implementation we steal mechanics from is
-`references/proliferate`, a shipped Tauri v2 app in this repo's references directory.
+Status: historical, closed 2026-08-23. This folder planned the replacement of the Electron host with
+a Tauri v2 shell, and all six phases are done. Shipped behaviour is
+[docs/shell.md](../../shell.md); read that first and treat everything here as the reasoning behind
+it, verified against the tree as it was on the date each phase landed.
 
 ## Why Tauri, and what does not change
 
@@ -72,11 +72,11 @@ automation left the shell for `plugins/browser`, so `desktop.browser-*` is delet
 Five details changed on contact, including a capability scoped to the window that would have handed
 `invoke` to every preview page; [sequencing.md](./sequencing.md) has them.
 
-**Coexist, then cut over.** The Tauri shell is a new package (`apps/desktop-tauri`)
-consuming the same renderer source, node artifact, bundled-plugins build, and protocol. CI builds
-both from the same commit; Electron ships until the cutover checklist in
-[sequencing.md](./sequencing.md) is green. In-place conversion was rejected: no fallback artifact,
-and every failure is ambiguous between "Tauri cannot do it" and "the port broke it".
+**Coexist, then cut over.** The Tauri shell was a second package, `apps/desktop`, consuming the
+same renderer source, node artifact, bundled-plugins build, and protocol, with CI building both from
+the same commit. Phase 5 merged it into `apps/desktop` and deleted Electron. In-place conversion was
+rejected up front: no fallback artifact, and every failure ambiguous between "Tauri cannot do it" and
+"the port broke it".
 
 **Custody stays TypeScript, in a Node "desktop helper" sidecar.** The broker, fleet store, token
 store, plugin cache and trust, preview tunnel, and service supervision move verbatim into a helper
@@ -95,7 +95,14 @@ agent-tool registry (so they project to MCP for free), and drives an installed C
 rows in the plugin's own table rather than inline base64, so a future audit trail at the registry seam
 has something to read. [webviews-and-frames.md](./webviews-and-frames.md).
 
-**Phase 4 landed on trunk, 2026-08-23.** `pnpm --filter @acorn/desktop-tauri run build` produces an
+**Phase 5 landed on trunk, 2026-08-23.** `apps/desktop` is the Tauri app. The Electron shell, its
+build files, its e2e specs, and its dependencies are deleted; `docs/electron.md` is replaced by
+[docs/shell.md](../../shell.md); the arch rule against Electron is a flat ban across imports,
+`createRequire` calls, and manifests. Phase 3's one waiver closed by deletion rather than by
+implementation: `desktop.preview-*` had no registrant and no caller once Electron went, so it left
+the protocol with `DesktopCapabilities`. [sequencing.md](./sequencing.md) has the whole list.
+
+**Phase 4 landed on trunk, 2026-08-23.** `pnpm --filter @acorn/desktop run build` produces an
 ad-hoc signed DMG with signed updater artifacts, and checks its own output against what staging wrote
 before it finishes. `.github/workflows/build-tauri.yml` runs it on a push to main, alongside
 `build-dmg.yml`. The pinned Node is fetched from nodejs.org and checksum-verified rather than copied
@@ -137,12 +144,13 @@ path. [distribution.md](./distribution.md) records the convergence points with
 | 2 | Rust shell skeleton + helper | ✅ Done (2026-08-23) | L |
 | 3 | Feature parity | ✅ Done (2026-08-23) | L |
 | 4 | Packaging and CI | ✅ Done (2026-08-23) | M |
-| 5 | Cutover and deletion | ⬜ Not started | M |
+| 5 | Cutover and deletion | ✅ Done (2026-08-23) | M |
 
-Ordering and exit criteria live in [sequencing.md](./sequencing.md), which records what each finished
-phase actually landed. The artifact exists. What gates phase 5 is a person running the smoke checklist
-in [testing.md](./testing.md) against the DMG on a machine that never had the Electron build, and the
-soak window in the cutover trigger.
+Ordering and exit criteria live in [sequencing.md](./sequencing.md), which records what each phase
+actually landed. Two items of the cutover trigger are still owed to a person and no script can close
+them: the smoke checklist in [testing.md](./testing.md) run against the DMG on a machine that never
+had the Electron build, and the soak window. They are release gates now rather than cutover gates,
+because the Electron artifact no longer exists to fall back to.
 
 ## Invariants
 
@@ -156,31 +164,32 @@ Read these before building anything in this folder.
   Electron out of the standalone node today.
 - The protocol and `/v2` are unchanged. A Tauri client pairs with an Electron-era node and the
   reverse, throughout the migration.
-- Security posture is a floor. Every property recorded in [docs/electron.md](../../electron.md)
+- Security posture is a floor. Every property recorded in [docs/shell.md](../../shell.md)
   is re-established or explicitly re-argued in these files, never silently dropped. The one
   deliberate change is the renderer CSP's `connect-src`, argued in
   [architecture.md](./architecture.md).
 - One artifact. The desktop-embedded node and the standalone tarball's node are the same
   `apps/node/dist` build, differing in supervision only.
 
-## Drift warning — read this before building
+## Drift warning
 
-Every path and behavior claim in this folder was verified against the tree on 2026-08-22. Where
-this folder disagrees with [docs/electron.md](../../electron.md),
-[docs/architecture-overview.md](../../architecture-overview.md), or
-[docs/node-distribution.md](../../node-distribution.md), those win until cutover: they describe
-what ships, this folder describes a proposal. Where this folder deliberately proposes changing a
-shipped behavior, the owning file here says so explicitly.
+Paths and behaviour claims in this folder were verified against the tree on 2026-08-22, before any of
+it was built. Several are now wrong: `apps/desktop` is `apps/desktop`, `src/client/bridge.ts`
+and `src/main/helperMain.ts` are under `src/shell/`, and the Electron files these documents compare
+against are gone. [docs/shell.md](../../shell.md),
+[docs/architecture-overview.md](../../architecture-overview.md), and
+[docs/node-distribution.md](../../node-distribution.md) win over anything here.
 
-## What closes this folder
+## What closed this folder
 
 The Tauri build is the released artifact, the deletion list in [sequencing.md](./sequencing.md) is
-executed, and [docs/electron.md](../../electron.md) is replaced by a shipped-behavior shell doc.
-At that point this folder's content is history, not plan.
+executed, and [docs/shell.md](../../shell.md) describes what ships. This folder's content is history
+now, not plan. Where it disagrees with `docs/shell.md`, that file wins.
 
 ## Reference documents
 
-- [docs/electron.md](../../electron.md) — the behavior contract every parity item is written against
+- [docs/shell.md](../../shell.md) — what the shell does today, and what every parity item was
+  written against when it was `docs/electron.md`
 - [docs/architecture-overview.md](../../architecture-overview.md) — runtime topology
 - [docs/node-distribution.md](../../node-distribution.md) — the standalone node that ships today
 - [bundle.md](../bundle.md) — node packaging; [remote.md](../remote.md) — non-desktop clients

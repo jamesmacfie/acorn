@@ -28,7 +28,7 @@ running Playwright directly can exercise stale output.
   testkit resolves a plugin's migration chain from its id — `makeTestPluginDb('github')` and
   `makeTestNodeContext({ plugin })` find `plugins/<id>/migrations` themselves;
 - architecture tests scan the package graph for forbidden imports, undeclared dependencies, cycles,
-  Electron leakage, protocol impurity, and non-contract plugin edges;
+  shell-binding leakage, protocol impurity, and non-contract plugin edges;
 - loadability tests EXECUTE the two rules that keep the workspace bootable, because a rule about
   whether something loads is honestly checked only by loading it:
   `packages/plugin-api/src/entrypoints.test.ts` imports every node-safe facade entrypoint in a
@@ -87,16 +87,10 @@ not weaken runtime limits to accommodate a saturated test runner.
 
 Verified on a clean tree. If you see exactly these and nothing else, your change is not the cause:
 
-- `apps/node/test/integration/serviceSpawn.test.ts` and `standaloneShutdown.test.ts` fail in some
-  environments with `SyntaxError: The requested module 'electron' does not provide an export named
-  'dialog'`, from `plugins/terminal/src/main/folderPickerIpc.ts` — which the standalone
-  (Electron-free) node still pulls in through the terminal plugin's main entry. That class of failure
-  now has a test of its own: `apps/node/test/integration/mainBarrelLoad.test.ts` loads every
-  `plugins/*/src/main/index.ts` in a plain `node --import tsx` child and fails with the barrel name
-  and the missing export, so it breaks at the commit that causes it rather than as a puzzling red in
-  two unrelated suites.
 - One live-PTY `posix_spawnp` failure in `agentSend` tests, a native-module ABI artefact.
   `pnpm rebuild:node` fixes the ABI class of failure; this one survives it.
+- `plugins/http/src/server/send.test.ts` fails one case comparing a temporary worktree path, a
+  macOS `/var` against `/private/var` artefact of the test's own fixture.
 
 Also worth knowing before you read a red gate as your own: the root `lint` script is
 `oxlint && turbo run lint`, so an oxlint failure means `tsc --noEmit` never ran at all. Check

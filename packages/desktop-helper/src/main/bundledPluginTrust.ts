@@ -26,7 +26,7 @@ export const BUNDLED_TRUST_OPT_OUT = 'ACORN_PROMPT_BUNDLED_PLUGIN_TRUST'
  *
  * Not `app.isPackaged`. The bytes this grant covers are the ones the build produced from the
  * first-party roster (`apps/desktop/scripts/build-bundled-plugins.mjs`) into this application's own
- * resource directory: `resourcesPath` in a packaged build, `out/bundled-plugins` in a development
+ * resource directory: the bundle's own resources when packaged, `dist/bundled-plugins` in a development
  * build, and in both cases a directory the build owns and nothing else writes to. Gating on packaging
  * meant every dev and e2e boot answered four dialogs about the developer's own build output, which
  * taught people to click Trust without reading, the opposite of what the prompt is for, and it wedged

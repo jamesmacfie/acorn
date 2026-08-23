@@ -78,7 +78,7 @@ const ackSchema = z.strictObject({
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure that came with the decision could not be fully parsed, because a node ran
-  // a newer manifest schema than this shell (main/pluginIpc.ts). The decision itself is exact; what is
+  // a newer manifest schema than this shell. The decision itself is exact; what is
   // incomplete is the snapshot, so this row must never become the baseline of a "what changed" diff.
   // Optional, because no file written before this field existed carries it, and its absence means
   // "complete", which is what those rows were.

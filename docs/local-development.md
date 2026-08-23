@@ -5,7 +5,7 @@ packages; `apps/node` and `apps/desktop` are the composition/build roots.
 
 ## Environment
 
-Create `apps/desktop/.env` for local Electron development:
+Create `apps/desktop/.env` for local desktop development:
 
 ```dotenv
 GITHUB_CLIENT_ID=...
@@ -13,8 +13,8 @@ SESSION_ENC_KEY=<64 hexadecimal characters>
 ```
 
 `GITHUB_CLIENT_ID` is only needed when connecting GitHub; the GitHub plugin owns that configuration.
-There is no GitHub client secret. `SESSION_ENC_KEY` is optional — the desktop supplies one from
-safeStorage, and a node with neither generates its own into the data root (see
+There is no GitHub client secret. `SESSION_ENC_KEY` is optional — a node with none generates its own
+into the data root (see
 [node-distribution.md](./node-distribution.md)). Setting it in `.env` pins a stable key across
 throwaway data roots, which is why it is still listed here.
 
@@ -32,13 +32,14 @@ acknowledges the same way a packaged build does — see [plugins.md](./plugins.m
 
 ```sh
 pnpm install
-pnpm run rebuild
+pnpm rebuild:node
 pnpm dev
 ```
 
-`pnpm dev` builds the Node artifact, builds the desktop main/preload/renderer, stages migrations and
-Node output, and launches Electron. `pnpm dev:node` runs the standalone Node and prints one JSON
-handshake line containing endpoint, fingerprint, certificate, Node ID, and device token.
+`pnpm dev` builds the Node artifact, the bundled plugins, the desktop helper and the injected bridge,
+stages them with the pinned Node runtime and the migration chains, then runs `tauri dev` against a
+Vite renderer on port 4319. `pnpm dev:node` runs the standalone Node and prints one JSON handshake
+line containing endpoint, fingerprint, certificate, Node ID, and device token.
 
 Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those — it rebuilds the plugin's
 package on every save. [plugins.md](./plugins.md) § The dev loop has the whole loop, including which
@@ -52,11 +53,11 @@ workspace root for the process that will load node-pty — where its prebuilt bi
 rebuild script detects that and does nothing:
 
 ```sh
-pnpm rebuild:node       # plain Node: tests, dev:node, database commands
-pnpm run rebuild        # Electron: desktop development/build
+pnpm rebuild:node
 ```
 
-Do not rebuild per package; all packages resolve the same physical native copy.
+There is one ABI to match, because the desktop runs the node under the same pinned Node runtime the
+tests use. Do not rebuild per package; all packages resolve the same physical native copy.
 
 ## Database workflow
 
@@ -91,9 +92,10 @@ database.
 
 ## Build artifacts
 
-`apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and chunks. Electron stages them into
-`apps/desktop/out/main/` and stages all core/plugin migrations. Build the service before desktop e2e;
-the staging check detects missing artifacts but cannot identify stale output by itself.
+`apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and chunks. `apps/desktop/scripts/stage.mjs`
+puts them, all core and plugin migration chains, the plugin frame stylesheet, and the pinned Node
+runtime where the bundler will find them. The staging check detects missing artifacts but cannot
+identify stale output by itself, so build order is `package.json`'s job.
 
 ## Data and credentials
 

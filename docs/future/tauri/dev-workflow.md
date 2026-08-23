@@ -1,6 +1,7 @@
 # Dev workflow
 
-Status: proposal, 2026-08-22; phase 2 built it, 2026-08-23.
+Status: historical. Proposed 2026-08-22, built in phase 2 and cut over in phase 5, both 2026-08-23.
+[docs/local-development.md](../../local-development.md) owns the shipped loop.
 
 ## The problem
 
@@ -18,7 +19,7 @@ config imports it, so the two shells cannot drift. It lives in `apps/desktop` un
 exists to own it; the import direction then reverses and nothing else changes. The worker rules travel with it verbatim,
 comments included: worker format `es`, the `worker-` prefix on the highlighter entry that the CSP
 filename match depends on, and Monaco's plain `[name]` pattern
-([docs/electron.md](../../electron.md) § The syntax-highlighter worker's separate policy).
+([docs/shell.md](../../shell.md) § The syntax-highlighter worker's separate policy).
 
 **Wire `tauri dev` the proliferate way** (`references/proliferate/apps/desktop/vite.config.ts` and
 `tauri.conf.json`): `beforeDevCommand` runs the Vite dev server, `strictPort` on port 4319, `clearScreen:
@@ -42,7 +43,7 @@ test asserts it does not.
 empties any updater endpoints.
 
 **The node in dev.** The Rust shell spawns the helper exactly as packaged, but pointed at
-`apps/desktop-tauri/dist/helper` and the checkout data root (`apps/node/.acorn`), the same contract
+`apps/desktop/dist/helper` and the checkout data root (`apps/node/.acorn`), the same contract
 `serviceHost` has today. The shell's own custody root is `apps/node/.acorn/shell`, so a developer's
 fleet and device tokens sit beside the node's data without mixing into it.
 
@@ -56,21 +57,19 @@ list because only it knows whether this is a bundle or a checkout. A dev build r
 `apps/desktop/.env`, where a developer's file already is, then the data directory's, which wins. That
 path goes at cutover with the package it names.
 
-**Scripts during coexistence.** Root `pnpm dev` keeps launching Electron unchanged; `pnpm
-dev:tauri` launches the new shell. Flipping the default is a phase 5 line item. The `.env` loading
-order and the e2e data-dir override behavior are restated in the new shell: bundled dev file first,
-then a user `.env` in the data directory.
+**Scripts during coexistence.** Root `pnpm dev` launched Electron and `pnpm dev:tauri` launched the
+new shell, until phase 5 deleted the first and `pnpm dev` became the only one. The `.env` loading
+order carried over: bundled dev file first, then a user `.env` in the data directory.
 
-One improvement worth naming: the renderer gains real HMR under `dev:tauri`, which
-`electron-vite preview` never gave.
+One improvement worth naming: the renderer gained real HMR, which `electron-vite preview` never gave.
 
 ## Why not keep electron-vite for the renderer during coexistence
 
-We do. Both shells import `apps/desktop/vite.renderer.config.ts` rather than forking it, so the
-client they build cannot drift. The Tauri config adds an output directory and a dev-server port and
-changes nothing else.
+We did. Both shells imported `apps/desktop/vite.renderer.config.ts` rather than forking it, so the
+client they built could not drift. Phase 5 folded that file back into `vite.config.ts`, since one
+shell needs one config.
 
 ## Exit criteria
 
-`pnpm dev:tauri` boots shell, helper, node, and an HMR renderer against the checkout data root with
-no manual steps. **Met 2026-08-23.**
+`pnpm dev` boots shell, helper, node, and an HMR renderer against the checkout data root with no
+manual steps. **Met 2026-08-23.**

@@ -42,14 +42,14 @@ compares every connection against it; a changed fingerprint stops the connection
 explicit repair of the Node entry.
 
 The Node also validates the `Host` header against the exact bound loopback port. The renderer never
-performs TLS or bearer handling: it calls the Electron preload broker, and Electron main owns the
-endpoint, pinned agent, and device token.
+performs TLS or bearer handling: it calls the broker through the injected bridge, and the desktop
+helper owns the endpoint, pinned agent, and device token.
 
 ## Device tokens
 
 Tokens have the form `acorn_dt_<uuid>_<base64url-secret>`. The raw value is returned only in the
-pairing response. The Node stores a SHA-256 hash in `devices`; Electron stores the raw token in a
-`safeStorage` blob scoped to the Node. Authentication failures return the same null result for
+pairing response. The Node stores a SHA-256 hash in `devices`; the desktop helper stores the raw
+token in a blob scoped to the Node, encrypted under the data key the shell holds in the OS keychain. Authentication failures return the same null result for
 missing, malformed, unknown, revoked, or incorrect tokens.
 
 Revoking a device through `DELETE /v2/core/devices/:id` invalidates future HTTP calls and closes its
@@ -68,7 +68,7 @@ Pairing uses one-time in-memory codes:
 4. The Node creates a device row and returns the device token once.
 
 Pairing failures use one `401 pairing_failed` response with no distinguishing details. The bundled
-local Node is a special case: Electron spawned it, so the service handshake can return a device token
+local Node is a special case: the helper spawned it, so the service handshake can return a device token
 without a user-entered code. The token is still stored and authenticated as a normal device token.
 
 Device administration is device-only:
@@ -123,6 +123,6 @@ client and Node use ping/pong watchdogs, and revocation closes device sockets.
 ## Encryption key
 
 `SESSION_ENC_KEY` is the 32-byte AES-256-GCM/JWE key for integration credentials and HTTP-client
-fields. It must be exactly 64 hexadecimal characters. Packaged Electron builds provision or migrate
-it through `safeStorage`; development may provide it through the environment. An existing database
+fields. It must be exactly 64 hexadecimal characters. The Node generates and stores it beside its own
+data root; development may provide it through the environment. An existing database
 without usable key material fails closed.

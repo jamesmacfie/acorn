@@ -1,4 +1,4 @@
-import type { PreviewBrowserRule, ServiceRpcPeer, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import type { PreviewBrowserRule, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { trustBundledClientPlugins, trustsBundledClientPlugins } from './bundledPluginTrust'
 import { recordCrash } from './crashBudget'
 import { deviceTokens, LOCAL_TOKEN_SCOPE, type TokenCipher } from './deviceTokenStore'
@@ -11,9 +11,9 @@ import { ServiceHost } from './serviceHost'
 
 // The custody stack, composed in one place: the broker and its fleet, the device tokens, the plugin
 // cache and trust store, the preview tunnels, and the supervised node service. Nothing in this
-// package imports Electron, which is what lets both shells run the same code: Electron main composes
-// it in process, and the Tauri shell composes it inside the desktop helper
-// (docs/future/tauri/architecture.md § Process model).
+// package imports a shell binding, which is what lets it run in a process of its own: the desktop
+// helper composes it under the bundled Node, and Rust supervises that (docs/shell.md § The shell
+// process).
 //
 // What stays outside: the window, the dialogs, the renderer projection, and the encryption. Those
 // reach this seam through the options below, so a shell supplies four small things and gets a warm
@@ -36,9 +36,6 @@ export type HelperOptions = {
   // Where broker pushes go. The shell owns the target, because only it knows whether a renderer is
   // currently attached.
   push: { frame(nodeId: string, frame: unknown): void; status(status: unknown): void }
-  // Shell-only capabilities the service can call back into (main/desktopCapabilities.ts). Omitted by a
-  // shell with no webviews.
-  desktopCapabilities?(peer: ServiceRpcPeer): () => void
   // A preview tunnel opened or closed. Only a shell that cannot inject a request header needs these:
   // the Tauri shell seeds the listener's secret into the preview webview's cookie store instead
   // (previewTunnel.ts). Electron leaves it out and keeps using `headersFor`.
@@ -91,7 +88,6 @@ export function createHelper(options: HelperOptions): Helper {
       console.error(`[service-host] service exited unexpectedly with code ${code}`)
       void recover()
     },
-    ...(options.desktopCapabilities ? { desktopCapabilities: options.desktopCapabilities } : {}),
   })
 
   const broker = new NodeBroker({ frame: options.push.frame, status: options.push.status })
@@ -167,7 +163,8 @@ export function createHelper(options: HelperOptions): Helper {
     return started
   }
 
-  // Settings → Plugins' Restart button (nodeBrokerIpc.ts explains why only the local node has one).
+  // Settings → Plugins' Restart button. Only the local node has one: a remote node is somebody else's
+  // process and this client has no business restarting it.
   //
   // Goes through the same `start` as boot and crash recovery, so the node re-reads its
   // disabled-plugins file on the way up, and `adoptLocalNode` re-records the endpoint, certificate,
@@ -204,7 +201,7 @@ export function createHelper(options: HelperOptions): Helper {
     recovering = false
   }
 
-  // Crash budget and restart backoff: docs/electron.md § Node child.
+  // Crash budget and restart backoff: docs/shell.md § Node child.
   const recover = async (): Promise<void> => {
     if (recovering || disposed) return
     recovering = true

@@ -1,6 +1,6 @@
 # Frontend
 
-The renderer is a SolidJS application bundled into the Electron desktop. It loads from
+The renderer is a SolidJS application bundled into the desktop app. It loads from
 `app://acorn`; it does not run from a Node origin and cannot make direct network requests.
 
 The framework choice is settled and is now a private implementation detail: third-party plugin UI
@@ -56,7 +56,7 @@ kept as thin as the job allows because that half can only be checked by looking 
 The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `CommandPalette.tsx` consume
 registry entries and client-core contracts. A feature that needs native behavior goes through the
 platform seam (`client-core/src/platform/`), which `@acorn/plugin-api/client` re-exports the plugin-safe
-parts of; plugins do not import Electron and do not read the host global.
+parts of; plugins do not name a shell binding and do not read the host global.
 
 The router is registry-driven. A source contributes path shapes with an explicit `order`, and the desktop
 shell composes them before rendering, so a static route stays ahead of a parameter route without embedding a
@@ -82,7 +82,7 @@ maximise state persisted per task, so the URL carries the intent, not the layout
 
 `packages/client-core/src/apiClient.ts` uses route builders and response types from
 `@acorn/protocol/api.ts`. In the desktop it calls the platform seam's `nodeTransport().fetch(nodeId,
-request)`, which Electron main sends through the pinned broker; with no transport it falls back to a
+request)`, which the desktop helper sends through the pinned broker; with no transport it falls back to a
 same-origin `fetch`. The standalone server can be tested with a direct
 fetch client, but it does not provide a renderer shell. Shared repository-picker and task-status
 reads are generic shell query wrappers backed by the owning source's `repository` contribution;

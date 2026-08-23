@@ -24,8 +24,8 @@ exchange the code, and a secret shipped inside a distributed binary is recoverab
 earlier version hit and could not fix; device flow exchanges on `client_id` alone. The web flow also
 needs a redirect URI, and the renderer has no server-served origin to redirect back to, while a remote
 node would need its own registered callback URL; device flow has neither problem, so a local node and
-a remote node run the same code path. And the web flow needs an auth `BrowserWindow` in Electron main
-to intercept the redirect, which device flow avoids. The cost is one extra step for the person
+a remote node run the same code path. And the web flow needs a shell-owned auth window to intercept
+the redirect, which device flow avoids. The cost is one extra step for the person
 connecting: they read a code and type it at `github.com/login/device`.
 
 ## Mirror

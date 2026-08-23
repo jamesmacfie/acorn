@@ -3,8 +3,11 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Can the Electron-free node load every plugin's main barrel? docs/plugins.md § Package shape and
-// docs/testing.md § Test layers cover why this check exists and what it replaced.
+// Can a plain Node process load every plugin's main barrel? docs/plugins.md § Package shape and
+// docs/testing.md § Test layers cover why this check exists and what it replaced. The failure it was
+// written for was an Electron import on a barrel; the shell that made that possible is gone, but the
+// rule it enforces is not, because a barrel that reaches for anything only the desktop bundle has
+// still breaks `dev:node` and the standalone node.
 //
 // main/ only: the node/ and server/ halves are already loaded by every composition-root suite in
 // this directory, because assembleNodeGraph imports them.
@@ -16,14 +19,10 @@ const barrels = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
   .filter(existsSync)
 
 // A child `node --import tsx` process, not an in-process `await import()`. Running it inside vitest
-// would be dishonest: Vite's CommonJS interop resolves a named value import of `ipcMain` out of the
-// electron package to undefined and carries on, so the in-process import of preview's barrel passed
-// while plain Node failed on the same file. The leniency is in the transform, and the runtime that
-// has to boot does not have it. Node's ESM linker checks the named exports of electron's CJS shim
-// before a line of the module runs, which is the failure being prevented.
-//
-// This file describes those imports in prose rather than writing them out, because
-// tools/arch/boundaries.test.ts scans import forms without stripping comments.
+// would be dishonest: Vite's CommonJS interop is lenient about a named value import that resolves to
+// nothing and carries on, so a barrel could pass here and fail in the runtime that has to boot.
+// Node's ESM linker checks a CJS shim's named exports before a line of the module runs, which is the
+// class of failure being prevented.
 //
 // One child process for all barrels rather than one each: a per-import try/catch still attributes
 // each failure, and this keeps the test at one second on a process instead of thirty seconds on five.
@@ -43,11 +42,11 @@ writeSync(1, JSON.stringify(failures))
 process.exit(0)
 `
 
-describe('plugin main barrels load outside Electron', () => {
+describe('plugin main barrels load in a plain Node process', () => {
   it('imports every plugins/*/src/main/index.ts in plain Node', () => {
     // Anti-vacuity: an empty glob would satisfy the assertion below trivially, and terminal's barrel
-    // is the one whose electron import broke boot. It must always be in the set.
-    expect(barrels.length).toBeGreaterThanOrEqual(3)
+    // is the one that broke boot. It must always be in the set.
+    expect(barrels.length).toBeGreaterThanOrEqual(2)
     expect(barrels.map((file) => relative(ROOT, file))).toContain('plugins/terminal/src/main/index.ts')
 
     const child = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], {

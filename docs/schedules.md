@@ -9,7 +9,7 @@ describes what is built.
 ## Why the node, and only the node
 
 A schedule is a promise to run when nobody is looking. Clients close, hide and sleep; the node is the
-long-lived process (Electron main's node, or the standalone node) and it is where the mirrors, the
+long-lived process (the desktop's node, or the standalone one) and it is where the mirrors, the
 prefs, the plugin routes and the storage already live. So: **one scheduler, node-side; no client ever
 owns a timer that fires work.**
 
@@ -17,7 +17,7 @@ Client-side polling — panel refresh, chrome revision — stays what it is: fre
 present. The two must not be confused. A panel poll says "I am looking at this"; a schedule says "do
 this whether or not anyone is".
 
-The scheduler lives in `packages/node-core/src/server/schedules/`, not in Electron code, so both Node
+The scheduler lives in `packages/node-core/src/server/schedules/`, not in shell code, so both Node
 hosts get the same one by construction. Each composition root
 (`apps/node/src/service/runtime.ts`, `apps/node/src/server/standalone.ts`) builds it, provides it as
 the `SCHEDULER` capability before the listener binds, starts it after, and stops it in the `schedules`

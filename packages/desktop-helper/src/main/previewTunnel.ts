@@ -16,13 +16,13 @@ export type TunnelNode = {
   fingerprint?: string
 }
 
-// Idle-listener reap window: docs/electron.md § Host-owned webviews.
+// Idle-listener reap window: docs/shell.md § Host-owned webviews.
 const IDLE_MS = 60_000
 
-// Per-renderer tunnel cap: docs/electron.md § Host-owned webviews.
+// Per-renderer tunnel cap: docs/shell.md § Host-owned webviews.
 const MAX_TUNNELS = 16
 
-// Header name and case handling: docs/electron.md § Host-owned webviews.
+// Header name and case handling: docs/shell.md § Host-owned webviews.
 const TUNNEL_HEADER = 'x-acorn-tunnel'
 
 // The same credential as a cookie, for a shell that cannot inject a header. Electron adds
@@ -34,13 +34,13 @@ const TUNNEL_COOKIE = 'acorn_tunnel'
 
 // Told the shell as each listener opens and closes, so it can seed that cookie. The secret goes to the
 // shell process and no further; nothing about this reaches the renderer, which is the whole reason
-// the secret exists (docs/electron.md § Host-owned webviews).
+// the secret exists (docs/shell.md § Host-owned webviews).
 export type TunnelEvents = {
   opened(port: number, secret: string): void
   closed(port: number): void
 }
 
-// Request-head deadline and size bound: docs/electron.md § Host-owned webviews.
+// Request-head deadline and size bound: docs/shell.md § Host-owned webviews.
 const HEAD_TIMEOUT_MS = 2_000
 const MAX_HEAD_BYTES = 8 * 1024
 
@@ -49,18 +49,18 @@ type Entry = {
   port: number
   sockets: Set<Socket>
   idle: ReturnType<typeof setTimeout> | null
-  // Per listener, not per connection: docs/electron.md § Host-owned webviews.
+  // Per listener, not per connection: docs/shell.md § Host-owned webviews.
   secret: string
 }
 
-// Byte-level comparison and why: docs/electron.md § Host-owned webviews.
+// Byte-level comparison and why: docs/shell.md § Host-owned webviews.
 function matches(presented: string, secret: string): boolean {
   const a = Buffer.from(presented, 'latin1')
   const b = Buffer.from(secret, 'latin1')
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
-// Secret check: docs/electron.md § Host-owned webviews. Either envelope satisfies it — the header
+// Secret check: docs/shell.md § Host-owned webviews. Either envelope satisfies it — the header
 // Electron injects, or the cookie the Tauri shell seeds — because they carry the same per-listener
 // secret and a dev server behind the tunnel sees both regardless.
 export function headCarriesSecret(head: string, secret: string): boolean {
@@ -89,7 +89,7 @@ const partsOf = (id: string): { nodeId: string; taskId: string } => {
 
 export class PreviewTunnels {
   private readonly entries = new Map<string, Entry>()
-  // Dedupes overlapping opens for the same key: docs/electron.md § Host-owned webviews.
+  // Dedupes overlapping opens for the same key: docs/shell.md § Host-owned webviews.
   private readonly opening = new Map<string, Promise<number>>()
 
   constructor(
@@ -117,7 +117,7 @@ export class PreviewTunnels {
     if (!this.resolve(target.nodeId)) throw new Error('That node is not paired.')
 
     const sockets = new Set<Socket>()
-    // Secret generation: docs/electron.md § Host-owned webviews.
+    // Secret generation: docs/shell.md § Host-owned webviews.
     const secret = randomBytes(32).toString('base64url')
     const server = createServer((socket) => {
       const entry = this.entries.get(id)
@@ -144,7 +144,7 @@ export class PreviewTunnels {
       // costs one destroyed socket rather than an upgrade attempt against the owner's device token.
       this.authorize(socket, secret, id, (head) => this.pipe(socket, node, target, id, head))
     })
-    // Loopback bind: docs/electron.md § Host-owned webviews.
+    // Loopback bind: docs/shell.md § Host-owned webviews.
     const port = await new Promise<number>((resolvePort, reject) => {
       server.once('error', reject)
       server.listen(0, '127.0.0.1', () => resolvePort((server.address() as { port: number }).port))
@@ -162,7 +162,7 @@ export class PreviewTunnels {
   }
 
   // How the secret reaches the WebContentsView without the preview plugin importing this file:
-  // docs/electron.md § Host-owned webviews.
+  // docs/shell.md § Host-owned webviews.
   headersFor(url: string): Record<string, string> | null {
     let parsed: URL
     try {
@@ -170,7 +170,7 @@ export class PreviewTunnels {
     } catch {
       return null
     }
-    // Loopback-only header attachment: docs/electron.md § Host-owned webviews.
+    // Loopback-only header attachment: docs/shell.md § Host-owned webviews.
     if (parsed.hostname !== '127.0.0.1') return null
     const port = Number(parsed.port)
     for (const entry of this.entries.values()) {
@@ -194,7 +194,7 @@ export class PreviewTunnels {
     timer.unref?.()
     const onData = (chunk: Buffer): void => {
       buffered = Buffer.concat([buffered, chunk])
-      // Byte-level comparison: docs/electron.md § Host-owned webviews.
+      // Byte-level comparison: docs/shell.md § Host-owned webviews.
       const end = buffered.indexOf('\r\n\r\n', 0, 'latin1')
       if (end === -1) {
         if (buffered.length > MAX_HEAD_BYTES) refuse('request head exceeded its ceiling')

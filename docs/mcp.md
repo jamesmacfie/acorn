@@ -44,7 +44,7 @@ MCP registration is handled by the profile launchers and the Node's `mcp` entryp
 shows the generated configuration and active capability state; it does not store a provider secret.
 
 Registration also refreshes once at boot, for every installed agent CLI, not only at session spawn.
-The registered launcher command is the Node's own binary path, which in a dev Electron build is a
-pnpm-store path that can go stale after a reinstall; a tmux-reattached or otherwise-restored session
+The registered launcher command is the Node's own binary path, which in a dev build is a checkout
+path that can go stale after a reinstall; a tmux-reattached or otherwise-restored session
 never re-spawns, so without the boot-time pass it would keep pointing at a launcher that no longer
 exists and show as disconnected.

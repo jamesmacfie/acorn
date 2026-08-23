@@ -74,7 +74,7 @@ to your plugin is how launch args change, so the trust record can see it.
   `gemini --experimental-acp`, `grok`. The user installs the CLI themselves; your descriptor's
   diagnostics say so when it is missing.
 - **`entry`** — a package-relative JS file, run with the node service's own binary
-  (`process.execPath` under `ELECTRON_RUN_AS_NODE=1`). This is how you ship an adapter for an agent
+  (`process.execPath`, which is the Node runtime the desktop bundle ships). This is how you ship an adapter for an agent
   that does not speak ACP natively: your package carries the adapter, the same way acorn's own
   Claude harness runs the packaged `claude-agent-acp` adapter. The entry is confined to your
   installed package directory at parse time, like every other manifest path.

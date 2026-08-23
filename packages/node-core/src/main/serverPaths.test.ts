@@ -16,7 +16,7 @@ function fixture(): { root: string; sourceModuleDir: string; bundledModuleDir: s
   roots.push(root)
   writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages:\n  - "packages/*"\n')
   const sourceModuleDir = join(root, 'packages/node-core/src/main')
-  const bundledModuleDir = join(root, 'apps/desktop/out/main')
+  const bundledModuleDir = join(root, 'apps/desktop/dist/helper')
   mkdirSync(sourceModuleDir, { recursive: true })
   mkdirSync(bundledModuleDir, { recursive: true })
   return { root, sourceModuleDir, bundledModuleDir }

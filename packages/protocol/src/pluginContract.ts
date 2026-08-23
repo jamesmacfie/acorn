@@ -174,7 +174,7 @@ const chromeAction = z.discriminatedUnion('verb', [
   // Host-owned promotion. The selected rail row carries the seed; the verb carries no plugin
   // callbacks, so it survives the descriptor boundary.
   z.object({ verb: z.literal('createTask') }),
-  // https only, opened in the real browser rather than in-app (docs/electron.md § navigation policy).
+  // https only, opened in the real browser rather than in-app (docs/shell.md § Navigation policy).
   z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
   // An `overlay` surface the same manifest declares, checked below. It's in both unions because an
   // overlay covers the window and belongs to no task's layout, so it needs nothing from its click

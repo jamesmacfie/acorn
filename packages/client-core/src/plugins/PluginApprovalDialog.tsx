@@ -144,7 +144,7 @@ export default function PluginApprovalDialog() {
       const target = landed()
       if (!current || !target) return
       // The dev grant is recorded before the distribution pass, because the pass is what fetches the
-      // bundle and main applies the grant as the bytes land (main/pluginIpc.ts). The other order would
+      // bundle and the helper applies the grant as the bytes land. The other order would
       // queue a trust prompt for the first bundle and auto-trust every one after it.
       if (current.dev) {
         await setPluginDevGrant({

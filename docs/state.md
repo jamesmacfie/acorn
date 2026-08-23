@@ -28,7 +28,7 @@ The desktop persists:
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.
 
-Device tokens are held by Electron main's `safeStorage` store, not by the renderer. Drafts are
+Device tokens are held by the desktop helper's encrypted store, not by the renderer. Drafts are
 best-effort client memory/persistence and can be lost on restart; they are never sent automatically
 while a Node is offline.
 

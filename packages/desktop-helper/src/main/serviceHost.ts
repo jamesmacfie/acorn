@@ -17,12 +17,6 @@ import {
 export type ServiceHostEvents = {
   stateChanged?(state: ServiceState, detail?: string): void
   unexpectedExit?(code: number): void
-  // The handlers the service can call back into for things only a shell can do — preview panes,
-  // browser driving (main/desktopCapabilities.ts). Injected rather than imported, because those
-  // handlers reach the window system and this file must not: it is the piece that moves into the
-  // Tauri helper unchanged (docs/future/tauri/architecture.md § Process model). A shell without
-  // webviews simply leaves it out, and the service's own calls answer "unavailable".
-  desktopCapabilities?(peer: ServiceRpcPeer): () => void
 }
 
 // How long a well-behaved service gets to exit after SIGTERM before we stop being polite. Its own
@@ -33,7 +27,6 @@ const KILL_ESCALATION_MS = 5_000
 export class ServiceHost {
   private child: ChildProcess | null = null
   private peer: ServiceRpcPeer | null = null
-  private disposeDesktopHandlers: (() => void) | null = null
   private stopping = false
 
   constructor(
@@ -51,12 +44,10 @@ export class ServiceHost {
     if (this.child) throw new Error('Service host is already started')
     this.stopping = false
     const child = spawn(process.execPath, [this.entry], {
-      // ELECTRON_RUN_AS_NODE makes Electron's binary behave as `node`, so the child needs no system
-      // Node install and keeps Electron's V8, the ABI the bundled node-pty is built against
-      // (docs/electron.md § Build and packaging). Under the Tauri helper `process.execPath` is
-      // already a real Node binary and the variable is inert, which is why the spawn is identical
-      // for both shells (docs/future/tauri/node-runtime.md).
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      // `process.execPath` is the Node the bundle ships, which is how the child needs no system Node
+      // install and how the bundled node-pty finds the ABI it was built against
+      // (docs/shell.md § Build and packaging).
+      env: { ...process.env },
       // stdin closed (the service never reads it); stdout/stderr inherited so its logs land wherever
       // the app's do; fd 3 is the IPC channel that gives the child `process.send`.
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
@@ -82,7 +73,6 @@ export class ServiceHost {
     }
     const peer = new ServiceRpcPeer(transport)
     this.peer = peer
-    this.disposeDesktopHandlers = this.events.desktopCapabilities?.(peer) ?? null
     peer.onEvent('service.state', (payload) => {
       const parsed = serviceStateEventSchema.safeParse(payload)
       if (parsed.success) this.events.stateChanged?.(parsed.data.state, parsed.data.detail)
@@ -152,8 +142,6 @@ export class ServiceHost {
   }
 
   private disposeConnection(reason: string): void {
-    this.disposeDesktopHandlers?.()
-    this.disposeDesktopHandlers = null
     this.peer?.close(reason)
     this.peer = null
   }

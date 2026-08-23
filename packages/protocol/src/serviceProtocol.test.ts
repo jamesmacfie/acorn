@@ -33,10 +33,10 @@ describe('service process RPC', () => {
     const [mainTransport, serviceTransport] = pair()
     const main = new ServiceRpcPeer(mainTransport)
     const service = new ServiceRpcPeer(serviceTransport)
-    main.register('desktop.preview-current-url', (payload) => {
-      const taskId = (payload as { taskId: unknown }).taskId
-      return `https://${String(taskId)}.test`
-    })
+    // The peer is symmetric: which side registers a method is a convention of the product, not of
+    // the transport, and this is the test that keeps it true in both directions. Every shipping
+    // method runs shell -> service, so the return leg here borrows one of their names.
+    main.register('service.stop', (payload) => `https://${String((payload as { taskId: unknown }).taskId)}.test`)
     service.register('service.preview-rules', async (payload) => {
       const taskId = (payload as { taskId: unknown }).taskId
       return [
@@ -44,7 +44,7 @@ describe('service process RPC', () => {
       ]
     })
 
-    await expect(service.request('desktop.preview-current-url', { taskId: 'task-1' })).resolves.toBe('https://task-1.test')
+    await expect(service.request('service.stop', { taskId: 'task-1' })).resolves.toBe('https://task-1.test')
     await expect(main.request<unknown[]>('service.preview-rules', { taskId: 'task-1' })).resolves.toHaveLength(1)
     main.close()
     service.close()
@@ -75,7 +75,7 @@ describe('service process RPC', () => {
     const [mainTransport, serviceTransport] = pair()
     const main = new ServiceRpcPeer(mainTransport)
     const service = new ServiceRpcPeer(serviceTransport)
-    const error = await service.request('desktop.preview-evict', { taskId: 't' }).catch((value: unknown) => value)
+    const error = await service.request('service.stop', { taskId: 't' }).catch((value: unknown) => value)
     expect(error).toBeInstanceOf(ServiceRpcError)
     expect(error).toMatchObject({ code: 'method_unavailable' })
     main.close()

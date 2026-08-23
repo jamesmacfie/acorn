@@ -6,7 +6,7 @@ contains the schema and migration chain.
 
 ## Data root
 
-Development uses `apps/node/.acorn/`; packaged Electron uses the app's `userData` root; standalone
+Development uses `apps/node/.acorn/`; a packaged desktop build uses the OS application-data root; standalone
 Nodes use `ACORN_DATA_DIR` or the development default. The root is mode `0700` and protected by an
 exclusive `node.lock`.
 

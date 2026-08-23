@@ -1,6 +1,7 @@
 # Node runtime
 
-Status: proposal, 2026-08-22; phase 2 built it and phase 4 finished it, 2026-08-23.
+Status: historical. Proposed 2026-08-22, built in phase 2 and finished in phase 4, 2026-08-23.
+[docs/shell.md](../../shell.md) § Node child owns shipped behaviour.
 
 ## The problem
 
@@ -13,7 +14,7 @@ Node, and a Rust parent cannot speak Node's structured `process.send` channel na
 
 **Bundle a pinned real Node binary as a Tauri external binary** (`binaries/node-<target-triple>`),
 declared in `tauri.conf.json` `bundle.externalBin`. The version pin is `node-runtime.json` at the
-repo root, read by `apps/desktop-tauri/scripts/stage.mjs` and by `scripts/pack-node.mjs` — one
+repo root, read by `apps/desktop/scripts/stage.mjs` and by `scripts/pack-node.mjs` — one
 runtime pin, two consumers. It pins the Node 24 LTS line the node already requires (`node:sqlite` is
 what sets the floor, [docs/node-distribution.md](../../node-distribution.md)), and the helper reports
 `process.version` in its ready line so the boot test can assert the runtime that booted is the one
@@ -21,7 +22,7 @@ the pin names.
 
 The staging script fetches the pinned build for its target from nodejs.org and verifies it against
 that release's `SHASUMS256.txt` before it goes anywhere near the bundle
-(`apps/desktop-tauri/scripts/nodeRuntime.mjs`). It caches the extracted binary with its digest beside
+(`apps/desktop/scripts/nodeRuntime.mjs`). It caches the extracted binary with its digest beside
 it, so a re-stage re-verifies without the network. Phase 2 copied whichever Node was running the
 script and refused when that was not the pin; phase 4 replaced that with one path, so a developer
 build and a release bundle the same verified bytes and nobody has to switch runtimes to stage.
@@ -40,7 +41,7 @@ Because the helper is a real Node process:
 ## Supervision parity
 
 The Rust side supervises the helper, and the helper supervises the node, so the behaviors recorded
-in [docs/electron.md](../../electron.md) carry over by keeping their code: the crash budget (five
+in [docs/shell.md](../../shell.md) carry over by keeping their code: the crash budget (five
 restarts inside ten minutes, 1-2-4-8-16-second backoff — `crashBudget.ts`), device-token persistence
 across restarts, fail-closed startup, and the recovery UI. The Rust helper supervisor transposes
 `references/proliferate/apps/desktop/src-tauri/src/sidecar.rs`: generation-counted exit observers,
@@ -113,9 +114,9 @@ of the run.
 
 - The node boots under the bundled runtime spawned from Rust via the helper; the versioned start
   handshake is adopted; `apps/node/test/integration/standaloneParity.test.ts` stays green. **Met in
-  phase 2**, and `apps/desktop-tauri/test/boot.test.ts` is what holds it.
+  phase 2**, and `apps/desktop/test/boot.test.ts` is what holds it.
 - Killing the service honors the crash budget and reaches the recovery UI on the sixth crash. The
   budget and the dialog are both wired; item 7 of the smoke checklist in [testing.md](./testing.md)
   is what confirms it.
 - The desktop build contains no `electron-rebuild` step and no Electron-ABI native module. True of
-  `apps/desktop-tauri`; the Electron package keeps its rebuild step until cutover.
+  `apps/desktop`; the Electron package keeps its rebuild step until cutover.

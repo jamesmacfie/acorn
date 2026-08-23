@@ -1,11 +1,12 @@
 # Sequencing
 
-Status: proposal, 2026-08-22; phases 0 to 4 executed 2026-08-23. Coexistence, the phases, the cutover trigger, and the deletion list.
+Status: historical. Proposed 2026-08-22, phases 0 to 5 executed 2026-08-23. Coexistence, the phases,
+the cutover trigger, and the deletion list. [docs/shell.md](../../shell.md) owns shipped behaviour.
 
 ## Coexistence: a second app package
 
 `apps/desktop` (Electron) remains untouched and shipped. The Tauri shell is a new package, working
-name `apps/desktop-tauri`, holding `src-tauri/` plus the extracted renderer Vite config, consuming
+name `apps/desktop`, holding `src-tauri/` plus the extracted renderer Vite config, consuming
 the same renderer source, node artifact, bundled-plugins build, and protocol. CI builds both from
 the same commit. This works because the Electron surface is 12 files behind an arch-tested seam:
 the two shells are two consumers of one seam, not two forks. The shared renderer config is
@@ -20,7 +21,7 @@ extracted once and imported by both build systems so it cannot drift.
 | 2 | Rust shell skeleton + helper ✅ | L | yes (parallel app) |
 | 3 | Feature parity ✅ | L | yes (parallel app) |
 | 4 | Packaging and CI ✅ | M | yes (parallel artifact) |
-| 5 | Cutover and deletion | M | — (the flip) |
+| 5 | Cutover and deletion ✅ | M | — (the flip) |
 
 ### Phase 0 — de-risk spikes
 
@@ -84,18 +85,18 @@ What landed, and where it sits:
 
 - **`packages/desktop-helper`.** The custody stack moved out of `apps/desktop/src/app/main/helper/`
   into its own workspace package, one phase earlier than the deletion list assumed. The arch rule
-  "apps never import each other" forced it: `apps/desktop-tauri` cannot reach into `apps/desktop`,
+  "apps never import each other" forced it: `apps/desktop` cannot reach into `apps/desktop`,
   so the code both shells run has to live in a package. Electron's `bootstrap.ts` imports it exactly
   as it imported the folder. The plugin request schemas came with it, as
   `main/pluginRequests.ts`, because both shells parse them and a schema that drifted would mean one
   host recording an acknowledgement the other cannot read.
-- **`apps/desktop-tauri`.** `src-tauri/` (six Rust modules), `src/main/` (the helper process),
+- **`apps/desktop`.** `src-tauri/` (six Rust modules), `src/main/` (the helper process),
   `src/client/bridge.ts` (the renderer bridge), `src/shared/wire.ts` (the vocabulary between them),
   and the Vite configs. It consumes `apps/desktop`'s renderer source through
   `vite.renderer.config.ts`, the import direction phase 1 set up.
-- **`node-runtime.json`.** The runtime pin, read by `apps/desktop-tauri/scripts/stage.mjs` and by
+- **`node-runtime.json`.** The runtime pin, read by `apps/desktop/scripts/stage.mjs` and by
   `scripts/pack-node.mjs`. One pin, two consumers, as designed.
-- **The boot test.** `apps/desktop-tauri/test/boot.test.ts` runs the staged helper under the bundled
+- **The boot test.** `apps/desktop/test/boot.test.ts` runs the staged helper under the bundled
   Node against a fresh data root, then asks it the first two questions the renderer asks. Eleven
   Rust unit tests cover the parts a headless run cannot reach. See
   [testing.md](./testing.md) § The boot test.
@@ -125,7 +126,7 @@ the `safeStorage` token migration, and the Playwright browser plugin. Those are 
 
 ### Phase 3 — feature parity ✅
 
-Done 2026-08-23. Every capability in [docs/electron.md](../../electron.md) now has a Tauri
+Done 2026-08-23. Every capability in [docs/shell.md](../../shell.md) now has a Tauri
 implementation or a waiver argued below. The platform seam has no null groups left: `bridge.test.ts`
 drives the whole of `SEAM_GROUPS` against the real bridge and exempts nothing.
 
@@ -185,7 +186,7 @@ Chrome (`pnpm --filter @acorn/plugin-browser test:smoke`).
 
 ### Phase 4 — packaging and CI ✅
 
-Done 2026-08-23. `pnpm --filter @acorn/desktop-tauri run build` produces an ad-hoc signed
+Done 2026-08-23. `pnpm --filter @acorn/desktop run build` produces an ad-hoc signed
 `acorn_0.1.0_aarch64.dmg` with signed updater artifacts beside it, and verifies its own output before
 it finishes. `.github/workflows/build-tauri.yml` runs the same command on a push to main, alongside
 `build-dmg.yml` rather than instead of it.
@@ -234,40 +235,73 @@ and `spctl` rejects it exactly as it rejects the Electron DMG. The smoke checkli
 never had the Electron build is the remaining item, and it is item 2 of the cutover trigger rather than
 something a script can close.
 
-### Phase 5 — cutover and deletion
+### Phase 5 — cutover and deletion ✅
 
-The flip, then the cleanup, executed as one phase so nothing half-dead lingers.
+Done 2026-08-23. The flip and the cleanup in one phase, so nothing half-dead lingers. `apps/desktop`
+is the Tauri app; `apps/desktop` and every Electron file are gone.
+
+The two packages merged into `apps/desktop` rather than the renderer moving into `apps/desktop`
+as the phase-2 note assumed. One desktop app should be called `desktop`, and keeping the name meant
+every `apps/desktop/src/app/client/...` path in packages, plugins, and tests stayed valid, including
+the three that are functional rather than prose (`adoption.test.ts`, `readStyleSheets.ts`, and the
+arch suite's roots). The shell's own TypeScript is `src/shell/`: the injected bridge, the helper
+process, and the wire between them, in one folder beside the renderer's `src/app/client/`.
+
+What the deletion list asked for, and what happened to each item:
+
+- **`apps/desktop/src/app/main/`.** Gone, all 19 files. `pluginFrameStyles.ts` was the one that was
+  not Electron's: its ordered list moved into `scripts/stage.mjs`, which was already parsing it out
+  of that file, and `cssHygiene.test.ts` reads it there. The parsing disappeared with the move, as
+  phase 2 predicted it would.
+- **The Electron build files and dependencies.** `electron-builder.yml`, `electron.vite.config.ts`,
+  `build/`, `make-icons.sh`, and the electron, electron-vite, electron-builder, @electron/rebuild,
+  @playwright/test, and @types/better-sqlite3 dependencies, in `apps/desktop` and in the preview and
+  terminal plugins. `vite.renderer.config.ts` folded into `vite.config.ts`: the extraction existed to
+  stop two shells drifting, and there is one.
+- **`scripts/rebuild-node-abi.mjs`.** The Electron-ABI branch was already only prose. The comment
+  says there is one ABI now, because the desktop runs the node under the same pinned runtime the
+  tests use.
+- **`apps/desktop/e2e` and `playwright.e2e.config.ts`.** Gone with the six specs.
+- **`.github/workflows/build-dmg.yml`.** Gone. `build-tauri.yml` is `build-desktop.yml` and runs
+  `pnpm --filter @acorn/desktop run dist`.
+- **`plugins/terminal/src/main/folderPickerIpc.ts`.** Gone, along with `plugins/preview/src/main/`,
+  which the list expected to go in phase 3 and which survived only because Electron still called it.
+- **Arch tests.** The Electron-consumer baseline is a flat ban: no import, no `createRequire`, and no
+  manifest entry. The Tauri rule points at `apps/desktop/src/shell/`, and the separate
+  "the desktop helper stays Electron-free" rule went, because the flat ban covers it.
+  `better-sqlite3` and `sharp` left `pnpm-workspace.yaml`.
+- **`docs/electron.md`.** Replaced by [docs/shell.md](../../shell.md), which describes the shell that
+  ships. Every reference in code and docs points at it, and it kept the section names those
+  references cite.
+
+Three things beyond the list, all of them the same "nothing half-dead lingers" rule:
+
+- **The phase-3 waiver is closed by deletion.** `desktop.preview-*`, `DesktopCapabilities`,
+  `desktopCapabilitiesOverRpc`, and the `desktopCapabilities` injection point on `ServiceHost` are
+  gone. Nothing in the node ever called them, and with no shell registering them the seam was a
+  protocol surface with neither end attached. `serviceRpcMethods` is three names.
+- **`electronPath` is `hostRuntimePath`,** on the service-start config and through `launcherSpec`,
+  and `ELECTRON_RUN_AS_NODE` left the MCP launcher env and the service spawn. It was inert under a
+  real Node, which is exactly what makes a stale name cheap to keep and expensive to trust.
+- **The comment sweep.** Around 60 comments described Electron in the present tense or pointed at a
+  file that no longer exists. The ones stating history keep it; the ones stating a falsehood about
+  today were rewritten.
 
 ## Cutover trigger
 
 All four, not any:
 
-1. The phase-3 parity list has no open waivers.
-2. The packaged DMG passes the smoke checklist on a machine that never had the Electron build. This
-   is the only one of the four still open.
-3. Developers have run `dev:tauri` as their default for an agreed soak window.
+1. The phase-3 parity list has no open waivers. Closed by deleting `desktop.preview-*`.
+2. The packaged DMG passes the smoke checklist in [testing.md](./testing.md) on a machine that never
+   had the Electron build. **Owed to a person.** No script closes this one.
+3. Developers have run the Tauri shell as their default for an agreed soak window. **Owed.**
 4. No invariant in the [README](./README.md) is regressed.
 
-Signing does not gate cutover: today's build is ad-hoc signed with no updater, so ad-hoc parity is
-parity.
+Signing does not gate cutover: the build is ad-hoc signed with no updater, so ad-hoc parity is parity.
 
-## Deletion list
-
-- `apps/desktop/src/app/main/` (the 12 Electron files, `preload.ts`, and their tests). All of it:
-  the custody stack left for `packages/desktop-helper` in phase 2, and both shells import it there.
-- `apps/desktop/electron-builder.yml`, `electron.vite.config.ts`, the electron scripts, and the
-  electron, electron-vite, electron-builder, and @electron/rebuild dependencies.
-- The Electron-ABI branch of `scripts/rebuild-node-abi.mjs`; the plain-Node path stays for the
-  standalone tarball.
-- `apps/desktop/e2e` and `playwright.e2e.config.ts`, or whatever remains after the extraction.
-- `.github/workflows/build-dmg.yml`. `build-tauri.yml` is the one that stays.
-- `plugins/terminal/src/main/folderPickerIpc.ts`, the last lazy Electron adapter. Preview's went in
-  phase 3 with the CDP driver; this one survives only because Electron still calls it, and the Tauri
-  shell has answered the same seam through `pick_folder` since phase 2.
-- Arch tests: the Electron-consumer baseline reaches zero and the rule flips to "nothing imports
-  electron". Stale `better-sqlite3` and `sharp` entries in `pnpm-workspace.yaml` go with it.
-- [docs/electron.md](../../electron.md) is replaced by a shipped-behavior shell doc, and this
-  folder is marked historical.
+Items 2 and 3 are the honest state of this migration. The code cut over ahead of them, and the
+Electron artifact no longer exists to fall back to, so the smoke checklist is a release gate now
+rather than a cutover gate.
 
 ## Rejected orderings
 

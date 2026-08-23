@@ -117,7 +117,7 @@ describe('wsHub auth', () => {
   })
 
   // docs/api-reference.md § Events: the socket is token-authenticated at upgrade. No cookie, no
-  // Origin: a broker socket from Electron main is not a browser socket, and there is no ambient
+  // Origin: a broker socket from the desktop helper is not a browser socket, and there is no ambient
   // credential left for an Origin check to defend.
   it('accepts a device bearer, and does not care what Origin says', async () => {
     const ws = await open({ ...authHeaders(), origin: 'http://evil.example.com' })

@@ -1,6 +1,7 @@
 # Shell architecture
 
-Status: proposal, 2026-08-22; phases 2 and 3 built it, 2026-08-23. The organizing principle: the renderer seam
+Status: historical. Proposed 2026-08-22, built in phases 2 and 3, 2026-08-23.
+[docs/shell.md](../../shell.md) owns shipped behaviour. The organizing principle: the renderer seam
 (`packages/client-core/src/platform/index.ts`) and the service protocol
 (`packages/protocol/src/serviceProtocol.ts`) are the two contracts that must not change; everything
 between them is replaceable.
@@ -59,7 +60,7 @@ command, `helper_endpoint()`.
 One WebSocket carries the whole former preload surface, and nothing else does: the listener answers
 a plain HTTP request with 426 and exists only to be upgraded. The wire messages are the existing Zod
 schemas that `nodeBrokerIpc.ts` and `pluginIpc.ts` validate; those two files were the spec for
-`apps/desktop-tauri/src/main/helperServer.ts`, a transliteration from `ipcMain` handlers to WebSocket
+`apps/desktop/src/shell/helperServer.ts`, a transliteration from `ipcMain` handlers to WebSocket
 frames that keeps the "renderer messages are Zod-parsed" posture verbatim. The upgrade requires the
 secret and an `Origin` check against the app origin; the secret is the real gate, because any local
 process can claim any origin it likes. `nodeFetch` keeps buffering whole responses, which the seam
@@ -73,13 +74,13 @@ and no second auth gate, and because `abort(requestId)` is already in the seam. 
 negligible somewhere in the tens of megabytes, and the upgrade is an id-tagged binary frame beside
 the JSON reply rather than a second transport.
 
-The renderer-side bridge is `apps/desktop-tauri/src/client/bridge.ts`: it assembles the
+The renderer-side bridge is `apps/desktop/src/shell/bridge.ts`: it assembles the
 preload-shaped object over the helper socket plus Tauri commands and events, and the shell injects it
 as a webview initialization script, which is what a preload is. Injecting it rather than importing it
 from the renderer entry is what keeps `apps/desktop/src/app/client/index.tsx` shell-agnostic.
 `packages/client-core/src/platform/index.ts` needed zero changes.
 `tools/arch/boundaries.test.ts` gained one rule, the mirror of the Electron one: nothing outside
-`apps/desktop-tauri` may name a Tauri binding.
+`apps/desktop` may name a Tauri binding.
 
 One value cannot wait for a round trip. The seam reads `hostPlatform()` synchronously, so the
 initialization script sets `__ACORN_PLATFORM__` ahead of the bridge itself.
@@ -128,7 +129,7 @@ It also names `ipc:` and `http://ipc.localhost`, which are Tauri's own IPC chann
 network origin. Leaving them out does not break `invoke`; it silently drops it to a slower
 postMessage path, which is what makes the omission easy to ship. The capability file is what says
 which commands that channel reaches. This is the honest cost of the helper decision and is a
-proposed change against [docs/electron.md](../../electron.md), where `connect-src 'self'` is the
+proposed change against [docs/shell.md](../../shell.md), where `connect-src 'self'` is the
 load-bearing directive. Everything else that directive protected still holds: the renderer still
 cannot reach a node directly, because nodes require the pinned agent and bearer that only the
 helper holds.
@@ -179,7 +180,7 @@ front of the app, and answering it granted nothing that survived the next rebuil
 
 Rejected: stronghold (a database and runtime for a problem one keychain entry solves), per-token
 keychain items (a prompt per node and ACL churn), tokens inside `fleet.json` (rejected in
-[docs/electron.md](../../electron.md) already).
+[docs/shell.md](../../shell.md) already).
 
 ## Window, lifecycle, and platform bits
 

@@ -151,7 +151,6 @@ export class ClaudeAgentDriver implements AgentDriver {
       // login under XDG_CONFIG_HOME.
       env: {
         ...brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CLAUDE_CODE_*'] }),
-        ELECTRON_RUN_AS_NODE: '1',
         CLAUDE_CODE_EXECUTABLE: descriptor.executable,
       },
       shell: false,

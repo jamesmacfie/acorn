@@ -155,7 +155,7 @@ describe('custody', () => {
   })
 
   it('never diffs an update against a partial snapshot', () => {
-    // A decision recorded when the disclosure could not be parsed (main/pluginIpc.ts). Its snapshot
+    // A decision recorded when the disclosure could not be parsed. Its snapshot
     // is known-incomplete, so using it as the "what changed" baseline would mark grants as newly
     // requested that the owner had already seen, the alarming direction.
     const trust = store()

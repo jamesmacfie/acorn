@@ -119,7 +119,7 @@ export default function WorkspaceProjectAssignments() {
   }
 
   // Modal rather than arm-to-confirm because the blast radius is real: every project in the workspace
-  // moves. Not `confirm()`, which Electron renders unstyled.
+  // moves. Not `confirm()`, which the webview renders unstyled.
   const [confirmDeleteWorkspace, setConfirmDeleteWorkspace] = createSignal<Workspace | null>(null)
 
   return (

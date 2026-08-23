@@ -25,7 +25,7 @@ describe('loopbackPortOf', () => {
   })
 
   it('is null for the userinfo disguise', () => {
-    // `http://localhost@evil.test` has hostname `evil.test`. The preview URL guard in Electron main
+    // `http://localhost@evil.test` has hostname `evil.test`. The shell's preview URL guard
     // refuses the same shape; the allowlist must not be the place that lets it through.
     expect(loopbackPortOf('http://localhost@evil.test:3000/')).toBeNull()
   })

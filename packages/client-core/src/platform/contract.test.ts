@@ -3,7 +3,7 @@ import { SEAM_GROUPS, seamProblems, type SeamGroup } from './contract'
 import { canPickFolder, fleetBridge, nodeTransport, pickFolder } from './index'
 
 // The seam contract against a mock host. The same checker runs against each shell's real host object
-// in that shell's own suite (apps/desktop/src/app/main/preload.test.ts), which is the half that
+// in that shell's own suite (apps/desktop/src/shell/bridge.test.ts), which is the half that
 // catches a renamed preload key; this half pins the semantics the checker is written against.
 
 // A host that implements everything, shaped as the preload is: flat members for the transport and

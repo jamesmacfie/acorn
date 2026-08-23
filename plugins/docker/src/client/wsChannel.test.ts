@@ -6,7 +6,7 @@ import { setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 // keeps the transport, the reconnect edge and the fleet filter. This one keeps what is docker's:
 // that a stream is routed by kind and id, and that a live subscription re-attaches after a drop.
 //
-// The bridge is faked, not a WebSocket: the renderer does not own a socket, Electron main's
+// The bridge is faked, not a WebSocket: the renderer does not own a socket, the helper's
 // broker does, so the thing under test is subscription bookkeeping.
 
 type Bridge = {

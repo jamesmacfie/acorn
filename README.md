@@ -1,8 +1,8 @@
 # acorn
 
 acorn is a local macOS workspace for reviewing GitHub pull requests and running coding agents in
-isolated git worktrees. The desktop app is a SolidJS renderer inside Electron. Its Electron-free
-Node service owns the data, integrations, worktrees, terminals, agents, workflows, and processes.
+isolated git worktrees. The desktop app is a SolidJS renderer inside a Tauri shell. Its Node service
+owns the data, integrations, worktrees, terminals, agents, workflows, and processes.
 
 The desktop can manage the bundled local Node and any other Nodes paired to the same installation.
 Every Node has its own data root and is addressed through the same HTTPS protocol.
@@ -25,14 +25,15 @@ Every Node has its own data root and is addressed through the same HTTPS protoco
 
 ## Runtime shape
 
-Electron main starts `apps/node` as an ordinary Node child process. The Node binds an HTTPS Hono
-server with TLS 1.3 on loopback and an ephemeral port, then reports its endpoint, certificate
-fingerprint, and local device token to Electron main. `ACORN_PORT` may pin a port for development or
-tests; the last successful port is kept in `node.json` as a preference.
+A small Rust shell owns the window and supervises a Node helper process, which starts `apps/node` as
+an ordinary child under the bundled Node runtime. The Node binds an HTTPS Hono server with TLS 1.3 on
+loopback and an ephemeral port, then reports its endpoint, certificate fingerprint, and local device
+token back. `ACORN_PORT` may pin a port for development or tests; the last successful port is kept in
+`node.json` as a preference.
 
-The renderer loads from Electron's `app://acorn` scheme. It does not hold device tokens or node
-certificates and cannot connect to a Node directly. Preload IPC calls the connection broker in
-Electron main, which performs pinned HTTPS/WebSocket connections and attaches the device bearer.
+The renderer loads from the shell's `app://acorn` scheme. It does not hold device tokens or node
+certificates and cannot connect to a Node directly. One loopback WebSocket reaches the helper's
+connection broker, which performs pinned HTTPS/WebSocket connections and attaches the device bearer.
 
 The Node serves only `/v2`: core routes under `/v2/core/*`, plugin routes under
 `/v2/p/<plugin>/*`, and the authenticated event/stream socket at `/v2/events`. It serves no web
@@ -41,7 +42,7 @@ assets and has no SPA fallback.
 ## Repository layout
 
 ```text
-apps/desktop/     Electron main, preload, renderer, packaging, and Playwright e2e
+apps/desktop/     Rust shell, desktop helper, renderer bridge, renderer, and packaging
 apps/node/        Node composition roots, standalone entry, plugin activation, and integration tests
 packages/protocol Wire contracts and route/query builders
 packages/node-core Node server, auth, storage, core services, MCP, and shared registries
@@ -64,30 +65,28 @@ of those migrations is [docs/third-party/README.md](./docs/third-party/README.md
 
 ```sh
 pnpm install
-pnpm run rebuild
+pnpm rebuild:node
 pnpm dev
 ```
 
 Useful commands:
 
 ```sh
-pnpm dev:node                              # standalone Node, no Electron window
+pnpm dev:node                              # standalone Node, no desktop window
 pnpm dev:plugin <id>                       # rebuild one loaded plugin's package on every save
 pnpm lint                                  # strict TypeScript and architecture checks
 pnpm test                                  # native rebuild plus Vitest suites
-pnpm --filter @acorn/desktop test:e2e      # builds the service artifact, then Playwright
 pnpm db:check                              # replay every SQLite migration chain
-pnpm --filter @acorn/desktop dist          # build and package the macOS app
+pnpm --filter @acorn/desktop dist          # build, package, and verify the macOS DMG
 pnpm pack:node                             # build the standalone Node tarball
 ```
 
-`SESSION_ENC_KEY` (64 hexadecimal characters) is optional in development — the desktop supplies one
-from safeStorage, and a standalone Node generates its own; setting it in `.env` pins a stable key
-across throwaway data roots. The GitHub plugin reads `GITHUB_CLIENT_ID` when GitHub connection/import
-features are enabled; it does not use a client secret. `node-pty` is the only native module (SQLite
-is the runtime's own `node:sqlite`): use `pnpm rebuild:node` for plain Node commands and
-`pnpm run rebuild` for Electron, as documented in
-[local-development.md](./docs/local-development.md).
+`SESSION_ENC_KEY` (64 hexadecimal characters) is optional in development — a Node with none generates
+its own; setting it in `.env` pins a stable key across throwaway data roots. The GitHub plugin reads
+`GITHUB_CLIENT_ID` when GitHub connection or import features are enabled; it does not use a client
+secret. `node-pty` is the only native module, since SQLite is the runtime's own `node:sqlite`, and
+there is one ABI to match because the desktop runs the node under the same pinned runtime the tests
+use: `pnpm rebuild:node`, as documented in [local-development.md](./docs/local-development.md).
 
 ## Documentation
 

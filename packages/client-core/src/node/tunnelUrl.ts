@@ -3,10 +3,10 @@ import { activeNodeId } from './activeNode'
 import { nodes } from './fleet'
 
 // Rewrite a loopback URL resolved by a node so it is reachable from this machine
-// (docs/electron.md § Host-owned webviews).
+// (docs/shell.md § Host-owned webviews).
 //
 // The preview pane's URL comes from the node: a run target's `url`, a repo's `previewMode: 'port'`,
-// or a URL script's stdout, then loaded by the client's Electron main. For the bundled local node
+// or a URL script's stdout, then loaded by the client's own shell. For the bundled local node
 // those are the same machine and nothing needs doing. For a remote node `http://localhost:5173`
 // points at the owner's laptop, where nothing is listening, and the pane shows a blank page.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0'])

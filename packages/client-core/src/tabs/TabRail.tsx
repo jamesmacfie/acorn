@@ -279,7 +279,7 @@ export default function TabRail() {
     }
   }
 
-  // Archive confirm/error use the same modal shell as create/rename (Electron has no
+  // Archive confirm/error use the same modal shell as create/rename (the webview has no
   // window.prompt/confirm-styling; the rail's dialogs stay consistent). When the bridge is
   // present, the archive always runs through the guarded teardown flow
   // (docs/workspaces-and-tasks.md § Worktrees and setup); the plain HTTP flip exists only for the

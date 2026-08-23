@@ -432,7 +432,7 @@ export function mountFrame(
  *
  * Here rather than left to each frame because the plumbing is identical everywhere and the wrong version
  * of it is silent: an anchor in a frame can't navigate anything, since the iframe sandbox has no
- * `allow-popups` and Electron pins every subframe to its own origin, so a frame that forgets this
+ * `allow-popups` and the shell pins every subframe to its own origin, so a frame that forgets this
  * handler renders links that do nothing.
  *
  * On @acorn/plugin-api/ui/sdk beside `connect` rather than on the /ui barrel beside `renderMarkdown`,

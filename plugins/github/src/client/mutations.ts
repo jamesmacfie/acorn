@@ -1,4 +1,4 @@
-// PR write actions. Routed through the broker, which attaches the device bearer in Electron main, so
+// PR write actions. Routed through the broker, which attaches the device bearer in the helper, so
 // there's no cookie and therefore no CSRF check (server/index.ts explains why). Throws the structured
 // error code on failure so callers can branch on merge_failed, reauth and the rest.
 //

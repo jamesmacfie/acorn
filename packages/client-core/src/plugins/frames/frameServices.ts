@@ -140,7 +140,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
       // the URL to `shell.openExternal` behind the scheme allowlist, so this opens in the owner's
       // browser and never in-app, with no second policy to keep in step
-      // (apps/desktop/src/app/main/electron.ts, docs/electron.md § navigation policy).
+      // (docs/shell.md § Navigation policy).
       window.open(url, '_blank', 'noopener,noreferrer')
     },
     frameHasFocus: () => host.frameHasFocus(),

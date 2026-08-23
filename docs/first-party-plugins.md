@@ -72,12 +72,14 @@ with names, not an interface.
 What has no sanctioned alternative, ever, is the *uncooperative* half — B reaching into A without A
 saying so. See [plugins.md](./plugins.md) § There is no uncooperative extension.
 
-**C. Electron main-process code** — a `src/main/` half that imports `electron`. The desktop
-surface is enumerated and boundary-tested; a loaded plugin has no main-process presence at all.
+**C. Code that runs in the desktop shell itself** — a `src/main/` half that names a shell binding.
+The shell surface is enumerated and boundary-tested; a loaded plugin has no presence there at all.
 
-Showing a web page is no longer an instance of this. The view service moved into `apps/desktop`
-and any plugin can place a `webview` surface; what still needs main is *driving* one — the CDP
-attachment behind preview's browser agent tools — plus preview's tunnel headers and page rules.
+This category is empty. Showing a web page stopped being an instance of it when the view service
+moved into the shell and any plugin gained a `webview` surface, and driving a browser stopped being
+one when `plugins/browser` started running Playwright against a browser of the node's own. The
+tier survives as a rule rather than as a list, because the next thing that genuinely needs a window
+should still land first-party.
 
 **D. Publishing a capability the shell or core depends on** — a plugin whose absence would leave
 core (or the shell in front of it) with a hole it cannot degrade around. These are the `required`
@@ -130,7 +132,7 @@ Ordered by how strong the first-party claim is.
 
 | Plugin | Why | Reason |
 | --- | --- | --- |
-| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes seven capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `WORKTREE_CREATED`, `TASK_CREATED`, …) that four other plugins consume, contributes two component slots, and has an Electron main half (`folderPickerIpc.ts`). It is the most privileged plugin in the tree and every reason applies at once. | A, B, C, D |
+| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes seven capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `WORKTREE_CREATED`, `TASK_CREATED`, …) that four other plugins consume, and contributes two component slots. It is the most privileged plugin in the tree. | A, B, D |
 | **agents** | `required`. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`; owns the managed-agent session model that core's context assembler and the shell's transcript both read. `managedAgents.ts` is still in protocol because client-core's agent-tool renderer registry names it. | D, E |
 | **docker** | Owns a WS channel prefix for container log and event streams. Its footer badge and rail slot are component contributions. | A, B |
 | **preview** | Its display lifecycle now calls the host-owned webview service any plugin surface can use. Its thin main adapter still supplies preview-only tunnel headers and page rules, and its CDP driver remains behind the six browser agent tools. Those driving and credential-bearing capabilities—not merely showing a page—are why preview remains first-party. | C |
@@ -224,7 +226,7 @@ host fetches on the plugin's behalf. That last one is what unblocked `http` and 
 ## Rules of thumb
 
 **When a new plugin should be first-party.** It owns transport (streams, WS channels), it renders
-inside another surface's component tree, it needs Electron main, or the shell cannot start without
+inside another surface's component tree, it needs to run inside the shell, or the shell cannot start without
 it. That is the whole list. "It is ours" is not a reason — GitHub stopped being `required` and
 nothing broke.
 
