@@ -4,6 +4,7 @@ import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
 import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
+import { nextFollowing } from './followScroll'
 import { Button, EmptyState } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
 
@@ -68,6 +69,14 @@ export default function AgentTranscript(props: {
   let applied = -1
   const nearBottom = (element: HTMLDivElement) =>
     element.scrollHeight - element.scrollTop - element.clientHeight < 96
+  // Armed by the reader's own input and spent on the next scroll event, which is how `nextFollowing`
+  // tells a decision to scroll up from the browser clamping scrollTop under a shrinking list. Momentum
+  // keeps delivering scroll events long after the gesture, but following is already off by then, and
+  // every new gesture re-arms this.
+  let userDriven = false
+  const noteInput = () => {
+    userDriven = true
+  }
   const pin = () => {
     const element = scrollElement()
     if (!element) return
@@ -78,12 +87,12 @@ export default function AgentTranscript(props: {
   const noteScroll = () => {
     const element = scrollElement()
     if (!element) return
-    // Our own writes echo back as scroll events. Reading near-bottom off one is a trap: the list has
-    // usually grown again by the time it arrives, so the write we just made now measures as "scrolled up"
-    // and following would switch itself off. Only a scroll we did not make counts.
+    // Our own writes echo back as scroll events, by which time the list has usually grown again, so the
+    // write we just made would measure as "scrolled up". Skip them.
     if (element.scrollTop === applied) return
     target = null
-    following = nearBottom(element)
+    following = nextFollowing({ following, nearBottom: nearBottom(element), userDriven })
+    userDriven = false
     if (following) scrollTopBySession.delete(viewId())
     else scrollTopBySession.set(viewId(), element.scrollTop)
   }
@@ -148,6 +157,10 @@ export default function AgentTranscript(props: {
           growth.observe(element)
         }}
         onScroll={noteScroll}
+        onWheel={noteInput}
+        onTouchMove={noteInput}
+        onPointerDown={noteInput}
+        onKeyDown={noteInput}
       >
         <Show
           when={items().length}
