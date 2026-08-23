@@ -44,8 +44,11 @@ export type HelperOptions = {
   // endpoint, certificate and token are all new, so whatever is rendering has to start over.
   onNodeReplaced?(): void
   // The crash budget is spent and this helper has stopped trying. The shell shows the recovery screen;
-  // `retry()` is how the owner's answer comes back. Nothing else clears the block.
-  onCrashBudgetExhausted(): void
+  // `retry()` is how the owner's answer comes back. Nothing else clears the block. `reason` is why the
+  // last attempt failed, when the service said anything: the recovery screen is the only place an owner sees
+  // this, and "another node already holds this data root" is the difference between a five-minute fix
+  // and a mystery.
+  onCrashBudgetExhausted(reason?: string): void
 }
 
 export type Helper = {
@@ -79,13 +82,20 @@ export function createHelper(options: HelperOptions): Helper {
   const crashTimes: number[] = []
   const tokens = deviceTokens(userDataDir, options.tokenCipher)
 
+  // Why the last start attempt failed, for the recovery screen. Reset by `start()` so a fixed problem
+  // cannot be reported as the cause of a later, different one.
+  let lastFailure: string | undefined
+
   const service = new ServiceHost(options.serviceEntry, options.service, {
     stateChanged: (state: ServiceState, detail?: string) => {
       console.log(`[service-host] ${state}${detail ? `: ${detail}` : ''}`)
+      if (state === 'failed' && detail) lastFailure = detail
     },
     unexpectedExit: (code) => {
       if (!booted || disposed) return
       console.error(`[service-host] service exited unexpectedly with code ${code}`)
+      // Only if the service did not already say why: its own message beats an exit code every time.
+      lastFailure ??= `the background service exited with code ${code}`
       void recover()
     },
   })
@@ -158,6 +168,7 @@ export function createHelper(options: HelperOptions): Helper {
   // crash recovery: a restart must not mint a new device row, and the endpoint can change across
   // restarts, so the caller always takes the fresh result rather than caching the first one.
   const start = async (): Promise<ServiceStartResult> => {
+    lastFailure = undefined
     const started = await service.start(tokens.read(LOCAL_TOKEN_SCOPE))
     adoptLocalNode(started)
     return started
@@ -210,7 +221,7 @@ export function createHelper(options: HelperOptions): Helper {
     const decision = recordCrash(crashTimes, Date.now())
     // Left blocked on purpose: `recovering` stays true until `retry()` clears it, so nothing restarts
     // behind the recovery screen.
-    if (!decision.retry) return void options.onCrashBudgetExhausted()
+    if (!decision.retry) return void options.onCrashBudgetExhausted(lastFailure)
     try {
       await wait(decision.delayMs)
       await start()
@@ -218,6 +229,9 @@ export function createHelper(options: HelperOptions): Helper {
       console.log('[service-host] background service recovered')
     } catch (error) {
       console.error('[service-host] recovery failed:', error)
+      // A rejected `start()` never spawned a child, so no state event carried a reason. This is the
+      // taken-port and locked-data-root case, which is exactly the one worth naming on the screen.
+      lastFailure ??= error instanceof Error ? error.message : String(error)
       await service.stop()
       recovering = false
       void recover()

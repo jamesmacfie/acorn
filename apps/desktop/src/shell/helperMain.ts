@@ -122,7 +122,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     // Electron reloads the window from main; here the renderer is told and reloads itself. Same
     // meaning either way: the node it was talking to has a new endpoint, certificate and token.
     onNodeReplaced: () => server?.push({ push: 'node-replaced' }),
-    onCrashBudgetExhausted: () => emit('crash-budget-exhausted'),
+    onCrashBudgetExhausted: (reason) => emit('crash-budget-exhausted', reason ? { reason } : undefined),
     tunnelEvents: {
       opened: (port, secret) => emit('tunnel-opened', { port, secret }),
       closed: (port) => emit('tunnel-closed', { port }),

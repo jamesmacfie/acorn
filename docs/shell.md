@@ -104,7 +104,9 @@ persists whatever device token the node ended up using and reuses it on every st
 included, since a restart must not mint a new device row and the node's endpoint can change between
 restarts. The recovery screen is a native dialog, because the shell that would render it is behind
 the gate it is about to show; its Retry button forgives the spent budget, since an owner asking for a
-retry may have just freed the port.
+retry may have just freed the port. It also names why the last attempt failed, when the service said
+anything — another node already holding the data root, a port it could not bind — because those
+messages go to stderr, and the dialog is the only place an owner would ever read them.
 
 The node owns SQLite, migrations, HTTP and WebSocket listeners, PTYs, tmux, worktrees, Git,
 processes, workflows, Docker, provider clients, reconciliation, and shutdown draining. Quit asks it

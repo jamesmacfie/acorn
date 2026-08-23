@@ -225,7 +225,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
             },
         },
         move |signal| match signal {
-            Signal::CrashBudgetExhausted => show_recovery(&handle),
+            Signal::CrashBudgetExhausted { reason } => show_recovery(&handle, reason.as_deref()),
             // The credential for a preview tunnel, held by the shell so it can be seeded into the
             // pane's cookie store. Never forwarded to the renderer (src/webviews.rs).
             Signal::TunnelOpened { port, secret } => handle.state::<Webviews<tauri::Wry>>().tunnel_opened(port, secret),
@@ -352,13 +352,17 @@ fn tauri_platform() -> &'static str {
 
 /// The crash budget is spent and the helper has stopped trying. Native, because the shell that would
 /// render this is behind the very gate it is about to show.
-fn show_recovery(app: &tauri::AppHandle) {
+fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
     let Some(shell) = app.try_state::<Shell>() else { return };
     let data_dir = shell.data_dir.clone();
+    // Whatever the service said about the last attempt. Most of the causes name their own fix — another
+    // node already holds this data root, a taken port, a file the owner cannot read — and this dialog
+    // is the only place the owner sees them, because the messages themselves go to stderr.
+    let because = reason.map(|reason| format!("\n\nThe last attempt failed: {reason}")).unwrap_or_default();
     let answer = app
         .dialog()
         .message(format!(
-            "It restarted five times in ten minutes, so acorn stopped trying. Your data is untouched — acorn never creates a fresh data root to recover.\n\n{}",
+            "It restarted five times in ten minutes, so acorn stopped trying. Your data is untouched — acorn never creates a fresh data root to recover.{because}\n\n{}",
             data_dir.display()
         ))
         .kind(MessageDialogKind::Error)
@@ -378,7 +382,8 @@ fn show_recovery(app: &tauri::AppHandle) {
     // A look-at-it action, not an answer to "what should acorn do now", so it asks again afterwards.
     let _ = tauri_plugin_opener::reveal_item_in_dir(&data_dir);
     let handle = app.clone();
-    std::thread::spawn(move || show_recovery(&handle));
+    let reason = reason.map(str::to_string);
+    std::thread::spawn(move || show_recovery(&handle, reason.as_deref()));
 }
 
 /// Kept honest by the same rule Electron's is: the origin the window loads and the origin the helper
